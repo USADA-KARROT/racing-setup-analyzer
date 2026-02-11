@@ -102,6 +102,24 @@ canvas{max-height:300px}
         </div>
       </template>
     </div>
+    <!-- OEM Tire Specs Detail -->
+    <template x-if="streetCarDetail?.oem_tire_specs">
+      <div class="mt-3 p-3 rounded-lg bg-slate-800/50 border border-white/5">
+        <div class="text-[10px] font-semibold text-slate-400 mb-2">🛞 OEM 輪胎規格 → 彈簧率估算</div>
+        <div class="grid grid-cols-2 gap-4 text-xs">
+          <div>
+            <span class="text-slate-500">前輪</span>
+            <span class="text-slate-300 ml-1" x-text="streetCarDetail.oem_tire_specs.front.width + '/' + streetCarDetail.oem_tire_specs.front.aspect + ' R' + streetCarDetail.oem_tire_specs.front.rim"></span>
+            <span class="text-sky-400 ml-2" x-text="'≈ ' + api.estimateTireSpring(streetCarDetail.oem_tire_specs.front.width, streetCarDetail.oem_tire_specs.front.aspect) + ' N/mm'"></span>
+          </div>
+          <div>
+            <span class="text-slate-500">後輪</span>
+            <span class="text-slate-300 ml-1" x-text="streetCarDetail.oem_tire_specs.rear.width + '/' + streetCarDetail.oem_tire_specs.rear.aspect + ' R' + streetCarDetail.oem_tire_specs.rear.rim"></span>
+            <span class="text-sky-400 ml-2" x-text="'≈ ' + api.estimateTireSpring(streetCarDetail.oem_tire_specs.rear.width, streetCarDetail.oem_tire_specs.rear.aspect) + ' N/mm'"></span>
+          </div>
+        </div>
+      </div>
+    </template>
     <!-- Data confidence badges -->
     <template x-if="streetCarDetail?.confidence">
       <div class="flex gap-2 mt-3 flex-wrap">
@@ -216,21 +234,103 @@ canvas{max-height:300px}
           <div class="mt-3">
             <button class="text-[10px] text-slate-500 hover:text-slate-300 flex items-center gap-1" @click="showAdvancedT1=!showAdvancedT1">
               <span x-text="showAdvancedT1 ? '▼' : '▶'"></span>
-              進階參數（輪胎彈性、Roll Center）
+              進階參數（輪胎彈性、Roll Center、輪圈升級）
             </button>
-            <div x-show="showAdvancedT1" x-transition class="grid grid-cols-3 gap-2 mt-2 text-sm">
-              <div>
-                <label class="text-xs text-slate-400">輪胎彈簧率 (N/mm)</label>
-                <input type="number" x-model.number="pred.tire_spring_rate" class="w-full mt-1" step="10">
+            <div x-show="showAdvancedT1" x-transition class="mt-2 text-sm space-y-3">
+              <div class="grid grid-cols-3 gap-2">
+                <div>
+                  <label class="text-xs text-slate-400">輪胎彈簧率 (N/mm)</label>
+                  <input type="number" x-model.number="pred.tire_spring_rate" class="w-full mt-1" step="10">
+                  <div class="text-[10px] text-slate-600 mt-0.5" x-show="streetCarDetail?.oem_tire_specs" x-text="'OEM 估算: F ' + wheelUpgrade.oem_front_spring + ' / R ' + wheelUpgrade.oem_rear_spring + ' N/mm'"></div>
+                </div>
+                <div>
+                  <label class="text-xs text-slate-400">前 RC 高度 (mm)</label>
+                  <input type="number" x-model.number="pred.front_roll_center_height" class="w-full mt-1" step="5">
+                </div>
+                <div>
+                  <label class="text-xs text-slate-400">後 RC 高度 (mm)</label>
+                  <input type="number" x-model.number="pred.rear_roll_center_height" class="w-full mt-1" step="5">
+                </div>
               </div>
-              <div>
-                <label class="text-xs text-slate-400">前 RC 高度 (mm)</label>
-                <input type="number" x-model.number="pred.front_roll_center_height" class="w-full mt-1" step="5">
-              </div>
-              <div>
-                <label class="text-xs text-slate-400">後 RC 高度 (mm)</label>
-                <input type="number" x-model.number="pred.rear_roll_center_height" class="w-full mt-1" step="5">
-              </div>
+              <!-- Wheel Upgrade Section -->
+              <template x-if="streetCarDetail?.oem_tire_specs">
+                <div class="p-3 rounded-lg bg-slate-800/50 border border-white/5">
+                  <div class="flex items-center gap-2 mb-2">
+                    <label class="flex items-center gap-1 cursor-pointer">
+                      <input type="checkbox" x-model="wheelUpgrade.enabled" @change="applyWheelUpgrade()" class="rounded bg-slate-700 border-slate-600">
+                      <span class="text-xs font-semibold text-slate-300">🔧 模擬輪圈升級</span>
+                    </label>
+                    <span class="text-[10px] text-slate-500">（保持外徑不變，自動重算扁平比與彈簧率）</span>
+                  </div>
+                  <div x-show="wheelUpgrade.enabled" x-transition>
+                    <div class="grid grid-cols-2 gap-4">
+                      <!-- Front wheel -->
+                      <div class="space-y-1">
+                        <div class="text-[10px] text-slate-500 font-semibold">前輪</div>
+                        <div class="text-[10px] text-slate-600" x-text="'OEM: ' + streetCarDetail.oem_tire_specs.front.width + '/' + streetCarDetail.oem_tire_specs.front.aspect + ' R' + streetCarDetail.oem_tire_specs.front.rim"></div>
+                        <div class="grid grid-cols-2 gap-1">
+                          <div>
+                            <label class="text-[10px] text-slate-500">輪圈 (吋)</label>
+                            <select x-model.number="wheelUpgrade.front_rim" @change="applyWheelUpgrade()" class="w-full text-xs">
+                              <template x-for="r in api.suggestRimSizes(streetCarDetail.oem_tire_specs.front.rim)" :key="'fr'+r">
+                                <option :value="r" x-text="r + '\"' + (r===streetCarDetail.oem_tire_specs.front.rim?' (OEM)':'')"></option>
+                              </template>
+                            </select>
+                          </div>
+                          <div>
+                            <label class="text-[10px] text-slate-500">胎寬 (mm)</label>
+                            <input type="number" x-model.number="wheelUpgrade.front_width" @change="applyWheelUpgrade()" class="w-full text-xs" step="5">
+                          </div>
+                        </div>
+                        <template x-if="wheelUpgrade.front_result && !wheelUpgrade.front_result.error">
+                          <div class="text-[10px] p-1.5 rounded bg-slate-900/50 space-y-0.5">
+                            <div class="text-slate-300">→ <span x-text="wheelUpgrade.front_width + '/' + wheelUpgrade.front_result.aspect + ' R' + wheelUpgrade.front_rim"></span></div>
+                            <div class="text-sky-400">彈簧率: <span x-text="wheelUpgrade.front_result.spring_rate"></span> N/mm</div>
+                            <div class="text-slate-500">胎壁: <span x-text="wheelUpgrade.front_result.sidewall_height"></span>mm (<span x-text="wheelUpgrade.front_result.sidewall_change_pct > 0 ? '+' : ''"></span><span x-text="wheelUpgrade.front_result.sidewall_change_pct"></span>%)</div>
+                          </div>
+                        </template>
+                        <template x-if="wheelUpgrade.front_result?.error">
+                          <div class="text-[10px] text-red-400 p-1" x-text="wheelUpgrade.front_result.message"></div>
+                        </template>
+                      </div>
+                      <!-- Rear wheel -->
+                      <div class="space-y-1">
+                        <div class="text-[10px] text-slate-500 font-semibold">後輪</div>
+                        <div class="text-[10px] text-slate-600" x-text="'OEM: ' + streetCarDetail.oem_tire_specs.rear.width + '/' + streetCarDetail.oem_tire_specs.rear.aspect + ' R' + streetCarDetail.oem_tire_specs.rear.rim"></div>
+                        <div class="grid grid-cols-2 gap-1">
+                          <div>
+                            <label class="text-[10px] text-slate-500">輪圈 (吋)</label>
+                            <select x-model.number="wheelUpgrade.rear_rim" @change="applyWheelUpgrade()" class="w-full text-xs">
+                              <template x-for="r in api.suggestRimSizes(streetCarDetail.oem_tire_specs.rear.rim)" :key="'rr'+r">
+                                <option :value="r" x-text="r + '\"' + (r===streetCarDetail.oem_tire_specs.rear.rim?' (OEM)':'')"></option>
+                              </template>
+                            </select>
+                          </div>
+                          <div>
+                            <label class="text-[10px] text-slate-500">胎寬 (mm)</label>
+                            <input type="number" x-model.number="wheelUpgrade.rear_width" @change="applyWheelUpgrade()" class="w-full text-xs" step="5">
+                          </div>
+                        </div>
+                        <template x-if="wheelUpgrade.rear_result && !wheelUpgrade.rear_result.error">
+                          <div class="text-[10px] p-1.5 rounded bg-slate-900/50 space-y-0.5">
+                            <div class="text-slate-300">→ <span x-text="wheelUpgrade.rear_width + '/' + wheelUpgrade.rear_result.aspect + ' R' + wheelUpgrade.rear_rim"></span></div>
+                            <div class="text-sky-400">彈簧率: <span x-text="wheelUpgrade.rear_result.spring_rate"></span> N/mm</div>
+                            <div class="text-slate-500">胎壁: <span x-text="wheelUpgrade.rear_result.sidewall_height"></span>mm (<span x-text="wheelUpgrade.rear_result.sidewall_change_pct > 0 ? '+' : ''"></span><span x-text="wheelUpgrade.rear_result.sidewall_change_pct"></span>%)</div>
+                          </div>
+                        </template>
+                        <template x-if="wheelUpgrade.rear_result?.error">
+                          <div class="text-[10px] text-red-400 p-1" x-text="wheelUpgrade.rear_result.message"></div>
+                        </template>
+                      </div>
+                    </div>
+                    <!-- Apply to prediction button -->
+                    <div class="mt-2 flex items-center gap-2">
+                      <button class="text-[10px] px-3 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white" @click="applyWheelSpringRate()">套用升級後彈簧率到預測</button>
+                      <button class="text-[10px] px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300" @click="resetWheelUpgrade()">恢復 OEM</button>
+                    </div>
+                  </div>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -1514,6 +1614,42 @@ canvas{max-height:300px}
           </div>
         </div>
 
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Tire Spring Rate 輪胎彈簧率</span>
+            <span class="badge badge-b">N/mm</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            輪胎本身的垂直剛性，等同於一個串聯在懸吊彈簧下方的「額外彈簧」。<br>
+            <strong>為什麼重要：</strong>輪胎彈簧率與懸吊彈簧串聯後，有效彈簧率 = 1/(1/K_spring + 1/K_tire)，直接影響 Ride Frequency 和 Roll Stiffness。<br>
+            <strong>如何取得：</strong>輪胎廠商極少公開此數值。本系統使用經驗公式自動估算：<br>
+            <span class="text-sky-400">K_tire ≈ 基準值 × (基準扁平比/實際扁平比) × (實際胎寬/基準胎寬)^0.3</span><br>
+            <span class="text-slate-500">
+              <strong>扁平比越低 → 胎壁越薄越硬 → 彈簧率越高</strong>。典型值：<br>
+              55 扁平比 ≈ 180-220 N/mm（舒適街胎）<br>
+              45 扁平比 ≈ 220-260 N/mm（運動街胎）<br>
+              40 扁平比 ≈ 250-290 N/mm（高性能胎）<br>
+              35 扁平比 ≈ 280-340 N/mm（超跑低扁平比）<br>
+              30 扁平比 ≈ 320-400 N/mm（極低扁平比）<br>
+              基準值：205/55R16 ≈ 220 N/mm
+            </span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Wheel Upgrade 輪圈升級</span>
+            <span class="badge badge-g">模擬</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            更換較大的輪圈（例如 17" → 18"），通常搭配更低扁平比的輪胎以保持外徑不變。<br>
+            <strong>影響：</strong><br>
+            <span class="text-sky-400">✅ 輪圈加大 → 扁平比降低 → 胎壁更硬 → 彈簧率上升 → 反應更快、側傾更小</span><br>
+            <span class="text-red-400">⚠️ 彈簧率上升 → Ride Frequency 升高 → 舒適性降低、可能過硬</span><br>
+            <span class="text-slate-500">本系統的「輪圈升級模擬」功能會自動計算外徑不變下的新扁平比，以及對應的彈簧率變化。</span>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -1706,6 +1842,14 @@ function app(){return{
   ggChartObj:null,
   // Corner weight canvas
   cwCanvasDrawn:false,
+  // Wheel upgrade
+  wheelUpgrade:{
+    enabled:false,
+    front_rim:18, rear_rim:18,
+    front_width:225, rear_width:225,
+    front_result:null, rear_result:null,
+    oem_front_spring:220, oem_rear_spring:220,
+  },
 
   get resultLabel(){
     if(!this.result) return '';
@@ -1820,6 +1964,26 @@ function app(){return{
     const rwMatch = oemSize.match(/R:\s*(\d+)\//);
     this.tire.front_tire_width = fwMatch ? parseInt(fwMatch[1]) : 0;
     this.tire.rear_tire_width = rwMatch ? parseInt(rwMatch[1]) : 0;
+    // 從 OEM 輪胎規格自動估算彈簧率
+    const specs = d.oem_tire_specs;
+    if (specs) {
+      const fSpring = api.estimateTireSpring(specs.front.width, specs.front.aspect);
+      const rSpring = api.estimateTireSpring(specs.rear.width, specs.rear.aspect);
+      this.pred.tire_spring_rate = Math.round((fSpring + rSpring) / 2);
+      this.wheelUpgrade.oem_front_spring = fSpring;
+      this.wheelUpgrade.oem_rear_spring = rSpring;
+      // 初始化換框預設值
+      this.wheelUpgrade.front_rim = specs.front.rim;
+      this.wheelUpgrade.rear_rim = specs.rear.rim;
+      this.wheelUpgrade.front_width = specs.front.width;
+      this.wheelUpgrade.rear_width = specs.rear.width;
+      this.wheelUpgrade.enabled = false;
+      this.wheelUpgrade.front_result = null;
+      this.wheelUpgrade.rear_result = null;
+      // 同步胎寬（若 OEM 規格有）
+      this.tire.front_tire_width = specs.front.width;
+      this.tire.rear_tire_width = specs.rear.width;
+    }
     // Apply geometry defaults
     const g = d.geometry_defaults || {};
     this.adv.front_camber_deg = g.front_camber_deg || -1.5;
@@ -1865,6 +2029,38 @@ function app(){return{
     this.adv.front_rebound_force = dd.front_rebound_force;
     this.adv.rear_bump_force = dd.rear_bump_force;
     this.adv.rear_rebound_force = dd.rear_rebound_force;
+  },
+
+  applyWheelUpgrade(){
+    if(!this.streetCarDetail?.oem_tire_specs) return;
+    const specs = this.streetCarDetail.oem_tire_specs;
+    this.wheelUpgrade.front_result = api.calcWheelUpgrade(specs.front, this.wheelUpgrade.front_rim, this.wheelUpgrade.front_width);
+    this.wheelUpgrade.rear_result = api.calcWheelUpgrade(specs.rear, this.wheelUpgrade.rear_rim, this.wheelUpgrade.rear_width);
+  },
+
+  applyWheelSpringRate(){
+    const fr = this.wheelUpgrade.front_result;
+    const rr = this.wheelUpgrade.rear_result;
+    if(fr && !fr.error && rr && !rr.error){
+      this.pred.tire_spring_rate = Math.round((fr.spring_rate + rr.spring_rate) / 2);
+      // 更新胎寬
+      this.tire.front_tire_width = this.wheelUpgrade.front_width;
+      this.tire.rear_tire_width = this.wheelUpgrade.rear_width;
+    }
+  },
+
+  resetWheelUpgrade(){
+    if(!this.streetCarDetail?.oem_tire_specs) return;
+    const specs = this.streetCarDetail.oem_tire_specs;
+    this.wheelUpgrade.front_rim = specs.front.rim;
+    this.wheelUpgrade.rear_rim = specs.rear.rim;
+    this.wheelUpgrade.front_width = specs.front.width;
+    this.wheelUpgrade.rear_width = specs.rear.width;
+    this.wheelUpgrade.front_result = null;
+    this.wheelUpgrade.rear_result = null;
+    this.pred.tire_spring_rate = Math.round((this.wheelUpgrade.oem_front_spring + this.wheelUpgrade.oem_rear_spring) / 2);
+    this.tire.front_tire_width = specs.front.width;
+    this.tire.rear_tire_width = specs.rear.width;
   },
 
   switchTier(t){
