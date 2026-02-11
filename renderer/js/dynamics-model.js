@@ -18,6 +18,7 @@
 // ============================================================
 const G = 9.81;        // m/s²
 const RHO_AIR = 1.225; // kg/m³ at sea level 20°C
+const G_STEEL = 80000; // MPa (shear modulus of steel, for ARB calculation)
 
 // ============================================================
 // Utility: round to N decimal places
@@ -83,9 +84,23 @@ class Tier1BasicBalance {
       rWr = this.wheelRate(p.rear_spring_rate, rMr);
     }
 
-    // Roll stiffness from springs
-    const fRsSpring = this.rollStiffnessSpring(fWr, p.front_track);
-    const rRsSpring = this.rollStiffnessSpring(rWr, p.rear_track);
+    // Effective wheel rate (spring in series with tire)
+    const tireK = p.tire_spring_rate ?? 220; // N/mm default
+    let fWrEff, rWrEff;
+    if (tireK > 0 && fWr > 0) {
+      fWrEff = 1.0 / (1.0 / tireK + 1.0 / fWr);
+    } else {
+      fWrEff = fWr;
+    }
+    if (tireK > 0 && rWr > 0) {
+      rWrEff = 1.0 / (1.0 / tireK + 1.0 / rWr);
+    } else {
+      rWrEff = rWr;
+    }
+
+    // Roll stiffness from springs (using effective wheel rate)
+    const fRsSpring = this.rollStiffnessSpring(fWrEff, p.front_track);
+    const rRsSpring = this.rollStiffnessSpring(rWrEff, p.rear_track);
 
     // Add ARB contribution
     const fArb = p.front_arb ?? 0;
@@ -99,17 +114,61 @@ class Tier1BasicBalance {
 
     // Weight distribution
     const wFrontPct = p.weight_front_pct ?? 50.0;
-
-    // Roll gradient (deg/g)
     const totalWeight = p.total_weight ?? 1000;
     const cgHeight = (p.cg_height ?? 300) / 1000; // to meters
+
+    // Roll gradient (deg/g)
     let rollGradient = 0;
     if (totalRs > 0) {
       rollGradient = (totalWeight * G * cgHeight) / (totalRs * 180 / Math.PI);
     }
 
-    // LLTD (Lateral Load Transfer Distribution)
-    const lltdFront = rsDistFront;
+    // === Ride Frequency ===
+    const sprungMassFront = (totalWeight * wFrontPct / 100) / 2; // per corner
+    const sprungMassRear = (totalWeight * (100 - wFrontPct) / 100) / 2;
+    let rideFreqFront = 0, rideFreqRear = 0;
+    if (sprungMassFront > 0 && fWrEff > 0) {
+      rideFreqFront = 1 / (2 * Math.PI) * Math.sqrt(fWrEff * 1000 / sprungMassFront);
+    }
+    if (sprungMassRear > 0 && rWrEff > 0) {
+      rideFreqRear = 1 / (2 * Math.PI) * Math.sqrt(rWrEff * 1000 / sprungMassRear);
+    }
+
+    function rideFreqCategory(hz) {
+      if (hz < 1.5) return 'comfort';
+      if (hz < 2.5) return 'street';
+      if (hz < 3.5) return 'track';
+      return 'race';
+    }
+
+    // === Decomposed LLTD (Geometric + Elastic) ===
+    const hRcF = (p.front_roll_center_height ?? 50) / 1000; // m
+    const hRcR = (p.rear_roll_center_height ?? 100) / 1000;
+    const tF = (p.front_track ?? 1500) / 1000; // m
+    const tR = (p.rear_track ?? 1500) / 1000;
+    const mF = totalWeight * wFrontPct / 100;
+    const mR = totalWeight * (100 - wFrontPct) / 100;
+
+    // Geometric load transfer (per g)
+    const dFzGeoF = mF * hRcF / tF;
+    const dFzGeoR = mR * hRcR / tR;
+
+    // Elastic load transfer (through springs/ARBs, per g)
+    const rollMomentArm = mF * (cgHeight - hRcF) + mR * (cgHeight - hRcR);
+    let dFzElasticF = 0, dFzElasticR = 0;
+    if (totalRs > 0) {
+      dFzElasticF = (fRsTotal / totalRs) * rollMomentArm / tF;
+      dFzElasticR = (rRsTotal / totalRs) * rollMomentArm / tR;
+    }
+
+    const totalDFzF = dFzGeoF + dFzElasticF;
+    const totalDFzR = dFzGeoR + dFzElasticR;
+    const totalDFz = totalDFzF + totalDFzR;
+    const lltdDecomposedFront = totalDFz > 0 ? (totalDFzF / totalDFz * 100) : 50;
+    const geoPctOfTotal = totalDFz > 0 ? ((dFzGeoF + dFzGeoR) / totalDFz * 100) : 0;
+
+    // Use decomposed LLTD as the real LLTD
+    const lltdFront = lltdDecomposedFront;
 
     // Understeer tendency
     const usGradient = lltdFront - wFrontPct;
@@ -135,6 +194,9 @@ class Tier1BasicBalance {
       // Roll stiffness
       front_wheel_rate: roundN(fWr, 1),
       rear_wheel_rate: roundN(rWr, 1),
+      front_wheel_rate_effective: roundN(fWrEff, 1),
+      rear_wheel_rate_effective: roundN(rWrEff, 1),
+      tire_spring_rate: tireK,
       front_roll_stiffness_spring: roundN(fRsSpring, 1),
       rear_roll_stiffness_spring: roundN(rRsSpring, 1),
       front_roll_stiffness_total: roundN(fRsTotal, 1),
@@ -149,6 +211,23 @@ class Tier1BasicBalance {
       understeer_normalized: roundN(usNormalized, 3),
       tendency: tendency,
       tendency_zh: tendencyZh,
+      // Ride frequency
+      ride_frequency: {
+        front_hz: roundN(rideFreqFront, 2),
+        rear_hz: roundN(rideFreqRear, 2),
+        ratio: rideFreqFront > 0 ? roundN(rideFreqRear / rideFreqFront, 3) : 0,
+        front_category: rideFreqCategory(rideFreqFront),
+        rear_category: rideFreqCategory(rideFreqRear),
+      },
+      // LLTD decomposition
+      lltd_decomposed: {
+        geometric_front: roundN(dFzGeoF, 1),
+        geometric_rear: roundN(dFzGeoR, 1),
+        elastic_front: roundN(dFzElasticF, 1),
+        elastic_rear: roundN(dFzElasticR, 1),
+        total_front_pct: roundN(lltdDecomposedFront, 1),
+        geometric_pct_of_total: roundN(geoPctOfTotal, 1),
+      },
       // Component breakdown
       breakdown: {
         spring_effect: roundN(
@@ -237,12 +316,56 @@ class TireModel {
     return roundN(Math.max(0.8, Math.min(1.25, factor)), 4);
   }
 
+  /**
+   * Tire load sensitivity: grip efficiency decreases as load increases.
+   * K_y = K * sin(2 * atan(Fz / Fz0))
+   * At Fz=Fz0: K_y ≈ 0.91K (already losing ~9% efficiency)
+   */
+  static tireLoadSensitivity(fzN, fz0N = 4000, k = 1.0) {
+    if (fzN <= 0 || fz0N <= 0) return k;
+    return k * Math.sin(2 * Math.atan(fzN / fz0N));
+  }
+
   /** Combined grip factor from temperature, pressure, and width. */
   static effectiveGrip(tireTempC, pressureBar, compound = 'medium', optimalPressure = 1.90, tireWidthMm = 0) {
     const gTemp = TireModel.gripFactorTemperature(tireTempC, compound);
     const gPres = TireModel.gripFactorPressure(pressureBar, optimalPressure);
     const gWidth = tireWidthMm > 0 ? TireModel.gripFactorWidth(tireWidthMm) : 1.0;
     return roundN(gTemp * gPres * gWidth, 4);
+  }
+}
+
+
+// ============================================================
+// Pacejka Simplified Tire Model (14-param, optional advanced model)
+// ============================================================
+class PacejkaTireModel {
+  // Default coefficients by tire category
+  static COEFFICIENTS = {
+    race:       { a1: -22.1, a2: 1011, a3: 1078, a4: 1.82, a5: 0.208, a6: 0.0, a7: -0.354, C: 1.30 },
+    semi_slick: { a1: -22.1, a2: 1011, a3: 1078, a4: 1.82, a5: 0.208, a6: 0.0, a7: -0.354, C: 1.30 },
+    sport:      { a1: -22.1, a2: 1011, a3: 900,  a4: 2.0,  a5: 0.15,  a6: 0.0, a7: -0.3,   C: 1.30 },
+  };
+
+  /**
+   * Simplified Pacejka Magic Formula lateral force.
+   * F = D * sin(C * atan(B*α - E*(B*α - atan(B*α))))
+   * @param {number} slipAngleDeg - slip angle in degrees
+   * @param {number} fzKn - vertical load in kN
+   * @param {number} camberDeg - camber angle in degrees
+   * @param {string} category - 'race'|'semi_slick'|'sport'
+   * @returns {number} lateral force in N
+   */
+  static lateralForce(slipAngleDeg, fzKn, camberDeg = 0, category = 'semi_slick') {
+    const co = PacejkaTireModel.COEFFICIENTS[category] || PacejkaTireModel.COEFFICIENTS.sport;
+    const alpha = slipAngleDeg * Math.PI / 180;
+    const C = co.C;
+    const D = (co.a1 * fzKn + co.a2) * fzKn;
+    const BCD = co.a3 * Math.sin(2 * Math.atan(fzKn / co.a4)) * (1 - co.a5 * Math.abs(camberDeg));
+    const E = co.a6 * fzKn + co.a7;
+    const B = (C * D) !== 0 ? BCD / (C * D) : 0;
+    const Ba = B * alpha;
+    return D * Math.sin(C * Math.atan(Ba - E * (Ba - Math.atan(Ba))));
   }
 }
 
@@ -340,6 +463,20 @@ class Tier2TireAware {
     const fWidthFactor = fWidth > 0 ? TireModel.gripFactorWidth(fWidth) : 1.0;
     const rWidthFactor = rWidth > 0 ? TireModel.gripFactorWidth(rWidth) : 1.0;
 
+    // Tire load sensitivity
+    const totalWeight = this.params.total_weight ?? 1000;
+    const wFrontPct = this.params.weight_front_pct ?? 50;
+    const nominalCornerLoad = totalWeight * G / 4;
+    const flLoad = (totalWeight * wFrontPct / 100 / 2) * G;
+    const rlLoad = (totalWeight * (100 - wFrontPct) / 100 / 2) * G;
+    const loadSensitivity = {
+      fl_efficiency: roundN(TireModel.tireLoadSensitivity(flLoad, nominalCornerLoad), 3),
+      fr_efficiency: roundN(TireModel.tireLoadSensitivity(flLoad, nominalCornerLoad), 3),
+      rl_efficiency: roundN(TireModel.tireLoadSensitivity(rlLoad, nominalCornerLoad), 3),
+      rr_efficiency: roundN(TireModel.tireLoadSensitivity(rlLoad, nominalCornerLoad), 3),
+      nominal_load_n: roundN(nominalCornerLoad, 0),
+    };
+
     return {
       ...t1,
       tier: 2,
@@ -354,6 +491,7 @@ class Tier2TireAware {
         front_width_factor: roundN(fWidthFactor, 4),
         rear_width_factor: roundN(rWidthFactor, 4),
       },
+      load_sensitivity: loadSensitivity,
       // Adjusted balance
       tire_us_shift: roundN(tireUsShift, 2),
       adjusted_understeer_gradient: roundN(adjustedUs, 2),
@@ -532,6 +670,112 @@ class Tier3Complete {
     damperInfo.entry_us_shift = roundN(damperUsShiftEntry, 2);
     damperInfo.exit_us_shift = roundN(damperUsShiftExit, 2);
 
+    // === Damping Ratio ===
+    const fWrEff = t2.front_wheel_rate_effective ?? t2.front_wheel_rate ?? 0;
+    const rWrEff = t2.rear_wheel_rate_effective ?? t2.rear_wheel_rate ?? 0;
+    const totalWeightT3 = this.params.total_weight ?? 1000;
+    const wFrontPctT3 = this.params.weight_front_pct ?? 50;
+    const sprungMassFrontT3 = (totalWeightT3 * wFrontPctT3 / 100) / 2;
+    const sprungMassRearT3 = (totalWeightT3 * (100 - wFrontPctT3) / 100) / 2;
+
+    // c = average damper force converted from kgf to Ns/m (approximate)
+    const fDampC = ((fBump + fRebound) / 2) * G; // kgf -> N (simplified)
+    const rDampC = ((rBump + rRebound) / 2) * G;
+    const fDampK = fWrEff * 1000; // N/mm -> N/m
+    const rDampK = rWrEff * 1000;
+
+    let dampingRatioFront = 0, dampingRatioRear = 0;
+    if (fDampK > 0 && sprungMassFrontT3 > 0) {
+      dampingRatioFront = fDampC / (2 * Math.sqrt(fDampK * sprungMassFrontT3));
+    }
+    if (rDampK > 0 && sprungMassRearT3 > 0) {
+      dampingRatioRear = rDampC / (2 * Math.sqrt(rDampK * sprungMassRearT3));
+    }
+
+    function dampingCategory(z) {
+      if (z < 0.3) return 'underdamped';
+      if (z < 0.5) return 'street';
+      if (z < 0.8) return 'track';
+      return 'race';
+    }
+
+    // Roll damping ratio
+    const cgHeightT3 = (this.params.cg_height ?? 300) / 1000;
+    const rollMOI = 0.5 * totalWeightT3 * Math.pow(cgHeightT3, 2);
+    const totalRsNmRad = (t2.total_roll_stiffness ?? 0) * 180 / Math.PI;
+    const critRollDamping = (totalRsNmRad > 0 && rollMOI > 0) ? Math.sqrt(totalRsNmRad * rollMOI) : 0;
+    const fTrack = (this.params.front_track ?? 1500) / 1000;
+    const rTrack = (this.params.rear_track ?? 1500) / 1000;
+    const actualRollDamping = (fDampC * Math.pow(fTrack / 2, 2) + rDampC * Math.pow(rTrack / 2, 2)) * Math.PI / 180;
+    const rollDampingRatio = critRollDamping > 0 ? actualRollDamping / (2 * critRollDamping) : 0;
+
+    const dampingInfo = {
+      front_ratio: roundN(dampingRatioFront, 3),
+      rear_ratio: roundN(dampingRatioRear, 3),
+      front_category: dampingCategory(dampingRatioFront),
+      rear_category: dampingCategory(dampingRatioRear),
+      roll_damping_ratio: roundN(rollDampingRatio, 3),
+    };
+
+    // === Longitudinal Weight Transfer ===
+    const brakingG = ap.braking_g ?? 0;
+    const accelG = ap.accel_g ?? 0;
+    const wheelbaseM = (this.params.wheelbase ?? 2700) / 1000;
+    const longTransfer = {};
+
+    if (brakingG > 0) {
+      const dFzBrake = totalWeightT3 * brakingG * cgHeightT3 / wheelbaseM;
+      const frontUnderBrake = (totalWeightT3 * wFrontPctT3 / 100) + dFzBrake;
+      const rearUnderBrake = (totalWeightT3 * (100 - wFrontPctT3) / 100) - dFzBrake;
+      longTransfer.braking = {
+        transfer_kg: roundN(dFzBrake, 1),
+        front_pct: roundN(frontUnderBrake / totalWeightT3 * 100, 1),
+        rear_pct: roundN(rearUnderBrake / totalWeightT3 * 100, 1),
+      };
+    }
+    if (accelG > 0) {
+      const dFzAccel = totalWeightT3 * accelG * cgHeightT3 / wheelbaseM;
+      const frontUnderAccel = (totalWeightT3 * wFrontPctT3 / 100) - dFzAccel;
+      const rearUnderAccel = (totalWeightT3 * (100 - wFrontPctT3) / 100) + dFzAccel;
+      longTransfer.acceleration = {
+        transfer_kg: roundN(dFzAccel, 1),
+        front_pct: roundN(frontUnderAccel / totalWeightT3 * 100, 1),
+        rear_pct: roundN(rearUnderAccel / totalWeightT3 * 100, 1),
+      };
+    }
+
+    // === Slip Angle & Yaw Dynamics ===
+    const mFT3 = totalWeightT3 * wFrontPctT3 / 100;
+    const mRT3 = totalWeightT3 * (100 - wFrontPctT3) / 100;
+    // Cornering stiffness estimate (N/deg) ≈ load * 0.12
+    const cAlphaF = mFT3 * G * 0.12;
+    const cAlphaR = mRT3 * G * 0.12;
+    const slipAngleFront = cAlphaF > 0 ? (mFT3 * G / cAlphaF) * (180 / Math.PI) : 0;
+    const slipAngleRear = cAlphaR > 0 ? (mRT3 * G / cAlphaR) * (180 / Math.PI) : 0;
+
+    // Characteristic speed (understeer only, K_us > 0)
+    const usGradRad = (t2.understeer_gradient ?? 0) * Math.PI / 180; // deg -> rad
+    let charSpeed = 0;
+    if (usGradRad > 0) {
+      charSpeed = Math.sqrt(G * wheelbaseM / usGradRad) * 3.6; // m/s -> km/h
+    }
+
+    // Yaw gain at reference speed (100 km/h)
+    const refSpeedMs = 100 / 3.6;
+    let yawGain = 0;
+    if (wheelbaseM > 0) {
+      const kUsVal = usGradRad;
+      yawGain = refSpeedMs / (wheelbaseM * (1 + kUsVal * Math.pow(refSpeedMs, 2) / G));
+    }
+
+    const dynamicsInfo = {
+      slip_angle_front_deg: roundN(slipAngleFront, 2),
+      slip_angle_rear_deg: roundN(slipAngleRear, 2),
+      first_saturates: slipAngleFront > slipAngleRear ? 'front' : 'rear',
+      characteristic_speed_kmh: charSpeed > 0 ? roundN(charSpeed, 0) : null,
+      yaw_gain_at_100kmh: roundN(yawGain, 3),
+    };
+
     // === Camber & Toe ===
     const fCamber = ap.front_camber_deg ?? -3.0;
     const rCamber = ap.rear_camber_deg ?? -2.0;
@@ -610,6 +854,10 @@ class Tier3Complete {
         lltd_front: t2.lltd_front,
         weight_front_pct: t2.weight_front_pct,
         mechanical_us: roundN(mechanicalUs, 2),
+        front_wheel_rate_effective: t2.front_wheel_rate_effective,
+        rear_wheel_rate_effective: t2.rear_wheel_rate_effective,
+        ride_frequency: t2.ride_frequency,
+        lltd_decomposed: t2.lltd_decomposed,
       },
       tire: t2.tire_grip || {},
       tire_us_shift: roundN(tireUs, 2),
@@ -618,6 +866,10 @@ class Tier3Complete {
       damper: damperInfo,
       geometry: geometryInfo,
       bump_rubber: brInfo,
+      damping: dampingInfo,
+      longitudinal_transfer: longTransfer,
+      dynamics: dynamicsInfo,
+      load_sensitivity: t2.load_sensitivity || {},
       // Final combined predictions
       prediction: {
         steady_state: {
@@ -742,6 +994,16 @@ function compareWithBaseline(tier, baselineInputs, currentInputs) {
     delta.roll_stiffness_dist_front = roundN(cRsd - bRsd, 2);
   }
 
+  // Ride frequency delta (available in all tiers)
+  const bRf = b.ride_frequency ?? (b.mechanical ? b.mechanical.ride_frequency : null);
+  const cRf = c.ride_frequency ?? (c.mechanical ? c.mechanical.ride_frequency : null);
+  if (bRf && cRf) {
+    delta.ride_frequency = {
+      front_hz: roundN(cRf.front_hz - bRf.front_hz, 2),
+      rear_hz: roundN(cRf.rear_hz - bRf.rear_hz, 2),
+    };
+  }
+
   // Tier 2+: tire grip delta
   if (tier >= 2) {
     let bTire = tier === 3 ? (b.tire || {}) : (b.tire_grip || {});
@@ -779,6 +1041,24 @@ function compareWithBaseline(tier, baselineInputs, currentInputs) {
       contDelta[k] = roundN((cCont[k] ?? 0) - (bCont[k] ?? 0), 3);
     }
     delta.contribution = contDelta;
+
+    // Damping ratio delta
+    if (b.damping && c.damping) {
+      delta.damping = {
+        front_ratio: roundN(c.damping.front_ratio - b.damping.front_ratio, 3),
+        rear_ratio: roundN(c.damping.rear_ratio - b.damping.rear_ratio, 3),
+        roll_damping_ratio: roundN(c.damping.roll_damping_ratio - b.damping.roll_damping_ratio, 3),
+      };
+    }
+
+    // Dynamics delta
+    if (b.dynamics && c.dynamics) {
+      delta.dynamics = {
+        slip_angle_front: roundN(c.dynamics.slip_angle_front_deg - b.dynamics.slip_angle_front_deg, 2),
+        slip_angle_rear: roundN(c.dynamics.slip_angle_rear_deg - b.dynamics.slip_angle_rear_deg, 2),
+        yaw_gain: roundN(c.dynamics.yaw_gain_at_100kmh - b.dynamics.yaw_gain_at_100kmh, 3),
+      };
+    }
   }
 
   return {
