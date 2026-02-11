@@ -1067,3 +1067,423 @@ function compareWithBaseline(tier, baselineInputs, currentInputs) {
     delta: delta,
   };
 }
+
+
+// ============================================================
+// Setup Advisor — 調校建議引擎
+// 14 條規則，根據計算結果產生優先級建議
+// ============================================================
+class SetupAdvisor {
+
+  /**
+   * Analyze a prediction result and generate setup suggestions.
+   * @param {Object} result - Output from any Tier's calculate()
+   * @param {number} tier - 1, 2, or 3
+   * @param {Object} params - Original input params (pred object)
+   * @param {Object} [advParams] - Advanced params (Tier 3 adv object)
+   * @returns {{ suggestions: Array<{priority,category,category_zh,message,suggestion,values}>, summary: {high,medium,low,total} }}
+   */
+  static analyze(result, tier, params, advParams) {
+    if (!result) return { suggestions: [], summary: { high: 0, medium: 0, low: 0, total: 0 } };
+
+    const suggestions = [];
+    const add = (priority, category, categoryZh, message, suggestion, values) => {
+      suggestions.push({ priority, category, category_zh: categoryZh, message, suggestion: suggestion || '', values: values || {} });
+    };
+
+    // ── Rule 1: Ride Frequency ratio out of flat-ride range ──
+    const rf = result.ride_frequency || (result.mechanical?.ride_frequency);
+    if (rf && rf.front_hz > 0 && rf.rear_hz > 0) {
+      // ratio = rear/front in our model
+      const ratio = rf.ratio;
+      if (ratio < 0.80 || ratio > 1.0) {
+        const pri = (ratio < 0.75 || ratio > 1.05) ? 'high' : 'medium';
+        const targetRatio = 0.90;
+        const targetFrontHz = rf.rear_hz / targetRatio;
+        // Reverse-calculate required spring rate
+        const fMr = params.front_motion_ratio ?? 1.0;
+        const tireK = params.tire_spring_rate ?? 220;
+        const wFrontPct = params.weight_front_pct ?? 50;
+        const totalWeight = params.total_weight ?? 1000;
+        const mCorner = (totalWeight * wFrontPct / 100) / 2;
+        const kWheelNeeded = Math.pow(2 * Math.PI * targetFrontHz, 2) * mCorner / 1000;
+        // Subtract tire compliance: k_spring_wheel = 1/(1/kWheelNeeded - 1/tireK)
+        let targetSpring = kWheelNeeded;
+        if (tireK > kWheelNeeded) {
+          const kSpringWheel = 1.0 / (1.0 / kWheelNeeded - 1.0 / tireK);
+          targetSpring = kSpringWheel / Math.pow(fMr, 2);
+        }
+        add(pri, 'spring', '彈簧',
+          `前後 Ride Frequency 比值 ${roundN(ratio, 2)} 偏離 Flat Ride 範圍 (0.85-0.95)。前 ${roundN(rf.front_hz, 1)} Hz / 後 ${roundN(rf.rear_hz, 1)} Hz`,
+          `建議前彈簧率調整為 ${roundN(targetSpring, 0)} N/mm（目前 ${params.front_spring_rate} N/mm），可達到比值 ${targetRatio}`,
+          { target_front_spring: roundN(targetSpring, 1), target_ratio: targetRatio, target_front_hz: roundN(targetFrontHz, 2) }
+        );
+      }
+    }
+
+    // ── Rule 2: Ride Frequency too low for track use ──
+    if (rf && rf.front_hz > 0 && rf.rear_hz > 0) {
+      const minHz = Math.min(rf.front_hz, rf.rear_hz);
+      if (minHz < 2.0) {
+        const pri = minHz < 1.5 ? 'high' : 'medium';
+        const axle = rf.front_hz < rf.rear_hz ? '前' : '後';
+        const axleHz = Math.min(rf.front_hz, rf.rear_hz);
+        add(pri, 'spring', '彈簧',
+          `${axle}軸 Ride Frequency ${roundN(axleHz, 2)} Hz 偏低，賽道使用建議 2.0-3.5 Hz`,
+          `提高${axle}彈簧率可增加頻率。使用「彈簧計算器」可精確計算所需彈簧率`,
+          { low_axis: axle, current_hz: roundN(axleHz, 2), target_hz: 2.5 }
+        );
+      }
+    }
+
+    // ── Rule 3: Ride Frequency too high (too stiff) ──
+    if (rf) {
+      if (rf.front_hz > 4.0) {
+        add('medium', 'spring', '彈簧',
+          `前軸 Ride Frequency ${roundN(rf.front_hz, 2)} Hz 偏高（> 4.0 Hz），可能影響機械抓地力`,
+          '考慮降低前彈簧率或使用較軟的輪胎', {});
+      }
+      if (rf.rear_hz > 4.0) {
+        add('medium', 'spring', '彈簧',
+          `後軸 Ride Frequency ${roundN(rf.rear_hz, 2)} Hz 偏高（> 4.0 Hz），可能影響機械抓地力`,
+          '考慮降低後彈簧率或使用較軟的輪胎', {});
+      }
+    }
+
+    // ── Rule 4: LLTD vs weight distribution mismatch ──
+    const lltdF = result.lltd_front ?? (result.mechanical?.lltd_front);
+    const wFPct = result.weight_front_pct ?? (result.mechanical?.weight_front_pct);
+    if (lltdF != null && wFPct != null) {
+      const diff = Math.abs(lltdF - wFPct);
+      if (diff > 8) {
+        const pri = diff > 12 ? 'high' : 'medium';
+        const direction = lltdF > wFPct ? '轉向不足' : '轉向過度';
+        const fix = lltdF > wFPct
+          ? '降低前 ARB 或增加後 ARB 剛性'
+          : '增加前 ARB 或降低後 ARB 剛性';
+        add(pri, 'arb', '防傾桿',
+          `LLTD ${roundN(lltdF, 1)}% vs 重量分佈 ${roundN(wFPct, 1)}%，差距 ${roundN(diff, 1)}% — ${direction}傾向明顯`,
+          fix,
+          { lltd: roundN(lltdF, 1), weight_pct: roundN(wFPct, 1), diff: roundN(diff, 1) }
+        );
+      }
+    }
+
+    // ── Rule 5: Roll Gradient too high ──
+    const rollGrad = result.roll_gradient_deg_per_g ?? (result.mechanical?.roll_gradient);
+    if (rollGrad != null && rollGrad > 3.0) {
+      const pri = rollGrad > 5.0 ? 'high' : 'medium';
+      add(pri, 'arb', '防傾桿',
+        `Roll Gradient ${roundN(rollGrad, 2)}°/g 偏大，賽道建議 < 2.0°/g`,
+        '增加 ARB 剛性或提高彈簧率可減小側傾',
+        { roll_gradient: roundN(rollGrad, 2) }
+      );
+    }
+
+    // ── Rule 6: Geometric load transfer is high proportion ──
+    const lltdDec = result.lltd_decomposed || (result.mechanical?.lltd_decomposed);
+    if (lltdDec && lltdDec.geometric_pct_of_total > 40) {
+      add('low', 'geometry', '幾何',
+        `幾何荷重轉移佔總荷重轉移的 ${roundN(lltdDec.geometric_pct_of_total, 1)}%（Roll Center 較高）`,
+        '過渡反應較快但彈簧/ARB 可調範圍較小。如需更大調整空間，可考慮降低 Roll Center 高度',
+        { geo_pct: roundN(lltdDec.geometric_pct_of_total, 1) }
+      );
+    }
+
+    // ── Rule 7: Damping ratio too low (Tier 3 only) ──
+    if (tier === 3 && result.damping) {
+      const dF = result.damping.front_ratio;
+      const dR = result.damping.rear_ratio;
+      const minD = Math.min(dF, dR);
+      if (minD < 0.3) {
+        const pri = minD < 0.2 ? 'high' : 'medium';
+        const axle = dF < dR ? '前' : '後';
+        const val = dF < dR ? dF : dR;
+        // Calculate target damper force for ζ=0.5
+        const totalWeight = params.total_weight ?? 1000;
+        const wFPctLocal = params.weight_front_pct ?? 50;
+        const effWr = axle === '前'
+          ? (result.mechanical?.front_wheel_rate_effective ?? result.front_wheel_rate_effective ?? 50)
+          : (result.mechanical?.rear_wheel_rate_effective ?? result.rear_wheel_rate_effective ?? 50);
+        const mCorner = axle === '前'
+          ? (totalWeight * wFPctLocal / 100) / 2
+          : (totalWeight * (100 - wFPctLocal) / 100) / 2;
+        const targetZeta = 0.5;
+        const targetC_N = targetZeta * 2 * Math.sqrt(effWr * 1000 * mCorner);
+        const targetC_kgf = targetC_N / G;
+        add(pri, 'damper', '阻尼',
+          `${axle}軸阻尼比 ${roundN(val, 2)}（${val < 0.2 ? '嚴重欠阻尼' : '欠阻尼'}），車身回彈過多`,
+          `建議${axle}軸平均阻尼力增加到 ~${roundN(targetC_kgf, 0)} kgf（目標 ζ=${targetZeta}）`,
+          { axis: axle, current_ratio: roundN(val, 2), target_kgf: roundN(targetC_kgf, 0), target_zeta: targetZeta }
+        );
+      }
+    }
+
+    // ── Rule 8: Front/rear damping ratio mismatch ──
+    if (tier === 3 && result.damping) {
+      const diff = Math.abs(result.damping.front_ratio - result.damping.rear_ratio);
+      if (diff > 0.25) {
+        add('medium', 'damper', '阻尼',
+          `前後阻尼比差距 ${roundN(diff, 2)}（前 ${roundN(result.damping.front_ratio, 2)} / 後 ${roundN(result.damping.rear_ratio, 2)}），可能造成 pitch 振盪`,
+          '建議前後阻尼比保持在 0.2 以內的差距',
+          { front_ratio: roundN(result.damping.front_ratio, 2), rear_ratio: roundN(result.damping.rear_ratio, 2), diff: roundN(diff, 2) }
+        );
+      }
+    }
+
+    // ── Rule 9: Front/rear grip imbalance (Tier 2+) ──
+    if (tier >= 2 && result.tire_grip) {
+      const gr = result.tire_grip.grip_ratio_f_r;
+      if (gr != null && Math.abs(gr - 1.0) > 0.08) {
+        const pri = Math.abs(gr - 1.0) > 0.15 ? 'high' : 'medium';
+        const weak = gr < 1.0 ? '前' : '後';
+        add(pri, 'tire', '輪胎',
+          `前後抓地力比 ${roundN(gr, 3)}，${weak}軸抓地力相對不足`,
+          `調整${weak}軸胎壓（偏離最佳值會降低抓地力）或更換胎種`,
+          { grip_ratio: roundN(gr, 3), weak_axis: weak }
+        );
+      }
+    }
+
+    // ── Rule 10: Tire not in operating window (Tier 2+) ──
+    if (tier >= 2 && result.tire_grip) {
+      const tg = result.tire_grip;
+      const corners = [
+        { name: '左前', val: tg.fl }, { name: '右前', val: tg.fr },
+        { name: '左後', val: tg.rl }, { name: '右後', val: tg.rr },
+      ];
+      for (const c of corners) {
+        if (c.val != null && c.val < 0.85) {
+          const pri = c.val < 0.75 ? 'high' : 'medium';
+          add(pri, 'tire', '輪胎',
+            `${c.name} 抓地力僅 ${roundN(c.val * 100, 0)}%，輪胎可能不在工作溫度或壓力範圍`,
+            '確認胎溫和胎壓是否在該輪胎的最佳區間',
+            { corner: c.name, grip_pct: roundN(c.val * 100, 0) }
+          );
+        }
+      }
+    }
+
+    // ── Rule 11: Aero balance mismatch (Tier 3) ──
+    if (tier === 3 && result.aero) {
+      const aeroF = result.aero.aero_balance_front_pct;
+      const mechWF = result.mechanical?.weight_front_pct ?? wFPct;
+      if (aeroF != null && mechWF != null) {
+        const diff = Math.abs(aeroF - mechWF);
+        if (diff > 10) {
+          add('medium', 'aero', '空力',
+            `空力平衡 ${roundN(aeroF, 1)}% vs 重量分佈 ${roundN(mechWF, 1)}%，差距 ${roundN(diff, 1)}%`,
+            '高速時轉向特性會與低速不同。調整前後下壓力係數可改善',
+            { aero_balance: roundN(aeroF, 1), weight_pct: roundN(mechWF, 1) }
+          );
+        }
+      }
+    }
+
+    // ── Rule 12: Cross Weight deviation (Tier 3) ──
+    if (tier === 3 && result.corner_weight) {
+      const dev = result.corner_weight.cross_deviation;
+      if (dev != null && dev > 1.5) {
+        const pri = dev > 2.5 ? 'high' : 'medium';
+        add(pri, 'weight', '重量',
+          `Cross Weight 偏差 ${roundN(dev, 1)}%（${roundN(result.corner_weight.cross_weight_pct, 1)}%），車輛左右不對稱`,
+          '調整角落重量（墊片、彈簧預載）使 Cross Weight 趨近 50%',
+          { cross_deviation: roundN(dev, 1), cross_weight_pct: roundN(result.corner_weight.cross_weight_pct, 1) }
+        );
+      }
+    }
+
+    // ── Rule 13: Camber deviation (Tier 3) ──
+    if (tier === 3 && result.geometry) {
+      const fc = result.geometry.front_camber;
+      const rc = result.geometry.rear_camber;
+      const fOff = Math.abs(Math.abs(fc) - 3.0);
+      const rOff = Math.abs(Math.abs(rc) - 2.0);
+      if (fOff > 1.5 || rOff > 1.0) {
+        const details = [];
+        if (fOff > 1.5) details.push(`前 Camber ${fc}° 偏離建議值 -3.0°`);
+        if (rOff > 1.0) details.push(`後 Camber ${rc}° 偏離建議值 -2.0°`);
+        add('low', 'geometry', '幾何',
+          `Camber 設定偏離賽道建議值：${details.join('、')}`,
+          '賽道使用建議前 -2.5°~-3.5°、後 -1.5°~-2.5°',
+          { front_camber: fc, rear_camber: rc }
+        );
+      }
+    }
+
+    // ── Rule 14: Oversteer warning — no characteristic speed ──
+    if (tier === 3 && result.prediction) {
+      const usG = result.prediction.steady_state.understeer_gradient;
+      if (usG < 0) {
+        add('high', 'balance', '平衡',
+          `車輛呈現轉向過度特性（US gradient = ${roundN(usG, 2)}）— 無特徵速度限制`,
+          '高速時轉向增益持續上升，需要駕駛技術修正。增加前軸荷重轉移（前 ARB、前彈簧）可改善',
+          { understeer_gradient: roundN(usG, 2) }
+        );
+      }
+    } else if (tier < 3) {
+      const usG = result.understeer_gradient ?? result.adjusted_understeer_gradient;
+      if (usG != null && usG < -5) {
+        add('high', 'balance', '平衡',
+          `車輛呈現明顯轉向過度特性（US gradient = ${roundN(usG, 2)}）`,
+          '增加前 ARB 或前彈簧率可增加前軸荷重轉移，改善平衡',
+          { understeer_gradient: roundN(usG, 2) }
+        );
+      }
+    }
+
+    // Sort by priority: high → medium → low
+    const priOrder = { high: 0, medium: 1, low: 2 };
+    suggestions.sort((a, b) => (priOrder[a.priority] ?? 9) - (priOrder[b.priority] ?? 9));
+
+    const summary = {
+      high: suggestions.filter(s => s.priority === 'high').length,
+      medium: suggestions.filter(s => s.priority === 'medium').length,
+      low: suggestions.filter(s => s.priority === 'low').length,
+      total: suggestions.length,
+    };
+
+    return { suggestions, summary };
+  }
+}
+
+
+// ============================================================
+// Spring Calculator — 彈簧計算器
+// 頻率↔彈簧率互算、對照表、ARB sizing
+// ============================================================
+class SpringCalculator {
+
+  /**
+   * Calculate required spring rate from target ride frequency.
+   * @param {number} targetHz - Target ride frequency in Hz
+   * @param {number} cornerMass - Sprung mass per corner in kg
+   * @param {number} motionRatio - Suspension motion ratio (default 1.0)
+   * @param {number} tireSpringRate - Tire spring rate in N/mm (default 220)
+   * @returns {{ spring_rate, wheel_rate, effective_wheel_rate, frequency_hz, category }}
+   */
+  static freqToSpring(targetHz, cornerMass, motionRatio, tireSpringRate) {
+    const mr = motionRatio || 1.0;
+    const tireK = tireSpringRate || 220;
+    const m = cornerMass || 250;
+    const f = targetHz || 2.0;
+
+    // Required effective wheel rate: k_eff = (2πf)² × m / 1000  [N/mm]
+    const kEff = Math.pow(2 * Math.PI * f, 2) * m / 1000;
+
+    // Subtract tire compliance to get spring-only wheel rate
+    // k_eff = 1/(1/k_tire + 1/k_wheel) → k_wheel = 1/(1/k_eff - 1/k_tire)
+    let kWheel;
+    if (tireK > kEff) {
+      kWheel = 1.0 / (1.0 / kEff - 1.0 / tireK);
+    } else {
+      // Tire spring rate is too low — can't achieve this frequency
+      kWheel = kEff * 10; // fallback: very stiff spring needed
+    }
+
+    // Reverse motion ratio: spring rate = wheel rate / MR²
+    const springRate = kWheel / Math.pow(mr, 2);
+
+    // Verify: compute actual frequency
+    const actualKWheel = springRate * Math.pow(mr, 2);
+    const actualKEff = 1.0 / (1.0 / tireK + 1.0 / actualKWheel);
+    const actualHz = 1 / (2 * Math.PI) * Math.sqrt(actualKEff * 1000 / m);
+
+    const cat = actualHz < 1.5 ? 'comfort' : actualHz < 2.5 ? 'street' : actualHz < 3.5 ? 'track' : 'race';
+
+    return {
+      spring_rate: roundN(springRate, 1),
+      wheel_rate: roundN(actualKWheel, 1),
+      effective_wheel_rate: roundN(actualKEff, 1),
+      frequency_hz: roundN(actualHz, 2),
+      category: cat,
+    };
+  }
+
+  /**
+   * Calculate ride frequency from spring rate.
+   * @param {number} springRate - Spring rate in N/mm
+   * @param {number} cornerMass - Sprung mass per corner in kg
+   * @param {number} motionRatio - default 1.0
+   * @param {number} tireSpringRate - default 220 N/mm
+   * @returns {{ frequency_hz, wheel_rate, effective_wheel_rate, category }}
+   */
+  static springToFreq(springRate, cornerMass, motionRatio, tireSpringRate) {
+    const mr = motionRatio || 1.0;
+    const tireK = tireSpringRate || 220;
+    const m = cornerMass || 250;
+    const k = springRate || 50;
+
+    const kWheel = k * Math.pow(mr, 2);
+    const kEff = 1.0 / (1.0 / tireK + 1.0 / kWheel);
+    const hz = 1 / (2 * Math.PI) * Math.sqrt(kEff * 1000 / m);
+    const cat = hz < 1.5 ? 'comfort' : hz < 2.5 ? 'street' : hz < 3.5 ? 'track' : 'race';
+
+    return {
+      frequency_hz: roundN(hz, 2),
+      wheel_rate: roundN(kWheel, 1),
+      effective_wheel_rate: roundN(kEff, 1),
+      category: cat,
+    };
+  }
+
+  /**
+   * Generate a spring rate ↔ frequency reference table.
+   * @param {number} cornerMass
+   * @param {number} motionRatio
+   * @param {number} tireSpringRate
+   * @param {number[]} [rates] - Spring rates to include (default common values)
+   * @returns {Array<{spring_rate, wheel_rate, effective_wheel_rate, frequency_hz, category}>}
+   */
+  static springTable(cornerMass, motionRatio, tireSpringRate, rates) {
+    const defaultRates = [20, 30, 40, 50, 60, 70, 80, 90, 100, 120, 140, 160, 180, 200];
+    const rateList = rates || defaultRates;
+    return rateList.map(r => ({
+      spring_rate: r,
+      ...SpringCalculator.springToFreq(r, cornerMass, motionRatio, tireSpringRate),
+    }));
+  }
+
+  /**
+   * Calculate ARB stiffness needed for target roll gradient.
+   * @param {number} totalWeight - kg
+   * @param {number} cgHeight - mm
+   * @param {number} targetRollGrad - target roll gradient in deg/g
+   * @param {number} frontPct - front roll stiffness distribution target %
+   * @param {number} existingSpringRollFront - existing spring roll stiffness front (Nm/deg)
+   * @param {number} existingSpringRollRear - existing spring roll stiffness rear (Nm/deg)
+   * @returns {{ total_roll_needed, front_roll_needed, rear_roll_needed, front_arb_needed, rear_arb_needed, current_roll_gradient }}
+   */
+  static arbSizing(totalWeight, cgHeight, targetRollGrad, frontPct, existingSpringRollFront, existingSpringRollRear) {
+    const m = totalWeight || 1000;
+    const h = (cgHeight || 300) / 1000; // to meters
+    const target = targetRollGrad || 2.0;
+    const fPct = frontPct || 55;
+
+    // Current roll stiffness from springs
+    const currentSpringTotal = (existingSpringRollFront || 0) + (existingSpringRollRear || 0);
+    let currentRollGrad = 0;
+    if (currentSpringTotal > 0) {
+      currentRollGrad = (m * G * h) / (currentSpringTotal * Math.PI / 180);
+    }
+
+    // Required total roll stiffness for target gradient
+    const totalNeeded = (m * G * h) / (target * Math.PI / 180);
+
+    const frontNeeded = totalNeeded * fPct / 100;
+    const rearNeeded = totalNeeded * (100 - fPct) / 100;
+
+    const frontArbNeeded = Math.max(0, frontNeeded - (existingSpringRollFront || 0));
+    const rearArbNeeded = Math.max(0, rearNeeded - (existingSpringRollRear || 0));
+
+    return {
+      total_roll_needed: roundN(totalNeeded, 0),
+      front_roll_needed: roundN(frontNeeded, 0),
+      rear_roll_needed: roundN(rearNeeded, 0),
+      front_arb_needed: roundN(frontArbNeeded, 0),
+      rear_arb_needed: roundN(rearArbNeeded, 0),
+      current_roll_gradient: roundN(currentRollGrad, 2),
+      current_spring_total: roundN(currentSpringTotal, 0),
+    };
+  }
+}

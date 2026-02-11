@@ -53,7 +53,7 @@ canvas{max-height:300px}
 <header class="flex items-center justify-between px-6 py-3 border-b border-white/5" style="background:var(--bg2)">
   <div class="flex items-center gap-3">
     <div class="text-lg font-bold text-sky-400">Racing Dynamics</div>
-    <div class="text-xs text-slate-600">賽車動態分析系統 v3.1 Desktop</div>
+    <div class="text-xs text-slate-600">賽車動態分析系統 v3.2 Desktop</div>
   </div>
   <div class="flex gap-2">
     <template x-for="tab in tabs" :key="tab.id">
@@ -829,6 +829,18 @@ canvas{max-height:300px}
             </div>
           </div>
 
+          <!-- Tier 3: Corner Weight Diagram + G-G Diagram -->
+          <div x-show="tier === 3 && result" class="grid-2 mb-4" x-init="$watch('result', () => { if(tier===3 && result){ $nextTick(()=>{drawCornerWeight();drawGGDiagram()}) } })">
+            <div class="card2 p-4" x-show="result?.corner_weight">
+              <div class="text-xs text-slate-400 mb-2">重量分佈俯視圖</div>
+              <canvas id="cwCanvas" width="240" height="200" style="display:block;margin:0 auto"></canvas>
+            </div>
+            <div class="card2 p-4">
+              <div class="text-xs text-slate-400 mb-2">G-G 摩擦圓</div>
+              <canvas id="ggChart" height="200"></canvas>
+            </div>
+          </div>
+
           <!-- Warnings -->
           <template x-for="w in (result?.warnings || [])" :key="w">
             <div class="warn mb-2" x-text="w"></div>
@@ -841,6 +853,222 @@ canvas{max-height:300px}
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ==================== TAB: 調校建議 ==================== -->
+<div x-show="currentTab==='advisor'" x-transition>
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-bold">調校建議 Setup Advisor</h2>
+    <button class="btn btn-primary" @click="runAdvisor()" :disabled="!result">
+      <span x-show="!result" class="text-xs">請先在「轉向預測」計算結果</span>
+      <span x-show="result">從預測結果分析</span>
+    </button>
+  </div>
+
+  <template x-if="!advisorResult && !result">
+    <div class="text-center text-slate-500 py-20">
+      <div class="text-4xl mb-4">📋</div>
+      <div class="text-lg mb-2">尚無預測結果</div>
+      <div class="text-xs">請先到「轉向預測」Tab 輸入參數並計算，再回來查看調校建議</div>
+    </div>
+  </template>
+
+  <template x-if="advisorResult">
+    <div>
+      <!-- Summary bar -->
+      <div class="card p-4 mb-4 flex items-center gap-6">
+        <div class="text-sm font-semibold">分析摘要</div>
+        <div class="flex gap-4 text-xs">
+          <span x-show="advisorResult.summary.high>0" class="flex items-center gap-1">🔴 <span class="font-bold text-red-400" x-text="advisorResult.summary.high"></span> 高優先</span>
+          <span x-show="advisorResult.summary.medium>0" class="flex items-center gap-1">🟡 <span class="font-bold text-yellow-400" x-text="advisorResult.summary.medium"></span> 中優先</span>
+          <span x-show="advisorResult.summary.low>0" class="flex items-center gap-1">🟢 <span class="font-bold text-green-400" x-text="advisorResult.summary.low"></span> 低優先</span>
+        </div>
+        <div class="ml-auto text-xs text-slate-500">Tier <span x-text="tier"></span> · 共 <span x-text="advisorResult.summary.total"></span> 條建議</div>
+      </div>
+
+      <!-- No issues -->
+      <template x-if="advisorResult.suggestions.length===0">
+        <div class="text-center text-green-400 py-16">
+          <div class="text-4xl mb-4">✅</div>
+          <div class="text-lg font-semibold">設定良好</div>
+          <div class="text-xs text-slate-400 mt-2">目前設定在各項指標都在合理範圍內</div>
+        </div>
+      </template>
+
+      <!-- Suggestion cards by priority -->
+      <template x-for="pri in ['high','medium','low']" :key="pri">
+        <div x-show="advisorResult.suggestions.filter(s=>s.priority===pri).length>0" class="mb-4">
+          <div class="text-xs font-bold uppercase tracking-wider mb-2" :class="pri==='high'?'text-red-400':pri==='medium'?'text-yellow-400':'text-green-400'" x-text="pri==='high'?'🔴 高優先':pri==='medium'?'🟡 中優先':'🟢 低優先'"></div>
+          <div class="space-y-2">
+            <template x-for="(s, idx) in advisorResult.suggestions.filter(s=>s.priority===pri)" :key="idx">
+              <div class="card p-4">
+                <div class="flex items-start gap-3">
+                  <div class="text-lg" x-text="advisorCategoryIcon(s.category)"></div>
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-1">
+                      <span class="badge" :class="pri==='high'?'badge-r':pri==='medium'?'badge-y':'badge-g'" x-text="s.category_zh"></span>
+                    </div>
+                    <div class="text-sm" x-text="s.message"></div>
+                    <div x-show="s.suggestion" class="mt-2 text-xs text-sky-400 flex items-start gap-1">
+                      <span>💡</span>
+                      <span x-text="s.suggestion"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </template>
+    </div>
+  </template>
+</div>
+
+<!-- ==================== TAB: 彈簧計算器 ==================== -->
+<div x-show="currentTab==='spring'" x-transition>
+  <h2 class="text-xl font-bold mb-4">彈簧計算器 Spring Calculator</h2>
+
+  <div class="grid-2">
+    <!-- Left: Frequency ↔ Spring Rate -->
+    <div class="card p-5">
+      <div class="section-title">頻率 ↔ 彈簧率互算</div>
+
+      <!-- Mode toggle -->
+      <div class="flex rounded-lg overflow-hidden border border-white/10 mb-4">
+        <button class="flex-1 px-3 py-2 text-xs font-semibold transition-colors" :class="springCalc.mode==='freq_to_spring'?'bg-sky-500 text-white':'bg-transparent text-slate-400'" @click="springCalc.mode='freq_to_spring'">頻率 → 彈簧率</button>
+        <button class="flex-1 px-3 py-2 text-xs font-semibold transition-colors" :class="springCalc.mode==='spring_to_freq'?'bg-sky-500 text-white':'bg-transparent text-slate-400'" @click="springCalc.mode='spring_to_freq'">彈簧率 → 頻率</button>
+      </div>
+
+      <!-- Inputs -->
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div x-show="springCalc.mode==='freq_to_spring'">
+          <label class="text-[10px] text-slate-400 block mb-1">目標頻率 (Hz)</label>
+          <input type="number" step="0.1" x-model.number="springCalc.target_hz" class="w-full">
+        </div>
+        <div x-show="springCalc.mode==='spring_to_freq'">
+          <label class="text-[10px] text-slate-400 block mb-1">彈簧率 (N/mm)</label>
+          <input type="number" step="5" x-model.number="springCalc.spring_rate" class="w-full">
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-400 block mb-1">角落質量 (kg)</label>
+          <input type="number" step="5" x-model.number="springCalc.corner_mass" class="w-full">
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-400 block mb-1">Motion Ratio</label>
+          <input type="number" step="0.05" x-model.number="springCalc.motion_ratio" class="w-full">
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-400 block mb-1">輪胎彈簧率 (N/mm)</label>
+          <input type="number" step="10" x-model.number="springCalc.tire_spring_rate" class="w-full">
+        </div>
+      </div>
+
+      <div class="flex gap-2 mb-4">
+        <button class="btn btn-primary" @click="runSpringCalc()">計算</button>
+        <button class="btn btn-sm bg-slate-600 text-slate-200" @click="loadFromPrediction()" x-show="result">從目前設定帶入</button>
+      </div>
+
+      <!-- Result -->
+      <template x-if="springCalcResult">
+        <div class="card2 p-4">
+          <div class="text-xs text-slate-400 mb-2">計算結果</div>
+          <template x-if="springCalc.mode==='freq_to_spring'">
+            <div class="space-y-2">
+              <div class="flex justify-between"><span class="text-xs text-slate-400">所需彈簧率</span><span class="text-lg font-bold text-sky-400" x-text="springCalcResult.spring_rate+' N/mm'"></span></div>
+              <div class="flex justify-between"><span class="text-xs text-slate-400">Wheel Rate</span><span class="text-sm font-mono" x-text="springCalcResult.wheel_rate+' N/mm'"></span></div>
+              <div class="flex justify-between"><span class="text-xs text-slate-400">有效 Wheel Rate</span><span class="text-sm font-mono" x-text="springCalcResult.effective_wheel_rate+' N/mm'"></span></div>
+              <div class="flex justify-between"><span class="text-xs text-slate-400">實際頻率</span><span class="text-sm font-mono" x-text="springCalcResult.frequency_hz+' Hz'"></span></div>
+              <div class="flex justify-between"><span class="text-xs text-slate-400">分類</span><span class="badge" :class="springCatBadge(springCalcResult.category)" x-text="springCatLabel(springCalcResult.category)"></span></div>
+            </div>
+          </template>
+          <template x-if="springCalc.mode==='spring_to_freq'">
+            <div class="space-y-2">
+              <div class="flex justify-between"><span class="text-xs text-slate-400">Ride Frequency</span><span class="text-lg font-bold text-sky-400" x-text="springCalcResult.frequency_hz+' Hz'"></span></div>
+              <div class="flex justify-between"><span class="text-xs text-slate-400">Wheel Rate</span><span class="text-sm font-mono" x-text="springCalcResult.wheel_rate+' N/mm'"></span></div>
+              <div class="flex justify-between"><span class="text-xs text-slate-400">有效 Wheel Rate</span><span class="text-sm font-mono" x-text="springCalcResult.effective_wheel_rate+' N/mm'"></span></div>
+              <div class="flex justify-between"><span class="text-xs text-slate-400">分類</span><span class="badge" :class="springCatBadge(springCalcResult.category)" x-text="springCatLabel(springCalcResult.category)"></span></div>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
+
+    <!-- Right: ARB Sizing -->
+    <div class="card p-5">
+      <div class="section-title">ARB 防傾桿計算</div>
+      <div class="text-xs text-slate-500 mb-3">根據目標 Roll Gradient 反算所需防傾桿剛性</div>
+
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div>
+          <label class="text-[10px] text-slate-400 block mb-1">目標 Roll Gradient (°/g)</label>
+          <input type="number" step="0.1" x-model.number="arbCalc.target_roll_grad" class="w-full">
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-400 block mb-1">前輪分配 (%)</label>
+          <input type="number" step="1" x-model.number="arbCalc.front_pct" class="w-full">
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-400 block mb-1">車重 (kg)</label>
+          <input type="number" step="10" x-model.number="arbCalc.total_weight" class="w-full">
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-400 block mb-1">重心高度 (mm)</label>
+          <input type="number" step="5" x-model.number="arbCalc.cg_height" class="w-full">
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-400 block mb-1">前彈簧 Roll Stiffness (Nm/deg)</label>
+          <input type="number" step="10" x-model.number="arbCalc.spring_roll_front" class="w-full">
+        </div>
+        <div>
+          <label class="text-[10px] text-slate-400 block mb-1">後彈簧 Roll Stiffness (Nm/deg)</label>
+          <input type="number" step="10" x-model.number="arbCalc.spring_roll_rear" class="w-full">
+        </div>
+      </div>
+
+      <div class="flex gap-2 mb-4">
+        <button class="btn btn-primary" @click="runArbCalc()">計算</button>
+        <button class="btn btn-sm bg-slate-600 text-slate-200" @click="loadArbFromPrediction()" x-show="result">從預測結果帶入</button>
+      </div>
+
+      <template x-if="arbResult">
+        <div class="card2 p-4">
+          <div class="text-xs text-slate-400 mb-2">ARB 計算結果</div>
+          <div class="space-y-2">
+            <div x-show="arbResult.current_roll_gradient>0" class="flex justify-between"><span class="text-xs text-slate-400">目前 Roll Gradient（僅彈簧）</span><span class="text-sm font-mono text-yellow-400" x-text="arbResult.current_roll_gradient+'°/g'"></span></div>
+            <div class="flex justify-between"><span class="text-xs text-slate-400">所需總 Roll Stiffness</span><span class="text-sm font-bold" x-text="arbResult.total_roll_needed+' Nm/deg'"></span></div>
+            <div class="border-t border-white/5 my-2"></div>
+            <div class="flex justify-between"><span class="text-xs text-slate-400">前軸需要</span><span class="text-sm font-mono" x-text="arbResult.front_roll_needed+' Nm/deg'"></span></div>
+            <div class="flex justify-between"><span class="text-xs text-slate-400">後軸需要</span><span class="text-sm font-mono" x-text="arbResult.rear_roll_needed+' Nm/deg'"></span></div>
+            <div class="border-t border-white/5 my-2"></div>
+            <div class="flex justify-between"><span class="text-xs text-sky-400">前 ARB 所需剛性</span><span class="text-lg font-bold text-sky-400" x-text="arbResult.front_arb_needed+' Nm/deg'"></span></div>
+            <div class="flex justify-between"><span class="text-xs text-pink-400">後 ARB 所需剛性</span><span class="text-lg font-bold text-pink-400" x-text="arbResult.rear_arb_needed+' Nm/deg'"></span></div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </div>
+
+  <!-- Spring Rate Reference Table -->
+  <div class="card p-5 mt-4" x-show="springTable.length>0">
+    <div class="section-title">彈簧率對照表</div>
+    <div class="text-xs text-slate-500 mb-3">角落質量 <span x-text="springCalc.corner_mass"></span> kg · MR <span x-text="springCalc.motion_ratio"></span> · 輪胎彈簧 <span x-text="springCalc.tire_spring_rate"></span> N/mm</div>
+    <table>
+      <thead><tr>
+        <th>彈簧率 (N/mm)</th><th>Wheel Rate (N/mm)</th><th>有效 Wheel Rate (N/mm)</th><th>Ride Frequency (Hz)</th><th>分類</th>
+      </tr></thead>
+      <tbody>
+        <template x-for="row in springTable" :key="row.spring_rate">
+          <tr>
+            <td class="font-mono font-semibold" x-text="row.spring_rate"></td>
+            <td class="font-mono text-xs" x-text="row.wheel_rate"></td>
+            <td class="font-mono text-xs" x-text="row.effective_wheel_rate"></td>
+            <td class="font-mono text-xs" :class="springCatColor(row.category)" x-text="row.frequency_hz+' Hz'"></td>
+            <td><span class="badge" :class="springCatBadge(row.category)" x-text="springCatLabel(row.category)"></span></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -905,6 +1133,8 @@ function app(){return{
   currentTab:'predict',
   tabs:[
     {id:'predict',label:'轉向預測',sub:'Handling Prediction'},
+    {id:'advisor',label:'調校建議',sub:'Setup Advisor'},
+    {id:'spring',label:'彈簧計算',sub:'Spring Calculator'},
     {id:'tire',label:'輪胎分析',sub:'Tire Analysis'},
   ],
   tier:1,
@@ -940,6 +1170,18 @@ function app(){return{
   compoundList:['yokohama_ad08r','bridgestone_re71rs','michelin_cup2','pirelli_trofeo_r','federal_rsrr','nankang_ar1','michelin_ps4s','slick_soft'],
   selCompounds:['yokohama_ad08r','michelin_cup2','federal_rsrr'],
   tireGripChartObj:null,tirePressChartObj:null,
+  // Advisor
+  advisorResult:null,
+  // Spring Calculator
+  springCalc:{mode:'freq_to_spring',target_hz:2.5,spring_rate:80,corner_mass:250,motion_ratio:0.85,tire_spring_rate:220},
+  springCalcResult:null,
+  springTable:[],
+  arbCalc:{target_roll_grad:1.5,front_pct:55,spring_roll_front:0,spring_roll_rear:0,total_weight:1000,cg_height:300},
+  arbResult:null,
+  // G-G chart
+  ggChartObj:null,
+  // Corner weight canvas
+  cwCanvasDrawn:false,
 
   get resultLabel(){
     if(!this.result) return '';
@@ -1144,6 +1386,8 @@ function app(){return{
   switchTab(id){
     this.currentTab=id;
     if(id==='tire') this.$nextTick(()=>{this.drawTireGrip();this.drawTirePress()});
+    if(id==='advisor' && this.result && !this.advisorResult) this.runAdvisor();
+    if(id==='spring' && !this.springTable.length) this.runSpringCalc();
   },
 
   toggleArr(arr,v){const i=arr.indexOf(v);if(i>=0)arr.splice(i,1);else arr.push(v)},
@@ -1183,7 +1427,9 @@ function app(){return{
     } else {
       this.result = api.predictTier3(this.pred, tireParams, this.adv);
     }
-    if(this.tier===3 && this.result?.contribution) this.$nextTick(()=>this.drawContribution());
+    if(this.tier===3 && this.result?.contribution) this.$nextTick(()=>{this.drawContribution();this.drawCornerWeight();this.drawGGDiagram()});
+    // Reset advisor when prediction changes
+    this.advisorResult=null;
     // Auto-compare against baseline if set (Tier 1 & 2 are compatible since both use Tier 2 API)
     const compatibleTier = (t) => t <= 2 ? 2 : t;
     if(this.baseline && compatibleTier(this.baseline.tier) === compatibleTier(this.tier)) this.computeDelta();
@@ -1369,6 +1615,138 @@ function app(){return{
       type:'bar',
       data:{labels,datasets:[{data:vals,backgroundColor:vals.map(v=>v>0?'rgba(239,68,68,.6)':'rgba(56,189,248,.6)'),borderRadius:4}]},
       options:{responsive:true,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8',callback:v=>v>0?'+'+v:v}},y:{ticks:{color:'#e2e8f0',font:{size:10}}}}}
+    });
+  },
+
+  // === Setup Advisor ===
+  runAdvisor(){
+    if(!this.result){
+      this.advisorResult=null;
+      return;
+    }
+    this.advisorResult = api.analyzeSetup(this.result, this.tier, this.pred, this.adv);
+  },
+
+  advisorPriorityIcon(p){
+    return p==='high'?'🔴':p==='medium'?'🟡':'🟢';
+  },
+  advisorCategoryIcon(c){
+    const map={spring:'🔧',arb:'⚙️',damper:'🛢️',tire:'🛞',aero:'💨',geometry:'📐',weight:'⚖️',balance:'⚠️'};
+    return map[c]||'📋';
+  },
+
+  // === Spring Calculator ===
+  runSpringCalc(){
+    const sc=this.springCalc;
+    if(sc.mode==='freq_to_spring'){
+      this.springCalcResult=api.calcSpringFromFreq(sc.target_hz,sc.corner_mass,sc.motion_ratio,sc.tire_spring_rate);
+    }else{
+      this.springCalcResult=api.calcFreqFromSpring(sc.spring_rate,sc.corner_mass,sc.motion_ratio,sc.tire_spring_rate);
+    }
+    this.springTable=api.calcSpringTable(sc.corner_mass,sc.motion_ratio,sc.tire_spring_rate);
+  },
+  springCatColor(cat){
+    return cat==='comfort'?'text-sky-400':cat==='street'?'text-green-400':cat==='track'?'text-yellow-400':'text-red-400';
+  },
+  springCatLabel(cat){
+    return cat==='comfort'?'舒適':cat==='street'?'街道':cat==='track'?'賽道':'競技';
+  },
+  springCatBadge(cat){
+    return cat==='comfort'?'badge-b':cat==='street'?'badge-g':cat==='track'?'badge-y':'badge-r';
+  },
+  loadFromPrediction(){
+    const tw=this.pred.total_weight||1000;
+    const wf=this.pred.weight_front_pct||50;
+    this.springCalc.corner_mass=Math.round(tw*wf/100/2);
+    this.springCalc.motion_ratio=this.pred.front_motion_ratio||1.0;
+    this.springCalc.tire_spring_rate=this.pred.tire_spring_rate||220;
+    this.runSpringCalc();
+  },
+  runArbCalc(){
+    const ac=this.arbCalc;
+    this.arbResult=api.calcArbSizing(ac.total_weight,ac.cg_height,ac.target_roll_grad,ac.front_pct,ac.spring_roll_front,ac.spring_roll_rear);
+  },
+  loadArbFromPrediction(){
+    if(!this.result)return;
+    this.arbCalc.total_weight=this.pred.total_weight||1000;
+    this.arbCalc.cg_height=this.pred.cg_height||300;
+    this.arbCalc.spring_roll_front=this.result.front_roll_stiffness_spring||(this.result.mechanical?.roll_stiffness_front)||0;
+    this.arbCalc.spring_roll_rear=this.result.rear_roll_stiffness_spring||(this.result.mechanical?.roll_stiffness_rear)||0;
+    this.runArbCalc();
+  },
+
+  // === Enhanced Charts ===
+  drawCornerWeight(){
+    if(this.tier!==3||!this.result?.corner_weight)return;
+    const c=document.getElementById('cwCanvas');
+    if(!c)return;
+    const ctx=c.getContext('2d');
+    const w=c.width,h=c.height;
+    ctx.clearRect(0,0,w,h);
+    const cw=this.result.corner_weight;
+    const maxW=Math.max(cw.fl,cw.fr,cw.rl,cw.rr);
+    // Car body
+    ctx.strokeStyle='rgba(255,255,255,0.2)';
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.roundRect(40,30,w-80,h-60,12);
+    ctx.stroke();
+    // Center line
+    ctx.strokeStyle='rgba(255,255,255,0.08)';
+    ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(w/2,30);ctx.lineTo(w/2,h-30);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(40,h/2);ctx.lineTo(w-40,h/2);ctx.stroke();
+    ctx.setLineDash([]);
+    // Corner circles
+    const corners=[{x:70,y:55,v:cw.fl,l:'FL'},{x:w-70,y:55,v:cw.fr,l:'FR'},{x:70,y:h-55,v:cw.rl,l:'RL'},{x:w-70,y:h-55,v:cw.rr,l:'RR'}];
+    for(const p of corners){
+      const ratio=p.v/maxW;
+      const r=14+ratio*10;
+      const alpha=0.3+ratio*0.5;
+      ctx.fillStyle=`rgba(56,189,248,${alpha})`;
+      ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#e2e8f0';ctx.font='bold 11px system-ui';ctx.textAlign='center';
+      ctx.fillText(roundN(p.v,1)+'kg',p.x,p.y+4);
+      ctx.fillStyle='#94a3b8';ctx.font='9px system-ui';
+      ctx.fillText(p.l,p.x,p.y-r-4);
+    }
+    // Info text
+    ctx.fillStyle='#94a3b8';ctx.font='9px system-ui';ctx.textAlign='center';
+    ctx.fillText(`F/R: ${roundN(cw.front_pct,1)}% / ${roundN(100-cw.front_pct,1)}%`,w/2,h-8);
+    ctx.fillText(`Cross: ${roundN(cw.cross_weight_pct,1)}%`,w/2,18);
+  },
+
+  drawGGDiagram(){
+    if(this.tier!==3||!this.result)return;
+    const c=document.getElementById('ggChart');
+    if(!c)return;
+    if(this.ggChartObj)this.ggChartObj.destroy();
+    // Estimate max lateral G from tire grip
+    const maxLatG=this.result.tire?.front_avg>=0.5?Math.min(this.result.tire.front_avg*1.3,2.0):1.2;
+    const maxBrakeG=this.adv.braking_g>0?this.adv.braking_g:maxLatG*0.9;
+    const maxAccelG=this.adv.accel_g>0?this.adv.accel_g:maxLatG*0.5;
+    // Build friction ellipse points
+    const pts=[];
+    for(let a=0;a<=360;a+=5){
+      const rad=a*Math.PI/180;
+      const latMax=maxLatG;
+      const longMax=Math.sin(rad)>0?maxAccelG:maxBrakeG;
+      const lat=latMax*Math.cos(rad);
+      const lon=longMax*Math.sin(rad);
+      pts.push({x:roundN(lat,3),y:roundN(lon,3)});
+    }
+    this.ggChartObj=new Chart(c,{
+      type:'scatter',
+      data:{datasets:[
+        {label:'摩擦圓',data:pts,borderColor:'rgba(56,189,248,0.5)',backgroundColor:'rgba(56,189,248,0.05)',fill:true,pointRadius:0,showLine:true,tension:0.1},
+        {label:'原點',data:[{x:0,y:0}],pointRadius:6,pointBackgroundColor:'#34d399',pointBorderColor:'#34d399'}
+      ]},
+      options:{responsive:true,aspectRatio:1,plugins:{legend:{labels:{color:'#e2e8f0',font:{size:10}}}},
+        scales:{
+          x:{title:{display:true,text:'側向 G (Lateral)',color:'#94a3b8'},grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#94a3b8'},min:-maxLatG*1.2,max:maxLatG*1.2},
+          y:{title:{display:true,text:'縱向 G (Longitudinal)',color:'#94a3b8'},grid:{color:'rgba(255,255,255,0.05)'},ticks:{color:'#94a3b8'},min:-maxBrakeG*1.3,max:maxAccelG*1.3}
+        }
+      }
     });
   },
 
