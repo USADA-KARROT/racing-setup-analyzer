@@ -53,7 +53,7 @@ canvas{max-height:300px}
 <header class="flex items-center justify-between px-6 py-3 border-b border-white/5" style="background:var(--bg2)">
   <div class="flex items-center gap-3">
     <div class="text-lg font-bold text-sky-400">Racing Dynamics</div>
-    <div class="text-xs text-slate-600">賽車動態分析系統 v3.0 Desktop</div>
+    <div class="text-xs text-slate-600">賽車動態分析系統 v3.1 Desktop</div>
   </div>
   <div class="flex gap-2">
     <template x-for="tab in tabs" :key="tab.id">
@@ -210,6 +210,27 @@ canvas{max-height:300px}
             <div>
               <label class="text-xs text-slate-400">軸距 (mm)</label>
               <input type="number" x-model.number="pred.wheelbase" class="w-full mt-1">
+            </div>
+          </div>
+          <!-- Advanced T1 parameters (collapsible) -->
+          <div class="mt-3">
+            <button class="text-[10px] text-slate-500 hover:text-slate-300 flex items-center gap-1" @click="showAdvancedT1=!showAdvancedT1">
+              <span x-text="showAdvancedT1 ? '▼' : '▶'"></span>
+              進階參數（輪胎彈性、Roll Center）
+            </button>
+            <div x-show="showAdvancedT1" x-transition class="grid grid-cols-3 gap-2 mt-2 text-sm">
+              <div>
+                <label class="text-xs text-slate-400">輪胎彈簧率 (N/mm)</label>
+                <input type="number" x-model.number="pred.tire_spring_rate" class="w-full mt-1" step="10">
+              </div>
+              <div>
+                <label class="text-xs text-slate-400">前 RC 高度 (mm)</label>
+                <input type="number" x-model.number="pred.front_roll_center_height" class="w-full mt-1" step="5">
+              </div>
+              <div>
+                <label class="text-xs text-slate-400">後 RC 高度 (mm)</label>
+                <input type="number" x-model.number="pred.rear_roll_center_height" class="w-full mt-1" step="5">
+              </div>
             </div>
           </div>
         </div>
@@ -528,6 +549,13 @@ canvas{max-height:300px}
             <div><label class="text-xs text-slate-400">前 Toe (°)</label><input type="number" x-model.number="adv.front_toe_deg" class="w-full mt-1" step="0.1"></div>
             <div><label class="text-xs text-slate-400">後 Toe (°)</label><input type="number" x-model.number="adv.rear_toe_deg" class="w-full mt-1" step="0.1"></div>
           </div>
+
+          <!-- Longitudinal G-force -->
+          <div class="grid-2 mt-3 text-sm">
+            <div><label class="text-xs text-slate-400">煞車 G 力</label><input type="number" x-model.number="adv.braking_g" class="w-full mt-1" step="0.1" min="0" max="3"></div>
+            <div><label class="text-xs text-slate-400">加速 G 力</label><input type="number" x-model.number="adv.accel_g" class="w-full mt-1" step="0.1" min="0" max="2"></div>
+          </div>
+          <div class="text-[10px] text-slate-500 mt-1">輸入煞車/加速 G 力計算縱向荷重轉移（0 = 不計算）</div>
         </div>
 
         <div class="flex gap-2 mt-2">
@@ -647,6 +675,128 @@ canvas{max-height:300px}
             </div>
           </div>
 
+          <!-- Ride Quality (all tiers) -->
+          <div x-show="result?.ride_frequency || result?.mechanical?.ride_frequency" class="card2 p-4 mb-4">
+            <div class="text-xs text-slate-400 mb-2">懸吊固有頻率 Ride Frequency</div>
+            <template x-if="(result?.ride_frequency || result?.mechanical?.ride_frequency)">
+              <div>
+                <div class="grid-2 mb-2">
+                  <div class="corner-box">
+                    <div class="val text-sky-300" x-text="(result?.ride_frequency || result?.mechanical?.ride_frequency)?.front_hz + ' Hz'"></div>
+                    <div class="lbl">前軸</div>
+                    <div class="text-[10px] mt-1" :class="{'text-green-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.front_category==='street','text-yellow-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.front_category==='track','text-red-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.front_category==='race','text-slate-500': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.front_category==='comfort'}" x-text="({'comfort':'舒適','street':'街道','track':'賽道','race':'競技'})[(result?.ride_frequency || result?.mechanical?.ride_frequency)?.front_category]"></div>
+                  </div>
+                  <div class="corner-box">
+                    <div class="val text-pink-300" x-text="(result?.ride_frequency || result?.mechanical?.ride_frequency)?.rear_hz + ' Hz'"></div>
+                    <div class="lbl">後軸</div>
+                    <div class="text-[10px] mt-1" :class="{'text-green-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.rear_category==='street','text-yellow-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.rear_category==='track','text-red-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.rear_category==='race','text-slate-500': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.rear_category==='comfort'}" x-text="({'comfort':'舒適','street':'街道','track':'賽道','race':'競技'})[(result?.ride_frequency || result?.mechanical?.ride_frequency)?.rear_category]"></div>
+                  </div>
+                </div>
+                <div class="text-xs text-slate-500">
+                  前/後比: <span class="font-mono text-slate-300" x-text="(result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio?.toFixed(3)"></span>
+                  <span class="text-[10px] ml-1" :class="{ 'text-green-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio >= 0.85 && (result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio <= 1.15, 'text-yellow-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio < 0.85 || (result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio > 1.15 }" x-text="(result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio >= 0.85 && (result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio <= 1.15 ? '(Flat ride 範圍內)' : '(偏離 Flat ride)'"></span>
+                </div>
+                <div class="text-xs text-slate-500 mt-1" x-text="'有效輪率: 前 ' + (result?.front_wheel_rate_effective || result?.mechanical?.front_wheel_rate_effective || '?') + ' / 後 ' + (result?.rear_wheel_rate_effective || result?.mechanical?.rear_wheel_rate_effective || '?') + ' N/mm'"></div>
+              </div>
+            </template>
+          </div>
+
+          <!-- LLTD Decomposition (all tiers) -->
+          <div x-show="result?.lltd_decomposed || result?.mechanical?.lltd_decomposed" class="card2 p-4 mb-4">
+            <div class="text-xs text-slate-400 mb-2">LLTD 分解（幾何 vs 彈性）</div>
+            <template x-if="(result?.lltd_decomposed || result?.mechanical?.lltd_decomposed)">
+              <div>
+                <div class="text-xs text-slate-500 mb-1">幾何轉移佔比: <span class="font-mono text-slate-300" x-text="(result?.lltd_decomposed || result?.mechanical?.lltd_decomposed)?.geometric_pct_of_total + '%'"></span></div>
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-[10px] w-10 text-right text-yellow-400">幾何</span>
+                  <div class="flex-1 h-4 rounded overflow-hidden bg-slate-700">
+                    <div class="bg-yellow-500 h-full transition-all" :style="'width:' + (result?.lltd_decomposed || result?.mechanical?.lltd_decomposed)?.geometric_pct_of_total + '%'"></div>
+                  </div>
+                  <span class="text-[10px] w-10 text-sky-400">彈性</span>
+                </div>
+                <div class="grid-2 text-xs text-slate-500">
+                  <div>前 幾何: <span class="text-slate-300" x-text="(result?.lltd_decomposed || result?.mechanical?.lltd_decomposed)?.geometric_front + ' N/g'"></span></div>
+                  <div>前 彈性: <span class="text-slate-300" x-text="(result?.lltd_decomposed || result?.mechanical?.lltd_decomposed)?.elastic_front + ' N/g'"></span></div>
+                  <div>後 幾何: <span class="text-slate-300" x-text="(result?.lltd_decomposed || result?.mechanical?.lltd_decomposed)?.geometric_rear + ' N/g'"></span></div>
+                  <div>後 彈性: <span class="text-slate-300" x-text="(result?.lltd_decomposed || result?.mechanical?.lltd_decomposed)?.elastic_rear + ' N/g'"></span></div>
+                </div>
+                <div class="text-xs text-slate-500 mt-1">LLTD 前: <span class="font-bold text-slate-300" x-text="(result?.lltd_decomposed || result?.mechanical?.lltd_decomposed)?.total_front_pct + '%'"></span></div>
+              </div>
+            </template>
+          </div>
+
+          <!-- Damping Analysis (Tier 3) -->
+          <div x-show="tier === 3 && result?.damping" class="card2 p-4 mb-4">
+            <div class="text-xs text-slate-400 mb-2">阻尼分析 Damping</div>
+            <div class="grid-2 mb-2">
+              <div class="corner-box">
+                <div class="val" :class="{'text-green-400': result?.damping?.front_category==='street','text-yellow-400': result?.damping?.front_category==='track','text-red-400': result?.damping?.front_category==='race','text-slate-400': result?.damping?.front_category==='underdamped'}" x-text="result?.damping?.front_ratio"></div>
+                <div class="lbl">前 ζ</div>
+                <div class="text-[10px] mt-1" :class="{'text-green-400': result?.damping?.front_category==='street','text-yellow-400': result?.damping?.front_category==='track','text-red-400': result?.damping?.front_category==='race','text-slate-500': result?.damping?.front_category==='underdamped'}" x-text="({'underdamped':'欠阻尼','street':'街道','track':'賽道','race':'競技'})[result?.damping?.front_category]"></div>
+              </div>
+              <div class="corner-box">
+                <div class="val" :class="{'text-green-400': result?.damping?.rear_category==='street','text-yellow-400': result?.damping?.rear_category==='track','text-red-400': result?.damping?.rear_category==='race','text-slate-400': result?.damping?.rear_category==='underdamped'}" x-text="result?.damping?.rear_ratio"></div>
+                <div class="lbl">後 ζ</div>
+                <div class="text-[10px] mt-1" :class="{'text-green-400': result?.damping?.rear_category==='street','text-yellow-400': result?.damping?.rear_category==='track','text-red-400': result?.damping?.rear_category==='race','text-slate-500': result?.damping?.rear_category==='underdamped'}" x-text="({'underdamped':'欠阻尼','street':'街道','track':'賽道','race':'競技'})[result?.damping?.rear_category]"></div>
+              </div>
+            </div>
+            <div class="text-xs text-slate-500">Roll Damping: <span class="font-mono text-slate-300" x-text="result?.damping?.roll_damping_ratio"></span></div>
+            <div class="text-[10px] text-slate-600 mt-1">街道 0.3-0.5 / 賽道 0.6-0.8 / 競技 0.8+</div>
+          </div>
+
+          <!-- Longitudinal Transfer (Tier 3) -->
+          <div x-show="tier === 3 && result?.longitudinal_transfer && (result?.longitudinal_transfer?.braking || result?.longitudinal_transfer?.acceleration)" class="card2 p-4 mb-4">
+            <div class="text-xs text-slate-400 mb-2">縱向荷重轉移</div>
+            <div x-show="result?.longitudinal_transfer?.braking" class="mb-2">
+              <div class="text-xs text-slate-500 mb-1">煞車</div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs w-14 text-right text-sky-400" x-text="'F ' + result?.longitudinal_transfer?.braking?.front_pct + '%'"></span>
+                <div class="flex-1 h-4 rounded overflow-hidden flex">
+                  <div class="bg-sky-500 transition-all" :style="'width:' + result?.longitudinal_transfer?.braking?.front_pct + '%'"></div>
+                  <div class="bg-pink-500 flex-1"></div>
+                </div>
+                <span class="text-xs w-14 text-pink-400" x-text="'R ' + result?.longitudinal_transfer?.braking?.rear_pct + '%'"></span>
+              </div>
+              <div class="text-[10px] text-slate-500 mt-1" x-text="'轉移量: ' + result?.longitudinal_transfer?.braking?.transfer_kg + ' kg'"></div>
+            </div>
+            <div x-show="result?.longitudinal_transfer?.acceleration">
+              <div class="text-xs text-slate-500 mb-1">加速</div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs w-14 text-right text-sky-400" x-text="'F ' + result?.longitudinal_transfer?.acceleration?.front_pct + '%'"></span>
+                <div class="flex-1 h-4 rounded overflow-hidden flex">
+                  <div class="bg-sky-500 transition-all" :style="'width:' + result?.longitudinal_transfer?.acceleration?.front_pct + '%'"></div>
+                  <div class="bg-pink-500 flex-1"></div>
+                </div>
+                <span class="text-xs w-14 text-pink-400" x-text="'R ' + result?.longitudinal_transfer?.acceleration?.rear_pct + '%'"></span>
+              </div>
+              <div class="text-[10px] text-slate-500 mt-1" x-text="'轉移量: ' + result?.longitudinal_transfer?.acceleration?.transfer_kg + ' kg'"></div>
+            </div>
+          </div>
+
+          <!-- Vehicle Dynamics (Tier 3) -->
+          <div x-show="tier === 3 && result?.dynamics" class="card2 p-4 mb-4">
+            <div class="text-xs text-slate-400 mb-2">車輛動態 Vehicle Dynamics</div>
+            <div class="grid-2 text-xs mb-2">
+              <div class="corner-box">
+                <div class="val text-sky-300" x-text="result?.dynamics?.slip_angle_front_deg + '°'"></div>
+                <div class="lbl">前軸 Slip Angle</div>
+              </div>
+              <div class="corner-box">
+                <div class="val text-pink-300" x-text="result?.dynamics?.slip_angle_rear_deg + '°'"></div>
+                <div class="lbl">後軸 Slip Angle</div>
+              </div>
+            </div>
+            <div class="text-xs text-slate-500 mb-1">
+              先飽和: <span class="font-bold" :class="result?.dynamics?.first_saturates==='front' ? 'text-sky-400' : 'text-pink-400'" x-text="result?.dynamics?.first_saturates==='front' ? '前軸 → 推頭' : '後軸 → 甩尾'"></span>
+            </div>
+            <div x-show="result?.dynamics?.characteristic_speed_kmh" class="text-xs text-slate-500">
+              特徵速度: <span class="font-mono text-slate-300" x-text="result?.dynamics?.characteristic_speed_kmh + ' km/h'"></span>
+            </div>
+            <div class="text-xs text-slate-500">
+              Yaw Gain @100: <span class="font-mono text-slate-300" x-text="result?.dynamics?.yaw_gain_at_100kmh + ' rad/s/rad'"></span>
+            </div>
+          </div>
+
           <!-- Tier 3: Contribution breakdown -->
           <div x-show="tier === 3 && result?.contribution" class="card2 p-4 mb-4">
             <div class="text-xs text-slate-400 mb-2">各因素貢獻（正=US / 負=OS）</div>
@@ -759,10 +909,11 @@ function app(){return{
   ],
   tier:1,
   // Prediction inputs
-  pred:{front_spring_rate:240,rear_spring_rate:925,front_arb:300,rear_arb:200,front_track:1440,rear_track:1380,front_motion_ratio:1.0,rear_motion_ratio:1.0,weight_front_pct:41.5,total_weight:570,cg_height:280,wheelbase:2730},
+  pred:{front_spring_rate:240,rear_spring_rate:925,front_arb:300,rear_arb:200,front_track:1440,rear_track:1380,front_motion_ratio:1.0,rear_motion_ratio:1.0,weight_front_pct:41.5,total_weight:570,cg_height:280,wheelbase:2730,tire_spring_rate:220,front_roll_center_height:50,rear_roll_center_height:100},
+  showAdvancedT1:false,
   tire:{fl_temp:88,fr_temp:92,rl_temp:85,rr_temp:90,fl_pressure:1.88,fr_pressure:1.92,rl_pressure:1.85,rr_pressure:1.90,front_compound:'yokohama_ad08r',rear_compound:'yokohama_ad08r',front_optimal_pressure:2.14,rear_optimal_pressure:2.21,front_tire_width:0,rear_tire_width:0,sameFrontRear:true},
   tireOptions:[],
-  adv:{fl_weight:112.5,fr_weight:114.5,rl_weight:170,rr_weight:173,speed_kmh:180,frontal_area:1.2,front_downforce_coeff:1.3,rear_downforce_coeff:1.5,front_bump_force:80,front_rebound_force:120,rear_bump_force:100,rear_rebound_force:150,front_camber_deg:-3.7,rear_camber_deg:-2.5,front_toe_deg:0.5,rear_toe_deg:0.3},
+  adv:{fl_weight:112.5,fr_weight:114.5,rl_weight:170,rr_weight:173,speed_kmh:180,frontal_area:1.2,front_downforce_coeff:1.3,rear_downforce_coeff:1.5,front_bump_force:80,front_rebound_force:120,rear_bump_force:100,rear_rebound_force:150,front_camber_deg:-3.7,rear_camber_deg:-2.5,front_toe_deg:0.5,rear_toe_deg:0.3,braking_g:0,accel_g:0},
   result:null,
   baseline:null,      // {tier, params, tire, adv, baselineUSG, baselineNorm}
   deltaResult:null,   // {delta_us, delta_norm, rel_norm, delta_tendency_zh, entry_delta, exit_delta}
