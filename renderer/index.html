@@ -1,0 +1,1255 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval'">
+<title>Racing Dynamics - 賽車動態分析系統</title>
+<script src="lib/tailwind.js"></script>
+<script defer src="lib/alpine.min.js"></script>
+<script src="lib/chart.min.js"></script>
+<style>
+:root{--bg:#0b1120;--bg2:#111827;--card:#1e293b;--card2:#334155;--accent:#38bdf8;--pink:#f472b6;--green:#34d399;--yellow:#facc15;--red:#ef4444;--text:#e2e8f0;--muted:#94a3b8}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,system-ui,sans-serif;margin:0}
+.card{background:var(--card);border:1px solid rgba(255,255,255,.06);border-radius:12px}
+.card2{background:var(--card2);border-radius:8px}
+input,select{background:var(--card2);color:var(--text);border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:6px 10px;font-size:.85rem}
+input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(56,189,248,.2)}
+.btn{padding:8px 16px;border-radius:8px;font-weight:600;cursor:pointer;transition:.15s;font-size:.85rem;border:none}
+.btn-primary{background:var(--accent);color:#0f172a}.btn-primary:hover{background:#7dd3fc}
+.btn-sm{padding:4px 12px;font-size:.75rem;border-radius:6px}
+.nav-btn{padding:12px 16px;border-radius:10px;cursor:pointer;transition:.2s;border:1px solid transparent;text-align:center;min-width:80px}
+.nav-btn:hover{background:rgba(56,189,248,.08)}
+.nav-btn.active{background:rgba(56,189,248,.15);border-color:rgba(56,189,248,.3)}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:.65rem;font-weight:600}
+.badge-b{background:rgba(56,189,248,.15);color:#38bdf8}
+.badge-p{background:rgba(244,114,182,.15);color:#f472b6}
+.badge-g{background:rgba(52,211,153,.15);color:#34d399}
+.badge-y{background:rgba(250,204,21,.15);color:#facc15}
+.badge-r{background:rgba(239,68,68,.15);color:#ef4444}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:6px 10px;color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;border-bottom:1px solid rgba(255,255,255,.08)}
+td{padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.8rem}
+.gauge-bar{height:32px;border-radius:8px;position:relative;overflow:hidden;background:linear-gradient(90deg,var(--accent) 0%,var(--green) 35%,var(--yellow) 50%,var(--pink) 65%,var(--red) 100%)}
+.gauge-needle{position:absolute;top:0;width:4px;height:100%;background:#fff;border-radius:2px;transition:left .5s ease;box-shadow:0 0 8px rgba(255,255,255,.8)}
+.gauge-label{position:absolute;bottom:-18px;font-size:.65rem;color:var(--muted);transform:translateX(-50%)}
+.section-title{font-size:1rem;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.corner-box{padding:12px;border-radius:8px;text-align:center;background:var(--card2)}
+.corner-box .val{font-size:1.1rem;font-weight:700}
+.corner-box .lbl{font-size:.65rem;color:var(--muted);margin-top:2px}
+.tier-tab{padding:10px 20px;border-radius:8px 8px 0 0;cursor:pointer;font-weight:600;font-size:.85rem;transition:.2s;border:1px solid transparent;border-bottom:none}
+.tier-tab.active{background:var(--card);border-color:rgba(255,255,255,.06)}
+.tier-tab:not(.active){background:transparent;color:var(--muted)}
+.warn{background:rgba(250,204,21,.08);border:1px solid rgba(250,204,21,.2);border-radius:8px;padding:8px 12px;font-size:.8rem;color:#fde047}
+canvas{max-height:300px}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
+</style>
+</head>
+<body x-data="app()" x-init="init()">
+
+<!-- Top Nav -->
+<header class="flex items-center justify-between px-6 py-3 border-b border-white/5" style="background:var(--bg2)">
+  <div class="flex items-center gap-3">
+    <div class="text-lg font-bold text-sky-400">Racing Dynamics</div>
+    <div class="text-xs text-slate-600">賽車動態分析系統 v3.0 Desktop</div>
+  </div>
+  <div class="flex gap-2">
+    <template x-for="tab in tabs" :key="tab.id">
+      <div class="nav-btn" :class="{'active': currentTab===tab.id}" @click="switchTab(tab.id)">
+        <div class="text-xs font-semibold" x-text="tab.label"></div>
+        <div class="text-[10px] text-slate-500" x-text="tab.sub"></div>
+      </div>
+    </template>
+  </div>
+</header>
+
+<main class="p-6 max-w-7xl mx-auto">
+
+<!-- ==================== TAB: 轉向趨勢預測 ==================== -->
+<div x-show="currentTab==='predict'" x-transition>
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-bold">轉向趨勢預測器</h2>
+    <!-- Mode toggle -->
+    <div class="flex items-center gap-3">
+      <div class="flex rounded-lg overflow-hidden border border-white/10">
+        <button class="px-4 py-2 text-xs font-semibold transition-colors" :class="streetMode ? 'bg-transparent text-slate-400' : 'bg-sky-500 text-white'" @click="streetMode=false; streetCar=''">專業模式</button>
+        <button class="px-4 py-2 text-xs font-semibold transition-colors" :class="streetMode ? 'bg-green-500 text-white' : 'bg-transparent text-slate-400'" @click="streetMode=true; if(!carPresets.length) loadPresets()">街車模式</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Street mode: car selection -->
+  <div x-show="streetMode" x-transition class="card p-4 mb-4">
+    <div class="flex items-center gap-4 flex-wrap">
+      <div>
+        <label class="text-xs text-slate-400">選擇車種</label>
+        <select x-model="streetCar" @change="applyPreset()" class="ml-2 text-sm min-w-[240px]">
+          <option value="">-- 請選擇 --</option>
+          <template x-for="c in carPresets" :key="c.id">
+            <option :value="c.id" x-text="c.name_zh + ' (' + c.years + ')'"></option>
+          </template>
+        </select>
+      </div>
+      <template x-if="streetCarDetail">
+        <div class="flex items-center gap-3 text-xs">
+          <span class="badge badge-g" x-text="streetCarDetail.layout"></span>
+          <span class="text-slate-400" x-text="streetCarDetail.params.total_weight + 'kg'"></span>
+          <span class="text-slate-400" x-text="'F' + streetCarDetail.params.weight_front_pct + '% / R' + (100-streetCarDetail.params.weight_front_pct) + '%'"></span>
+          <span class="text-slate-400" x-text="streetCarDetail.oem_tire"></span>
+          <span class="text-slate-400" x-text="streetCarDetail.oem_tire_size"></span>
+        </div>
+      </template>
+    </div>
+    <!-- Data confidence badges -->
+    <template x-if="streetCarDetail?.confidence">
+      <div class="flex gap-2 mt-3 flex-wrap">
+        <template x-for="(level, key) in streetCarDetail.confidence" :key="key">
+          <span class="text-[10px] px-2 py-0.5 rounded-full" :class="level==='confirmed'?'bg-green-900/30 text-green-400':level==='estimated'?'bg-yellow-900/30 text-yellow-400':'bg-red-900/30 text-red-400'" x-text="key + ': ' + (level==='confirmed'?'已確認':level==='estimated'?'估算':'無公開數據')"></span>
+        </template>
+      </div>
+    </template>
+    <div x-show="streetCarDetail?.notes" class="text-xs text-slate-500 mt-2" x-text="streetCarDetail?.notes"></div>
+  </div>
+
+  <!-- Tier tabs -->
+  <div class="flex gap-1 mb-0">
+    <div class="tier-tab" :class="{'active':tier===1}" @click="switchTier(1)">Tier 1 快速</div>
+    <div class="tier-tab" :class="{'active':tier===2}" @click="switchTier(2)">Tier 2 輪胎詳細</div>
+    <div class="tier-tab" :class="{'active':tier===3}" @click="switchTier(3)">Tier 3 完整</div>
+  </div>
+
+  <div class="card p-5">
+    <div class="grid-2">
+      <!-- LEFT: Inputs -->
+      <div class="space-y-4">
+
+        <!-- Tier 1: Mechanical -->
+        <div>
+          <div class="section-title"><span class="badge badge-b">Tier 1</span> 機械設定
+            <span x-show="streetMode && streetCar" class="text-[10px] text-yellow-400 ml-2">鎖定中 — 由車種預設帶入</span>
+          </div>
+          <!-- Street mode: locked summary -->
+          <div x-show="streetMode && streetCar" class="card2 p-3 mb-3 text-xs text-slate-400 space-y-1">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-[10px] text-slate-500">車種固定參數</span>
+              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-600 text-slate-300 hover:bg-slate-500" @click="applyPreset()">全部還原預設</button>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <span>彈簧: F <b class="text-slate-200" x-text="pred.front_spring_rate"></b> / R <b class="text-slate-200" x-text="pred.rear_spring_rate"></b> N/mm</span>
+              <span>ARB: F <b class="text-slate-200" x-text="pred.front_arb"></b> / R <b class="text-slate-200" x-text="pred.rear_arb"></b> Nm/deg</span>
+              <span>配重: F <b class="text-slate-200" x-text="pred.weight_front_pct + '%'"></b></span>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+              <span>輪距: F <b class="text-slate-200" x-text="pred.front_track"></b> / R <b class="text-slate-200" x-text="pred.rear_track"></b></span>
+              <span>總重: <b class="text-slate-200" x-text="pred.total_weight + 'kg'"></b></span>
+              <span>軸距: <b class="text-slate-200" x-text="pred.wheelbase + 'mm'"></b></span>
+            </div>
+          </div>
+          <!-- Street mode: Damper adjust (if car has adjustable dampers) -->
+          <div x-show="streetMode && streetCar && streetCarDetail?.damper_adjustable && tier >= 3" class="mb-3">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs text-green-400 font-semibold">可調阻尼</span>
+              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-600 text-slate-300 hover:bg-slate-500" @click="resetDamper()">還原阻尼預設</button>
+            </div>
+            <div class="grid-4 text-sm">
+              <div><label class="text-xs text-slate-400">前 Bump (kgf)</label><input type="number" x-model.number="adv.front_bump_force" class="w-full mt-1"></div>
+              <div><label class="text-xs text-slate-400">前 Rebound</label><input type="number" x-model.number="adv.front_rebound_force" class="w-full mt-1"></div>
+              <div><label class="text-xs text-slate-400">後 Bump (kgf)</label><input type="number" x-model.number="adv.rear_bump_force" class="w-full mt-1"></div>
+              <div><label class="text-xs text-slate-400">後 Rebound</label><input type="number" x-model.number="adv.rear_rebound_force" class="w-full mt-1"></div>
+            </div>
+            <div class="text-[10px] text-slate-500 mt-1">無法取得精確阻尼力值時，可以調段數比例感受趨勢方向</div>
+          </div>
+          <!-- Pro mode: all fields -->
+          <div x-show="!streetMode || !streetCar" class="grid-2 text-sm">
+            <div>
+              <label class="text-xs text-slate-400">前彈簧率 (N/mm)</label>
+              <input type="number" x-model.number="pred.front_spring_rate" class="w-full mt-1" step="10">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">後彈簧率 (N/mm)</label>
+              <input type="number" x-model.number="pred.rear_spring_rate" class="w-full mt-1" step="10">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">前 ARB (Nm/deg)</label>
+              <input type="number" x-model.number="pred.front_arb" class="w-full mt-1" step="10">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">後 ARB (Nm/deg)</label>
+              <input type="number" x-model.number="pred.rear_arb" class="w-full mt-1" step="10">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">前輪距 (mm)</label>
+              <input type="number" x-model.number="pred.front_track" class="w-full mt-1">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">後輪距 (mm)</label>
+              <input type="number" x-model.number="pred.rear_track" class="w-full mt-1">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">前 Motion Ratio</label>
+              <input type="number" x-model.number="pred.front_motion_ratio" class="w-full mt-1" step="0.01">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">後 Motion Ratio</label>
+              <input type="number" x-model.number="pred.rear_motion_ratio" class="w-full mt-1" step="0.01">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">前軸荷重 %</label>
+              <input type="number" x-model.number="pred.weight_front_pct" class="w-full mt-1" step="0.5">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">總重 (kg)</label>
+              <input type="number" x-model.number="pred.total_weight" class="w-full mt-1">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">CG 高度 (mm)</label>
+              <input type="number" x-model.number="pred.cg_height" class="w-full mt-1">
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">軸距 (mm)</label>
+              <input type="number" x-model.number="pred.wheelbase" class="w-full mt-1">
+            </div>
+          </div>
+        </div>
+
+        <!-- Tier 1: Simple tire selector -->
+        <div x-show="tier === 1" x-transition>
+          <div class="section-title"><span class="badge badge-p">輪胎</span> 快速選擇</div>
+          <div class="mb-2">
+            <div class="flex items-center gap-2 mb-1">
+              <label class="text-xs text-slate-400">輪胎型號</label>
+              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300" @click="tire.sameFrontRear=!tire.sameFrontRear" x-text="tire.sameFrontRear?'前後相同':'前後不同'"></button>
+            </div>
+            <div :class="tire.sameFrontRear?'':'grid-2'">
+              <div>
+                <label x-show="!tire.sameFrontRear" class="text-[10px] text-slate-500">前輪</label>
+                <select x-model="tire.front_compound" @change="onTireSelect('front')" class="w-full mt-0.5 text-xs">
+                  <optgroup label="── Semi-Slick ──">
+                    <template x-for="t in tireOptions.filter(t=>t.category==='semi_slick')" :key="t.id">
+                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                    </template>
+                  </optgroup>
+                  <optgroup label="── Sport ──">
+                    <template x-for="t in tireOptions.filter(t=>t.category==='sport')" :key="t.id">
+                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                    </template>
+                  </optgroup>
+                  <optgroup label="── Race ──">
+                    <template x-for="t in tireOptions.filter(t=>t.category==='race')" :key="t.id">
+                      <option :value="t.id" x-text="t.name_zh"></option>
+                    </template>
+                  </optgroup>
+                </select>
+              </div>
+              <div x-show="!tire.sameFrontRear">
+                <label class="text-[10px] text-slate-500">後輪</label>
+                <select x-model="tire.rear_compound" @change="onTireSelect('rear')" class="w-full mt-0.5 text-xs">
+                  <optgroup label="── Semi-Slick ──">
+                    <template x-for="t in tireOptions.filter(t=>t.category==='semi_slick')" :key="t.id">
+                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                    </template>
+                  </optgroup>
+                  <optgroup label="── Sport ──">
+                    <template x-for="t in tireOptions.filter(t=>t.category==='sport')" :key="t.id">
+                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                    </template>
+                  </optgroup>
+                  <optgroup label="── Race ──">
+                    <template x-for="t in tireOptions.filter(t=>t.category==='race')" :key="t.id">
+                      <option :value="t.id" x-text="t.name_zh"></option>
+                    </template>
+                  </optgroup>
+                </select>
+              </div>
+            </div>
+            <!-- Tire info badges (compact) -->
+            <div x-show="selectedTireInfo" class="flex flex-wrap gap-1.5 mt-1.5 text-[10px]">
+              <span class="px-1.5 py-0.5 rounded bg-pink-900/20 text-pink-400" x-text="'抓地力: ' + ((selectedTireInfo?.peak_grip||1)*100).toFixed(0) + '%'"></span>
+              <span class="px-1.5 py-0.5 rounded bg-sky-900/20 text-sky-400" x-text="'最佳溫度: ' + (selectedTireInfo?.optimal_temp||'?') + '°C'"></span>
+              <span x-show="selectedTireInfo?.notes" class="px-1.5 py-0.5 rounded bg-yellow-900/20 text-yellow-400" x-text="selectedTireInfo?.notes"></span>
+            </div>
+          </div>
+          <div class="text-[10px] text-slate-500 mt-1 mb-1">快速模式：自動使用建議胎壓和預設溫度。切換至 Tier 2 可手動調整四角溫壓。</div>
+        </div>
+
+        <!-- Tier 2+: Full tire controls -->
+        <div x-show="tier >= 2" x-transition>
+          <div class="section-title"><span class="badge badge-p">Tier 2</span> 輪胎條件（詳細）</div>
+          <div class="grid-4 text-sm mb-2">
+            <div class="text-center text-xs text-slate-500">FL</div>
+            <div class="text-center text-xs text-slate-500">FR</div>
+            <div class="text-center text-xs text-slate-500">RL</div>
+            <div class="text-center text-xs text-slate-500">RR</div>
+          </div>
+          <div class="text-xs text-slate-400 mb-1">胎溫 (°C)</div>
+          <div class="grid-4 mb-2">
+            <input type="number" x-model.number="tire.fl_temp" class="text-center">
+            <input type="number" x-model.number="tire.fr_temp" class="text-center">
+            <input type="number" x-model.number="tire.rl_temp" class="text-center">
+            <input type="number" x-model.number="tire.rr_temp" class="text-center">
+          </div>
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xs text-slate-400">胎壓</span>
+            <div class="flex rounded overflow-hidden border border-white/10 text-[10px]">
+              <button class="px-2 py-0.5 transition-colors" :class="pressureUnit==='psi'?'bg-sky-500 text-white':'text-slate-400'" @click="switchPressureUnit('psi')">PSI</button>
+              <button class="px-2 py-0.5 transition-colors" :class="pressureUnit==='bar'?'bg-sky-500 text-white':'text-slate-400'" @click="switchPressureUnit('bar')">bar</button>
+              <button class="px-2 py-0.5 transition-colors" :class="pressureUnit==='kpa'?'bg-sky-500 text-white':'text-slate-400'" @click="switchPressureUnit('kpa')">kPa</button>
+            </div>
+          </div>
+          <div class="grid-4 mb-2">
+            <input type="number" :value="fromBar(tire.fl_pressure)" @input="tire.fl_pressure=toBar($event.target.value)" :step="pressureStep" class="text-center">
+            <input type="number" :value="fromBar(tire.fr_pressure)" @input="tire.fr_pressure=toBar($event.target.value)" :step="pressureStep" class="text-center">
+            <input type="number" :value="fromBar(tire.rl_pressure)" @input="tire.rl_pressure=toBar($event.target.value)" :step="pressureStep" class="text-center">
+            <input type="number" :value="fromBar(tire.rr_pressure)" @input="tire.rr_pressure=toBar($event.target.value)" :step="pressureStep" class="text-center">
+          </div>
+          <!-- Tire selector -->
+          <div class="mb-2">
+            <div class="flex items-center gap-2 mb-1">
+              <label class="text-xs text-slate-400">輪胎型號</label>
+              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300" @click="tire.sameFrontRear=!tire.sameFrontRear" x-text="tire.sameFrontRear?'前後相同':'前後不同'"></button>
+            </div>
+            <div :class="tire.sameFrontRear?'':'grid-2'">
+              <div>
+                <label x-show="!tire.sameFrontRear" class="text-[10px] text-slate-500">前輪</label>
+                <select x-model="tire.front_compound" @change="onTireSelect('front')" class="w-full mt-0.5 text-xs">
+                  <optgroup label="── 賽道日性能胎 Semi-Slick ──">
+                    <template x-for="t in tireOptions.filter(t=>t.category==='semi_slick')" :key="t.id">
+                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                    </template>
+                  </optgroup>
+                  <optgroup label="── 高性能街胎 Sport ──">
+                    <template x-for="t in tireOptions.filter(t=>t.category==='sport')" :key="t.id">
+                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                    </template>
+                  </optgroup>
+                  <optgroup label="── 賽車光頭胎 Race ──">
+                    <template x-for="t in tireOptions.filter(t=>t.category==='race')" :key="t.id">
+                      <option :value="t.id" x-text="t.name_zh"></option>
+                    </template>
+                  </optgroup>
+                  <optgroup label="── 通用配方 (舊版) ──">
+                    <option value="soft">Soft</option><option value="medium">Medium</option><option value="hard">Hard</option><option value="wet">Wet</option>
+                  </optgroup>
+                </select>
+              </div>
+              <div x-show="!tire.sameFrontRear">
+                <label class="text-[10px] text-slate-500">後輪</label>
+                <select x-model="tire.rear_compound" @change="onTireSelect('rear')" class="w-full mt-0.5 text-xs">
+                  <optgroup label="── 賽道日性能胎 Semi-Slick ──">
+                    <template x-for="t in tireOptions.filter(t=>t.category==='semi_slick')" :key="t.id">
+                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                    </template>
+                  </optgroup>
+                  <optgroup label="── 高性能街胎 Sport ──">
+                    <template x-for="t in tireOptions.filter(t=>t.category==='sport')" :key="t.id">
+                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                    </template>
+                  </optgroup>
+                  <optgroup label="── 賽車光頭胎 Race ──">
+                    <template x-for="t in tireOptions.filter(t=>t.category==='race')" :key="t.id">
+                      <option :value="t.id" x-text="t.name_zh"></option>
+                    </template>
+                  </optgroup>
+                  <optgroup label="── 通用配方 (舊版) ──">
+                    <option value="soft">Soft</option><option value="medium">Medium</option><option value="hard">Hard</option><option value="wet">Wet</option>
+                  </optgroup>
+                </select>
+              </div>
+            </div>
+            <!-- Tire info badges -->
+            <div x-show="selectedTireInfo" class="flex flex-wrap gap-1.5 mt-1.5 text-[10px]">
+              <span class="px-1.5 py-0.5 rounded bg-pink-900/20 text-pink-400" x-text="'抓地力: ' + ((selectedTireInfo?.peak_grip||1)*100).toFixed(0) + '%'"></span>
+              <span class="px-1.5 py-0.5 rounded bg-sky-900/20 text-sky-400" x-text="'最佳溫度: ' + (selectedTireInfo?.optimal_temp||'?') + '°C ±' + (selectedTireInfo?.temp_window||'?')"></span>
+              <span class="px-1.5 py-0.5 rounded bg-green-900/20 text-green-400" x-text="'建議前胎壓: ' + fromBar(selectedTireInfo?.optimal_pressure_front_bar||1.9) + ' ' + pressureUnit.toUpperCase()"></span>
+              <span class="px-1.5 py-0.5 rounded bg-green-900/20 text-green-400" x-text="'建議後胎壓: ' + fromBar(selectedTireInfo?.optimal_pressure_rear_bar||1.9) + ' ' + pressureUnit.toUpperCase()"></span>
+              <span x-show="selectedTireInfo?.notes" class="px-1.5 py-0.5 rounded bg-yellow-900/20 text-yellow-400" x-text="selectedTireInfo?.notes"></span>
+            </div>
+          </div>
+          <!-- Tire width -->
+          <div class="grid-2 mb-1">
+            <div>
+              <label class="text-xs text-slate-400">前胎寬 (mm)</label>
+              <select x-model.number="tire.front_tire_width" class="w-full mt-1 text-xs">
+                <option value="0">-- 不指定 --</option>
+                <template x-for="w in availableWidthsFront" :key="w">
+                  <option :value="w" x-text="w + ' mm'"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-slate-400">後胎寬 (mm)</label>
+              <select x-model.number="tire.rear_tire_width" class="w-full mt-1 text-xs">
+                <option value="0">-- 不指定 --</option>
+                <template x-for="w in availableWidthsRear" :key="w">
+                  <option :value="w" x-text="w + ' mm'"></option>
+                </template>
+              </select>
+            </div>
+          </div>
+          <div x-show="tire.front_tire_width > 0 || tire.rear_tire_width > 0" class="text-[10px] text-slate-500 mb-1">
+            胎寬效果: 前 <span class="text-slate-300" x-text="tire.front_tire_width > 0 ? (Math.sqrt(tire.front_tire_width/245)*100).toFixed(1)+'%' : '-'"></span>
+            / 後 <span class="text-slate-300" x-text="tire.rear_tire_width > 0 ? (Math.sqrt(tire.rear_tire_width/245)*100).toFixed(1)+'%' : '-'"></span>
+            (以 245mm 為基準 100%)
+          </div>
+
+          <!-- Tire Pressure Management 胎壓管理 -->
+          <div class="card2 p-3 mt-3">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-xs font-semibold text-pink-400 flex items-center gap-1">
+                <span>胎壓管理</span>
+                <span class="text-[10px] text-slate-500">冷胎壓 → 跑圈 → 量測熱胎壓</span>
+              </div>
+              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300" @click="tpm.show=!tpm.show" x-text="tpm.show?'收起':'展開'"></button>
+            </div>
+            <div x-show="tpm.show" x-transition>
+              <!-- Step 1: Cold pressure -->
+              <div class="mb-3">
+                <div class="text-xs text-slate-400 mb-1">① 出場前冷胎壓 <span class="text-slate-500" x-text="'(' + pressureUnit.toUpperCase() + ')'"></span></div>
+                <div class="grid-4">
+                  <input type="number" :value="fromBar(tpm.cold_fl)" @input="tpm.cold_fl=toBar($event.target.value)" :step="pressureStep" class="text-center text-xs">
+                  <input type="number" :value="fromBar(tpm.cold_fr)" @input="tpm.cold_fr=toBar($event.target.value)" :step="pressureStep" class="text-center text-xs">
+                  <input type="number" :value="fromBar(tpm.cold_rl)" @input="tpm.cold_rl=toBar($event.target.value)" :step="pressureStep" class="text-center text-xs">
+                  <input type="number" :value="fromBar(tpm.cold_rr)" @input="tpm.cold_rr=toBar($event.target.value)" :step="pressureStep" class="text-center text-xs">
+                </div>
+              </div>
+              <!-- Step 2: How many laps / ambient -->
+              <div class="grid grid-cols-3 gap-2 mb-3 text-xs">
+                <div>
+                  <label class="text-slate-400">跑了幾圈</label>
+                  <input type="number" x-model.number="tpm.laps" class="w-full mt-1 text-center" min="0" step="1">
+                </div>
+                <div>
+                  <label class="text-slate-400">外氣溫 (°C)</label>
+                  <input type="number" x-model.number="tpm.ambient_temp" class="w-full mt-1 text-center" step="1">
+                </div>
+                <div>
+                  <label class="text-slate-400">路面溫度 (°C)</label>
+                  <input type="number" x-model.number="tpm.track_temp" class="w-full mt-1 text-center" step="1">
+                </div>
+              </div>
+              <!-- Step 3: Measured hot pressure -->
+              <div class="mb-3">
+                <div class="text-xs text-slate-400 mb-1">③ 進站量測熱胎壓 <span class="text-slate-500" x-text="'(' + pressureUnit.toUpperCase() + ')'"></span></div>
+                <div class="grid-4">
+                  <input type="number" :value="fromBar(tpm.hot_fl)" @input="tpm.hot_fl=toBar($event.target.value)" :step="pressureStep" class="text-center text-xs">
+                  <input type="number" :value="fromBar(tpm.hot_fr)" @input="tpm.hot_fr=toBar($event.target.value)" :step="pressureStep" class="text-center text-xs">
+                  <input type="number" :value="fromBar(tpm.hot_rl)" @input="tpm.hot_rl=toBar($event.target.value)" :step="pressureStep" class="text-center text-xs">
+                  <input type="number" :value="fromBar(tpm.hot_rr)" @input="tpm.hot_rr=toBar($event.target.value)" :step="pressureStep" class="text-center text-xs">
+                </div>
+              </div>
+              <!-- Target hot pressure -->
+              <div class="mb-3">
+                <div class="text-xs text-slate-400 mb-1">目標熱胎壓 <span class="text-slate-500" x-text="'(' + pressureUnit.toUpperCase() + ')'"></span></div>
+                <div class="grid-2">
+                  <div class="flex items-center gap-1">
+                    <span class="text-xs text-slate-500 w-6">前</span>
+                    <input type="number" :value="fromBar(tpm.target_front)" @input="tpm.target_front=toBar($event.target.value)" :step="pressureStep" class="flex-1 text-center text-xs">
+                  </div>
+                  <div class="flex items-center gap-1">
+                    <span class="text-xs text-slate-500 w-6">後</span>
+                    <input type="number" :value="fromBar(tpm.target_rear)" @input="tpm.target_rear=toBar($event.target.value)" :step="pressureStep" class="flex-1 text-center text-xs">
+                  </div>
+                </div>
+              </div>
+              <button class="btn btn-sm w-full" style="background:var(--pink);color:#0f172a" @click="analyzePressure()">分析胎壓</button>
+
+              <!-- Analysis results -->
+              <div x-show="tpm.result" x-transition class="mt-3 space-y-2">
+                <!-- Rise per corner -->
+                <div class="text-xs text-slate-400 mb-1">冷→熱 升壓量</div>
+                <div class="grid-4 text-center text-xs">
+                  <div class="corner-box"><div class="val text-sm" :class="tpm.result?.rise_color?.fl" x-text="tpm.result?.rise_display?.fl"></div><div class="lbl">FL</div></div>
+                  <div class="corner-box"><div class="val text-sm" :class="tpm.result?.rise_color?.fr" x-text="tpm.result?.rise_display?.fr"></div><div class="lbl">FR</div></div>
+                  <div class="corner-box"><div class="val text-sm" :class="tpm.result?.rise_color?.rl" x-text="tpm.result?.rise_display?.rl"></div><div class="lbl">RL</div></div>
+                  <div class="corner-box"><div class="val text-sm" :class="tpm.result?.rise_color?.rr" x-text="tpm.result?.rise_display?.rr"></div><div class="lbl">RR</div></div>
+                </div>
+                <!-- vs Target -->
+                <div class="text-xs text-slate-400">vs 目標熱胎壓</div>
+                <div class="grid-4 text-center text-xs">
+                  <div class="corner-box"><div class="val text-sm" :class="tpm.result?.vs_color?.fl" x-text="tpm.result?.vs_display?.fl"></div><div class="lbl">FL</div></div>
+                  <div class="corner-box"><div class="val text-sm" :class="tpm.result?.vs_color?.fr" x-text="tpm.result?.vs_display?.fr"></div><div class="lbl">FR</div></div>
+                  <div class="corner-box"><div class="val text-sm" :class="tpm.result?.vs_color?.rl" x-text="tpm.result?.vs_display?.rl"></div><div class="lbl">RL</div></div>
+                  <div class="corner-box"><div class="val text-sm" :class="tpm.result?.vs_color?.rr" x-text="tpm.result?.vs_display?.rr"></div><div class="lbl">RR</div></div>
+                </div>
+                <!-- Suggested cold for next stint -->
+                <div class="text-xs text-slate-400">建議下次冷胎壓 (達到目標熱胎壓)</div>
+                <div class="grid-4 text-center text-xs">
+                  <div class="corner-box"><div class="val text-sm text-green-400" x-text="tpm.result?.suggest_display?.fl"></div><div class="lbl">FL</div></div>
+                  <div class="corner-box"><div class="val text-sm text-green-400" x-text="tpm.result?.suggest_display?.fr"></div><div class="lbl">FR</div></div>
+                  <div class="corner-box"><div class="val text-sm text-green-400" x-text="tpm.result?.suggest_display?.rl"></div><div class="lbl">RL</div></div>
+                  <div class="corner-box"><div class="val text-sm text-green-400" x-text="tpm.result?.suggest_display?.rr"></div><div class="lbl">RR</div></div>
+                </div>
+                <!-- Advice -->
+                <template x-for="msg in tpm.result?.advice||[]" :key="msg">
+                  <div class="text-xs px-2 py-1.5 rounded" style="background:rgba(244,114,182,.06);border:1px solid rgba(244,114,182,.12)" x-text="msg"></div>
+                </template>
+                <!-- Apply hot pressure to prediction -->
+                <button class="btn btn-sm w-full mt-1" style="background:var(--accent);color:#0f172a" @click="applyHotPressure()">將熱胎壓套用至預測</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tier 3: Advanced -->
+        <div x-show="tier >= 3" x-transition>
+          <div class="section-title"><span class="badge badge-g">Tier 3</span> 四角重量 / 空力 / Damper / 幾何</div>
+
+          <!-- Corner weights -->
+          <div class="text-xs text-slate-400 mb-1">四角重量 (kg)</div>
+          <div class="grid-4 mb-3">
+            <div class="text-center"><input type="number" x-model.number="adv.fl_weight" class="w-full text-center" step="0.5"><div class="text-[10px] text-slate-500">FL</div></div>
+            <div class="text-center"><input type="number" x-model.number="adv.fr_weight" class="w-full text-center" step="0.5"><div class="text-[10px] text-slate-500">FR</div></div>
+            <div class="text-center"><input type="number" x-model.number="adv.rl_weight" class="w-full text-center" step="0.5"><div class="text-[10px] text-slate-500">RL</div></div>
+            <div class="text-center"><input type="number" x-model.number="adv.rr_weight" class="w-full text-center" step="0.5"><div class="text-[10px] text-slate-500">RR</div></div>
+          </div>
+
+          <!-- Aero -->
+          <div class="grid-2 mb-3 text-sm">
+            <div><label class="text-xs text-slate-400">車速 (km/h)</label><input type="number" x-model.number="adv.speed_kmh" class="w-full mt-1"></div>
+            <div><label class="text-xs text-slate-400">投影面積 (m²)</label><input type="number" x-model.number="adv.frontal_area" class="w-full mt-1" step="0.1"></div>
+            <div><label class="text-xs text-slate-400">前下壓力係數 CzF</label><input type="number" x-model.number="adv.front_downforce_coeff" class="w-full mt-1" step="0.1"></div>
+            <div><label class="text-xs text-slate-400">後下壓力係數 CzR</label><input type="number" x-model.number="adv.rear_downforce_coeff" class="w-full mt-1" step="0.1"></div>
+          </div>
+
+          <!-- Damper (hide when street mode has its own damper section) -->
+          <div x-show="!streetMode || !streetCar || !streetCarDetail?.damper_adjustable" class="grid-4 mb-3 text-sm">
+            <div><label class="text-xs text-slate-400">前 Bump (kgf)</label><input type="number" x-model.number="adv.front_bump_force" class="w-full mt-1"></div>
+            <div><label class="text-xs text-slate-400">前 Rebound</label><input type="number" x-model.number="adv.front_rebound_force" class="w-full mt-1"></div>
+            <div><label class="text-xs text-slate-400">後 Bump (kgf)</label><input type="number" x-model.number="adv.rear_bump_force" class="w-full mt-1"></div>
+            <div><label class="text-xs text-slate-400">後 Rebound</label><input type="number" x-model.number="adv.rear_rebound_force" class="w-full mt-1"></div>
+          </div>
+
+          <!-- Geometry -->
+          <div class="grid-4 text-sm">
+            <div><label class="text-xs text-slate-400">前 Camber (°)</label><input type="number" x-model.number="adv.front_camber_deg" class="w-full mt-1" step="0.1"></div>
+            <div><label class="text-xs text-slate-400">後 Camber (°)</label><input type="number" x-model.number="adv.rear_camber_deg" class="w-full mt-1" step="0.1"></div>
+            <div><label class="text-xs text-slate-400">前 Toe (°)</label><input type="number" x-model.number="adv.front_toe_deg" class="w-full mt-1" step="0.1"></div>
+            <div><label class="text-xs text-slate-400">後 Toe (°)</label><input type="number" x-model.number="adv.rear_toe_deg" class="w-full mt-1" step="0.1"></div>
+          </div>
+        </div>
+
+        <div class="flex gap-2 mt-2">
+          <button class="btn btn-primary flex-1" @click="runPrediction()">計算預測</button>
+          <button class="btn flex-1" style="background:var(--yellow);color:#0f172a" @click="setBaseline()" :disabled="!result" x-text="baseline ? '重新歸零' : '歸零 (設基準)'"></button>
+        </div>
+        <div x-show="baseline" class="mt-2 text-xs px-3 py-2 rounded-lg" style="background:rgba(250,204,21,.08);border:1px solid rgba(250,204,21,.15)">
+          <div class="flex items-center justify-between">
+            <span class="text-yellow-300 font-semibold">基準已鎖定</span>
+            <button class="text-slate-400 hover:text-red-400 text-xs" @click="clearBaseline()">清除基準</button>
+          </div>
+          <div class="text-slate-400 mt-1" x-text="'Tier ' + baseline?.tier + ' | USG 基準: ' + (baseline?.baselineUSG?.toFixed(2) ?? '?')"></div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Results -->
+      <div class="space-y-4">
+        <div x-show="result">
+          <!-- Delta display (when baseline is set) -->
+          <div x-show="baseline && deltaResult" class="card2 p-4 mb-4" style="background:rgba(250,204,21,.06);border:1px solid rgba(250,204,21,.15)">
+            <div class="text-center">
+              <div class="text-xs text-yellow-400 mb-1">相對基準變化</div>
+              <div class="text-2xl font-bold" :class="deltaResult?.delta_us > 1.5 ? 'text-red-400' : deltaResult?.delta_us < -1.5 ? 'text-sky-400' : 'text-green-400'">
+                <span x-text="deltaResult?.delta_tendency_zh"></span>
+              </div>
+              <div class="text-xs text-slate-400 mt-1">
+                USG 變化: <span class="font-mono font-bold" :class="deltaResult?.delta_us > 0 ? 'text-red-300' : deltaResult?.delta_us < 0 ? 'text-sky-300' : 'text-slate-300'" x-text="(deltaResult?.delta_us > 0 ? '+' : '') + deltaResult?.delta_us?.toFixed(2)"></span>
+              </div>
+            </div>
+            <div class="relative mt-3 mb-5">
+              <div class="h-6 rounded-full" style="background:linear-gradient(90deg,#38bdf8 0%,#334155 45%,#facc15 50%,#334155 55%,#ef4444 100%)"></div>
+              <div class="absolute top-0 w-1 h-6 bg-yellow-400 rounded" style="left:50%;transform:translateX(-50%)" title="基準"></div>
+              <div class="absolute top-0 w-3 h-6 bg-white rounded shadow" :style="'left:' + (50 + (deltaResult?.rel_norm||0)*45) + '%;transform:translateX(-50%)'" title="目前"></div>
+              <div class="flex justify-between text-[10px] text-slate-500 mt-1">
+                <span>更偏 OS</span>
+                <span class="text-yellow-500">基準</span>
+                <span>更偏 US</span>
+              </div>
+            </div>
+            <!-- Tier 3: entry/exit delta -->
+            <div x-show="tier===3 && deltaResult?.entry_delta !== undefined" class="grid grid-cols-3 gap-2 text-xs mt-2">
+              <div class="text-center"><span class="text-slate-500">入彎</span><br><span class="font-bold" :class="deltaResult?.entry_delta > 0 ? 'text-red-300' : 'text-sky-300'" x-text="(deltaResult?.entry_delta > 0 ? '+' : '') + deltaResult?.entry_delta?.toFixed(2)"></span></div>
+              <div class="text-center"><span class="text-slate-500">定常</span><br><span class="font-bold" :class="deltaResult?.delta_us > 0 ? 'text-red-300' : 'text-sky-300'" x-text="(deltaResult?.delta_us > 0 ? '+' : '') + deltaResult?.delta_us?.toFixed(2)"></span></div>
+              <div class="text-center"><span class="text-slate-500">出彎</span><br><span class="font-bold" :class="deltaResult?.exit_delta > 0 ? 'text-red-300' : 'text-sky-300'" x-text="(deltaResult?.exit_delta > 0 ? '+' : '') + deltaResult?.exit_delta?.toFixed(2)"></span></div>
+            </div>
+          </div>
+
+          <!-- Main gauge -->
+          <div class="card2 p-5 mb-4">
+            <div class="text-center mb-3">
+              <span class="text-2xl font-bold" :class="resultColor" x-text="resultLabel"></span>
+              <div class="text-xs text-slate-500 mt-1" x-text="'Understeer Gradient: ' + resultGradient"></div>
+            </div>
+            <div class="relative mb-6">
+              <div class="gauge-bar"></div>
+              <div class="gauge-needle" :style="'left:' + gaugePosition + '%'"></div>
+              <template x-if="baseline"><div class="absolute top-0 w-1 h-full bg-yellow-400 opacity-60 rounded" :style="'left:' + baselineGaugePos + '%'" title="基準位置"></div></template>
+              <div class="gauge-label" style="left:5%">OS</div>
+              <div class="gauge-label" style="left:50%">Neutral</div>
+              <div class="gauge-label" style="left:95%">US</div>
+            </div>
+            <!-- Tier 3: entry / steady / exit -->
+            <div x-show="tier===3 && result?.prediction" class="grid grid-cols-3 gap-3 mt-4">
+              <div class="card2 p-3 text-center">
+                <div class="text-xs text-slate-500 mb-1">入彎 Turn-In</div>
+                <div class="font-bold text-sm" :class="tendencyColor(result?.prediction?.turn_entry?.tendency)" x-text="result?.prediction?.turn_entry?.tendency_zh"></div>
+                <div class="text-xs text-slate-500" x-text="result?.prediction?.turn_entry?.understeer_gradient"></div>
+              </div>
+              <div class="card2 p-3 text-center">
+                <div class="text-xs text-slate-500 mb-1">定常 Steady</div>
+                <div class="font-bold text-sm" :class="tendencyColor(result?.prediction?.steady_state?.tendency)" x-text="result?.prediction?.steady_state?.tendency_zh"></div>
+                <div class="text-xs text-slate-500" x-text="result?.prediction?.steady_state?.understeer_gradient"></div>
+              </div>
+              <div class="card2 p-3 text-center">
+                <div class="text-xs text-slate-500 mb-1">出彎 Exit</div>
+                <div class="font-bold text-sm" :class="tendencyColor(result?.prediction?.turn_exit?.tendency)" x-text="result?.prediction?.turn_exit?.tendency_zh"></div>
+                <div class="text-xs text-slate-500" x-text="result?.prediction?.turn_exit?.understeer_gradient"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Roll Stiffness -->
+          <div class="card2 p-4 mb-4">
+            <div class="text-xs text-slate-400 mb-2">Roll Stiffness Distribution</div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs w-16 text-right text-sky-400" x-text="'F ' + (result?.roll_stiffness_dist_front || result?.mechanical?.roll_stiffness_dist_front || 50) + '%'"></span>
+              <div class="flex-1 h-5 rounded overflow-hidden flex">
+                <div class="bg-sky-500 transition-all" :style="'width:' + (result?.roll_stiffness_dist_front || result?.mechanical?.roll_stiffness_dist_front || 50) + '%'"></div>
+                <div class="bg-pink-500 flex-1"></div>
+              </div>
+              <span class="text-xs w-16 text-pink-400" x-text="'R ' + (100-(result?.roll_stiffness_dist_front || result?.mechanical?.roll_stiffness_dist_front || 50)).toFixed(1) + '%'"></span>
+            </div>
+            <div class="flex justify-between text-xs text-slate-500">
+              <span x-text="'前: ' + (result?.front_roll_stiffness_total || result?.mechanical?.roll_stiffness_front || 0) + ' Nm/deg'"></span>
+              <span x-text="'後: ' + (result?.rear_roll_stiffness_total || result?.mechanical?.roll_stiffness_rear || 0) + ' Nm/deg'"></span>
+            </div>
+            <div class="text-xs text-slate-500 mt-1" x-text="'靜態荷重: F ' + (result?.weight_front_pct || result?.mechanical?.weight_front_pct || 50) + '% | LLTD 前: ' + (result?.lltd_front || result?.mechanical?.lltd_front || 50) + '%'"></div>
+          </div>
+
+          <!-- Tire grip (all tiers now have tire data) -->
+          <div x-show="result?.tire_grip" class="card2 p-4 mb-4">
+            <div class="text-xs text-slate-400 mb-2">輪胎抓地力</div>
+            <div class="grid-4">
+              <div class="corner-box"><div class="val" :class="gripColor(result?.tire_grip?.fl)" x-text="(result?.tire_grip?.fl*100).toFixed(1)+'%'"></div><div class="lbl">FL</div></div>
+              <div class="corner-box"><div class="val" :class="gripColor(result?.tire_grip?.fr)" x-text="(result?.tire_grip?.fr*100).toFixed(1)+'%'"></div><div class="lbl">FR</div></div>
+              <div class="corner-box"><div class="val" :class="gripColor(result?.tire_grip?.rl)" x-text="(result?.tire_grip?.rl*100).toFixed(1)+'%'"></div><div class="lbl">RL</div></div>
+              <div class="corner-box"><div class="val" :class="gripColor(result?.tire_grip?.rr)" x-text="(result?.tire_grip?.rr*100).toFixed(1)+'%'"></div><div class="lbl">RR</div></div>
+            </div>
+            <div class="flex justify-between mt-2 text-xs text-slate-500">
+              <span x-text="'前軸平均: ' + ((result?.tire_grip?.front_avg||0)*100).toFixed(1) + '%'"></span>
+              <span x-text="'後軸平均: ' + ((result?.tire_grip?.rear_avg||0)*100).toFixed(1) + '%'"></span>
+              <span x-text="'前/後比: ' + (result?.tire_grip?.grip_ratio_f_r||1).toFixed(3)"></span>
+            </div>
+            <div x-show="result?.tire_grip?.front_width_mm > 0 || result?.tire_grip?.rear_width_mm > 0" class="text-[10px] text-slate-500 mt-1">
+              胎寬修正: 前 <span class="text-slate-300" x-text="(result?.tire_grip?.front_width_factor||1).toFixed(3) + 'x (' + (result?.tire_grip?.front_width_mm||0) + 'mm)'"></span>
+              / 後 <span class="text-slate-300" x-text="(result?.tire_grip?.rear_width_factor||1).toFixed(3) + 'x (' + (result?.tire_grip?.rear_width_mm||0) + 'mm)'"></span>
+            </div>
+          </div>
+
+          <!-- Tier 3: Contribution breakdown -->
+          <div x-show="tier === 3 && result?.contribution" class="card2 p-4 mb-4">
+            <div class="text-xs text-slate-400 mb-2">各因素貢獻（正=US / 負=OS）</div>
+            <canvas id="contributionChart" height="180"></canvas>
+          </div>
+
+          <!-- Tier 3: Corner weight / Aero -->
+          <div x-show="tier === 3" class="grid-2 mb-4">
+            <div class="card2 p-4" x-show="result?.corner_weight">
+              <div class="text-xs text-slate-400 mb-2">Corner Weight</div>
+              <div class="grid-4 mb-2">
+                <div class="corner-box"><div class="val text-sky-300" x-text="result?.corner_weight?.fl"></div><div class="lbl">FL</div></div>
+                <div class="corner-box"><div class="val text-sky-300" x-text="result?.corner_weight?.fr"></div><div class="lbl">FR</div></div>
+                <div class="corner-box"><div class="val text-pink-300" x-text="result?.corner_weight?.rl"></div><div class="lbl">RL</div></div>
+                <div class="corner-box"><div class="val text-pink-300" x-text="result?.corner_weight?.rr"></div><div class="lbl">RR</div></div>
+              </div>
+              <div class="text-xs text-slate-500">
+                <span x-text="'Cross: ' + result?.corner_weight?.cross_weight_pct + '%'"></span> |
+                <span x-text="'L/R差: ' + result?.corner_weight?.lr_imbalance_pct + '%'"></span>
+              </div>
+            </div>
+            <div class="card2 p-4" x-show="result?.aero">
+              <div class="text-xs text-slate-400 mb-2">空力效果 @ <span x-text="result?.aero?.speed_kmh + ' km/h'"></span></div>
+              <div class="flex justify-between text-sm mb-1">
+                <span>前下壓: <span class="font-bold text-sky-400" x-text="result?.aero?.front_downforce_kg + ' kg'"></span></span>
+                <span>後下壓: <span class="font-bold text-pink-400" x-text="result?.aero?.rear_downforce_kg + ' kg'"></span></span>
+              </div>
+              <div class="text-xs text-slate-500" x-text="'空力平衡 F' + result?.aero?.aero_balance_front_pct + '% | 有效荷重 F' + result?.aero?.effective_weight_front_pct + '%'"></div>
+              <div class="text-xs text-slate-500" x-text="'空力 US 偏移: ' + result?.aero?.aero_us_shift"></div>
+            </div>
+          </div>
+
+          <!-- Warnings -->
+          <template x-for="w in (result?.warnings || [])" :key="w">
+            <div class="warn mb-2" x-text="w"></div>
+          </template>
+        </div>
+
+        <div x-show="!result" class="text-center text-slate-500 py-20">
+          <div class="text-lg mb-2">輸入參數後按「計算預測」</div>
+          <div class="text-xs">系統將根據你選擇的 Tier 層級計算轉向趨勢</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TAB: 胎溫分析 ==================== -->
+<div x-show="currentTab==='tire'" x-transition>
+  <h2 class="text-xl font-bold mb-4">輪胎抓地力分析</h2>
+  <div class="grid-2">
+    <div class="card p-5">
+      <div class="section-title">溫度-抓地力曲線</div>
+      <div class="flex flex-wrap gap-1.5 mb-3">
+        <template x-for="c in compoundList" :key="c">
+          <button class="text-[10px] px-2 py-1 rounded-full" :class="selCompounds.includes(c)?'bg-sky-500 text-white':'bg-slate-700 text-slate-300'" @click="toggleArr(selCompounds,c);drawTireGrip()" x-text="getTireParams(c)[3]"></button>
+        </template>
+      </div>
+      <canvas id="tireGripChart" height="250"></canvas>
+    </div>
+    <div class="card p-5">
+      <div class="section-title">壓力-抓地力曲線</div>
+      <canvas id="tirePressureChart" height="250"></canvas>
+      <div class="text-xs text-slate-500 mt-2">最佳壓力 = 1.90 bar 時 100%，每偏離 0.1 bar 降低約 2%</div>
+    </div>
+  </div>
+  <!-- Tire database table -->
+  <div class="card p-5 mt-4" x-show="tireOptions.length">
+    <div class="section-title">賽道日輪胎資料庫</div>
+    <div style="max-height:400px;overflow-y:auto">
+      <table>
+        <thead><tr>
+          <th>輪胎</th><th>品牌</th><th>TW</th><th>抓地力</th><th>最佳溫度</th><th>溫域</th>
+          <th>建議前胎壓</th><th>建議後胎壓</th><th>備註</th>
+        </tr></thead>
+        <tbody>
+          <template x-for="t in tireOptions" :key="t.id">
+            <tr>
+              <td class="font-semibold text-xs" x-text="t.name_zh"></td>
+              <td class="text-xs" x-text="t.brand"></td>
+              <td><span class="badge" :class="t.treadwear <= 100?'badge-r':t.treadwear <= 200?'badge-y':'badge-g'" x-text="t.treadwear || 'N/A'"></span></td>
+              <td class="font-mono text-xs" :class="t.peak_grip >= 1.15?'text-pink-400':t.peak_grip >= 1.08?'text-yellow-400':'text-slate-300'" x-text="(t.peak_grip*100).toFixed(0)+'%'"></td>
+              <td class="font-mono text-xs" x-text="t.optimal_temp + '°C'"></td>
+              <td class="font-mono text-xs" x-text="'±' + t.temp_window + '°C'"></td>
+              <td class="font-mono text-xs text-green-400" x-text="fromBar(t.optimal_pressure_front_bar) + ' ' + pressureUnit.toUpperCase()"></td>
+              <td class="font-mono text-xs text-green-400" x-text="fromBar(t.optimal_pressure_rear_bar) + ' ' + pressureUnit.toUpperCase()"></td>
+              <td class="text-[10px] text-slate-500" x-text="t.notes"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script src="js/tire-data.js"></script>
+<script src="js/dynamics-model.js"></script>
+<script src="js/car-presets.js"></script>
+<script src="js/api.js"></script>
+<script>
+const COLORS=['#38bdf8','#f472b6','#34d399','#facc15','#a78bfa','#fb923c','#22d3ee','#e879f9','#84cc16','#f87171'];
+
+function app(){return{
+  currentTab:'predict',
+  tabs:[
+    {id:'predict',label:'轉向預測',sub:'Handling Prediction'},
+    {id:'tire',label:'輪胎分析',sub:'Tire Analysis'},
+  ],
+  tier:1,
+  // Prediction inputs
+  pred:{front_spring_rate:240,rear_spring_rate:925,front_arb:300,rear_arb:200,front_track:1440,rear_track:1380,front_motion_ratio:1.0,rear_motion_ratio:1.0,weight_front_pct:41.5,total_weight:570,cg_height:280,wheelbase:2730},
+  tire:{fl_temp:88,fr_temp:92,rl_temp:85,rr_temp:90,fl_pressure:1.88,fr_pressure:1.92,rl_pressure:1.85,rr_pressure:1.90,front_compound:'yokohama_ad08r',rear_compound:'yokohama_ad08r',front_optimal_pressure:2.14,rear_optimal_pressure:2.21,front_tire_width:0,rear_tire_width:0,sameFrontRear:true},
+  tireOptions:[],
+  adv:{fl_weight:112.5,fr_weight:114.5,rl_weight:170,rr_weight:173,speed_kmh:180,frontal_area:1.2,front_downforce_coeff:1.3,rear_downforce_coeff:1.5,front_bump_force:80,front_rebound_force:120,rear_bump_force:100,rear_rebound_force:150,front_camber_deg:-3.7,rear_camber_deg:-2.5,front_toe_deg:0.5,rear_toe_deg:0.3},
+  result:null,
+  baseline:null,      // {tier, params, tire, adv, baselineUSG, baselineNorm}
+  deltaResult:null,   // {delta_us, delta_norm, rel_norm, delta_tendency_zh, entry_delta, exit_delta}
+  contribChart:null,
+  // Pressure unit
+  pressureUnit:'psi',  // 'psi', 'bar', 'kpa'
+  // Tire Pressure Management
+  tpm:{
+    show:false,
+    cold_fl:1.90, cold_fr:1.90, cold_rl:1.80, cold_rr:1.80,
+    hot_fl:0, hot_fr:0, hot_rl:0, hot_rr:0,
+    laps:3,
+    ambient_temp:28,
+    track_temp:40,
+    target_front:2.10, target_rear:2.00,
+    result:null,
+  },
+  // Street mode
+  streetMode:false,
+  streetCar:'',
+  streetCarDetail:null,
+  carPresets:[],
+  // Tire analysis
+  compoundList:['yokohama_ad08r','bridgestone_re71rs','michelin_cup2','pirelli_trofeo_r','federal_rsrr','nankang_ar1','michelin_ps4s','slick_soft'],
+  selCompounds:['yokohama_ad08r','michelin_cup2','federal_rsrr'],
+  tireGripChartObj:null,tirePressChartObj:null,
+
+  get resultLabel(){
+    if(!this.result) return '';
+    if(this.tier===3 && this.result.prediction) return this.result.prediction.steady_state.tendency_zh;
+    return this.result.adjusted_tendency_zh || this.result.tendency_zh || '';
+  },
+  get resultColor(){
+    const t = this.tier===3&&this.result?.prediction ? this.result.prediction.steady_state.tendency : (this.result?.adjusted_tendency||this.result?.tendency||'');
+    return this.tendencyColor(t);
+  },
+  get resultGradient(){
+    if(!this.result) return '';
+    if(this.tier===3 && this.result.prediction) return this.result.prediction.steady_state.understeer_gradient;
+    return this.result.adjusted_understeer_gradient ?? this.result.understeer_gradient ?? '';
+  },
+  get gaugePosition(){
+    if(!this.result) return 50;
+    let n;
+    if(this.tier===3 && this.result.prediction) n = this.result.prediction.steady_state.normalized;
+    else n = this.result.adjusted_normalized ?? this.result.understeer_normalized ?? 0;
+    return ((n + 1) / 2 * 100);
+  },
+  get baselineGaugePos(){
+    if(!this.baseline) return 50;
+    return ((this.baseline.baselineNorm + 1) / 2 * 100);
+  },
+  get selectedTireInfo(){
+    return this.tireOptions.find(t=>t.id===this.tire.front_compound)||null;
+  },
+  get availableWidthsFront(){
+    const t = this.tireOptions.find(t=>t.id===this.tire.front_compound);
+    return t?.available_widths || [185,195,205,215,225,235,245,255,265,275,285,295,305,315,325];
+  },
+  get availableWidthsRear(){
+    const c = this.tire.sameFrontRear ? this.tire.front_compound : this.tire.rear_compound;
+    const t = this.tireOptions.find(t=>t.id===c);
+    return t?.available_widths || [185,195,205,215,225,235,245,255,265,275,285,295,305,315,325];
+  },
+
+  // Pressure conversion (internal always bar)
+  get pressureStep(){ return this.pressureUnit==='psi'?0.5:this.pressureUnit==='kpa'?5:0.01; },
+  fromBar(bar){
+    if(this.pressureUnit==='psi') return Math.round(bar*14.5038*10)/10;
+    if(this.pressureUnit==='kpa') return Math.round(bar*100);
+    return Math.round(bar*100)/100;
+  },
+  toBar(val){
+    const v=parseFloat(val)||0;
+    if(this.pressureUnit==='psi') return Math.round(v/14.5038*1000)/1000;
+    if(this.pressureUnit==='kpa') return Math.round(v/100*1000)/1000;
+    return v;
+  },
+  switchPressureUnit(u){ this.pressureUnit=u; },
+
+  tendencyColor(t){
+    if(t==='Understeer') return 'text-red-400';
+    if(t==='Oversteer') return 'text-sky-400';
+    return 'text-green-400';
+  },
+  gripColor(v){
+    if(!v) return 'text-slate-400';
+    if(v>=0.95) return 'text-green-400';
+    if(v>=0.85) return 'text-yellow-400';
+    return 'text-red-400';
+  },
+
+  init(){
+    this.tireOptions = api.getTires();
+  },
+
+  loadPresets(){
+    if(this.carPresets.length) return;
+    this.carPresets = api.getPresets();
+  },
+
+  applyPreset(){
+    if(!this.streetCar){ this.streetCarDetail=null; return; }
+    const d = api.getPreset(this.streetCar);
+    this.streetCarDetail = d;
+    // Apply locked params
+    const p = d.params;
+    this.pred.front_spring_rate = p.front_spring_rate;
+    this.pred.rear_spring_rate = p.rear_spring_rate;
+    this.pred.front_arb = p.front_arb;
+    this.pred.rear_arb = p.rear_arb;
+    this.pred.front_track = p.front_track;
+    this.pred.rear_track = p.rear_track;
+    this.pred.front_motion_ratio = p.front_motion_ratio;
+    this.pred.rear_motion_ratio = p.rear_motion_ratio;
+    this.pred.weight_front_pct = p.weight_front_pct;
+    this.pred.total_weight = p.total_weight;
+    this.pred.cg_height = p.cg_height;
+    this.pred.wheelbase = p.wheelbase;
+    // Apply tire defaults
+    const t = d.tire_defaults || {};
+    this.tire.front_compound = t.front_compound || 'yokohama_ad08r';
+    this.tire.rear_compound = t.rear_compound || this.tire.front_compound;
+    this.tire.sameFrontRear = (this.tire.front_compound === this.tire.rear_compound);
+    // 從輪胎資料庫取得最佳胎壓
+    const ftire = this.tireOptions.find(x=>x.id===this.tire.front_compound);
+    const rtire = this.tireOptions.find(x=>x.id===this.tire.rear_compound);
+    this.tire.front_optimal_pressure = ftire?.optimal_pressure_front_bar || t.front_optimal_pressure || 2.14;
+    this.tire.rear_optimal_pressure = rtire?.optimal_pressure_rear_bar || t.rear_optimal_pressure || 2.21;
+    // Set tire pressures
+    this.tire.fl_pressure = this.tire.front_optimal_pressure;
+    this.tire.fr_pressure = this.tire.front_optimal_pressure;
+    this.tire.rl_pressure = this.tire.rear_optimal_pressure;
+    this.tire.rr_pressure = this.tire.rear_optimal_pressure;
+    // 嘗試從 OEM 胎寬設定
+    const oemSize = d.oem_tire_size || '';
+    const fwMatch = oemSize.match(/F:\s*(\d+)\//);
+    const rwMatch = oemSize.match(/R:\s*(\d+)\//);
+    this.tire.front_tire_width = fwMatch ? parseInt(fwMatch[1]) : 0;
+    this.tire.rear_tire_width = rwMatch ? parseInt(rwMatch[1]) : 0;
+    // Apply geometry defaults
+    const g = d.geometry_defaults || {};
+    this.adv.front_camber_deg = g.front_camber_deg || -1.5;
+    this.adv.rear_camber_deg = g.rear_camber_deg || -2.0;
+    this.adv.front_toe_deg = g.front_toe_deg || 0;
+    this.adv.rear_toe_deg = g.rear_toe_deg || 0;
+    // Sync tpm defaults with selected tire
+    this.tpm.cold_fl = this.tire.front_optimal_pressure;
+    this.tpm.cold_fr = this.tire.front_optimal_pressure;
+    this.tpm.cold_rl = this.tire.rear_optimal_pressure;
+    this.tpm.cold_rr = this.tire.rear_optimal_pressure;
+    this.tpm.target_front = this.tire.front_optimal_pressure;
+    this.tpm.target_rear = this.tire.rear_optimal_pressure;
+    this.tpm.hot_fl = 0; this.tpm.hot_fr = 0; this.tpm.hot_rl = 0; this.tpm.hot_rr = 0;
+    this.tpm.result = null;
+    // Apply damper defaults if car has adjustable dampers
+    const dd = d.damper_defaults;
+    if(dd){
+      this.adv.front_bump_force = dd.front_bump_force || 80;
+      this.adv.front_rebound_force = dd.front_rebound_force || 120;
+      this.adv.rear_bump_force = dd.rear_bump_force || 100;
+      this.adv.rear_rebound_force = dd.rear_rebound_force || 150;
+    }
+    // Set corner weights from weight distribution
+    const tw = p.total_weight;
+    const fpct = p.weight_front_pct / 100;
+    this.adv.fl_weight = Math.round(tw * fpct / 2 * 10) / 10;
+    this.adv.fr_weight = Math.round(tw * fpct / 2 * 10) / 10;
+    this.adv.rl_weight = Math.round(tw * (1 - fpct) / 2 * 10) / 10;
+    this.adv.rr_weight = Math.round(tw * (1 - fpct) / 2 * 10) / 10;
+    // Clear previous results and baseline
+    this.result = null;
+    this.baseline = null;
+    this.deltaResult = null;
+    // 選車後預設 Tier 1 (快速模式)，使用者可自行切換
+    this.tier = 1;
+  },
+
+  resetDamper(){
+    if(!this.streetCarDetail?.damper_defaults) return;
+    const dd = this.streetCarDetail.damper_defaults;
+    this.adv.front_bump_force = dd.front_bump_force;
+    this.adv.front_rebound_force = dd.front_rebound_force;
+    this.adv.rear_bump_force = dd.rear_bump_force;
+    this.adv.rear_rebound_force = dd.rear_rebound_force;
+  },
+
+  switchTier(t){
+    const prev = this.tier;
+    this.tier = t;
+    // 切換 Tier 後自動重新計算（如果之前已有結果）
+    if(this.result && prev !== t) this.$nextTick(()=>this.runPrediction());
+  },
+
+  onTireSelect(axle){
+    // 選輪胎後自動帶入最佳胎壓
+    const id = axle === 'front' ? this.tire.front_compound : this.tire.rear_compound;
+    const t = this.tireOptions.find(t=>t.id===id);
+    if(t){
+      if(axle === 'front' || this.tire.sameFrontRear){
+        this.tire.front_optimal_pressure = t.optimal_pressure_front_bar;
+        this.tire.fl_pressure = t.optimal_pressure_front_bar;
+        this.tire.fr_pressure = t.optimal_pressure_front_bar;
+        // 同步 TPM 冷胎壓
+        this.tpm.cold_fl = t.optimal_pressure_front_bar;
+        this.tpm.cold_fr = t.optimal_pressure_front_bar;
+        this.tpm.target_front = t.optimal_pressure_front_bar;
+      }
+      if(axle === 'rear' || this.tire.sameFrontRear){
+        this.tire.rear_optimal_pressure = t.optimal_pressure_rear_bar;
+        this.tire.rl_pressure = t.optimal_pressure_rear_bar;
+        this.tire.rr_pressure = t.optimal_pressure_rear_bar;
+        this.tpm.cold_rl = t.optimal_pressure_rear_bar;
+        this.tpm.cold_rr = t.optimal_pressure_rear_bar;
+        this.tpm.target_rear = t.optimal_pressure_rear_bar;
+      }
+      // 前後相同模式下同步後輪配方
+      if(this.tire.sameFrontRear){
+        this.tire.rear_compound = this.tire.front_compound;
+      }
+      // 自動帶入可用胎寬（如果目前寬度不在選項中則重置）
+      if(this.tire.front_tire_width > 0 && !t.available_widths.includes(this.tire.front_tire_width)){
+        this.tire.front_tire_width = 0;
+      }
+    }
+  },
+
+  switchTab(id){
+    this.currentTab=id;
+    if(id==='tire') this.$nextTick(()=>{this.drawTireGrip();this.drawTirePress()});
+  },
+
+  toggleArr(arr,v){const i=arr.indexOf(v);if(i>=0)arr.splice(i,1);else arr.push(v)},
+
+  // === Prediction ===
+  runPrediction(){
+    // 前後相同模式下同步後輪
+    if(this.tire.sameFrontRear){
+      this.tire.rear_compound = this.tire.front_compound;
+    }
+    // 建構 tire_params (含胎寬)
+    const tireParams = {...this.tire};
+    if(this.tier===1){
+      // Tier 1 快速模式：使用 Tier 2 API，自動帶入建議胎壓和預設溫度
+      const quickTire = {
+        front_compound: this.tire.front_compound,
+        rear_compound: this.tire.rear_compound,
+        front_optimal_pressure: this.tire.front_optimal_pressure,
+        rear_optimal_pressure: this.tire.rear_optimal_pressure,
+        front_tire_width: this.tire.front_tire_width,
+        rear_tire_width: this.tire.rear_tire_width,
+      };
+      // 使用最佳溫度和建議胎壓（從輪胎資料庫自動帶入）
+      const ftire = this.tireOptions.find(t=>t.id===this.tire.front_compound);
+      const rtire = this.tireOptions.find(t=>t.id===this.tire.rear_compound);
+      quickTire.fl_temp = ftire?.optimal_temp || 80;
+      quickTire.fr_temp = ftire?.optimal_temp || 80;
+      quickTire.rl_temp = rtire?.optimal_temp || 80;
+      quickTire.rr_temp = rtire?.optimal_temp || 80;
+      quickTire.fl_pressure = ftire?.optimal_pressure_front_bar || 2.14;
+      quickTire.fr_pressure = ftire?.optimal_pressure_front_bar || 2.14;
+      quickTire.rl_pressure = rtire?.optimal_pressure_rear_bar || 2.21;
+      quickTire.rr_pressure = rtire?.optimal_pressure_rear_bar || 2.21;
+      this.result = api.predictTier2(this.pred, quickTire);
+    } else if(this.tier===2){
+      this.result = api.predictTier2(this.pred, tireParams);
+    } else {
+      this.result = api.predictTier3(this.pred, tireParams, this.adv);
+    }
+    if(this.tier===3 && this.result?.contribution) this.$nextTick(()=>this.drawContribution());
+    // Auto-compare against baseline if set (Tier 1 & 2 are compatible since both use Tier 2 API)
+    const compatibleTier = (t) => t <= 2 ? 2 : t;
+    if(this.baseline && compatibleTier(this.baseline.tier) === compatibleTier(this.tier)) this.computeDelta();
+    else this.deltaResult = null;
+  },
+
+  setBaseline(){
+    if(!this.result) return;
+    // Extract the USG and normalized from current result based on tier
+    let usg, norm;
+    if(this.tier===3 && this.result.prediction){
+      usg = this.result.prediction.steady_state.understeer_gradient;
+      norm = this.result.prediction.steady_state.normalized;
+    } else {
+      // Tier 1 (快速) and Tier 2 both return Tier 2 format
+      usg = this.result.adjusted_understeer_gradient ?? this.result.understeer_gradient;
+      norm = this.result.adjusted_normalized ?? this.result.understeer_normalized;
+    }
+    // Deep copy current inputs as baseline snapshot
+    this.baseline = {
+      tier: this.tier,
+      params: JSON.parse(JSON.stringify(this.pred)),
+      tire: JSON.parse(JSON.stringify(this.tire)),
+      adv: JSON.parse(JSON.stringify(this.adv)),
+      baselineUSG: usg,
+      baselineNorm: norm,
+    };
+    this.deltaResult = null; // Reset delta (current = baseline)
+  },
+
+  clearBaseline(){
+    this.baseline = null;
+    this.deltaResult = null;
+  },
+
+  analyzePressure(){
+    const t = this.tpm;
+    const corners = ['fl','fr','rl','rr'];
+    const cold = {fl:t.cold_fl, fr:t.cold_fr, rl:t.cold_rl, rr:t.cold_rr};
+    const hot = {fl:t.hot_fl, fr:t.hot_fr, rl:t.hot_rl, rr:t.hot_rr};
+    const target = {fl:t.target_front, fr:t.target_front, rl:t.target_rear, rr:t.target_rear};
+
+    // Rise = hot - cold
+    const rise = {}, rise_display = {}, rise_color = {};
+    const vs = {}, vs_display = {}, vs_color = {};
+    const suggest = {}, suggest_display = {};
+    const advice = [];
+
+    const fmt = (bar) => {
+      if(this.pressureUnit==='psi') return (bar*14.5038).toFixed(1);
+      if(this.pressureUnit==='kpa') return Math.round(bar*100).toString();
+      return bar.toFixed(2);
+    };
+    const fmtSign = (bar) => {
+      const v = fmt(Math.abs(bar));
+      return (bar>=0?'+':'-') + v;
+    };
+
+    let avgRiseFront = 0, avgRiseRear = 0;
+    for(const c of corners){
+      if(hot[c] <= 0) continue; // not measured
+      rise[c] = hot[c] - cold[c];
+      rise_display[c] = fmtSign(rise[c]);
+      // Rise color: normal 0.2-0.4 bar rise is typical
+      const r = rise[c];
+      rise_color[c] = r < 0.1 ? 'text-sky-400' : r < 0.25 ? 'text-green-400' : r < 0.45 ? 'text-yellow-400' : 'text-red-400';
+
+      // vs target
+      vs[c] = hot[c] - target[c];
+      vs_display[c] = fmtSign(vs[c]);
+      vs_color[c] = Math.abs(vs[c]) < 0.05 ? 'text-green-400' : Math.abs(vs[c]) < 0.15 ? 'text-yellow-400' : 'text-red-400';
+
+      // Suggest cold = cold + (target - hot) = cold - vs
+      suggest[c] = Math.max(0.5, cold[c] - vs[c]);
+      suggest_display[c] = fmt(suggest[c]);
+    }
+
+    // Check if any corner not measured
+    const measured = corners.filter(c => hot[c] > 0);
+    if(measured.length === 0){
+      this.tpm.result = null;
+      return;
+    }
+
+    // Avg rise front / rear
+    if(hot.fl > 0 && hot.fr > 0) avgRiseFront = ((rise.fl||0) + (rise.fr||0)) / 2;
+    if(hot.rl > 0 && hot.rr > 0) avgRiseRear = ((rise.rl||0) + (rise.rr||0)) / 2;
+
+    // Fill missing display with '--'
+    for(const c of corners){
+      if(!rise_display[c]) { rise_display[c]='--'; rise_color[c]='text-slate-500'; }
+      if(!vs_display[c]) { vs_display[c]='--'; vs_color[c]='text-slate-500'; }
+      if(!suggest_display[c]) suggest_display[c]='--';
+    }
+
+    // Advice
+    if(t.laps <= 2 && avgRiseFront < 0.15) advice.push('僅跑 ' + t.laps + ' 圈，胎壓升幅偏小 — 輪胎可能還沒進入工作溫度，建議多跑 1-2 圈再量');
+    if(avgRiseFront > 0.45) advice.push('前輪升壓較大 (' + fmt(avgRiseFront) + ') — 可能過度推頭或煞車過重');
+    if(avgRiseRear > 0.45) advice.push('後輪升壓較大 (' + fmt(avgRiseRear) + ') — 可能有過度滑移或動力輸出過大');
+
+    // Left/right imbalance
+    if(hot.fl > 0 && hot.fr > 0){
+      const diff = Math.abs(rise.fl - rise.fr);
+      if(diff > 0.15) advice.push('前輪左右升壓差 ' + fmt(diff) + ' — 可能賽道偏單側彎或 camber 不均');
+    }
+    if(hot.rl > 0 && hot.rr > 0){
+      const diff = Math.abs(rise.rl - rise.rr);
+      if(diff > 0.15) advice.push('後輪左右升壓差 ' + fmt(diff) + ' — 檢查 alignment 或駕駛習慣');
+    }
+
+    // Front vs rear rise rate
+    if(avgRiseFront > 0 && avgRiseRear > 0){
+      const ratio = avgRiseFront / avgRiseRear;
+      if(ratio > 1.3) advice.push('前輪升壓比後輪高 — 前軸負擔較大，可能偏轉向不足');
+      else if(ratio < 0.7) advice.push('後輪升壓比前輪高 — 後軸負擔較大，可能偏轉向過度');
+    }
+
+    // Stint planning
+    if(t.laps >= 5 && avgRiseFront > 0.35){
+      advice.push('長 stint (' + t.laps + '圈) 升壓明顯，考慮設定較低冷胎壓讓中段圈壓在最佳區間');
+    }
+
+    // Temperature note
+    if(t.track_temp > 45){
+      advice.push('路面溫度 ' + t.track_temp + '°C 偏高，輪胎升壓會加速，建議降低冷胎壓 ' + fmt(0.07) + ' 左右');
+    }
+
+    this.tpm.result = {
+      rise_display, rise_color,
+      vs_display, vs_color,
+      suggest_display,
+      advice,
+      suggest_bar: suggest, // for applyHotPressure suggest cold
+    };
+  },
+
+  applyHotPressure(){
+    // Apply the measured hot pressures to the main prediction inputs
+    const t = this.tpm;
+    if(t.hot_fl > 0) this.tire.fl_pressure = t.hot_fl;
+    if(t.hot_fr > 0) this.tire.fr_pressure = t.hot_fr;
+    if(t.hot_rl > 0) this.tire.rl_pressure = t.hot_rl;
+    if(t.hot_rr > 0) this.tire.rr_pressure = t.hot_rr;
+  },
+
+  computeDelta(){
+    if(!this.baseline) return;
+    // Tier 1 快速模式 internally uses Tier 2, so compare as Tier 2
+    const t = this.baseline.tier === 1 ? 2 : this.baseline.tier;
+    // Build baseline inputs
+    const baseInputs = {params: this.baseline.params};
+    const curInputs = {params: JSON.parse(JSON.stringify(this.pred))};
+    if(t >= 2){
+      baseInputs.tire_params = this.baseline.tire;
+      curInputs.tire_params = JSON.parse(JSON.stringify(this.tire));
+    }
+    if(t >= 3){
+      baseInputs.advanced_params = this.baseline.adv;
+      curInputs.advanced_params = JSON.parse(JSON.stringify(this.adv));
+    }
+    const resp = api.compare(t, baseInputs, curInputs);
+    if(resp.delta){
+      this.deltaResult = {
+        delta_us: resp.delta.understeer_gradient,
+        delta_norm: resp.delta.normalized,
+        rel_norm: resp.delta.relative_normalized,
+        delta_tendency_zh: resp.delta.tendency_zh,
+        entry_delta: resp.delta.turn_entry_delta,
+        exit_delta: resp.delta.turn_exit_delta,
+        contribution: resp.delta.contribution,
+      };
+    }
+  },
+
+  drawContribution(){
+    const ctx=document.getElementById('contributionChart');
+    if(!ctx||!this.result?.contribution) return;
+    if(this.contribChart) this.contribChart.destroy();
+    const c=this.result.contribution;
+    const labels=['機械','輪胎','空力','Camber','Toe','Bump Rubber','Damper(入)','Damper(出)'];
+    const vals=[c.mechanical,c.tire,c.aero,c.camber,c.toe,c.bump_rubber,c.damper_entry,c.damper_exit];
+    this.contribChart=new Chart(ctx,{
+      type:'bar',
+      data:{labels,datasets:[{data:vals,backgroundColor:vals.map(v=>v>0?'rgba(239,68,68,.6)':'rgba(56,189,248,.6)'),borderRadius:4}]},
+      options:{responsive:true,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8',callback:v=>v>0?'+'+v:v}},y:{ticks:{color:'#e2e8f0',font:{size:10}}}}}
+    });
+  },
+
+  // === Tire Analysis ===
+  getTireParams(id){
+    // 先從 tireOptions (API 資料) 找，否則用 legacy
+    const t = this.tireOptions.find(t=>t.id===id);
+    if(t) return [t.optimal_temp, t.temp_window, t.peak_grip, t.name_zh || t.name];
+    const legacy = {slick_soft:[90,12,1.08],slick_hard:[100,18,1.02],soft:[85,15,1.05],medium:[95,20,1.0],hard:[105,25,.95],wet:[55,30,.7]};
+    const p = legacy[id];
+    return p ? [...p, id] : [95,20,1.0,id];
+  },
+
+  drawTireGrip(){
+    const ctx=document.getElementById('tireGripChart');if(!ctx)return;
+    if(this.tireGripChartObj)this.tireGripChartObj.destroy();
+    const ds=[];let ci=0;
+    for(const name of this.selCompounds){
+      const[opt,win,peak,label]=this.getTireParams(name);
+      const col=COLORS[ci++%COLORS.length];const pts=[];
+      for(let t=20;t<=140;t+=2){const d=Math.abs(t-opt);const f=Math.exp(-.5*(d/win)**2)*peak;pts.push({x:t,y:Math.round(f*1000)/10})}
+      ds.push({label:label,data:pts,borderColor:col,pointRadius:0,tension:.4});
+    }
+    this.tireGripChartObj=new Chart(ctx,{type:'scatter',data:{datasets:ds},options:{responsive:true,showLine:true,plugins:{legend:{labels:{color:'#e2e8f0',font:{size:10}}}},scales:{x:{title:{display:true,text:'胎溫 (°C)',color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8'}},y:{title:{display:true,text:'抓地力 %',color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8'}}}}});
+  },
+  drawTirePress(){
+    const ctx=document.getElementById('tirePressureChart');if(!ctx)return;
+    if(this.tirePressChartObj)this.tirePressChartObj.destroy();
+    const pts=[];for(let p=1.5;p<=2.3;p+=.02){const f=Math.max(50,100-20*Math.abs(p-1.9));pts.push({x:Math.round(p*100)/100,y:Math.round(f*10)/10})}
+    this.tirePressChartObj=new Chart(ctx,{type:'scatter',data:{datasets:[{label:'Grip vs Pressure',data:pts,borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,.1)',fill:true,pointRadius:0,tension:.4}]},options:{responsive:true,showLine:true,plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:'胎壓 (bar)',color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8'}},y:{title:{display:true,text:'抓地力 %',color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8'},min:80,max:110}}}});
+  },
+}}
+</script>
+</body>
+</html>
