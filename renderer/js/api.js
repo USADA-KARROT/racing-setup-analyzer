@@ -152,6 +152,33 @@ const api = {
     return SpringCalculator.arbSizing(totalWeight, cgHeight, targetRollGrad, frontPct, springRollFront, springRollRear);
   },
 
+  // === Tire Spring Rate Estimation ===
+
+  /** Estimate tire spring rate from dimensions */
+  estimateTireSpring(width, aspectRatio) {
+    return TireSpringEstimator.estimate(width, aspectRatio);
+  },
+
+  /** Parse tire size string into structured specs */
+  parseTireSize(sizeStr) {
+    return TireSpringEstimator.parseTireSize(sizeStr);
+  },
+
+  /** Estimate tire spring rates from OEM size string */
+  estimateTireSpringFromString(sizeStr) {
+    return TireSpringEstimator.estimateFromString(sizeStr);
+  },
+
+  /** Calculate wheel upgrade impact */
+  calcWheelUpgrade(originalSpec, newRimSize, newWidth) {
+    return TireSpringEstimator.calculateWheelUpgrade(originalSpec, newRimSize, newWidth);
+  },
+
+  /** Get suggested rim sizes for upgrades */
+  suggestRimSizes(originalRim) {
+    return TireSpringEstimator.suggestRimSizes(originalRim);
+  },
+
   // === Stats ===
 
   /** Get app stats */
