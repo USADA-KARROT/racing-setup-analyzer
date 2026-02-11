@@ -53,7 +53,7 @@ canvas{max-height:300px}
 <header class="flex items-center justify-between px-6 py-3 border-b border-white/5" style="background:var(--bg2)">
   <div class="flex items-center gap-3">
     <div class="text-lg font-bold text-sky-400">Racing Dynamics</div>
-    <div class="text-xs text-slate-600">賽車動態分析系統 v3.2 Desktop</div>
+    <div class="text-xs text-slate-600">賽車動態分析系統 v3.3 Desktop</div>
   </div>
   <div class="flex gap-2">
     <template x-for="tab in tabs" :key="tab.id">
@@ -85,10 +85,14 @@ canvas{max-height:300px}
     <div class="flex items-center gap-4 flex-wrap">
       <div>
         <label class="text-xs text-slate-400">選擇車種</label>
-        <select x-model="streetCar" @change="applyPreset()" class="ml-2 text-sm min-w-[240px]">
-          <option value="">-- 請選擇 --</option>
-          <template x-for="c in carPresets" :key="c.id">
-            <option :value="c.id" x-text="c.name_zh + ' (' + c.years + ')'"></option>
+        <select x-model="streetCar" @change="applyPreset()" class="ml-2 text-sm min-w-[280px]">
+          <option value="">-- 請選擇車種 (112 台) --</option>
+          <template x-for="g in carPresetGroups" :key="g.label">
+            <optgroup :label="g.label">
+              <template x-for="c in g.cars" :key="c.id">
+                <option :value="c.id" x-text="c.name_zh + ' (' + c.years + ')'"></option>
+              </template>
+            </optgroup>
           </template>
         </select>
       </div>
@@ -1773,7 +1777,7 @@ canvas{max-height:300px}
       <p>Racing Dynamics 是基於 <strong>Milliken & Milliken, Race Car Vehicle Dynamics</strong> 等經典文獻的車輛動態計算工具。</p>
       <p>物理引擎包含：Roll Stiffness 側傾剛性分析、LLTD 分解（幾何+彈性）、Pacejka 輪胎模型、阻尼比分析、縱向荷重轉移、Slip Angle 自行車模型、Yaw Gain 偏航增益。</p>
       <p>所有計算在本地離線執行，不需要網路連線。</p>
-      <p class="text-slate-600">v3.2 Desktop · USADA-KARROT</p>
+      <p class="text-slate-600">v3.3 Desktop · USADA-KARROT</p>
     </div>
   </div>
 
@@ -1826,6 +1830,7 @@ function app(){return{
   streetCar:'',
   streetCarDetail:null,
   carPresets:[],
+  carPresetGroups:[],
   // Tire analysis
   compoundList:['yokohama_ad08r','bridgestone_re71rs','michelin_cup2','pirelli_trofeo_r','federal_rsrr','nankang_ar1','michelin_ps4s','slick_soft'],
   selCompounds:['yokohama_ad08r','michelin_cup2','federal_rsrr'],
@@ -1923,6 +1928,54 @@ function app(){return{
   loadPresets(){
     if(this.carPresets.length) return;
     this.carPresets = api.getPresets();
+    // Build grouped structure by manufacturer
+    const brandMap = {
+      'Toyota':    { match: id => /^toyota_|^ae86/.test(id), zh: '豐田 Toyota' },
+      'Lexus':     { match: id => /^lexus_/.test(id), zh: 'Lexus' },
+      'Honda':     { match: id => /^honda_/.test(id), zh: '本田 Honda' },
+      'Nissan':    { match: id => /^nissan_/.test(id), zh: '日產 Nissan' },
+      'Mazda':     { match: id => /^mazda_/.test(id), zh: '馬自達 Mazda' },
+      'Subaru':    { match: id => /^subaru_/.test(id), zh: '速霸陸 Subaru' },
+      'Mitsubishi':{ match: id => /^mitsubishi_/.test(id), zh: '三菱 Mitsubishi' },
+      'Suzuki':    { match: id => /^suzuki_/.test(id), zh: '鈴木 Suzuki' },
+      'BMW':       { match: id => /^bmw_/.test(id), zh: 'BMW' },
+      'Porsche':   { match: id => /^porsche_/.test(id), zh: '保時捷 Porsche' },
+      'Mercedes':  { match: id => /^mercedes_|^amg_/.test(id), zh: '賓士 Mercedes-AMG' },
+      'Audi':      { match: id => /^audi_/.test(id), zh: '奧迪 Audi' },
+      'VW':        { match: id => /^vw_/.test(id), zh: '福斯 VW' },
+      'Ferrari':   { match: id => /^ferrari_/.test(id), zh: '法拉利 Ferrari' },
+      'Lamborghini':{ match: id => /^lamborghini_/.test(id), zh: '藍寶堅尼 Lamborghini' },
+      'Alfa Romeo':{ match: id => /^alfa_/.test(id), zh: '愛快羅密歐 Alfa Romeo' },
+      'Maserati':  { match: id => /^maserati_/.test(id), zh: '瑪莎拉蒂 Maserati' },
+      'Fiat/Abarth':{ match: id => /^fiat_/.test(id), zh: '飛雅特/阿巴斯 Abarth' },
+      'Lotus':     { match: id => /^lotus_/.test(id), zh: '蓮花 Lotus' },
+      'McLaren':   { match: id => /^mclaren_/.test(id), zh: '麥拉倫 McLaren' },
+      'Aston Martin':{ match: id => /^aston_/.test(id), zh: '奧斯頓馬丁 Aston Martin' },
+      'Caterham':  { match: id => /^caterham_/.test(id), zh: 'Caterham' },
+      'MINI':      { match: id => /^mini_/.test(id), zh: 'MINI' },
+      'Ford':      { match: id => /^ford_/.test(id), zh: '福特 Ford' },
+      'Chevrolet': { match: id => /^chevrolet_/.test(id), zh: '雪佛蘭 Chevrolet' },
+      'Dodge':     { match: id => /^dodge_/.test(id), zh: '道奇 Dodge' },
+      'Tesla':     { match: id => /^tesla_/.test(id), zh: '特斯拉 Tesla' },
+      'Hyundai':   { match: id => /^hyundai_/.test(id), zh: '現代 Hyundai' },
+      'Kia':       { match: id => /^kia_/.test(id), zh: '起亞 Kia' },
+      'BYD':       { match: id => /^byd_/.test(id), zh: '比亞迪 BYD' },
+      'Radical':   { match: id => /^radical_/.test(id), zh: 'Radical' },
+      'Ariel':     { match: id => /^ariel_/.test(id), zh: 'Ariel' },
+    };
+    const groups = [];
+    const used = new Set();
+    for (const [brand, cfg] of Object.entries(brandMap)) {
+      const cars = this.carPresets.filter(c => cfg.match(c.id));
+      if (cars.length) {
+        groups.push({ label: cfg.zh, cars });
+        cars.forEach(c => used.add(c.id));
+      }
+    }
+    // Catch any unmatched
+    const others = this.carPresets.filter(c => !used.has(c.id));
+    if (others.length) groups.push({ label: '其他 Other', cars: others });
+    this.carPresetGroups = groups;
   },
 
   applyPreset(){
