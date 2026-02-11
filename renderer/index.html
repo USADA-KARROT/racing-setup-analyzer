@@ -276,8 +276,8 @@ canvas{max-height:300px}
                           <div>
                             <label class="text-[10px] text-slate-500">輪圈 (吋)</label>
                             <select x-model.number="wheelUpgrade.front_rim" @change="applyWheelUpgrade()" class="w-full text-xs">
-                              <template x-for="r in api.suggestRimSizes(streetCarDetail.oem_tire_specs.front.rim)" :key="'fr'+r">
-                                <option :value="r" x-text="r + '\"' + (r===streetCarDetail.oem_tire_specs.front.rim?' (OEM)':'')"></option>
+                              <template x-for="opt in wheelUpgrade.frontRimOptions" :key="'fr'+opt.value">
+                                <option :value="opt.value" :selected="opt.value===wheelUpgrade.front_rim" x-text="opt.label"></option>
                               </template>
                             </select>
                           </div>
@@ -305,8 +305,8 @@ canvas{max-height:300px}
                           <div>
                             <label class="text-[10px] text-slate-500">輪圈 (吋)</label>
                             <select x-model.number="wheelUpgrade.rear_rim" @change="applyWheelUpgrade()" class="w-full text-xs">
-                              <template x-for="r in api.suggestRimSizes(streetCarDetail.oem_tire_specs.rear.rim)" :key="'rr'+r">
-                                <option :value="r" x-text="r + '\"' + (r===streetCarDetail.oem_tire_specs.rear.rim?' (OEM)':'')"></option>
+                              <template x-for="opt in wheelUpgrade.rearRimOptions" :key="'rr'+opt.value">
+                                <option :value="opt.value" :selected="opt.value===wheelUpgrade.rear_rim" x-text="opt.label"></option>
                               </template>
                             </select>
                           </div>
@@ -1854,6 +1854,7 @@ function app(){return{
     front_width:225, rear_width:225,
     front_result:null, rear_result:null,
     oem_front_spring:220, oem_rear_spring:220,
+    frontRimOptions:[], rearRimOptions:[],
   },
 
   get resultLabel(){
@@ -2033,6 +2034,9 @@ function app(){return{
       this.wheelUpgrade.enabled = false;
       this.wheelUpgrade.front_result = null;
       this.wheelUpgrade.rear_result = null;
+      // 建立輪圈選項
+      this.wheelUpgrade.frontRimOptions = api.suggestRimSizes(specs.front.rim).map(r => ({value:r, label:r+'"'+(r===specs.front.rim?' (OEM)':'')}));
+      this.wheelUpgrade.rearRimOptions = api.suggestRimSizes(specs.rear.rim).map(r => ({value:r, label:r+'"'+(r===specs.rear.rim?' (OEM)':'')}));
       // 同步胎寬（若 OEM 規格有）
       this.tire.front_tire_width = specs.front.width;
       this.tire.rear_tire_width = specs.rear.width;
