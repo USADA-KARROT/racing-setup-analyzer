@@ -53,7 +53,7 @@ canvas{max-height:300px}
 <header class="flex items-center justify-between px-6 py-3 border-b border-white/5" style="background:var(--bg2)">
   <div class="flex items-center gap-3">
     <div class="text-lg font-bold text-sky-400">Racing Dynamics</div>
-    <div class="text-xs text-slate-600">賽車動態分析系統 v3.3 Desktop</div>
+    <div class="text-xs text-slate-600">賽車動態分析系統 v3.4 Desktop</div>
   </div>
   <div class="flex gap-2">
     <template x-for="tab in tabs" :key="tab.id">
@@ -86,7 +86,7 @@ canvas{max-height:300px}
       <div>
         <label class="text-xs text-slate-400">選擇車種</label>
         <select x-model="streetCar" @change="applyPreset()" class="ml-2 text-sm min-w-[280px]">
-          <option value="">-- 請選擇車種 (112 台) --</option>
+          <option value="">-- 請選擇車種 (501 台) --</option>
           <template x-for="g in carPresetGroups" :key="g.label">
             <optgroup :label="g.label">
               <template x-for="c in g.cars" :key="c.id">
@@ -1777,7 +1777,7 @@ canvas{max-height:300px}
       <p>Racing Dynamics 是基於 <strong>Milliken & Milliken, Race Car Vehicle Dynamics</strong> 等經典文獻的車輛動態計算工具。</p>
       <p>物理引擎包含：Roll Stiffness 側傾剛性分析、LLTD 分解（幾何+彈性）、Pacejka 輪胎模型、阻尼比分析、縱向荷重轉移、Slip Angle 自行車模型、Yaw Gain 偏航增益。</p>
       <p>所有計算在本地離線執行，不需要網路連線。</p>
-      <p class="text-slate-600">v3.3 Desktop · USADA-KARROT</p>
+      <p class="text-slate-600">v3.4 Desktop · USADA-KARROT</p>
     </div>
   </div>
 
@@ -1931,38 +1931,107 @@ function app(){return{
     this.carPresets = api.getPresets();
     // Build grouped structure by manufacturer
     const brandMap = {
-      'Toyota':    { match: id => /^toyota_|^ae86/.test(id), zh: '豐田 Toyota' },
-      'Lexus':     { match: id => /^lexus_/.test(id), zh: 'Lexus' },
-      'Honda':     { match: id => /^honda_/.test(id), zh: '本田 Honda' },
-      'Nissan':    { match: id => /^nissan_/.test(id), zh: '日產 Nissan' },
-      'Mazda':     { match: id => /^mazda_/.test(id), zh: '馬自達 Mazda' },
-      'Subaru':    { match: id => /^subaru_/.test(id), zh: '速霸陸 Subaru' },
-      'Mitsubishi':{ match: id => /^mitsubishi_/.test(id), zh: '三菱 Mitsubishi' },
-      'Suzuki':    { match: id => /^suzuki_/.test(id), zh: '鈴木 Suzuki' },
-      'BMW':       { match: id => /^bmw_/.test(id), zh: 'BMW' },
-      'Porsche':   { match: id => /^porsche_/.test(id), zh: '保時捷 Porsche' },
-      'Mercedes':  { match: id => /^mercedes_|^amg_/.test(id), zh: '賓士 Mercedes-AMG' },
-      'Audi':      { match: id => /^audi_/.test(id), zh: '奧迪 Audi' },
-      'VW':        { match: id => /^vw_/.test(id), zh: '福斯 VW' },
-      'Ferrari':   { match: id => /^ferrari_/.test(id), zh: '法拉利 Ferrari' },
+      // — 日本 Japanese —
+      'Toyota':     { match: id => /^toyota_|^ae86/.test(id), zh: '豐田 Toyota' },
+      'Lexus':      { match: id => /^lexus_/.test(id), zh: 'Lexus' },
+      'Honda':      { match: id => /^honda_|^acura_/.test(id), zh: '本田 Honda / Acura' },
+      'Nissan':     { match: id => /^nissan_/.test(id), zh: '日產 Nissan' },
+      'Mazda':      { match: id => /^mazda_/.test(id), zh: '馬自達 Mazda' },
+      'Subaru':     { match: id => /^subaru_/.test(id), zh: '速霸陸 Subaru' },
+      'Mitsubishi': { match: id => /^mitsubishi_/.test(id), zh: '三菱 Mitsubishi' },
+      'Suzuki':     { match: id => /^suzuki_/.test(id), zh: '鈴木 Suzuki' },
+      'Daihatsu':   { match: id => /^daihatsu_/.test(id), zh: '大發 Daihatsu' },
+      'Isuzu':      { match: id => /^isuzu_/.test(id), zh: '五十鈴 Isuzu' },
+      // — 德國 German —
+      'BMW':        { match: id => /^bmw_/.test(id), zh: 'BMW' },
+      'Porsche':    { match: id => /^porsche_/.test(id), zh: '保時捷 Porsche' },
+      'Mercedes':   { match: id => /^mercedes_|^amg_/.test(id), zh: '賓士 Mercedes-AMG' },
+      'Audi':       { match: id => /^audi_/.test(id), zh: '奧迪 Audi' },
+      'VW':         { match: id => /^vw_|^volkswagen_/.test(id), zh: '福斯 VW' },
+      'Opel':       { match: id => /^opel_/.test(id), zh: '歐寶 Opel' },
+      'ALPINA':     { match: id => /^alpina_/.test(id), zh: 'ALPINA' },
+      'Brabus':     { match: id => /^brabus_/.test(id), zh: 'Brabus' },
+      'RUF':        { match: id => /^ruf_/.test(id), zh: 'RUF' },
+      // — 義大利 Italian —
+      'Ferrari':    { match: id => /^ferrari_/.test(id), zh: '法拉利 Ferrari' },
       'Lamborghini':{ match: id => /^lamborghini_/.test(id), zh: '藍寶堅尼 Lamborghini' },
-      'Alfa Romeo':{ match: id => /^alfa_/.test(id), zh: '愛快羅密歐 Alfa Romeo' },
-      'Maserati':  { match: id => /^maserati_/.test(id), zh: '瑪莎拉蒂 Maserati' },
+      'Alfa Romeo': { match: id => /^alfa_/.test(id), zh: '愛快羅密歐 Alfa Romeo' },
+      'Maserati':   { match: id => /^maserati_/.test(id), zh: '瑪莎拉蒂 Maserati' },
       'Fiat/Abarth':{ match: id => /^fiat_/.test(id), zh: '飛雅特/阿巴斯 Abarth' },
-      'Lotus':     { match: id => /^lotus_/.test(id), zh: '蓮花 Lotus' },
-      'McLaren':   { match: id => /^mclaren_/.test(id), zh: '麥拉倫 McLaren' },
+      'Pagani':     { match: id => /^pagani_/.test(id), zh: '帕加尼 Pagani' },
+      'Lancia':     { match: id => /^lancia_/.test(id), zh: '蘭吉雅 Lancia' },
+      'De Tomaso':  { match: id => /^de_tomaso/.test(id), zh: 'De Tomaso' },
+      'Dallara':    { match: id => /^dallara_/.test(id), zh: 'Dallara' },
+      // — 英國 British —
+      'Lotus':      { match: id => /^lotus_/.test(id), zh: '蓮花 Lotus' },
+      'McLaren':    { match: id => /^mclaren_/.test(id), zh: '麥拉倫 McLaren' },
       'Aston Martin':{ match: id => /^aston_/.test(id), zh: '奧斯頓馬丁 Aston Martin' },
-      'Caterham':  { match: id => /^caterham_/.test(id), zh: 'Caterham' },
-      'MINI':      { match: id => /^mini_/.test(id), zh: 'MINI' },
-      'Ford':      { match: id => /^ford_/.test(id), zh: '福特 Ford' },
-      'Chevrolet': { match: id => /^chevrolet_/.test(id), zh: '雪佛蘭 Chevrolet' },
-      'Dodge':     { match: id => /^dodge_/.test(id), zh: '道奇 Dodge' },
-      'Tesla':     { match: id => /^tesla_/.test(id), zh: '特斯拉 Tesla' },
-      'Hyundai':   { match: id => /^hyundai_/.test(id), zh: '現代 Hyundai' },
-      'Kia':       { match: id => /^kia_/.test(id), zh: '起亞 Kia' },
-      'BYD':       { match: id => /^byd_/.test(id), zh: '比亞迪 BYD' },
-      'Radical':   { match: id => /^radical_/.test(id), zh: 'Radical' },
-      'Ariel':     { match: id => /^ariel_/.test(id), zh: 'Ariel' },
+      'Jaguar':     { match: id => /^jaguar_/.test(id), zh: '捷豹 Jaguar' },
+      'Land Rover': { match: id => /^land_/.test(id), zh: '路虎 Land Rover' },
+      'Bentley':    { match: id => /^bentley_/.test(id), zh: '賓利 Bentley' },
+      'Rolls-Royce':{ match: id => /^rolls_/.test(id), zh: '勞斯萊斯 Rolls-Royce' },
+      'Caterham':   { match: id => /^caterham_/.test(id), zh: 'Caterham' },
+      'MINI':       { match: id => /^mini_/.test(id), zh: 'MINI' },
+      'Morgan':     { match: id => /^morgan_/.test(id), zh: 'Morgan' },
+      'TVR':        { match: id => /^tvr_/.test(id), zh: 'TVR' },
+      'BAC':        { match: id => /^bac_/.test(id), zh: 'BAC' },
+      'Noble':      { match: id => /^noble_/.test(id), zh: 'Noble' },
+      'Ginetta':    { match: id => /^ginetta_/.test(id), zh: 'Ginetta' },
+      'Radical':    { match: id => /^radical_/.test(id), zh: 'Radical' },
+      'Ariel':      { match: id => /^ariel_/.test(id), zh: 'Ariel' },
+      'Gordon Murray':{ match: id => /^gordon_/.test(id), zh: 'Gordon Murray' },
+      // — 法國 French —
+      'Peugeot':    { match: id => /^peugeot_/.test(id), zh: '寶獅 Peugeot' },
+      'Renault':    { match: id => /^renault_|^alpine_/.test(id), zh: '雷諾 Renault / Alpine' },
+      'Citroen':    { match: id => /^citroen_/.test(id), zh: '雪鐵龍 Citroen' },
+      'Bugatti':    { match: id => /^bugatti_/.test(id), zh: '布加迪 Bugatti' },
+      // — 瑞典 Swedish —
+      'Volvo':      { match: id => /^volvo_/.test(id), zh: '富豪 Volvo' },
+      'Polestar':   { match: id => /^polestar_/.test(id), zh: 'Polestar' },
+      'Koenigsegg': { match: id => /^koenigsegg_/.test(id), zh: '柯尼賽格 Koenigsegg' },
+      'Saab':       { match: id => /^saab_/.test(id), zh: 'Saab' },
+      // — 其他歐洲 Other European —
+      'SEAT/Cupra': { match: id => /^seat_|^cupra_/.test(id), zh: 'SEAT / Cupra' },
+      'Skoda':      { match: id => /^skoda_/.test(id), zh: 'Skoda' },
+      'Dacia':      { match: id => /^dacia_/.test(id), zh: 'Dacia' },
+      'Wiesmann':   { match: id => /^wiesmann_/.test(id), zh: 'Wiesmann' },
+      'Donkervoort':{ match: id => /^donkervoort_/.test(id), zh: 'Donkervoort' },
+      'Spyker':     { match: id => /^spyker_/.test(id), zh: 'Spyker' },
+      'Zenvo':      { match: id => /^zenvo_/.test(id), zh: 'Zenvo' },
+      'Rimac':      { match: id => /^rimac_/.test(id), zh: 'Rimac' },
+      'smart':      { match: id => /^smart_/.test(id), zh: 'smart' },
+      // — 美國 American —
+      'Ford':       { match: id => /^ford_|^shelby_/.test(id), zh: '福特 Ford / Shelby' },
+      'Chevrolet':  { match: id => /^chevrolet_|^corvette_/.test(id), zh: '雪佛蘭 Chevrolet' },
+      'Dodge':      { match: id => /^dodge_/.test(id), zh: '道奇 Dodge' },
+      'Cadillac':   { match: id => /^cadillac_/.test(id), zh: '凱迪拉克 Cadillac' },
+      'Pontiac':    { match: id => /^pontiac_/.test(id), zh: '龐蒂克 Pontiac' },
+      'Chrysler':   { match: id => /^chrysler_/.test(id), zh: '克萊斯勒 Chrysler' },
+      'Jeep':       { match: id => /^jeep_/.test(id), zh: 'Jeep' },
+      'GMC':        { match: id => /^gmc_|^ram_/.test(id), zh: 'GMC / RAM' },
+      'Tesla':      { match: id => /^tesla_/.test(id), zh: '特斯拉 Tesla' },
+      'Rivian':     { match: id => /^rivian_/.test(id), zh: 'Rivian' },
+      'Lucid':      { match: id => /^lucid_/.test(id), zh: 'Lucid' },
+      'DeLorean':   { match: id => /^delorean_/.test(id), zh: 'DeLorean' },
+      'Hennessey':  { match: id => /^hennessey_|^saleen_|^panoz_|^local_|^polaris_/.test(id), zh: 'Hennessey / Other US' },
+      // — 韓國 Korean —
+      'Hyundai':    { match: id => /^hyundai_/.test(id), zh: '現代 Hyundai' },
+      'Kia':        { match: id => /^kia_/.test(id), zh: '起亞 Kia' },
+      'Genesis':    { match: id => /^genesis_/.test(id), zh: '捷尼賽思 Genesis' },
+      'SsangYong':  { match: id => /^ssangyong_/.test(id), zh: '雙龍 SsangYong' },
+      // — 中國 Chinese —
+      'BYD':        { match: id => /^byd_/.test(id), zh: '比亞迪 BYD' },
+      'NIO':        { match: id => /^nio_/.test(id), zh: '蔚來 NIO' },
+      'XPeng':      { match: id => /^xpeng_/.test(id), zh: '小鵬 XPeng' },
+      'Geely/Zeekr':{ match: id => /^geely_/.test(id), zh: '吉利/極氪 Geely/Zeekr' },
+      'Li Auto':    { match: id => /^li_/.test(id), zh: '理想 Li Auto' },
+      'MG':         { match: id => /^mg_/.test(id), zh: 'MG' },
+      'Other CN':   { match: id => /^lynk_|^changan_|^great_|^ora_|^hongqi_|^wuling_|^hsk_/.test(id), zh: '其他中國 Other Chinese' },
+      // — 澳洲 / 東南亞 / 印度 —
+      'Holden/HSV': { match: id => /^holden_|^hsv_/.test(id), zh: 'Holden / HSV' },
+      'Tata/Mahindra':{ match: id => /^tata_|^mahindra_|^maruti_|^tamo_/.test(id), zh: 'Tata / Mahindra' },
+      'Proton':     { match: id => /^proton_|^perodua_/.test(id), zh: '寶騰 Proton / Perodua' },
+      'VinFast':    { match: id => /^vinfast_/.test(id), zh: 'VinFast' },
     };
     const groups = [];
     const used = new Set();
