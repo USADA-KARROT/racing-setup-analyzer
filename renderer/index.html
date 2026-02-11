@@ -75,7 +75,7 @@ canvas{max-height:300px}
     <div class="flex items-center gap-3">
       <div class="flex rounded-lg overflow-hidden border border-white/10">
         <button class="px-4 py-2 text-xs font-semibold transition-colors" :class="streetMode ? 'bg-transparent text-slate-400' : 'bg-sky-500 text-white'" @click="streetMode=false; streetCar=''">專業模式</button>
-        <button class="px-4 py-2 text-xs font-semibold transition-colors" :class="streetMode ? 'bg-green-500 text-white' : 'bg-transparent text-slate-400'" @click="streetMode=true; if(!carPresets.length) loadPresets()">街車模式</button>
+        <button class="px-4 py-2 text-xs font-semibold transition-colors" :class="streetMode ? 'bg-green-500 text-white' : 'bg-transparent text-slate-400'" @click="streetMode=true; proOem.enabled=false; if(!carPresets.length) loadPresets()">街車模式</button>
       </div>
     </div>
   </div>
@@ -245,7 +245,7 @@ canvas{max-height:300px}
                 <div>
                   <label class="text-xs text-slate-400">輪胎彈簧率 (N/mm)</label>
                   <input type="number" x-model.number="pred.tire_spring_rate" class="w-full mt-1" step="10">
-                  <div class="text-[10px] text-slate-600 mt-0.5" x-show="streetCarDetail?.oem_tire_specs" x-text="'OEM 估算: F ' + wheelUpgrade.oem_front_spring + ' / R ' + wheelUpgrade.oem_rear_spring + ' N/mm'"></div>
+                  <div class="text-[10px] text-slate-600 mt-0.5" x-show="getOemSpecs()" x-text="'OEM 估算: F ' + wheelUpgrade.oem_front_spring + ' / R ' + wheelUpgrade.oem_rear_spring + ' N/mm'"></div>
                 </div>
                 <div>
                   <label class="text-xs text-slate-400">前 RC 高度 (mm)</label>
@@ -256,8 +256,60 @@ canvas{max-height:300px}
                   <input type="number" x-model.number="pred.rear_roll_center_height" class="w-full mt-1" step="5">
                 </div>
               </div>
+              <!-- Pro mode: Manual OEM tire spec input -->
+              <div x-show="!streetCarDetail?.oem_tire_specs" class="p-3 rounded-lg bg-slate-800/50 border border-white/5">
+                <div class="text-[10px] font-semibold text-slate-400 mb-2">🛞 OEM 基準輪胎規格（用於輪圈升級模擬）</div>
+                <label class="flex items-center gap-1 mb-2 cursor-pointer">
+                  <input type="checkbox" x-model="proOem.sameAxle" @change="syncProOemRear()" class="rounded bg-slate-700 border-slate-600">
+                  <span class="text-[10px] text-slate-400">前後相同</span>
+                </label>
+                <div class="grid grid-cols-2 gap-4">
+                  <!-- Front -->
+                  <div class="space-y-1">
+                    <div class="text-[10px] text-slate-500 font-semibold">前輪</div>
+                    <div class="grid grid-cols-3 gap-1">
+                      <div>
+                        <label class="text-[10px] text-slate-500">胎寬</label>
+                        <input type="number" x-model.number="proOem.front_width" @input="syncProOemRear()" class="w-full text-xs" step="5" min="145" max="355">
+                      </div>
+                      <div>
+                        <label class="text-[10px] text-slate-500">扁平比</label>
+                        <input type="number" x-model.number="proOem.front_aspect" @input="syncProOemRear()" class="w-full text-xs" step="5" min="20" max="70">
+                      </div>
+                      <div>
+                        <label class="text-[10px] text-slate-500">框徑 (吋)</label>
+                        <input type="number" x-model.number="proOem.front_rim" @input="syncProOemRear()" class="w-full text-xs" min="13" max="22">
+                      </div>
+                    </div>
+                    <div class="text-[10px] text-sky-400" x-text="'≈ ' + api.estimateTireSpring(proOem.front_width, proOem.front_aspect) + ' N/mm'"></div>
+                  </div>
+                  <!-- Rear -->
+                  <div class="space-y-1">
+                    <div class="text-[10px] text-slate-500 font-semibold">後輪</div>
+                    <div class="grid grid-cols-3 gap-1">
+                      <div>
+                        <label class="text-[10px] text-slate-500">胎寬</label>
+                        <input type="number" x-model.number="proOem.rear_width" class="w-full text-xs" step="5" min="145" max="355" :disabled="proOem.sameAxle">
+                      </div>
+                      <div>
+                        <label class="text-[10px] text-slate-500">扁平比</label>
+                        <input type="number" x-model.number="proOem.rear_aspect" class="w-full text-xs" step="5" min="20" max="70" :disabled="proOem.sameAxle">
+                      </div>
+                      <div>
+                        <label class="text-[10px] text-slate-500">框徑 (吋)</label>
+                        <input type="number" x-model.number="proOem.rear_rim" class="w-full text-xs" min="13" max="22" :disabled="proOem.sameAxle">
+                      </div>
+                    </div>
+                    <div class="text-[10px] text-sky-400" x-text="'≈ ' + api.estimateTireSpring(proOem.rear_width, proOem.rear_aspect) + ' N/mm'"></div>
+                  </div>
+                </div>
+                <div class="mt-2 flex items-center gap-2">
+                  <button class="text-[10px] px-3 py-1 rounded text-white" :class="proOem.enabled ? 'bg-green-700' : 'bg-sky-600 hover:bg-sky-500'" @click="applyProOem()" x-text="proOem.enabled ? '✓ 已啟用' : '確認並啟用輪圈升級工具'"></button>
+                  <button x-show="proOem.enabled" class="text-[10px] px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300" @click="clearProOem()">清除</button>
+                </div>
+              </div>
               <!-- Wheel Upgrade Section -->
-              <template x-if="streetCarDetail?.oem_tire_specs">
+              <template x-if="getOemSpecs()">
                 <div class="p-3 rounded-lg bg-slate-800/50 border border-white/5">
                   <div class="flex items-center gap-2 mb-2">
                     <label class="flex items-center gap-1 cursor-pointer">
@@ -271,7 +323,7 @@ canvas{max-height:300px}
                       <!-- Front wheel -->
                       <div class="space-y-1">
                         <div class="text-[10px] text-slate-500 font-semibold">前輪</div>
-                        <div class="text-[10px] text-slate-600" x-text="'OEM: ' + streetCarDetail.oem_tire_specs.front.width + '/' + streetCarDetail.oem_tire_specs.front.aspect + ' R' + streetCarDetail.oem_tire_specs.front.rim"></div>
+                        <div class="text-[10px] text-slate-600" x-text="'OEM: ' + getOemSpecs().front.width + '/' + getOemSpecs().front.aspect + ' R' + getOemSpecs().front.rim"></div>
                         <div class="grid grid-cols-2 gap-1">
                           <div>
                             <label class="text-[10px] text-slate-500">輪圈 (吋)</label>
@@ -300,7 +352,7 @@ canvas{max-height:300px}
                       <!-- Rear wheel -->
                       <div class="space-y-1">
                         <div class="text-[10px] text-slate-500 font-semibold">後輪</div>
-                        <div class="text-[10px] text-slate-600" x-text="'OEM: ' + streetCarDetail.oem_tire_specs.rear.width + '/' + streetCarDetail.oem_tire_specs.rear.aspect + ' R' + streetCarDetail.oem_tire_specs.rear.rim"></div>
+                        <div class="text-[10px] text-slate-600" x-text="'OEM: ' + getOemSpecs().rear.width + '/' + getOemSpecs().rear.aspect + ' R' + getOemSpecs().rear.rim"></div>
                         <div class="grid grid-cols-2 gap-1">
                           <div>
                             <label class="text-[10px] text-slate-500">輪圈 (吋)</label>
@@ -1856,6 +1908,13 @@ function app(){return{
     oem_front_spring:220, oem_rear_spring:220,
     frontRimOptions:[], rearRimOptions:[],
   },
+  // Pro mode OEM baseline (manual input)
+  proOem:{
+    enabled:false,
+    sameAxle:true,
+    front_width:225, front_aspect:45, front_rim:18,
+    rear_width:225, rear_aspect:45, rear_rim:18,
+  },
 
   get resultLabel(){
     if(!this.result) return '';
@@ -1924,6 +1983,54 @@ function app(){return{
 
   init(){
     this.tireOptions = api.getTires();
+  },
+
+  // === OEM Specs 統一介面 ===
+  getOemSpecs(){
+    if(this.streetCarDetail?.oem_tire_specs) return this.streetCarDetail.oem_tire_specs;
+    if(this.proOem.enabled) return {
+      front:{width:this.proOem.front_width, aspect:this.proOem.front_aspect, rim:this.proOem.front_rim},
+      rear:{width:this.proOem.rear_width, aspect:this.proOem.rear_aspect, rim:this.proOem.rear_rim},
+    };
+    return null;
+  },
+
+  applyProOem(){
+    const o = this.proOem;
+    const fSpring = api.estimateTireSpring(o.front_width, o.front_aspect);
+    const rSpring = api.estimateTireSpring(o.rear_width, o.rear_aspect);
+    this.wheelUpgrade.oem_front_spring = fSpring;
+    this.wheelUpgrade.oem_rear_spring = rSpring;
+    this.wheelUpgrade.front_rim = o.front_rim;
+    this.wheelUpgrade.rear_rim = o.rear_rim;
+    this.wheelUpgrade.front_width = o.front_width;
+    this.wheelUpgrade.rear_width = o.rear_width;
+    this.wheelUpgrade.enabled = false;
+    this.wheelUpgrade.front_result = null;
+    this.wheelUpgrade.rear_result = null;
+    this.wheelUpgrade.frontRimOptions = api.suggestRimSizes(o.front_rim).map(r=>({value:r, label:r+'"'+(r===o.front_rim?' (OEM)':'')}));
+    this.wheelUpgrade.rearRimOptions = api.suggestRimSizes(o.rear_rim).map(r=>({value:r, label:r+'"'+(r===o.rear_rim?' (OEM)':'')}));
+    this.pred.tire_spring_rate = Math.round((fSpring + rSpring) / 2);
+    this.tire.front_tire_width = o.front_width;
+    this.tire.rear_tire_width = o.rear_width;
+    o.enabled = true;
+  },
+
+  clearProOem(){
+    this.proOem.enabled = false;
+    this.wheelUpgrade.enabled = false;
+    this.wheelUpgrade.front_result = null;
+    this.wheelUpgrade.rear_result = null;
+    this.wheelUpgrade.frontRimOptions = [];
+    this.wheelUpgrade.rearRimOptions = [];
+  },
+
+  syncProOemRear(){
+    if(this.proOem.sameAxle){
+      this.proOem.rear_width = this.proOem.front_width;
+      this.proOem.rear_aspect = this.proOem.front_aspect;
+      this.proOem.rear_rim = this.proOem.front_rim;
+    }
   },
 
   loadPresets(){
@@ -2158,8 +2265,8 @@ function app(){return{
   },
 
   applyWheelUpgrade(){
-    if(!this.streetCarDetail?.oem_tire_specs) return;
-    const specs = this.streetCarDetail.oem_tire_specs;
+    const specs = this.getOemSpecs();
+    if(!specs) return;
     this.wheelUpgrade.front_result = api.calcWheelUpgrade(specs.front, this.wheelUpgrade.front_rim, this.wheelUpgrade.front_width);
     this.wheelUpgrade.rear_result = api.calcWheelUpgrade(specs.rear, this.wheelUpgrade.rear_rim, this.wheelUpgrade.rear_width);
   },
@@ -2176,8 +2283,8 @@ function app(){return{
   },
 
   resetWheelUpgrade(){
-    if(!this.streetCarDetail?.oem_tire_specs) return;
-    const specs = this.streetCarDetail.oem_tire_specs;
+    const specs = this.getOemSpecs();
+    if(!specs) return;
     this.wheelUpgrade.front_rim = specs.front.rim;
     this.wheelUpgrade.rear_rim = specs.rear.rim;
     this.wheelUpgrade.front_width = specs.front.width;
