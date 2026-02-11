@@ -123,6 +123,35 @@ const api = {
     };
   },
 
+  // === Setup Advisor ===
+
+  /** Analyze setup and generate tuning suggestions */
+  analyzeSetup(result, tier, params, advParams) {
+    return SetupAdvisor.analyze(result, tier, params, advParams);
+  },
+
+  // === Spring Calculator ===
+
+  /** Calculate spring rate from target frequency */
+  calcSpringFromFreq(targetHz, cornerMass, motionRatio, tireSpringRate) {
+    return SpringCalculator.freqToSpring(targetHz, cornerMass, motionRatio, tireSpringRate);
+  },
+
+  /** Calculate frequency from spring rate */
+  calcFreqFromSpring(springRate, cornerMass, motionRatio, tireSpringRate) {
+    return SpringCalculator.springToFreq(springRate, cornerMass, motionRatio, tireSpringRate);
+  },
+
+  /** Generate spring rate reference table */
+  calcSpringTable(cornerMass, motionRatio, tireSpringRate, rates) {
+    return SpringCalculator.springTable(cornerMass, motionRatio, tireSpringRate, rates);
+  },
+
+  /** Calculate ARB sizing for target roll gradient */
+  calcArbSizing(totalWeight, cgHeight, targetRollGrad, frontPct, springRollFront, springRollRear) {
+    return SpringCalculator.arbSizing(totalWeight, cgHeight, targetRollGrad, frontPct, springRollFront, springRollRear);
+  },
+
   // === Stats ===
 
   /** Get app stats */
