@@ -1120,6 +1120,529 @@ canvas{max-height:300px}
   </div>
 </div>
 
+<!-- ==================== TAB: 使用說明 ==================== -->
+<div x-show="currentTab==='guide'" x-transition>
+  <h2 class="text-xl font-bold mb-4">使用說明 User Guide</h2>
+
+  <!-- Quick Start -->
+  <div class="card p-5 mb-4">
+    <div class="section-title">快速上手</div>
+    <div class="text-sm leading-relaxed space-y-3">
+      <p>Racing Dynamics 是一款車輛底盤動態分析工具，幫助你在賽道日之前<strong class="text-sky-400">預測車輛的轉向特性</strong>，並給出具體的調校建議。</p>
+      <div class="card2 p-4">
+        <div class="text-xs text-slate-400 mb-2">基本使用流程</div>
+        <ol class="list-decimal list-inside space-y-2 text-sm">
+          <li><strong>轉向預測</strong> — 選擇車輛（街車模式）或手動輸入懸吊參數，按「計算預測」</li>
+          <li><strong>調校建議</strong> — 系統根據結果產生調校建議，告訴你該調什麼、調多少</li>
+          <li><strong>彈簧計算</strong> — 用計算器算出需要的彈簧型號（輸入目標頻率 → 得到彈簧率）</li>
+          <li><strong>輪胎分析</strong> — 查看輪胎抓地力 vs 溫度/壓力的關係曲線</li>
+          <li>調完參數後回到「轉向預測」重算，可設定 Baseline 比較前後差異</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tier Explanation -->
+  <div class="card p-5 mb-4">
+    <div class="section-title">三層分析架構 Three-Tier System</div>
+    <div class="grid grid-cols-3 gap-3">
+      <div class="card2 p-4">
+        <div class="badge badge-g mb-2">Tier 1 快速</div>
+        <div class="text-sm font-semibold mb-1">機械平衡</div>
+        <div class="text-xs text-slate-400 leading-relaxed">
+          只需要彈簧率、ARB、車重分佈等基本參數。<br>
+          計算 Roll Stiffness 分佈、LLTD、Ride Frequency。<br>
+          <strong class="text-green-400">適合：</strong>快速評估底盤平衡方向
+        </div>
+      </div>
+      <div class="card2 p-4">
+        <div class="badge badge-y mb-2">Tier 2 輪胎</div>
+        <div class="text-sm font-semibold mb-1">輪胎感知</div>
+        <div class="text-xs text-slate-400 leading-relaxed">
+          加入輪胎溫度、壓力、配方資料。<br>
+          計算四角抓地力、前後抓地力比、負載敏感度。<br>
+          <strong class="text-yellow-400">適合：</strong>考慮輪胎狀態的分析
+        </div>
+      </div>
+      <div class="card2 p-4">
+        <div class="badge badge-r mb-2">Tier 3 完整</div>
+        <div class="text-sm font-semibold mb-1">完整動態</div>
+        <div class="text-xs text-slate-400 leading-relaxed">
+          加入角落重量、空力、阻尼器、Camber/Toe。<br>
+          計算阻尼比、縱向荷重轉移、Slip Angle、Yaw Gain。<br>
+          <strong class="text-red-400">適合：</strong>賽道日前的完整設定驗證
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Glossary -->
+  <div class="card p-5 mb-4">
+    <div class="section-title">專業名詞解釋 Glossary</div>
+
+    <div class="text-xs text-slate-500 mb-3">點擊類別可展開/收合</div>
+
+    <!-- Category: 轉向特性 -->
+    <div class="mb-3" x-data="{open:true}">
+      <div class="flex items-center gap-2 cursor-pointer py-2 border-b border-white/5" @click="open=!open">
+        <span class="text-xs" x-text="open?'▼':'▶'"></span>
+        <span class="text-sm font-bold text-sky-400">轉向特性 Handling Characteristics</span>
+      </div>
+      <div x-show="open" x-transition class="space-y-3 mt-3">
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Understeer 轉向不足（推頭）</span>
+            <span class="badge badge-r">US</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            車輛的轉向幅度<strong>小於</strong>駕駛者方向盤輸入的角度。前輪先到達抓地力極限，車頭往彎外跑。<br>
+            <span class="text-slate-500">感覺：方向盤打了但車不轉 →「推頭」。對一般駕駛者較安全，因為放油門就能修正。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Oversteer 轉向過度（甩尾）</span>
+            <span class="badge badge-b">OS</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            車輛的轉向幅度<strong>大於</strong>駕駛者方向盤輸入的角度。後輪先到達抓地力極限，車尾往彎外滑。<br>
+            <span class="text-slate-500">感覺：車尾突然外滑 →「甩尾」。需要即時反打修正，處理難度較高。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Neutral 中性</span>
+            <span class="badge badge-g">N</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            前後輪同時接近抓地力極限，車輛按照方向盤輸入的角度精確轉向。<br>
+            <span class="text-slate-500">這是理想狀態，但不穩定 — 職業車手追求微微 Understeer 的安全設定。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Understeer Gradient 轉向不足梯度</span>
+            <span class="badge badge-p">deg/g</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            量化轉向特性的指標，單位 deg/g（度/每G側向加速度）。<br>
+            <strong class="text-red-400">正值</strong> = Understeer（值越大越推頭）<br>
+            <strong class="text-sky-400">負值</strong> = Oversteer（值越大越甩尾）<br>
+            <strong class="text-green-400">接近 0</strong> = Neutral<br>
+            <span class="text-slate-500">本系統用 ±3 deg/g 作為中性判定閾值。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Characteristic Speed 特徵速度</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            只有 Understeer 車輛才有的指標。在這個速度下，轉向增益（Yaw Gain）降到一半。<br>
+            <span class="text-slate-500">意義：特徵速度越高，高速下方向盤反應越靈敏。Oversteer 車沒有特徵速度 — 理論上轉向增益無限上升。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Yaw Gain 偏航增益</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            每度方向盤輸入產生的車身旋轉速率（deg/s per deg）。<br>
+            <span class="text-slate-500">低速時 Yaw Gain ≈ V/L（速度÷軸距）。Understeer 車在高速時 Yaw Gain 降低（反應變鈍），Oversteer 車則增加（反應變靈敏甚至失控）。</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Category: 懸吊與彈簧 -->
+    <div class="mb-3" x-data="{open:true}">
+      <div class="flex items-center gap-2 cursor-pointer py-2 border-b border-white/5" @click="open=!open">
+        <span class="text-xs" x-text="open?'▼':'▶'"></span>
+        <span class="text-sm font-bold text-green-400">懸吊與彈簧 Suspension & Springs</span>
+      </div>
+      <div x-show="open" x-transition class="space-y-3 mt-3">
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Spring Rate 彈簧率</span>
+            <span class="badge badge-g">N/mm</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            彈簧每壓縮 1mm 需要的力（N/mm）。數字越大彈簧越硬。<br>
+            <span class="text-slate-500">例：80 N/mm 的街車彈簧壓 10mm 需要 800N（約 82 kg）的力。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Wheel Rate 輪率</span>
+            <span class="badge badge-g">N/mm</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            從輪胎接觸面看到的有效彈簧率 = Spring Rate × Motion Ratio²。<br>
+            <span class="text-slate-500">因為避震器的安裝角度和位置（Motion Ratio），輪胎實際感受到的硬度跟彈簧本身不同。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Effective Wheel Rate 有效輪率</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            輪胎彈簧和懸吊彈簧<strong>串聯</strong>後的實際剛性。公式：1/K_eff = 1/K_tire + 1/K_wheel<br>
+            <span class="text-slate-500">因為輪胎本身也有彈性（約 180-260 N/mm），實際輪率永遠比彈簧單獨的 Wheel Rate 更低。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Motion Ratio 運動比</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            避震器/彈簧的位移量 ÷ 輪胎的位移量。<br>
+            <span class="text-slate-500">例：MR = 0.85 代表輪胎移動 10mm 時彈簧只壓縮 8.5mm。大多數量產車 MR 在 0.6-1.0 之間。直接安裝在輪軸上的 MR = 1.0。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Ride Frequency 固有頻率</span>
+            <span class="badge badge-y">Hz</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            懸吊系統的自然振盪頻率，反映車輛通過路面不平時的反應速度。<br>
+            <strong>公式：</strong>f = 1/(2π) × √(K_eff / m_corner)<br><br>
+            <div class="grid grid-cols-4 gap-2 text-center">
+              <div><span class="badge badge-b">< 1.5 Hz</span><div class="text-[10px] mt-1">舒適</div></div>
+              <div><span class="badge badge-g">1.5-2.5 Hz</span><div class="text-[10px] mt-1">街道</div></div>
+              <div><span class="badge badge-y">2.5-3.5 Hz</span><div class="text-[10px] mt-1">賽道</div></div>
+              <div><span class="badge badge-r">> 3.5 Hz</span><div class="text-[10px] mt-1">競技</div></div>
+            </div>
+            <div class="mt-2 text-slate-500"><strong>前/後比值</strong>建議 0.85-0.95（後略高於前），稱為 Flat Ride — 車身通過路面凸起時不會產生 pitch（前後搖擺）。</div>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">ARB / Anti-Roll Bar 防傾桿</span>
+            <span class="badge badge-g">Nm/deg</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            連接左右輪的扭力桿，在車身側傾時提供額外的 Roll Stiffness。<br>
+            <span class="text-slate-500">增加前 ARB → 增加前軸荷重轉移 → 更 Understeer。增加後 ARB → 更 Oversteer。ARB 是調整轉向平衡最直接的工具。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Damping Ratio 阻尼比</span>
+            <span class="badge badge-p">ζ</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            阻尼器（避震器）抑制彈簧振盪的能力。<br>
+            <strong>公式：</strong>ζ = c / (2 × √(K × m))<br><br>
+            <div class="grid grid-cols-4 gap-2 text-center">
+              <div><span class="badge badge-r">< 0.3</span><div class="text-[10px] mt-1">欠阻尼</div></div>
+              <div><span class="badge badge-y">0.3-0.5</span><div class="text-[10px] mt-1">街道</div></div>
+              <div><span class="badge badge-g">0.5-0.8</span><div class="text-[10px] mt-1">賽道</div></div>
+              <div><span class="badge badge-b">> 0.8</span><div class="text-[10px] mt-1">競技</div></div>
+            </div>
+            <div class="mt-2 text-slate-500">欠阻尼（< 0.3）：壓到路面凸起後車身持續彈跳。過阻尼（> 1.0）：避震器太硬，彈簧無法正常工作。</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Category: 荷重轉移 -->
+    <div class="mb-3" x-data="{open:true}">
+      <div class="flex items-center gap-2 cursor-pointer py-2 border-b border-white/5" @click="open=!open">
+        <span class="text-xs" x-text="open?'▼':'▶'"></span>
+        <span class="text-sm font-bold text-yellow-400">荷重轉移 Load Transfer</span>
+      </div>
+      <div x-show="open" x-transition class="space-y-3 mt-3">
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">LLTD 側向荷重轉移分佈</span>
+            <span class="badge badge-y">Lateral Load Transfer Distribution</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            過彎時，<strong>前軸承擔多少比例的側向荷重轉移</strong>。這是決定轉向特性的核心指標。<br><br>
+            <strong>原理：</strong>過彎時離心力使車身側傾，重量從內側輪轉移到外側輪。LLTD 決定前後軸各承擔多少比例。<br><br>
+            <strong class="text-red-400">LLTD > 重量分佈</strong> → Understeer（前軸荷重轉移比例高，前輪先飽和）<br>
+            <strong class="text-sky-400">LLTD < 重量分佈</strong> → Oversteer（後軸荷重轉移比例高，後輪先飽和）<br>
+            <span class="text-slate-500">例：LLTD 前 60% + 重量分佈前 55% → 差距 5% → 輕微 Understeer。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Geometric vs Elastic 幾何 vs 彈性荷重轉移</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            荷重轉移由兩個路徑產生：<br><br>
+            <strong>幾何荷重轉移</strong>：透過 Roll Center（側傾中心）直接傳遞。<strong>瞬間發生</strong>，不經過彈簧。<br>
+            <strong>彈性荷重轉移</strong>：透過彈簧和 ARB 的側傾產生。<strong>有延遲</strong>，跟隨車身側傾角度。<br><br>
+            <span class="text-slate-500">幾何佔比高 → 過渡反應快但可調範圍小。彈性佔比高 → 可透過 ARB 調整。一般車輛幾何佔 20-35% 為正常。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Roll Stiffness 側傾剛性</span>
+            <span class="badge badge-y">Nm/deg</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            車身每側傾 1 度需要的力矩。由彈簧 + ARB 共同提供。<br>
+            <span class="text-slate-500">Roll Stiffness Distribution（前後分配比）直接影響 LLTD 的彈性部分。前佔比越高 → 越 Understeer。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Roll Gradient 側傾梯度</span>
+            <span class="badge badge-y">deg/g</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            每 1G 側向加速度造成的車身側傾角度。<br>
+            <span class="text-slate-500">街車約 3-6°/g，賽道改裝車 < 2°/g，方程式賽車 < 1°/g。值越小代表車身越穩定。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Roll Center 側傾中心</span>
+            <span class="badge badge-y">mm</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            車輛側傾時的虛擬旋轉中心點，由懸吊幾何決定（A臂角度等）。<br>
+            <span class="text-slate-500">Roll Center 越高 → 幾何荷重轉移佔比越大。一般前軸 30-80mm，後軸 80-150mm。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Longitudinal Load Transfer 縱向荷重轉移</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            煞車或加速時，前後軸之間的重量轉移。<br>
+            <strong>公式：</strong>ΔFz = M × G_force × h_CG / wheelbase<br>
+            <span class="text-slate-500">煞車時重量往前移（前輪負擔增加）。加速時重量往後移（後輪負擔增加）。重心越高、軸距越短，轉移越大。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Cross Weight 對角重量</span>
+            <span class="badge badge-y">%</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            (左前 + 右後) ÷ 總重 × 100%。理想值 = 50%。<br>
+            <span class="text-slate-500">偏離 50% 代表車輛左右轉時特性不同。> 50% → 左轉較穩定，右轉較不穩。可透過彈簧預載或墊片調整。</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Category: 輪胎 -->
+    <div class="mb-3" x-data="{open:true}">
+      <div class="flex items-center gap-2 cursor-pointer py-2 border-b border-white/5" @click="open=!open">
+        <span class="text-xs" x-text="open?'▼':'▶'"></span>
+        <span class="text-sm font-bold text-pink-400">輪胎 Tires</span>
+      </div>
+      <div x-show="open" x-transition class="space-y-3 mt-3">
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Tire Grip 輪胎抓地力</span>
+            <span class="badge badge-p">%</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            輪胎在當前溫度和壓力下能發揮的抓地力百分比（100% = 最佳條件）。<br>
+            <span class="text-slate-500">受三個因素影響：溫度（鐘形曲線，偏離最佳溫度就下降）、壓力（每偏離 0.1 bar 下降約 2%）、胎寬（面積越大抓地越好，但有遞減效應）。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Tire Load Sensitivity 輪胎負載敏感度</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            輪胎承受越大的垂直荷重，抓地力<strong>效率</strong>越低的現象。<br>
+            <span class="text-slate-500">例：2000N 荷重時 μ=1.0，但 4000N 荷重時 μ 可能只有 0.91。這就是為什麼荷重轉移會降低總抓地力 — 外側輪增加的抓地力 < 內側輪減少的抓地力。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Slip Angle 側偏角</span>
+            <span class="badge badge-p">deg</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            輪胎的行進方向與實際朝向之間的角度差。<br>
+            <span class="text-slate-500">過彎時輪胎會產生側偏角才能產生轉向力。角度越大 → 抓地力越大 → 但超過峰值後急劇下降（失控）。前輪先飽和 = Understeer，後輪先飽和 = Oversteer。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Pacejka Magic Formula 魔術公式</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            Hans Pacejka 教授開發的輪胎力學經驗公式，用數學模型模擬輪胎在各種條件下的表現。<br>
+            <strong>公式：</strong>F = D × sin(C × atan(B×α - E×(B×α - atan(B×α))))<br>
+            <span class="text-slate-500">B=剛性因子、C=形狀因子、D=峰值、E=曲率。幾乎所有專業輪胎模擬都基於此公式的變體。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Treadwear 磨耗指數</span>
+            <span class="badge badge-p">TW</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            美國 UTQG 標準的輪胎磨耗等級。數字越小 = 抓地力越好但磨耗越快。<br>
+            <span class="text-slate-500">TW 100 以下：半熱熔胎（賽道用）。TW 140-200：高性能街胎。TW 300+：一般街胎。TW 越低抓地力越好，但一條胎可能只跑 5000km。</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Category: 空力與幾何 -->
+    <div class="mb-3" x-data="{open:true}">
+      <div class="flex items-center gap-2 cursor-pointer py-2 border-b border-white/5" @click="open=!open">
+        <span class="text-xs" x-text="open?'▼':'▶'"></span>
+        <span class="text-sm font-bold text-purple-400">空力與幾何 Aero & Geometry</span>
+      </div>
+      <div x-show="open" x-transition class="space-y-3 mt-3">
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Downforce 下壓力</span>
+            <span class="badge badge-b">kg</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            空氣流過車身產生的向下壓力，增加輪胎的垂直荷重（不增加慣性質量）。<br>
+            <strong>公式：</strong>Df = 0.5 × ρ_air × V² × A × Cz<br>
+            <span class="text-slate-500">與速度的<strong>平方</strong>成正比 — 200 km/h 的下壓力是 100 km/h 的 4 倍。前後下壓力分佈影響高速時的轉向特性。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Aero Balance 空力平衡</span>
+            <span class="badge badge-b">%</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            前軸下壓力佔總下壓力的比例。<br>
+            <span class="text-slate-500">如果空力平衡跟重量分佈差距太大，高速和低速時的轉向特性會完全不同。例：低速 Understeer 但高速 Oversteer。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Camber 外傾角</span>
+            <span class="badge badge-b">deg</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            從車頭正面看，輪胎頂部往內或外傾斜的角度。<br>
+            <strong>負 Camber</strong>（輪胎頂部往內）：增加過彎時外側輪的接地面積，提升抓地力。<br>
+            <span class="text-slate-500">賽道建議：前 -2.5° ~ -3.5°，後 -1.5° ~ -2.5°。過大的負 Camber 會加速直線行駛時的胎肩磨耗。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">Toe 束角</span>
+            <span class="badge badge-b">deg</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            從車頂俯視，左右輪胎是否往內（Toe-in）或往外（Toe-out）指。<br>
+            <strong>前 Toe-out</strong>：入彎反應更快，但直線穩定性降低。<br>
+            <strong>後 Toe-in</strong>：增加後軸穩定性（減少 Oversteer）。<br>
+            <span class="text-slate-500">Toe 過大會增加滾動阻力和輪胎磨耗。賽道通常前 0°~0.5° out，後 0.2°~0.5° in。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">CG Height 重心高度</span>
+            <span class="badge badge-b">mm</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            車輛重心離地面的高度。影響所有荷重轉移的量。<br>
+            <span class="text-slate-500">重心越高 → 側傾越大、荷重轉移越大 → 不利操控。一般街車 400-550mm，跑車 350-450mm，方程式 250-300mm。</span>
+          </div>
+        </div>
+
+        <div class="card2 p-3">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-sm font-bold">G-G Diagram 摩擦圓</span>
+          </div>
+          <div class="text-xs text-slate-300 leading-relaxed">
+            以側向 G 為橫軸、縱向 G 為縱軸的橢圓圖，表示車輛在各方向上的最大加速能力。<br>
+            <span class="text-slate-500">圓心 = 直線等速。左右 = 過彎。上 = 加速。下 = 煞車。好的車手會讓 G 力軌跡貼著摩擦圓的邊緣走。</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Tips -->
+  <div class="card p-5 mb-4">
+    <div class="section-title">賽道日調校小技巧</div>
+    <div class="space-y-2">
+      <div class="card2 p-3 flex gap-3 items-start">
+        <span class="text-lg">🔧</span>
+        <div class="text-xs text-slate-300 leading-relaxed"><strong>每次只改一個變數</strong> — 同時改彈簧和 ARB 就無法判斷哪個有效。改一項，跑幾圈，記錄感受，再改下一項。</div>
+      </div>
+      <div class="card2 p-3 flex gap-3 items-start">
+        <span class="text-lg">🌡️</span>
+        <div class="text-xs text-slate-300 leading-relaxed"><strong>先確認輪胎在工作溫度</strong> — 輪胎不在溫度窗口內，任何底盤調整的感受都不準確。先跑 2-3 圈暖胎再評估。</div>
+      </div>
+      <div class="card2 p-3 flex gap-3 items-start">
+        <span class="text-lg">📊</span>
+        <div class="text-xs text-slate-300 leading-relaxed"><strong>用 Baseline 功能對比</strong> — 調整前先按「設為 Baseline」，調完重算就能看到 ΔUS（轉向不足梯度變化）數值。</div>
+      </div>
+      <div class="card2 p-3 flex gap-3 items-start">
+        <span class="text-lg">🔴</span>
+        <div class="text-xs text-slate-300 leading-relaxed"><strong>Understeer 比 Oversteer 安全</strong> — 如果不確定，保持微微 Understeer（LLTD 比重量分佈高 2-3%）。推頭可以靠收油門修正，甩尾需要即時反打方向盤。</div>
+      </div>
+      <div class="card2 p-3 flex gap-3 items-start">
+        <span class="text-lg">💨</span>
+        <div class="text-xs text-slate-300 leading-relaxed"><strong>高速彎和低速彎分開看</strong> — 使用 Tier 3 的 Contribution 分析。空力在低速彎幾乎無效，但在高速彎可能主導轉向特性。</div>
+      </div>
+      <div class="card2 p-3 flex gap-3 items-start">
+        <span class="text-lg">📏</span>
+        <div class="text-xs text-slate-300 leading-relaxed"><strong>胎壓管理是最便宜的調校</strong> — 利用「輪胎壓力管理」記錄冷/熱胎壓，系統會建議下次的冷胎壓設定。比換彈簧便宜多了。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- About -->
+  <div class="card p-5">
+    <div class="section-title">關於本系統</div>
+    <div class="text-xs text-slate-400 leading-relaxed space-y-2">
+      <p>Racing Dynamics 是基於 <strong>Milliken & Milliken, Race Car Vehicle Dynamics</strong> 等經典文獻的車輛動態計算工具。</p>
+      <p>物理引擎包含：Roll Stiffness 側傾剛性分析、LLTD 分解（幾何+彈性）、Pacejka 輪胎模型、阻尼比分析、縱向荷重轉移、Slip Angle 自行車模型、Yaw Gain 偏航增益。</p>
+      <p>所有計算在本地離線執行，不需要網路連線。</p>
+      <p class="text-slate-600">v3.2 Desktop · USADA-KARROT</p>
+    </div>
+  </div>
+
+</div>
+
 </main>
 
 <script src="js/tire-data.js"></script>
@@ -1136,6 +1659,7 @@ function app(){return{
     {id:'advisor',label:'調校建議',sub:'Setup Advisor'},
     {id:'spring',label:'彈簧計算',sub:'Spring Calculator'},
     {id:'tire',label:'輪胎分析',sub:'Tire Analysis'},
+    {id:'guide',label:'使用說明',sub:'User Guide'},
   ],
   tier:1,
   // Prediction inputs
