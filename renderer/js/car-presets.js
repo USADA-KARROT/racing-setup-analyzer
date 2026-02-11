@@ -52,6 +52,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Michelin Pilot Sport N4",
         "oem_tire_size": "F: 235/40 R18 / R: 295/30 R18",
+        "oem_tire_specs": {
+            "front": {"width": 235, "aspect": 40, "rim": 18},
+            "rear":  {"width": 295, "aspect": 30, "rim": 18}
+        },
         "suspension_type": "F: MacPherson / R: Multi-link",
         "damper_adjustable": false,
         "arb_adjustable": true,
@@ -100,6 +104,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Michelin Pilot Sport Cup+",
         "oem_tire_size": "F: 235/35 R19 / R: 305/30 R19",
+        "oem_tire_specs": {
+            "front": {"width": 235, "aspect": 35, "rim": 19},
+            "rear":  {"width": 305, "aspect": 30, "rim": 19}
+        },
         "suspension_type": "F: MacPherson / R: Multi-link",
         "damper_adjustable": true,  // PASM option
         "damper_defaults": {"front_bump_force": 90, "front_rebound_force": 130, "rear_bump_force": 110, "rear_rebound_force": 160},
@@ -149,6 +157,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Michelin Pilot Sport Cup 2 N1",
         "oem_tire_size": "F: 245/35 R20 / R: 305/30 R20",
+        "oem_tire_specs": {
+            "front": {"width": 245, "aspect": 35, "rim": 20},
+            "rear":  {"width": 305, "aspect": 30, "rim": 20}
+        },
         "suspension_type": "F: MacPherson / R: Multi-link + 後輪轉向",
         "damper_adjustable": true,  // PASM standard
         "damper_defaults": {"front_bump_force": 95, "front_rebound_force": 140, "rear_bump_force": 120, "rear_rebound_force": 170},
@@ -198,6 +210,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Michelin Pilot Sport Cup 2",
         "oem_tire_size": "F: 255/35 R20 / R: 315/30 R21",
+        "oem_tire_specs": {
+            "front": {"width": 255, "aspect": 35, "rim": 20},
+            "rear":  {"width": 315, "aspect": 30, "rim": 21}
+        },
         "suspension_type": "F: 雙A臂 (Double Wishbone) / R: Multi-link + 後輪轉向",
         "damper_adjustable": true,
         "damper_defaults": {"front_bump_force": 100, "front_rebound_force": 150, "rear_bump_force": 130, "rear_rebound_force": 180},
@@ -250,6 +266,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Dunlop SP Sport MAXX 050",
         "oem_tire_size": "F: 225/40 ZR18 / R: 225/40 ZR18",
+        "oem_tire_specs": {
+            "front": {"width": 225, "aspect": 40, "rim": 18},
+            "rear":  {"width": 225, "aspect": 40, "rim": 18}
+        },
         "suspension_type": "F: MacPherson / R: 雙A臂 (Double Wishbone)",
         "damper_adjustable": false,
         "arb_adjustable": false,
@@ -298,6 +318,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Michelin Pilot Sport 4S",
         "oem_tire_size": "F: 225/40 ZR18 / R: 225/40 ZR18",
+        "oem_tire_specs": {
+            "front": {"width": 225, "aspect": 40, "rim": 18},
+            "rear":  {"width": 225, "aspect": 40, "rim": 18}
+        },
         "suspension_type": "F: MacPherson / R: Double Wishbone",
         "damper_adjustable": false,        // circuit-tuned but not adjustable
         "arb_adjustable": false,
@@ -349,6 +373,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Pirelli P Zero",
         "oem_tire_size": "F: 245/35 R20 / R: 305/30 R20",
+        "oem_tire_specs": {
+            "front": {"width": 245, "aspect": 35, "rim": 20},
+            "rear":  {"width": 305, "aspect": 30, "rim": 20}
+        },
         "suspension_type": "F: 雙A臂 / R: Multi-link (磁流變避震 SCM2)",
         "damper_adjustable": true,         // magnetorheological
         "damper_defaults": {"front_bump_force": 85, "front_rebound_force": 125, "rear_bump_force": 105, "rear_rebound_force": 155},
@@ -398,6 +426,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Michelin Pilot Sport Cup 2 K2",
         "oem_tire_size": "F: 245/35 R20 / R: 305/30 R20",
+        "oem_tire_specs": {
+            "front": {"width": 245, "aspect": 35, "rim": 20},
+            "rear":  {"width": 305, "aspect": 30, "rim": 20}
+        },
         "suspension_type": "F: 雙A臂 / R: Multi-link (磁流變避震 SCM-E)",
         "damper_adjustable": true,
         "damper_defaults": {"front_bump_force": 95, "front_rebound_force": 140, "rear_bump_force": 120, "rear_rebound_force": 170},
@@ -447,6 +479,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Michelin Pilot Sport 4S K1",
         "oem_tire_size": "F: 245/35 R20 / R: 305/35 R20",
+        "oem_tire_specs": {
+            "front": {"width": 245, "aspect": 35, "rim": 20},
+            "rear":  {"width": 305, "aspect": 35, "rim": 20}
+        },
         "suspension_type": "F: 雙A臂 / R: Multi-link",
         "damper_adjustable": true,
         "damper_defaults": {"front_bump_force": 80, "front_rebound_force": 120, "rear_bump_force": 100, "rear_rebound_force": 150},
@@ -499,6 +535,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Michelin Pilot Sport 4S",
         "oem_tire_size": "F: 275/35 R19 / R: 285/30 R20",
+        "oem_tire_specs": {
+            "front": {"width": 275, "aspect": 35, "rim": 19},
+            "rear":  {"width": 285, "aspect": 30, "rim": 20}
+        },
         "suspension_type": "F: 雙接頭彈簧柱 / R: 五連桿",
         "damper_adjustable": true,
         "damper_defaults": {"front_bump_force": 75, "front_rebound_force": 110, "rear_bump_force": 85, "rear_rebound_force": 130},
@@ -551,6 +591,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Pirelli P Zero",
         "oem_tire_size": "F: 245/30 R20 / R: 305/30 R20",
+        "oem_tire_specs": {
+            "front": {"width": 245, "aspect": 30, "rim": 20},
+            "rear":  {"width": 305, "aspect": 30, "rim": 20}
+        },
         "suspension_type": "F: 雙A臂 / R: 雙A臂",
         "damper_adjustable": true,         // magnetorheological option
         "damper_defaults": {"front_bump_force": 80, "front_rebound_force": 120, "rear_bump_force": 100, "rear_rebound_force": 150},
@@ -603,6 +647,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Michelin Pilot Super Sport",
         "oem_tire_size": "F: 265/35 R19 / R: 295/30 R20",
+        "oem_tire_specs": {
+            "front": {"width": 265, "aspect": 35, "rim": 19},
+            "rear":  {"width": 295, "aspect": 30, "rim": 20}
+        },
         "suspension_type": "F: 雙A臂 / R: 雙A臂 (前中置引擎 + 後置變速箱)",
         "damper_adjustable": true,
         "damper_defaults": {"front_bump_force": 85, "front_rebound_force": 125, "rear_bump_force": 95, "rear_rebound_force": 140},
@@ -655,6 +703,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Bridgestone RE050",
         "oem_tire_size": "F: 215/45R17 / R: 245/40R17",
+        "oem_tire_specs": {
+            "front": {"width": 215, "aspect": 45, "rim": 17},
+            "rear":  {"width": 245, "aspect": 40, "rim": 17}
+        },
         "suspension_type": "F: 雙A臂 / R: 雙A臂（全車四輪獨立雙A臂）",
         "damper_adjustable": false,
         "arb_adjustable": false,
@@ -703,6 +755,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Michelin Pilot Sport 4 S",
         "oem_tire_size": "265/30ZR19",
+        "oem_tire_specs": {
+            "front": {"width": 265, "aspect": 30, "rim": 19},
+            "rear":  {"width": 265, "aspect": 30, "rim": 19}
+        },
         "suspension_type": "F: Dual-Axis MacPherson / R: Multi-link",
         "damper_adjustable": false,
         "arb_adjustable": false,
@@ -754,6 +810,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Michelin Primacy HP",
         "oem_tire_size": "205/55R16 (base) / 215/45R17",
+        "oem_tire_specs": {
+            "front": {"width": 215, "aspect": 45, "rim": 17},
+            "rear":  {"width": 215, "aspect": 45, "rim": 17}
+        },
         "suspension_type": "F: MacPherson / R: 雙A臂",
         "damper_adjustable": false,
         "arb_adjustable": false,
@@ -802,6 +862,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Michelin Pilot Sport 4",
         "oem_tire_size": "215/40R18",
+        "oem_tire_specs": {
+            "front": {"width": 215, "aspect": 40, "rim": 18},
+            "rear":  {"width": 215, "aspect": 40, "rim": 18}
+        },
         "suspension_type": "F: MacPherson / R: Multi-link",
         "damper_adjustable": false,
         "arb_adjustable": false,
@@ -853,6 +917,10 @@ var CAR_PRESETS = {
         },
         "oem_tire": "Michelin Pilot Sport",
         "oem_tire_size": "F: 225/45R18 / R: 255/40R18",
+        "oem_tire_specs": {
+            "front": {"width": 225, "aspect": 45, "rim": 18},
+            "rear":  {"width": 255, "aspect": 40, "rim": 18}
+        },
         "suspension_type": "F: MacPherson / R: Multi-link（M 專用副車架）",
         "damper_adjustable": false,
         "arb_adjustable": false,

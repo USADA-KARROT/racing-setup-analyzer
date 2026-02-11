@@ -1487,3 +1487,168 @@ class SpringCalculator {
     };
   }
 }
+
+// ============================================================
+// Tire Spring Rate Estimator
+// 從輪胎規格（扁平比、胎寬）推算輪胎彈簧率
+//
+// 公式根據輪胎工程經驗值：
+//   K_tire ≈ base_factor × (width/205) × (reference_aspect / actual_aspect)
+//
+// 參考值（205/55R16 ≈ 220 N/mm 為基準）：
+//   扁平比越低 → 胎壁越硬 → 彈簧率越高
+//   胎寬越大 → 接地面積增 → 彈簧率略高
+//
+// Typical ranges:
+//   55 aspect → 180-220 N/mm
+//   45 aspect → 220-260 N/mm
+//   40 aspect → 250-290 N/mm
+//   35 aspect → 280-340 N/mm
+//   30 aspect → 320-400 N/mm
+// ============================================================
+class TireSpringEstimator {
+  // Reference: 205/55R16 ≈ 220 N/mm
+  static REF_WIDTH = 205;
+  static REF_ASPECT = 55;
+  static REF_SPRING_RATE = 220;
+
+  /**
+   * 從輪胎規格推算彈簧率
+   * @param {number} width - 胎寬 (mm), e.g. 235
+   * @param {number} aspectRatio - 扁平比, e.g. 40
+   * @returns {number} 估算彈簧率 (N/mm)
+   */
+  static estimate(width, aspectRatio) {
+    if (!width || !aspectRatio || aspectRatio <= 0) return this.REF_SPRING_RATE;
+
+    // 扁平比越低 → 彈簧率越高（反比關係）
+    const aspectFactor = this.REF_ASPECT / aspectRatio;
+    // 胎寬越大 → 彈簧率略增（弱正比, 指數 0.3）
+    const widthFactor = Math.pow(width / this.REF_WIDTH, 0.3);
+
+    const estimated = this.REF_SPRING_RATE * aspectFactor * widthFactor;
+    return roundN(Math.max(100, Math.min(500, estimated)), 0);
+  }
+
+  /**
+   * 從規格字串解析前後輪胎規格
+   * 支援格式：
+   *   "F: 235/40 R18 / R: 295/30 R18"
+   *   "265/30ZR19"
+   *   "205/55R16 (base) / 215/45R17"
+   *   "F: 225/40 ZR18 / R: 225/40 ZR18"
+   * @param {string} sizeStr - OEM tire size string
+   * @returns {{front: {width,aspect,rim}, rear: {width,aspect,rim}}}
+   */
+  static parseTireSize(sizeStr) {
+    if (!sizeStr) return null;
+
+    const result = { front: null, rear: null };
+
+    // Try F: / R: format first
+    const fMatch = sizeStr.match(/F:\s*(\d+)\/(\d+)\s*Z?R(\d+)/i);
+    const rMatch = sizeStr.match(/R:\s*(\d+)\/(\d+)\s*Z?R(\d+)/i);
+
+    if (fMatch && rMatch) {
+      result.front = { width: +fMatch[1], aspect: +fMatch[2], rim: +fMatch[3] };
+      result.rear = { width: +rMatch[1], aspect: +rMatch[2], rim: +rMatch[3] };
+      return result;
+    }
+
+    // Try single spec (same front/rear) - "265/30ZR19" or "215/40R18"
+    const singleMatch = sizeStr.match(/(\d+)\/(\d+)\s*Z?R(\d+)/i);
+    if (singleMatch) {
+      const spec = { width: +singleMatch[1], aspect: +singleMatch[2], rim: +singleMatch[3] };
+      result.front = { ...spec };
+      result.rear = { ...spec };
+      return result;
+    }
+
+    return null;
+  }
+
+  /**
+   * 從 OEM 規格字串直接估算前後彈簧率
+   * @param {string} sizeStr - OEM tire size string
+   * @returns {{front_spring_rate: number, rear_spring_rate: number, front_spec: object, rear_spec: object}|null}
+   */
+  static estimateFromString(sizeStr) {
+    const parsed = this.parseTireSize(sizeStr);
+    if (!parsed) return null;
+
+    return {
+      front_spring_rate: this.estimate(parsed.front.width, parsed.front.aspect),
+      rear_spring_rate: this.estimate(parsed.rear.width, parsed.rear.aspect),
+      front_spec: parsed.front,
+      rear_spec: parsed.rear,
+    };
+  }
+
+  /**
+   * 計算換框（升級輪圈）後的輪胎規格變化
+   * 保持外徑不變，重新計算扁平比
+   * @param {object} originalSpec - {width, aspect, rim}
+   * @param {number} newRimSize - 新輪圈直徑 (inches)
+   * @param {number} newWidth - 新胎寬 (mm), optional
+   * @returns {{width, aspect, rim, original_diameter, new_diameter, spring_rate, diameter_change_mm}}
+   */
+  static calculateWheelUpgrade(originalSpec, newRimSize, newWidth) {
+    if (!originalSpec) return null;
+
+    const w0 = originalSpec.width;
+    const a0 = originalSpec.aspect;
+    const r0 = originalSpec.rim;
+
+    // 原始外徑 (mm)
+    // 外徑 = 輪圈直徑(mm) + 2 × 胎壁高度
+    // 胎壁高度 = 胎寬 × 扁平比 / 100
+    const originalDiameter = r0 * 25.4 + 2 * (w0 * a0 / 100);
+
+    const nw = newWidth || w0;
+    const nr = newRimSize;
+
+    // 保持外徑不變，反算新扁平比
+    // originalDiameter = nr * 25.4 + 2 * (nw * newAspect / 100)
+    // newAspect = (originalDiameter - nr * 25.4) / (2 * nw) * 100
+    const newSidewallHeight = (originalDiameter - nr * 25.4) / 2;
+    const newAspect = Math.round(newSidewallHeight / nw * 100);
+
+    // 如果扁平比不合理（< 20 或 > 70），提示不適合
+    if (newAspect < 20 || newAspect > 70) {
+      return {
+        error: true,
+        message: `計算出的扁平比 ${newAspect} 不在合理範圍（20-70），此輪圈尺寸不適用`,
+        width: nw, aspect: newAspect, rim: nr,
+      };
+    }
+
+    const newDiameter = nr * 25.4 + 2 * (nw * newAspect / 100);
+    const springRate = this.estimate(nw, newAspect);
+
+    return {
+      width: nw,
+      aspect: newAspect,
+      rim: nr,
+      original_diameter: roundN(originalDiameter, 1),
+      new_diameter: roundN(newDiameter, 1),
+      diameter_change_mm: roundN(newDiameter - originalDiameter, 1),
+      spring_rate: springRate,
+      sidewall_height: roundN(newSidewallHeight, 1),
+      original_sidewall: roundN(w0 * a0 / 100, 1),
+      sidewall_change_pct: roundN((newSidewallHeight - w0 * a0 / 100) / (w0 * a0 / 100) * 100, 1),
+    };
+  }
+
+  /**
+   * 常見升級輪圈選項，根據原始輪圈大小產生建議
+   * @param {number} originalRim - 原始輪圈尺寸
+   * @returns {number[]} 建議的輪圈尺寸列表
+   */
+  static suggestRimSizes(originalRim) {
+    const sizes = [];
+    for (let r = Math.max(15, originalRim - 1); r <= Math.min(22, originalRim + 2); r++) {
+      sizes.push(r);
+    }
+    return sizes;
+  }
+}
