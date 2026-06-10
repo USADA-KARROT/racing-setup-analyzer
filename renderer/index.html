@@ -1288,6 +1288,80 @@ canvas{max-height:300px}
   </div>
 </div>
 
+<!-- ==================== TAB: 麗寶單圈 ==================== -->
+<div x-show="currentTab==='lihpao'" x-transition>
+  <h2 class="text-xl font-bold mb-1">麗寶國際賽車場 G2 — 單圈時間模擬</h2>
+  <p class="text-xs text-slate-500 mb-4">3.500 km / 23 彎 · 用目前「轉向預測」分頁的車輛+輪胎設定 · 預測最快單圈、胎壓甜蜜點出現圈數、逐圈圈速演化</p>
+  <div class="grid-2">
+    <!-- 輸入 -->
+    <div class="card p-5">
+      <div class="section-title">模擬條件</div>
+      <div class="grid-2 text-sm gap-3">
+        <div><label class="text-xs text-slate-400">引擎功率 (kW)</label><input type="number" x-model.number="lihpao.power_kw" class="w-full mt-1"></div>
+        <div><label class="text-xs text-slate-400">驅動</label>
+          <select x-model="lihpao.layout" class="w-full mt-1"><option>AWD</option><option>RWD</option><option>FWD</option></select></div>
+        <div><label class="text-xs text-slate-400">圈數 (stint)</label><input type="number" x-model.number="lihpao.laps" class="w-full mt-1"></div>
+        <div><label class="text-xs text-slate-400">冷胎壓 (bar)</label><input type="number" step="0.05" x-model.number="lihpao.cold_pressure" class="w-full mt-1"></div>
+        <div><label class="text-xs text-slate-400">氣溫 (°C)</label><input type="number" x-model.number="lihpao.ambient_c" class="w-full mt-1"></div>
+        <div><label class="text-xs text-slate-400">路面溫 (°C)</label><input type="number" x-model.number="lihpao.track_c" class="w-full mt-1"></div>
+        <div><label class="text-xs text-slate-400">起跑油量 (kg)</label><input type="number" x-model.number="lihpao.fuel_start" class="w-full mt-1"></div>
+        <div><label class="text-xs text-slate-400">每圈油耗 (kg)</label><input type="number" step="0.1" x-model.number="lihpao.fuel_per_lap" class="w-full mt-1"></div>
+      </div>
+      <div class="text-[10px] text-slate-500 mt-2">車重/抓地/空力/平衡取自「轉向預測」分頁(目前車種與輪胎)。胎種：<span class="text-slate-300" x-text="tire.front_compound"></span></div>
+      <button class="w-full mt-3 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-white font-bold" @click="runLihpao()">模擬單圈</button>
+      <div class="text-[10px] text-amber-400/80 mt-2">⚠ 絕對圈速取決於輸入規格。賽道紀錄多為大改車，原廠車預測較慢屬正常。</div>
+    </div>
+
+    <!-- 結果摘要 -->
+    <div class="card p-5" x-show="lihpaoResult && !lihpaoResult.error">
+      <div class="section-title">預測結果</div>
+      <template x-if="lihpaoResult">
+        <div>
+          <div class="grid-2 gap-3 mb-3">
+            <div class="corner-box"><div class="val text-2xl text-sky-300" x-text="lihpaoResult.fastest_time_str"></div><div class="lbl">最快單圈 (第 <span x-text="lihpaoResult.fastest_lap"></span> 圈)</div></div>
+            <div class="corner-box"><div class="val text-2xl text-pink-300" x-text="'第 '+lihpaoResult.sweet_pressure_lap+' 圈'"></div><div class="lbl">胎壓甜蜜點出現</div></div>
+          </div>
+          <div class="text-xs text-slate-400 space-y-1">
+            <div class="flex justify-between"><span>峰值抓地圈 / 退化起始</span><span class="text-slate-200" x-text="'第 '+lihpaoResult.peak_grip_lap+' 圈'"></span></div>
+            <div class="flex justify-between"><span>熱胎甜蜜點 (目標)</span><span class="text-slate-200" x-text="lihpaoResult.optimal_pressure_bar+' bar / '+lihpaoResult.optimal_temp_c+'°C'"></span></div>
+            <div class="flex justify-between"><span class="text-green-400">建議冷胎壓</span><span class="text-green-400 font-bold" x-text="lihpaoResult.recommended_cold_pressure_bar+' bar'"></span></div>
+            <div class="flex justify-between"><span>平衡 / 圈速懲罰</span><span class="text-slate-200" x-text="lihpaoResult.inputs.balance_us_deg_g+' deg/g ('+lihpaoResult.inputs.balance_penalty_pct+'%)'"></span></div>
+            <div class="flex justify-between"><span>峰值摩擦 μ / 動力</span><span class="text-slate-200" x-text="lihpaoResult.inputs.base_mu+' / '+lihpaoResult.inputs.power_kw+'kW '+lihpaoResult.inputs.drivetrain"></span></div>
+          </div>
+        </div>
+      </template>
+    </div>
+    <div class="card p-5 flex items-center justify-center text-slate-500 text-sm" x-show="!lihpaoResult">按「模擬單圈」開始</div>
+  </div>
+
+  <!-- 逐圈圖表 + 表格 -->
+  <div class="card p-5 mt-4" x-show="lihpaoResult && lihpaoResult.laps">
+    <div class="section-title">逐圈演化：圈速 vs 抓地力</div>
+    <canvas id="lihpaoChart" height="90"></canvas>
+    <div class="overflow-x-auto mt-3">
+      <table class="w-full text-xs text-center">
+        <thead class="text-slate-400 border-b border-white/10"><tr>
+          <th class="py-1">圈</th><th>胎溫°C</th><th>熱胎壓 bar</th><th>抓地%</th><th>質量 kg</th><th>圈速</th><th>窗口</th>
+        </tr></thead>
+        <tbody>
+          <template x-for="L in (lihpaoResult?lihpaoResult.laps:[])" :key="L.lap">
+            <tr class="border-b border-white/5" :class="L.lap===lihpaoResult.fastest_lap?'bg-sky-500/15':''">
+              <td class="py-1" x-text="L.lap"></td>
+              <td x-text="L.temp_c"></td>
+              <td :class="L.in_window?'text-green-400':''" x-text="L.pressure_bar"></td>
+              <td x-text="(L.grip_factor*100).toFixed(0)+'%'"></td>
+              <td x-text="L.mass_kg"></td>
+              <td class="font-mono" :class="L.lap===lihpaoResult.fastest_lap?'text-sky-300 font-bold':''" x-text="L.lap_s.toFixed(2)"></td>
+              <td x-text="L.in_window?'★':''"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+    <div class="text-[10px] text-slate-500 mt-2">★ = 胎溫與胎壓同時落在工作窗口。藍底 = 最快單圈。曲線顯示冷胎→甜蜜點→過熱/磨耗退化的典型 stint 演化。</div>
+  </div>
+</div>
+
 <!-- ==================== TAB: 使用說明 ==================== -->
 <div x-show="currentTab==='guide'" x-transition>
   <h2 class="text-xl font-bold mb-4">使用說明 User Guide</h2>
@@ -1852,6 +1926,7 @@ canvas{max-height:300px}
 <script src="js/tire-data.js"></script>
 <script src="js/dynamics-model.js"></script>
 <script src="js/car-presets.js"></script>
+<script src="js/lihpao-laptime.js"></script>
 <script src="js/api.js"></script>
 <script>
 const COLORS=['#38bdf8','#f472b6','#34d399','#facc15','#a78bfa','#fb923c','#22d3ee','#e879f9','#84cc16','#f87171'];
@@ -1863,11 +1938,14 @@ function app(){return{
     {id:'advisor',label:'調校建議',sub:'Setup Advisor'},
     {id:'spring',label:'彈簧計算',sub:'Spring Calculator'},
     {id:'tire',label:'輪胎分析',sub:'Tire Analysis'},
+    {id:'lihpao',label:'麗寶單圈',sub:'Lihpao Lap Sim'},
     {id:'guide',label:'使用說明',sub:'User Guide'},
   ],
   tier:1,
   // Prediction inputs
-  pred:{front_spring_rate:240,rear_spring_rate:925,front_arb:300,rear_arb:200,front_track:1440,rear_track:1380,front_motion_ratio:1.0,rear_motion_ratio:1.0,weight_front_pct:41.5,total_weight:570,cg_height:280,wheelbase:2730,tire_spring_rate:220,front_roll_center_height:50,rear_roll_center_height:100},
+  pred:{front_spring_rate:240,rear_spring_rate:925,front_arb:300,rear_arb:200,front_track:1440,rear_track:1380,front_motion_ratio:1.0,rear_motion_ratio:1.0,weight_front_pct:41.5,total_weight:570,cg_height:280,wheelbase:2730,tire_spring_rate:220,front_roll_center_height:50,rear_roll_center_height:50},
+  lihpao:{power_kw:200,laps:14,ambient_c:28,track_c:38,cold_pressure:1.95,fuel_start:45,fuel_per_lap:2.2,layout:'AWD'},
+  lihpaoResult:null,
   showAdvancedT1:false,
   tire:{fl_temp:88,fr_temp:92,rl_temp:85,rr_temp:90,fl_pressure:1.88,fr_pressure:1.92,rl_pressure:1.85,rr_pressure:1.90,front_compound:'yokohama_ad08r',rear_compound:'yokohama_ad08r',front_optimal_pressure:2.14,rear_optimal_pressure:2.21,front_tire_width:0,rear_tire_width:0,sameFrontRear:true},
   tireOptions:[],
@@ -2399,6 +2477,42 @@ function app(){return{
     const compatibleTier = (t) => t <= 2 ? 2 : t;
     if(this.baseline && compatibleTier(this.baseline.tier) === compatibleTier(this.tier)) this.computeDelta();
     else this.deltaResult = null;
+  },
+
+  runLihpao(){
+    // 用目前 setup 跑麗寶 G2 stint 模擬
+    const L=this.lihpao;
+    const tireParams={
+      front_compound:this.tire.front_compound, rear_compound:this.tire.rear_compound,
+      front_tire_width:this.tire.front_tire_width||0, rear_tire_width:this.tire.rear_tire_width||0,
+      fl_pressure:L.cold_pressure,
+    };
+    this.lihpaoResult = api.simulateLihpao({
+      params:this.pred, tireParams:tireParams, advParams:(this.tier===3?this.adv:{}),
+      layout:L.layout, power_kw:L.power_kw,
+      env:{ambient_c:L.ambient_c, track_c:L.track_c},
+      stint:{laps:L.laps, fuel_start_kg:L.fuel_start, fuel_per_lap_kg:L.fuel_per_lap, cold_pressure_bar:L.cold_pressure},
+    });
+    this.$nextTick(()=>this.drawLihpaoChart());
+  },
+
+  drawLihpaoChart(){
+    const r=this.lihpaoResult; if(!r||!r.laps) return;
+    const c=document.getElementById('lihpaoChart'); if(!c) return;
+    if(this._lihpaoChart) this._lihpaoChart.destroy();
+    this._lihpaoChart=new Chart(c.getContext('2d'),{
+      type:'line',
+      data:{labels:r.laps.map(l=>l.lap),datasets:[
+        {label:'圈速 (s)',data:r.laps.map(l=>l.lap_s),borderColor:'#38bdf8',yAxisID:'y',tension:0.3},
+        {label:'抓地 %',data:r.laps.map(l=>l.grip_factor*100),borderColor:'#f472b6',yAxisID:'y1',tension:0.3},
+      ]},
+      options:{responsive:true,plugins:{legend:{labels:{color:'#cbd5e1',font:{size:10}}}},
+        scales:{
+          x:{ticks:{color:'#94a3b8',font:{size:9}},title:{display:true,text:'圈數',color:'#94a3b8',font:{size:9}}},
+          y:{position:'left',ticks:{color:'#38bdf8',font:{size:9}},title:{display:true,text:'圈速 s',color:'#38bdf8',font:{size:9}}},
+          y1:{position:'right',ticks:{color:'#f472b6',font:{size:9}},grid:{drawOnChartArea:false},title:{display:true,text:'抓地 %',color:'#f472b6',font:{size:9}}},
+        }}
+    });
   },
 
   setBaseline(){

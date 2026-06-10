@@ -179,6 +179,14 @@ const api = {
     return TireSpringEstimator.suggestRimSizes(originalRim);
   },
 
+  // === Lihpao Lap-Time Simulator ===
+
+  /** 麗寶 G2 單圈/stint 模擬：吃目前的 setup，回傳最快圈/甜蜜點/逐圈表 */
+  simulateLihpao(setup) {
+    if (typeof simulateLihpao === 'undefined') return { error: 'lihpao-laptime.js not loaded' };
+    return simulateLihpao(setup);
+  },
+
   // === Stats ===
 
   /** Get app stats */

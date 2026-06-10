@@ -139,3 +139,26 @@ K ≈ 220 × (55/aspect)^0.35 × (width/205)^0.3 × (0.15 + 0.85·P/2.2)   [N/mm
 - Suspension Secrets: Wheel Rate & Chassis Roll Stiffness
 - Bakker, Pacejka, Lidner, SAE 890087（Pacejka '89）
 - kktse.github.io: RE-71R 255/40R17 vertical stiffness measurement
+
+## 麗寶單圈模擬器 (lihpao-laptime.js)
+
+**賽道**：麗寶 G2 (3.500 km, 23 彎)。幾何為代表性 + 對標校準 (radius_scale=1.1)：
+改裝半熱熔 GR Yaris(mu≈1.25/220kW) → 1:50.3 ≈ 真實紀錄 1:50.89(蘇彥銘)。
+⚠ 絕對圈速取決於輸入規格；賽道紀錄多為大改車，原廠車預測較慢屬正常且正確。
+
+**(1) GG 點質量單圈模擬 (LihpaoLapSim)**：
+- 過彎極速：`μ·(m·g + ½ρ·ClA·v²) = m·v²/r` 對 v² 解二次(含空力下壓力)
+- 直線：`F = min(P/v, μ·N·驅動軸比) − ½ρ·CdA·v² − 滾阻`；煞車用 `μ·N + 阻力`
+- 賽道離散 5m/點 → 曲率極速上限 → 前向(加速)/後向(煞車)多次掃描收斂 → Σdx/v
+- 平衡懲罰：偏離中性 |K_us| 越大圈速越慢(最多 ~4%)
+
+**(2) 輪胎 stint 演化 (LihpaoStintSim)**：
+- 胎溫：一階趨近工作平衡溫 `Teq = 0.55(track+44) + 0.45·optimal_temp`(兼顧路面做功與輪胎設計溫)，τ≈1.6 圈
+- 胎壓：理想氣體 `P_hot = P_cold·(T_gas+273)/(T_amb+273)`
+- 抓地相對因子 = (鐘形溫度曲線/peak) × 壓力曲線，冷胎地板 55%；峰值=base_mu(=peak×寬度)
+- 磨耗：峰值後線性退化，軟胎(低 treadwear)退得快
+- 燃油：每圈遞減 → 車變輕變快
+- 逐圈重算單圈時間 → 找**最快圈**、**胎壓甜蜜點圈**(熱壓首次進 optimal±0.07)、峰值抓地圈、退化起始
+- **建議冷胎壓** = 讓熱壓在第~3圈(暖胎完成)落在 optimal：`cold = optP·(T_amb+273)/(T_gas3+273)`
+
+典型輸出曲線：冷胎 out-lap(慢) → 2-4 圈快速進窗口(最快圈) → 過熱+磨耗退化(圈速回升)。

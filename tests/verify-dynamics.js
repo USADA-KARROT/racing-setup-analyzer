@@ -18,9 +18,11 @@ const jsDir = path.join(__dirname, '..', 'renderer', 'js');
 const src =
   fs.readFileSync(path.join(jsDir, 'tire-data.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'dynamics-model.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'lihpao-laptime.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
-  'compareWithBaseline, roundN, TRACKDAY_TIRES };';
+  'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
+  'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
 const ctx = {};
 vm.createContext(ctx);
@@ -353,6 +355,51 @@ console.log('\n[19] 預設車庫傾向分佈合理性 (回歸「全部轉向過�
     `U/N/O = ${cnt.Understeer}/${cnt.Neutral}/${cnt.Oversteer}`);
   // 前驅(FF)應以轉向不足為主，不該以轉向過度為主
   check('FF 前驅車 轉向不足 > 轉向過度 (物理正確)', ff.U > ff.O, `FF US=${ff.U} OS=${ff.O}`);
+}
+
+console.log('\n[20] 麗寶單圈模擬器 — GG 點質量 lap sim');
+{
+  // 賽道總長對齊 3500m (含半徑校準)
+  const segLen = M.LIHPAO_G2.segments.reduce((s, seg) => s + (seg.type === 'corner' ? seg.arc : seg.length), 0);
+  check('賽道段落總長 ≈ 3500m (±200)', Math.abs(segLen - 3500) < 200, `got ${segLen}`);
+
+  const grYaris = { mass_kg: 1280, power_kw: 220, drivetrain: 'AWD', mu: 1.25, ClA: 0.3, CdA: 0.72 };
+  const base = new M.LihpaoLapSim(grYaris).lapTime();
+  // 改裝半熱熔 GR Yaris 對標真實紀錄 1:50.89 (±5s)
+  check('改裝 GR Yaris 圈速 ≈ 110.9s (1:50, ±6s)', Math.abs(base.lap_s - 110.9) < 6, `got ${base.lap_s.toFixed(1)}s`);
+  check('極速合理 (180-260 km/h)', base.v_max_kmh > 180 && base.v_max_kmh < 260, `got ${base.v_max_kmh.toFixed(0)}`);
+
+  // 單調性：抓地↑→更快, 動力↑→更快, 質量↑→更慢
+  const moreGrip = new M.LihpaoLapSim({ ...grYaris, mu: 1.40 }).lapTime();
+  const morePower = new M.LihpaoLapSim({ ...grYaris, power_kw: 320 }).lapTime();
+  const heavier = new M.LihpaoLapSim({ ...grYaris, mass_kg: 1500 }).lapTime();
+  check('抓地↑ → 圈速更快', moreGrip.lap_s < base.lap_s, `${moreGrip.lap_s.toFixed(1)} < ${base.lap_s.toFixed(1)}`);
+  check('動力↑ → 圈速更快', morePower.lap_s < base.lap_s);
+  check('質量↑ → 圈速更慢', heavier.lap_s > base.lap_s);
+}
+
+console.log('\n[21] 麗寶 stint 演化 — 胎壓甜蜜點 / 最快圈 / 退化');
+{
+  const r = M.simulateLihpao({
+    params: { total_weight: 1280, weight_front_pct: 59, front_track: 1535, rear_track: 1550,
+      front_spring_rate: 60, rear_spring_rate: 55, front_arb: 600, rear_arb: 300, front_motion_ratio: 1, rear_motion_ratio: 1,
+      cg_height: 480, wheelbase: 2560 },
+    tireParams: { front_compound: 'yokohama_a052', rear_compound: 'yokohama_a052', front_tire_width: 235 },
+    layout: 'AWD', power_kw: 220, env: { ambient_c: 28, track_c: 38 },
+    stint: { laps: 12, fuel_start_kg: 45, fuel_per_lap_kg: 2.2, cold_pressure_bar: 1.95 },
+  });
+  check('產生 12 圈逐圈資料', r.laps.length === 12);
+  check('最快單圈時間字串格式 m:ss.mmm', /^\d:\d\d\.\d{3}$/.test(r.fastest_time_str), r.fastest_time_str);
+  check('甜蜜點在 stint 早段 (第1-5圈)', r.sweet_pressure_lap >= 1 && r.sweet_pressure_lap <= 5, `第${r.sweet_pressure_lap}圈`);
+  check('最快圈 ≈ 峰值抓地圈 (±1)', Math.abs(r.fastest_lap - r.peak_grip_lap) <= 1);
+  // 冷胎 out-lap 比最快圈慢
+  check('第1圈(冷胎)比最快圈慢', r.laps[0].lap_s > r.fastest_time_s, `lap1 ${r.laps[0].lap_s} > best ${r.fastest_time_s}`);
+  // 熱胎壓 > 冷胎壓 (升溫建壓)
+  check('熱胎壓 > 冷胎壓 (升溫建壓)', r.laps[r.laps.length-1].pressure_bar > 1.95);
+  // 建議冷壓 < 熱胎甜蜜點 (因升溫建壓)
+  check('建議冷胎壓 < 熱胎甜蜜點', r.recommended_cold_pressure_bar < r.optimal_pressure_bar, `${r.recommended_cold_pressure_bar} < ${r.optimal_pressure_bar}`);
+  // 峰值後退化：末圈抓地 < 峰值圈抓地
+  check('峰值後抓地退化', r.laps[r.laps.length-1].grip_factor < r.laps[r.peak_grip_lap-1].grip_factor);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
