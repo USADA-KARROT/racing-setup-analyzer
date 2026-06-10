@@ -2523,6 +2523,13 @@ function app(){return{
   runLihpao(){
     // 用目前 setup 跑麗寶 G2 stint 模擬
     const L=this.lihpao;
+    // 換胎時冷胎壓自動跟著該胎最佳熱胎壓走(最佳−0.2)，避免沿用前一條胎的壓力
+    // 造成過壓/欠壓懲罰(例：街胎 2.4 換光頭胎 1.5)。同一條胎內保留使用者手動值。
+    const ftd=(typeof TRACKDAY_TIRES!=='undefined')?TRACKDAY_TIRES[this.tire.front_compound]:null;
+    if(ftd && L._coldForCompound!==this.tire.front_compound){
+      L.cold_pressure=Math.round((ftd.optimal_pressure_front_bar-0.2)*100)/100;
+      L._coldForCompound=this.tire.front_compound;
+    }
     const tireParams={
       front_compound:this.tire.front_compound, rear_compound:this.tire.rear_compound,
       front_tire_width:this.tire.front_tire_width||0, rear_tire_width:this.tire.rear_tire_width||0,

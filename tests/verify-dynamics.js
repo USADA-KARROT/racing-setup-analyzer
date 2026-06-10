@@ -402,5 +402,30 @@ console.log('\n[21] 麗寶 stint 演化 — 胎壓甜蜜點 / 最快圈 / 退化
   check('峰值後抓地退化', r.laps[r.laps.length-1].grip_factor < r.laps[r.peak_grip_lap-1].grip_factor);
 }
 
+console.log('\n[22] 胎種抓地排序 — 光頭胎應比街胎快 (回歸「光頭胎變慢」bug)');
+{
+  const carP = { total_weight: 1280, weight_front_pct: 55, front_track: 1535, rear_track: 1550,
+    front_spring_rate: 80, rear_spring_rate: 70, front_arb: 600, rear_arb: 300,
+    front_motion_ratio: 1, rear_motion_ratio: 1, cg_height: 300, wheelbase: 2560 };
+  const lap = (comp) => {
+    const td = M.TRACKDAY_TIRES[comp];
+    const cold = Math.round((td.optimal_pressure_front_bar - 0.2) * 100) / 100;
+    return M.simulateLihpao({ params: carP, tireParams: { front_compound: comp, rear_compound: comp, front_tire_width: 245 },
+      layout: 'AWD', power_kw: 300, env: { ambient_c: 28, track_c: 38 }, stint: { laps: 10, cold_pressure_bar: cold } }).fastest_time_s;
+  };
+  const street = lap('michelin_ps4s');     // peak 1.00
+  const semi = lap('yokohama_a052');        // peak 1.14
+  const slick = lap('slick_soft');          // peak 1.30
+  check('光頭軟胎 比 街胎(PS4S) 快', slick < street, `slick ${slick.toFixed(1)} < street ${street.toFixed(1)}`);
+  check('光頭軟胎 比 半熱熔(A052) 快', slick < semi, `slick ${slick.toFixed(1)} < semi ${semi.toFixed(1)}`);
+  check('半熱熔 比 街胎 快', semi < street, `semi ${semi.toFixed(1)} < street ${street.toFixed(1)}`);
+  // 光頭胎(高最佳溫)在熱賽道能達到工作窗口(峰值抓地>85%)
+  const td = M.TRACKDAY_TIRES['slick_soft'];
+  const r = M.simulateLihpao({ params: carP, tireParams: { front_compound: 'slick_soft', rear_compound: 'slick_soft', front_tire_width: 245 },
+    layout: 'AWD', power_kw: 300, env: { ambient_c: 28, track_c: 38 }, stint: { laps: 10, cold_pressure_bar: 1.35 } });
+  check('光頭胎在熱賽道達工作窗口 (峰值抓地>85%)', Math.max(...r.laps.map(l => l.grip_factor)) > 0.85,
+    `peak grip ${(Math.max(...r.laps.map(l => l.grip_factor)) * 100).toFixed(0)}%`);
+}
+
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
 process.exit(fail > 0 ? 1 : 0);

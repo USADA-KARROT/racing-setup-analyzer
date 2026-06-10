@@ -201,9 +201,12 @@ class LihpaoStintSim {
   tireTemp(lap) {
     const trackC = this.env.track_c;
     const optT = this.car.optimal_temp ?? 70;
-    // 工作平衡溫 = 路溫做功升溫 與 輪胎設計溫 的加權(輪胎為自身最佳溫設計，
-    // 不會無條件大幅過熱；街胎 optT 低→偏熱、賽胎 optT 高→需充分暖胎)
-    const Teq = 0.55 * (trackC + 44) + 0.45 * optT;
+    // 工作平衡溫：硬操的輪胎(賽道熱圈)會被開到接近自己的「設計工作溫」，
+    // 賽道溫只做微調(熱賽道→略過熱、冷賽道→不到溫)。
+    //   Teq = optimal + (track − 32)×0.6
+    // 這樣光頭胎(optT 90-100)會正確熱到工作窗口(否則永遠發揮不出 peak)，
+    // 而街胎在熱賽道會略過熱、在冷賽道剛好 —— 皆符合實況。
+    const Teq = optT + (trackC - 32) * 0.6;
     const Tstart = this.env.ambient_c + 5; // 出 pit 微溫
     const tau = 1.6; // 圈，時間常數(~3-4 圈到平衡)
     return Teq + (Tstart - Teq) * Math.exp(-(lap - 1) / tau);
