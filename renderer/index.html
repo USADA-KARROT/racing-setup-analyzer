@@ -182,6 +182,7 @@ canvas{max-height:300px}
               <div><label class="text-xs text-slate-400">後 Rebound</label><input type="number" x-model.number="adv.rear_rebound_force" class="w-full mt-1"></div>
             </div>
             <div class="text-[10px] text-slate-500 mt-1">無法取得精確阻尼力值時，可以調段數比例感受趨勢方向</div>
+            <div class="text-[10px] text-slate-500 mt-1">阻尼力參考速度 <input type="number" x-model.number="adv.damper_ref_speed" step="0.1" min="0.05" max="1" class="w-14 inline-block"> m/s（規格表常見 0.1–0.3 m/s）</div>
           </div>
           <!-- Pro mode: all fields -->
           <div x-show="!streetMode || !streetCar" class="grid-2 text-sm">
@@ -691,19 +692,22 @@ canvas{max-height:300px}
           </div>
 
           <!-- Damper (hide when street mode has its own damper section) -->
-          <div x-show="!streetMode || !streetCar || !streetCarDetail?.damper_adjustable" class="grid-4 mb-3 text-sm">
-            <div><label class="text-xs text-slate-400">前 Bump (kgf)</label><input type="number" x-model.number="adv.front_bump_force" class="w-full mt-1"></div>
-            <div><label class="text-xs text-slate-400">前 Rebound</label><input type="number" x-model.number="adv.front_rebound_force" class="w-full mt-1"></div>
-            <div><label class="text-xs text-slate-400">後 Bump (kgf)</label><input type="number" x-model.number="adv.rear_bump_force" class="w-full mt-1"></div>
-            <div><label class="text-xs text-slate-400">後 Rebound</label><input type="number" x-model.number="adv.rear_rebound_force" class="w-full mt-1"></div>
+          <div x-show="!streetMode || !streetCar || !streetCarDetail?.damper_adjustable" class="mb-3">
+            <div class="grid-4 text-sm">
+              <div><label class="text-xs text-slate-400">前 Bump (kgf)</label><input type="number" x-model.number="adv.front_bump_force" class="w-full mt-1"></div>
+              <div><label class="text-xs text-slate-400">前 Rebound</label><input type="number" x-model.number="adv.front_rebound_force" class="w-full mt-1"></div>
+              <div><label class="text-xs text-slate-400">後 Bump (kgf)</label><input type="number" x-model.number="adv.rear_bump_force" class="w-full mt-1"></div>
+              <div><label class="text-xs text-slate-400">後 Rebound</label><input type="number" x-model.number="adv.rear_rebound_force" class="w-full mt-1"></div>
+            </div>
+            <div class="text-[10px] text-slate-500 mt-1">阻尼力參考速度 <input type="number" x-model.number="adv.damper_ref_speed" step="0.1" min="0.05" max="1" class="w-14 inline-block"> m/s（規格表常見 0.1–0.3 m/s）</div>
           </div>
 
           <!-- Geometry -->
           <div class="grid-4 text-sm">
             <div><label class="text-xs text-slate-400">前 Camber (°)</label><input type="number" x-model.number="adv.front_camber_deg" class="w-full mt-1" step="0.1"></div>
             <div><label class="text-xs text-slate-400">後 Camber (°)</label><input type="number" x-model.number="adv.rear_camber_deg" class="w-full mt-1" step="0.1"></div>
-            <div><label class="text-xs text-slate-400">前 Toe (°)</label><input type="number" x-model.number="adv.front_toe_deg" class="w-full mt-1" step="0.1"></div>
-            <div><label class="text-xs text-slate-400">後 Toe (°)</label><input type="number" x-model.number="adv.rear_toe_deg" class="w-full mt-1" step="0.1"></div>
+            <div><label class="text-xs text-slate-400">前 Toe (°，+ = Toe-in)</label><input type="number" x-model.number="adv.front_toe_deg" class="w-full mt-1" step="0.1"></div>
+            <div><label class="text-xs text-slate-400">後 Toe (°，+ = Toe-in)</label><input type="number" x-model.number="adv.rear_toe_deg" class="w-full mt-1" step="0.1"></div>
           </div>
 
           <!-- Longitudinal G-force -->
@@ -849,8 +853,8 @@ canvas{max-height:300px}
                   </div>
                 </div>
                 <div class="text-xs text-slate-500">
-                  前/後比: <span class="font-mono text-slate-300" x-text="(result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio?.toFixed(3)"></span>
-                  <span class="text-[10px] ml-1" :class="{ 'text-green-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio >= 0.85 && (result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio <= 1.15, 'text-yellow-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio < 0.85 || (result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio > 1.15 }" x-text="(result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio >= 0.85 && (result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio <= 1.15 ? '(Flat ride 範圍內)' : '(偏離 Flat ride)'"></span>
+                  後/前比: <span class="font-mono text-slate-300" x-text="(result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio?.toFixed(3)"></span>
+                  <span class="text-[10px] ml-1" :class="{ 'text-green-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio >= 0.85 && (result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio <= 1.35, 'text-yellow-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio < 0.85 || (result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio > 1.35 }" x-text="(result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio >= 0.85 && (result?.ride_frequency || result?.mechanical?.ride_frequency)?.ratio <= 1.35 ? '(常見範圍內：賽道 0.9-1.0 / Flat Ride 1.1-1.2)' : '(偏離常見範圍)'"></span>
                 </div>
                 <div class="text-xs text-slate-500 mt-1" x-text="'有效輪率: 前 ' + (result?.front_wheel_rate_effective || result?.mechanical?.front_wheel_rate_effective || '?') + ' / 後 ' + (result?.rear_wheel_rate_effective || result?.mechanical?.rear_wheel_rate_effective || '?') + ' N/mm'"></div>
               </div>
@@ -935,22 +939,29 @@ canvas{max-height:300px}
             <div class="grid-2 text-xs mb-2">
               <div class="corner-box">
                 <div class="val text-sky-300" x-text="result?.dynamics?.slip_angle_front_deg + '°'"></div>
-                <div class="lbl">前軸 Slip Angle</div>
+                <div class="lbl">前軸 Slip Angle @1g</div>
               </div>
               <div class="corner-box">
                 <div class="val text-pink-300" x-text="result?.dynamics?.slip_angle_rear_deg + '°'"></div>
-                <div class="lbl">後軸 Slip Angle</div>
+                <div class="lbl">後軸 Slip Angle @1g</div>
               </div>
             </div>
             <div class="text-xs text-slate-500 mb-1">
               先飽和: <span class="font-bold" :class="result?.dynamics?.first_saturates==='front' ? 'text-sky-400' : 'text-pink-400'" x-text="result?.dynamics?.first_saturates==='front' ? '前軸 → 推頭' : '後軸 → 甩尾'"></span>
             </div>
+            <div class="text-xs text-slate-500">
+              線性 K<sub>us</sub>: <span class="font-mono text-slate-300" x-text="result?.dynamics?.understeer_gradient_linear_deg_g + ' °/g'"></span>
+            </div>
             <div x-show="result?.dynamics?.characteristic_speed_kmh" class="text-xs text-slate-500">
               特徵速度: <span class="font-mono text-slate-300" x-text="result?.dynamics?.characteristic_speed_kmh + ' km/h'"></span>
             </div>
-            <div class="text-xs text-slate-500">
-              Yaw Gain @100: <span class="font-mono text-slate-300" x-text="result?.dynamics?.yaw_gain_at_100kmh + ' rad/s/rad'"></span>
+            <div x-show="result?.dynamics?.critical_speed_kmh" class="text-xs text-amber-400">
+              臨界速度 (OS): <span class="font-mono" x-text="result?.dynamics?.critical_speed_kmh + ' km/h'"></span>
             </div>
+            <div x-show="result?.dynamics?.yaw_gain_at_100kmh != null" class="text-xs text-slate-500">
+              Yaw Gain @100: <span class="font-mono text-slate-300" x-text="result?.dynamics?.yaw_gain_at_100kmh + ' 1/s'"></span>
+            </div>
+            <div class="text-[10px] text-slate-600 mt-1">線性自行車模型（Pacejka 軸剛性，已依車重校準荷重敏感度）。未含定位/柔性轉向補償，後重車的 OS 傾向會被高估；數值為理論參考</div>
           </div>
 
           <!-- Tier 3: Contribution breakdown -->
@@ -970,7 +981,7 @@ canvas{max-height:300px}
                 <div class="corner-box"><div class="val text-pink-300" x-text="result?.corner_weight?.rr"></div><div class="lbl">RR</div></div>
               </div>
               <div class="text-xs text-slate-500">
-                <span x-text="'Cross: ' + result?.corner_weight?.cross_weight_pct + '%'"></span> |
+                <span x-text="'Cross (FL+RR): ' + result?.corner_weight?.cross_weight_pct + '%'"></span> |
                 <span x-text="'L/R差: ' + result?.corner_weight?.lr_imbalance_pct + '%'"></span>
               </div>
             </div>
@@ -1191,14 +1202,15 @@ canvas{max-height:300px}
         <div class="card2 p-4">
           <div class="text-xs text-slate-400 mb-2">ARB 計算結果</div>
           <div class="space-y-2">
-            <div x-show="arbResult.current_roll_gradient>0" class="flex justify-between"><span class="text-xs text-slate-400">目前 Roll Gradient（僅彈簧）</span><span class="text-sm font-mono text-yellow-400" x-text="arbResult.current_roll_gradient+'°/g'"></span></div>
+            <div x-show="arbResult.current_roll_gradient>0" class="flex justify-between"><span class="text-xs text-slate-400">目前 Roll Gradient（彈簧，未含 ARB）</span><span class="text-sm font-mono text-yellow-400" x-text="arbResult.current_roll_gradient+'°/g'"></span></div>
             <div class="flex justify-between"><span class="text-xs text-slate-400">所需總 Roll Stiffness</span><span class="text-sm font-bold" x-text="arbResult.total_roll_needed+' Nm/deg'"></span></div>
             <div class="border-t border-white/5 my-2"></div>
             <div class="flex justify-between"><span class="text-xs text-slate-400">前軸需要</span><span class="text-sm font-mono" x-text="arbResult.front_roll_needed+' Nm/deg'"></span></div>
             <div class="flex justify-between"><span class="text-xs text-slate-400">後軸需要</span><span class="text-sm font-mono" x-text="arbResult.rear_roll_needed+' Nm/deg'"></span></div>
             <div class="border-t border-white/5 my-2"></div>
-            <div class="flex justify-between"><span class="text-xs text-sky-400">前 ARB 所需剛性</span><span class="text-lg font-bold text-sky-400" x-text="arbResult.front_arb_needed+' Nm/deg'"></span></div>
-            <div class="flex justify-between"><span class="text-xs text-pink-400">後 ARB 所需剛性</span><span class="text-lg font-bold text-pink-400" x-text="arbResult.rear_arb_needed+' Nm/deg'"></span></div>
+            <div class="flex justify-between"><span class="text-xs text-sky-400">前 ARB 所需剛性</span><span class="text-lg font-bold text-sky-400" x-text="arbResult.front_arb_needed != null ? arbResult.front_arb_needed+' Nm/deg' : '—'"></span></div>
+            <div class="flex justify-between"><span class="text-xs text-pink-400">後 ARB 所需剛性</span><span class="text-lg font-bold text-pink-400" x-text="arbResult.rear_arb_needed != null ? arbResult.rear_arb_needed+' Nm/deg' : '—'"></span></div>
+            <div x-show="arbResult.unreachable" class="text-[10px] text-amber-400 mt-1">目標側傾梯度低於輪胎柔度的上限，單靠 ARB 無法達成（需更硬的輪胎或更高胎壓）</div>
           </div>
         </div>
       </template>
@@ -1480,7 +1492,7 @@ canvas{max-height:300px}
               <div><span class="badge badge-y">2.5-3.5 Hz</span><div class="text-[10px] mt-1">賽道</div></div>
               <div><span class="badge badge-r">> 3.5 Hz</span><div class="text-[10px] mt-1">競技</div></div>
             </div>
-            <div class="mt-2 text-slate-500"><strong>前/後比值</strong>建議 0.85-0.95（後略高於前），稱為 Flat Ride — 車身通過路面凸起時不會產生 pitch（前後搖擺）。</div>
+            <div class="mt-2 text-slate-500"><strong>後/前比值</strong>：舒適取向建議 1.10-1.20（後比前高 10-20%，Olley 的 Flat Ride — 後軸「追上」前軸的起伏，pitch 收斂成 bounce）；賽道/空力平台取向則常用 0.90-1.00（前高後低）。</div>
           </div>
         </div>
 
@@ -1600,8 +1612,8 @@ canvas{max-height:300px}
             <span class="badge badge-y">%</span>
           </div>
           <div class="text-xs text-slate-300 leading-relaxed">
-            (左前 + 右後) ÷ 總重 × 100%。理想值 = 50%。<br>
-            <span class="text-slate-500">偏離 50% 代表車輛左右轉時特性不同。> 50% → 左轉較穩定，右轉較不穩。可透過彈簧預載或墊片調整。</span>
+            (左前 + 右後) ÷ 總重 × 100%。理想值 = 50%。本工具刻意採用 FL+RR 對角作為分析視角（非對稱賽道/偏置配重時直接觀察右前輪負載）。<br>
+            <span class="text-slate-500">偏離 50% 代表左右彎特性不同。&gt; 50% → 右彎較穩定、左彎偏轉向過度；&lt; 50% 相反。注意：磅秤顯示的 cross 多為 RF+LR = 100% − 此值，對照時請換算。可透過彈簧預載或墊片調整。</span>
           </div>
         </div>
 
@@ -1736,7 +1748,7 @@ canvas{max-height:300px}
           </div>
           <div class="text-xs text-slate-300 leading-relaxed">
             前軸下壓力佔總下壓力的比例。<br>
-            <span class="text-slate-500">如果空力平衡跟重量分佈差距太大，高速和低速時的轉向特性會完全不同。例：低速 Understeer 但高速 Oversteer。</span>
+            <span class="text-slate-500">下壓力增加抓地力但不增加質量：空力平衡比重量分佈<strong>偏前</strong> → 高速轉向過度（前軸抓地餘裕變大）；<strong>偏後</strong> → 高速轉向不足/穩定。差距太大時高低速特性會完全不同。</span>
           </div>
         </div>
 
@@ -1859,7 +1871,7 @@ function app(){return{
   showAdvancedT1:false,
   tire:{fl_temp:88,fr_temp:92,rl_temp:85,rr_temp:90,fl_pressure:1.88,fr_pressure:1.92,rl_pressure:1.85,rr_pressure:1.90,front_compound:'yokohama_ad08r',rear_compound:'yokohama_ad08r',front_optimal_pressure:2.14,rear_optimal_pressure:2.21,front_tire_width:0,rear_tire_width:0,sameFrontRear:true},
   tireOptions:[],
-  adv:{fl_weight:112.5,fr_weight:114.5,rl_weight:170,rr_weight:173,speed_kmh:180,frontal_area:1.2,front_downforce_coeff:1.3,rear_downforce_coeff:1.5,front_bump_force:80,front_rebound_force:120,rear_bump_force:100,rear_rebound_force:150,front_camber_deg:-3.7,rear_camber_deg:-2.5,front_toe_deg:0.5,rear_toe_deg:0.3,braking_g:0,accel_g:0},
+  adv:{fl_weight:112.5,fr_weight:114.5,rl_weight:170,rr_weight:173,speed_kmh:180,frontal_area:1.2,front_downforce_coeff:1.3,rear_downforce_coeff:1.5,front_bump_force:80,front_rebound_force:120,rear_bump_force:100,rear_rebound_force:150,damper_ref_speed:0.3,front_camber_deg:-3.7,rear_camber_deg:-2.5,front_toe_deg:-0.1,rear_toe_deg:0.3,braking_g:0,accel_g:0},
   result:null,
   baseline:null,      // {tier, params, tire, adv, baselineUSG, baselineNorm}
   deltaResult:null,   // {delta_us, delta_norm, rel_norm, delta_tendency_zh, entry_delta, exit_delta}
@@ -1893,7 +1905,7 @@ function app(){return{
   springCalc:{mode:'freq_to_spring',target_hz:2.5,spring_rate:80,corner_mass:250,motion_ratio:0.85,tire_spring_rate:220},
   springCalcResult:null,
   springTable:[],
-  arbCalc:{target_roll_grad:1.5,front_pct:55,spring_roll_front:0,spring_roll_rear:0,total_weight:1000,cg_height:300},
+  arbCalc:{target_roll_grad:1.5,front_pct:55,spring_roll_front:0,spring_roll_rear:0,tire_roll_front:0,tire_roll_rear:0,total_weight:1000,cg_height:300},
   arbResult:null,
   // G-G chart
   ggChartObj:null,
@@ -2617,14 +2629,18 @@ function app(){return{
   },
   runArbCalc(){
     const ac=this.arbCalc;
-    this.arbResult=api.calcArbSizing(ac.total_weight,ac.cg_height,ac.target_roll_grad,ac.front_pct,ac.spring_roll_front,ac.spring_roll_rear);
+    this.arbResult=api.calcArbSizing(ac.total_weight,ac.cg_height,ac.target_roll_grad,ac.front_pct,ac.spring_roll_front,ac.spring_roll_rear,ac.tire_roll_front,ac.tire_roll_rear);
   },
   loadArbFromPrediction(){
     if(!this.result)return;
     this.arbCalc.total_weight=this.pred.total_weight||1000;
     this.arbCalc.cg_height=this.pred.cg_height||300;
-    this.arbCalc.spring_roll_front=this.result.front_roll_stiffness_spring||(this.result.mechanical?.roll_stiffness_front)||0;
-    this.arbCalc.spring_roll_rear=this.result.rear_roll_stiffness_spring||(this.result.mechanical?.roll_stiffness_rear)||0;
+    // 必須帶「彈簧端」側傾剛性（Tier 3 走 mechanical.roll_stiffness_spring_*），
+    // 不可用 total（total 含現有 ARB 與輪胎串聯，會讓 ARB 需求被低估）
+    this.arbCalc.spring_roll_front=this.result.front_roll_stiffness_spring||(this.result.mechanical?.roll_stiffness_spring_front)||0;
+    this.arbCalc.spring_roll_rear=this.result.rear_roll_stiffness_spring||(this.result.mechanical?.roll_stiffness_spring_rear)||0;
+    this.arbCalc.tire_roll_front=this.result.front_roll_stiffness_tire||(this.result.mechanical?.roll_stiffness_tire_front)||0;
+    this.arbCalc.tire_roll_rear=this.result.rear_roll_stiffness_tire||(this.result.mechanical?.roll_stiffness_tire_rear)||0;
     this.runArbCalc();
   },
 
@@ -2666,7 +2682,7 @@ function app(){return{
     // Info text
     ctx.fillStyle='#94a3b8';ctx.font='9px system-ui';ctx.textAlign='center';
     ctx.fillText(`F/R: ${roundN(cw.front_pct,1)}% / ${roundN(100-cw.front_pct,1)}%`,w/2,h-8);
-    ctx.fillText(`Cross: ${roundN(cw.cross_weight_pct,1)}%`,w/2,18);
+    ctx.fillText(`Cross (FL+RR): ${roundN(cw.cross_weight_pct,1)}%`,w/2,18);
   },
 
   drawGGDiagram(){

@@ -18,7 +18,6 @@
 // ============================================================
 const G = 9.81;        // m/s²
 const RHO_AIR = 1.225; // kg/m³ at sea level 20°C
-const G_STEEL = 80000; // MPa (shear modulus of steel, for ARB calculation)
 
 // ============================================================
 // Utility: round to N decimal places
@@ -60,14 +59,16 @@ class Tier1BasicBalance {
   }
 
   /**
-   * Roll stiffness contribution from springs (Nm/deg).
-   * K_roll = K_wheel * (track/2)^2 * (pi/180)
-   * K_wheel in N/mm, track in mm → convert to N/m and m
+   * Roll stiffness of one axle from a pair of springs (Nm/deg).
+   * Two springs per axle, each at lever arm t/2:
+   *   K_roll = 2 * K_wheel * (t/2)^2 = K_wheel * t^2 / 2   [Nm/rad]
+   * (Milliken RCVD; OptimumG Tech Tip 2; Suspension Secrets)
+   * K_wheel in N/mm, track in mm → output in Nm/deg
    */
   rollStiffnessSpring(wheelRateNmm, trackMm) {
     const kW = wheelRateNmm * 1000; // N/m
-    const tHalf = trackMm / 2000;   // m
-    return kW * Math.pow(tHalf, 2) * (Math.PI / 180);
+    const t = trackMm / 1000;       // m
+    return kW * Math.pow(t, 2) / 2 * (Math.PI / 180);
   }
 
   calculate() {
@@ -98,15 +99,24 @@ class Tier1BasicBalance {
       rWrEff = rWr;
     }
 
-    // Roll stiffness from springs (using effective wheel rate)
-    const fRsSpring = this.rollStiffnessSpring(fWrEff, p.front_track);
-    const rRsSpring = this.rollStiffnessSpring(rWrEff, p.rear_track);
-
-    // Add ARB contribution
+    // === Axle roll stiffness ===
+    // Suspension contribution: springs (at wheel rate) + ARB, then in series
+    // with the tire pair's own roll stiffness — in roll the tires are the
+    // last spring between suspension and road, for ARB as well as springs.
+    const fRsSpring = this.rollStiffnessSpring(fWr, p.front_track ?? 1500);
+    const rRsSpring = this.rollStiffnessSpring(rWr, p.rear_track ?? 1500);
     const fArb = p.front_arb ?? 0;
     const rArb = p.rear_arb ?? 0;
-    const fRsTotal = fRsSpring + fArb;
-    const rRsTotal = rRsSpring + rArb;
+    const fRsSusp = fRsSpring + fArb;
+    const rRsSusp = rRsSpring + rArb;
+    const fRsTire = this.rollStiffnessSpring(tireK, p.front_track ?? 1500);
+    const rRsTire = this.rollStiffnessSpring(tireK, p.rear_track ?? 1500);
+    const fRsTotal = (fRsSusp > 0 && fRsTire > 0)
+      ? 1.0 / (1.0 / fRsSusp + 1.0 / fRsTire)
+      : fRsSusp;
+    const rRsTotal = (rRsSusp > 0 && rRsTire > 0)
+      ? 1.0 / (1.0 / rRsSusp + 1.0 / rRsTire)
+      : rRsSusp;
     const totalRs = fRsTotal + rRsTotal;
 
     // Roll stiffness distribution
@@ -117,10 +127,23 @@ class Tier1BasicBalance {
     const totalWeight = p.total_weight ?? 1000;
     const cgHeight = (p.cg_height ?? 300) / 1000; // to meters
 
-    // Roll gradient (deg/g)
+    // Roll centers & axle masses (shared with the LLTD decomposition below)
+    const hRcF = (p.front_roll_center_height ?? 50) / 1000; // m
+    const hRcR = (p.rear_roll_center_height ?? 100) / 1000;
+    const tF = (p.front_track ?? 1500) / 1000; // m
+    const tR = (p.rear_track ?? 1500) / 1000;
+    const mF = totalWeight * wFrontPct / 100;
+    const mR = totalWeight * (100 - wFrontPct) / 100;
+
+    // Roll moment arm: CG height above the roll axis, weighted per axle (kg·m)
+    const rollMomentArm = mF * (cgHeight - hRcF) + mR * (cgHeight - hRcR);
+
+    // Roll gradient (deg/g):
+    //   φ = M_roll / K_roll = m·g·(h_cg − h_roll_axis) / K_total
+    //   [Nm] / [Nm/deg] = deg — no radian conversion needed
     let rollGradient = 0;
     if (totalRs > 0) {
-      rollGradient = (totalWeight * G * cgHeight) / (totalRs * 180 / Math.PI);
+      rollGradient = (rollMomentArm * G) / totalRs;
     }
 
     // === Ride Frequency ===
@@ -142,19 +165,11 @@ class Tier1BasicBalance {
     }
 
     // === Decomposed LLTD (Geometric + Elastic) ===
-    const hRcF = (p.front_roll_center_height ?? 50) / 1000; // m
-    const hRcR = (p.rear_roll_center_height ?? 100) / 1000;
-    const tF = (p.front_track ?? 1500) / 1000; // m
-    const tR = (p.rear_track ?? 1500) / 1000;
-    const mF = totalWeight * wFrontPct / 100;
-    const mR = totalWeight * (100 - wFrontPct) / 100;
-
     // Geometric load transfer (per g)
     const dFzGeoF = mF * hRcF / tF;
     const dFzGeoR = mR * hRcR / tR;
 
     // Elastic load transfer (through springs/ARBs, per g)
-    const rollMomentArm = mF * (cgHeight - hRcF) + mR * (cgHeight - hRcR);
     let dFzElasticF = 0, dFzElasticR = 0;
     if (totalRs > 0) {
       dFzElasticF = (fRsTotal / totalRs) * rollMomentArm / tF;
@@ -199,6 +214,8 @@ class Tier1BasicBalance {
       tire_spring_rate: tireK,
       front_roll_stiffness_spring: roundN(fRsSpring, 1),
       rear_roll_stiffness_spring: roundN(rRsSpring, 1),
+      front_roll_stiffness_tire: roundN(fRsTire, 1),
+      rear_roll_stiffness_tire: roundN(rRsTire, 1),
       front_roll_stiffness_total: roundN(fRsTotal, 1),
       rear_roll_stiffness_total: roundN(rRsTotal, 1),
       total_roll_stiffness: roundN(totalRs, 1),
@@ -317,9 +334,10 @@ class TireModel {
   }
 
   /**
-   * Tire load sensitivity: grip efficiency decreases as load increases.
-   * K_y = K * sin(2 * atan(Fz / Fz0))
-   * At Fz=Fz0: K_y ≈ 0.91K (already losing ~9% efficiency)
+   * Tire load sensitivity shape: cornering stiffness vs vertical load,
+   * K_y = K * sin(2 * atan(Fz / Fz0))  — same shape as the Pacejka '89 BCD
+   * term. Peaks at Fz = Fz0 (factor exactly 1.0) and falls off at higher
+   * load; this fall-off is why lateral load transfer costs an axle grip.
    */
   static tireLoadSensitivity(fzN, fz0N = 4000, k = 1.0) {
     if (fzN <= 0 || fz0N <= 0) return k;
@@ -358,14 +376,40 @@ class PacejkaTireModel {
    */
   static lateralForce(slipAngleDeg, fzKn, camberDeg = 0, category = 'semi_slick') {
     const co = PacejkaTireModel.COEFFICIENTS[category] || PacejkaTireModel.COEFFICIENTS.sport;
-    const alpha = slipAngleDeg * Math.PI / 180;
     const C = co.C;
     const D = (co.a1 * fzKn + co.a2) * fzKn;
-    const BCD = co.a3 * Math.sin(2 * Math.atan(fzKn / co.a4)) * (1 - co.a5 * Math.abs(camberDeg));
+    const BCD = PacejkaTireModel.corneringStiffness(fzKn, camberDeg, category);
     const E = co.a6 * fzKn + co.a7;
     const B = (C * D) !== 0 ? BCD / (C * D) : 0;
-    const Ba = B * alpha;
+    // '89 係數以「度」擬合（BCD 為 N/deg），slip angle 直接用度帶入，
+    // 不可轉成 radians（會把力低估 57 倍）
+    const Ba = B * slipAngleDeg;
     return D * Math.sin(C * Math.atan(Ba - E * (Ba - Math.atan(Ba))));
+  }
+
+  /**
+   * Cornering stiffness at zero slip (N/deg): the BCD term of the '89 model.
+   * BCD = a3 * sin(2 * atan(Fz/a4)) * (1 - a5*|γ|) — peaks at Fz = a4 (kN)
+   * and falls off at higher load (tire load sensitivity).
+   * The a5 camber term is applied with γ in radians: with the published
+   * a5 ≈ 0.208 this gives the physically sensible ~1-2% reduction at 3°
+   * camber (per-degree application would wrongly erase >60% of stiffness).
+   * @param {number} fzKn - vertical load on the tire in kN
+   * @param {number} camberDeg - camber angle in degrees
+   * @param {string} category - 'race'|'semi_slick'|'sport'
+   * @returns {number} cornering stiffness in N/deg
+   */
+  static corneringStiffness(fzKn, camberDeg = 0, category = 'semi_slick', a4OverrideKn = 0) {
+    const co = PacejkaTireModel.COEFFICIENTS[category] || PacejkaTireModel.COEFFICIENTS.sport;
+    if (fzKn <= 0) return 0;
+    // a4OverrideKn: 發布的 a4（峰值荷重 ≈1.8-2.0 kN/胎）是 1980 年代輕車胎
+    // 的擬合值；現代輪胎依車重選型（load index），剛性峰值會落在工作荷重
+    // 附近。呼叫端可傳入車輛的平均單胎靜載把「膝點」校準到該車，
+    // 否則所有 >750kg 的車都會被誤判為遠超過峰值。
+    const a4 = Math.max(co.a4, a4OverrideKn || 0);
+    const camberRad = Math.abs(camberDeg) * Math.PI / 180;
+    const camberFactor = Math.max(0, 1 - co.a5 * camberRad);
+    return co.a3 * Math.sin(2 * Math.atan(fzKn / a4)) * camberFactor;
   }
 }
 
@@ -463,17 +507,18 @@ class Tier2TireAware {
     const fWidthFactor = fWidth > 0 ? TireModel.gripFactorWidth(fWidth) : 1.0;
     const rWidthFactor = rWidth > 0 ? TireModel.gripFactorWidth(rWidth) : 1.0;
 
-    // Tire load sensitivity
+    // Tire load sensitivity (cornering-stiffness efficiency vs nominal load;
+    // left/right static loads are equal here since only axle weights are known)
     const totalWeight = this.params.total_weight ?? 1000;
     const wFrontPct = this.params.weight_front_pct ?? 50;
     const nominalCornerLoad = totalWeight * G / 4;
-    const flLoad = (totalWeight * wFrontPct / 100 / 2) * G;
-    const rlLoad = (totalWeight * (100 - wFrontPct) / 100 / 2) * G;
+    const frontCornerLoad = (totalWeight * wFrontPct / 100 / 2) * G;
+    const rearCornerLoad = (totalWeight * (100 - wFrontPct) / 100 / 2) * G;
     const loadSensitivity = {
-      fl_efficiency: roundN(TireModel.tireLoadSensitivity(flLoad, nominalCornerLoad), 3),
-      fr_efficiency: roundN(TireModel.tireLoadSensitivity(flLoad, nominalCornerLoad), 3),
-      rl_efficiency: roundN(TireModel.tireLoadSensitivity(rlLoad, nominalCornerLoad), 3),
-      rr_efficiency: roundN(TireModel.tireLoadSensitivity(rlLoad, nominalCornerLoad), 3),
+      fl_efficiency: roundN(TireModel.tireLoadSensitivity(frontCornerLoad, nominalCornerLoad), 3),
+      fr_efficiency: roundN(TireModel.tireLoadSensitivity(frontCornerLoad, nominalCornerLoad), 3),
+      rl_efficiency: roundN(TireModel.tireLoadSensitivity(rearCornerLoad, nominalCornerLoad), 3),
+      rr_efficiency: roundN(TireModel.tireLoadSensitivity(rearCornerLoad, nominalCornerLoad), 3),
       nominal_load_n: roundN(nominalCornerLoad, 0),
     };
 
@@ -541,16 +586,16 @@ class Tier3Complete {
   }
 
   /**
-   * Toe effect on effective cornering stiffness.
-   * Front: toe-out reduces understeer. Rear: toe-in reduces oversteer.
+   * Toe effect on the understeer balance. Convention: positive = toe-in.
+   * Front toe-in → straight-line stability, slower turn-in (more understeer);
+   * front toe-out (negative) → sharper turn-in (less understeer).
+   * Rear toe-in → rear stability (more understeer); rear toe-out → oversteer.
    * Returns an understeer shift value (positive = more understeer).
    */
   toeStabilityFactor(toeDeg, isFront) {
-    if (isFront) {
-      return -toeDeg * 1.5;
-    } else {
-      return toeDeg * 1.5;
-    }
+    // 同一符號慣例（+ = toe-in）下前後軸方向相同；isFront 保留簽名相容，
+    // 目前刻意不影響計算
+    return toeDeg * 1.5;
   }
 
   calculate() {
@@ -573,6 +618,9 @@ class Tier3Complete {
     if (totalW > 0) {
       const frontW = flW + frW;
       const rearW = rlW + rrW;
+      // Cross weight diagonal: FL + RR（本工具刻意採用此對角作為分析視角，
+      // 用於非對稱賽道/偏置配重時直接觀察右前輪負載；與磅秤常見的 RF+LR
+      // 互補：FL+RR% = 100% − RF+LR%）
       const crossW = flW + rrW;
       const crossPct = crossW / totalW * 100;
       crossDeviation = Math.abs(crossPct - 50);
@@ -592,10 +640,12 @@ class Tier3Complete {
       };
 
       if (crossDeviation > 1.0) {
+        // FL+RR > 50% ⟺ RF+LR < 50%（reverse wedge）→ 左彎偏鬆（轉向過度）、
+        // 右彎偏緊（轉向不足/較穩定）；< 50% 相反
         if (crossPct > 50) {
-          cwWarning = 'Cross weight ' + crossPct.toFixed(1) + '%: 右彎較穩定，左彎偏轉向過度';
+          cwWarning = 'Cross weight (FL+RR) ' + crossPct.toFixed(1) + '%: 右彎較穩定，左彎偏轉向過度';
         } else {
-          cwWarning = 'Cross weight ' + crossPct.toFixed(1) + '%: 左彎較穩定，右彎偏轉向過度';
+          cwWarning = 'Cross weight (FL+RR) ' + crossPct.toFixed(1) + '%: 左彎較穩定，右彎偏轉向過度';
         }
       }
     }
@@ -618,7 +668,11 @@ class Tier3Complete {
     if (totalW > 0 && totalDf > 0) {
       const frontW = flW + frW;
       effectiveFrontPct = (frontW + frontDfKg) / (totalW + totalDf) * 100;
-      aeroUsShift = effectiveFrontPct - (frontW / totalW * 100);
+      // Downforce adds grip without adding mass: shifting vertical load share
+      // toward the front gives the front axle more grip margin for the same
+      // lateral demand → LESS understeer. Front-biased aero = high-speed
+      // oversteer; rear-biased aero = high-speed understeer/stability.
+      aeroUsShift = -(effectiveFrontPct - (frontW / totalW * 100));
     } else {
       effectiveFrontPct = t2.weight_front_pct ?? 50;
       aeroUsShift = 0;
@@ -678,9 +732,17 @@ class Tier3Complete {
     const sprungMassFrontT3 = (totalWeightT3 * wFrontPctT3 / 100) / 2;
     const sprungMassRearT3 = (totalWeightT3 * (100 - wFrontPctT3) / 100) / 2;
 
-    // c = average damper force converted from kgf to Ns/m (approximate)
-    const fDampC = ((fBump + fRebound) / 2) * G; // kgf -> N (simplified)
-    const rDampC = ((rBump + rRebound) / 2) * G;
+    // Damper coefficient c = F / v_ref. Spec-sheet forces are quoted at a
+    // reference shaft speed (commonly 0.1–0.3 m/s, e.g. TEIN uses 0.3 m/s) —
+    // dividing by it converts force (kgf→N) into N·s/m. Reflected to the
+    // wheel via the motion ratio (damper assumed to share the spring's MR).
+    // 防呆：使用者清空欄位（''）或輸入 0/負值都會造成除以零 → 退回 0.3
+    const refSpdRaw = Number(ap.damper_ref_speed);
+    const damperRefSpeed = (Number.isFinite(refSpdRaw) && refSpdRaw > 0) ? refSpdRaw : 0.3; // m/s
+    const fMrT3 = this.params.front_motion_ratio ?? 1.0;
+    const rMrT3 = this.params.rear_motion_ratio ?? 1.0;
+    const fDampC = ((fBump + fRebound) / 2) * G / damperRefSpeed * Math.pow(fMrT3, 2); // N·s/m at wheel
+    const rDampC = ((rBump + rRebound) / 2) * G / damperRefSpeed * Math.pow(rMrT3, 2);
     const fDampK = fWrEff * 1000; // N/mm -> N/m
     const rDampK = rWrEff * 1000;
 
@@ -699,15 +761,20 @@ class Tier3Complete {
       return 'race';
     }
 
-    // Roll damping ratio
+    // Roll damping ratio: ζ_roll = C_roll / (2·√(K_roll · I_roll))
+    // C_roll = Σ 2·c·(t/2)² per axle = c·t²/2  [N·m·s/rad] — two dampers per
+    // axle, all quantities per-radian so no degree conversion is involved.
+    // I_roll ≈ m·(0.3·t_avg)²: roll radius of gyration ≈ 30% of track (approx).
     const cgHeightT3 = (this.params.cg_height ?? 300) / 1000;
-    const rollMOI = 0.5 * totalWeightT3 * Math.pow(cgHeightT3, 2);
-    const totalRsNmRad = (t2.total_roll_stiffness ?? 0) * 180 / Math.PI;
-    const critRollDamping = (totalRsNmRad > 0 && rollMOI > 0) ? Math.sqrt(totalRsNmRad * rollMOI) : 0;
     const fTrack = (this.params.front_track ?? 1500) / 1000;
     const rTrack = (this.params.rear_track ?? 1500) / 1000;
-    const actualRollDamping = (fDampC * Math.pow(fTrack / 2, 2) + rDampC * Math.pow(rTrack / 2, 2)) * Math.PI / 180;
-    const rollDampingRatio = critRollDamping > 0 ? actualRollDamping / (2 * critRollDamping) : 0;
+    const avgTrack = (fTrack + rTrack) / 2;
+    const rollMOI = totalWeightT3 * Math.pow(0.3 * avgTrack, 2);
+    const totalRsNmRad = (t2.total_roll_stiffness ?? 0) * 180 / Math.PI; // Nm/deg → Nm/rad
+    const actualRollDamping = fDampC * Math.pow(fTrack, 2) / 2 + rDampC * Math.pow(rTrack, 2) / 2;
+    const rollDampingRatio = (totalRsNmRad > 0 && rollMOI > 0)
+      ? actualRollDamping / (2 * Math.sqrt(totalRsNmRad * rollMOI))
+      : 0;
 
     const dampingInfo = {
       front_ratio: roundN(dampingRatioFront, 3),
@@ -715,6 +782,7 @@ class Tier3Complete {
       front_category: dampingCategory(dampingRatioFront),
       rear_category: dampingCategory(dampingRatioRear),
       roll_damping_ratio: roundN(rollDampingRatio, 3),
+      damper_ref_speed_ms: damperRefSpeed,
     };
 
     // === Longitudinal Weight Transfer ===
@@ -744,36 +812,84 @@ class Tier3Complete {
       };
     }
 
-    // === Slip Angle & Yaw Dynamics ===
-    const mFT3 = totalWeightT3 * wFrontPctT3 / 100;
-    const mRT3 = totalWeightT3 * (100 - wFrontPctT3) / 100;
-    // Cornering stiffness estimate (N/deg) ≈ load * 0.12
-    const cAlphaF = mFT3 * G * 0.12;
-    const cAlphaR = mRT3 * G * 0.12;
-    const slipAngleFront = cAlphaF > 0 ? (mFT3 * G / cAlphaF) * (180 / Math.PI) : 0;
-    const slipAngleRear = cAlphaR > 0 ? (mRT3 * G / cAlphaR) * (180 / Math.PI) : 0;
+    // === Slip Angle & Yaw Dynamics (linear bicycle model, Gillespie ch.6) ===
+    // Axle cornering stiffness from the Pacejka '89 BCD term evaluated at the
+    // static per-tire load, scaled by tire width where known. The load
+    // sensitivity built into BCD makes the heavier axle proportionally
+    // "weaker" — exactly the mechanism behind weight-distribution understeer.
+    const tpT3 = this.tireParams || {};
+    // Axle loads: prefer measured corner weights when entered; otherwise
+    // total weight × distribution
+    let wF_N, wR_N;
+    if (totalW > 0) {
+      wF_N = (flW + frW) * G;
+      wR_N = (rlW + rrW) * G;
+    } else {
+      wF_N = totalWeightT3 * wFrontPctT3 / 100 * G;
+      wR_N = totalWeightT3 * (100 - wFrontPctT3) / 100 * G;
+    }
+    // 把 Pacejka 荷重敏感度的「膝點」校準到本車的平均單胎靜載
+    // （詳見 corneringStiffness 註解）
+    const a4EffKn = (wF_N + wR_N) / 4 / 1000;
 
-    // Characteristic speed (understeer only, K_us > 0)
-    const usGradRad = (t2.understeer_gradient ?? 0) * Math.PI / 180; // deg -> rad
-    let charSpeed = 0;
-    if (usGradRad > 0) {
-      charSpeed = Math.sqrt(G * wheelbaseM / usGradRad) * 3.6; // m/s -> km/h
+    function tireCategoryT3(compound) {
+      if (typeof TRACKDAY_TIRES !== 'undefined' && compound && TRACKDAY_TIRES[compound]) {
+        return TRACKDAY_TIRES[compound].category;
+      }
+      return 'sport';
+    }
+    const fWidthT3 = tpT3.front_tire_width ?? 0;
+    const rWidthT3 = tpT3.rear_tire_width ?? 0;
+    const fWidthFactorT3 = fWidthT3 > 0 ? TireModel.gripFactorWidth(fWidthT3) : 1.0;
+    const rWidthFactorT3 = rWidthT3 > 0 ? TireModel.gripFactorWidth(rWidthT3) : 1.0;
+    const fCamberDyn = ap.front_camber_deg ?? -3.0;
+    const rCamberDyn = ap.rear_camber_deg ?? -2.0;
+
+    const cAlphaF = 2 * PacejkaTireModel.corneringStiffness(
+      wF_N / 2 / 1000, fCamberDyn, tireCategoryT3(tpT3.front_compound), a4EffKn) * fWidthFactorT3; // N/deg per axle
+    const cAlphaR = 2 * PacejkaTireModel.corneringStiffness(
+      wR_N / 2 / 1000, rCamberDyn, tireCategoryT3(tpT3.rear_compound), a4EffKn) * rWidthFactorT3;
+
+    // Slip angle required at 1 g lateral (deg): α = W·a_y / C_α
+    const slipAngleFront = cAlphaF > 0 ? wF_N / cAlphaF : 0;
+    const slipAngleRear = cAlphaR > 0 ? wR_N / cAlphaR : 0;
+
+    // Understeer gradient (Gillespie eq. 6-10): K_us = W_f/C_αf − W_r/C_αr [deg/g]
+    const kUsLinDeg = slipAngleFront - slipAngleRear;
+    const kUsLinRad = kUsLinDeg * Math.PI / 180;
+
+    // Characteristic speed (understeer: yaw gain peaks) or critical speed
+    // (oversteer: linear model becomes unstable): V = √(g·L / |K_us|)
+    // |K_us| < 0.1 deg/g 視為中性：再小的梯度算出的特徵/臨界速度會是
+    // 數千 km/h 的無意義數字，不顯示
+    let charSpeed = null, critSpeed = null;
+    const NEUTRAL_KUS_DEG = 0.1;
+    if (kUsLinDeg > NEUTRAL_KUS_DEG) {
+      charSpeed = Math.sqrt(G * wheelbaseM / kUsLinRad) * 3.6; // km/h
+    } else if (kUsLinDeg < -NEUTRAL_KUS_DEG) {
+      critSpeed = Math.sqrt(G * wheelbaseM / -kUsLinRad) * 3.6;
     }
 
-    // Yaw gain at reference speed (100 km/h)
+    // Yaw rate gain r/δ at 100 km/h (Gillespie): V / (L + K_us·V²/g)  [1/s]
+    // 接近臨界速度（>85%）時線性模型發散、數值無意義 → 不顯示
     const refSpeedMs = 100 / 3.6;
-    let yawGain = 0;
-    if (wheelbaseM > 0) {
-      const kUsVal = usGradRad;
-      yawGain = refSpeedMs / (wheelbaseM * (1 + kUsVal * Math.pow(refSpeedMs, 2) / G));
-    }
+    let yawGain = null;
+    const yawDenom = wheelbaseM + kUsLinRad * Math.pow(refSpeedMs, 2) / G;
+    const nearCritical = critSpeed != null && 100 >= 0.85 * critSpeed;
+    if (yawDenom > 0.01 && !nearCritical) {
+      yawGain = refSpeedMs / yawDenom;
+    } // else: at/above (or near) critical speed — the linear model diverges
 
     const dynamicsInfo = {
-      slip_angle_front_deg: roundN(slipAngleFront, 2),
+      cornering_stiffness_front_n_deg: roundN(cAlphaF, 0),
+      cornering_stiffness_rear_n_deg: roundN(cAlphaR, 0),
+      slip_angle_front_deg: roundN(slipAngleFront, 2),   // at 1 g lateral
       slip_angle_rear_deg: roundN(slipAngleRear, 2),
       first_saturates: slipAngleFront > slipAngleRear ? 'front' : 'rear',
-      characteristic_speed_kmh: charSpeed > 0 ? roundN(charSpeed, 0) : null,
-      yaw_gain_at_100kmh: roundN(yawGain, 3),
+      understeer_gradient_linear_deg_g: roundN(kUsLinDeg, 2),
+      characteristic_speed_kmh: charSpeed != null ? roundN(charSpeed, 0) : null,
+      critical_speed_kmh: critSpeed != null ? roundN(critSpeed, 0) : null,
+      yaw_gain_at_100kmh: yawGain != null ? roundN(yawGain, 3) : null,
     };
 
     // === Camber & Toe ===
@@ -849,6 +965,10 @@ class Tier3Complete {
       mechanical: {
         roll_stiffness_front: t2.front_roll_stiffness_total,
         roll_stiffness_rear: t2.rear_roll_stiffness_total,
+        roll_stiffness_spring_front: t2.front_roll_stiffness_spring,
+        roll_stiffness_spring_rear: t2.rear_roll_stiffness_spring,
+        roll_stiffness_tire_front: t2.front_roll_stiffness_tire,
+        roll_stiffness_tire_rear: t2.rear_roll_stiffness_tire,
         roll_stiffness_dist_front: t2.roll_stiffness_dist_front,
         roll_gradient: t2.roll_gradient_deg_per_g,
         lltd_front: t2.lltd_front,
@@ -1051,12 +1171,14 @@ function compareWithBaseline(tier, baselineInputs, currentInputs) {
       };
     }
 
-    // Dynamics delta
+    // Dynamics delta (yaw gain can be null above the critical speed)
     if (b.dynamics && c.dynamics) {
       delta.dynamics = {
         slip_angle_front: roundN(c.dynamics.slip_angle_front_deg - b.dynamics.slip_angle_front_deg, 2),
         slip_angle_rear: roundN(c.dynamics.slip_angle_rear_deg - b.dynamics.slip_angle_rear_deg, 2),
-        yaw_gain: roundN(c.dynamics.yaw_gain_at_100kmh - b.dynamics.yaw_gain_at_100kmh, 3),
+        yaw_gain: (c.dynamics.yaw_gain_at_100kmh != null && b.dynamics.yaw_gain_at_100kmh != null)
+          ? roundN(c.dynamics.yaw_gain_at_100kmh - b.dynamics.yaw_gain_at_100kmh, 3)
+          : null,
       };
     }
   }
@@ -1091,32 +1213,39 @@ class SetupAdvisor {
       suggestions.push({ priority, category, category_zh: categoryZh, message, suggestion: suggestion || '', values: values || {} });
     };
 
-    // ── Rule 1: Ride Frequency ratio out of flat-ride range ──
+    // ── Rule 1: Front/rear ride frequency relationship ──
+    // ratio = rear/front. Olley "Flat Ride": rear ride frequency 10-20%
+    // HIGHER than front (ratio ≈ 1.10-1.20) so pitch settles into bounce
+    // after a bump. Track/aero cars often run the front stiffer instead
+    // (ratio 0.9-1.0) for platform control — both are legitimate, so only
+    // clear outliers are flagged.
     const rf = result.ride_frequency || (result.mechanical?.ride_frequency);
     if (rf && rf.front_hz > 0 && rf.rear_hz > 0) {
-      // ratio = rear/front in our model
       const ratio = rf.ratio;
-      if (ratio < 0.80 || ratio > 1.0) {
-        const pri = (ratio < 0.75 || ratio > 1.05) ? 'high' : 'medium';
-        const targetRatio = 0.90;
-        const targetFrontHz = rf.rear_hz / targetRatio;
-        // Reverse-calculate required spring rate
-        const fMr = params.front_motion_ratio ?? 1.0;
+      if (ratio < 0.85 || ratio > 1.35) {
+        const pri = (ratio < 0.75 || ratio > 1.5) ? 'medium' : 'low';
+        const targetRatio = 1.10;
+        const targetRearHz = rf.front_hz * targetRatio;
+        // Reverse-calculate required REAR spring rate for flat ride
+        const rMr = params.rear_motion_ratio ?? 1.0;
         const tireK = params.tire_spring_rate ?? 220;
         const wFrontPct = params.weight_front_pct ?? 50;
         const totalWeight = params.total_weight ?? 1000;
-        const mCorner = (totalWeight * wFrontPct / 100) / 2;
-        const kWheelNeeded = Math.pow(2 * Math.PI * targetFrontHz, 2) * mCorner / 1000;
+        const mCorner = (totalWeight * (100 - wFrontPct) / 100) / 2;
+        const kWheelNeeded = Math.pow(2 * Math.PI * targetRearHz, 2) * mCorner / 1000;
         // Subtract tire compliance: k_spring_wheel = 1/(1/kWheelNeeded - 1/tireK)
-        let targetSpring = kWheelNeeded;
+        let targetSpring;
         if (tireK > kWheelNeeded) {
           const kSpringWheel = 1.0 / (1.0 / kWheelNeeded - 1.0 / tireK);
-          targetSpring = kSpringWheel / Math.pow(fMr, 2);
+          targetSpring = kSpringWheel / Math.pow(rMr, 2);
+        } else {
+          // 目標頻率超過輪胎剛性上限，給下界值（同樣換算回彈簧端）
+          targetSpring = kWheelNeeded / Math.pow(rMr, 2);
         }
         add(pri, 'spring', '彈簧',
-          `前後 Ride Frequency 比值 ${roundN(ratio, 2)} 偏離 Flat Ride 範圍 (0.85-0.95)。前 ${roundN(rf.front_hz, 1)} Hz / 後 ${roundN(rf.rear_hz, 1)} Hz`,
-          `建議前彈簧率調整為 ${roundN(targetSpring, 0)} N/mm（目前 ${params.front_spring_rate} N/mm），可達到比值 ${targetRatio}`,
-          { target_front_spring: roundN(targetSpring, 1), target_ratio: targetRatio, target_front_hz: roundN(targetFrontHz, 2) }
+          `後/前 Ride Frequency 比值 ${roundN(ratio, 2)}（前 ${roundN(rf.front_hz, 1)} Hz / 後 ${roundN(rf.rear_hz, 1)} Hz）偏離常見範圍。舒適取向（Olley Flat Ride）建議後軸比前軸高 10-20%（比值 1.10-1.20）；賽道/空力平台取向常用前高後低（0.90-1.00）`,
+          `若以 Flat Ride 為目標，後彈簧率約 ${roundN(targetSpring, 0)} N/mm（目前 ${params.rear_spring_rate} N/mm）可達到比值 ${targetRatio}`,
+          { target_rear_spring: roundN(targetSpring, 1), target_ratio: targetRatio, target_rear_hz: roundN(targetRearHz, 2) }
         );
       }
     }
@@ -1203,19 +1332,38 @@ class SetupAdvisor {
         const totalWeight = params.total_weight ?? 1000;
         const wFPctLocal = params.weight_front_pct ?? 50;
         const effWr = axle === '前'
-          ? (result.mechanical?.front_wheel_rate_effective ?? result.front_wheel_rate_effective ?? 50)
-          : (result.mechanical?.rear_wheel_rate_effective ?? result.rear_wheel_rate_effective ?? 50);
+          ? (result.mechanical?.front_wheel_rate_effective ?? result.front_wheel_rate_effective ?? 0)
+          : (result.mechanical?.rear_wheel_rate_effective ?? result.rear_wheel_rate_effective ?? 0);
         const mCorner = axle === '前'
           ? (totalWeight * wFPctLocal / 100) / 2
           : (totalWeight * (100 - wFPctLocal) / 100) / 2;
         const targetZeta = 0.5;
-        const targetC_N = targetZeta * 2 * Math.sqrt(effWr * 1000 * mCorner);
-        const targetC_kgf = targetC_N / G;
-        add(pri, 'damper', '阻尼',
-          `${axle}軸阻尼比 ${roundN(val, 2)}（${val < 0.2 ? '嚴重欠阻尼' : '欠阻尼'}），車身回彈過多`,
-          `建議${axle}軸平均阻尼力增加到 ~${roundN(targetC_kgf, 0)} kgf（目標 ζ=${targetZeta}）`,
-          { axis: axle, current_ratio: roundN(val, 2), target_kgf: roundN(targetC_kgf, 0), target_zeta: targetZeta }
-        );
+        // 參考速度優先用計算結果實際採用的值（與顯示的 ζ 一致），並防 0
+        const refVRaw = Number(result.damping?.damper_ref_speed_ms ?? advParams?.damper_ref_speed);
+        const refV = (Number.isFinite(refVRaw) && refVRaw > 0) ? refVRaw : 0.3;
+        if (effWr > 0 && mCorner > 0) {
+          // Target damper coefficient at the wheel, reflected back to the
+          // damper through MR², then expressed as a force at the reference
+          // shaft speed (what spec sheets quote)
+          const mrAxle = axle === '前'
+            ? (params.front_motion_ratio ?? 1.0)
+            : (params.rear_motion_ratio ?? 1.0);
+          const targetC_wheel = targetZeta * 2 * Math.sqrt(effWr * 1000 * mCorner); // N·s/m
+          const targetC_damper = targetC_wheel / Math.pow(mrAxle, 2);
+          const targetF_kgf = targetC_damper * refV / G;
+          add(pri, 'damper', '阻尼',
+            `${axle}軸阻尼比 ${roundN(val, 2)}（${val < 0.2 ? '嚴重欠阻尼' : '欠阻尼'}），車身回彈過多`,
+            `建議${axle}軸平均阻尼力（@${refV} m/s）增加到 ~${roundN(targetF_kgf, 0)} kgf（目標 ζ=${targetZeta}）`,
+            { axis: axle, current_ratio: roundN(val, 2), target_kgf: roundN(targetF_kgf, 0), target_zeta: targetZeta, ref_speed_ms: refV }
+          );
+        } else {
+          // 缺少有效輪率資料 — 不憑空捏造目標阻尼力
+          add(pri, 'damper', '阻尼',
+            `${axle}軸阻尼比 ${roundN(val, 2)}（${val < 0.2 ? '嚴重欠阻尼' : '欠阻尼'}），車身回彈過多`,
+            `提高${axle}軸阻尼力可改善（缺少有效輪率資料，無法計算具體目標值）`,
+            { axis: axle, current_ratio: roundN(val, 2), target_zeta: targetZeta }
+          );
+        }
       }
     }
 
@@ -1225,7 +1373,7 @@ class SetupAdvisor {
       if (diff > 0.25) {
         add('medium', 'damper', '阻尼',
           `前後阻尼比差距 ${roundN(diff, 2)}（前 ${roundN(result.damping.front_ratio, 2)} / 後 ${roundN(result.damping.rear_ratio, 2)}），可能造成 pitch 振盪`,
-          '建議前後阻尼比保持在 0.2 以內的差距',
+          '建議前後阻尼比保持在 0.25 以內的差距',
           { front_ratio: roundN(result.damping.front_ratio, 2), rear_ratio: roundN(result.damping.rear_ratio, 2), diff: roundN(diff, 2) }
         );
       }
@@ -1311,14 +1459,16 @@ class SetupAdvisor {
       }
     }
 
-    // ── Rule 14: Oversteer warning — no characteristic speed ──
+    // ── Rule 14: Oversteer warning ──
     if (tier === 3 && result.prediction) {
       const usG = result.prediction.steady_state.understeer_gradient;
       if (usG < 0) {
+        const critKmh = result.dynamics?.critical_speed_kmh;
         add('high', 'balance', '平衡',
-          `車輛呈現轉向過度特性（US gradient = ${roundN(usG, 2)}）— 無特徵速度限制`,
-          '高速時轉向增益持續上升，需要駕駛技術修正。增加前軸荷重轉移（前 ARB、前彈簧）可改善',
-          { understeer_gradient: roundN(usG, 2) }
+          `車輛呈現轉向過度特性（US gradient = ${roundN(usG, 2)}）`,
+          (critKmh ? `線性模型估算臨界速度約 ${critKmh} km/h，超過後轉向增益發散。` : '高速時轉向增益持續上升，需要駕駛技術修正。')
+            + '增加前軸荷重轉移（前 ARB、前彈簧）可改善',
+          { understeer_gradient: roundN(usG, 2), critical_speed_kmh: critKmh ?? null }
         );
       }
     } else if (tier < 3) {
@@ -1454,79 +1604,104 @@ class SpringCalculator {
    * @param {number} existingSpringRollRear - existing spring roll stiffness rear (Nm/deg)
    * @returns {{ total_roll_needed, front_roll_needed, rear_roll_needed, front_arb_needed, rear_arb_needed, current_roll_gradient }}
    */
-  static arbSizing(totalWeight, cgHeight, targetRollGrad, frontPct, existingSpringRollFront, existingSpringRollRear) {
+  static arbSizing(totalWeight, cgHeight, targetRollGrad, frontPct, existingSpringRollFront, existingSpringRollRear, tireRollFront, tireRollRear) {
     const m = totalWeight || 1000;
     const h = (cgHeight || 300) / 1000; // to meters
     const target = targetRollGrad || 2.0;
     const fPct = frontPct || 55;
+    const springF = existingSpringRollFront || 0;
+    const springR = existingSpringRollRear || 0;
+    const tireF = tireRollFront || 0;
+    const tireR = tireRollRear || 0;
 
-    // Current roll stiffness from springs
-    const currentSpringTotal = (existingSpringRollFront || 0) + (existingSpringRollRear || 0);
+    // All roll stiffness in Nm/deg → roll gradient = M_roll [Nm/g] / K [Nm/deg]
+    // = deg/g directly. h uses full CG height (roll-center heights unknown in
+    // this tool), which slightly overestimates the roll moment — conservative.
+    // 若有提供輪胎側傾剛性（tireRollFront/Rear），會把輪胎柔度串聯進來，
+    // 與 Tier 1 模型一致（否則裝上建議的 ARB 後實際側傾會比目標大 ~10-15%）。
+    const series = (a, b) => (a > 0 && b > 0) ? 1 / (1 / a + 1 / b) : a;
+    const currentTotal = series(springF, tireF) + series(springR, tireR);
     let currentRollGrad = 0;
-    if (currentSpringTotal > 0) {
-      currentRollGrad = (m * G * h) / (currentSpringTotal * Math.PI / 180);
+    if (currentTotal > 0) {
+      currentRollGrad = (m * G * h) / currentTotal;
     }
 
-    // Required total roll stiffness for target gradient
-    const totalNeeded = (m * G * h) / (target * Math.PI / 180);
-
+    // Required total axle-level roll stiffness (Nm/deg) for target gradient
+    const totalNeeded = (m * G * h) / target;
     const frontNeeded = totalNeeded * fPct / 100;
     const rearNeeded = totalNeeded * (100 - fPct) / 100;
 
-    const frontArbNeeded = Math.max(0, frontNeeded - (existingSpringRollFront || 0));
-    const rearArbNeeded = Math.max(0, rearNeeded - (existingSpringRollRear || 0));
+    // 透過輪胎串聯反推懸吊端需求：K_susp = 1/(1/K_axle − 1/K_tire)。
+    // 若輪胎剛性本身低於軸需求，目標無法達成（回傳 null）。
+    const suspNeeded = (axleNeed, tire) => {
+      if (tire > axleNeed) return 1 / (1 / axleNeed - 1 / tire);
+      if (tire > 0) return null; // 輪胎柔度已限制住，加 ARB 也到不了
+      return axleNeed;           // 無輪胎資料 — 直接用軸需求
+    };
+    const frontSusp = suspNeeded(frontNeeded, tireF);
+    const rearSusp = suspNeeded(rearNeeded, tireR);
+    const frontArbNeeded = frontSusp == null ? null : Math.max(0, frontSusp - springF);
+    const rearArbNeeded = rearSusp == null ? null : Math.max(0, rearSusp - springR);
 
     return {
       total_roll_needed: roundN(totalNeeded, 0),
       front_roll_needed: roundN(frontNeeded, 0),
       rear_roll_needed: roundN(rearNeeded, 0),
-      front_arb_needed: roundN(frontArbNeeded, 0),
-      rear_arb_needed: roundN(rearArbNeeded, 0),
+      front_arb_needed: frontArbNeeded == null ? null : roundN(frontArbNeeded, 0),
+      rear_arb_needed: rearArbNeeded == null ? null : roundN(rearArbNeeded, 0),
+      unreachable: frontArbNeeded == null || rearArbNeeded == null,
       current_roll_gradient: roundN(currentRollGrad, 2),
-      current_spring_total: roundN(currentSpringTotal, 0),
+      current_spring_total: roundN(springF + springR, 0),
     };
   }
 }
 
 // ============================================================
 // Tire Spring Rate Estimator
-// 從輪胎規格（扁平比、胎寬）推算輪胎彈簧率
+// 從輪胎規格（扁平比、胎寬、胎壓）推算輪胎垂直彈簧率
 //
-// 公式根據輪胎工程經驗值：
-//   K_tire ≈ base_factor × (width/205) × (reference_aspect / actual_aspect)
+// 實測上輪胎垂直剛性主要由「胎壓」決定（約 80-90%），胎壁高度
+// （扁平比）與胎寬是次要因素，因此扁平比只用弱指數修正：
+//   K ≈ 220 × (55/aspect)^0.35 × (width/205)^0.3 × (0.15 + 0.85·P/2.2)
 //
-// 參考值（205/55R16 ≈ 220 N/mm 為基準）：
-//   扁平比越低 → 胎壁越硬 → 彈簧率越高
-//   胎寬越大 → 接地面積增 → 彈簧率略高
+// 校準點：
+//   205/55R16 @2.2bar ≈ 220 N/mm（文獻常用基準）
+//   255/40R17 RE-71R 實測 ≈ 250 N/mm（本式估 ~263，+5%）
+//   乘用車胎實測範圍約 188-320 N/mm
 //
-// Typical ranges:
-//   55 aspect → 180-220 N/mm
-//   45 aspect → 220-260 N/mm
-//   40 aspect → 250-290 N/mm
-//   35 aspect → 280-340 N/mm
-//   30 aspect → 320-400 N/mm
+// Typical @2.2 bar:
+//   55 aspect → ~210-225 N/mm
+//   45 aspect → ~230-250 N/mm
+//   40 aspect → ~245-265 N/mm
+//   35 aspect → ~255-285 N/mm
+//   30 aspect → ~270-300 N/mm
 // ============================================================
 class TireSpringEstimator {
-  // Reference: 205/55R16 ≈ 220 N/mm
+  // Reference: 205/55R16 ≈ 220 N/mm at 2.2 bar
   static REF_WIDTH = 205;
   static REF_ASPECT = 55;
   static REF_SPRING_RATE = 220;
+  static REF_PRESSURE = 2.2; // bar
 
   /**
-   * 從輪胎規格推算彈簧率
+   * 從輪胎規格推算垂直彈簧率
    * @param {number} width - 胎寬 (mm), e.g. 235
    * @param {number} aspectRatio - 扁平比, e.g. 40
+   * @param {number} [pressureBar=2.2] - 胎壓 (bar)；垂直剛性的主導因素
    * @returns {number} 估算彈簧率 (N/mm)
    */
-  static estimate(width, aspectRatio) {
+  static estimate(width, aspectRatio, pressureBar) {
     if (!width || !aspectRatio || aspectRatio <= 0) return this.REF_SPRING_RATE;
+    const p = pressureBar || this.REF_PRESSURE;
 
-    // 扁平比越低 → 彈簧率越高（反比關係）
-    const aspectFactor = this.REF_ASPECT / aspectRatio;
-    // 胎寬越大 → 彈簧率略增（弱正比, 指數 0.3）
+    // 扁平比：弱反比（指數 0.35）— 胎壁越短剛性略增
+    const aspectFactor = Math.pow(this.REF_ASPECT / aspectRatio, 0.35);
+    // 胎寬：弱正比（指數 0.3）
     const widthFactor = Math.pow(width / this.REF_WIDTH, 0.3);
+    // 胎壓：主導項，近似線性（含小量結構剛性常數項）
+    const pressureFactor = 0.15 + 0.85 * (p / this.REF_PRESSURE);
 
-    const estimated = this.REF_SPRING_RATE * aspectFactor * widthFactor;
+    const estimated = this.REF_SPRING_RATE * aspectFactor * widthFactor * pressureFactor;
     return roundN(Math.max(100, Math.min(500, estimated)), 0);
   }
 

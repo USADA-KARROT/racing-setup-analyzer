@@ -109,7 +109,7 @@ const api = {
     const rearTotal = rl + rr;
     const leftTotal = fl + rl;
     const rightTotal = fr + rr;
-    const crossWeight = fl + rr;
+    const crossWeight = fl + rr; // FL + RR（本工具採用的分析對角；磅秤 RF+LR = 100% − 此值）
 
     return {
       total: roundN(total, 1),
@@ -147,16 +147,16 @@ const api = {
     return SpringCalculator.springTable(cornerMass, motionRatio, tireSpringRate, rates);
   },
 
-  /** Calculate ARB sizing for target roll gradient */
-  calcArbSizing(totalWeight, cgHeight, targetRollGrad, frontPct, springRollFront, springRollRear) {
-    return SpringCalculator.arbSizing(totalWeight, cgHeight, targetRollGrad, frontPct, springRollFront, springRollRear);
+  /** Calculate ARB sizing for target roll gradient (tire roll stiffness optional) */
+  calcArbSizing(totalWeight, cgHeight, targetRollGrad, frontPct, springRollFront, springRollRear, tireRollFront, tireRollRear) {
+    return SpringCalculator.arbSizing(totalWeight, cgHeight, targetRollGrad, frontPct, springRollFront, springRollRear, tireRollFront, tireRollRear);
   },
 
   // === Tire Spring Rate Estimation ===
 
-  /** Estimate tire spring rate from dimensions */
-  estimateTireSpring(width, aspectRatio) {
-    return TireSpringEstimator.estimate(width, aspectRatio);
+  /** Estimate tire spring rate from dimensions (pressure in bar, optional) */
+  estimateTireSpring(width, aspectRatio, pressureBar) {
+    return TireSpringEstimator.estimate(width, aspectRatio, pressureBar);
   },
 
   /** Parse tire size string into structured specs */
