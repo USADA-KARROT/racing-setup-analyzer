@@ -28,6 +28,42 @@ function roundN(val, n) {
 }
 
 // ============================================================
+// Handling-balance scale (understeer gradient in deg/g)
+// 全模型的轉向平衡統一用「真實 understeer gradient, deg/g」表示。
+// 正 = 轉向不足(US), 負 = 轉向過度(OS)。一般量產車 +1~+4、賽車 0~+1.5、
+// 後置/中置可能微負。NEUTRAL 帶寬 ±0.5 deg/g。
+// ============================================================
+const US_NEUTRAL_BAND = 0.5;   // deg/g — 此帶內視為中性
+const US_NORM_SCALE = 4.0;     // deg/g 對應正規化 ±1 的滿刻度
+function usTendency(degPerG) {
+  if (degPerG > US_NEUTRAL_BAND) return ['Understeer', '轉向不足'];
+  if (degPerG < -US_NEUTRAL_BAND) return ['Oversteer', '轉向過度'];
+  return ['Neutral', '中性'];
+}
+function usNorm(degPerG) {
+  return Math.max(-1.0, Math.min(1.0, degPerG / US_NORM_SCALE));
+}
+
+/**
+ * Axle pair cornering stiffness (N/deg) including lateral load transfer.
+ * 兩條輪胎(外側增載/內側減載)各自的 cornering stiffness 相加；因負載敏感度
+ * (Pacejka BCD 的凹性)，荷重轉移越大 → 該軸有效 cornering stiffness 越低。
+ * 這是把「配重」與「LLTD/側傾剛性分配」統一進同一個負載敏感度物理的關鍵。
+ * @param {number} axleMassKg 該軸靜態質量 (kg)
+ * @param {number} transferKgPerG 單側荷重轉移 (kg per g)
+ * @param {number} ayRefG 評估用的側向加速度 (g)
+ * @param {number} a4RefKn 負載敏感度膝點(平均單胎靜載, kN)
+ */
+function axlePairCorneringStiffness(axleMassKg, transferKgPerG, ayRefG, a4RefKn) {
+  const halfStatic = axleMassKg / 2;            // 單胎靜態質量 (kg)
+  const dt = transferKgPerG * ayRefG;           // ayRef 下單側轉移量 (kg)
+  const fzOutKn = Math.max(0, halfStatic + dt) * G / 1000; // 外胎垂直力 (kN)
+  const fzInKn = Math.max(0, halfStatic - dt) * G / 1000;  // 內胎
+  return PacejkaTireModel.corneringStiffness(fzOutKn, 0, 'sport', a4RefKn)
+       + PacejkaTireModel.corneringStiffness(fzInKn, 0, 'sport', a4RefKn);
+}
+
+// ============================================================
 // TIER 1: 簡易版 - Setup → Handling Tendency
 // Input: spring rates, ARB, track, MR, weight dist
 // Output: Understeer gradient indicator (-1 to +1)
@@ -127,9 +163,13 @@ class Tier1BasicBalance {
     const totalWeight = p.total_weight ?? 1000;
     const cgHeight = (p.cg_height ?? 300) / 1000; // to meters
 
-    // Roll centers & axle masses (shared with the LLTD decomposition below)
+    // Roll centers & axle masses (shared with the LLTD decomposition below).
+    // 預設前後相等：側傾中心不對稱（尤其後>前）會讓幾何荷重轉移系統性偏向後軸，
+    // 把 LLTD 壓到低於配重% → 即使側傾剛性與配重配平的車也會被算成轉向過度。
+    // 在沒有實際 roll center 數據時，採對稱預設＝平衡由「側傾剛性分配 vs 配重」決定
+    // （這才是使用者實際在調的東西）。有真實數據時可由 preset/輸入覆寫。
     const hRcF = (p.front_roll_center_height ?? 50) / 1000; // m
-    const hRcR = (p.rear_roll_center_height ?? 100) / 1000;
+    const hRcR = (p.rear_roll_center_height ?? 50) / 1000;
     const tF = (p.front_track ?? 1500) / 1000; // m
     const tR = (p.rear_track ?? 1500) / 1000;
     const mF = totalWeight * wFrontPct / 100;
@@ -185,24 +225,23 @@ class Tier1BasicBalance {
     // Use decomposed LLTD as the real LLTD
     const lltdFront = lltdDecomposedFront;
 
-    // Understeer tendency
-    const usGradient = lltdFront - wFrontPct;
+    // === Steady-state understeer gradient (deg/g, unified Milliken model) ===
+    // K_us = W_f/C_αf − W_r/C_αr, where each axle's cornering stiffness C_α is
+    // evaluated at its static load PLUS its lateral load transfer (per the LLTD
+    // decomposition above). 這一條同時捕捉:
+    //   (a) 配重 — 車頭重 → 前軸單胎負載大 → 負載敏感度使 C_αf 偏低 → 轉向不足
+    //   (b) LLTD/側傾剛性分配 — 前軸荷重轉移多 → C_αf 進一步下降 → 轉向不足
+    // 取代舊式 (LLTD% − weight%)：舊式漏掉 (a)，導致前驅/車頭重車被誤判轉向過度。
+    const ayRef = 1.0; // g — 評估荷重轉移的參考側向加速度(校準後 LLTD 敏感度最合理)
+    const a4Ref = totalWeight * G / 4 / 1000; // 平均單胎靜載 (kN)，校準負載敏感度膝點
+    const cAlphaF = axlePairCorneringStiffness(mF, totalDFzF, ayRef, a4Ref);
+    const cAlphaR = axlePairCorneringStiffness(mR, totalDFzR, ayRef, a4Ref);
+    const usGradient = (cAlphaF > 0 && cAlphaR > 0)
+      ? (mF * G / cAlphaF) - (mR * G / cAlphaR)
+      : 0;
 
-    // Normalize to -1 (max oversteer) to +1 (max understeer)
-    const usNormalized = Math.max(-1.0, Math.min(1.0, usGradient / 15.0));
-
-    // Handling tendency label
-    let tendency, tendencyZh;
-    if (usGradient > 3) {
-      tendency = 'Understeer';
-      tendencyZh = '轉向不足';
-    } else if (usGradient < -3) {
-      tendency = 'Oversteer';
-      tendencyZh = '轉向過度';
-    } else {
-      tendency = 'Neutral';
-      tendencyZh = '中性';
-    }
+    const usNormalized = usNorm(usGradient);
+    const [tendency, tendencyZh] = usTendency(usGradient);
 
     return {
       tier: 1,
@@ -472,21 +511,12 @@ class Tier2TireAware {
     const gripRatio = rearAvgGrip > 0 ? (frontAvgGrip / rearAvgGrip) : 1.0;
 
     // Tire-adjusted understeer gradient
-    const tireUsShift = -(gripRatio - 1.0) * 30;
+    // 前/後抓地比失衡 → 平衡偏移 (deg/g)。gripRatio<1(前軸較弱) → 轉向不足(+)。
+    // 增益 14：前軸抓地少 10% ≈ +1.4 deg/g 偏移。
+    const tireUsShift = -(gripRatio - 1.0) * 14;
     const adjustedUs = t1.understeer_gradient + tireUsShift;
-    const adjustedNormalized = Math.max(-1.0, Math.min(1.0, adjustedUs / 15.0));
-
-    let tendency, tendencyZh;
-    if (adjustedUs > 3) {
-      tendency = 'Understeer';
-      tendencyZh = '轉向不足';
-    } else if (adjustedUs < -3) {
-      tendency = 'Oversteer';
-      tendencyZh = '轉向過度';
-    } else {
-      tendency = 'Neutral';
-      tendencyZh = '中性';
-    }
+    const adjustedNormalized = usNorm(adjustedUs);
+    const [tendency, tendencyZh] = usTendency(adjustedUs);
 
     // Grip warnings
     const warnings = [];
@@ -672,7 +702,8 @@ class Tier3Complete {
       // toward the front gives the front axle more grip margin for the same
       // lateral demand → LESS understeer. Front-biased aero = high-speed
       // oversteer; rear-biased aero = high-speed understeer/stability.
-      aeroUsShift = -(effectiveFrontPct - (frontW / totalW * 100));
+      // 0.2: 每 1% 有效配重前移 ≈ 0.2 deg/g 偏移(deg/g 尺度)。
+      aeroUsShift = -(effectiveFrontPct - (frontW / totalW * 100)) * 0.2;
     } else {
       effectiveFrontPct = t2.weight_front_pct ?? 50;
       aeroUsShift = 0;
@@ -701,10 +732,11 @@ class Tier3Complete {
       rear_rebound: rRebound,
     };
 
+    // Damper 只影響「過渡」平衡(進/出彎),對穩態平衡影響小 → deg/g 尺度用小增益 0.03。
     let damperRatioBump, damperUsShiftEntry;
     if (fBump + rBump > 0) {
       damperRatioBump = fBump / (fBump + rBump) * 100;
-      damperUsShiftEntry = (damperRatioBump - 50) * 0.1;
+      damperUsShiftEntry = (damperRatioBump - 50) * 0.03;
     } else {
       damperRatioBump = 50;
       damperUsShiftEntry = 0;
@@ -713,7 +745,7 @@ class Tier3Complete {
     let damperRatioRebound, damperUsShiftExit;
     if (fRebound + rRebound > 0) {
       damperRatioRebound = fRebound / (fRebound + rRebound) * 100;
-      damperUsShiftExit = (damperRatioRebound - 50) * 0.1;
+      damperUsShiftExit = (damperRatioRebound - 50) * 0.03;
     } else {
       damperRatioRebound = 50;
       damperUsShiftExit = 0;
@@ -900,8 +932,10 @@ class Tier3Complete {
 
     const fCamberGrip = this.camberGripFactor(fCamber);
     const rCamberGrip = this.camberGripFactor(rCamber);
-    const camberUsShift = -(fCamberGrip - rCamberGrip) * 20;
+    // 前後 camber 抓地差 → 平衡偏移 (deg/g)。增益 10：camberGrip 差 0.05 ≈ 0.5 deg/g。
+    const camberUsShift = -(fCamberGrip - rCamberGrip) * 10;
 
+    // Toe 偏移 (deg/g)：前後各 toeDeg×1.0(原 1.5 降為 deg/g 尺度)。
     const toeUsShift = this.toeStabilityFactor(fToe, true) + this.toeStabilityFactor(rToe, false);
 
     const geometryInfo = {
@@ -923,7 +957,7 @@ class Tier3Complete {
       const rBrRate = ap.rear_bump_rubber_engaged ? (ap.rear_bump_rubber_rate ?? 0) : 0;
       if (fBrRate + rBrRate > 0) {
         const brRatioFront = fBrRate / (fBrRate + rBrRate) * 100;
-        brUsShift = (brRatioFront - 50) * 0.3;
+        brUsShift = (brRatioFront - 50) * 0.06; // deg/g 尺度
       }
       brInfo = {
         front_rate: fBrRate,
@@ -939,15 +973,9 @@ class Tier3Complete {
     const totalUsEntry = totalUsSteady + damperUsShiftEntry;
     const totalUsExit = totalUsSteady + damperUsShiftExit;
 
-    function tendencyLabel(usVal) {
-      if (usVal > 3) return ['Understeer', '轉向不足'];
-      if (usVal < -3) return ['Oversteer', '轉向過度'];
-      return ['Neutral', '中性'];
-    }
-
-    const steadyT = tendencyLabel(totalUsSteady);
-    const entryT = tendencyLabel(totalUsEntry);
-    const exitT = tendencyLabel(totalUsExit);
+    const steadyT = usTendency(totalUsSteady);
+    const entryT = usTendency(totalUsEntry);
+    const exitT = usTendency(totalUsExit);
 
     // Compile all warnings
     const allWarnings = [...(t2.warnings || [])];
@@ -994,19 +1022,19 @@ class Tier3Complete {
       prediction: {
         steady_state: {
           understeer_gradient: roundN(totalUsSteady, 2),
-          normalized: roundN(Math.max(-1, Math.min(1, totalUsSteady / 15)), 3),
+          normalized: roundN(usNorm(totalUsSteady), 3),
           tendency: steadyT[0],
           tendency_zh: steadyT[1],
         },
         turn_entry: {
           understeer_gradient: roundN(totalUsEntry, 2),
-          normalized: roundN(Math.max(-1, Math.min(1, totalUsEntry / 15)), 3),
+          normalized: roundN(usNorm(totalUsEntry), 3),
           tendency: entryT[0],
           tendency_zh: entryT[1],
         },
         turn_exit: {
           understeer_gradient: roundN(totalUsExit, 2),
-          normalized: roundN(Math.max(-1, Math.min(1, totalUsExit / 15)), 3),
+          normalized: roundN(usNorm(totalUsExit), 3),
           tendency: exitT[0],
           tendency_zh: exitT[1],
         },
@@ -1083,15 +1111,15 @@ function compareWithBaseline(tier, baselineInputs, currentInputs) {
   const cNorm = getNorm(c, tier);
   const deltaNorm = roundN(cNorm - bNorm, 3);
 
-  // Relative normalized
-  const relNorm = roundN(Math.max(-1.0, Math.min(1.0, deltaUs / 10.0)), 3);
+  // Relative normalized (deltaUs 為 deg/g；±2 deg/g 視為滿刻度)
+  const relNorm = roundN(Math.max(-1.0, Math.min(1.0, deltaUs / 2.0)), 3);
 
-  // Tendency label for the delta
+  // Tendency label for the delta (deg/g 尺度：±0.4 deg/g 以上才算明顯差異)
   let deltaTendency, deltaTendencyZh;
-  if (deltaUs > 1.5) {
+  if (deltaUs > 0.4) {
     deltaTendency = 'more_understeer';
     deltaTendencyZh = '比基準更轉向不足';
-  } else if (deltaUs < -1.5) {
+  } else if (deltaUs < -0.4) {
     deltaTendency = 'more_oversteer';
     deltaTendencyZh = '比基準更轉向過度';
   } else {
@@ -1144,9 +1172,9 @@ function compareWithBaseline(tier, baselineInputs, currentInputs) {
       const cPhase = c.prediction[phase].understeer_gradient;
       const d = roundN(cPhase - bPhase, 3);
       delta[phase + '_delta'] = d;
-      if (d > 1.5) {
+      if (d > 0.4) {
         delta[phase + '_tendency_zh'] = '比基準更轉向不足';
-      } else if (d < -1.5) {
+      } else if (d < -0.4) {
         delta[phase + '_tendency_zh'] = '比基準更轉向過度';
       } else {
         delta[phase + '_tendency_zh'] = '與基準相近';
@@ -1472,10 +1500,10 @@ class SetupAdvisor {
         );
       }
     } else if (tier < 3) {
-      const usG = result.understeer_gradient ?? result.adjusted_understeer_gradient;
-      if (usG != null && usG < -5) {
+      const usG = result.adjusted_understeer_gradient ?? result.understeer_gradient;
+      if (usG != null && usG < -1.0) {
         add('high', 'balance', '平衡',
-          `車輛呈現明顯轉向過度特性（US gradient = ${roundN(usG, 2)}）`,
+          `車輛呈現明顯轉向過度特性（US gradient = ${roundN(usG, 2)} deg/g）`,
           '增加前 ARB 或前彈簧率可增加前軸荷重轉移，改善平衡',
           { understeer_gradient: roundN(usG, 2) }
         );

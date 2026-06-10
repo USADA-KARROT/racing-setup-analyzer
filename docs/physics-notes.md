@@ -39,6 +39,23 @@ K_axle = 1 / (1/(K_spring_roll + K_arb) + 1/K_tire_roll)
 **Ride frequency**：`f = (1/2π)√(K_eff/m_corner)`，K_eff 為彈簧與輪胎串聯（OptimumG ride rate 慣例）。已知限制：m_corner 用軸重/2（含簧下質量），頻率略低估 ~5%。
 
 **LLTD 分解**：幾何項 `m_axle·h_RC/t` + 彈性項 `(K_axle/ΣK)·m·(h_cg−h_RA)/t`（簡化 Milliken，忽略簧下質量項）。
+預設側傾中心高度**前後相等(各 50mm)**：不對稱(尤其後>前)會讓幾何荷重轉移系統性偏後、
+把 LLTD 壓到低於配重%。無實測 RC 數據時採對稱，使平衡由「側傾剛性分配 vs 配重」決定。
+
+**轉向平衡 understeer_gradient（deg/g，統一 Milliken 模型）**：
+```
+K_us = W_f/C_αf − W_r/C_αr            [deg/g, 正=US 負=OS]
+C_α(軸) = C(外胎載) + C(內胎載)         (Pacejka BCD; 外胎=靜載/2+ΔFz, 內胎=靜載/2−ΔFz)
+ΔFz = 該軸單側荷重轉移 (來自上面 LLTD 分解) × ay_ref(=1.0g)
+```
+一條公式同時涵蓋兩個機制(取代舊式 `LLTD% − 配重%`)：
+- **配重**：車頭重 → 前軸單胎負載大 → 負載敏感度使 C_αf 偏低 → 轉向不足
+- **LLTD/側傾剛性分配**：前軸荷重轉移多 → C_αf 進一步下降 → 轉向不足；ARB 透過此項微調
+> ⚠️ 修正紀錄(2026-06)：舊式 `LLTD%−配重%` 漏掉「配重×負載敏感度」項，且預設後 RC=100
+> (前 50)注入後偏，導致**幾乎所有車被誤判轉向過度**(前驅 Civic 也變 OS)。改用統一模型後：
+> Civic FL5 +1.6(US ✓)、GR Yaris +1.3(US ✓)、996 GT3 −1.9(OS ✓)。
+> 標籤門檻 ±0.5 deg/g(中性帶)，正規化滿刻度 ±4 deg/g。各次要項(輪胎/空力/camber/toe/
+> damper/bump)增益已重新校準成 deg/g 等效偏移。
 
 ## Tier 3 — 完整動態
 
@@ -107,9 +124,9 @@ K ≈ 220 × (55/aspect)^0.35 × (width/205)^0.3 × (0.15 + 0.85·P/2.2)   [N/mm
 - 阻尼 MR 假設與彈簧相同
 - 各項 US shift 的縮放係數（×30/×20/×1.5/×0.1/×0.3、/15 正規化）為啟發式調校值，
   合成的 US gradient 是定性指標，不是可量測的 deg/g
-- **兩個平衡指標的差異**：Tier 1 的 `understeer_gradient`（LLTD% − 配重%）是
-  「側傾剛性分配 vs 配重」的相對平衡指標；Tier 3 的線性 K_us 是荷重敏感度驅動的
-  絕對理論值。前重 FF 車兩者可能一正一負（LLTD 指標說 OS、線性 K_us 說 US）——
+- **兩個平衡指標**：Tier 1/Tier 3 的 `understeer_gradient` 現為統一 Milliken K_us(含荷重轉移)；
+  Tier 3 `dynamics` 區另有純線性 K_us(無荷重轉移, Gillespie 低加速度值, 供特徵/臨界速度用)。
+  兩者現在同號一致(都是 deg/g)，差別只在前者納入 ay_ref 的荷重轉移效應。〔舊版註記〕前重 FF 車曾兩者一正一負——
   前者回答「setup 相對這台車偏哪邊」，後者回答「這台車先天偏哪邊」，並不矛盾
 - Pacejka 的 race 與 semi_slick 係數目前相同（占位值，待有實測資料再分化）
 - 線性模型的 camber 效應極小（~1%/3°），主要 camber 影響由 camberGripFactor 啟發式承擔

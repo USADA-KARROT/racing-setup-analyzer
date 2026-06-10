@@ -311,5 +311,49 @@ console.log('\n[17] arbSizing 輪胎柔度補償（軸級閉合）');
   check('無輪胎參數時維持舊行為', legacy.front_arb_needed != null && legacy.unreachable === false);
 }
 
+console.log('\n[18] 統一機械平衡 (Tier1 understeer_gradient, deg/g) — 配重 + LLTD');
+{
+  // 共用底盤，只改配重分佈：車頭重 → 轉向不足，車尾重 → 轉向過度
+  const chassis = { front_spring_rate: 60, rear_spring_rate: 60, front_arb: 300, rear_arb: 300,
+    front_track: 1550, rear_track: 1550, front_motion_ratio: 1, rear_motion_ratio: 1,
+    total_weight: 1300, cg_height: 300, wheelbase: 2600 };
+  const us62 = new M.Tier1BasicBalance({ ...chassis, weight_front_pct: 62 }).calculate().understeer_gradient;
+  const us50 = new M.Tier1BasicBalance({ ...chassis, weight_front_pct: 50 }).calculate().understeer_gradient;
+  const us40 = new M.Tier1BasicBalance({ ...chassis, weight_front_pct: 40 }).calculate().understeer_gradient;
+  check('車頭重(62%F) → 轉向不足 (US>0)', us62 > 0.3, `got ${us62}`);
+  check('50/50 → 近中性 (|US|<0.3)', Math.abs(us50) < 0.3, `got ${us50}`);
+  check('車尾重(40%F) → 轉向過度 (US<0)', us40 < -0.3, `got ${us40}`);
+  check('配重單調: 62%F 比 50%F 更US, 40%F 更OS', us62 > us50 && us50 > us40);
+  check('US 在 deg/g 合理範圍 (|US|<8)', Math.abs(us62) < 8 && Math.abs(us40) < 8);
+
+  // ARB 方向：前 ARB↑ → 更US；後 ARB↑ → 更OS（使用者實際在調的）
+  const balanced = { ...chassis, weight_front_pct: 50 };
+  const stiffFront = new M.Tier1BasicBalance({ ...balanced, front_arb: 800, rear_arb: 200 }).calculate().understeer_gradient;
+  const stiffRear = new M.Tier1BasicBalance({ ...balanced, front_arb: 200, rear_arb: 800 }).calculate().understeer_gradient;
+  check('前 ARB 硬 → 轉向不足方向', stiffFront > 0, `got ${stiffFront}`);
+  check('後 ARB 硬 → 轉向過度方向', stiffRear < 0, `got ${stiffRear}`);
+  check('前硬 vs 後硬 方向相反且對稱', stiffFront > stiffRear);
+}
+
+console.log('\n[19] 預設車庫傾向分佈合理性 (回歸「全部轉向過度」bug)');
+{
+  const presetsSrc = fs.readFileSync(path.join(jsDir, 'car-presets.js'), 'utf8') + '\nthis.__p = CAR_PRESETS;';
+  const pctx = {}; vm.createContext(pctx); vm.runInContext(presetsSrc, pctx);
+  const presets = pctx.__p;
+  let cnt = { Understeer: 0, Neutral: 0, Oversteer: 0 }, ff = { U: 0, O: 0 }, n = 0;
+  for (const [id, car] of Object.entries(presets)) {
+    if (!car.params) continue; n++;
+    const r = new M.Tier1BasicBalance(car.params).calculate();
+    cnt[r.tendency]++;
+    if (car.layout === 'FF') { if (r.tendency === 'Understeer') ff.U++; if (r.tendency === 'Oversteer') ff.O++; }
+  }
+  // 不該再出現「壓倒性全部轉向過度」：OS 不應超過半數
+  check(`OS 不超過 50% (修正前幾乎全 OS)`, cnt.Oversteer < n * 0.5, `OS=${cnt.Oversteer}/${n}`);
+  check('三種傾向都有合理數量(各>10%)', cnt.Understeer > n*0.1 && cnt.Neutral > n*0.1 && cnt.Oversteer > n*0.1,
+    `U/N/O = ${cnt.Understeer}/${cnt.Neutral}/${cnt.Oversteer}`);
+  // 前驅(FF)應以轉向不足為主，不該以轉向過度為主
+  check('FF 前驅車 轉向不足 > 轉向過度 (物理正確)', ff.U > ff.O, `FF US=${ff.U} OS=${ff.O}`);
+}
+
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
 process.exit(fail > 0 ? 1 : 0);
