@@ -797,6 +797,25 @@ canvas{max-height:300px}
             </div>
           </div>
 
+          <!-- 麗寶 G2 單圈預測 (隨計算預測同步，用當下這台車的設定) -->
+          <div x-show="lihpaoResult && !lihpaoResult.error" class="card2 p-4 mb-4" style="background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.18)">
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-xs text-sky-300 font-semibold">🏁 麗寶 G2 單圈預測（此設定）</div>
+              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-600 text-slate-300 hover:bg-slate-500" @click="currentTab='lihpao'">逐圈詳情 →</button>
+            </div>
+            <template x-if="lihpaoResult">
+              <div>
+                <div class="grid grid-cols-3 gap-2 mb-2">
+                  <div class="text-center"><div class="text-xl font-bold text-sky-300" x-text="lihpaoResult.fastest_time_str"></div><div class="text-[10px] text-slate-500">最快單圈（第<span x-text="lihpaoResult.fastest_lap"></span>圈）</div></div>
+                  <div class="text-center"><div class="text-xl font-bold text-pink-300" x-text="lihpaoResult.sweet_pressure_lap ? '第'+lihpaoResult.sweet_pressure_lap+'圈' : '未達'"></div><div class="text-[10px] text-slate-500" x-text="lihpaoResult.sweet_pressure_lap ? '胎壓甜蜜點' : '胎壓未進窗口'"></div></div>
+                  <div class="text-center"><div class="text-xl font-bold text-green-400" x-text="lihpaoResult.recommended_cold_pressure_bar"></div><div class="text-[10px] text-slate-500">建議冷胎壓 bar</div></div>
+                </div>
+                <div class="text-[10px] text-slate-500 text-center" x-text="'峰值抓地第'+lihpaoResult.peak_grip_lap+'圈 · μ '+lihpaoResult.inputs.base_mu+' · '+lihpaoResult.inputs.power_kw+'kW '+lihpaoResult.inputs.drivetrain+' · '+lihpaoResult.inputs.dry_mass_kg+'kg · 胎 '+tire.front_compound"></div>
+                <div class="text-[10px] text-amber-400/70 text-center mt-1">絕對圈速依輸入規格(馬力可在麗寶分頁調整)；紀錄車多為大改</div>
+              </div>
+            </template>
+          </div>
+
           <!-- Roll Stiffness -->
           <div class="card2 p-4 mb-4">
             <div class="text-xs text-slate-400 mb-2">Roll Stiffness Distribution</div>
@@ -1319,7 +1338,7 @@ canvas{max-height:300px}
         <div>
           <div class="grid-2 gap-3 mb-3">
             <div class="corner-box"><div class="val text-2xl text-sky-300" x-text="lihpaoResult.fastest_time_str"></div><div class="lbl">最快單圈 (第 <span x-text="lihpaoResult.fastest_lap"></span> 圈)</div></div>
-            <div class="corner-box"><div class="val text-2xl text-pink-300" x-text="'第 '+lihpaoResult.sweet_pressure_lap+' 圈'"></div><div class="lbl">胎壓甜蜜點出現</div></div>
+            <div class="corner-box"><div class="val text-2xl text-pink-300" x-text="lihpaoResult.sweet_pressure_lap ? '第 '+lihpaoResult.sweet_pressure_lap+' 圈' : '未達'"></div><div class="lbl" x-text="lihpaoResult.sweet_pressure_lap ? '胎壓甜蜜點出現' : '胎壓未進窗口(調冷壓)'"></div></div>
           </div>
           <div class="text-xs text-slate-400 space-y-1">
             <div class="flex justify-between"><span>峰值抓地圈 / 退化起始</span><span class="text-slate-200" x-text="'第 '+lihpaoResult.peak_grip_lap+' 圈'"></span></div>
@@ -2337,12 +2356,32 @@ function app(){return{
     this.adv.fr_weight = Math.round(tw * fpct / 2 * 10) / 10;
     this.adv.rl_weight = Math.round(tw * (1 - fpct) / 2 * 10) / 10;
     this.adv.rr_weight = Math.round(tw * (1 - fpct) / 2 * 10) / 10;
+    // 麗寶單圈：自動帶入驅動佈局與類別馬力估計(preset 無馬力欄位 → 依類別功重比×車重估)
+    this.lihpao.layout = this.mapDrivetrain(d.layout);
+    this.lihpao.category = d.category;
+    this.lihpao.power_kw = this.estPowerKw(d.category, p.total_weight);
+    // 冷胎壓設成跟該胎最佳熱胎壓匹配(最佳−0.2)，讓 stint 能升溫進入甜蜜點
+    this.lihpao.cold_pressure = Math.round((this.tire.front_optimal_pressure - 0.2) * 100) / 100;
     // Clear previous results and baseline
     this.result = null;
     this.baseline = null;
     this.deltaResult = null;
+    this.lihpaoResult = null;
     // 選車後預設 Tier 1 (快速模式)，使用者可自行切換
     this.tier = 1;
+  },
+
+  mapDrivetrain(layout){
+    if(/AWD|4WD/i.test(layout)) return 'AWD';
+    if(/^FF$/i.test(layout) || /FWD/i.test(layout)) return 'FWD';
+    return 'RWD'; // RR / MR / FR / FMR
+  },
+  estPowerKw(category, massKg){
+    // 類別典型功重比 (kW/kg) × 車重 → 馬力估計(可在麗寶分頁手動調整)
+    const ptw={sports_car:0.16,hot_hatch:0.15,supercar:0.32,sedan:0.10,electric:0.18,
+      kei_car:0.045,race_car:0.36,suv:0.10,hatchback:0.085,gt_car:0.30};
+    const r=ptw[category]??0.13;
+    return Math.max(40, Math.round((massKg||1300)*r/5)*5);
   },
 
   resetDamper(){
@@ -2477,6 +2516,8 @@ function app(){return{
     const compatibleTier = (t) => t <= 2 ? 2 : t;
     if(this.baseline && compatibleTier(this.baseline.tier) === compatibleTier(this.tier)) this.computeDelta();
     else this.deltaResult = null;
+    // 同步算麗寶單圈預測(用當下這台車的設定)，預測結果區直接顯示
+    this.runLihpao();
   },
 
   runLihpao(){
@@ -2489,7 +2530,7 @@ function app(){return{
     };
     this.lihpaoResult = api.simulateLihpao({
       params:this.pred, tireParams:tireParams, advParams:(this.tier===3?this.adv:{}),
-      layout:L.layout, power_kw:L.power_kw,
+      layout:L.layout, power_kw:L.power_kw, category:L.category,
       env:{ambient_c:L.ambient_c, track_c:L.track_c},
       stint:{laps:L.laps, fuel_start_kg:L.fuel_start, fuel_per_lap_kg:L.fuel_per_lap, cold_pressure_bar:L.cold_pressure},
     });
