@@ -126,8 +126,8 @@ const api = {
   // === Setup Advisor ===
 
   /** Analyze setup and generate tuning suggestions */
-  analyzeSetup(result, tier, params, advParams) {
-    return SetupAdvisor.analyze(result, tier, params, advParams);
+  analyzeSetup(result, tier, params, advParams, tr) {
+    return SetupAdvisor.analyze(result, tier, params, advParams, tr);
   },
 
   // === Spring Calculator ===

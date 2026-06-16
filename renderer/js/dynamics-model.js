@@ -1291,12 +1291,18 @@ class SetupAdvisor {
    * @param {Object} [advParams] - Advanced params (Tier 3 adv object)
    * @returns {{ suggestions: Array<{priority,category,category_zh,message,suggestion,values}>, summary: {high,medium,low,total} }}
    */
-  static analyze(result, tier, params, advParams) {
+  static analyze(result, tier, params, advParams, tr) {
     if (!result) return { suggestions: [], summary: { high: 0, medium: 0, low: 0, total: 0 } };
 
+    // i18n: tr(key) translates a key; falls back to the key itself when no translator is injected.
+    const T = (typeof tr === 'function') ? tr : (k => k);
+    const fmt = (key, vars) => { let s = T(key); if (vars) for (const p in vars) s = s.split('{' + p + '}').join(vars[p]); return s; };
+    const FRONT = T('adv.frag.front'), REAR = T('adv.frag.rear');
+
     const suggestions = [];
-    const add = (priority, category, categoryZh, message, suggestion, values) => {
-      suggestions.push({ priority, category, category_zh: categoryZh, message, suggestion: suggestion || '', values: values || {} });
+    // add(priority, category, message, suggestion, values) — category is the English key; category_zh is localized from it.
+    const add = (priority, category, message, suggestion, values) => {
+      suggestions.push({ priority, category, category_zh: T('adv.cat.' + category), message, suggestion: suggestion || '', values: values || {} });
     };
 
     // ── Rule 1: Front/rear ride frequency relationship ──
@@ -1328,9 +1334,9 @@ class SetupAdvisor {
           // 目標頻率超過輪胎剛性上限，給下界值（同樣換算回彈簧端）
           targetSpring = kWheelNeeded / Math.pow(rMr, 2);
         }
-        add(pri, 'spring', '彈簧',
-          `後/前 Ride Frequency 比值 ${roundN(ratio, 2)}（前 ${roundN(rf.front_hz, 1)} Hz / 後 ${roundN(rf.rear_hz, 1)} Hz）偏離常見範圍。舒適取向（Olley Flat Ride）建議後軸比前軸高 10-20%（比值 1.10-1.20）；賽道/空力平台取向常用前高後低（0.90-1.00）`,
-          `若以 Flat Ride 為目標，後彈簧率約 ${roundN(targetSpring, 0)} N/mm（目前 ${params.rear_spring_rate} N/mm）可達到比值 ${targetRatio}`,
+        add(pri, 'spring',
+          fmt('adv.r1.msg', { ratio: roundN(ratio, 2), front: roundN(rf.front_hz, 1), rear: roundN(rf.rear_hz, 1) }),
+          fmt('adv.r1.sug', { spring: roundN(targetSpring, 0), cur: params.rear_spring_rate, ratio: targetRatio }),
           { target_rear_spring: roundN(targetSpring, 1), target_ratio: targetRatio, target_rear_hz: roundN(targetRearHz, 2) }
         );
       }
@@ -1341,11 +1347,11 @@ class SetupAdvisor {
       const minHz = Math.min(rf.front_hz, rf.rear_hz);
       if (minHz < 2.0) {
         const pri = minHz < 1.5 ? 'high' : 'medium';
-        const axle = rf.front_hz < rf.rear_hz ? '前' : '後';
+        const axle = rf.front_hz < rf.rear_hz ? FRONT : REAR;
         const axleHz = Math.min(rf.front_hz, rf.rear_hz);
-        add(pri, 'spring', '彈簧',
-          `${axle}軸 Ride Frequency ${roundN(axleHz, 2)} Hz 偏低，賽道使用建議 2.0-3.5 Hz`,
-          `提高${axle}彈簧率可增加頻率。使用「彈簧計算器」可精確計算所需彈簧率`,
+        add(pri, 'spring',
+          fmt('adv.r2.msg', { axle, hz: roundN(axleHz, 2) }),
+          fmt('adv.r2.sug', { axle }),
           { low_axis: axle, current_hz: roundN(axleHz, 2), target_hz: 2.5 }
         );
       }
@@ -1354,14 +1360,14 @@ class SetupAdvisor {
     // ── Rule 3: Ride Frequency too high (too stiff) ──
     if (rf) {
       if (rf.front_hz > 4.0) {
-        add('medium', 'spring', '彈簧',
-          `前軸 Ride Frequency ${roundN(rf.front_hz, 2)} Hz 偏高（> 4.0 Hz），可能影響機械抓地力`,
-          '考慮降低前彈簧率或使用較軟的輪胎', {});
+        add('medium', 'spring',
+          fmt('adv.r3.msg', { axle: FRONT, hz: roundN(rf.front_hz, 2) }),
+          fmt('adv.r3.sug', { axle: FRONT }), {});
       }
       if (rf.rear_hz > 4.0) {
-        add('medium', 'spring', '彈簧',
-          `後軸 Ride Frequency ${roundN(rf.rear_hz, 2)} Hz 偏高（> 4.0 Hz），可能影響機械抓地力`,
-          '考慮降低後彈簧率或使用較軟的輪胎', {});
+        add('medium', 'spring',
+          fmt('adv.r3.msg', { axle: REAR, hz: roundN(rf.rear_hz, 2) }),
+          fmt('adv.r3.sug', { axle: REAR }), {});
       }
     }
 
@@ -1372,12 +1378,10 @@ class SetupAdvisor {
       const diff = Math.abs(lltdF - wFPct);
       if (diff > 8) {
         const pri = diff > 12 ? 'high' : 'medium';
-        const direction = lltdF > wFPct ? '轉向不足' : '轉向過度';
-        const fix = lltdF > wFPct
-          ? '降低前 ARB 或增加後 ARB 剛性'
-          : '增加前 ARB 或降低後 ARB 剛性';
-        add(pri, 'arb', '防傾桿',
-          `LLTD ${roundN(lltdF, 1)}% vs 重量分佈 ${roundN(wFPct, 1)}%，差距 ${roundN(diff, 1)}% — ${direction}傾向明顯`,
+        const dir = lltdF > wFPct ? T('us.Understeer') : T('us.Oversteer');
+        const fix = lltdF > wFPct ? T('adv.r4.fixUnder') : T('adv.r4.fixOver');
+        add(pri, 'arb',
+          fmt('adv.r4.msg', { lltd: roundN(lltdF, 1), wpct: roundN(wFPct, 1), diff: roundN(diff, 1), dir }),
           fix,
           { lltd: roundN(lltdF, 1), weight_pct: roundN(wFPct, 1), diff: roundN(diff, 1) }
         );
@@ -1388,9 +1392,9 @@ class SetupAdvisor {
     const rollGrad = result.roll_gradient_deg_per_g ?? (result.mechanical?.roll_gradient);
     if (rollGrad != null && rollGrad > 3.0) {
       const pri = rollGrad > 5.0 ? 'high' : 'medium';
-      add(pri, 'arb', '防傾桿',
-        `Roll Gradient ${roundN(rollGrad, 2)}°/g 偏大，賽道建議 < 2.0°/g`,
-        '增加 ARB 剛性或提高彈簧率可減小側傾',
+      add(pri, 'arb',
+        fmt('adv.r5.msg', { rg: roundN(rollGrad, 2) }),
+        T('adv.r5.sug'),
         { roll_gradient: roundN(rollGrad, 2) }
       );
     }
@@ -1398,9 +1402,9 @@ class SetupAdvisor {
     // ── Rule 6: Geometric load transfer is high proportion ──
     const lltdDec = result.lltd_decomposed || (result.mechanical?.lltd_decomposed);
     if (lltdDec && lltdDec.geometric_pct_of_total > 40) {
-      add('low', 'geometry', '幾何',
-        `幾何荷重轉移佔總荷重轉移的 ${roundN(lltdDec.geometric_pct_of_total, 1)}%（Roll Center 較高）`,
-        '過渡反應較快但彈簧/ARB 可調範圍較小。如需更大調整空間，可考慮降低 Roll Center 高度',
+      add('low', 'geometry',
+        fmt('adv.r6.msg', { pct: roundN(lltdDec.geometric_pct_of_total, 1) }),
+        T('adv.r6.sug'),
         { geo_pct: roundN(lltdDec.geometric_pct_of_total, 1) }
       );
     }
@@ -1412,15 +1416,16 @@ class SetupAdvisor {
       const minD = Math.min(dF, dR);
       if (minD < 0.3) {
         const pri = minD < 0.2 ? 'high' : 'medium';
-        const axle = dF < dR ? '前' : '後';
-        const val = dF < dR ? dF : dR;
+        const isFront = dF < dR;
+        const axle = isFront ? FRONT : REAR;
+        const val = isFront ? dF : dR;
         // Calculate target damper force for ζ=0.5
         const totalWeight = params.total_weight ?? 1000;
         const wFPctLocal = params.weight_front_pct ?? 50;
-        const effWr = axle === '前'
+        const effWr = isFront
           ? (result.mechanical?.front_wheel_rate_effective ?? result.front_wheel_rate_effective ?? 0)
           : (result.mechanical?.rear_wheel_rate_effective ?? result.rear_wheel_rate_effective ?? 0);
-        const mCorner = axle === '前'
+        const mCorner = isFront
           ? (totalWeight * wFPctLocal / 100) / 2
           : (totalWeight * (100 - wFPctLocal) / 100) / 2;
         const targetZeta = 0.5;
@@ -1431,22 +1436,22 @@ class SetupAdvisor {
           // Target damper coefficient at the wheel, reflected back to the
           // damper through MR², then expressed as a force at the reference
           // shaft speed (what spec sheets quote)
-          const mrAxle = axle === '前'
+          const mrAxle = isFront
             ? (params.front_motion_ratio ?? 1.0)
             : (params.rear_motion_ratio ?? 1.0);
           const targetC_wheel = targetZeta * 2 * Math.sqrt(effWr * 1000 * mCorner); // N·s/m
           const targetC_damper = targetC_wheel / Math.pow(mrAxle, 2);
           const targetF_kgf = targetC_damper * refV / G;
-          add(pri, 'damper', '阻尼',
-            `${axle}軸阻尼比 ${roundN(val, 2)}（${val < 0.2 ? '嚴重欠阻尼' : '欠阻尼'}），車身回彈過多`,
-            `建議${axle}軸平均阻尼力（@${refV} m/s）增加到 ~${roundN(targetF_kgf, 0)} kgf（目標 ζ=${targetZeta}）`,
+          add(pri, 'damper',
+            fmt('adv.r7.msg', { axle, ratio: roundN(val, 2), sev: T(val < 0.2 ? 'adv.frag.severeUnderdamped' : 'adv.frag.underdamped') }),
+            fmt('adv.r7.sug', { axle, refV, kgf: roundN(targetF_kgf, 0), zeta: targetZeta }),
             { axis: axle, current_ratio: roundN(val, 2), target_kgf: roundN(targetF_kgf, 0), target_zeta: targetZeta, ref_speed_ms: refV }
           );
         } else {
           // 缺少有效輪率資料 — 不憑空捏造目標阻尼力
-          add(pri, 'damper', '阻尼',
-            `${axle}軸阻尼比 ${roundN(val, 2)}（${val < 0.2 ? '嚴重欠阻尼' : '欠阻尼'}），車身回彈過多`,
-            `提高${axle}軸阻尼力可改善（缺少有效輪率資料，無法計算具體目標值）`,
+          add(pri, 'damper',
+            fmt('adv.r7.msg', { axle, ratio: roundN(val, 2), sev: T(val < 0.2 ? 'adv.frag.severeUnderdamped' : 'adv.frag.underdamped') }),
+            fmt('adv.r7.sugNoData', { axle }),
             { axis: axle, current_ratio: roundN(val, 2), target_zeta: targetZeta }
           );
         }
@@ -1457,9 +1462,9 @@ class SetupAdvisor {
     if (tier === 3 && result.damping) {
       const diff = Math.abs(result.damping.front_ratio - result.damping.rear_ratio);
       if (diff > 0.25) {
-        add('medium', 'damper', '阻尼',
-          `前後阻尼比差距 ${roundN(diff, 2)}（前 ${roundN(result.damping.front_ratio, 2)} / 後 ${roundN(result.damping.rear_ratio, 2)}），可能造成 pitch 振盪`,
-          '建議前後阻尼比保持在 0.25 以內的差距',
+        add('medium', 'damper',
+          fmt('adv.r8.msg', { diff: roundN(diff, 2), f: roundN(result.damping.front_ratio, 2), r: roundN(result.damping.rear_ratio, 2) }),
+          T('adv.r8.sug'),
           { front_ratio: roundN(result.damping.front_ratio, 2), rear_ratio: roundN(result.damping.rear_ratio, 2), diff: roundN(diff, 2) }
         );
       }
@@ -1470,10 +1475,10 @@ class SetupAdvisor {
       const gr = result.tire_grip.grip_ratio_f_r;
       if (gr != null && Math.abs(gr - 1.0) > 0.08) {
         const pri = Math.abs(gr - 1.0) > 0.15 ? 'high' : 'medium';
-        const weak = gr < 1.0 ? '前' : '後';
-        add(pri, 'tire', '輪胎',
-          `前後抓地力比 ${roundN(gr, 3)}，${weak}軸抓地力相對不足`,
-          `調整${weak}軸胎壓（偏離最佳值會降低抓地力）或更換胎種`,
+        const weak = gr < 1.0 ? FRONT : REAR;
+        add(pri, 'tire',
+          fmt('adv.r9.msg', { gr: roundN(gr, 3), weak }),
+          fmt('adv.r9.sug', { weak }),
           { grip_ratio: roundN(gr, 3), weak_axis: weak }
         );
       }
@@ -1483,15 +1488,15 @@ class SetupAdvisor {
     if (tier >= 2 && result.tire_grip) {
       const tg = result.tire_grip;
       const corners = [
-        { name: '左前', val: tg.fl }, { name: '右前', val: tg.fr },
-        { name: '左後', val: tg.rl }, { name: '右後', val: tg.rr },
+        { name: T('adv.corner.fl'), val: tg.fl }, { name: T('adv.corner.fr'), val: tg.fr },
+        { name: T('adv.corner.rl'), val: tg.rl }, { name: T('adv.corner.rr'), val: tg.rr },
       ];
       for (const c of corners) {
         if (c.val != null && c.val < 0.85) {
           const pri = c.val < 0.75 ? 'high' : 'medium';
-          add(pri, 'tire', '輪胎',
-            `${c.name} 抓地力僅 ${roundN(c.val * 100, 0)}%，輪胎可能不在工作溫度或壓力範圍`,
-            '確認胎溫和胎壓是否在該輪胎的最佳區間',
+          add(pri, 'tire',
+            fmt('adv.r10.msg', { corner: c.name, pct: roundN(c.val * 100, 0) }),
+            T('adv.r10.sug'),
             { corner: c.name, grip_pct: roundN(c.val * 100, 0) }
           );
         }
@@ -1505,9 +1510,9 @@ class SetupAdvisor {
       if (aeroF != null && mechWF != null) {
         const diff = Math.abs(aeroF - mechWF);
         if (diff > 10) {
-          add('medium', 'aero', '空力',
-            `空力平衡 ${roundN(aeroF, 1)}% vs 重量分佈 ${roundN(mechWF, 1)}%，差距 ${roundN(diff, 1)}%`,
-            '高速時轉向特性會與低速不同。調整前後下壓力係數可改善',
+          add('medium', 'aero',
+            fmt('adv.r11.msg', { aero: roundN(aeroF, 1), wpct: roundN(mechWF, 1), diff: roundN(diff, 1) }),
+            T('adv.r11.sug'),
             { aero_balance: roundN(aeroF, 1), weight_pct: roundN(mechWF, 1) }
           );
         }
@@ -1519,9 +1524,9 @@ class SetupAdvisor {
       const dev = result.corner_weight.cross_deviation;
       if (dev != null && dev > 1.5) {
         const pri = dev > 2.5 ? 'high' : 'medium';
-        add(pri, 'weight', '重量',
-          `Cross Weight 偏差 ${roundN(dev, 1)}%（${roundN(result.corner_weight.cross_weight_pct, 1)}%），車輛左右不對稱`,
-          '調整角落重量（墊片、彈簧預載）使 Cross Weight 趨近 50%',
+        add(pri, 'weight',
+          fmt('adv.r12.msg', { dev: roundN(dev, 1), pct: roundN(result.corner_weight.cross_weight_pct, 1) }),
+          T('adv.r12.sug'),
           { cross_deviation: roundN(dev, 1), cross_weight_pct: roundN(result.corner_weight.cross_weight_pct, 1) }
         );
       }
@@ -1535,11 +1540,11 @@ class SetupAdvisor {
       const rOff = Math.abs(Math.abs(rc) - 2.0);
       if (fOff > 1.5 || rOff > 1.0) {
         const details = [];
-        if (fOff > 1.5) details.push(`前 Camber ${fc}° 偏離建議值 -3.0°`);
-        if (rOff > 1.0) details.push(`後 Camber ${rc}° 偏離建議值 -2.0°`);
-        add('low', 'geometry', '幾何',
-          `Camber 設定偏離賽道建議值：${details.join('、')}`,
-          '賽道使用建議前 -2.5°~-3.5°、後 -1.5°~-2.5°',
+        if (fOff > 1.5) details.push(fmt('adv.r13.detFront', { fc }));
+        if (rOff > 1.0) details.push(fmt('adv.r13.detRear', { rc }));
+        add('low', 'geometry',
+          fmt('adv.r13.msg', { details: details.join(T('adv.frag.listSep')) }),
+          T('adv.r13.sug'),
           { front_camber: fc, rear_camber: rc }
         );
       }
@@ -1550,19 +1555,19 @@ class SetupAdvisor {
       const usG = result.prediction.steady_state.understeer_gradient;
       if (usG < 0) {
         const critKmh = result.dynamics?.critical_speed_kmh;
-        add('high', 'balance', '平衡',
-          `車輛呈現轉向過度特性（US gradient = ${roundN(usG, 2)}）`,
-          (critKmh ? `線性模型估算臨界速度約 ${critKmh} km/h，超過後轉向增益發散。` : '高速時轉向增益持續上升，需要駕駛技術修正。')
-            + '增加前軸荷重轉移（前 ARB、前彈簧）可改善',
+        add('high', 'balance',
+          fmt('adv.r14.msg', { usg: roundN(usG, 2) }),
+          (critKmh ? fmt('adv.r14.sugCritPre', { kmh: critKmh }) : T('adv.r14.sugNoCritPre'))
+            + T('adv.r14.sugSuffix'),
           { understeer_gradient: roundN(usG, 2), critical_speed_kmh: critKmh ?? null }
         );
       }
     } else if (tier < 3) {
       const usG = result.adjusted_understeer_gradient ?? result.understeer_gradient;
       if (usG != null && usG < -1.0) {
-        add('high', 'balance', '平衡',
-          `車輛呈現明顯轉向過度特性（US gradient = ${roundN(usG, 2)} deg/g）`,
-          '增加前 ARB 或前彈簧率可增加前軸荷重轉移，改善平衡',
+        add('high', 'balance',
+          fmt('adv.r14b.msg', { usg: roundN(usG, 2) }),
+          T('adv.r14b.sug'),
           { understeer_gradient: roundN(usG, 2) }
         );
       }
