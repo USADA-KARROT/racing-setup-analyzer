@@ -53,15 +53,22 @@ canvas{max-height:300px}
 <header class="flex items-center justify-between px-6 py-3 border-b border-white/5" style="background:var(--bg2)">
   <div class="flex items-center gap-3">
     <div class="text-lg font-bold text-sky-400">Racing Dynamics</div>
-    <div class="text-xs text-slate-600">賽車動態分析系統 v3.4 Desktop</div>
+    <div class="text-xs text-slate-600"><span x-text="t('chrome.subtitle')"></span> v3.4</div>
   </div>
-  <div class="flex gap-2">
+  <div class="flex items-center gap-2">
     <template x-for="tab in tabs" :key="tab.id">
       <div class="nav-btn" :class="{'active': currentTab===tab.id}" @click="switchTab(tab.id)">
-        <div class="text-xs font-semibold" x-text="tab.label"></div>
-        <div class="text-[10px] text-slate-500" x-text="tab.sub"></div>
+        <div class="text-xs font-semibold" x-text="t(tab.key)"></div>
       </div>
     </template>
+    <!-- Language switcher -->
+    <div class="flex ml-2 rounded-lg overflow-hidden border border-white/10">
+      <template x-for="lg in langs" :key="lg.id">
+        <button class="px-2 py-1 text-[11px] font-semibold transition-colors"
+          :class="lang===lg.id ? 'bg-sky-500 text-white' : 'bg-transparent text-slate-400 hover:text-slate-200'"
+          @click="setLang(lg.id)" x-text="lg.label"></button>
+      </template>
+    </div>
   </div>
 </header>
 
@@ -70,12 +77,12 @@ canvas{max-height:300px}
 <!-- ==================== TAB: 轉向趨勢預測 ==================== -->
 <div x-show="currentTab==='predict'" x-transition>
   <div class="flex items-center justify-between mb-4">
-    <h2 class="text-xl font-bold">轉向趨勢預測器</h2>
+    <h2 class="text-xl font-bold" x-text="t('h2.predict')"></h2>
     <!-- Mode toggle -->
     <div class="flex items-center gap-3">
       <div class="flex rounded-lg overflow-hidden border border-white/10">
-        <button class="px-4 py-2 text-xs font-semibold transition-colors" :class="streetMode ? 'bg-transparent text-slate-400' : 'bg-sky-500 text-white'" @click="streetMode=false; streetCar=''">專業模式</button>
-        <button class="px-4 py-2 text-xs font-semibold transition-colors" :class="streetMode ? 'bg-green-500 text-white' : 'bg-transparent text-slate-400'" @click="streetMode=true; proOem.enabled=false; if(!carPresets.length) loadPresets()">街車模式</button>
+        <button class="px-4 py-2 text-xs font-semibold transition-colors" :class="streetMode ? 'bg-transparent text-slate-400' : 'bg-sky-500 text-white'" @click="streetMode=false; streetCar=''" x-text="t('mode.pro')"></button>
+        <button class="px-4 py-2 text-xs font-semibold transition-colors" :class="streetMode ? 'bg-green-500 text-white' : 'bg-transparent text-slate-400'" @click="streetMode=true; proOem.enabled=false; if(!carPresets.length) loadPresets()" x-text="t('mode.street')"></button>
       </div>
     </div>
   </div>
@@ -84,13 +91,13 @@ canvas{max-height:300px}
   <div x-show="streetMode" x-transition class="card p-4 mb-4">
     <div class="flex items-center gap-4 flex-wrap">
       <div>
-        <label class="text-xs text-slate-400">選擇車種</label>
+        <label class="text-xs text-slate-400" x-text="t('lbl.pickCar')"></label>
         <select x-model="streetCar" @change="applyPreset()" class="ml-2 text-sm min-w-[280px]">
-          <option value="">-- 請選擇車種 (501 台) --</option>
+          <option value="" x-text="t('opt.pickCar')"></option>
           <template x-for="g in carPresetGroups" :key="g.label">
             <optgroup :label="g.label">
               <template x-for="c in g.cars" :key="c.id">
-                <option :value="c.id" x-text="c.name_zh + ' (' + c.years + ')'"></option>
+                <option :value="c.id" x-text="nm(c) + ' (' + c.years + ')'"></option>
               </template>
             </optgroup>
           </template>
@@ -109,15 +116,15 @@ canvas{max-height:300px}
     <!-- OEM Tire Specs Detail -->
     <template x-if="streetCarDetail?.oem_tire_specs">
       <div class="mt-3 p-3 rounded-lg bg-slate-800/50 border border-white/5">
-        <div class="text-[10px] font-semibold text-slate-400 mb-2">🛞 OEM 輪胎規格 → 彈簧率估算</div>
+        <div class="text-[10px] font-semibold text-slate-400 mb-2" x-text="t('oem.estHdr')"></div>
         <div class="grid grid-cols-2 gap-4 text-xs">
           <div>
-            <span class="text-slate-500">前輪</span>
+            <span class="text-slate-500" x-text="t('lbl.front')"></span>
             <span class="text-slate-300 ml-1" x-text="streetCarDetail.oem_tire_specs.front.width + '/' + streetCarDetail.oem_tire_specs.front.aspect + ' R' + streetCarDetail.oem_tire_specs.front.rim"></span>
             <span class="text-sky-400 ml-2" x-text="'≈ ' + api.estimateTireSpring(streetCarDetail.oem_tire_specs.front.width, streetCarDetail.oem_tire_specs.front.aspect) + ' N/mm'"></span>
           </div>
           <div>
-            <span class="text-slate-500">後輪</span>
+            <span class="text-slate-500" x-text="t('lbl.rear')"></span>
             <span class="text-slate-300 ml-1" x-text="streetCarDetail.oem_tire_specs.rear.width + '/' + streetCarDetail.oem_tire_specs.rear.aspect + ' R' + streetCarDetail.oem_tire_specs.rear.rim"></span>
             <span class="text-sky-400 ml-2" x-text="'≈ ' + api.estimateTireSpring(streetCarDetail.oem_tire_specs.rear.width, streetCarDetail.oem_tire_specs.rear.aspect) + ' N/mm'"></span>
           </div>
@@ -137,9 +144,9 @@ canvas{max-height:300px}
 
   <!-- Tier tabs -->
   <div class="flex gap-1 mb-0">
-    <div class="tier-tab" :class="{'active':tier===1}" @click="switchTier(1)">Tier 1 快速</div>
-    <div class="tier-tab" :class="{'active':tier===2}" @click="switchTier(2)">Tier 2 輪胎詳細</div>
-    <div class="tier-tab" :class="{'active':tier===3}" @click="switchTier(3)">Tier 3 完整</div>
+    <div class="tier-tab" :class="{'active':tier===1}" @click="switchTier(1)" x-text="t('tier.t1')"></div>
+    <div class="tier-tab" :class="{'active':tier===2}" @click="switchTier(2)" x-text="t('tier.t2')"></div>
+    <div class="tier-tab" :class="{'active':tier===3}" @click="switchTier(3)" x-text="t('tier.t3')"></div>
   </div>
 
   <div class="card p-5">
@@ -149,14 +156,14 @@ canvas{max-height:300px}
 
         <!-- Tier 1: Mechanical -->
         <div>
-          <div class="section-title"><span class="badge badge-b">Tier 1</span> 機械設定
-            <span x-show="streetMode && streetCar" class="text-[10px] text-yellow-400 ml-2">鎖定中 — 由車種預設帶入</span>
+          <div class="section-title"><span class="badge badge-b">Tier 1</span> <span x-text="t('sec.t1')"></span>
+            <span x-show="streetMode && streetCar" class="text-[10px] text-yellow-400 ml-2" x-text="t('sec.t1lock')"></span>
           </div>
           <!-- Street mode: locked summary -->
           <div x-show="streetMode && streetCar" class="card2 p-3 mb-3 text-xs text-slate-400 space-y-1">
             <div class="flex items-center justify-between mb-1">
-              <span class="text-[10px] text-slate-500">車種固定參數</span>
-              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-600 text-slate-300 hover:bg-slate-500" @click="applyPreset()">全部還原預設</button>
+              <span class="text-[10px] text-slate-500" x-text="t('lbl.fixedParams')"></span>
+              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-600 text-slate-300 hover:bg-slate-500" @click="applyPreset()" x-text="t('btn.resetAll')"></button>
             </div>
             <div class="grid grid-cols-3 gap-2">
               <span>彈簧: F <b class="text-slate-200" x-text="pred.front_spring_rate"></b> / R <b class="text-slate-200" x-text="pred.rear_spring_rate"></b> N/mm</span>
@@ -172,14 +179,14 @@ canvas{max-height:300px}
           <!-- Street mode: Damper adjust (if car has adjustable dampers) -->
           <div x-show="streetMode && streetCar && streetCarDetail?.damper_adjustable && tier >= 3" class="mb-3">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs text-green-400 font-semibold">可調阻尼</span>
-              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-600 text-slate-300 hover:bg-slate-500" @click="resetDamper()">還原阻尼預設</button>
+              <span class="text-xs text-green-400 font-semibold" x-text="t('lbl.adjDamper')"></span>
+              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-600 text-slate-300 hover:bg-slate-500" @click="resetDamper()" x-text="t('btn.resetDamper')"></button>
             </div>
             <div class="grid-4 text-sm">
-              <div><label class="text-xs text-slate-400">前 Bump (kgf)</label><input type="number" x-model.number="adv.front_bump_force" class="w-full mt-1"></div>
-              <div><label class="text-xs text-slate-400">前 Rebound</label><input type="number" x-model.number="adv.front_rebound_force" class="w-full mt-1"></div>
-              <div><label class="text-xs text-slate-400">後 Bump (kgf)</label><input type="number" x-model.number="adv.rear_bump_force" class="w-full mt-1"></div>
-              <div><label class="text-xs text-slate-400">後 Rebound</label><input type="number" x-model.number="adv.rear_rebound_force" class="w-full mt-1"></div>
+              <div><label class="text-xs text-slate-400" x-text="t('lbl.fBump')"></label><input type="number" x-model.number="adv.front_bump_force" class="w-full mt-1"></div>
+              <div><label class="text-xs text-slate-400" x-text="t('lbl.fReb')"></label><input type="number" x-model.number="adv.front_rebound_force" class="w-full mt-1"></div>
+              <div><label class="text-xs text-slate-400" x-text="t('lbl.rBump')"></label><input type="number" x-model.number="adv.rear_bump_force" class="w-full mt-1"></div>
+              <div><label class="text-xs text-slate-400" x-text="t('lbl.rReb')"></label><input type="number" x-model.number="adv.rear_rebound_force" class="w-full mt-1"></div>
             </div>
             <div class="text-[10px] text-slate-500 mt-1">無法取得精確阻尼力值時，可以調段數比例感受趨勢方向</div>
             <div class="text-[10px] text-slate-500 mt-1">阻尼力參考速度 <input type="number" x-model.number="adv.damper_ref_speed" step="0.1" min="0.05" max="1" class="w-14 inline-block"> m/s（規格表常見 0.1–0.3 m/s）</div>
@@ -187,51 +194,51 @@ canvas{max-height:300px}
           <!-- Pro mode: all fields -->
           <div x-show="!streetMode || !streetCar" class="grid-2 text-sm">
             <div>
-              <label class="text-xs text-slate-400">前彈簧率 (N/mm)</label>
+              <label class="text-xs text-slate-400" x-text="t('lbl.fSpring')"></label>
               <input type="number" x-model.number="pred.front_spring_rate" class="w-full mt-1" step="10">
             </div>
             <div>
-              <label class="text-xs text-slate-400">後彈簧率 (N/mm)</label>
+              <label class="text-xs text-slate-400" x-text="t('lbl.rSpring')"></label>
               <input type="number" x-model.number="pred.rear_spring_rate" class="w-full mt-1" step="10">
             </div>
             <div>
-              <label class="text-xs text-slate-400">前 ARB (Nm/deg)</label>
+              <label class="text-xs text-slate-400" x-text="t('lbl.fArb')"></label>
               <input type="number" x-model.number="pred.front_arb" class="w-full mt-1" step="10">
             </div>
             <div>
-              <label class="text-xs text-slate-400">後 ARB (Nm/deg)</label>
+              <label class="text-xs text-slate-400" x-text="t('lbl.rArb')"></label>
               <input type="number" x-model.number="pred.rear_arb" class="w-full mt-1" step="10">
             </div>
             <div>
-              <label class="text-xs text-slate-400">前輪距 (mm)</label>
+              <label class="text-xs text-slate-400" x-text="t('lbl.fTrack')"></label>
               <input type="number" x-model.number="pred.front_track" class="w-full mt-1">
             </div>
             <div>
-              <label class="text-xs text-slate-400">後輪距 (mm)</label>
+              <label class="text-xs text-slate-400" x-text="t('lbl.rTrack')"></label>
               <input type="number" x-model.number="pred.rear_track" class="w-full mt-1">
             </div>
             <div>
-              <label class="text-xs text-slate-400">前 Motion Ratio</label>
+              <label class="text-xs text-slate-400" x-text="t('lbl.fMr')"></label>
               <input type="number" x-model.number="pred.front_motion_ratio" class="w-full mt-1" step="0.01">
             </div>
             <div>
-              <label class="text-xs text-slate-400">後 Motion Ratio</label>
+              <label class="text-xs text-slate-400" x-text="t('lbl.rMr')"></label>
               <input type="number" x-model.number="pred.rear_motion_ratio" class="w-full mt-1" step="0.01">
             </div>
             <div>
-              <label class="text-xs text-slate-400">前軸荷重 %</label>
+              <label class="text-xs text-slate-400" x-text="t('lbl.frontPct')"></label>
               <input type="number" x-model.number="pred.weight_front_pct" class="w-full mt-1" step="0.5">
             </div>
             <div>
-              <label class="text-xs text-slate-400">總重 (kg)</label>
+              <label class="text-xs text-slate-400" x-text="t('lbl.totalWeight')"></label>
               <input type="number" x-model.number="pred.total_weight" class="w-full mt-1">
             </div>
             <div>
-              <label class="text-xs text-slate-400">CG 高度 (mm)</label>
+              <label class="text-xs text-slate-400" x-text="t('lbl.cg')"></label>
               <input type="number" x-model.number="pred.cg_height" class="w-full mt-1">
             </div>
             <div>
-              <label class="text-xs text-slate-400">軸距 (mm)</label>
+              <label class="text-xs text-slate-400" x-text="t('lbl.wb')"></label>
               <input type="number" x-model.number="pred.wheelbase" class="w-full mt-1">
             </div>
           </div>
@@ -239,46 +246,46 @@ canvas{max-height:300px}
           <div class="mt-3">
             <button class="text-[10px] text-slate-500 hover:text-slate-300 flex items-center gap-1" @click="showAdvancedT1=!showAdvancedT1">
               <span x-text="showAdvancedT1 ? '▼' : '▶'"></span>
-              進階參數（輪胎彈性、Roll Center、輪圈升級）
+              <span x-text="t('lbl.advParams')"></span>
             </button>
             <div x-show="showAdvancedT1" x-transition class="mt-2 text-sm space-y-3">
               <div class="grid grid-cols-3 gap-2">
                 <div>
-                  <label class="text-xs text-slate-400">輪胎彈簧率 (N/mm)</label>
+                  <label class="text-xs text-slate-400" x-text="t('lbl.tireSpring')"></label>
                   <input type="number" x-model.number="pred.tire_spring_rate" class="w-full mt-1" step="10">
                   <div class="text-[10px] text-slate-600 mt-0.5" x-show="getOemSpecs()" x-text="'OEM 估算: F ' + wheelUpgrade.oem_front_spring + ' / R ' + wheelUpgrade.oem_rear_spring + ' N/mm'"></div>
                 </div>
                 <div>
-                  <label class="text-xs text-slate-400">前 RC 高度 (mm)</label>
+                  <label class="text-xs text-slate-400" x-text="t('lbl.fRc')"></label>
                   <input type="number" x-model.number="pred.front_roll_center_height" class="w-full mt-1" step="5">
                 </div>
                 <div>
-                  <label class="text-xs text-slate-400">後 RC 高度 (mm)</label>
+                  <label class="text-xs text-slate-400" x-text="t('lbl.rRc')"></label>
                   <input type="number" x-model.number="pred.rear_roll_center_height" class="w-full mt-1" step="5">
                 </div>
               </div>
               <!-- Pro mode: Manual OEM tire spec input -->
               <div x-show="!streetCarDetail?.oem_tire_specs" class="p-3 rounded-lg bg-slate-800/50 border border-white/5">
-                <div class="text-[10px] font-semibold text-slate-400 mb-2">🛞 OEM 基準輪胎規格（用於輪圈升級模擬）</div>
+                <div class="text-[10px] font-semibold text-slate-400 mb-2" x-text="t('oem.upgHdr')"></div>
                 <label class="flex items-center gap-1 mb-2 cursor-pointer">
                   <input type="checkbox" x-model="proOem.sameAxle" @change="syncProOemRear()" class="rounded bg-slate-700 border-slate-600">
-                  <span class="text-[10px] text-slate-400">前後相同</span>
+                  <span class="text-[10px] text-slate-400" x-text="t('lbl.sameFR')"></span>
                 </label>
                 <div class="grid grid-cols-2 gap-4">
                   <!-- Front -->
                   <div class="space-y-1">
-                    <div class="text-[10px] text-slate-500 font-semibold">前輪</div>
+                    <div class="text-[10px] text-slate-500 font-semibold" x-text="t('lbl.front')"></div>
                     <div class="grid grid-cols-3 gap-1">
                       <div>
-                        <label class="text-[10px] text-slate-500">胎寬</label>
+                        <label class="text-[10px] text-slate-500" x-text="t('lbl.tireWidth')"></label>
                         <input type="number" x-model.number="proOem.front_width" @input="syncProOemRear()" class="w-full text-xs" step="5" min="145" max="355">
                       </div>
                       <div>
-                        <label class="text-[10px] text-slate-500">扁平比</label>
+                        <label class="text-[10px] text-slate-500" x-text="t('lbl.aspect')"></label>
                         <input type="number" x-model.number="proOem.front_aspect" @input="syncProOemRear()" class="w-full text-xs" step="5" min="20" max="70">
                       </div>
                       <div>
-                        <label class="text-[10px] text-slate-500">框徑 (吋)</label>
+                        <label class="text-[10px] text-slate-500" x-text="t('lbl.rim')"></label>
                         <input type="number" x-model.number="proOem.front_rim" @input="syncProOemRear()" class="w-full text-xs" min="13" max="22">
                       </div>
                     </div>
@@ -286,18 +293,18 @@ canvas{max-height:300px}
                   </div>
                   <!-- Rear -->
                   <div class="space-y-1">
-                    <div class="text-[10px] text-slate-500 font-semibold">後輪</div>
+                    <div class="text-[10px] text-slate-500 font-semibold" x-text="t('lbl.rear')"></div>
                     <div class="grid grid-cols-3 gap-1">
                       <div>
-                        <label class="text-[10px] text-slate-500">胎寬</label>
+                        <label class="text-[10px] text-slate-500" x-text="t('lbl.tireWidth')"></label>
                         <input type="number" x-model.number="proOem.rear_width" class="w-full text-xs" step="5" min="145" max="355" :disabled="proOem.sameAxle">
                       </div>
                       <div>
-                        <label class="text-[10px] text-slate-500">扁平比</label>
+                        <label class="text-[10px] text-slate-500" x-text="t('lbl.aspect')"></label>
                         <input type="number" x-model.number="proOem.rear_aspect" class="w-full text-xs" step="5" min="20" max="70" :disabled="proOem.sameAxle">
                       </div>
                       <div>
-                        <label class="text-[10px] text-slate-500">框徑 (吋)</label>
+                        <label class="text-[10px] text-slate-500" x-text="t('lbl.rim')"></label>
                         <input type="number" x-model.number="proOem.rear_rim" class="w-full text-xs" min="13" max="22" :disabled="proOem.sameAxle">
                       </div>
                     </div>
@@ -305,8 +312,8 @@ canvas{max-height:300px}
                   </div>
                 </div>
                 <div class="mt-2 flex items-center gap-2">
-                  <button class="text-[10px] px-3 py-1 rounded text-white" :class="proOem.enabled ? 'bg-green-700' : 'bg-sky-600 hover:bg-sky-500'" @click="applyProOem()" x-text="proOem.enabled ? '✓ 已啟用' : '確認並啟用輪圈升級工具'"></button>
-                  <button x-show="proOem.enabled" class="text-[10px] px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300" @click="clearProOem()">清除</button>
+                  <button class="text-[10px] px-3 py-1 rounded text-white" :class="proOem.enabled ? 'bg-green-700' : 'bg-sky-600 hover:bg-sky-500'" @click="applyProOem()" x-text="proOem.enabled ? t('btn.enabledMark') : t('btn.enableUpgrade')"></button>
+                  <button x-show="proOem.enabled" class="text-[10px] px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300" @click="clearProOem()" x-text="t('btn.clear')"></button>
                 </div>
               </div>
               <!-- Wheel Upgrade Section -->
@@ -323,11 +330,11 @@ canvas{max-height:300px}
                     <div class="grid grid-cols-2 gap-4">
                       <!-- Front wheel -->
                       <div class="space-y-1">
-                        <div class="text-[10px] text-slate-500 font-semibold">前輪</div>
+                        <div class="text-[10px] text-slate-500 font-semibold" x-text="t('lbl.front')"></div>
                         <div class="text-[10px] text-slate-600" x-text="'OEM: ' + getOemSpecs().front.width + '/' + getOemSpecs().front.aspect + ' R' + getOemSpecs().front.rim"></div>
                         <div class="grid grid-cols-2 gap-1">
                           <div>
-                            <label class="text-[10px] text-slate-500">輪圈 (吋)</label>
+                            <label class="text-[10px] text-slate-500" x-text="t('lbl.wheel')"></label>
                             <select x-model.number="wheelUpgrade.front_rim" @change="applyWheelUpgrade()" class="w-full text-xs">
                               <template x-for="opt in wheelUpgrade.frontRimOptions" :key="'fr'+opt.value">
                                 <option :value="opt.value" :selected="opt.value===wheelUpgrade.front_rim" x-text="opt.label"></option>
@@ -335,7 +342,7 @@ canvas{max-height:300px}
                             </select>
                           </div>
                           <div>
-                            <label class="text-[10px] text-slate-500">胎寬 (mm)</label>
+                            <label class="text-[10px] text-slate-500" x-text="t('lbl.tireWidthMm')"></label>
                             <input type="number" x-model.number="wheelUpgrade.front_width" @change="applyWheelUpgrade()" class="w-full text-xs" step="5">
                           </div>
                         </div>
@@ -352,11 +359,11 @@ canvas{max-height:300px}
                       </div>
                       <!-- Rear wheel -->
                       <div class="space-y-1">
-                        <div class="text-[10px] text-slate-500 font-semibold">後輪</div>
+                        <div class="text-[10px] text-slate-500 font-semibold" x-text="t('lbl.rear')"></div>
                         <div class="text-[10px] text-slate-600" x-text="'OEM: ' + getOemSpecs().rear.width + '/' + getOemSpecs().rear.aspect + ' R' + getOemSpecs().rear.rim"></div>
                         <div class="grid grid-cols-2 gap-1">
                           <div>
-                            <label class="text-[10px] text-slate-500">輪圈 (吋)</label>
+                            <label class="text-[10px] text-slate-500" x-text="t('lbl.wheel')"></label>
                             <select x-model.number="wheelUpgrade.rear_rim" @change="applyWheelUpgrade()" class="w-full text-xs">
                               <template x-for="opt in wheelUpgrade.rearRimOptions" :key="'rr'+opt.value">
                                 <option :value="opt.value" :selected="opt.value===wheelUpgrade.rear_rim" x-text="opt.label"></option>
@@ -364,7 +371,7 @@ canvas{max-height:300px}
                             </select>
                           </div>
                           <div>
-                            <label class="text-[10px] text-slate-500">胎寬 (mm)</label>
+                            <label class="text-[10px] text-slate-500" x-text="t('lbl.tireWidthMm')"></label>
                             <input type="number" x-model.number="wheelUpgrade.rear_width" @change="applyWheelUpgrade()" class="w-full text-xs" step="5">
                           </div>
                         </div>
@@ -382,8 +389,8 @@ canvas{max-height:300px}
                     </div>
                     <!-- Apply to prediction button -->
                     <div class="mt-2 flex items-center gap-2">
-                      <button class="text-[10px] px-3 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white" @click="applyWheelSpringRate()">套用升級後彈簧率到預測</button>
-                      <button class="text-[10px] px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300" @click="resetWheelUpgrade()">恢復 OEM</button>
+                      <button class="text-[10px] px-3 py-1 rounded bg-sky-600 hover:bg-sky-500 text-white" @click="applyWheelSpringRate()" x-text="t('btn.applyUpgradeSpring')"></button>
+                      <button class="text-[10px] px-3 py-1 rounded bg-slate-700 hover:bg-slate-600 text-slate-300" @click="resetWheelUpgrade()" x-text="t('btn.restoreOem')"></button>
                     </div>
                   </div>
                 </div>
@@ -394,49 +401,49 @@ canvas{max-height:300px}
 
         <!-- Tier 1: Simple tire selector -->
         <div x-show="tier === 1" x-transition>
-          <div class="section-title"><span class="badge badge-p">輪胎</span> 快速選擇</div>
+          <div class="section-title"><span class="badge badge-p" x-text="t('badge.tire')"></span> <span x-text="t('sec.tireQuick')"></span></div>
           <div class="mb-2">
             <div class="flex items-center gap-2 mb-1">
-              <label class="text-xs text-slate-400">輪胎型號</label>
-              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300" @click="tire.sameFrontRear=!tire.sameFrontRear" x-text="tire.sameFrontRear?'前後相同':'前後不同'"></button>
+              <label class="text-xs text-slate-400" x-text="t('lbl.tireModel')"></label>
+              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300" @click="tire.sameFrontRear=!tire.sameFrontRear" x-text="tire.sameFrontRear?t('lbl.sameFR'):t('lbl.diffFR')"></button>
             </div>
             <div :class="tire.sameFrontRear?'':'grid-2'">
               <div>
-                <label x-show="!tire.sameFrontRear" class="text-[10px] text-slate-500">前輪</label>
+                <label x-show="!tire.sameFrontRear" class="text-[10px] text-slate-500" x-text="t('lbl.front')"></label>
                 <select x-model="tire.front_compound" @change="onTireSelect('front')" class="w-full mt-0.5 text-xs">
                   <optgroup label="── Semi-Slick ──">
                     <template x-for="t in tireOptions.filter(t=>t.category==='semi_slick')" :key="t.id">
-                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                      <option :value="t.id" x-text="nm(t) + ' (' + t.treadwear + 'TW)'"></option>
                     </template>
                   </optgroup>
                   <optgroup label="── Sport ──">
                     <template x-for="t in tireOptions.filter(t=>t.category==='sport')" :key="t.id">
-                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                      <option :value="t.id" x-text="nm(t) + ' (' + t.treadwear + 'TW)'"></option>
                     </template>
                   </optgroup>
                   <optgroup label="── Race ──">
                     <template x-for="t in tireOptions.filter(t=>t.category==='race')" :key="t.id">
-                      <option :value="t.id" x-text="t.name_zh"></option>
+                      <option :value="t.id" x-text="nm(t)"></option>
                     </template>
                   </optgroup>
                 </select>
               </div>
               <div x-show="!tire.sameFrontRear">
-                <label class="text-[10px] text-slate-500">後輪</label>
+                <label class="text-[10px] text-slate-500" x-text="t('lbl.rear')"></label>
                 <select x-model="tire.rear_compound" @change="onTireSelect('rear')" class="w-full mt-0.5 text-xs">
                   <optgroup label="── Semi-Slick ──">
                     <template x-for="t in tireOptions.filter(t=>t.category==='semi_slick')" :key="t.id">
-                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                      <option :value="t.id" x-text="nm(t) + ' (' + t.treadwear + 'TW)'"></option>
                     </template>
                   </optgroup>
                   <optgroup label="── Sport ──">
                     <template x-for="t in tireOptions.filter(t=>t.category==='sport')" :key="t.id">
-                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                      <option :value="t.id" x-text="nm(t) + ' (' + t.treadwear + 'TW)'"></option>
                     </template>
                   </optgroup>
                   <optgroup label="── Race ──">
                     <template x-for="t in tireOptions.filter(t=>t.category==='race')" :key="t.id">
-                      <option :value="t.id" x-text="t.name_zh"></option>
+                      <option :value="t.id" x-text="nm(t)"></option>
                     </template>
                   </optgroup>
                 </select>
@@ -454,7 +461,7 @@ canvas{max-height:300px}
 
         <!-- Tier 2+: Full tire controls -->
         <div x-show="tier >= 2" x-transition>
-          <div class="section-title"><span class="badge badge-p">Tier 2</span> 輪胎條件（詳細）</div>
+          <div class="section-title"><span class="badge badge-p">Tier 2</span> <span x-text="t('sec.t2')"></span></div>
           <div class="grid-4 text-sm mb-2">
             <div class="text-center text-xs text-slate-500">FL</div>
             <div class="text-center text-xs text-slate-500">FR</div>
@@ -469,7 +476,7 @@ canvas{max-height:300px}
             <input type="number" x-model.number="tire.rr_temp" class="text-center">
           </div>
           <div class="flex items-center gap-2 mb-1">
-            <span class="text-xs text-slate-400">胎壓</span>
+            <span class="text-xs text-slate-400" x-text="t('lbl.pressure')"></span>
             <div class="flex rounded overflow-hidden border border-white/10 text-[10px]">
               <button class="px-2 py-0.5 transition-colors" :class="pressureUnit==='psi'?'bg-sky-500 text-white':'text-slate-400'" @click="switchPressureUnit('psi')">PSI</button>
               <button class="px-2 py-0.5 transition-colors" :class="pressureUnit==='bar'?'bg-sky-500 text-white':'text-slate-400'" @click="switchPressureUnit('bar')">bar</button>
@@ -485,26 +492,26 @@ canvas{max-height:300px}
           <!-- Tire selector -->
           <div class="mb-2">
             <div class="flex items-center gap-2 mb-1">
-              <label class="text-xs text-slate-400">輪胎型號</label>
-              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300" @click="tire.sameFrontRear=!tire.sameFrontRear" x-text="tire.sameFrontRear?'前後相同':'前後不同'"></button>
+              <label class="text-xs text-slate-400" x-text="t('lbl.tireModel')"></label>
+              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-700 text-slate-300" @click="tire.sameFrontRear=!tire.sameFrontRear" x-text="tire.sameFrontRear?t('lbl.sameFR'):t('lbl.diffFR')"></button>
             </div>
             <div :class="tire.sameFrontRear?'':'grid-2'">
               <div>
-                <label x-show="!tire.sameFrontRear" class="text-[10px] text-slate-500">前輪</label>
+                <label x-show="!tire.sameFrontRear" class="text-[10px] text-slate-500" x-text="t('lbl.front')"></label>
                 <select x-model="tire.front_compound" @change="onTireSelect('front')" class="w-full mt-0.5 text-xs">
                   <optgroup label="── 賽道日性能胎 Semi-Slick ──">
                     <template x-for="t in tireOptions.filter(t=>t.category==='semi_slick')" :key="t.id">
-                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                      <option :value="t.id" x-text="nm(t) + ' (' + t.treadwear + 'TW)'"></option>
                     </template>
                   </optgroup>
                   <optgroup label="── 高性能街胎 Sport ──">
                     <template x-for="t in tireOptions.filter(t=>t.category==='sport')" :key="t.id">
-                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                      <option :value="t.id" x-text="nm(t) + ' (' + t.treadwear + 'TW)'"></option>
                     </template>
                   </optgroup>
                   <optgroup label="── 賽車光頭胎 Race ──">
                     <template x-for="t in tireOptions.filter(t=>t.category==='race')" :key="t.id">
-                      <option :value="t.id" x-text="t.name_zh"></option>
+                      <option :value="t.id" x-text="nm(t)"></option>
                     </template>
                   </optgroup>
                   <optgroup label="── 通用配方 (舊版) ──">
@@ -513,21 +520,21 @@ canvas{max-height:300px}
                 </select>
               </div>
               <div x-show="!tire.sameFrontRear">
-                <label class="text-[10px] text-slate-500">後輪</label>
+                <label class="text-[10px] text-slate-500" x-text="t('lbl.rear')"></label>
                 <select x-model="tire.rear_compound" @change="onTireSelect('rear')" class="w-full mt-0.5 text-xs">
                   <optgroup label="── 賽道日性能胎 Semi-Slick ──">
                     <template x-for="t in tireOptions.filter(t=>t.category==='semi_slick')" :key="t.id">
-                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                      <option :value="t.id" x-text="nm(t) + ' (' + t.treadwear + 'TW)'"></option>
                     </template>
                   </optgroup>
                   <optgroup label="── 高性能街胎 Sport ──">
                     <template x-for="t in tireOptions.filter(t=>t.category==='sport')" :key="t.id">
-                      <option :value="t.id" x-text="t.name_zh + ' (' + t.treadwear + 'TW)'"></option>
+                      <option :value="t.id" x-text="nm(t) + ' (' + t.treadwear + 'TW)'"></option>
                     </template>
                   </optgroup>
                   <optgroup label="── 賽車光頭胎 Race ──">
                     <template x-for="t in tireOptions.filter(t=>t.category==='race')" :key="t.id">
-                      <option :value="t.id" x-text="t.name_zh"></option>
+                      <option :value="t.id" x-text="nm(t)"></option>
                     </template>
                   </optgroup>
                   <optgroup label="── 通用配方 (舊版) ──">
@@ -548,18 +555,18 @@ canvas{max-height:300px}
           <!-- Tire width -->
           <div class="grid-2 mb-1">
             <div>
-              <label class="text-xs text-slate-400">前胎寬 (mm)</label>
+              <label class="text-xs text-slate-400" x-text="t('lbl.fWidth')"></label>
               <select x-model.number="tire.front_tire_width" class="w-full mt-1 text-xs">
-                <option value="0">-- 不指定 --</option>
+                <option value="0" x-text="t('opt.none')"></option>
                 <template x-for="w in availableWidthsFront" :key="w">
                   <option :value="w" x-text="w + ' mm'"></option>
                 </template>
               </select>
             </div>
             <div>
-              <label class="text-xs text-slate-400">後胎寬 (mm)</label>
+              <label class="text-xs text-slate-400" x-text="t('lbl.rWidth')"></label>
               <select x-model.number="tire.rear_tire_width" class="w-full mt-1 text-xs">
-                <option value="0">-- 不指定 --</option>
+                <option value="0" x-text="t('opt.none')"></option>
                 <template x-for="w in availableWidthsRear" :key="w">
                   <option :value="w" x-text="w + ' mm'"></option>
                 </template>
@@ -595,15 +602,15 @@ canvas{max-height:300px}
               <!-- Step 2: How many laps / ambient -->
               <div class="grid grid-cols-3 gap-2 mb-3 text-xs">
                 <div>
-                  <label class="text-slate-400">跑了幾圈</label>
+                  <label class="text-slate-400" x-text="t('lbl.laps')"></label>
                   <input type="number" x-model.number="tpm.laps" class="w-full mt-1 text-center" min="0" step="1">
                 </div>
                 <div>
-                  <label class="text-slate-400">外氣溫 (°C)</label>
+                  <label class="text-slate-400" x-text="t('lbl.ambient')"></label>
                   <input type="number" x-model.number="tpm.ambient_temp" class="w-full mt-1 text-center" step="1">
                 </div>
                 <div>
-                  <label class="text-slate-400">路面溫度 (°C)</label>
+                  <label class="text-slate-400" x-text="t('lbl.trackTemp')"></label>
                   <input type="number" x-model.number="tpm.track_temp" class="w-full mt-1 text-center" step="1">
                 </div>
               </div>
@@ -631,7 +638,7 @@ canvas{max-height:300px}
                   </div>
                 </div>
               </div>
-              <button class="btn btn-sm w-full" style="background:var(--pink);color:#0f172a" @click="analyzePressure()">分析胎壓</button>
+              <button class="btn btn-sm w-full" style="background:var(--pink);color:#0f172a" @click="analyzePressure()" x-text="t('btn.analyzePressure')"></button>
 
               <!-- Analysis results -->
               <div x-show="tpm.result" x-transition class="mt-3 space-y-2">
@@ -664,7 +671,7 @@ canvas{max-height:300px}
                   <div class="text-xs px-2 py-1.5 rounded" style="background:rgba(244,114,182,.06);border:1px solid rgba(244,114,182,.12)" x-text="msg"></div>
                 </template>
                 <!-- Apply hot pressure to prediction -->
-                <button class="btn btn-sm w-full mt-1" style="background:var(--accent);color:#0f172a" @click="applyHotPressure()">將熱胎壓套用至預測</button>
+                <button class="btn btn-sm w-full mt-1" style="background:var(--accent);color:#0f172a" @click="applyHotPressure()" x-text="t('btn.applyHotPressure')"></button>
               </div>
             </div>
           </div>
@@ -672,10 +679,10 @@ canvas{max-height:300px}
 
         <!-- Tier 3: Advanced -->
         <div x-show="tier >= 3" x-transition>
-          <div class="section-title"><span class="badge badge-g">Tier 3</span> 四角重量 / 空力 / Damper / 幾何</div>
+          <div class="section-title"><span class="badge badge-g">Tier 3</span> <span x-text="t('sec.t3')"></span></div>
 
           <!-- Corner weights -->
-          <div class="text-xs text-slate-400 mb-1">四角重量 (kg)</div>
+          <div class="text-xs text-slate-400 mb-1" x-text="t('lbl.cornerWeight')"></div>
           <div class="grid-4 mb-3">
             <div class="text-center"><input type="number" x-model.number="adv.fl_weight" class="w-full text-center" step="0.5"><div class="text-[10px] text-slate-500">FL</div></div>
             <div class="text-center"><input type="number" x-model.number="adv.fr_weight" class="w-full text-center" step="0.5"><div class="text-[10px] text-slate-500">FR</div></div>
@@ -685,47 +692,47 @@ canvas{max-height:300px}
 
           <!-- Aero -->
           <div class="grid-2 mb-3 text-sm">
-            <div><label class="text-xs text-slate-400">車速 (km/h)</label><input type="number" x-model.number="adv.speed_kmh" class="w-full mt-1"></div>
-            <div><label class="text-xs text-slate-400">投影面積 (m²)</label><input type="number" x-model.number="adv.frontal_area" class="w-full mt-1" step="0.1"></div>
-            <div><label class="text-xs text-slate-400">前下壓力係數 CzF</label><input type="number" x-model.number="adv.front_downforce_coeff" class="w-full mt-1" step="0.1"></div>
-            <div><label class="text-xs text-slate-400">後下壓力係數 CzR</label><input type="number" x-model.number="adv.rear_downforce_coeff" class="w-full mt-1" step="0.1"></div>
+            <div><label class="text-xs text-slate-400" x-text="t('lbl.speed')"></label><input type="number" x-model.number="adv.speed_kmh" class="w-full mt-1"></div>
+            <div><label class="text-xs text-slate-400" x-text="t('lbl.area')"></label><input type="number" x-model.number="adv.frontal_area" class="w-full mt-1" step="0.1"></div>
+            <div><label class="text-xs text-slate-400" x-text="t('lbl.czf')"></label><input type="number" x-model.number="adv.front_downforce_coeff" class="w-full mt-1" step="0.1"></div>
+            <div><label class="text-xs text-slate-400" x-text="t('lbl.czr')"></label><input type="number" x-model.number="adv.rear_downforce_coeff" class="w-full mt-1" step="0.1"></div>
           </div>
 
           <!-- Damper (hide when street mode has its own damper section) -->
           <div x-show="!streetMode || !streetCar || !streetCarDetail?.damper_adjustable" class="mb-3">
             <div class="grid-4 text-sm">
-              <div><label class="text-xs text-slate-400">前 Bump (kgf)</label><input type="number" x-model.number="adv.front_bump_force" class="w-full mt-1"></div>
-              <div><label class="text-xs text-slate-400">前 Rebound</label><input type="number" x-model.number="adv.front_rebound_force" class="w-full mt-1"></div>
-              <div><label class="text-xs text-slate-400">後 Bump (kgf)</label><input type="number" x-model.number="adv.rear_bump_force" class="w-full mt-1"></div>
-              <div><label class="text-xs text-slate-400">後 Rebound</label><input type="number" x-model.number="adv.rear_rebound_force" class="w-full mt-1"></div>
+              <div><label class="text-xs text-slate-400" x-text="t('lbl.fBump')"></label><input type="number" x-model.number="adv.front_bump_force" class="w-full mt-1"></div>
+              <div><label class="text-xs text-slate-400" x-text="t('lbl.fReb')"></label><input type="number" x-model.number="adv.front_rebound_force" class="w-full mt-1"></div>
+              <div><label class="text-xs text-slate-400" x-text="t('lbl.rBump')"></label><input type="number" x-model.number="adv.rear_bump_force" class="w-full mt-1"></div>
+              <div><label class="text-xs text-slate-400" x-text="t('lbl.rReb')"></label><input type="number" x-model.number="adv.rear_rebound_force" class="w-full mt-1"></div>
             </div>
             <div class="text-[10px] text-slate-500 mt-1">阻尼力參考速度 <input type="number" x-model.number="adv.damper_ref_speed" step="0.1" min="0.05" max="1" class="w-14 inline-block"> m/s（規格表常見 0.1–0.3 m/s）</div>
           </div>
 
           <!-- Geometry -->
           <div class="grid-4 text-sm">
-            <div><label class="text-xs text-slate-400">前 Camber (°)</label><input type="number" x-model.number="adv.front_camber_deg" class="w-full mt-1" step="0.1"></div>
-            <div><label class="text-xs text-slate-400">後 Camber (°)</label><input type="number" x-model.number="adv.rear_camber_deg" class="w-full mt-1" step="0.1"></div>
-            <div><label class="text-xs text-slate-400">前 Toe (°，+ = Toe-in)</label><input type="number" x-model.number="adv.front_toe_deg" class="w-full mt-1" step="0.1"></div>
-            <div><label class="text-xs text-slate-400">後 Toe (°，+ = Toe-in)</label><input type="number" x-model.number="adv.rear_toe_deg" class="w-full mt-1" step="0.1"></div>
+            <div><label class="text-xs text-slate-400" x-text="t('lbl.fCamber')"></label><input type="number" x-model.number="adv.front_camber_deg" class="w-full mt-1" step="0.1"></div>
+            <div><label class="text-xs text-slate-400" x-text="t('lbl.rCamber')"></label><input type="number" x-model.number="adv.rear_camber_deg" class="w-full mt-1" step="0.1"></div>
+            <div><label class="text-xs text-slate-400" x-text="t('lbl.fToe')"></label><input type="number" x-model.number="adv.front_toe_deg" class="w-full mt-1" step="0.1"></div>
+            <div><label class="text-xs text-slate-400" x-text="t('lbl.rToe')"></label><input type="number" x-model.number="adv.rear_toe_deg" class="w-full mt-1" step="0.1"></div>
           </div>
 
           <!-- Longitudinal G-force -->
           <div class="grid-2 mt-3 text-sm">
-            <div><label class="text-xs text-slate-400">煞車 G 力</label><input type="number" x-model.number="adv.braking_g" class="w-full mt-1" step="0.1" min="0" max="3"></div>
-            <div><label class="text-xs text-slate-400">加速 G 力</label><input type="number" x-model.number="adv.accel_g" class="w-full mt-1" step="0.1" min="0" max="2"></div>
+            <div><label class="text-xs text-slate-400" x-text="t('lbl.brakeG')"></label><input type="number" x-model.number="adv.braking_g" class="w-full mt-1" step="0.1" min="0" max="3"></div>
+            <div><label class="text-xs text-slate-400" x-text="t('lbl.accelG')"></label><input type="number" x-model.number="adv.accel_g" class="w-full mt-1" step="0.1" min="0" max="2"></div>
           </div>
           <div class="text-[10px] text-slate-500 mt-1">輸入煞車/加速 G 力計算縱向荷重轉移（0 = 不計算）</div>
         </div>
 
         <div class="flex gap-2 mt-2">
-          <button class="btn btn-primary flex-1" @click="runPrediction()">計算預測</button>
-          <button class="btn flex-1" style="background:var(--yellow);color:#0f172a" @click="setBaseline()" :disabled="!result" x-text="baseline ? '重新歸零' : '歸零 (設基準)'"></button>
+          <button class="btn btn-primary flex-1" @click="runPrediction()" x-text="t('btn.calc')"></button>
+          <button class="btn flex-1" style="background:var(--yellow);color:#0f172a" @click="setBaseline()" :disabled="!result" x-text="baseline ? t('btn.reBaseline') : t('btn.setBaseline')"></button>
         </div>
         <div x-show="baseline" class="mt-2 text-xs px-3 py-2 rounded-lg" style="background:rgba(250,204,21,.08);border:1px solid rgba(250,204,21,.15)">
           <div class="flex items-center justify-between">
             <span class="text-yellow-300 font-semibold">基準已鎖定</span>
-            <button class="text-slate-400 hover:text-red-400 text-xs" @click="clearBaseline()">清除基準</button>
+            <button class="text-slate-400 hover:text-red-400 text-xs" @click="clearBaseline()" x-text="t('btn.clearBaseline')"></button>
           </div>
           <div class="text-slate-400 mt-1" x-text="'Tier ' + baseline?.tier + ' | USG 基準: ' + (baseline?.baselineUSG?.toFixed(2) ?? '?')"></div>
         </div>
@@ -737,7 +744,7 @@ canvas{max-height:300px}
           <!-- Delta display (when baseline is set) -->
           <div x-show="baseline && deltaResult" class="card2 p-4 mb-4" style="background:rgba(250,204,21,.06);border:1px solid rgba(250,204,21,.15)">
             <div class="text-center">
-              <div class="text-xs text-yellow-400 mb-1">相對基準變化</div>
+              <div class="text-xs text-yellow-400 mb-1" x-text="t('res.deltaBaseline')"></div>
               <div class="text-2xl font-bold" :class="deltaResult?.delta_us > 1.5 ? 'text-red-400' : deltaResult?.delta_us < -1.5 ? 'text-sky-400' : 'text-green-400'">
                 <span x-text="deltaResult?.delta_tendency_zh"></span>
               </div>
@@ -780,17 +787,17 @@ canvas{max-height:300px}
             <!-- Tier 3: entry / steady / exit -->
             <div x-show="tier===3 && result?.prediction" class="grid grid-cols-3 gap-3 mt-4">
               <div class="card2 p-3 text-center">
-                <div class="text-xs text-slate-500 mb-1">入彎 Turn-In</div>
+                <div class="text-xs text-slate-500 mb-1" x-text="t('res.entry')"></div>
                 <div class="font-bold text-sm" :class="tendencyColor(result?.prediction?.turn_entry?.tendency)" x-text="result?.prediction?.turn_entry?.tendency_zh"></div>
                 <div class="text-xs text-slate-500" x-text="result?.prediction?.turn_entry?.understeer_gradient"></div>
               </div>
               <div class="card2 p-3 text-center">
-                <div class="text-xs text-slate-500 mb-1">定常 Steady</div>
+                <div class="text-xs text-slate-500 mb-1" x-text="t('res.steady')"></div>
                 <div class="font-bold text-sm" :class="tendencyColor(result?.prediction?.steady_state?.tendency)" x-text="result?.prediction?.steady_state?.tendency_zh"></div>
                 <div class="text-xs text-slate-500" x-text="result?.prediction?.steady_state?.understeer_gradient"></div>
               </div>
               <div class="card2 p-3 text-center">
-                <div class="text-xs text-slate-500 mb-1">出彎 Exit</div>
+                <div class="text-xs text-slate-500 mb-1" x-text="t('res.exit')"></div>
                 <div class="font-bold text-sm" :class="tendencyColor(result?.prediction?.turn_exit?.tendency)" x-text="result?.prediction?.turn_exit?.tendency_zh"></div>
                 <div class="text-xs text-slate-500" x-text="result?.prediction?.turn_exit?.understeer_gradient"></div>
               </div>
@@ -801,14 +808,14 @@ canvas{max-height:300px}
           <div x-show="lihpaoResult && !lihpaoResult.error" class="card2 p-4 mb-4" style="background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.18)">
             <div class="flex items-center justify-between mb-2">
               <div class="text-xs text-sky-300 font-semibold">🏁 麗寶 G2 單圈預測（此設定）</div>
-              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-600 text-slate-300 hover:bg-slate-500" @click="currentTab='lihpao'">逐圈詳情 →</button>
+              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-600 text-slate-300 hover:bg-slate-500" @click="currentTab='lihpao'" x-text="t('btn.lapDetail')"></button>
             </div>
             <template x-if="lihpaoResult">
               <div>
                 <div class="grid grid-cols-3 gap-2 mb-2">
                   <div class="text-center"><div class="text-xl font-bold text-sky-300" x-text="lihpaoResult.fastest_time_str"></div><div class="text-[10px] text-slate-500">最快單圈（第<span x-text="lihpaoResult.fastest_lap"></span>圈）</div></div>
                   <div class="text-center"><div class="text-xl font-bold text-pink-300" x-text="lihpaoResult.sweet_pressure_lap ? '第'+lihpaoResult.sweet_pressure_lap+'圈' : '未達'"></div><div class="text-[10px] text-slate-500" x-text="lihpaoResult.sweet_pressure_lap ? '胎壓甜蜜點' : '胎壓未進窗口'"></div></div>
-                  <div class="text-center"><div class="text-xl font-bold text-green-400" x-text="lihpaoResult.recommended_cold_pressure_bar"></div><div class="text-[10px] text-slate-500">建議冷胎壓 bar</div></div>
+                  <div class="text-center"><div class="text-xl font-bold text-green-400" x-text="lihpaoResult.recommended_cold_pressure_bar"></div><div class="text-[10px] text-slate-500" x-text="t('res.recCold')"></div></div>
                 </div>
                 <div class="text-[10px] text-slate-500 text-center" x-text="'峰值抓地第'+lihpaoResult.peak_grip_lap+'圈 · μ '+lihpaoResult.inputs.base_mu+' · '+lihpaoResult.inputs.power_kw+'kW '+lihpaoResult.inputs.drivetrain+' · '+lihpaoResult.inputs.dry_mass_kg+'kg · 胎 '+tire.front_compound"></div>
                 <div class="text-[10px] text-amber-400/70 text-center mt-1">絕對圈速依輸入規格(馬力可在麗寶分頁調整)；紀錄車多為大改</div>
@@ -836,7 +843,7 @@ canvas{max-height:300px}
 
           <!-- Tire grip (all tiers now have tire data) -->
           <div x-show="result?.tire_grip" class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2">輪胎抓地力</div>
+            <div class="text-xs text-slate-400 mb-2" x-text="t('res.tireGrip')"></div>
             <div class="grid-4">
               <div class="corner-box"><div class="val" :class="gripColor(result?.tire_grip?.fl)" x-text="(result?.tire_grip?.fl*100).toFixed(1)+'%'"></div><div class="lbl">FL</div></div>
               <div class="corner-box"><div class="val" :class="gripColor(result?.tire_grip?.fr)" x-text="(result?.tire_grip?.fr*100).toFixed(1)+'%'"></div><div class="lbl">FR</div></div>
@@ -856,18 +863,18 @@ canvas{max-height:300px}
 
           <!-- Ride Quality (all tiers) -->
           <div x-show="result?.ride_frequency || result?.mechanical?.ride_frequency" class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2">懸吊固有頻率 Ride Frequency</div>
+            <div class="text-xs text-slate-400 mb-2" x-text="t('res.rideFreq')"></div>
             <template x-if="(result?.ride_frequency || result?.mechanical?.ride_frequency)">
               <div>
                 <div class="grid-2 mb-2">
                   <div class="corner-box">
                     <div class="val text-sky-300" x-text="(result?.ride_frequency || result?.mechanical?.ride_frequency)?.front_hz + ' Hz'"></div>
-                    <div class="lbl">前軸</div>
+                    <div class="lbl" x-text="t('res.frontAxle')"></div>
                     <div class="text-[10px] mt-1" :class="{'text-green-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.front_category==='street','text-yellow-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.front_category==='track','text-red-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.front_category==='race','text-slate-500': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.front_category==='comfort'}" x-text="({'comfort':'舒適','street':'街道','track':'賽道','race':'競技'})[(result?.ride_frequency || result?.mechanical?.ride_frequency)?.front_category]"></div>
                   </div>
                   <div class="corner-box">
                     <div class="val text-pink-300" x-text="(result?.ride_frequency || result?.mechanical?.ride_frequency)?.rear_hz + ' Hz'"></div>
-                    <div class="lbl">後軸</div>
+                    <div class="lbl" x-text="t('res.rearAxle')"></div>
                     <div class="text-[10px] mt-1" :class="{'text-green-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.rear_category==='street','text-yellow-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.rear_category==='track','text-red-400': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.rear_category==='race','text-slate-500': (result?.ride_frequency || result?.mechanical?.ride_frequency)?.rear_category==='comfort'}" x-text="({'comfort':'舒適','street':'街道','track':'賽道','race':'競技'})[(result?.ride_frequency || result?.mechanical?.ride_frequency)?.rear_category]"></div>
                   </div>
                 </div>
@@ -882,7 +889,7 @@ canvas{max-height:300px}
 
           <!-- LLTD Decomposition (all tiers) -->
           <div x-show="result?.lltd_decomposed || result?.mechanical?.lltd_decomposed" class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2">LLTD 分解（幾何 vs 彈性）</div>
+            <div class="text-xs text-slate-400 mb-2" x-text="t('res.lltd')"></div>
             <template x-if="(result?.lltd_decomposed || result?.mechanical?.lltd_decomposed)">
               <div>
                 <div class="text-xs text-slate-500 mb-1">幾何轉移佔比: <span class="font-mono text-slate-300" x-text="(result?.lltd_decomposed || result?.mechanical?.lltd_decomposed)?.geometric_pct_of_total + '%'"></span></div>
@@ -906,16 +913,16 @@ canvas{max-height:300px}
 
           <!-- Damping Analysis (Tier 3) -->
           <div x-show="tier === 3 && result?.damping" class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2">阻尼分析 Damping</div>
+            <div class="text-xs text-slate-400 mb-2" x-text="t('res.damping')"></div>
             <div class="grid-2 mb-2">
               <div class="corner-box">
                 <div class="val" :class="{'text-green-400': result?.damping?.front_category==='street','text-yellow-400': result?.damping?.front_category==='track','text-red-400': result?.damping?.front_category==='race','text-slate-400': result?.damping?.front_category==='underdamped'}" x-text="result?.damping?.front_ratio"></div>
-                <div class="lbl">前 ζ</div>
+                <div class="lbl" x-text="t('res.fZeta')"></div>
                 <div class="text-[10px] mt-1" :class="{'text-green-400': result?.damping?.front_category==='street','text-yellow-400': result?.damping?.front_category==='track','text-red-400': result?.damping?.front_category==='race','text-slate-500': result?.damping?.front_category==='underdamped'}" x-text="({'underdamped':'欠阻尼','street':'街道','track':'賽道','race':'競技'})[result?.damping?.front_category]"></div>
               </div>
               <div class="corner-box">
                 <div class="val" :class="{'text-green-400': result?.damping?.rear_category==='street','text-yellow-400': result?.damping?.rear_category==='track','text-red-400': result?.damping?.rear_category==='race','text-slate-400': result?.damping?.rear_category==='underdamped'}" x-text="result?.damping?.rear_ratio"></div>
-                <div class="lbl">後 ζ</div>
+                <div class="lbl" x-text="t('res.rZeta')"></div>
                 <div class="text-[10px] mt-1" :class="{'text-green-400': result?.damping?.rear_category==='street','text-yellow-400': result?.damping?.rear_category==='track','text-red-400': result?.damping?.rear_category==='race','text-slate-500': result?.damping?.rear_category==='underdamped'}" x-text="({'underdamped':'欠阻尼','street':'街道','track':'賽道','race':'競技'})[result?.damping?.rear_category]"></div>
               </div>
             </div>
@@ -925,9 +932,9 @@ canvas{max-height:300px}
 
           <!-- Longitudinal Transfer (Tier 3) -->
           <div x-show="tier === 3 && result?.longitudinal_transfer && (result?.longitudinal_transfer?.braking || result?.longitudinal_transfer?.acceleration)" class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2">縱向荷重轉移</div>
+            <div class="text-xs text-slate-400 mb-2" x-text="t('res.longTransfer')"></div>
             <div x-show="result?.longitudinal_transfer?.braking" class="mb-2">
-              <div class="text-xs text-slate-500 mb-1">煞車</div>
+              <div class="text-xs text-slate-500 mb-1" x-text="t('res.brake')"></div>
               <div class="flex items-center gap-2">
                 <span class="text-xs w-14 text-right text-sky-400" x-text="'F ' + result?.longitudinal_transfer?.braking?.front_pct + '%'"></span>
                 <div class="flex-1 h-4 rounded overflow-hidden flex">
@@ -939,7 +946,7 @@ canvas{max-height:300px}
               <div class="text-[10px] text-slate-500 mt-1" x-text="'轉移量: ' + result?.longitudinal_transfer?.braking?.transfer_kg + ' kg'"></div>
             </div>
             <div x-show="result?.longitudinal_transfer?.acceleration">
-              <div class="text-xs text-slate-500 mb-1">加速</div>
+              <div class="text-xs text-slate-500 mb-1" x-text="t('res.accel')"></div>
               <div class="flex items-center gap-2">
                 <span class="text-xs w-14 text-right text-sky-400" x-text="'F ' + result?.longitudinal_transfer?.acceleration?.front_pct + '%'"></span>
                 <div class="flex-1 h-4 rounded overflow-hidden flex">
@@ -954,15 +961,15 @@ canvas{max-height:300px}
 
           <!-- Vehicle Dynamics (Tier 3) -->
           <div x-show="tier === 3 && result?.dynamics" class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2">車輛動態 Vehicle Dynamics</div>
+            <div class="text-xs text-slate-400 mb-2" x-text="t('res.vehDyn')"></div>
             <div class="grid-2 text-xs mb-2">
               <div class="corner-box">
                 <div class="val text-sky-300" x-text="result?.dynamics?.slip_angle_front_deg + '°'"></div>
-                <div class="lbl">前軸 Slip Angle @1g</div>
+                <div class="lbl" x-text="t('res.fSlip')"></div>
               </div>
               <div class="corner-box">
                 <div class="val text-pink-300" x-text="result?.dynamics?.slip_angle_rear_deg + '°'"></div>
-                <div class="lbl">後軸 Slip Angle @1g</div>
+                <div class="lbl" x-text="t('res.rSlip')"></div>
               </div>
             </div>
             <div class="text-xs text-slate-500 mb-1">
@@ -985,7 +992,7 @@ canvas{max-height:300px}
 
           <!-- Tier 3: Contribution breakdown -->
           <div x-show="tier === 3 && result?.contribution" class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2">各因素貢獻（正=US / 負=OS）</div>
+            <div class="text-xs text-slate-400 mb-2" x-text="t('res.contrib')"></div>
             <canvas id="contributionChart" height="180"></canvas>
           </div>
 
@@ -1018,11 +1025,11 @@ canvas{max-height:300px}
           <!-- Tier 3: Corner Weight Diagram + G-G Diagram -->
           <div x-show="tier === 3 && result" class="grid-2 mb-4" x-init="$watch('result', () => { if(tier===3 && result){ $nextTick(()=>{drawCornerWeight();drawGGDiagram()}) } })">
             <div class="card2 p-4" x-show="result?.corner_weight">
-              <div class="text-xs text-slate-400 mb-2">重量分佈俯視圖</div>
+              <div class="text-xs text-slate-400 mb-2" x-text="t('res.weightTop')"></div>
               <canvas id="cwCanvas" width="240" height="200" style="display:block;margin:0 auto"></canvas>
             </div>
             <div class="card2 p-4">
-              <div class="text-xs text-slate-400 mb-2">G-G 摩擦圓</div>
+              <div class="text-xs text-slate-400 mb-2" x-text="t('res.gg')"></div>
               <canvas id="ggChart" height="200"></canvas>
             </div>
           </div>
@@ -1034,8 +1041,8 @@ canvas{max-height:300px}
         </div>
 
         <div x-show="!result" class="text-center text-slate-500 py-20">
-          <div class="text-lg mb-2">輸入參數後按「計算預測」</div>
-          <div class="text-xs">系統將根據你選擇的 Tier 層級計算轉向趨勢</div>
+          <div class="text-lg mb-2" x-text="t('ph.calc')"></div>
+          <div class="text-xs" x-text="t('ph.calcSub')"></div>
         </div>
       </div>
     </div>
@@ -1045,7 +1052,7 @@ canvas{max-height:300px}
 <!-- ==================== TAB: 調校建議 ==================== -->
 <div x-show="currentTab==='advisor'" x-transition>
   <div class="flex items-center justify-between mb-4">
-    <h2 class="text-xl font-bold">調校建議 Setup Advisor</h2>
+    <h2 class="text-xl font-bold" x-text="t('h2.advisor')"></h2>
     <button class="btn btn-primary" @click="runAdvisor()" :disabled="!result">
       <span x-show="!result" class="text-xs">請先在「轉向預測」計算結果</span>
       <span x-show="result">從預測結果分析</span>
@@ -1113,31 +1120,31 @@ canvas{max-height:300px}
 
 <!-- ==================== TAB: 彈簧計算器 ==================== -->
 <div x-show="currentTab==='spring'" x-transition>
-  <h2 class="text-xl font-bold mb-4">彈簧計算器 Spring Calculator</h2>
+  <h2 class="text-xl font-bold mb-4" x-text="t('h2.spring')"></h2>
 
   <div class="grid-2">
     <!-- Left: Frequency ↔ Spring Rate -->
     <div class="card p-5">
-      <div class="section-title">頻率 ↔ 彈簧率互算</div>
+      <div class="section-title" x-text="t('sec.freqSpring')"></div>
 
       <!-- Mode toggle -->
       <div class="flex rounded-lg overflow-hidden border border-white/10 mb-4">
-        <button class="flex-1 px-3 py-2 text-xs font-semibold transition-colors" :class="springCalc.mode==='freq_to_spring'?'bg-sky-500 text-white':'bg-transparent text-slate-400'" @click="springCalc.mode='freq_to_spring'">頻率 → 彈簧率</button>
-        <button class="flex-1 px-3 py-2 text-xs font-semibold transition-colors" :class="springCalc.mode==='spring_to_freq'?'bg-sky-500 text-white':'bg-transparent text-slate-400'" @click="springCalc.mode='spring_to_freq'">彈簧率 → 頻率</button>
+        <button class="flex-1 px-3 py-2 text-xs font-semibold transition-colors" :class="springCalc.mode==='freq_to_spring'?'bg-sky-500 text-white':'bg-transparent text-slate-400'" @click="springCalc.mode='freq_to_spring'" x-text="t('btn.freqToSpring')"></button>
+        <button class="flex-1 px-3 py-2 text-xs font-semibold transition-colors" :class="springCalc.mode==='spring_to_freq'?'bg-sky-500 text-white':'bg-transparent text-slate-400'" @click="springCalc.mode='spring_to_freq'" x-text="t('btn.springToFreq')"></button>
       </div>
 
       <!-- Inputs -->
       <div class="grid grid-cols-2 gap-3 mb-4">
         <div x-show="springCalc.mode==='freq_to_spring'">
-          <label class="text-[10px] text-slate-400 block mb-1">目標頻率 (Hz)</label>
+          <label class="text-[10px] text-slate-400 block mb-1" x-text="t('lbl.targetFreq')"></label>
           <input type="number" step="0.1" x-model.number="springCalc.target_hz" class="w-full">
         </div>
         <div x-show="springCalc.mode==='spring_to_freq'">
-          <label class="text-[10px] text-slate-400 block mb-1">彈簧率 (N/mm)</label>
+          <label class="text-[10px] text-slate-400 block mb-1" x-text="t('th.springRate')"></label>
           <input type="number" step="5" x-model.number="springCalc.spring_rate" class="w-full">
         </div>
         <div>
-          <label class="text-[10px] text-slate-400 block mb-1">角落質量 (kg)</label>
+          <label class="text-[10px] text-slate-400 block mb-1" x-text="t('lbl.cornerMass')"></label>
           <input type="number" step="5" x-model.number="springCalc.corner_mass" class="w-full">
         </div>
         <div>
@@ -1145,14 +1152,14 @@ canvas{max-height:300px}
           <input type="number" step="0.05" x-model.number="springCalc.motion_ratio" class="w-full">
         </div>
         <div>
-          <label class="text-[10px] text-slate-400 block mb-1">輪胎彈簧率 (N/mm)</label>
+          <label class="text-[10px] text-slate-400 block mb-1" x-text="t('lbl.tireSpring')"></label>
           <input type="number" step="10" x-model.number="springCalc.tire_spring_rate" class="w-full">
         </div>
       </div>
 
       <div class="flex gap-2 mb-4">
-        <button class="btn btn-primary" @click="runSpringCalc()">計算</button>
-        <button class="btn btn-sm bg-slate-600 text-slate-200" @click="loadFromPrediction()" x-show="result">從目前設定帶入</button>
+        <button class="btn btn-primary" @click="runSpringCalc()" x-text="t('btn.calcShort')"></button>
+        <button class="btn btn-sm bg-slate-600 text-slate-200" @click="loadFromPrediction()" x-show="result" x-text="t('btn.fromCurrent')"></button>
       </div>
 
       <!-- Result -->
@@ -1165,7 +1172,7 @@ canvas{max-height:300px}
               <div class="flex justify-between"><span class="text-xs text-slate-400">Wheel Rate</span><span class="text-sm font-mono" x-text="springCalcResult.wheel_rate+' N/mm'"></span></div>
               <div class="flex justify-between"><span class="text-xs text-slate-400">有效 Wheel Rate</span><span class="text-sm font-mono" x-text="springCalcResult.effective_wheel_rate+' N/mm'"></span></div>
               <div class="flex justify-between"><span class="text-xs text-slate-400">實際頻率</span><span class="text-sm font-mono" x-text="springCalcResult.frequency_hz+' Hz'"></span></div>
-              <div class="flex justify-between"><span class="text-xs text-slate-400">分類</span><span class="badge" :class="springCatBadge(springCalcResult.category)" x-text="springCatLabel(springCalcResult.category)"></span></div>
+              <div class="flex justify-between"><span class="text-xs text-slate-400" x-text="t('th.category')"></span><span class="badge" :class="springCatBadge(springCalcResult.category)" x-text="springCatLabel(springCalcResult.category)"></span></div>
             </div>
           </template>
           <template x-if="springCalc.mode==='spring_to_freq'">
@@ -1173,7 +1180,7 @@ canvas{max-height:300px}
               <div class="flex justify-between"><span class="text-xs text-slate-400">Ride Frequency</span><span class="text-lg font-bold text-sky-400" x-text="springCalcResult.frequency_hz+' Hz'"></span></div>
               <div class="flex justify-between"><span class="text-xs text-slate-400">Wheel Rate</span><span class="text-sm font-mono" x-text="springCalcResult.wheel_rate+' N/mm'"></span></div>
               <div class="flex justify-between"><span class="text-xs text-slate-400">有效 Wheel Rate</span><span class="text-sm font-mono" x-text="springCalcResult.effective_wheel_rate+' N/mm'"></span></div>
-              <div class="flex justify-between"><span class="text-xs text-slate-400">分類</span><span class="badge" :class="springCatBadge(springCalcResult.category)" x-text="springCatLabel(springCalcResult.category)"></span></div>
+              <div class="flex justify-between"><span class="text-xs text-slate-400" x-text="t('th.category')"></span><span class="badge" :class="springCatBadge(springCalcResult.category)" x-text="springCatLabel(springCalcResult.category)"></span></div>
             </div>
           </template>
         </div>
@@ -1182,39 +1189,39 @@ canvas{max-height:300px}
 
     <!-- Right: ARB Sizing -->
     <div class="card p-5">
-      <div class="section-title">ARB 防傾桿計算</div>
+      <div class="section-title" x-text="t('sec.arb')"></div>
       <div class="text-xs text-slate-500 mb-3">根據目標 Roll Gradient 反算所需防傾桿剛性</div>
 
       <div class="grid grid-cols-2 gap-3 mb-4">
         <div>
-          <label class="text-[10px] text-slate-400 block mb-1">目標 Roll Gradient (°/g)</label>
+          <label class="text-[10px] text-slate-400 block mb-1" x-text="t('lbl.targetRoll')"></label>
           <input type="number" step="0.1" x-model.number="arbCalc.target_roll_grad" class="w-full">
         </div>
         <div>
-          <label class="text-[10px] text-slate-400 block mb-1">前輪分配 (%)</label>
+          <label class="text-[10px] text-slate-400 block mb-1" x-text="t('lbl.frontDist')"></label>
           <input type="number" step="1" x-model.number="arbCalc.front_pct" class="w-full">
         </div>
         <div>
-          <label class="text-[10px] text-slate-400 block mb-1">車重 (kg)</label>
+          <label class="text-[10px] text-slate-400 block mb-1" x-text="t('lbl.carWeight')"></label>
           <input type="number" step="10" x-model.number="arbCalc.total_weight" class="w-full">
         </div>
         <div>
-          <label class="text-[10px] text-slate-400 block mb-1">重心高度 (mm)</label>
+          <label class="text-[10px] text-slate-400 block mb-1" x-text="t('lbl.cgHeight')"></label>
           <input type="number" step="5" x-model.number="arbCalc.cg_height" class="w-full">
         </div>
         <div>
-          <label class="text-[10px] text-slate-400 block mb-1">前彈簧 Roll Stiffness (Nm/deg)</label>
+          <label class="text-[10px] text-slate-400 block mb-1" x-text="t('lbl.fSpringRoll')"></label>
           <input type="number" step="10" x-model.number="arbCalc.spring_roll_front" class="w-full">
         </div>
         <div>
-          <label class="text-[10px] text-slate-400 block mb-1">後彈簧 Roll Stiffness (Nm/deg)</label>
+          <label class="text-[10px] text-slate-400 block mb-1" x-text="t('lbl.rSpringRoll')"></label>
           <input type="number" step="10" x-model.number="arbCalc.spring_roll_rear" class="w-full">
         </div>
       </div>
 
       <div class="flex gap-2 mb-4">
-        <button class="btn btn-primary" @click="runArbCalc()">計算</button>
-        <button class="btn btn-sm bg-slate-600 text-slate-200" @click="loadArbFromPrediction()" x-show="result">從預測結果帶入</button>
+        <button class="btn btn-primary" @click="runArbCalc()" x-text="t('btn.calcShort')"></button>
+        <button class="btn btn-sm bg-slate-600 text-slate-200" @click="loadArbFromPrediction()" x-show="result" x-text="t('btn.fromResult')"></button>
       </div>
 
       <template x-if="arbResult">
@@ -1238,11 +1245,11 @@ canvas{max-height:300px}
 
   <!-- Spring Rate Reference Table -->
   <div class="card p-5 mt-4" x-show="springTable.length>0">
-    <div class="section-title">彈簧率對照表</div>
+    <div class="section-title" x-text="t('sec.springTable')"></div>
     <div class="text-xs text-slate-500 mb-3">角落質量 <span x-text="springCalc.corner_mass"></span> kg · MR <span x-text="springCalc.motion_ratio"></span> · 輪胎彈簧 <span x-text="springCalc.tire_spring_rate"></span> N/mm</div>
     <table>
       <thead><tr>
-        <th>彈簧率 (N/mm)</th><th>Wheel Rate (N/mm)</th><th>有效 Wheel Rate (N/mm)</th><th>Ride Frequency (Hz)</th><th>分類</th>
+        <th x-text="t('th.springRate')"></th><th>Wheel Rate (N/mm)</th><th x-text="t('th.effWheelRate')"></th><th>Ride Frequency (Hz)</th><th x-text="t('th.category')"></th>
       </tr></thead>
       <tbody>
         <template x-for="row in springTable" :key="row.spring_rate">
@@ -1261,10 +1268,10 @@ canvas{max-height:300px}
 
 <!-- ==================== TAB: 胎溫分析 ==================== -->
 <div x-show="currentTab==='tire'" x-transition>
-  <h2 class="text-xl font-bold mb-4">輪胎抓地力分析</h2>
+  <h2 class="text-xl font-bold mb-4" x-text="t('h2.tire')"></h2>
   <div class="grid-2">
     <div class="card p-5">
-      <div class="section-title">溫度-抓地力曲線</div>
+      <div class="section-title" x-text="t('sec.tempGrip')"></div>
       <div class="flex flex-wrap gap-1.5 mb-3">
         <template x-for="c in compoundList" :key="c">
           <button class="text-[10px] px-2 py-1 rounded-full" :class="selCompounds.includes(c)?'bg-sky-500 text-white':'bg-slate-700 text-slate-300'" @click="toggleArr(selCompounds,c);drawTireGrip()" x-text="getTireParams(c)[3]"></button>
@@ -1273,24 +1280,24 @@ canvas{max-height:300px}
       <canvas id="tireGripChart" height="250"></canvas>
     </div>
     <div class="card p-5">
-      <div class="section-title">壓力-抓地力曲線</div>
+      <div class="section-title" x-text="t('sec.presGrip')"></div>
       <canvas id="tirePressureChart" height="250"></canvas>
       <div class="text-xs text-slate-500 mt-2">最佳壓力 = 1.90 bar 時 100%，每偏離 0.1 bar 降低約 2%</div>
     </div>
   </div>
   <!-- Tire database table -->
   <div class="card p-5 mt-4" x-show="tireOptions.length">
-    <div class="section-title">賽道日輪胎資料庫</div>
+    <div class="section-title" x-text="t('sec.tireDb')"></div>
     <div style="max-height:400px;overflow-y:auto">
       <table>
         <thead><tr>
-          <th>輪胎</th><th>品牌</th><th>TW</th><th>抓地力</th><th>最佳溫度</th><th>溫域</th>
-          <th>建議前胎壓</th><th>建議後胎壓</th><th>備註</th>
+          <th x-text="t('th.tire')"></th><th x-text="t('th.brand')"></th><th>TW</th><th x-text="t('th.grip')"></th><th x-text="t('th.optTemp')"></th><th x-text="t('th.tempWin')"></th>
+          <th x-text="t('th.fPress')"></th><th x-text="t('th.rPress')"></th><th x-text="t('th.notes')"></th>
         </tr></thead>
         <tbody>
           <template x-for="t in tireOptions" :key="t.id">
             <tr>
-              <td class="font-semibold text-xs" x-text="t.name_zh"></td>
+              <td class="font-semibold text-xs" x-text="nm(t)"></td>
               <td class="text-xs" x-text="t.brand"></td>
               <td><span class="badge" :class="t.treadwear <= 100?'badge-r':t.treadwear <= 200?'badge-y':'badge-g'" x-text="t.treadwear || 'N/A'"></span></td>
               <td class="font-mono text-xs" :class="t.peak_grip >= 1.15?'text-pink-400':t.peak_grip >= 1.08?'text-yellow-400':'text-slate-300'" x-text="(t.peak_grip*100).toFixed(0)+'%'"></td>
@@ -1309,31 +1316,31 @@ canvas{max-height:300px}
 
 <!-- ==================== TAB: 麗寶單圈 ==================== -->
 <div x-show="currentTab==='lihpao'" x-transition>
-  <h2 class="text-xl font-bold mb-1">麗寶國際賽車場 G2 — 單圈時間模擬</h2>
-  <p class="text-xs text-slate-500 mb-4">3.500 km / 23 彎 · 用目前「轉向預測」分頁的車輛+輪胎設定 · 預測最快單圈、胎壓甜蜜點出現圈數、逐圈圈速演化</p>
+  <h2 class="text-xl font-bold mb-1" x-text="t('h2.lihpao')"></h2>
+  <p class="text-xs text-slate-500 mb-4" x-text="t('lihpao.sub')"></p>
   <div class="grid-2">
     <!-- 輸入 -->
     <div class="card p-5">
-      <div class="section-title">模擬條件</div>
+      <div class="section-title" x-text="t('sec.lihpaoCond')"></div>
       <div class="grid-2 text-sm gap-3">
-        <div><label class="text-xs text-slate-400">引擎功率 (kW)</label><input type="number" x-model.number="lihpao.power_kw" class="w-full mt-1"></div>
-        <div><label class="text-xs text-slate-400">驅動</label>
+        <div><label class="text-xs text-slate-400" x-text="t('lbl.powerKw')"></label><input type="number" x-model.number="lihpao.power_kw" class="w-full mt-1"></div>
+        <div><label class="text-xs text-slate-400" x-text="t('lbl.drivetrain')"></label>
           <select x-model="lihpao.layout" class="w-full mt-1"><option>AWD</option><option>RWD</option><option>FWD</option></select></div>
-        <div><label class="text-xs text-slate-400">圈數 (stint)</label><input type="number" x-model.number="lihpao.laps" class="w-full mt-1"></div>
-        <div><label class="text-xs text-slate-400">冷胎壓 (bar)</label><input type="number" step="0.05" x-model.number="lihpao.cold_pressure" class="w-full mt-1"></div>
-        <div><label class="text-xs text-slate-400">氣溫 (°C)</label><input type="number" x-model.number="lihpao.ambient_c" class="w-full mt-1"></div>
-        <div><label class="text-xs text-slate-400">路面溫 (°C)</label><input type="number" x-model.number="lihpao.track_c" class="w-full mt-1"></div>
-        <div><label class="text-xs text-slate-400">起跑油量 (kg)</label><input type="number" x-model.number="lihpao.fuel_start" class="w-full mt-1"></div>
-        <div><label class="text-xs text-slate-400">每圈油耗 (kg)</label><input type="number" step="0.1" x-model.number="lihpao.fuel_per_lap" class="w-full mt-1"></div>
+        <div><label class="text-xs text-slate-400" x-text="t('lbl.stintLaps')"></label><input type="number" x-model.number="lihpao.laps" class="w-full mt-1"></div>
+        <div><label class="text-xs text-slate-400" x-text="t('lbl.coldP')"></label><input type="number" step="0.05" x-model.number="lihpao.cold_pressure" class="w-full mt-1"></div>
+        <div><label class="text-xs text-slate-400" x-text="t('lbl.ambient2')"></label><input type="number" x-model.number="lihpao.ambient_c" class="w-full mt-1"></div>
+        <div><label class="text-xs text-slate-400" x-text="t('lbl.trackTemp2')"></label><input type="number" x-model.number="lihpao.track_c" class="w-full mt-1"></div>
+        <div><label class="text-xs text-slate-400" x-text="t('lbl.fuelStart')"></label><input type="number" x-model.number="lihpao.fuel_start" class="w-full mt-1"></div>
+        <div><label class="text-xs text-slate-400" x-text="t('lbl.fuelPerLap')"></label><input type="number" step="0.1" x-model.number="lihpao.fuel_per_lap" class="w-full mt-1"></div>
       </div>
       <div class="text-[10px] text-slate-500 mt-2">車重/抓地/空力/平衡取自「轉向預測」分頁(目前車種與輪胎)。胎種：<span class="text-slate-300" x-text="tire.front_compound"></span></div>
-      <button class="w-full mt-3 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-white font-bold" @click="runLihpao()">模擬單圈</button>
+      <button class="w-full mt-3 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-white font-bold" @click="runLihpao()" x-text="t('btn.simLap')"></button>
       <div class="text-[10px] text-amber-400/80 mt-2">⚠ 絕對圈速取決於輸入規格。賽道紀錄多為大改車，原廠車預測較慢屬正常。</div>
     </div>
 
     <!-- 結果摘要 -->
     <div class="card p-5" x-show="lihpaoResult && !lihpaoResult.error">
-      <div class="section-title">預測結果</div>
+      <div class="section-title" x-text="t('sec.lihpaoResult')"></div>
       <template x-if="lihpaoResult">
         <div>
           <div class="grid-2 gap-3 mb-3">
@@ -1355,12 +1362,12 @@ canvas{max-height:300px}
 
   <!-- 逐圈圖表 + 表格 -->
   <div class="card p-5 mt-4" x-show="lihpaoResult && lihpaoResult.laps">
-    <div class="section-title">逐圈演化：圈速 vs 抓地力</div>
+    <div class="section-title" x-text="t('sec.lihpaoChart')"></div>
     <canvas id="lihpaoChart" height="90"></canvas>
     <div class="overflow-x-auto mt-3">
       <table class="w-full text-xs text-center">
         <thead class="text-slate-400 border-b border-white/10"><tr>
-          <th class="py-1">圈</th><th>胎溫°C</th><th>熱胎壓 bar</th><th>抓地%</th><th>質量 kg</th><th>圈速</th><th>窗口</th>
+          <th class="py-1" x-text="t('th.lap')"></th><th x-text="t('th.tempC')"></th><th x-text="t('th.hotP')"></th><th x-text="t('th.gripPct')"></th><th x-text="t('th.massKg')"></th><th x-text="t('th.lapTime')"></th><th x-text="t('th.window')"></th>
         </tr></thead>
         <tbody>
           <template x-for="L in (lihpaoResult?lihpaoResult.laps:[])" :key="L.lap">
@@ -1383,11 +1390,11 @@ canvas{max-height:300px}
 
 <!-- ==================== TAB: 使用說明 ==================== -->
 <div x-show="currentTab==='guide'" x-transition>
-  <h2 class="text-xl font-bold mb-4">使用說明 User Guide</h2>
+  <h2 class="text-xl font-bold mb-4" x-text="t('h2.guide')"></h2>
 
   <!-- Quick Start -->
   <div class="card p-5 mb-4">
-    <div class="section-title">快速上手</div>
+    <div class="section-title" x-text="t('sec.quickStart')"></div>
     <div class="text-sm leading-relaxed space-y-3">
       <p>Racing Dynamics 是一款車輛底盤動態分析工具，幫助你在賽道日之前<strong class="text-sky-400">預測車輛的轉向特性</strong>，並給出具體的調校建議。</p>
       <div class="card2 p-4">
@@ -1405,10 +1412,10 @@ canvas{max-height:300px}
 
   <!-- Tier Explanation -->
   <div class="card p-5 mb-4">
-    <div class="section-title">三層分析架構 Three-Tier System</div>
+    <div class="section-title" x-text="t('sec.threeTier')"></div>
     <div class="grid grid-cols-3 gap-3">
       <div class="card2 p-4">
-        <div class="badge badge-g mb-2">Tier 1 快速</div>
+        <div class="badge badge-g mb-2" x-text="t('tier.t1')"></div>
         <div class="text-sm font-semibold mb-1">機械平衡</div>
         <div class="text-xs text-slate-400 leading-relaxed">
           只需要彈簧率、ARB、車重分佈等基本參數。<br>
@@ -1426,7 +1433,7 @@ canvas{max-height:300px}
         </div>
       </div>
       <div class="card2 p-4">
-        <div class="badge badge-r mb-2">Tier 3 完整</div>
+        <div class="badge badge-r mb-2" x-text="t('tier.t3')"></div>
         <div class="text-sm font-semibold mb-1">完整動態</div>
         <div class="text-xs text-slate-400 leading-relaxed">
           加入角落重量、空力、阻尼器、Camber/Toe。<br>
@@ -1439,7 +1446,7 @@ canvas{max-height:300px}
 
   <!-- Glossary -->
   <div class="card p-5 mb-4">
-    <div class="section-title">專業名詞解釋 Glossary</div>
+    <div class="section-title" x-text="t('sec.glossary')"></div>
 
     <div class="text-xs text-slate-500 mb-3">點擊類別可展開/收合</div>
 
@@ -1898,7 +1905,7 @@ canvas{max-height:300px}
 
   <!-- Tips -->
   <div class="card p-5 mb-4">
-    <div class="section-title">賽道日調校小技巧</div>
+    <div class="section-title" x-text="t('sec.tips')"></div>
     <div class="space-y-2">
       <div class="card2 p-3 flex gap-3 items-start">
         <span class="text-lg">🔧</span>
@@ -1929,7 +1936,7 @@ canvas{max-height:300px}
 
   <!-- About -->
   <div class="card p-5">
-    <div class="section-title">關於本系統</div>
+    <div class="section-title" x-text="t('sec.about')"></div>
     <div class="text-xs text-slate-400 leading-relaxed space-y-2">
       <p>Racing Dynamics 是基於 <strong>Milliken & Milliken, Race Car Vehicle Dynamics</strong> 等經典文獻的車輛動態計算工具。</p>
       <p>物理引擎包含：Roll Stiffness 側傾剛性分析、LLTD 分解（幾何+彈性）、Pacejka 輪胎模型、阻尼比分析、縱向荷重轉移、Slip Angle 自行車模型、Yaw Gain 偏航增益。</p>
@@ -1942,6 +1949,7 @@ canvas{max-height:300px}
 
 </main>
 
+<script src="js/i18n.js"></script>
 <script src="js/tire-data.js"></script>
 <script src="js/dynamics-model.js"></script>
 <script src="js/car-presets.js"></script>
@@ -1951,14 +1959,24 @@ canvas{max-height:300px}
 const COLORS=['#38bdf8','#f472b6','#34d399','#facc15','#a78bfa','#fb923c','#22d3ee','#e879f9','#84cc16','#f87171'];
 
 function app(){return{
+  // === i18n (English primary / 繁中 / 日本語) ===
+  lang: (typeof localStorage!=='undefined' && localStorage.getItem('lang')) || 'en',
+  langs:[{id:'en',label:'EN'},{id:'zh',label:'繁'},{id:'ja',label:'日'}],
+  setLang(l){ this.lang=l; try{localStorage.setItem('lang',l)}catch(e){} },
+  t(k){ const D=(typeof I18N!=='undefined')?I18N:null; if(!D) return k;
+        return (D[this.lang]&&D[this.lang][k]) || (D.en&&D.en[k]) || k; },
+  // 把模型回傳的英文傾向(Understeer/Oversteer/Neutral)轉成目前語言
+  tnd(tendencyEn){ return this.t('us.'+(tendencyEn||'Neutral')); },
+  // 資料驅動名稱(車款/輪胎)：英文/日文模式用英文 name，繁中用 name_zh
+  nm(o){ if(!o) return ''; return (this.lang==='zh' && o.name_zh) ? o.name_zh : (o.name || o.name_zh || ''); },
   currentTab:'predict',
   tabs:[
-    {id:'predict',label:'轉向預測',sub:'Handling Prediction'},
-    {id:'advisor',label:'調校建議',sub:'Setup Advisor'},
-    {id:'spring',label:'彈簧計算',sub:'Spring Calculator'},
-    {id:'tire',label:'輪胎分析',sub:'Tire Analysis'},
-    {id:'lihpao',label:'麗寶單圈',sub:'Lihpao Lap Sim'},
-    {id:'guide',label:'使用說明',sub:'User Guide'},
+    {id:'predict',key:'tab.predict'},
+    {id:'advisor',key:'tab.advisor'},
+    {id:'spring',key:'tab.spring'},
+    {id:'tire',key:'tab.tire'},
+    {id:'lihpao',key:'tab.lihpao'},
+    {id:'guide',key:'tab.guide'},
   ],
   tier:1,
   // Prediction inputs

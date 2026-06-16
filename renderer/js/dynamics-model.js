@@ -44,11 +44,69 @@ function usNorm(degPerG) {
   return Math.max(-1.0, Math.min(1.0, degPerG / US_NORM_SCALE));
 }
 
+/*
+╔══════════════════════════════════════════════════════════════════════════╗
+║  知識文 #1 — 車為什麼會推頭 / 甩尾？輪胎負載敏感度 (Tire Load Sensitivity)  ║
+║  對象：FSAE / 賽道新手工程師   程度：★★☆   閱讀時間：3 分鐘               ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+【一句話】
+  轉向不足(推頭)還是轉向過度(甩尾)，根本上是在比「前軸和後軸，誰先把抓地力用完」。
+  而決定誰先用完的核心物理，是一條反直覺的曲線：輪胎越重，每公斤負載能給的抓地力反而越少。
+
+【直覺：先打掉一個常見誤會】
+  很多人以為「壓得越重抓地力越大，所以重的那軸比較不會滑」。前半句對、後半句錯。
+  輪胎的側向抓地力 Fy 確實隨垂直負載 Fz 增加，但是「邊際遞減」的——
+  加第 1 個 100kg，抓地力長很多；加第 5 個 100kg，只長一點點。
+  把抓地力「除以」負載,得到「每公斤的效率(= μ)」,這個效率是隨負載「下降」的。
+  → 所以越重的軸，雖然總抓地力大，但相對於它要承擔的離心力，反而比較吃緊、比較早滑。
+
+【物理：這條曲線怎麼決定平衡】
+  過彎時整台車的離心力，前後軸各自要分攤的部分,正比於各軸的「質量」。
+  而各軸能提供的抓地力上限,由它的負載 × 那個負載下的 μ 決定。
+  比較兩軸「需求/能力」的緊張程度,就知道誰先滑:
+    • 前軸先滑 → 推頭 (Understeer, 轉向不足)
+    • 後軸先滑 → 甩尾 (Oversteer, 轉向過度)
+  這就是為什麼「車頭重的車(前驅居多)天生推頭」——前軸又重、效率又被負載敏感度拉低。
+
+  第二層：左右荷重轉移 (lateral load transfer) 也透過同一條曲線起作用。
+  過彎時外輪增載、內輪減載;因為曲線是「凹」的,外輪多賺的 μ < 內輪虧掉的 μ,
+  所以「一軸的荷重轉移越大 → 那一整軸的有效抓地效率越低 → 那一軸越早滑」。
+  → 這就是 ARB / 彈簧 / 防傾桿在做的事:它們改變的是「前後軸各分到多少荷重轉移」
+    (工程上叫 LLTD, Lateral Load Transfer Distribution)。
+    前 ARB 加硬 → 前軸荷重轉移變多 → 前軸效率降 → 更推頭。後 ARB 加硬 → 更甩尾。
+
+【公式 (Milliken, RCVD)】
+  轉向不足梯度  K_us = W_f / C_αf − W_r / C_αr     [deg/g]
+    W_f, W_r = 前/後軸重 (N)
+    C_αf, C_αr = 前/後軸的 cornering stiffness (N/deg)，= 該軸兩條胎在「各自負載下」的和
+  K_us > 0 → 推頭；< 0 → 甩尾；≈ 0 → 中性。
+  漂亮之處：把「配重(靜態 Fz)」和「ARB/LLTD(荷重轉移 ΔFz)」用同一條曲線一次算進去。
+
+【對應到下面這個函式 axlePairCorneringStiffness()】
+  • halfStatic = 該軸一條胎的靜態負載 → 處理「配重」那一層
+  • dt = 荷重轉移 → 外胎 halfStatic+dt、內胎 halfStatic−dt → 處理「LLTD/ARB」那一層
+  • 兩條胎各自查 Pacejka 的 cornering stiffness 再相加 → 凹曲線自動讓「轉移越大效率越低」
+  下面 Tier1 的 calculate() 就拿前後軸的 C_α 套上面那條 K_us 公式。
+
+【FSAE 注意 ⚠】
+  • FSAE 賽車車重輕(~200-250kg)、胎窄、低速，負載敏感度的「膝點」位置和量產車不同——
+    本模型用平均單胎靜載校準膝點(a4Ref)，你做自己的車時要換成你輪胎的實測 Fz-Fy 數據。
+  • FSAE 最有效的平衡工具通常是 ARB(改 LLTD)，因為配重分佈受規則/包裝限制難動。
+  • 真實的 C_α 一定要用「你那條胎的 TTC(Tire Test Consortium)數據」擬合，不要照抄這裡的
+    sport 預設係數——這是 FSAE 車隊最常犯、也最致命的偷懶。
+
+【延伸】
+  Milliken & Milliken, Race Car Vehicle Dynamics, ch.5-6 (load sensitivity, K_us)
+  下一篇 → 知識文 #2：側傾剛性怎麼算、為什麼 ARB 是調 LLTD 的主力 (見 rollStiffnessSpring)
+*/
+
 /**
  * Axle pair cornering stiffness (N/deg) including lateral load transfer.
  * 兩條輪胎(外側增載/內側減載)各自的 cornering stiffness 相加；因負載敏感度
  * (Pacejka BCD 的凹性)，荷重轉移越大 → 該軸有效 cornering stiffness 越低。
  * 這是把「配重」與「LLTD/側傾剛性分配」統一進同一個負載敏感度物理的關鍵。
+ * 詳見上方「知識文 #1」。
  * @param {number} axleMassKg 該軸靜態質量 (kg)
  * @param {number} transferKgPerG 單側荷重轉移 (kg per g)
  * @param {number} ayRefG 評估用的側向加速度 (g)
