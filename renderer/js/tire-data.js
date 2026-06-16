@@ -20,6 +20,7 @@ const TRACKDAY_TIRES = {
         available_widths: [225, 235, 245, 255, 265, 275, 285, 295, 305, 315, 325, 345],
         compound_type: 'medium',
         notes: 'Porsche N-spec \u539f\u5ee0\u914d\u80ce\uff0c\u8cfd\u9053\u65e5\u9996\u9078',
+        notes_en: "Porsche N-spec OEM fitment; top pick for track days.",
     },
     'michelin_cup2r': {
         name: 'Michelin Pilot Sport Cup 2 R',
@@ -32,6 +33,7 @@ const TRACKDAY_TIRES = {
         available_widths: [245, 255, 265, 275, 285, 295, 305, 315, 325],
         compound_type: 'soft',
         notes: '\u6bd4 Cup 2 \u66f4\u504f\u8cfd\u9053\u6027\u80fd\uff0c\u9700\u5145\u5206\u6696\u80ce',
+        notes_en: "More track-focused than the Cup 2; needs a thorough warm-up.",
     },
     'yokohama_a052': {
         name: 'Yokohama ADVAN A052',
@@ -44,6 +46,7 @@ const TRACKDAY_TIRES = {
         available_widths: [195, 205, 215, 225, 235, 245, 255, 265, 275, 285, 295],
         compound_type: 'medium',
         notes: 'AD08R \u5f8c\u7e7c\uff0c\u53f0\u7063 GR Yaris \u71b1\u9580\u9078\u64c7',
+        notes_en: "Successor to the AD08R; popular choice for the GR Yaris in Taiwan.",
     },
     'yokohama_ad08r': {
         name: 'Yokohama ADVAN Neova AD08R',
@@ -56,6 +59,7 @@ const TRACKDAY_TIRES = {
         available_widths: [195, 205, 215, 225, 235, 245, 255, 265, 275, 285, 295],
         compound_type: 'medium',
         notes: '\u53f0\u7063\u6700\u53d7\u6b61\u8fce\u7684\u8cfd\u9053\u65e5\u7528\u80ce\u4e4b\u4e00\uff0c\u5de5\u4f5c\u6eab\u57df\u5bec\u5ee3',
+        notes_en: "One of Taiwan's most popular track-day tires, with a wide operating temperature window.",
     },
     'bridgestone_re71rs': {
         name: 'Bridgestone Potenza RE-71RS',
@@ -68,6 +72,7 @@ const TRACKDAY_TIRES = {
         available_widths: [195, 205, 215, 225, 235, 245, 255, 265, 275],
         compound_type: 'medium',
         notes: 'RE-71R \u5f8c\u7e7c\uff0c\u6975\u5f37\u4e7e\u5730\u6293\u5730\u529b\uff0c\u53f0\u7063 Time Attack \u5e38\u5ba2',
+        notes_en: "Successor to the RE-71R; very strong dry grip, a regular at Taiwan Time Attack events.",
     },
     'pirelli_trofeo_r': {
         name: 'Pirelli P Zero Trofeo R',
@@ -80,6 +85,7 @@ const TRACKDAY_TIRES = {
         available_widths: [225, 235, 245, 255, 265, 275, 285, 295, 305, 315, 325, 345],
         compound_type: 'soft',
         notes: '\u4fdd\u6642\u6377/\u6cd5\u62c9\u5229\u539f\u5ee0\u9078\u7528\uff0c\u9700\u6696\u5230\u5de5\u4f5c\u6eab\u5ea6',
+        notes_en: "OEM fitment on Porsche/Ferrari; must be brought up to operating temperature.",
     },
     'pirelli_trofeo_rs': {
         name: 'Pirelli P Zero Trofeo RS',
@@ -92,6 +98,7 @@ const TRACKDAY_TIRES = {
         available_widths: [245, 255, 265, 275, 285, 295, 305, 315, 325],
         compound_type: 'soft',
         notes: 'Trofeo R \u5347\u7d1a\u7248\uff0c\u66f4\u504f\u8cfd\u9053\uff0c\u6696\u80ce\u9700\u6c42\u66f4\u9ad8',
+        notes_en: "Upgraded version of the Trofeo R; more track-focused, with higher warm-up demands.",
     },
     'hankook_rs4': {
         name: 'Hankook Ventus RS4 (Z232)',
@@ -104,6 +111,7 @@ const TRACKDAY_TIRES = {
         available_widths: [195, 205, 215, 225, 235, 245, 255, 265, 275, 285, 295],
         compound_type: 'medium',
         notes: 'CP\u503c\u6975\u9ad8\u7684\u97d3\u570b\u534a\u71b1\u7194\u80ce',
+        notes_en: "Korean semi-slick offering excellent value for money.",
     },
     'federal_rsrr': {
         name: 'Federal 595 RS-RR',
@@ -116,6 +124,7 @@ const TRACKDAY_TIRES = {
         available_widths: [195, 205, 215, 225, 235, 245, 255, 265, 275],
         compound_type: 'medium',
         notes: '\u53f0\u7063\u672c\u571f\u54c1\u724c\uff0c\u9ad8CP\u503c\u5165\u9580\u8cfd\u9053\u80ce',
+        notes_en: "Taiwanese home brand; high-value entry-level track tire.",
     },
     'federal_rsr': {
         name: 'Federal 595 RS-R',
@@ -128,6 +137,7 @@ const TRACKDAY_TIRES = {
         available_widths: [195, 205, 215, 225, 235, 245, 255, 265, 275],
         compound_type: 'hard',
         notes: 'RS-RR \u4e4b\u4e0b\u7684\u5165\u9580\u9078\u64c7\uff0c\u8010\u4e45\u5ea6\u8f03\u4f73',
+        notes_en: "Entry-level option below the RS-RR, with better durability.",
     },
     'nankang_ar1': {
         name: 'Nankang AR-1',
@@ -140,6 +150,7 @@ const TRACKDAY_TIRES = {
         available_widths: [195, 205, 215, 225, 235, 245, 255, 265, 275, 285, 295, 305, 315],
         compound_type: 'soft',
         notes: '\u53f0\u7063\u54c1\u724c\uff0c\u8d85\u9ad8CP\u503c DOT Race \u80ce',
+        notes_en: "Taiwanese brand; outstanding-value DOT race tire.",
     },
     'nankang_ns2r': {
         name: 'Nankang NS-2R',
@@ -152,6 +163,7 @@ const TRACKDAY_TIRES = {
         available_widths: [195, 205, 215, 225, 235, 245, 255, 265, 275, 285, 295],
         compound_type: 'medium',
         notes: '\u53f0\u7063\u54c1\u724c\uff0c\u8857\u9053/\u8cfd\u9053\u517c\u7528',
+        notes_en: "Taiwanese brand; dual-purpose street/track tire.",
     },
     'nankang_cr1': {
         name: 'Nankang CR-1',
@@ -164,6 +176,7 @@ const TRACKDAY_TIRES = {
         available_widths: [195, 205, 215, 225, 235, 245, 255, 265, 275, 285, 295],
         compound_type: 'medium',
         notes: '\u53f0\u7063\u54c1\u724c\uff0cAR-1 \u8207 NS-2R \u4e4b\u9593\u7684\u9078\u64c7',
+        notes_en: "Taiwanese brand; sits between the AR-1 and the NS-2R.",
     },
     'toyo_r888r': {
         name: 'Toyo Proxes R888R',
@@ -176,6 +189,7 @@ const TRACKDAY_TIRES = {
         available_widths: [185, 195, 205, 215, 225, 235, 245, 255, 265, 275, 285, 295, 305, 315],
         compound_type: 'soft',
         notes: '\u7d93\u5178 DOT Race \u80ce\uff0c\u6b50\u7f8e Time Attack \u5e38\u7528',
+        notes_en: "Classic DOT race tire, widely used in Time Attack across Europe and the US.",
     },
     'toyo_rr': {
         name: 'Toyo Proxes RR',
@@ -188,6 +202,7 @@ const TRACKDAY_TIRES = {
         available_widths: [205, 225, 245, 255, 275, 295, 315],
         compound_type: 'soft',
         notes: 'R888R \u4ee5\u4e0a\u7684\u7d14\u8cfd\u9053\u7248\u672c',
+        notes_en: "Pure track version positioned above the R888R.",
     },
     'continental_ecf': {
         name: 'Continental ExtremeContact Force',
@@ -200,6 +215,7 @@ const TRACKDAY_TIRES = {
         available_widths: [205, 215, 225, 235, 245, 255, 265, 275, 285, 295, 305],
         compound_type: 'medium',
         notes: 'BMW/AMG \u8eca\u4e3b\u71b1\u9580\u9078\u64c7',
+        notes_en: "Popular choice among BMW/AMG owners.",
     },
     'continental_sc7': {
         name: 'Continental SportContact 7',
@@ -212,6 +228,7 @@ const TRACKDAY_TIRES = {
         available_widths: [205, 215, 225, 235, 245, 255, 265, 275, 285, 295, 305, 315, 325],
         compound_type: 'hard',
         notes: '\u8857\u9053/\u8cfd\u9053\u517c\u7528\uff0c\u65e5\u5e38\u5be6\u7528\u6027\u4f73',
+        notes_en: "Dual-purpose street/track tire with strong everyday usability.",
     },
     'dunlop_ziii': {
         name: 'Dunlop Direzza ZIII',
@@ -224,6 +241,7 @@ const TRACKDAY_TIRES = {
         available_widths: [195, 205, 215, 225, 235, 245, 255, 265, 275],
         compound_type: 'medium',
         notes: 'ZII Star Spec \u5f8c\u7e7c\uff0c\u65e5\u7cfb\u534a\u71b1\u7194\u80ce',
+        notes_en: "Successor to the ZII Star Spec; Japanese semi-slick.",
     },
     // === High Performance Sport (280-400TW, for street/track dual use) ===
     'michelin_ps4s': {
@@ -237,6 +255,7 @@ const TRACKDAY_TIRES = {
         available_widths: [205, 215, 225, 235, 245, 255, 265, 275, 285, 295, 305, 315, 325, 345],
         compound_type: 'hard',
         notes: '\u9ad8\u6027\u80fd\u8857\u80ce\u6a19\u7aff\uff0c\u8cfd\u9053\u65e5\u5165\u9580\u63a8\u85a6',
+        notes_en: "Benchmark high-performance street tire; recommended entry point for track days.",
     },
     // === Racing Slick (no treadwear, for reference) ===
     'slick_soft': {
@@ -250,6 +269,7 @@ const TRACKDAY_TIRES = {
         available_widths: [200, 225, 250, 270, 280, 300, 320, 340, 360],
         compound_type: 'soft',
         notes: '\u8cfd\u8eca\u7528\u5149\u982d\u80ce\uff08\u50c5\u4f9b\u53c3\u8003\uff09',
+        notes_en: "Racing slick for competition use (for reference only).",
     },
     'slick_hard': {
         name: 'Racing Slick (Hard)',
@@ -262,6 +282,7 @@ const TRACKDAY_TIRES = {
         available_widths: [200, 225, 250, 270, 280, 300, 320, 340, 360],
         compound_type: 'hard',
         notes: '\u8cfd\u8eca\u7528\u5149\u982d\u80ce\uff08\u50c5\u4f9b\u53c3\u8003\uff09',
+        notes_en: "Racing slick for competition use (for reference only).",
     },
 };
 

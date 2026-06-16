@@ -60,6 +60,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": true,
         "notes": "非電控避震，手動可調車高",
+        "notes_en": "Non-electronic dampers; manually adjustable ride height.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -113,6 +114,7 @@ var CAR_PRESETS = {
         "damper_defaults": {"front_bump_force": 90, "front_rebound_force": 130, "rear_bump_force": 110, "rear_rebound_force": 160},
         "arb_adjustable": true,
         "notes": "997.2 有 PASM 電控避震選配",
+        "notes_en": "997.2 offers optional PASM electronic dampers.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -166,6 +168,7 @@ var CAR_PRESETS = {
         "damper_defaults": {"front_bump_force": 95, "front_rebound_force": 140, "rear_bump_force": 120, "rear_rebound_force": 170},
         "arb_adjustable": true,
         "notes": "首代後輪轉向；球型軸承 camber plate",
+        "notes_en": "First generation with rear-wheel steering; spherical-bearing camber plates.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -219,6 +222,7 @@ var CAR_PRESETS = {
         "damper_defaults": {"front_bump_force": 100, "front_rebound_force": 150, "rear_bump_force": 130, "rear_rebound_force": 180},
         "arb_adjustable": true,
         "notes": "首代雙A臂前懸吊 (源自 991 RSR 賽車)；漸進式彈簧",
+        "notes_en": "First GT3 with double-wishbone front suspension (derived from the 991 RSR race car); progressive springs.",
         "confidence": {
             "spring_rate": "estimated",  // progressive rates
             "weight_dist": "confirmed",
@@ -274,6 +278,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "前重 59%，等前後彈簧率 36/36 是特殊設計；AWD 中差會過熱",
+        "notes_en": "59% front weight bias; the matched 36/36 front/rear spring rates are a deliberate design choice; the AWD center diff is prone to overheating.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -326,6 +331,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,        // circuit-tuned but not adjustable
         "arb_adjustable": false,
         "notes": "Circuit Pack: 前後 Torsen LSD、BBS 鍛造輪圈 (8.8kg)、加粗前 ARB",
+        "notes_en": "Circuit Pack: front and rear Torsen LSDs, BBS forged wheels (8.8 kg), and a thicker front anti-roll bar.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -382,6 +388,7 @@ var CAR_PRESETS = {
         "damper_defaults": {"front_bump_force": 85, "front_rebound_force": 125, "rear_bump_force": 105, "rear_rebound_force": 155},
         "arb_adjustable": false,
         "notes": "彈簧率/ARB 為推估值 — Ferrari 不公開；磁流變避震自動控制",
+        "notes_en": "Spring rates/ARB are estimated — Ferrari does not publish figures; magnetorheological dampers are automatically controlled.",
         "confidence": {
             "spring_rate": "unknown",
             "weight_dist": "confirmed",
@@ -435,6 +442,7 @@ var CAR_PRESETS = {
         "damper_defaults": {"front_bump_force": 95, "front_rebound_force": 140, "rear_bump_force": 120, "rear_rebound_force": 170},
         "arb_adjustable": false,
         "notes": "比 GTB 輕 90kg；彈簧率/ARB 為推估值",
+        "notes_en": "90 kg lighter than the GTB; spring rates/ARB are estimated.",
         "confidence": {
             "spring_rate": "unknown",
             "weight_dist": "confirmed",
@@ -488,6 +496,7 @@ var CAR_PRESETS = {
         "damper_defaults": {"front_bump_force": 80, "front_rebound_force": 120, "rear_bump_force": 100, "rear_rebound_force": 150},
         "arb_adjustable": false,
         "notes": "V6 + 電動馬達 PHEV；彈簧率/ARB 為推估值",
+        "notes_en": "V6 plus electric motor PHEV; spring rates/ARB are estimated.",
         "confidence": {
             "spring_rate": "unknown",
             "weight_dist": "confirmed",
@@ -544,6 +553,7 @@ var CAR_PRESETS = {
         "damper_defaults": {"front_bump_force": 75, "front_rebound_force": 110, "rear_bump_force": 85, "rear_rebound_force": 130},
         "arb_adjustable": false,
         "notes": "前置引擎 54% 前重；彈簧率為近似值",
+        "notes_en": "Front-engined with 54% front weight bias; spring rates are approximate.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -600,6 +610,7 @@ var CAR_PRESETS = {
         "damper_defaults": {"front_bump_force": 80, "front_rebound_force": 120, "rear_bump_force": 100, "rear_rebound_force": 150},
         "arb_adjustable": false,
         "notes": "AWD；彈簧率/ARB 為推估值",
+        "notes_en": "AWD; spring rates/ARB are estimated.",
         "confidence": {
             "spring_rate": "unknown",
             "weight_dist": "confirmed",
@@ -656,6 +667,7 @@ var CAR_PRESETS = {
         "damper_defaults": {"front_bump_force": 85, "front_rebound_force": 125, "rear_bump_force": 95, "rear_rebound_force": 140},
         "arb_adjustable": false,
         "notes": "前中置引擎+後置變速箱 Transaxle 配置，接近 50:50；彈簧率為推估",
+        "notes_en": "Front-mid engine with rear-mounted transaxle layout, close to 50:50; spring rates are estimated.",
         "confidence": {
             "spring_rate": "unknown",
             "weight_dist": "confirmed",
@@ -711,6 +723,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "經典前置後驅跑車，9000rpm VTEC 高轉引擎，四輪雙A臂懸吊，接近 50:50 配重",
+        "notes_en": "Classic front-engine, rear-drive sports car with a high-revving 9000 rpm VTEC engine, double-wishbone suspension at all four corners, and near 50:50 weight distribution.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -763,6 +776,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "第六代 Type R，Dual-Axis 前懸吊減少扭力轉向，紐柏林 FF 最速紀錄保持者",
+        "notes_en": "Sixth-generation Type R; dual-axis front suspension reduces torque steer; holds the FF lap record at the Nürburgring.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -818,6 +832,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "與 Subaru BRZ 共同開發，水平對臥引擎超低重心 460mm，入門 FR 跑車經典",
+        "notes_en": "Co-developed with the Subaru BRZ; the boxer engine gives a very low center of gravity (460 mm); a classic entry-level FR sports car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -870,6 +885,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "第二代 86，引擎升級至 2.4L 水平對臥，底盤強化，前後彈簧率更均衡",
+        "notes_en": "Second-generation 86; engine upgraded to a 2.4 L boxer, chassis stiffened, with more balanced front/rear spring rates.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -925,6 +941,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "S54 直六自然進氣經典，前 100 N/mm 彈簧率較硬，50:50 配重，賽道改裝熱門車型",
+        "notes_en": "Classic naturally aspirated S54 inline-six; stiffer front spring rate at 100 N/mm, 50:50 weight distribution; a popular track-build platform.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -966,6 +983,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "S14 車身較 S13 加寬，重量增加約 70kg，但操控穩定性提升。前後配重仍為 55:45，搭配 SR20DET 引擎，是甩尾與賽道兼用的熱門選擇。",
+        "notes_en": "The S14 body is wider than the S13 and roughly 70 kg heavier, but with improved handling stability. Weight distribution remains 55:45, and paired with the SR20DET it is a popular choice for both drifting and track use.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1007,6 +1025,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "S15 Spec-R 是 Silvia 系列最終版本，配備六速手排與 Helical LSD，彈簧與阻尼較前代強化。車身剛性提升，被視為原廠狀態下最均衡的 S 底盤。",
+        "notes_en": "The S15 Spec-R is the final iteration of the Silvia, with a six-speed manual and a helical LSD, plus stiffer springs and dampers than its predecessor. Increased body rigidity makes it the most balanced S-chassis in stock form.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1048,6 +1067,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "R32 GT-R 搭載 RB26DETT 雙渦輪引擎與 ATTESA E-TS 四驅系統，前後多連桿懸吊。原廠前偏重配置為 57:43，強化前軸抓地力。因其統治性的賽道表現被譽為「戰神」。",
+        "notes_en": "The R32 GT-R carries the RB26DETT twin-turbo engine and the ATTESA E-TS AWD system, with multi-link suspension front and rear. The stock 57:43 front bias boosts front-axle grip. Its dominant track performance earned it the nickname 'Godzilla.'",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1089,6 +1109,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "R33 軸距加長至 2720mm，車身剛性大幅提升，高速穩定性優於 R32。車重增加約 110kg，但 ATTESA E-TS Pro 與 Super HICAS 的升級彌補了靈活性的損失。曾於紐柏林創下 7 分 59 秒紀錄。",
+        "notes_en": "The R33 extends the wheelbase to 2720 mm with greatly increased body rigidity, giving better high-speed stability than the R32. It is about 110 kg heavier, but upgraded ATTESA E-TS Pro and Super HICAS make up for the lost agility. It set a 7:59 Nürburgring lap time.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1130,6 +1151,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "R34 V-Spec 軸距縮短至 2665mm 回歸靈活性，配備主動式 LSD 與強化的車體結構。碳纖維後擾流板產生有效下壓力，是 RB26 時代 GT-R 的集大成之作。V-Spec 標配 BREMBO 煞車系統。",
+        "notes_en": "The R34 V-Spec shortens the wheelbase to 2665 mm for renewed agility, with an active LSD and a reinforced body structure. The carbon-fiber rear diffuser generates effective downforce, making it the culmination of the RB26-era GT-R. The V-Spec comes standard with Brembo brakes.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1171,6 +1193,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "R35 搭載 VR38DETT 3.8L 雙渦輪引擎與獨立式變速箱（後置式 transaxle），實現接近 54:46 的配重。Bilstein DampTronic 電子可調避震器可依駕駛模式自動調整。後期車型馬力提升至 570ps 以上。",
+        "notes_en": "The R35 uses the VR38DETT 3.8 L twin-turbo engine with a rear transaxle, achieving close to 54:46 weight distribution. Bilstein DampTronic electronically adjustable dampers adapt automatically to the drive mode. Later models raise output above 570 ps.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1212,6 +1235,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "370Z 搭載 VQ37VHR 3.7L V6 自然進氣引擎，前雙 A 臂後多連桿懸吊與短軸距 2550mm 賦予銳利的轉向反應。NISMO 版本配備專用調校避震器與更硬的彈簧。SynchroRev Match 自動補油功能為一大特色。",
+        "notes_en": "The 370Z runs the VQ37VHR 3.7 L naturally aspirated V6; double-wishbone front and multi-link rear suspension with a short 2550 mm wheelbase give sharp steering response. The NISMO version gets dedicated dampers and stiffer springs. SynchroRev Match auto rev-matching is a notable feature.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1253,6 +1277,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "新世代 Z 沿用 370Z 的 2550mm 軸距平台，搭載 VR30DDTT 3.0L V6 雙渦輪引擎（405ps）。前雙 A 臂後多連桿維持 Z 系列傳統，懸吊幾何經重新調校，前彈簧較 370Z 強化約 13%。Performance 版配備機械式 LSD。",
+        "notes_en": "New-generation Z carries over the 370Z's 2550mm wheelbase platform, powered by the VR30DDTT 3.0L V6 twin-turbo (405ps). Double-wishbone front, multi-link rear stays true to Z tradition, with retuned suspension geometry and front springs roughly 13% stiffer than the 370Z. Performance trim gets a mechanical limited-slip diff.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1294,6 +1319,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "S2000 AP1 搭載 F20C 2.0L VTEC 引擎（紅線 9000rpm），前後雙 A 臂懸吊與 50:50 完美配重是其操控核心。重心高度僅約 430mm，得益於引擎低置設計。後期 AP1 升級為 17 吋輪圈（F:215/45R17 R:245/40R17）。轉向極為精準但極限操控需要經驗。",
+        "notes_en": "S2000 AP1 runs the F20C 2.0L VTEC (9000rpm redline), with double-wishbone suspension front and rear and a perfect 50:50 balance at the core of its handling. Center of gravity is just ~430mm, thanks to the low-mounted engine. Late AP1 upgraded to 17-inch wheels (F: 215/45R17, R: 245/40R17). Steering is razor-sharp, but the handling limit demands experience.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1335,6 +1361,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "EK9 是初代 Civic Type R，搭載 B16B 1.6L VTEC 引擎（185ps/8200rpm）。前後雙 A 臂懸吊在同級中極為罕見，車重僅 1050kg，功率重量比優異。手感直接的液壓轉向與 Helical LSD 是駕駛樂趣的關鍵。紅頭引擎需高轉速才能發揮全部性能。",
+        "notes_en": "EK9 is the first-generation Civic Type R, powered by the B16B 1.6L VTEC (185ps/8200rpm). Double-wishbone suspension front and rear is rare in this class; at just 1050kg, its power-to-weight ratio is excellent. Direct hydraulic steering and a helical LSD are key to the driving pleasure. The red-top engine needs high revs to deliver full performance.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1376,6 +1403,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "FD2 是四門轎車型態的 Type R，搭載 K20A 2.0L i-VTEC 引擎（225ps/8000rpm）。前懸吊改為麥花臣，後雙 A 臂保留。軸距加長至 2700mm 提升高速穩定性，Helical LSD 與強化車體結構確保賽道性能。日本市場專賣車型。",
+        "notes_en": "FD2 is the four-door sedan Type R, powered by the K20A 2.0L i-VTEC (225ps/8000rpm). Front suspension switched to MacPherson strut, while the rear double-wishbone is retained. Wheelbase stretched to 2700mm for high-speed stability; a helical LSD and reinforced body structure ensure track performance. Japan-only model.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1417,6 +1445,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "FK8 搭載 K20C1 2.0L VTEC Turbo 引擎（320ps），首次採用渦輪增壓的 Type R。前懸吊為專利 dual-axis strut 設計，有效抑制扭力轉向。自適應避震器可依 Comfort/Sport/+R 模式切換阻尼。曾於 2017 年創下紐柏林前驅車圈速紀錄（7 分 43 秒 80）。20 吋輪圈搭配 245/30 低扁平比輪胎。",
+        "notes_en": "FK8 runs the K20C1 2.0L VTEC Turbo (320ps), the first turbocharged Type R. Front suspension uses a patented dual-axis strut design that effectively suppresses torque steer. Adaptive dampers switch firmness across Comfort/Sport/+R modes. Set the Nürburgring FWD lap record in 2017 (7:43.80). 20-inch wheels with low-profile 245/30 tires.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1458,6 +1487,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "全鋁車身中置後驅超跑，前後雙A臂懸吊由 Ayrton Senna 協助調校。前後異尺寸輪圈為其特色，重心極低。C30A 3.0L V6 VTEC 自然進氣。",
+        "notes_en": "All-aluminum mid-engine RWD supercar, with double-wishbone suspension front and rear tuned with help from Ayrton Senna. Staggered front/rear wheel sizes are a signature feature; very low center of gravity. C30A 3.0L V6 VTEC, naturally aspirated.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1499,6 +1529,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "前後雙A臂是本車最大特色，B18C 1.8L VTEC 紅頭引擎搭配僅 1060kg 車重。輕量化標竿，手感教科書級的前驅跑車。限滑差速器為標配。",
+        "notes_en": "Double-wishbone suspension front and rear is this car's defining feature, with the B18C 1.8L VTEC red-top engine and just 1060kg. A lightweighting benchmark and a textbook-feel FWD sports car. Limited-slip diff is standard.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1540,6 +1571,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "傳奇甩尾車，4A-GE 雙凸輪 1.6L 引擎搭配後輪驅動。後四連桿硬軸懸吊是甩尾的關鍵特性。輕量短軸距帶來極高的靈活性。頭文字D 主角車。",
+        "notes_en": "Legendary drift car, with the 4A-GE twin-cam 1.6L engine driving the rear wheels. The four-link live rear axle is key to its drift character. Light weight and short wheelbase give exceptional agility. The hero car of Initial D.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -1581,6 +1613,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "中置後驅渦輪小跑車，3S-GTE 引擎。短軸距加上後重偏配讓操控極具挑戰性，突然的 snap oversteer 是其惡名。Rev3 以後懸吊經過大幅修正改善。",
+        "notes_en": "Mid-engine RWD turbo compact, with the 3S-GTE engine. Short wheelbase plus rear weight bias make handling very challenging; sudden snap oversteer is its notorious trait. Rev3 onward, the suspension was substantially revised for improvement.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -1622,6 +1655,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "傳奇 2JZ-GTE 雙渦輪直六引擎，改裝潛力無限。前雙A臂後多連桿懸吊提供出色的高速穩定性。RZ 為日規輕量運動版。接近完美的前後配重。",
+        "notes_en": "Legendary 2JZ-GTE twin-turbo inline-six with limitless tuning potential. Double-wishbone front, multi-link rear suspension delivers excellent high-speed stability. RZ is the JDM lightweight sport version. Near-perfect front/rear weight balance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -1663,6 +1697,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "與 BMW Z4 共用平台（J29），B58 3.0L 直六渦輪引擎。極短軸距賦予靈敏轉向反應，主動式電子差速器為標配。前麥花臣附鍛造鋁合金下臂。",
+        "notes_en": "Shares its platform with the BMW Z4 (J29), powered by the B58 3.0L turbo inline-six. Very short wheelbase gives sharp steering response; an active electronic diff is standard. Front MacPherson strut with forged aluminum lower arms.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -1704,6 +1739,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "經典輕量敞篷跑車，前後雙A臂懸吊配上完美配重。以駕駛樂趣著稱，全球賽道日最受歡迎車款之一。改裝零件市場極為豐富。人馬一體哲學的代表作。",
+        "notes_en": "Classic lightweight convertible, with double-wishbone suspension front and rear and perfect balance. Renowned for driving pleasure and one of the most popular track-day cars worldwide. Extremely rich aftermarket parts market. The flagship of the jinba-ittai philosophy.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1745,6 +1781,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "NA 的進化版，車身剛性大幅提升，維持前後雙A臂。底盤基本延續 NA 但經過全面強化，操控更精確。BP 1.8L 引擎可靠耐用，Mazdaspeed 版附渦輪。",
+        "notes_en": "Evolution of the NA with greatly improved body rigidity, retaining double-wishbone suspension front and rear. The chassis largely carries over from the NA but is comprehensively reinforced for more precise handling. The BP 1.8L engine is reliable and durable; the Mazdaspeed version adds a turbo.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1786,6 +1823,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "SKYACTIV 世代的 MX-5，回歸輕量化初衷，僅 1060kg。前雙A臂後多連桿為新設計，重心比 NA 還低。SKYACTIV-G 2.0L 引擎高轉延伸性佳。RF 硬頂版重約 45kg 多。",
+        "notes_en": "The SKYACTIV-generation MX-5, returning to its lightweight roots at just 1060kg. New design with double-wishbone front and multi-link rear; center of gravity is even lower than the NA. The SKYACTIV-G 2.0L engine extends well to high revs. The RF hardtop version weighs about 45kg more.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -1827,6 +1865,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "13B-REW 雙渦輪轉子引擎，前後雙A臂懸吊。極低的重心與緊湊的車身尺寸帶來銳利操控。初期型為 225/50R16 及 255/40R16，後期升級 17 吋。Spirit R 為最終限定版。",
+        "notes_en": "13B-REW twin-turbo rotary engine, with double-wishbone suspension front and rear. Very low center of gravity and compact dimensions deliver sharp handling. Early cars ran 225/50R16 and 255/40R16; later cars upgraded to 17-inch. Spirit R was the final limited edition.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -1868,6 +1907,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": true,
         "notes": "WRC 霸主的公路版，EJ20 水平對臥渦輪引擎搭配對稱式 AWD。DCCD 中央差速器可調前後扭力分配。前後麥花臣結構簡單但經拉力賽驗證。Ver.V/VI 為最受追捧的型號。",
+        "notes_en": "Road-going version of the WRC champion, with the EJ20 turbo flat-four and symmetrical AWD. The DCCD center diff adjusts front/rear torque split. MacPherson struts front and rear are simple but rally-proven. Ver.V/VI are the most sought-after models.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -1909,6 +1949,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "V6 機械增壓動力搭配輕量車身，賽道利器。雙叉臂懸吊可調性高，前後防傾桿均可調整。原廠減震器具備阻尼調整功能。",
+        "notes_en": "Supercharged V6 power in a lightweight body, a track weapon. Highly adjustable double-wishbone suspension, with adjustable anti-roll bars front and rear. Factory dampers feature adjustable damping.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -1950,6 +1991,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "蓮花最新中置跑車，兼顧日常與賽道。鋁合金底盤搭配雙叉臂懸吊，操控精準。可選配賽道套件含可調減震器。",
+        "notes_en": "Lotus's latest mid-engine sports car, balancing daily use and track work. Aluminum chassis with double-wishbone suspension for precise handling. An optional track pack adds adjustable dampers.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -1991,6 +2033,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "碳纖維單體殼底盤，液壓互連懸吊系統。三種駕駛模式（Normal/Sport/Track）改變減震器阻尼設定。無傳統防傾桿，由液壓系統替代。",
+        "notes_en": "Carbon-fiber monocoque chassis with a hydraulically interconnected suspension system. Three driving modes (Normal/Sport/Track) alter damper settings. No conventional anti-roll bars; the hydraulic system takes their place.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2032,6 +2075,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "第二代超級系列，Proactive Chassis Control II 液壓互連懸吊。碳纖維單體殼比570S更輕更剛。無傳統防傾桿，液壓系統提供主動側傾控制。",
+        "notes_en": "Second-generation Super Series, with Proactive Chassis Control II hydraulically interconnected suspension. Carbon-fiber monocoque is lighter and stiffer than the 570S. No conventional anti-roll bars; the hydraulic system provides active roll control.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2073,6 +2117,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "極致輕量化道路賽車，重心極低。De Dion 後軸提供獨立懸吊般的操控特性。無後防傾桿，後軸側傾剛度靠彈簧提供。對路面品質敏感，適合賽道使用。",
+        "notes_en": "Ultra-lightweight road racer with a very low center of gravity. The De Dion rear axle delivers handling characteristics close to independent suspension. No rear anti-roll bar; rear roll stiffness comes from the springs. Sensitive to surface quality and best suited to track use.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -2114,6 +2159,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "前驅鋼砲，短軸距帶來靈活操控。前輪負載高，注意推頭傾向。後多連桿懸吊提供良好的後軸循跡性。可選配電子避震器。",
+        "notes_en": "FWD hot hatch with a short wheelbase for agile handling. High front-wheel loading, so watch for understeer. Multi-link rear suspension provides good rear-axle traction. Electronic dampers optional.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2155,6 +2201,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "AMG 4.0T V8 動力，前中置引擎佈局接近50:50配重。自適應阻尼懸吊搭配雙叉臂結構。前後防傾桿可調，底盤調校偏向運動。",
+        "notes_en": "AMG 4.0T V8 power, with a front-mid engine layout giving near 50:50 balance. Adaptive damper suspension with a double-wishbone setup. Adjustable anti-roll bars front and rear; chassis tuning leans sporty.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2196,6 +2243,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "碳纖維單體殼結構，無動力轉向。前雙叉臂後麥花臣佈局特殊。極輕車重帶來出色的功率重量比。轉向手感直接但需要適應無助力特性。",
+        "notes_en": "Carbon-fiber monocoque construction with no power steering. Unusual layout: double-wishbone front, MacPherson strut rear. Very light weight gives an excellent power-to-weight ratio. Steering feel is direct but takes getting used to without assistance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2237,6 +2285,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "4.3L V8 自然進氣經典中置跑車。E-Diff 電子差速器首次應用。可選配磁流變減震器。前後雙叉臂提供優秀的幾何控制，但車重較現代車型偏高。",
+        "notes_en": "Classic mid-engine 4.3L V8 naturally aspirated. First application of the E-Diff electronic differential. Magnetorheological dampers optional. Front and rear double-wishbone gives excellent geometry control, but kerb weight is high by modern standards.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2278,6 +2327,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "小車身大馬力的義式鋼砲。後扭力樑懸吊限制了後軸調校空間，無後防傾桿。前驅佈局搭配短軸距，市區靈活但高速穩定性需注意。Koni FSD 減震器為選配。",
+        "notes_en": "Italian hot hatch, small body with big power. The rear torsion-beam suspension limits rear-axle tuning, with no rear anti-roll bar. FWD layout with a short wheelbase: nimble in town, but watch high-speed stability. Koni FSD dampers optional.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2319,6 +2369,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "GT 定位的大型前置後驅跑車，4.7L V8 自然進氣。Skyhook 自適應懸吊系統。車重偏高但軸距長，高速穩定性佳。底盤調校偏舒適，適合長途巡航。",
+        "notes_en": "Large front-engine, RWD GT, 4.7L V8 naturally aspirated. Skyhook adaptive suspension. Heavy but long wheelbase gives good high-speed stability. Comfort-biased chassis tuning, well suited to long-distance cruising.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2360,6 +2411,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "2.9L V6 雙渦輪增壓，完美50:50配重。前雙叉臂搭配後多連桿，底盤由Ferrari技術團隊調校。主動懸吊與Torque Vectoring差速器為標配。碳纖維傳動軸降低轉動慣量。",
+        "notes_en": "2.9L V6 twin-turbo, perfect 50:50 weight distribution. Front double-wishbone with rear multi-link, chassis tuned by Ferrari's engineering team. Active suspension and a torque-vectoring differential are standard. Carbon-fibre driveshaft reduces rotational inertia.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2401,6 +2453,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": true,
         "notes": "5.0L Coyote V8，首代獨立後懸吊 Mustang。前頭重，可透過加粗後防傾桿改善轉向特性。Performance Pack 包含更大煞車與 Torsen LSD。MagneRide 為 PP2 選配。",
+        "notes_en": "5.0L Coyote V8, first Mustang with independent rear suspension. Nose-heavy; turn-in can be improved with a thicker rear anti-roll bar. Performance Pack adds bigger brakes and a Torsen LSD. MagneRide optional on PP2.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -2442,6 +2495,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "最新世代 Mustang，5.0L V8 升級至486hp。MagneRide 3.0 列為 Performance Pack 標配。底盤結構強化，後副車架剛性提升。電子差速器取代機械式 LSD。",
+        "notes_en": "Latest-generation Mustang, 5.0L V8 raised to 486hp. MagneRide 3.0 is standard on the Performance Pack. Stiffened chassis structure and a more rigid rear subframe. Electronic differential replaces the mechanical LSD.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2483,6 +2537,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "5.2L Voodoo 平曲軸 V8，8250rpm紅線。MagneRide 標配，彈簧率顯著高於標準 GT。寬體輪拱容納超寬輪胎。賽道取向調校，日常舒適性妥協明顯。",
+        "notes_en": "5.2L Voodoo flat-plane-crank V8, 8250rpm redline. MagneRide standard, with spring rates significantly higher than the standard GT. Wide-body arches house ultra-wide tyres. Track-focused tuning with clear compromises to everyday comfort.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -2524,6 +2579,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "6.2L LT1 V8，Alpha 平台比前代大幅減重。MagneRide 為1LE套件標配。前麥花臣搭配五連桿後懸吊，操控表現超越同級。1LE套件加入電子限滑差速器。",
+        "notes_en": "6.2L LT1 V8, Alpha platform much lighter than its predecessor. MagneRide standard on the 1LE package. Front MacPherson strut with a five-link rear; handling beats its class rivals. The 1LE package adds an electronic limited-slip diff.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2565,6 +2621,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "6.2L LT4 機械增壓 V8，鋁合金車架。前後雙叉臂搭配 MagneRide 3.0 磁流變減震器。Z07套件增加碳纖維空力套件產生巨大下壓力。已知高溫賽道散熱問題。",
+        "notes_en": "6.2L LT4 supercharged V8, aluminium chassis. Front and rear double-wishbone with MagneRide 3.0 magnetorheological dampers. The Z07 package adds carbon-fibre aero for huge downforce. Known high-temperature track cooling issues.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -2606,6 +2663,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "首代中置引擎 Corvette，6.2L LT2 V8。MagneRide 4.0 標配（Z51套件）。從前置轉為中置佈局，重量分佈大幅改善。乾式油底殼設計降低重心。電子限滑差速器標配。",
+        "notes_en": "First mid-engine Corvette, 6.2L LT2 V8. MagneRide 4.0 standard (Z51 package). Switching from front- to mid-engine layout greatly improves weight distribution. Dry-sump design lowers the centre of gravity. Electronic limited-slip diff standard.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2647,6 +2705,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "6.2L HEMI 機械增壓 V8，717hp+。車重超過兩噸，前頭重比例高。Bilstein 自適應減震器標配。直線加速為主要設計取向，彎道性能受限於車重與前軸負載。寬體版增加輪距。",
+        "notes_en": "6.2L HEMI supercharged V8, 717hp+. Over two tonnes with a heavily nose-biased weight distribution. Bilstein adaptive dampers standard. Designed primarily for straight-line acceleration; cornering is limited by weight and front-axle load. Wide-body version widens the track.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2688,6 +2747,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "雙馬達全驅電動車，電池組位於底盤中央降低重心。車重偏高但重心極低，彎中穩定性佳。電動動力扭矩響應即時，出彎加速優勢明顯。原廠胎壓建議偏高以降低滾阻。",
+        "notes_en": "Dual-motor AWD EV, battery pack mounted centrally in the floor to lower the centre of gravity. Heavy but very low CoG, giving good mid-corner stability. Instant electric torque response gives a clear corner-exit advantage. Higher recommended tyre pressures from the factory to reduce rolling resistance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2729,6 +2789,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "2.3L EcoBoost 四驅鋼砲，GKN Twinster 後軸扭矩分配系統可實現甩尾模式。前軸負載高但四驅系統有效改善推頭。原廠配備 Cup 2 半熱熔胎。已知頭墊片問題需注意。",
+        "notes_en": "2.3L EcoBoost AWD hot hatch; the GKN Twinster rear-axle torque-vectoring system enables a drift mode. High front-axle load, but the AWD system effectively curbs understeer. Factory-fitted Cup 2 semi-slick tyres. Watch the known head-gasket issue.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -2770,6 +2831,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "2.0T 前驅性能房車，電子控制懸吊（ECS）標配。N Corner Carving Differential (e-LSD) 有效抑制扭矩轉向。N Grin Shift 提供短暫超增壓。賽道模式下 Launch Control 與 Rev Matching 自動啟用。性價比極高的賽道入門車。",
+        "notes_en": "2.0T FWD performance sedan, electronically controlled suspension (ECS) standard. The N Corner Carving Differential (e-LSD) effectively curbs torque steer. N Grin Shift provides a brief overboost. Launch Control and Rev Matching engage automatically in track mode. Excellent value as a track-day entry car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2811,6 +2873,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "E36 M3搭載S50/S52直六引擎，後軸採用經典Z-axle多連桿設計。重心適中，前後配重均勻，適合作為入門級駕駛訓練用車。",
+        "notes_en": "The E36 M3 runs the S50/S52 inline-six, with a classic Z-axle multi-link rear. Moderate CoG and balanced weight distribution make it a good entry-level driver-training car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2852,6 +2915,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "搭載S65 V8自然進氣引擎的E92 M3，高轉速特性鮮明。EDC電子避震可調，前後配重均衡，賽道表現優異。車重較高但底盤剛性出色。",
+        "notes_en": "The E92 M3 with its S65 naturally aspirated V8 has a distinctly high-revving character. EDC adaptive dampers adjustable, balanced weight distribution, and excellent track performance. Heavy but with outstanding chassis rigidity.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -2893,6 +2957,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "F80 M3使用S55雙渦輪直六引擎，大量碳纖維材料減輕車重。自適應M懸吊可調三段阻尼，碳纖維傳動軸降低簧下質量。轉向手感精準但路感回饋較E92少。",
+        "notes_en": "The F80 M3 uses the S55 twin-turbo inline-six, with extensive carbon-fibre to cut weight. Adaptive M suspension with three damper settings; carbon-fibre driveshaft reduces unsprung mass. Steering is precise but offers less road feel than the E92.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -2934,6 +2999,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "G80 M3搭載S58雙渦輪直六引擎，動力大幅提升。車重增加明顯，但底盤調校更為成熟。前後交錯輪圈尺寸(19/20)，後軸抓地力充足。Competition版標配自適應懸吊。",
+        "notes_en": "The G80 M3 runs the S58 twin-turbo inline-six with much higher power. Noticeably heavier, but with more mature chassis tuning. Staggered wheels (19/20) give ample rear-axle grip. Adaptive suspension standard on the Competition.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -2975,6 +3041,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "Z4 M搭載E46 M3的S54直六引擎，短軸距帶來極高靈活性。車身重心極低，敞篷結構但底盤剛性仍可接受。後軸容易滑動，需要精準的油門控制。",
+        "notes_en": "The Z4 M uses the E46 M3's S54 inline-six; its short wheelbase gives very high agility. Very low CoG, and chassis rigidity remains acceptable despite the convertible structure. The rear axle breaks loose easily, demanding precise throttle control.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3016,6 +3083,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "F87 M2基於2系Coupe平台，短軸距配合M差速器帶來極佳的操控樂趣。M2 Competition版搭載S55引擎。自適應懸吊可調，尺寸緊湊適合山路駕駛。",
+        "notes_en": "The F87 M2 is based on the 2 Series Coupe platform; the short wheelbase plus M differential delivers excellent handling fun. The M2 Competition runs the S55 engine. Adaptive suspension adjustable, and the compact dimensions suit mountain-road driving.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3057,6 +3125,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "G87 M2使用S58雙渦輪引擎與G80 M3共享動力總成，車重大幅增加。前後交錯輪圈設計(19/20)，標配自適應懸吊。車身尺寸較F87明顯加大。",
+        "notes_en": "The G87 M2 uses the S58 twin-turbo engine, sharing its powertrain with the G80 M3, with a significant weight increase. Staggered wheels (19/20) and standard adaptive suspension. Body dimensions are noticeably larger than the F87.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3098,6 +3167,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "718 Cayman S中置引擎佈局提供近乎完美的重心位置。前後均為MacPherson設計，motion ratio接近1:1。PASM可調避震標配，底盤平衡性為保時捷產品線中最佳。",
+        "notes_en": "The 718 Cayman S's mid-engine layout gives a near-perfect CoG location. MacPherson strut front and rear, with a motion ratio close to 1:1. PASM adjustable dampers standard; the best chassis balance in the Porsche line-up.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3139,6 +3209,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "718 GT4搭載4.0升自然進氣水平對臥六缸引擎，源自992世代。前後防傾桿可調，PASM避震可調。大尾翼提供額外下壓力，賽道取向但保留街道實用性。",
+        "notes_en": "The 718 GT4 runs a 4.0L naturally aspirated flat-six derived from the 992 generation. Adjustable anti-roll bars front and rear, plus adjustable PASM dampers. The large rear wing adds downforce; track-focused while retaining street usability.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3180,6 +3251,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": true,
         "notes": "964 RS為經典輕量化911，大幅減重至1220kg。後軸半乘曳臂設計在極限時較不可預測，需要豐富的駕駛經驗。前後防傾桿可手動調節，彈簧率較標準964大幅提升。",
+        "notes_en": "The 964 RS is a classic lightweight 911, cut down to 1220kg. The rear semi-trailing-arm design is less predictable at the limit and demands plenty of driving experience. Manually adjustable anti-roll bars front and rear, with spring rates much higher than the standard 964.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3221,6 +3293,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": true,
         "notes": "993 RS為最後的氣冷911 RS，後軸改用多連桿(LSA)設計大幅改善極限穩定性。自然進氣3.8升水平對臥引擎。輕量化車身配合賽道取向懸吊，是氣冷911的操控巔峰。",
+        "notes_en": "The 993 RS is the last air-cooled 911 RS; the rear axle switched to a multi-link (LSA) design that greatly improves stability at the limit. Naturally aspirated 3.8L flat-six. A lightweight body paired with track-oriented suspension makes it the handling peak of the air-cooled 911.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3262,6 +3335,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "Taycan 4S為純電動跑車，電池組安裝於底盤中央使重心極低(420mm)。前雙A臂後多連桿懸吊，PASM標配。車重超過2噸但底盤調校維持保時捷水準。後軸轉向可選配。",
+        "notes_en": "The Taycan 4S is a fully electric sports car; the battery pack mounted in the center of the chassis gives an extremely low center of gravity (420mm). Front double-wishbone, rear multi-link suspension, with PASM standard. Weighs over 2 tonnes, but the chassis tuning maintains Porsche standards. Rear-axle steering optional.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3303,6 +3377,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "W204 C63搭載M156 6.2升V8自然進氣引擎，動力充沛但車頭較重。前三連桿懸吊為賓士特色設計。Performance Package版配備機械式限滑差速器。底盤偏向舒適但仍具運動性。",
+        "notes_en": "The W204 C63 runs the M156 6.2L naturally aspirated V8, abundant power but nose-heavy. The front three-link suspension is a signature Mercedes design. The Performance Package version adds a mechanical limited-slip diff. Chassis leans toward comfort but still sporty.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3344,6 +3419,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "W205 C63 S搭載M177 4.0升雙渦輪V8引擎，動力提升且油耗改善。AMG Ride Control自適應避震可調三段。電子限滑差速器取代機械式，前軸負荷仍然偏高。",
+        "notes_en": "The W205 C63 S runs the M177 4.0L twin-turbo V8, with more power and improved fuel economy. AMG Ride Control adaptive dampers with three settings. An electronic limited-slip diff replaces the mechanical unit; front-axle load remains high.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3385,6 +3461,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "AMG GT採用前中置引擎佈局，M178 4.0升雙渦輪V8。前後雙A臂懸吊為鋁合金材質。後置變速箱(transaxle)實現47:53前後配重。電子避震三段可調，車身重心極低。",
+        "notes_en": "The AMG GT uses a front-mid-engine layout with the M178 4.0L twin-turbo V8. Double-wishbone suspension front and rear in aluminum. A rear-mounted transaxle achieves 47:53 weight distribution. Three-stage adaptive dampers and a very low center of gravity.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3426,6 +3503,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "RS3搭載2.5升直列五缸渦輪引擎，Quattro四驅系統前軸偏重明顯。Magnetic Ride磁流變避震可選配。前驅偏重的佈局在高速過彎時傾向推頭，需依賴四驅系統分配動力補償。",
+        "notes_en": "The RS3 runs a 2.5L inline-five turbo with the Quattro AWD system; markedly front-heavy. Magnetic Ride magnetorheological dampers optional. The front-biased layout tends toward understeer in high-speed corners, relying on the AWD system's torque distribution to compensate.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3467,6 +3545,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "R8 V10中置引擎全鋁車架，前後雙A臂懸吊源自賽車技術。Quattro四驅但後軸驅動偏重。5.2升V10自然進氣引擎，Magnetic Ride磁流變避震標配。重心極低，底盤平衡感極佳。",
+        "notes_en": "The R8 V10 has a mid-engine all-aluminum spaceframe, with front and rear double-wishbone suspension derived from racing. Quattro AWD but rear-drive biased. 5.2L naturally aspirated V10, with Magnetic Ride magnetorheological dampers standard. Very low center of gravity and excellent chassis balance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3508,6 +3587,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "TT RS搭載2.5升直列五缸渦輪引擎，與RS3共享動力總成。短軸距配合Quattro四驅，前軸偏重但操控靈活。Magnetic Ride可選配，底盤回饋直接。短車身在彎道中反應敏銳。",
+        "notes_en": "The TT RS runs a 2.5L inline-five turbo sharing its powertrain with the RS3. A short wheelbase with Quattro AWD makes it front-heavy but agile. Magnetic Ride optional, with direct chassis feedback. The short body responds sharply in corners.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3549,6 +3629,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "MQB平台打造的Mk7 GTI是鋼砲標竿，XDS電子限滑差速器補償前驅轉向不足。MK7.5 Performance版配備機械式LSD。後多連桿獨立懸吊(非扭力樑)提供優異的後軸穩定性。",
+        "notes_en": "The MQB-platform Mk7 GTI is the hot-hatch benchmark; XDS electronic limited-slip compensates for FWD understeer. The Mk7.5 Performance version adds a mechanical LSD. Independent rear multi-link suspension (not a torsion beam) provides excellent rear-axle stability.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3590,6 +3671,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "Golf R搭載EA888 2.0T引擎配合Haldex四驅系統。DCC自適應避震可選配，電子差速器鎖前後軸。比GTI重約130kg但四驅系統大幅提升出彎牽引力。前軸仍然偏重。",
+        "notes_en": "The Golf R runs the EA888 2.0T engine with a Haldex AWD system. DCC adaptive dampers optional, with an electronic diff locking front and rear axles. About 130kg heavier than the GTI, but the AWD system greatly improves corner-exit traction. Still front-heavy.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3631,6 +3713,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "Mk8 GTI延續MQB Evo平台，標配DCC自適應避震與Vehicle Dynamics Manager整合控制。EA888 Gen4引擎動力提升至245ps。電子限滑差速器(XDS+)更為精密，底盤電子化程度更高。",
+        "notes_en": "The Mk8 GTI continues on the MQB Evo platform, with DCC adaptive dampers and integrated Vehicle Dynamics Manager control as standard. EA888 Gen4 engine raises output to 245ps. The electronic limited-slip diff (XDS+) is more refined, with a higher level of chassis electronics.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3672,6 +3755,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "VAB 末代 STI，DCCD 中央差速器可調，Bilstein 避震可選，前重偏高但後雙 A 臂提供良好循跡性",
+        "notes_en": "The VAB, the final STI, with adjustable DCCD center diff and optional Bilstein dampers; front-heavy, but the rear double-wishbone provides good traction.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -3713,6 +3797,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "初代 86/BRZ 共用平台，極低重心（460mm），原廠胎刻意窄以強調駕駛樂趣，後雙 A 臂懸吊幾何優秀",
+        "notes_en": "First-gen 86/BRZ shared platform; very low center of gravity (460mm), deliberately narrow factory tires to emphasize driving fun, and excellent rear double-wishbone suspension geometry.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -3754,6 +3839,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "二代 BRZ，剛性提升50%，重心更低，2.4L 水平對臥引擎，鋁製車頂降低重心，內側後輪制動轉向控制",
+        "notes_en": "Second-gen BRZ; 50% stiffer, lower center of gravity, 2.4L flat-four, aluminum roof to lower the center of gravity, and inner-rear-wheel brake-based torque vectoring.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -3795,6 +3881,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": true,
         "notes": "最後的 4G63 渦輪引擎 Evo，ACD/AYC 主動中央/後差速器，MIVEC 可變氣門，拉力血統底盤調校",
+        "notes_en": "The last 4G63 turbo Evo, with ACD/AYC active center/rear diffs, MIVEC variable valve timing, and rally-bred chassis tuning.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -3836,6 +3923,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "末代 Evo，4B11T 引擎搭配 S-AWC 超級全輪控制系統，Eibach 彈簧搭配 Bilstein 避震，Brembo 煞車",
+        "notes_en": "The final Evo, with the 4B11T engine and S-AWC Super All Wheel Control system, Eibach springs paired with Bilstein dampers, and Brembo brakes.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -3877,6 +3965,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "不到一噸的渦輪小鋼砲，1.4T BoosterJet，後扭力樑結構簡單但調校出色，Monroe 避震器，極輕車重帶來靈活操控",
+        "notes_en": "A sub-one-tonne turbo hot hatch, 1.4T BoosterJet; the rear torsion beam is simple but well tuned, with Monroe dampers, and the very light weight gives agile handling.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3918,6 +4007,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "中置引擎 K-car，660cc 渦輪，極低重心，後 De Dion 軸式懸吊兼顧空間與操控，前後異尺寸輪胎強調後驅特性",
+        "notes_en": "A mid-engine kei car, 660cc turbo, very low center of gravity; the rear De Dion axle suspension balances space and handling, with staggered front/rear tires emphasizing its RWD character.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -3959,6 +4049,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "N 性能部門代表作，2.0T 275ps，電控 e-LSD，可調電子避震，N 模式排氣聲浪放大，後多連桿改善 FF 動態",
+        "notes_en": "A flagship of the N performance division, 2.0T 275ps, with electronically controlled e-LSD, adjustable electronic dampers, amplified exhaust note in N mode, and a rear multi-link improving FWD dynamics.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4000,6 +4091,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "WRC 血統小鋼砲，1.6T 204ps，後扭力樑有橫向穩定桿補強，機械式 LSD，N 部門調校底盤，輕量化車體",
+        "notes_en": "A WRC-bred hot hatch, 1.6T 204ps; the rear torsion beam is reinforced with an anti-roll bar, plus a mechanical LSD, N-division chassis tuning, and a lightweight body.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4041,6 +4133,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "電動 N 性能車，雙馬達 AWD 650ps，84kWh 電池，電子避震可調，e-LSD 前後軸皆有，虛擬換檔模擬，50:50 配重",
+        "notes_en": "An electric N performance car, twin-motor AWD 650ps, 84kWh battery, adjustable electronic dampers, e-LSD on both front and rear axles, simulated virtual gear shifting, and 50:50 weight distribution.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4082,6 +4175,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "Biermann 主導開發的韓系 GT，3.3T V6 370ps，後驅為主可選 AWD，前後多連桿五連桿設計，Brembo 煞車",
+        "notes_en": "A Korean GT developed under Biermann, 3.3T V6 370ps, primarily RWD with optional AWD, front/rear multi-link/five-link suspension, and Brembo brakes.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4123,6 +4217,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "ND 平台統規賽車，Long Road Racing 打造，防滾籠+賽車座椅，可調 Penske 避震，減重約80kg，統一規格確保公平競爭",
+        "notes_en": "An ND-platform spec racer built by Long Road Racing, with roll cage and racing seat, adjustable Penske dampers, around 80kg weight reduction, and uniform spec ensuring fair competition.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -4164,6 +4259,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "992 世代統規杯賽車，4.0L 水平對臥六缸 510ps，後置後驅，前 MacPherson 後多連桿可調，序列式 6 速犬牙齒輪箱",
+        "notes_en": "A 992-generation spec cup racer, 4.0L flat-six 510ps, rear-engine RWD, adjustable front MacPherson strut and rear multi-link, and a sequential 6-speed dog-gearbox.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4205,6 +4301,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "G82 M4 基礎的 GT4 級賽車，S58 3.0T 直六，前 MacPherson 後多連桿全可調，KW 四向可調避震，賽用 ABS 可調",
+        "notes_en": "GT4-class racer based on the G82 M4, S58 3.0T inline-six. Front MacPherson strut, rear multi-link, both fully adjustable. KW 4-way adjustable dampers, adjustable race ABS.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4246,6 +4343,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "GR86 統規賽車版，防滾籠+輕量化，可調避震器，後雙 A 臂幾何經賽事最佳化，ECU 統一管理確保公平性",
+        "notes_en": "Spec-series race version of the GR86 with roll cage and weight reduction. Adjustable dampers, rear double-wishbone geometry optimized for racing, ECU spec-locked to ensure fair competition.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4287,6 +4385,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "Huracán 統規賽車 EVO2 版，5.2L V10 後驅，雙 A 臂前後可調，序列式 6 速 X-Trac 變速箱，碳纖空力套件",
+        "notes_en": "EVO2 spec-series racer based on the Huracán, 5.2L V10 RWD. Front and rear double-wishbone, both adjustable. Sequential 6-speed X-Trac gearbox, carbon-fiber aero kit.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4328,6 +4427,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "296 GTB 為基礎的 GT3 級賽車，3.0 V6 雙渦輪（無 Hybrid），前後雙 A 臂全可調，高下壓力空力套件，極低重心",
+        "notes_en": "GT3-class racer based on the 296 GTB, 3.0 twin-turbo V6 (no hybrid). Fully adjustable front and rear double-wishbone, high-downforce aero kit, very low center of gravity.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4369,6 +4469,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "鋼管車架原型賽車，Ford EcoBoost 1.5L 渦輪約 230ps，極輕車重配高下壓力，前後雙 A 臂 Intrax 可調避震",
+        "notes_en": "Tubular-frame prototype racer, Ford EcoBoost 1.5L turbo at around 230 ps. Very light weight paired with high downforce, front and rear double-wishbone with adjustable Intrax dampers.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4410,6 +4511,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "極致輕量化管狀車架，Honda 2.0T 320ps，無車身面板，前後雙 A 臂不等長設計，Bilstein 可調避震，馬力重量比驚人",
+        "notes_en": "Extreme lightweight tubular spaceframe, Honda 2.0T 320 ps, no body panels. Unequal-length front and rear double-wishbone, adjustable Bilstein dampers, staggering power-to-weight ratio.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4451,6 +4553,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "三馬達 1020ps，0-100 km/h 2.1 秒，前雙 A 臂後多連桿全鋁懸吊，自適應氣壓避震可調，電池落地低重心",
+        "notes_en": "Tri-motor, 1020 ps, 0-100 km/h in 2.1 s. Front double-wishbone, rear multi-link, all-aluminum suspension, adjustable adaptive air suspension. Floor-mounted battery for a low center of gravity.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4492,6 +4595,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "G26 平台電動四門轎跑，雙馬達 544ps，前 MacPherson 後五連桿，自適應 M 懸吊可選，83.9kWh 電池，50:50 配重",
+        "notes_en": "G26-platform electric four-door coupe, dual-motor 544 ps. Front MacPherson strut, rear five-link, optional adaptive M suspension, 83.9 kWh battery, 50:50 weight balance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4533,6 +4637,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "CTB 電池車身一體化技術，刀片電池 82.5kWh，雙馬達 530ps，前 MacPherson 後五連桿，iTAC 智能扭矩控制",
+        "notes_en": "CTB cell-to-body integration, 82.5 kWh Blade battery, dual-motor 530 ps. Front MacPherson strut, rear five-link, iTAC intelligent torque control.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4574,6 +4679,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "S58 3.0T 直六 510ps，M xDrive 可切後驅，自適應 M 懸吊，高重心 SUV 但 M 部門強化防傾桿與副車架，主動式 M 差速器",
+        "notes_en": "S58 3.0T inline-six, 510 ps, M xDrive with rear-drive mode. Adaptive M suspension; high-CoG SUV but with M-division reinforced anti-roll bars and subframe, plus an active M differential.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4615,6 +4721,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "2.9T V6 440ps，PASM 主動氣壓懸吊降低 10mm，PTV Plus 扭矩分導後差速器，Sport Chrono 含賽道模式，SUV 中操控標竿",
+        "notes_en": "2.9T V6, 440 ps. PASM active air suspension lowered by 10 mm, PTV Plus torque-vectoring rear differential, Sport Chrono with track mode. A handling benchmark among SUVs.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4656,6 +4763,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "S13 是甩尾入門經典車款，SR20DET 渦輪引擎搭配輕量車身，前麥花臣後多連桿懸吊提供良好的操控基礎。原廠彈簧偏軟，多數玩家會升級強化彈簧與可調避震器。",
+        "notes_en": "The S13 is a classic entry-level drift car, SR20DET turbo engine paired with a lightweight body. Front MacPherson strut, rear multi-link suspension provides a solid handling base. Factory springs are soft, so most owners upgrade to stiffer springs and coilovers.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -4697,6 +4805,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "FL5 世代採用雙軸適應式減震器，前麥花臣後多連桿，原廠即配 Michelin PS4S。前驅鋼砲標竿，紐柏格林 FF 量產車紀錄保持者。",
+        "notes_en": "FL5 generation uses dual-axis adaptive dampers, front MacPherson strut, rear multi-link, with Michelin PS4S as standard. A front-drive hot-hatch benchmark and the Nürburgring FF production-car lap record holder.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4738,6 +4847,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "超輕量中置引擎跑車，底盤平衡極佳。原廠彈簧偏硬，適合賽道使用。後輪重量分佈高，注意轉向過度傾向。",
+        "notes_en": "Ultra-lightweight mid-engine sports car with excellent chassis balance. Factory springs are firm, suited to track use. High rear weight distribution; watch for oversteer tendency.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -4779,6 +4889,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "經典的E30 M3，S14直四引擎，輕量化車身使其操控極為靈活。後懸吊為半乘曳臂設計，極限操控需注意後軸抬升轉向特性。",
+        "notes_en": "The classic E30 M3, S14 inline-four, lightweight body making it extremely agile. Rear semi-trailing-arm suspension; at the limit, watch for rear-axle lift-induced steering behavior.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4820,6 +4931,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": true,
         "notes": "經典 GDB 世代（淚眼/鷹眼），前 MacPherson 後雙 A 臂，對稱式 AWD，前重偏多需注意推頭傾向",
+        "notes_en": "Classic GDB generation (Bugeye/Hawkeye), front MacPherson strut, rear double-wishbone, symmetrical AWD. Front-heavy, so watch for understeer tendency.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -4864,6 +4976,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "電動車 NISMO 運動版，低重心但車重較大，前驅配置，NISMO 專屬調校懸吊與空力套件，40kWh 電池",
+        "notes_en": "NISMO sport version of the electric Leaf, low center of gravity but heavy. FWD layout, NISMO-specific tuned suspension and aero kit, 40 kWh battery.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -4905,6 +5018,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "e-4ORCE 雙馬達 AWD 電動 SUV，NISMO 專屬運動懸吊與空力，91kWh 電池，NISMO 調校強化操控回饋",
+        "notes_en": "e-4ORCE dual-motor AWD electric SUV, NISMO-specific sport suspension and aero, 91 kWh battery, NISMO tuning for enhanced handling feedback.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -4946,6 +5060,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "VR38DETT 3.8L V6 雙渦輪 600ps，ATTESA E-TS AWD，Bilstein DampTronic 電控避震，NISMO 專屬碳纖維空力與強化車體剛性",
+        "notes_en": "VR38DETT 3.8L twin-turbo V6, 600 ps, ATTESA E-TS AWD, Bilstein DampTronic electronically controlled dampers, NISMO-specific carbon-fiber aero and reinforced body rigidity.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -4987,6 +5102,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "FM 平台首發，VQ35DE 3.5L V6 280ps，前後多連桿鋁合金副車架，與 Infiniti G35 共用平台，後驅操控佳",
+        "notes_en": "Debut of the FM platform, VQ35DE 3.5L V6, 280 ps, front and rear multi-link with aluminum subframes. Shares its platform with the Infiniti G35; strong rear-drive handling.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -5028,6 +5144,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "S20 直六 DOHC 24V 引擎（源自 GT-R），4 氣門 3 化油器 2 凸輪軸，僅生產 420 輛，Chapman 後懸吊輕量設計",
+        "notes_en": "S20 inline-six DOHC 24V engine (derived from the GT-R), 4 valves, 3 carburetors, 2 camshafts. Only 420 units built. Lightweight Chapman strut rear suspension.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -5069,6 +5186,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "SR20DET 230ps 四驅小鋼砲，WRC Group A 基礎車型，前重偏高但 AWD 補償抓地力，車身小巧靈活，ATTESA 全時四驅",
+        "notes_en": "SR20DET 230 ps AWD pocket rocket, the WRC Group A homologation base car. Front-heavy but AWD compensates for grip. Small, agile body, ATTESA full-time AWD.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -5110,6 +5228,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "非對稱設計的方塊車，HR15DE 1.5L 111ps，重心偏高但輕量車體，後扭力樑簡單可靠，適合趣味改裝",
+        "notes_en": "Asymmetrically styled box car, HR15DE 1.5L, 111 ps. High center of gravity but lightweight body, simple and reliable rear torsion-beam, good for fun modifications.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -5155,6 +5274,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "初代中置引擎 MR2，4A-GZE 機械增壓 145ps，輕量車體配中置引擎低慣性，後軸敏感需注意急減速時甩尾傾向",
+        "notes_en": "First-generation mid-engine MR2, 4A-GZE supercharged, 145 ps. Lightweight body with low mid-engine inertia. Sensitive rear axle; watch for lift-off oversteer tendency under hard deceleration.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -5196,6 +5316,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "WRC 傳奇 Celica，3S-GTE 2.0T 235ps，全時四驅，Carlos Sainz 駕駛奪冠車型，前後 MacPherson 結構簡單易改裝",
+        "notes_en": "Legendary WRC Celica. 3S-GTE 2.0T, 235ps, full-time 4WD; the Carlos Sainz championship-winning car. MacPherson strut front and rear keeps it simple and easy to modify.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -5237,6 +5358,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "4E-FTE 1.3L 渦輪 135ps，僅 900kg 極輕量車體，馬力重量比出色，後扭力樑簡單但極限高，日本走り屋名車",
+        "notes_en": "4E-FTE 1.3L turbo, 135ps in a featherweight 900kg body for an excellent power-to-weight ratio. Simple rear torsion-beam axle but a high limit; a Japanese street-racer icon.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -5278,6 +5400,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "2JZ-GTE 3.0L 雙渦輪 280ps（自主規制），JDM 版 Lexus GS300，前雙A臂後多連桿，直線加速性能改裝潛力極大",
+        "notes_en": "2JZ-GTE 3.0L twin-turbo, 280ps (gentleman's agreement limit). JDM Lexus GS300; double-wishbone front, multi-link rear, with huge tuning potential for straight-line acceleration.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -5319,6 +5442,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "D4D 柴油 FR 商用車改甩尾車！高重心極不穩定但極具娛樂性，板簧後軸容易滑移，需大幅改裝底盤才能安全漂移",
+        "notes_en": "D4D diesel RWD commercial van turned drift car! Very unstable from the high center of gravity but hugely entertaining; the leaf-sprung rear axle breaks away easily and needs extensive chassis work to drift safely.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -5360,6 +5484,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "1GZ-FE 5.0L V12 280ps，日本國寶級旗艦，全氣壓懸吊極致舒適，手工打造車身，重心高車體重但穩定性佳",
+        "notes_en": "1GZ-FE 5.0L V12, 280ps. Japan's national-treasure flagship. Full air suspension for ultimate ride comfort and a hand-built body; high center of gravity and heavy, but very stable.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -5401,6 +5526,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "TNGA-F 平台，V35A-FTS 3.5L V6 雙渦輪 415ps，E-KDSS 電控防傾桿，全時四驅加力箱，車重近 2.5 噸高重心但越野能力無敵",
+        "notes_en": "TNGA-F platform. V35A-FTS 3.5L V6 twin-turbo, 415ps. E-KDSS electronic anti-roll bars, full-time 4WD with transfer case; nearly 2.5 tonnes with a high center of gravity, but unbeatable off-road.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -5442,6 +5568,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "第五代 Prius 改採後雙 A 臂懸吊，TNGA-C 平台大幅提升操控，2.0L 油電 196ps，低風阻車體 Cd 0.27，重心極低",
+        "notes_en": "Fifth-gen Prius switches to a double-wishbone rear suspension; the TNGA-C platform greatly improves handling. 2.0L hybrid, 196ps, low-drag body at Cd 0.27 and a very low center of gravity.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -5487,6 +5614,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "2GR-FSE 3.5L V6 318ps，AVS 自適應可調避震，前雙 A 臂後多連桿，F Sport 專屬 LSD 選配，後驅運動房車",
+        "notes_en": "2GR-FSE 3.5L V6, 318ps. AVS adaptive variable suspension, double-wishbone front, multi-link rear; F Sport optional LSD. RWD sports sedan.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -5528,6 +5656,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "2UR-GSE 5.0L V8 471ps，GA-L 後驅平台，前後多連桿全鋁懸吊，AVS 自適應避震，碳纖維車頂選配，GT 旗艦跑車",
+        "notes_en": "2UR-GSE 5.0L V8, 471ps. GA-L RWD platform, all-aluminum multi-link suspension front and rear, AVS adaptive suspension, optional carbon-fiber roof. GT flagship coupe.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -5569,6 +5698,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "2UR-GSE 5.0L V8 472ps，Torsen LSD，TVD 扭矩分導系統，前雙 A 臂後多連桿，AVS 自適應避震，碳纖維引擎蓋選配",
+        "notes_en": "2UR-GSE 5.0L V8, 472ps. Torsen LSD, TVD torque-vectoring system, double-wishbone front, multi-link rear, AVS adaptive suspension, optional carbon-fiber hood.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -5610,6 +5740,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "2UR-GSE 5.0L V8 477ps，TVD 扭矩分導差速器，前雙 A 臂後多連桿，AVS 自適應避震標配，最後的 V8 四門運動房車",
+        "notes_en": "2UR-GSE 5.0L V8, 477ps. TVD torque-vectoring differential, double-wishbone front, multi-link rear, AVS adaptive suspension standard. The last of the V8 four-door sports sedans.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -5651,6 +5782,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "2UR-GSE 5.0L V8 423ps，Torsen LSD，首款 Lexus F 性能車，前雙 A 臂後多連桿，專屬強化副車架與彈簧，8 速 SPDS 變速箱",
+        "notes_en": "2UR-GSE 5.0L V8, 423ps. Torsen LSD, the first Lexus F performance car; double-wishbone front, multi-link rear, dedicated reinforced subframe and springs, 8-speed SPDS transmission.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -5696,6 +5828,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "ER 1.2L 渦輪 110ps 僅 735kg，附贈 Motocompo 折疊摩托車！寬體套件為標配，極輕量前驅小鋼砲",
+        "notes_en": "ER 1.2L turbo, 110ps, just 735kg, and it came with the folding Motocompo scooter! Wide-body kit standard; an ultra-light FWD hot hatch.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -5737,6 +5870,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "CR-X 精神後繼，LEA 1.5L+IMA 油電混合 6MT，輕量車體低重心，精神上的運動油電車，後扭力樑但調校積極",
+        "notes_en": "Spiritual successor to the CR-X. LEA 1.5L plus IMA hybrid with a 6-speed manual; light body, low center of gravity. A sporty hybrid in spirit, with a rear torsion beam but aggressive tuning.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -5778,6 +5912,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "後置馬達後驅電動車！154ps 最小迴轉半徑 4.3m，35.5kWh 電池低重心，後驅配置操控樂趣極高，可惜已停產",
+        "notes_en": "Rear-motor, RWD EV! 154ps, a tiny 4.3m turning radius, 35.5kWh battery low in the chassis. The RWD layout makes it great fun to drive; sadly discontinued.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -5823,6 +5958,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "世界首款量產雙轉子引擎車，10A 型 110ps，僅生產 1,519 輛，De Dion 後軸兼顧輕量與剛性，日本汽車工業里程碑",
+        "notes_en": "The world's first production twin-rotor car. Type 10A, 110ps, only 1,519 built. De Dion rear axle balances light weight and rigidity; a milestone of Japanese automotive industry.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -5864,6 +6000,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "SKYACTIV 平台 SUV，2.5L NA 190ps 或 2.2D 190ps，G-Vectoring Control Plus 動態控制，同級操控標竿",
+        "notes_en": "SKYACTIV-platform SUV. 2.5L naturally aspirated 190ps or 2.2D 190ps. G-Vectoring Control Plus dynamic control; a class handling benchmark.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -5905,6 +6042,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "世界唯一量產三轉子引擎 20B-REW 雙渦輪 300ps，豪華 GT 定位，前雙 A 臂後多連桿，電控懸吊，油耗驚人但動力順滑",
+        "notes_en": "The world's only production triple-rotor car, the 20B-REW twin-turbo, 300ps. Positioned as a luxury GT; double-wishbone front, multi-link rear, electronically controlled suspension. Terrible fuel economy but silky power delivery.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -5950,6 +6088,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "後置引擎 660cc 輕卡，空車時後軸極重，載貨後反而平衡。短軸距敏捷但容易 snap oversteer，Sambar 甩尾王者傳說",
+        "notes_en": "Rear-engined 660cc kei truck; the rear axle is very heavy when empty but balances out under load. Short wheelbase makes it nimble but prone to snap oversteer; the stuff of Sambar drift-king legend.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -5991,6 +6130,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "SGP 平台，FB25 2.5L 水平對臥 182ps，對稱式 AWD，後雙 A 臂懸吊，最低離地高 220mm，跨界 SUV 中操控佳",
+        "notes_en": "SGP platform. FB25 2.5L flat-four, 182ps, symmetrical AWD, double-wishbone rear, 220mm ground clearance. Strong handling for a crossover SUV.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6036,6 +6176,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "4G15 MIVEC 1.5L 渦輪 163ps，Ralliart 調校底盤，CVT 附模擬 6 速手動模式，輕量前驅小鋼砲",
+        "notes_en": "4G15 MIVEC 1.5L turbo, 163ps. Ralliart-tuned chassis, CVT with a simulated 6-speed manual mode; a light FWD hot hatch.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6077,6 +6218,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "6A12 MIVEC 2.0L V6 200ps，日本年度風雲車，前驅但 MIVEC V6 高轉快感，後多連桿提供良好循跡性，可惜未正式外銷",
+        "notes_en": "6A12 MIVEC 2.0L V6, 200ps. Japan Car of the Year; FWD, but the high-revving MIVEC V6 is a thrill, with a multi-link rear for good grip. Sadly never officially exported.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6118,6 +6260,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "4G63T 2.0L 渦輪 210ps AWD，與 Evo 共用引擎，DSM 平台最強版本，改裝潛力巨大，Fast & Furious 名車",
+        "notes_en": "4G63T 2.0L turbo, 210ps, AWD. Shares its engine with the Evo and is the strongest version of the DSM platform; huge tuning potential. A Fast & Furious icon.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6163,6 +6306,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "Giugiaro 設計的日本美學名車，G161 1.6L DOHC 120ps，前雙 A 臂後半曳臂，手工車身（初期型），收藏價值極高",
+        "notes_en": "A Japanese design icon styled by Giugiaro. G161 1.6L DOHC, 120ps, double-wishbone front, semi-trailing-arm rear, hand-built body (early cars); highly collectible.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6204,6 +6348,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "660cc 3 氣筒後置引擎單座輕卡，僅 530kg！極短軸距超靈活，三輪車精神後繼，短距離賽道趣味滿點的話題車",
+        "notes_en": "660cc 3-cylinder rear-engine single-seat kei truck, just 530kg! Ultra-short wheelbase makes it extremely agile; spiritual successor to the three-wheeler, a fun talking-point car on short circuits.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6245,6 +6390,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "M15A 1.5L 110ps，輕量 950kg 小車運動版，鈴木的隱藏版小鋼砲，後扭力樑但車身極輕，彎道靈活度出色",
+        "notes_en": "M15A 1.5L, 110ps. Lightweight 950kg sporty city car; Suzuki's hidden-gem hot hatch. Rear torsion beam, but the very light body gives excellent cornering agility.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6290,6 +6436,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "TNGA-C 平台，2ZR-FXE 1.8L 油電 122ps，GR Sport 專屬強化懸吊，後雙 A 臂同級少見，低重心造型設計",
+        "notes_en": "TNGA-C platform; 2ZR-FXE 1.8L hybrid, 122ps. GR Sport-specific stiffened suspension, rear double-wishbone (rare in this class), low-slung styling.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6331,6 +6478,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "e:HEV 1.5L 油電 131ps，RS 版運動懸吊調校，後扭力樑但 Honda 調校出色，Magic Seat 多功能座椅",
+        "notes_en": "e:HEV 1.5L hybrid, 131ps. RS sport suspension tuning; rear torsion beam, but Honda's tuning is excellent. Magic Seat multi-configuration seating.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6372,6 +6520,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "SKYACTIV 平台小型 SUV，P5-VPS 2.0L 148ps，GVC Plus 動態控制，後扭力樑但 Mazda 底盤調校精準，同級操控佳",
+        "notes_en": "SKYACTIV platform compact SUV; P5-VPS 2.0L, 148ps. GVC Plus dynamic control. Rear torsion beam, but Mazda's precise chassis tuning gives class-leading handling.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6413,6 +6562,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "SGP 平台，FA24 2.4L 渦輪水平對臥 260ps，對稱式 AWD，後雙 A 臂，X-MODE 越野模式，最低離地高 213mm",
+        "notes_en": "SGP platform; FA24 2.4L turbo flat-four, 260ps. Symmetrical AWD, rear double-wishbone, X-MODE off-road mode, 213mm minimum ground clearance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6454,6 +6604,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "CMF-C/D 平台（與 Nissan 共用），2.4L+雙馬達 PHEV 255ps，S-AWC 超級全輪控制，20kWh 電池，純電續航 87km",
+        "notes_en": "CMF-C/D platform (shared with Nissan); 2.4L plus twin-motor PHEV, 255ps. S-AWC Super All Wheel Control, 20kWh battery, 87km electric range.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6499,6 +6650,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "TNGA-K 平台，T24A-FTS 2.4T 275ps，AVS 自適應可調避震，後雙 A 臂，F Sport 專屬運動懸吊與煞車",
+        "notes_en": "TNGA-K platform; T24A-FTS 2.4T, 275ps. AVS adaptive variable suspension, rear double-wishbone, F Sport-specific sport suspension and brakes.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6540,6 +6692,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "TNGA-K 平台，2.4T 油電 371ps，DIRECT4 前後電動馬達驅動力可變分配，AVS 自適應避震，前後異尺寸輪胎強化運動性",
+        "notes_en": "TNGA-K platform; 2.4T hybrid, 371ps. DIRECT4 variable front/rear electric-motor torque distribution, AVS adaptive suspension, staggered front/rear tyres for added sportiness.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6581,6 +6734,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "TNGA-K 平台 PHEV，A25A-FXS 2.5L+雙馬達 306ps，純電續航 68km，18.1kWh 電池，後雙 A 臂，0-100 km/h 6.0 秒",
+        "notes_en": "TNGA-K platform PHEV; A25A-FXS 2.5L plus twin-motor, 306ps. 68km electric range, 18.1kWh battery, rear double-wishbone, 0-100 km/h in 6.0s.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6622,6 +6776,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "e:HEV 2.0L 油電 184ps，Honda 新世代 SUV，後多連桿懸吊提供良好穩定性，Honda SENSING 標配",
+        "notes_en": "e:HEV 2.0L hybrid, 184ps. Honda's new-generation SUV; rear multi-link suspension provides good stability. Honda SENSING standard.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6663,6 +6818,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "e-POWER 串聯式油電+雙馬達 AWD，e-4ORCE 精密前後扭矩控制，KR15DDT 1.5T 發電用，煞車時後馬達回生平衡車身姿態",
+        "notes_en": "e-POWER series hybrid plus twin-motor AWD; e-4ORCE precise front/rear torque control. KR15DDT 1.5T runs as a generator; under braking the rear motor regenerates to balance body attitude.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6708,6 +6864,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "e-SKYACTIV 電動馬達 145ps，35.5kWh 小電池策略，Freestyle 對開門設計，GVC Plus 電動版，續航 256km",
+        "notes_en": "e-SKYACTIV electric motor, 145ps. 35.5kWh small-battery strategy, Freestyle rear-hinged doors, GVC Plus (EV version), 256km range.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6749,6 +6906,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "e-SUBARU GLOBAL 平台（與 bZ4X 共同開發），雙馬達 AWD 218ps，71.4kWh 電池，X-MODE 越野模式，Grip Control",
+        "notes_en": "e-SUBARU GLOBAL platform (co-developed with the bZ4X); twin-motor AWD, 218ps. 71.4kWh battery, X-MODE off-road mode, Grip Control.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6790,6 +6948,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "e-TNGA 平台，雙馬達 AWD 218ps，71.4kWh 電池，與 Solterra 共同開發，太陽能車頂選配，低重心電池配置",
+        "notes_en": "e-TNGA platform; twin-motor AWD, 218ps. 71.4kWh battery, co-developed with the Solterra, optional solar roof, low centre of gravity from the floor-mounted battery.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6831,6 +6990,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "日本年度風雲車！輕自動車電動車，EM47 馬達 64ps，20kWh 電池，低重心電池配置，續航 180km，城市通勤最佳",
+        "notes_en": "Japan Car of the Year! Kei electric car; EM47 motor, 64ps. 20kWh battery, low centre of gravity from the battery layout, 180km range, ideal for city commuting.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6872,6 +7032,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "S07B 660cc 渦輪 64ps 6MT！N 系列唯一手排，RS 專屬 CVT/6MT 選擇，輕量車體回歸初代 N360 精神，操控樂趣滿點的現代輕自動車",
+        "notes_en": "S07B 660cc turbo, 64ps, 6MT! The only manual in the N series; RS offers a choice of CVT or 6MT. Lightweight body that returns to the spirit of the original N360 — a thoroughly fun modern kei car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6914,6 +7075,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": true,
         "notes": "第三代 Supra，直六 7M-GTE 渦輪引擎，前後重量分佈良好，GT 風格巡航車",
+        "notes_en": "Third-generation Supra; inline-six 7M-GTE turbo engine, good front/rear weight distribution, GT-style cruiser.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -6955,6 +7117,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "WRC 拉力賽血統，3S-GTE 渦輪引擎搭配全時四驅，前置引擎導致前重偏高",
+        "notes_en": "WRC rally heritage; 3S-GTE turbo engine with full-time 4WD. Front engine results in a slightly front-heavy bias.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -6996,6 +7159,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "甩尾神車，1JZ-GTE 渦輪直六搭配後驅，優異的前後配重，漂移文化代表車款",
+        "notes_en": "Legendary drift car; 1JZ-GTE turbo inline-six with rear-wheel drive, excellent front/rear weight balance, an icon of drift culture.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -7037,6 +7201,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "JZX 系列中堅車型，1JZ-GTE 渦輪引擎，舒適取向但仍具改裝潛力，漂移入門選擇",
+        "notes_en": "A mainstay of the JZX series; 1JZ-GTE turbo engine, comfort-oriented but still with good tuning potential, an entry-level drift choice.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -7078,6 +7243,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "3S-GE BEAMS 自然進氣高轉引擎，輕量後驅運動房車，海外以 Lexus IS200/300 銷售",
+        "notes_en": "3S-GE BEAMS naturally aspirated high-revving engine; lightweight RWD sports sedan, sold overseas as the Lexus IS200/300.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -7119,6 +7285,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "豪華 GT 跑車，1JZ-GTE 渦輪引擎，海外以 Lexus SC300/400 銷售，電子懸吊可調",
+        "notes_en": "Luxury GT coupe; 1JZ-GTE turbo engine, sold overseas as the Lexus SC300/400, adjustable electronic suspension.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -7160,6 +7327,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "日本皇冠運動版，2.0T 或 3.5L V6 引擎，後驅豪華房車，AVS 自適應懸吊系統",
+        "notes_en": "Sport version of Japan's Crown; 2.0T or 3.5L V6 engine, RWD luxury sedan, AVS adaptive suspension system.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -7201,6 +7369,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "Silvia 系列經典車型，CA18DET/SR20DET 渦輪引擎，輕量車身搭配後驅，漂移始祖",
+        "notes_en": "Classic Silvia, CA18DET/SR20DET turbo engine, light body with RWD; the original drift machine.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -7242,6 +7411,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "翻燈版 Silvia，SR20DET 渦輪引擎，掀背車身提供更好的空力效果，與 S13 共享底盤",
+        "notes_en": "Pop-up headlight Silvia, SR20DET turbo, hatchback body for better aero; shares its chassis with the S13.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -7283,6 +7453,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "VG30DETT 雙渦輪 V6 引擎，四輪多連桿懸吊，前後輪距配置略有差異，操控性優異",
+        "notes_en": "VG30DETT twin-turbo V6, four-wheel multi-link suspension; slightly different front/rear track widths, excellent handling.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -7324,6 +7495,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "VQ35DE 自然進氣 V6 引擎，FM 平台前中置引擎配置，重心低且配重優異",
+        "notes_en": "VQ35DE naturally aspirated V6, FM platform front-mid engine layout; low center of gravity and excellent weight distribution.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -7365,6 +7537,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "四門 Skyline 後驅版，RB25DET NEO 渦輪直六，比 GT-R 輕且更靈活，漂移愛好者首選",
+        "notes_en": "Four-door RWD Skyline, RB25DET NEO turbo inline-six; lighter and more agile than the GT-R, a drift favorite.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -7406,6 +7579,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "日產旗艦豪華房車，VK45DE 4.5L V8 引擎，電子控制懸吊，相當於 Infiniti Q45",
+        "notes_en": "Nissan's flagship luxury sedan, VK45DE 4.5L V8, electronically controlled suspension; equivalent to the Infiniti Q45.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -7447,6 +7621,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "旅行車版 GT-R，搭載 RB26DETT 引擎及 ATTESA E-TS 四驅系統，實用性與性能兼備",
+        "notes_en": "Wagon version of the GT-R, RB26DETT engine with ATTESA E-TS AWD; combines practicality and performance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -7488,6 +7663,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "BTCC 英國房車賽冠軍血統，SR20DE 引擎，多連桿後懸吊提供優於同級的操控性",
+        "notes_en": "BTCC British touring car championship bloodline, SR20DE engine; multi-link rear suspension delivers class-leading handling.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -7529,6 +7705,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "B16A VTEC 自然進氣引擎，超輕車身僅 1040kg，前後雙 A 臂懸吊，山路利器",
+        "notes_en": "B16A naturally aspirated VTEC, ultra-light 1040kg body, front and rear double-wishbone suspension; a touge weapon.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -7570,6 +7747,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "首代 VTEC Civic，B16A 引擎，僅 960kg 的極致輕量化，四輪雙 A 臂懸吊先驅",
+        "notes_en": "First-generation VTEC Civic, B16A engine, extreme 960kg lightweight build; a pioneer of four-wheel double-wishbone suspension.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -7611,6 +7789,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "H22A VTEC 高轉引擎，前後雙 A 臂懸吊，前驅跑車代表，機械式四輪轉向系統",
+        "notes_en": "H22A high-revving VTEC, front and rear double-wishbone suspension; a FWD sports car icon with mechanical four-wheel steering.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -7652,6 +7831,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "K20A 高轉 VTEC 引擎搭配 6 速手排，前後雙 A 臂懸吊，限量運動房車，螺旋式 LSD",
+        "notes_en": "K20A high-revving VTEC with 6-speed manual, front and rear double-wishbone suspension; limited-run sport sedan with helical LSD.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -7693,6 +7873,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "L15B 直噴引擎搭配 CVT/6MT，超輕量掀背車，One-Make 賽事人氣車款",
+        "notes_en": "L15B direct-injection engine with CVT/6MT, ultra-light hatchback; a popular one-make race car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -7734,6 +7915,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "3.5L V6 雙渦輪混合動力超跑，三電動馬達 SH-AWD 四驅系統，磁流變阻尼器",
+        "notes_en": "3.5L V6 twin-turbo hybrid supercar, three-electric-motor SH-AWD system, magnetorheological dampers.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -7775,6 +7957,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "K20A 高轉 VTEC 引擎，8400rpm 紅線，螺旋式 LSD，Type R 最後的前驅純粹駕駛體驗",
+        "notes_en": "K20A high-revving VTEC, 8400rpm redline, helical LSD; the last pure FWD driving experience of the Type R.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -7816,6 +7999,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": true,
         "notes": "13B-T 渦輪轉子引擎，輕量緊湊車身，近乎 50:50 配重，渦輪轉子的經典代表",
+        "notes_en": "13B-T turbo rotary engine, light and compact body, near 50:50 weight distribution; a classic of the turbo rotary era.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -7857,6 +8041,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "RENESIS 13B-MSP 自然進氣轉子引擎，9000rpm 紅線，前中置引擎 51:49 完美配重",
+        "notes_en": "RENESIS 13B-MSP naturally aspirated rotary, 9000rpm redline, front-mid engine layout with perfect 51:49 weight distribution.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -7898,6 +8083,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "第三代 MX-5，MZR 2.0L 引擎，比 NB 略大但仍保持輕量後驅精神，電動硬頂可選",
+        "notes_en": "Third-generation MX-5, MZR 2.0L engine; slightly larger than the NB but keeping the lightweight RWD spirit, with optional power hardtop.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -7939,6 +8125,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "SKYACTIV-G 2.0L/2.5L 引擎，GVC Plus 動態控制技術，AWD 可選，設計導向掀背車",
+        "notes_en": "SKYACTIV-G 2.0L/2.5L engines, GVC Plus dynamic control, optional AWD; a design-led hatchback.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -7980,6 +8167,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "SKYACTIV-G 2.5L/2.5T 引擎，GVC 動態控制，多連桿後懸吊提供同級領先操控性",
+        "notes_en": "SKYACTIV-G 2.5L/2.5T engines, GVC dynamic control; multi-link rear suspension delivers class-leading handling.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -8021,6 +8209,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "SKYACTIV-G 1.5L 引擎，超輕量小型車，全日本 Mazda Party Race 賽事車款",
+        "notes_en": "SKYACTIV-G 1.5L engine, ultra-light subcompact; the race car of the all-Japan Mazda Party Race series.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -8062,6 +8251,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "EJ25 渦輪水平對臥引擎，STI 調校懸吊與 Brembo 煞車，跨界 SUV 性能版",
+        "notes_en": "EJ25 turbo boxer engine, STI-tuned suspension and Brembo brakes; the performance version of the crossover SUV.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -8103,6 +8293,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "EJ20 渦輪水平對臥引擎，全時四驅旅行車，5MT/4AT 可選，兼顧日常與性能",
+        "notes_en": "EJ20 turbo boxer engine, full-time AWD wagon, 5MT/4AT options; balances daily use and performance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -8144,6 +8335,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "CB18 1.8L 直噴渦輪引擎，電子控制阻尼器 STI 調校，EyeSight X 先進駕駛輔助",
+        "notes_en": "CB18 1.8L direct-injection turbo, STI-tuned electronically controlled dampers, EyeSight X advanced driver assistance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -8185,6 +8377,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "FA24 2.4L 直噴渦輪水平對臥引擎，SGP 全球平台，後雙 A 臂懸吊，6MT/CVT 可選",
+        "notes_en": "FA24 2.4L direct-injection turbo flat-four; SGP global platform; rear double-wishbone suspension; 6MT or CVT.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -8226,6 +8419,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "4G63 渦輪引擎 280ps，首度採用 Brembo 煞車與加寬車體，AYC 主動偏擺控制系統",
+        "notes_en": "4G63 turbo, 280ps; first Evo with Brembo brakes and a widened body; AYC active yaw control.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -8267,6 +8461,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "Tommi Mäkinen Edition，WRC 冠軍紀念版，鈦合金渦輪，強化懸吊與空力套件",
+        "notes_en": "Tommi Mäkinen Edition; WRC-title commemorative model; titanium turbo; uprated suspension and aero kit.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -8308,6 +8503,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "改用 CT9A 底盤加長軸距，4G63 渦輪引擎，ACD 主動中央差速器首度搭載",
+        "notes_en": "Switched to the CT9A chassis with a longer wheelbase; 4G63 turbo; first Evo with ACD active center differential.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -8349,6 +8545,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "MR 為 Mitsubishi Racing 版，Bilstein 阻尼器，Super AYC 超級主動偏擺控制系統",
+        "notes_en": "MR is the Mitsubishi Racing version; Bilstein dampers; Super AYC super active yaw control.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -8390,6 +8587,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "6G72 雙渦輪 V6 引擎搭配四驅四輪轉向，重達 1710kg，海外以 3000GT VR-4 銷售",
+        "notes_en": "6G72 twin-turbo V6 with AWD and four-wheel steering; weighs 1710kg; sold overseas as the 3000GT VR-4.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -8431,6 +8629,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "1.5L 直噴渦輪引擎，S-AWC 超級全輪控制系統，三菱最後的跨界 SUV 產品線",
+        "notes_en": "1.5L direct-injection turbo; S-AWC super all-wheel control; Mitsubishi's final crossover SUV line.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -8472,6 +8671,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "660cc 渦輪三缸後驅輕跑，僅 700kg，前後雙 A 臂懸吊，三片式可拆車頂，ABC 三兄弟之一",
+        "notes_en": "660cc turbo three-cylinder rear-drive roadster; just 700kg; front and rear double-wishbone; three-piece removable roof; one of the ABC trio.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -8513,6 +8713,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "R06A 660cc 渦輪引擎，非承載式車身梯型車架，前後硬軸懸吊，純粹越野小型 SUV",
+        "notes_en": "R06A 660cc turbo; body-on-frame ladder chassis; live axles front and rear; a pure off-road compact SUV.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -8554,6 +8755,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "R06A 660cc 渦輪引擎搭配 5AGS/5MT，僅 670kg 的超輕量車身，山路利器",
+        "notes_en": "R06A 660cc turbo with 5AGS or 5MT; ultra-light body at just 670kg; a mountain-road weapon.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -8595,6 +8797,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "KF-VET 660cc 渦輪引擎，D-Frame 骨架結構，電動硬頂敞篷，GR Sport 版可選",
+        "notes_en": "KF-VET 660cc turbo; D-Frame structure; electric retractable hardtop convertible; GR Sport version available.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -8636,6 +8839,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "KF-VE/KF-VET 660cc 引擎，輕量高頂輕自動車，日常通勤代步車款",
+        "notes_en": "KF-VE/KF-VET 660cc engine; lightweight tall-body kei car; an everyday commuter.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -8677,6 +8881,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "E07A 660cc MTREC 三氣缸中置引擎，自然進氣 8100rpm 紅線，ABC 三兄弟之一",
+        "notes_en": "E07A 660cc MTREC three-cylinder mid-engine; naturally aspirated with an 8100rpm redline; one of the ABC trio.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -8718,6 +8923,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "HR15DE 1.5L 引擎搭配 5MT，NISMO 調校懸吊與車身剛性強化，輕量入門運動車",
+        "notes_en": "HR15DE 1.5L with 5MT; NISMO-tuned suspension and stiffened body; a lightweight entry-level sports car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -8759,6 +8965,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "HR16DE 1.6L 引擎搭配 5MT，NISMO 專用 ECU 調校與強化懸吊，實用型運動掀背",
+        "notes_en": "HR16DE 1.6L with 5MT; NISMO-specific ECU tune and uprated suspension; a practical sporty hatchback.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -8800,6 +9007,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "1.8L 機械增壓引擎，Lotus 協助底盤調校，限量 400 台歐洲版，Gazoo Racing 首款量產車",
+        "notes_en": "1.8L supercharged engine; chassis tuned with Lotus; limited to 400 European units; Gazoo Racing's first production car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -8841,6 +9049,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "V8 5.0L 2UR-FSE 引擎，日本皇室御用車 GRMN 特仕版，21 吋碳纖維鍛造輪框，僅一台",
+        "notes_en": "5.0L 2UR-FSE V8; GRMN special edition of the Japanese imperial limousine; 21-inch forged carbon wheels; one-off, single unit.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -8882,6 +9091,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "1LR-GUE 4.8L V10 自然進氣引擎，9000rpm 紅線，碳纖維複合材料車身，限量 500 台超級跑車",
+        "notes_en": "1LR-GUE 4.8L naturally aspirated V10 with a 9000rpm redline; carbon-fiber composite body; supercar limited to 500 units.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -8923,6 +9133,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "經典義大利 GT 跑車，V6 引擎前驅配置",
+        "notes_en": "Classic Italian GT coupe; V6 engine, front-wheel drive.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -8964,6 +9175,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "搭載 3.2L V6 Busso 引擎的高性能房車，前驅配置",
+        "notes_en": "High-performance sedan powered by the 3.2L Busso V6; front-wheel drive.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9005,6 +9217,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "小型高性能掀背車，配備 DNA 駕駛模式選擇系統",
+        "notes_en": "Compact hot hatch; features the DNA driving-mode selector.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -9046,6 +9259,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "搭載 2.9L V6 雙渦輪引擎的高性能 SUV，紐柏林最速 SUV 紀錄保持者",
+        "notes_en": "High-performance SUV with a 2.9L twin-turbo V6; holds the Nürburgring SUV lap record.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9087,6 +9301,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "全鋁車身中置引擎超跑，搭載 3.6L V8 引擎",
+        "notes_en": "All-aluminum mid-engine supercar powered by a 3.6L V8.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9128,6 +9343,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "自然進氣 4.5L V8 中置引擎超跑，570 匹馬力",
+        "notes_en": "Naturally aspirated 4.5L V8 mid-engine supercar; 570 hp.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9169,6 +9385,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "恩佐·法拉利親自批准的最後一款超跑，雙渦輪 V8 引擎，碳纖維與凱夫拉車身",
+        "notes_en": "The last supercar personally approved by Enzo Ferrari; twin-turbo V8, carbon-fiber and Kevlar body.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9210,6 +9427,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "搭載 6.5L V12 自然進氣引擎，800 匹馬力前置後驅 GT 超跑",
+        "notes_en": "6.5L V12 naturally aspirated engine; 800 hp front-engine RWD GT supercar.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9251,6 +9469,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "插電式混合動力超跑，V8 渦輪增壓加三具電動馬達，總輸出 986 匹馬力",
+        "notes_en": "Plug-in hybrid supercar; twin-turbo V8 plus three electric motors, 986 hp combined output.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9292,6 +9511,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "搭載 5.2L V10 自然進氣引擎的全時四驅超跑，560 匹馬力",
+        "notes_en": "AWD supercar with a 5.2L V10 naturally aspirated engine; 560 hp.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9333,6 +9553,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "搭載 6.5L V12 自然進氣引擎的旗艦超跑，碳纖維單體殼車身，700 匹馬力",
+        "notes_en": "Flagship supercar with a 6.5L V12 naturally aspirated engine; carbon-fiber monocoque, 700 hp.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9374,6 +9595,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "超級 SUV，搭載 4.0L V8 雙渦輪增壓引擎，650 匹馬力，氣壓式懸吊",
+        "notes_en": "Super SUV with a 4.0L twin-turbo V8; 650 hp, air suspension.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9415,6 +9637,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "碳纖維單體殼中置引擎超跑，搭載自主研發 3.0L V6 Nettuno 雙渦輪引擎，630 匹馬力",
+        "notes_en": "Carbon-fiber monocoque mid-engine supercar; in-house 3.0L V6 Nettuno twin-turbo, 630 hp.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9456,6 +9679,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "四驅豪華運動房車，3.0L V6 雙渦輪增壓引擎，配備 Skyhook 主動式避震",
+        "notes_en": "AWD luxury sports sedan; 3.0L twin-turbo V6 with Skyhook adaptive dampers.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9497,6 +9721,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "碳鈦合金單體殼車身，AMG 6.0L V12 雙渦輪引擎，主動式空氣力學翼片",
+        "notes_en": "Carbon-titanium monocoque body; AMG 6.0L twin-turbo V12, active aerodynamic flaps.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9538,6 +9763,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "極致輕量化中置引擎跑車，鋁合金擠出底盤，僅重 725 公斤",
+        "notes_en": "Ultra-lightweight mid-engine sports car; extruded aluminum chassis, only 725 kg.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9579,6 +9805,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "中置 3.5L V6 機械增壓引擎，400 匹馬力，兼具 GT 舒適性與跑車操控",
+        "notes_en": "Mid-mounted 3.5L supercharged V6; 400 hp, blends GT comfort with sports-car handling.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9620,6 +9847,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "基於 Elise 平台的封閉式 GT 跑車，搭載 Toyota 2ZZ-GE 引擎，渦輪增壓版本 200 匹",
+        "notes_en": "Closed-roof GT based on the Elise platform; Toyota 2ZZ-GE engine, 200 hp in turbocharged form.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9661,6 +9889,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "長尾版本輕量化跑車，碳纖維單體殼，頂置排氣管設計，600 匹馬力",
+        "notes_en": "Longtail lightweight sports car; carbon-fiber monocoque, top-exit exhaust, 600 hp.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9702,6 +9931,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "極致長尾版本，碳纖維單體殼加碳纖維車身板件，765 匹馬力，限量生產",
+        "notes_en": "Extreme Longtail variant; carbon-fiber monocoque with carbon-fiber body panels, 765 hp, limited production.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9743,6 +9973,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "油電混合動力超跑，碳纖維 MonoCage 單體殼，903 匹馬力，主動式空氣力學，限量 375 台",
+        "notes_en": "Hybrid supercar; carbon-fiber MonoCage monocoque, 903 hp, active aerodynamics, limited to 375 units.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9784,6 +10015,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "全新鋁合金平台 GT 跑車，5.2L V12 雙渦輪增壓引擎，600 匹馬力",
+        "notes_en": "GT on an all-new aluminum platform; 5.2L twin-turbo V12, 600 hp.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9825,6 +10057,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "中置混合動力超跑，4.0L V8 雙渦輪加雙電動馬達，碳纖維單體殼，目標 998 匹總輸出",
+        "notes_en": "Mid-engine hybrid supercar; 4.0L twin-turbo V8 plus twin electric motors, carbon-fiber monocoque, targeting 998 hp combined.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -9866,6 +10099,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "碳纖維車身板件的旗艦 GT 超跑，5.2L V12 雙渦輪，725 匹馬力",
+        "notes_en": "Flagship GT supercar with carbon-fiber body panels; 5.2L twin-turbo V12, 725 hp.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9907,6 +10141,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "頂級豪華 GT 轎跑，4.0L V8 雙渦輪增壓，氣壓懸吊搭配 48V 主動防傾桿",
+        "notes_en": "Top-tier luxury GT coupe; 4.0L twin-turbo V8, air suspension with 48V active anti-roll bars.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -9948,6 +10183,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "超豪華 GT 轎跑，6.6L V12 雙渦輪，氣壓懸吊，對開式車門",
+        "notes_en": "Ultra-luxury GT coupe; 6.6L twin-turbo V12, air suspension, coach (suicide) doors.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -9989,6 +10225,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "鋁合金底盤搭配手工木質車身的經典英式跑車，搭載 BMW B48 2.0L 渦輪引擎",
+        "notes_en": "Classic British sports car with an aluminum chassis and hand-built wood-framed body; BMW B48 2.0L turbo engine.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -10030,6 +10267,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "暴力英式跑車，自製 4.0L 直六引擎，406 匹馬力，無防滑控制系統",
+        "notes_en": "Brutal British sports car; in-house 4.0L inline-six, 406 hp, no traction control.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -10071,6 +10309,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "極致輕量化賽道日用車，Suzuki 1.6L 引擎 152 匹馬力，僅重 540 公斤",
+        "notes_en": "Ultra-lightweight track-day car; Suzuki 1.6L engine, 152 hp, only 540 kg.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -10112,6 +10351,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "單座中置引擎超輕量跑車，碳纖維與石墨烯車身，可合法上路的方程式賽車",
+        "notes_en": "Single-seat mid-engine ultra-lightweight sports car; carbon-fiber and graphene body, a road-legal formula car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -10153,6 +10393,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "法系鋼炮掀背車，1.6L 渦輪增壓引擎，Torsen 限滑差速器",
+        "notes_en": "French hot hatch; 1.6L turbo with a Torsen limited-slip diff.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -10194,6 +10435,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "法系性能掀背，1.6L THP 渦輪增壓 270 匹馬力，Torsen 限滑差速器",
+        "notes_en": "French performance hatch; 1.6L THP turbo making 270 hp, with a Torsen limited-slip diff.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -10235,6 +10477,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "Peugeot Sport Engineered 插電式混合動力高性能旅行車，360 匹綜合馬力",
+        "notes_en": "Peugeot Sport Engineered plug-in hybrid performance wagon; 360 hp combined.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -10276,6 +10519,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "紐柏林前驅最速紀錄保持者，四輪轉向系統，Torsen 限滑差速器，300 匹馬力",
+        "notes_en": "Former FWD Nürburgring lap-record holder; four-wheel steering, Torsen limited-slip diff, 300 hp.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -10317,6 +10561,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "經典法系小鋼炮，自然進氣 2.0L 引擎搭配六速手排，操控靈活",
+        "notes_en": "Classic French hot hatch; naturally aspirated 2.0L with a six-speed manual, agile handling.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -10358,6 +10603,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "全鋁底盤中置引擎輕量跑車，1.8L 渦輪增壓引擎，252 匹馬力，重視駕駛樂趣",
+        "notes_en": "Lightweight mid-engined sports car on an all-aluminium chassis; 1.8L turbo, 252 hp, driver-focused.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -10399,6 +10645,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "限量版高性能掀背，1.6L 渦輪增壓 207 匹馬力，降低車身 15mm，限量 200 台",
+        "notes_en": "Limited-run high-performance hatch; 1.6L turbo, 207 hp, ride height lowered 15mm, 200 units built.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -10440,6 +10687,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "西班牙高性能掀背，2.0L TSI 引擎 300 匹馬力，VAQ 電子差速器，紐柏林前驅紀錄",
+        "notes_en": "Spanish high-performance hatch; 2.0L TSI making 300 hp, VAQ electronic diff, held the FWD Nürburgring record.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -10481,6 +10729,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "瑞典高性能房車，3.0L 直六渦輪增壓引擎 367 匹馬力，Ohlins 避震器，限量生產",
+        "notes_en": "Swedish high-performance sedan; 3.0L turbo straight-six making 367 hp, Öhlins dampers, limited production.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -10522,6 +10771,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "瑞典純電動高性能轎車，雙馬達四驅 408 匹馬力，可選配 Ohlins 避震器",
+        "notes_en": "Swedish all-electric performance sedan; dual-motor AWD, 408 hp, optional Öhlins dampers.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -10563,6 +10813,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "瑞典極速超跑，5.0L V8 雙渦輪 1160 匹馬力，最高時速 447 km/h 世界紀錄，限量 25 台",
+        "notes_en": "Swedish hypercar; 5.0L twin-turbo V8 making 1160 hp, 447 km/h top-speed world record, 25 units built.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -10604,6 +10855,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "瑞典渦輪增壓運動房車，2.8L V6 渦輪引擎 280 匹馬力，XWD 四驅可選",
+        "notes_en": "Swedish turbocharged sport sedan; 2.8L turbo V6 making 280 hp, optional XWD all-wheel drive.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -10645,6 +10897,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "義大利迷你鋼炮，1.4L 渦輪增壓引擎 160 匹馬力，Koni 避震器",
+        "notes_en": "Italian mini hot hatch; 1.4L turbo making 160 hp, Koni dampers.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -10686,6 +10939,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "WRC 傳奇拉力戰車，2.0L 渦輪增壓引擎 210 匹馬力，全時四驅，六屆 WRC 冠軍",
+        "notes_en": "Legendary WRC rally car; 2.0L turbo making 210 hp, full-time AWD, six-time WRC champion.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -10727,6 +10981,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "1960 年代經典英國房車賽傳奇，Lotus 調校的 Ford 1.6L 雙凸輪軸引擎，鋁合金部件輕量化",
+        "notes_en": "Legendary 1960s British touring car; Lotus-tuned Ford 1.6L twin-cam, lightweight aluminium panels.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -10768,6 +11023,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "注重長途舒適性的中置引擎 GT 跑車，620 匹馬力，碳纖維單體殼，行李空間 570 公升",
+        "notes_en": "Mid-engined GT focused on long-distance comfort; 620 hp, carbon-fibre monocoque, 570L of luggage space.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -10809,6 +11065,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "限量 3000 台的極致版本，2.0L 渦輪 306 匹馬力，機械式限滑差速器，碳纖維空力套件",
+        "notes_en": "Ultimate edition limited to 3000 units; 2.0L turbo making 306 hp, mechanical limited-slip diff, carbon-fibre aero kit.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -10850,6 +11107,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "英國手工超跑，Ford Duratec 3.0L V6 雙渦輪增壓 425 匹馬力，無電子輔助系統",
+        "notes_en": "British hand-built supercar; Ford Duratec 3.0L twin-turbo V6 making 425 hp, no electronic aids.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -10891,6 +11149,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "英國入門級賽道跑車，Ford 1.8L 自然進氣引擎，玻璃纖維車身，GRDC 統規賽用車",
+        "notes_en": "British entry-level track car; naturally aspirated Ford 1.8L, fibreglass body, GRDC one-make race car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -10932,6 +11191,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": true,
         "notes": "經典 E34 M5，自然進氣直六 S38 引擎，手排後驅，駕駛者之車",
+        "notes_en": "Classic E34 M5; naturally aspirated S38 straight-six, manual, RWD — a driver's car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -10973,6 +11233,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": true,
         "notes": "E39 M5，S62 V8 自然進氣引擎 400 匹馬力，公認最佳 M5 世代，手排後驅經典",
+        "notes_en": "E39 M5; naturally aspirated S62 V8 making 400 hp, widely regarded as the best M5 generation, manual RWD classic.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11014,6 +11275,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "F90 M5，S63 雙渦輪 V8 引擎 600 匹，M xDrive 全驅系統可切換純後驅模式，兼顧性能與日常",
+        "notes_en": "F90 M5; S63 twin-turbo V8 making 600 hp, M xDrive AWD switchable to pure RWD, balances performance and daily use.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11055,6 +11317,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "E60 M5，傳奇 S85 V10 引擎 507 匹，源自 F1 技術，轉速紅線 8250 RPM，聲浪無敵",
+        "notes_en": "E60 M5; legendary S85 V10 making 507 hp, F1-derived tech, 8250 rpm redline, unmatched sound.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11096,6 +11359,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "E24 M6，搭載 S38 直六引擎，優雅的鯊魚頭設計，80 年代經典 GT 跑車",
+        "notes_en": "E24 M6; powered by the S38 straight-six, elegant shark-nose styling, an iconic 1980s GT.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -11137,6 +11401,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "F13 M6 雙門跑車，S63 雙渦輪 V8 引擎 560 匹，碳纖維車頂，豪華與性能兼備",
+        "notes_en": "F13 M6 coupe; S63 twin-turbo V8, 560 hp; carbon-fiber roof; blends luxury with performance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11178,6 +11443,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "E31 850CSi，S70 V12 引擎 380 匹，M 部門調校底盤，90 年代旗艦 GT 經典",
+        "notes_en": "E31 850CSi; S70 V12, 380 hp; M-division-tuned chassis; classic 90s flagship GT.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -11219,6 +11485,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "Z3 M Coupé，暱稱「麵包車」，S52/S54 直六引擎，短軸距剛性極佳，隱藏版經典",
+        "notes_en": "Z3 M Coupe, nicknamed the 'breadvan'; S52/S54 inline-six; short wheelbase with excellent rigidity; a sleeper classic.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11260,6 +11527,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "G29 Z4 M40i，B58 直六渦輪 340 匹，與 Toyota Supra 共用平台，電子差速後驅敞篷",
+        "notes_en": "G29 Z4 M40i; B58 turbo inline-six, 340 hp; shares its platform with the Toyota Supra; RWD convertible with electronic diff.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11301,6 +11569,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "F82 M4，S55 直六雙渦輪 431 匹，碳纖維傳動軸，純後驅設定，賽道與街道兼備",
+        "notes_en": "F82 M4; S55 twin-turbo inline-six, 431 hp; carbon-fiber driveshaft; pure RWD setup; equally at home on track and street.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11342,6 +11611,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "128ti，B48 四缸渦輪 265 匹前驅鋼砲，機械式 LSD，致敬經典 ti 傳統",
+        "notes_en": "128ti; B48 turbo four-cylinder, 265 hp FWD hot hatch; mechanical LSD; a tribute to the classic ti lineage.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -11383,6 +11653,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "G42 M240i，B58 直六渦輪 374 匹，xDrive 全驅系統，後驅為主的駕駛感受",
+        "notes_en": "G42 M240i; B58 turbo inline-six, 374 hp; xDrive AWD with a rear-biased driving feel.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11424,6 +11695,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "X5 M Competition，S63 雙渦輪 V8 引擎 625 匹，自適應氣壓懸吊，超級 SUV",
+        "notes_en": "X5 M Competition; S63 twin-turbo V8, 625 hp; adaptive air suspension; a super SUV.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11465,6 +11737,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "930 Turbo，經典「寡婦製造機」，渦輪遲滯加後置引擎，極具挑戰性的駕駛體驗",
+        "notes_en": "930 Turbo, the classic 'widowmaker'; turbo lag plus a rear-engine layout makes for a challenging drive.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11506,6 +11779,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "964 Carrera，首代配備 ABS 與動力轉向的 911，M64 水平對臥六缸 250 匹",
+        "notes_en": "964 Carrera; first 911 with ABS and power steering; M64 flat-six, 250 hp.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11547,6 +11821,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "993 Carrera，最後一代氣冷 911，多連桿後懸吊大幅提升操控，被譽為最美 911",
+        "notes_en": "993 Carrera; the last air-cooled 911; multi-link rear suspension greatly improves handling; widely regarded as the most beautiful 911.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11588,6 +11863,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "996 Carrera，首代水冷 911，M96 水平對臥六缸 300 匹，性價比最高的 911 入門",
+        "notes_en": "996 Carrera; first water-cooled 911; M96 flat-six, 300 hp; the best-value entry into 911 ownership.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11629,6 +11905,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "997 Carrera S，M97 水平對臥六缸 355 匹，回歸圓燈經典造型，PASM 可調阻尼可選",
+        "notes_en": "997 Carrera S; M97 flat-six, 355 hp; return to the classic round-headlight styling; PASM adaptive dampers optional.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11670,6 +11947,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "991 Turbo S，雙渦輪水平對臥六缸 580 匹，全時四驅後軸轉向，0-100 僅 2.9 秒",
+        "notes_en": "991 Turbo S; twin-turbo flat-six, 580 hp; AWD with rear-axle steering; 0-100 km/h in just 2.9 s.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11711,6 +11989,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "992 Carrera S，雙渦輪水平對臥六缸 450 匹，最新世代 911，前後混合胎圈尺寸",
+        "notes_en": "992 Carrera S; twin-turbo flat-six, 450 hp; the latest-generation 911; staggered front/rear tire and wheel sizes.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11752,6 +12031,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "944 Turbo，前置水冷四缸渦輪 250 匹，後置變速箱完美 50:50 配重，操控標竿",
+        "notes_en": "944 Turbo; front-mounted water-cooled turbo four-cylinder, 250 hp; rear-mounted transaxle for perfect 50:50 weight balance; a handling benchmark.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11793,6 +12073,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "928 GTS，V8 前置引擎 GT 旗艦 350 匹，Weissach 後軸設計，被低估的保時捷經典",
+        "notes_en": "928 GTS; front-engine V8 flagship GT, 350 hp; Weissach rear-axle design; an underrated Porsche classic.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11834,6 +12115,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "保時捷 968，944 最終進化版，3.0 四缸可變氣門正時 240 匹，後置變速箱完美配重",
+        "notes_en": "Porsche 968; the final evolution of the 944; 3.0 four-cylinder with variable valve timing, 240 hp; rear-mounted transaxle for perfect weight balance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11875,6 +12157,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "986 Boxster，中置水平對臥六缸敞篷，底盤平衡極佳，入門保時捷的最佳選擇",
+        "notes_en": "986 Boxster; mid-mounted flat-six convertible; excellent chassis balance; the best entry point into Porsche ownership.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11916,6 +12199,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "987 Boxster S，3.4 水平對臥六缸 295 匹，PASM 可選，中置後驅操控教科書",
+        "notes_en": "987 Boxster S; 3.4 flat-six, 295 hp; PASM optional; a textbook mid-engine RWD handler.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11957,6 +12241,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "981 Cayman，中置水平對臥六缸硬頂，比 Boxster 剛性更高，被譽為最佳駕駛機器之一",
+        "notes_en": "981 Cayman; mid-mounted flat-six hardtop; stiffer than the Boxster; hailed as one of the best driver's cars.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -11998,6 +12283,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "Panamera Turbo，雙渦輪 V8 引擎 550 匹，三腔氣壓懸吊後軸轉向，四門跑車標竿",
+        "notes_en": "Panamera Turbo; twin-turbo V8, 550 hp; three-chamber air suspension with rear-axle steering; a four-door sports car benchmark.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -12039,6 +12325,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "Cayenne Turbo GT，雙渦輪 V8 引擎 640 匹，鋼製彈簧降低 17mm，紐柏林 SUV 紀錄保持者",
+        "notes_en": "Cayenne Turbo GT; twin-turbo V8, 640 hp; steel springs lowered by 17 mm; Nurburgring SUV lap record holder.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -12080,6 +12367,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "190E Evo II，DTM 經典街車，Cosworth 引擎 235 匹，巨大尾翼，僅生產 502 台",
+        "notes_en": "190E Evo II; DTM-derived homologation special; Cosworth engine, 235 hp; massive rear wing; only 502 produced.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -12121,6 +12409,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "W206 C63 S，四缸渦輪加電動馬達複合動力 680 匹，後軸電驅，新世代 AMG 方向",
+        "notes_en": "W206 C63 S: 4-cylinder turbo plus electric motor, 680 hp combined hybrid, rear-axle electric drive — a new direction for AMG.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -12162,6 +12451,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "E63 S，M177 雙渦輪 V8 引擎 612 匹，4MATIC+ 可切純後驅，漂移模式，性能房車王",
+        "notes_en": "E63 S: M177 twin-turbo V8, 612 hp, 4MATIC+ with pure-RWD drift mode — king of the performance sedans.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -12203,6 +12493,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "CLS63 AMG，M157 雙渦輪 V8 引擎 557 匹，四門轎跑優雅造型，兼顧舒適與性能",
+        "notes_en": "CLS63 AMG: M157 twin-turbo V8, 557 hp; elegant four-door coupe balancing comfort and performance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -12244,6 +12535,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "AMG ONE，F1 級 1.6 V6 渦輪混合動力 1063 匹，碳纖維單體殼，紐柏林量產車紀錄",
+        "notes_en": "AMG ONE: F1-derived 1.6 V6 turbo hybrid, 1063 hp, carbon-fiber monocoque; Nürburgring production-car record holder.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -12285,6 +12577,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "AMG GT R，「綠色地獄之獸」，M178 雙渦輪 V8 引擎 585 匹，後軸轉向，賽道利器",
+        "notes_en": "AMG GT R: the \"Beast of the Green Hell,\" M178 twin-turbo V8, 585 hp, rear-axle steering — a track weapon.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -12326,6 +12619,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "A45 S AMG，世界最強四缸渦輪 421 匹，AMG Torque Control 後軸扭力分配，漂移鋼砲",
+        "notes_en": "A45 S AMG: world's most powerful 4-cylinder turbo at 421 hp, AMG Torque Control rear-axle torque distribution — a drift-capable hot hatch.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -12367,6 +12661,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "B7 RS4，4.2 V8 自然進氣 420 匹紅線 8250 轉，Quattro 全驅，後期 Audi Sport 經典",
+        "notes_en": "B7 RS4: 4.2 naturally aspirated V8, 420 hp, 8250 rpm redline, Quattro AWD — a late-era Audi Sport classic.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -12408,6 +12703,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "B9 RS5，2.9 雙渦輪 V6 引擎 450 匹，Quattro 全驅，Sport 差速器可選，全天候跑車",
+        "notes_en": "B9 RS5: 2.9 twin-turbo V6, 450 hp, Quattro AWD, optional Sport differential — an all-weather sports car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -12449,6 +12745,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "C8 RS6 Avant，4.0 雙渦輪 V8 輕混 600 匹，寬體旅行車，載全家去紐柏林的最佳選擇",
+        "notes_en": "C8 RS6 Avant: 4.0 twin-turbo V8 mild hybrid, 600 hp; wide-body wagon — the best way to take the whole family to the Nürburgring.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -12490,6 +12787,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "8Y S3，2.0 渦輪 310 匹，Quattro 全驅扭力分配後軸，日常性能小車好選擇",
+        "notes_en": "8Y S3: 2.0 turbo, 310 hp, Quattro AWD with rear-axle torque distribution — a great everyday performance compact.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -12531,6 +12829,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "初代 TT 8N，包浩斯設計經典，1.8T 四缸渦輪 225 匹（Quattro 版），造型設計標竿",
+        "notes_en": "First-gen TT 8N: Bauhaus design classic, 1.8T 4-cylinder turbo, 225 hp (Quattro version) — a design benchmark.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -12572,6 +12871,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "RS e-tron GT，雙電動馬達 646 匹，J1 平台與 Taycan 共用，800V 架構，電動四門 GT",
+        "notes_en": "RS e-tron GT: twin electric motors, 646 hp, J1 platform shared with the Taycan, 800V architecture — an electric four-door GT.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -12613,6 +12913,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "Mk5 GTI，PQ35 平台首代，2.0 TSI 200 匹 DSG 變速箱，復興 GTI 精神之作",
+        "notes_en": "Mk5 GTI: first on the PQ35 platform, 2.0 TSI 200 hp with DSG gearbox — the car that revived the GTI spirit.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -12654,6 +12955,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "Mk6 GTI，EA888 Gen2 引擎 210 匹，XDS 電子差速，Mk5 的精緻進化版",
+        "notes_en": "Mk6 GTI: EA888 Gen2 engine, 210 hp, XDS electronic diff — a refined evolution of the Mk5.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -12695,6 +12997,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "Mk8 Golf R，EA888 Evo4 引擎 320 匹，R Performance 後軸扭力分配，漂移模式加持",
+        "notes_en": "Mk8 Golf R: EA888 Evo4 engine, 320 hp, R Performance rear-axle torque distribution with drift mode.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -12736,6 +13039,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "Scirocco R，2.0 TSI 280 匹前驅轎跑，XDS+ 電子差速，低矮車身操控銳利",
+        "notes_en": "Scirocco R: 2.0 TSI, 280 hp, FWD coupe, XDS+ electronic diff; low-slung body with sharp handling.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -12777,6 +13081,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "Polo GTI AW，2.0 TSI 200 匹小鋼砲，MQB A0 平台，輕量靈活的都會性能車",
+        "notes_en": "Polo GTI AW: 2.0 TSI 200 hp hot hatch, MQB A0 platform — a light, agile urban performance car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -12818,6 +13123,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "ID.4 GTX，雙馬達全驅 299 匹，MEB 純電平台，低重心電動 SUV，實用性能兼備",
+        "notes_en": "ID.4 GTX: twin-motor AWD, 299 hp, MEB pure-EV platform — a low-CG electric SUV blending practicality and performance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -12859,6 +13165,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "Corsa OPC，1.6 渦輪 207 匹，FSD 頻率選擇阻尼減震，輕量級小鋼砲",
+        "notes_en": "Corsa OPC: 1.6 turbo, 207 hp, FSD (Frequency Selective Damping) dampers — a lightweight hot hatch.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -12900,6 +13207,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "Astra OPC J，2.0 渦輪 280 匹，HiPerStrut 前懸吊消除扭力轉向，紐柏林前驅紀錄車",
+        "notes_en": "Astra OPC J: 2.0 turbo, 280 hp, HiPerStrut front suspension to eliminate torque steer — a Nürburgring FWD record car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -12941,6 +13249,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "現代福特 GT，中置 5.4L V8 機械增壓引擎，賽道取向超跑",
+        "notes_en": "Modern Ford GT: mid-mounted 5.4L supercharged V8, track-focused supercar.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -12982,6 +13291,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "第二代福特 GT，碳纖維車身，3.5L V6 雙渦輪增壓，限量生產超跑",
+        "notes_en": "Second-gen Ford GT: carbon-fiber body, 3.5L twin-turbo V6, limited-production supercar.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -13023,6 +13333,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "輕巧靈活的鋼砲，1.5L 三缸渦輪引擎，駕駛樂趣極高",
+        "notes_en": "Light, agile hot hatch: 1.5L 3-cylinder turbo, hugely fun to drive.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -13064,6 +13375,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "越野性能猛獸，FOX 懸吊，3.0L V6 雙渦輪增壓，400匹馬力",
+        "notes_en": "Off-road performance beast: FOX suspension, 3.0L twin-turbo V6, 400 hp.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -13105,6 +13417,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "小型皮卡混合動力，2.5L Atkinson 循環引擎搭配電動馬達，油耗極佳",
+        "notes_en": "Compact pickup hybrid; 2.5L Atkinson-cycle engine paired with an electric motor for excellent fuel economy.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -13146,6 +13459,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "沙漠越野皮卡之王，3.5L V6 雙渦輪增壓，FOX 內部旁通減震器",
+        "notes_en": "King of desert off-road pickups; 3.5L twin-turbo V6 with FOX internal-bypass dampers.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -13187,6 +13501,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "760匹馬力機械增壓 V8，最強量產野馬，DCT 雙離合變速箱",
+        "notes_en": "760 hp supercharged V8; the most powerful production Mustang, with a DCT dual-clutch gearbox.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -13228,6 +13543,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "電動跨界 SUV，雙馬達全驅，480匹馬力，MagneRide 磁流變減震器",
+        "notes_en": "Electric crossover SUV; dual-motor AWD, 480 hp, with MagneRide magnetorheological dampers.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -13269,6 +13585,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "輕量化硬核 Corvette，LS6 V8 引擎 405匹馬力，橫置複合板簧懸吊",
+        "notes_en": "Lightweight, hardcore Corvette; LS6 V8 making 405 hp, with transverse composite leaf-spring suspension.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -13310,6 +13627,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "鋁合金車架 Z06，7.0L LS7 V8 自然進氣 505匹馬力，乾式油底殼",
+        "notes_en": "Aluminium-frame Z06; 7.0L LS7 naturally aspirated V8 making 505 hp, with a dry-sump oil system.",
         "confidence": {
             "spring_rate": "confirmed",
             "weight_dist": "confirmed",
@@ -13351,6 +13669,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "平面曲軸 5.5L V8 自然進氣 670匹馬力，紅線轉速 8600rpm，賽車級引擎",
+        "notes_en": "Flat-plane-crank 5.5L naturally aspirated V8 making 670 hp; 8600 rpm redline, a race-grade engine.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -13392,6 +13711,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "650匹馬力 LT4 機械增壓 V8，MagneRide 3.0 磁流變減震器，1LE 套件可選",
+        "notes_en": "650 hp LT4 supercharged V8; MagneRide 3.0 magnetorheological dampers, optional 1LE package.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -13433,6 +13753,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "賽道特化版 Camaro，LS7 7.0L V8 自然進氣 505匹，無音響無空調輕量化",
+        "notes_en": "Track-focused Camaro; LS7 7.0L naturally aspirated V8 making 505 hp, stripped of audio and A/C for lightness.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -13474,6 +13795,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "澳洲 Holden Commodore 掛雪佛蘭標，LS3 V8 415匹，絕版後驅性能房車",
+        "notes_en": "Australian Holden Commodore wearing a Chevrolet badge; LS3 V8 making 415 hp, a discontinued RWD performance sedan.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -13515,6 +13837,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "8.3L V10 自然進氣怪獸，510匹馬力，純粹暴力的美式超跑",
+        "notes_en": "8.3L V10 naturally aspirated monster making 510 hp; pure, brutal American supercar.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -13556,6 +13879,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "紐北傳奇，8.4L V10 645匹馬力，極端空力套件，賽道圈速紀錄保持者",
+        "notes_en": "Nürburgring legend; 8.4L V10 making 645 hp, extreme aero package, lap-record holder.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -13597,6 +13921,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "707匹馬力四門轎車，6.2L HEMI V8 機械增壓，美式肌肉轎跑",
+        "notes_en": "707 hp four-door sedan; 6.2L HEMI supercharged V8, an American muscle sedan.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -13638,6 +13963,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "直線加速特化，840匹馬力 6.2L 機械增壓 V8，TransBrake 起步系統，限量生產",
+        "notes_en": "Drag-strip specialist; 840 hp 6.2L supercharged V8 with a TransBrake launch system, limited production.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -13679,6 +14005,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "668匹馬力 6.2L 機械增壓 V8，MagneRide 4.0，可選手排，最終 V8 凱迪拉克",
+        "notes_en": "668 hp 6.2L supercharged V8; MagneRide 4.0, optional manual, the final V8 Cadillac.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -13720,6 +14047,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "640匹馬力 LT4 機械增壓 V8，MagneRide 第三代，美式豪華性能房車",
+        "notes_en": "640 hp LT4 supercharged V8; third-generation MagneRide, an American luxury performance sedan.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -13761,6 +14089,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "464匹馬力 3.6L V6 雙渦輪增壓，MagneRide，挑戰 BMW M3 的美系性能車",
+        "notes_en": "464 hp 3.6L twin-turbo V6; MagneRide, an American performance car aimed at the BMW M3.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -13802,6 +14131,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "澳洲 Holden Monaro 換標，LS2 V8 400匹馬力，經典美式肌肉車復刻",
+        "notes_en": "Rebadged Australian Holden Monaro; LS2 V8 making 400 hp, a classic American muscle-car revival.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -13843,6 +14173,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "最後一代 Firebird，LS1 V8 325匹馬力，WS6 套件提升操控性能",
+        "notes_en": "The last-generation Firebird; LS1 V8 making 325 hp, with the WS6 package for improved handling.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -13884,6 +14215,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "6.4L HEMI V8 470匹馬力，豪華性能大型轎車，自適應避震系統",
+        "notes_en": "6.4L HEMI V8 making 470 hp; a luxury performance full-size sedan with adaptive dampers.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -13925,6 +14257,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "707匹馬力 6.2L HEMI V8 機械增壓 SUV，3.5秒破百，全球最快量產 SUV 之一",
+        "notes_en": "707 hp 6.2L HEMI supercharged V8 SUV; 0-100 km/h in 3.5 s, one of the fastest production SUVs in the world.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -13966,6 +14299,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "702匹馬力 6.2L HEMI V8 機械增壓皮卡，Bilstein 避震，超級越野性能卡車",
+        "notes_en": "702 hp 6.2L HEMI supercharged V8 pickup; Bilstein dampers, a high-performance off-road truck.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14007,6 +14341,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "雙馬達全輪驅動電動跨界，456匹馬力，低重心電池組佈局",
+        "notes_en": "Dual-motor AWD electric crossover; 456 hp, with a low-center-of-gravity battery layout.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14048,6 +14383,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "四馬達電動皮卡，835匹馬力，氣壓懸吊可調車身高度，涉水深度達1米",
+        "notes_en": "Quad-motor electric pickup; 835 hp, adjustable air suspension for ride height, and 1 m wading depth.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14089,6 +14425,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "819匹馬力雙馬達豪華電動轎車，EPA 續航超過830公里，氣壓懸吊",
+        "notes_en": "819 hp dual-motor luxury EV sedan; EPA range over 830 km; air suspension.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14130,6 +14467,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "三馬達 1000匹馬力電動巨獸，CrabWalk 橫行模式，可提取車頂，超過4噸車重",
+        "notes_en": "Tri-motor 1000 hp electric beast; CrabWalk diagonal-drive mode; removable roof panels; over 4 tonnes kerb weight.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14171,6 +14509,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "基於 Civic Si 平台，1.5L 渦輪增壓 200匹馬力，六速手排可選，運動掀背車",
+        "notes_en": "Based on the Civic Si platform; 1.5L turbo, 200 hp; six-speed manual optional; sport hatchback.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14212,6 +14551,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "355匹馬力 3.0L V6 渦輪增壓，SH-AWD 超級四驅系統，自適應避震",
+        "notes_en": "355 hp 3.0L turbo V6; SH-AWD super-handling all-wheel drive; adaptive dampers.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14253,6 +14593,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "276匹馬力 2.0T，N DCT 濕式雙離合變速箱，電子限滑差速器，小型性能跨界車",
+        "notes_en": "276 hp 2.0T; N DCT wet dual-clutch gearbox; electronic limited-slip diff; compact performance crossover.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14294,6 +14635,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "致敬1974年 Pony Coupe，氫燃料電池混合動力，後驅雙馬達，概念超跑",
+        "notes_en": "Tribute to the 1974 Pony Coupe; hydrogen fuel-cell hybrid powertrain; RWD dual-motor; concept supercar.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14335,6 +14677,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "280匹馬力 2.0T，電子控制懸吊，電子限滑差速器，紐北調校鋼砲",
+        "notes_en": "280 hp 2.0T; electronically controlled suspension; electronic limited-slip diff; Nürburgring-tuned hot hatch.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14376,6 +14719,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "375匹馬力 3.5L V6 雙渦輪增壓，電子控制懸吊，豪華運動中型 SUV",
+        "notes_en": "375 hp 3.5L twin-turbo V6; electronically controlled suspension; luxury sport mid-size SUV.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14417,6 +14761,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "585匹馬力雙馬達電動跨界，E-GMP 800V 平台，3.5秒破百，電子限滑差速器",
+        "notes_en": "585 hp dual-motor electric crossover; E-GMP 800V platform; 0-100 km/h in 3.5 s; electronic limited-slip diff.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14458,6 +14803,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "290匹馬力 2.5L 渦輪增壓，8速 DCT 濕式雙離合，運動中型轎車",
+        "notes_en": "290 hp 2.5L turbo; 8-speed DCT wet dual-clutch; sport mid-size sedan.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14499,6 +14845,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "201匹馬力 1.6L 渦輪增壓，7速 DCT，入門級運動轎車，高性價比選擇",
+        "notes_en": "201 hp 1.6L turbo; 7-speed DCT; entry-level sport sedan; strong value choice.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14540,6 +14887,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "365匹馬力 3.3L V6 雙渦輪增壓，後驅為主，挑戰 BMW 3 系的韓系豪華運動轎車",
+        "notes_en": "365 hp 3.3L twin-turbo V6; primarily RWD; Korean luxury sport sedan taking on the BMW 3 Series.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14581,6 +14929,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "375匹馬力 3.5L V6 雙渦輪增壓，後輪轉向，氣壓懸吊，豪華大型轎車",
+        "notes_en": "375 hp 3.5L twin-turbo V6; rear-wheel steering; air suspension; full-size luxury sedan.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14622,6 +14971,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "1.5L 渦輪增壓或 1.6L 柴油，韓國雙龍緊湊型 SUV，實用取向",
+        "notes_en": "1.5L turbo or 1.6L diesel; SsangYong compact SUV; practicality-oriented.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14663,6 +15013,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "經典美式跑車之王，7.0L Ford 427 V8，極輕車重配暴力引擎，復刻車常用規格",
+        "notes_en": "King of classic American sports cars; 7.0L Ford 427 V8; very light weight paired with a brutal engine; common replica spec.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14704,6 +15055,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "DeLorean 品牌復活，電動 GT 跑車，鷗翼門設計，預計續航超過480公里",
+        "notes_en": "Revival of the DeLorean brand; electric GT sports car; gull-wing door design; projected range over 480 km.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14745,6 +15097,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "1817匹馬力 6.6L 雙渦輪增壓 V8，碳纖維車身，目標極速超過500km/h",
+        "notes_en": "1817 hp 6.6L twin-turbo V8; carbon-fibre body; targeting a top speed over 500 km/h.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14786,6 +15139,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "750匹馬力 7.0L 雙渦輪增壓 V8，全碳纖維車身，美國製造的稀有超跑",
+        "notes_en": "750 hp 7.0L twin-turbo V8; full carbon-fibre body; rare American-built supercar.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14827,6 +15181,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "鋁合金車架 GT 跑車，Ford SVT V8 引擎，手工製造的美國小眾跑車",
+        "notes_en": "Aluminium-chassis GT sports car; Ford SVT V8 engine; hand-built American niche sports car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14868,6 +15223,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "群眾設計越野超跑，LS3 V8 430匹馬力，長行程懸吊，街道合法沙漠拉力車",
+        "notes_en": "Crowd-designed off-road supercar; LS3 V8, 430 hp; long-travel suspension; street-legal desert rally car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14909,6 +15265,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "三輪街道跑車，2.0L ProStar 引擎 203匹馬力，單後輪設計，極致輕量化體驗",
+        "notes_en": "Three-wheeled street roadster; 2.0L ProStar engine, 203 hp; single rear wheel design; extreme lightweight experience.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14950,6 +15307,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "傳奇利曼賽車，氣冷水平對臥12缸，極致賽道機器",
+        "notes_en": "Legendary Le Mans racer; air-cooled flat-12; the ultimate track machine.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -14991,6 +15349,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "擊敗法拉利的利曼傳奇，美國V8中置引擎，車高僅40吋",
+        "notes_en": "The Le Mans legend that beat Ferrari; American V8 mid-engine; just 40 inches tall.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15032,6 +15391,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "史上最昂貴汽車之一，Colombo V12引擎，60年代GT賽事霸主",
+        "notes_en": "One of the most expensive cars ever; Colombo V12 engine; dominant GT racer of the 1960s.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15073,6 +15433,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "空力設計先驅，Ford 289 V8引擎，首輛贏得FIA GT冠軍的美國車",
+        "notes_en": "Aerodynamics pioneer with Ford 289 V8; first American car to win an FIA GT championship.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15114,6 +15475,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "LMP1油電混合原型車，2.4升V6渦輪增壓＋電動馬達，終贏利曼冠軍",
+        "notes_en": "LMP1 hybrid prototype; 2.4L twin-turbo V6 plus electric motors; finally took the Le Mans win.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15155,6 +15517,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "史上唯一轉子引擎利曼冠軍車，R26B四轉子引擎，聲浪傳奇",
+        "notes_en": "The only rotary-engined Le Mans winner ever; R26B four-rotor engine; legendary exhaust note.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15196,6 +15559,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "GT1規格利曼賽車，VRH35L 3.5升V8雙渦輪，日產最接近利曼冠軍之作",
+        "notes_en": "GT1-spec Le Mans racer; VRH35L 3.5L twin-turbo V8; Nissan's closest shot at a Le Mans win.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15237,6 +15601,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "F1公路車賽道版，BMW S70 V12引擎，1995年利曼冠軍",
+        "notes_en": "Track version of the F1 road car; BMW S70 V12; 1995 Le Mans winner.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15278,6 +15643,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "DTM傳奇戰車，S14直列四缸引擎，80年代房車賽霸主",
+        "notes_en": "Legendary DTM machine; S14 inline-four; dominant force in 1980s touring car racing.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15319,6 +15685,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "DTM經典對手，Cosworth調校2.5升直四，與E30 M3世紀對決",
+        "notes_en": "Classic DTM rival; Cosworth-tuned 2.5L inline-four; iconic battles against the E30 M3.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15360,6 +15727,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "LMP1柴電混合四驅賽車，TDI柴油渦輪+電動前軸，三連霸利曼",
+        "notes_en": "LMP1 diesel-electric hybrid with AWD; TDI turbo diesel plus electric front axle; three straight Le Mans wins.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15401,6 +15769,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "賓利重返利曼，4.0升V8雙渦輪，時隔73年再奪利曼冠軍",
+        "notes_en": "Bentley's Le Mans return; 4.0L twin-turbo V8; first Le Mans win in 73 years.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15442,6 +15811,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "捷豹C組賽車，7.0升V12引擎，1988年利曼冠軍，TWR打造",
+        "notes_en": "Jaguar Group C racer; 7.0L V12; 1988 Le Mans winner, built by TWR.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15483,6 +15853,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "GT1規格利曼賽車，3.6升V8雙渦輪，外型極度流線，惜未奪冠",
+        "notes_en": "GT1-spec Le Mans racer; 3.6L twin-turbo V8; extremely slippery bodywork, though never a winner.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15524,6 +15895,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "C組原型賽車，VEJ30 3.5升V8雙渦輪，March底盤設計",
+        "notes_en": "Group C prototype; VEJ30 3.5L twin-turbo V8; March-designed chassis.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15565,6 +15937,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "C組王者，水平對臥六缸雙渦輪，地面效應設計，四連霸利曼",
+        "notes_en": "Group C king; flat-six twin-turbo; ground-effect design; four consecutive Le Mans wins.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15606,6 +15979,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "開頂式原型賽車，F1衍生4.0升V12引擎，Dallara底盤，美國賽事霸主",
+        "notes_en": "Open-top prototype; F1-derived 4.0L V12; Dallara chassis; dominant in American racing.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15647,6 +16021,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "BMW唯一利曼冠軍車，P75 6.0升V12引擎，Williams F1技術打造",
+        "notes_en": "BMW's only Le Mans winner; P75 6.0L V12; built with Williams F1 technology.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15688,6 +16063,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "GT1級距賽車，6.0升V12引擎，DB9為基礎，利曼GT組冠軍",
+        "notes_en": "GT1-class racer; 6.0L V12; based on the DB9; Le Mans GT class winner.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15729,6 +16105,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "美國GT賽車代表，LS7.R 5.5升V8引擎，多次利曼GT組冠軍",
+        "notes_en": "Flagship American GT racer; LS7.R 5.5L V8; multiple Le Mans GT class wins.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15770,6 +16147,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "GTE Pro級距賽車，3.9升V8雙渦輪，WEC及利曼GT組多次冠軍",
+        "notes_en": "GTE Pro class racer; 3.9L twin-turbo V8; multiple WEC and Le Mans GT class wins.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15811,6 +16189,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "首款中置引擎911賽車，4.0升水平對臥六缸，GTE級距強者",
+        "notes_en": "First mid-engined 911 racer; 4.0L flat-six; a GTE-class standout.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15852,6 +16231,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "GTE Pro級距賽車，4.0升V8雙渦輪，IMSA及WEC參賽",
+        "notes_en": "GTE Pro class racer; 4.0L twin-turbo V8; campaigned in IMSA and WEC.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15893,6 +16273,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "致敬GT40，3.5升V6 EcoBoost雙渦輪，2016利曼GT冠軍",
+        "notes_en": "A tribute to the GT40; 3.5L twin-turbo V6 EcoBoost; 2016 Le Mans GT winner.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15934,6 +16315,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "Le Mans Hypercar規格，3.5升V6雙渦輪混合動力，連續利曼冠軍",
+        "notes_en": "Le Mans Hypercar spec; 3.5L twin-turbo V6 hybrid; consecutive Le Mans wins.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -15975,6 +16357,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "Le Mans Hypercar，3.0升V6雙渦輪混合動力，2023利曼冠軍，法拉利回歸原型車巔峰",
+        "notes_en": "Le Mans Hypercar; 3.0L twin-turbo V6 hybrid; 2023 Le Mans winner; Ferrari's return to the top of prototype racing.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16016,6 +16399,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "LMDh規格賽車，4.6升V8雙渦輪混合動力，Multimatic底盤，Penske團隊運營",
+        "notes_en": "LMDh-spec racer; 4.6L twin-turbo V8 hybrid; Multimatic chassis; run by the Penske team.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16057,6 +16441,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "LMDh規格賽車，5.5升V8自然進氣混合動力，Dallara底盤，Action Express團隊",
+        "notes_en": "LMDh-class prototype racer; 5.5L V8 naturally aspirated hybrid, Dallara chassis, run by the Action Express team.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16098,6 +16483,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "LMDh規格賽車，P66/3 4.0升V8雙渦輪混合動力，Dallara底盤，RLL團隊",
+        "notes_en": "LMDh-class prototype racer; P66/3 4.0L twin-turbo V8 hybrid, Dallara chassis, run by the RLL team.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16139,6 +16525,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "F1技術下放公路車，4.7升V12源自641 F1引擎，碳纖維單體車身",
+        "notes_en": "F1 tech for the road; 4.7L V12 derived from the 641 F1 engine, carbon-fiber monocoque body.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16180,6 +16567,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "90年代極速王者，BMW S70/2 V12引擎，三座佈局，金箔隔熱",
+        "notes_en": "Top-speed king of the '90s; BMW S70/2 V12, three-seat layout, gold-foil heat shielding.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16221,6 +16609,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "史上最美汽車之一，XK 3.8升直六引擎，60年代跑車典範",
+        "notes_en": "One of the most beautiful cars ever made; XK 3.8L inline-six, the definitive '60s sports car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16262,6 +16651,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "曾為世界最快量產車，3.5升V6雙渦輪，TWR與捷豹合作傑作",
+        "notes_en": "Once the world's fastest production car; 3.5L twin-turbo V6, a TWR-Jaguar collaboration masterpiece.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16303,6 +16693,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "現代英倫GT跑車，5.0升機械增壓V8，鋁合金車身，迷人排氣聲浪",
+        "notes_en": "Modern British GT; 5.0L supercharged V8, aluminum body, intoxicating exhaust note.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16344,6 +16735,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "007詹姆士龐德座駕，4.0升直六引擎，經典英倫紳士GT",
+        "notes_en": "James Bond's 007 car; 4.0L inline-six, the classic British gentleman's GT.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16385,6 +16777,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "Adrian Newey設計，Cosworth 6.5升V12，地面效應公路車，F1技術極致",
+        "notes_en": "Designed by Adrian Newey; Cosworth 6.5L V12, ground-effect road car, the pinnacle of F1 technology.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16426,6 +16819,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "千匹馬力俱樂部始祖，8.0升W16四渦輪，極速407km/h，汽車工程奇蹟",
+        "notes_en": "Founder of the 1000 hp club; 8.0L quad-turbo W16, 407 km/h top speed, an engineering marvel.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16467,6 +16861,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "Veyron後繼者，8.0升W16四渦輪1500匹馬力，Super Sport極速490km/h",
+        "notes_en": "Successor to the Veyron; 8.0L quad-turbo W16 with 1500 hp, Super Sport tops out at 490 km/h.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16508,6 +16903,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "瑞典極速猛獸，5.0升V8雙渦輪1600匹，Light Speed Transmission九速變速箱",
+        "notes_en": "Swedish top-speed monster; 5.0L twin-turbo V8 with 1600 hp, nine-speed Light Speed Transmission.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16549,6 +16945,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "克羅埃西亞電動超跑，四馬達1914匹，0-100僅1.81秒，電動車性能標竿",
+        "notes_en": "Croatian electric hypercar; quad-motor 1914 hp, 0-100 km/h in just 1.81 s, an EV performance benchmark.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16590,6 +16987,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "F1傳奇設計師Gordon Murray傑作，Cosworth V12引擎，後置風扇，僅986公斤",
+        "notes_en": "Masterpiece by F1 legend Gordon Murray; Cosworth V12, rear-mounted fan, just 986 kg.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16631,6 +17029,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "致敬車神洗拿，4.0升V8雙渦輪800匹，極致賽道導向超跑",
+        "notes_en": "A tribute to Ayrton Senna; 4.0L twin-turbo V8 with 800 hp, an uncompromising track-focused supercar.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16672,6 +17071,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "法拉利旗艦混合動力超跑，6.3升V12+HY-KERS系統，963匹總馬力",
+        "notes_en": "Ferrari's flagship hybrid hypercar; 6.3L V12 plus HY-KERS system, 963 hp total.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16713,6 +17113,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "保時捷油電旗艦，4.6升V8+雙電動馬達，紐柏林6分57秒紀錄",
+        "notes_en": "Porsche's hybrid flagship; 4.6L V8 plus two electric motors, 6:57 Nürburgring lap record.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16754,6 +17155,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "蓮花首款純電超跑，四馬達2000匹，碳纖維單體車身，英國電動旗艦",
+        "notes_en": "Lotus's first all-electric hypercar; quad-motor 2000 hp, carbon-fiber monocoque, the British EV flagship.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16795,6 +17197,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "義大利設計美國心臟，Ford 351 Cleveland V8，Ghia設計，中置引擎GT",
+        "notes_en": "Italian design with an American heart; Ford 351 Cleveland V8, Ghia styling, mid-engine GT.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16836,6 +17239,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "英國手工跑車，TVR自製Speed Six直六引擎，玻璃纖維車身，純粹駕駛體驗",
+        "notes_en": "British hand-built sports car; TVR's own Speed Six inline-six, fiberglass body, a pure driving experience.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16877,6 +17281,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "法國後置引擎跑車，PRV 2.7升V6引擎，玻璃纖維車身，重量輕盈",
+        "notes_en": "French rear-engine sports car; PRV 2.7L V6, fiberglass body, lightweight construction.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16918,6 +17323,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "Alpine最後的後置引擎跑車，PRV 3.0升V6渦輪增壓，法國GT末代傳奇",
+        "notes_en": "Alpine's last rear-engine sports car; PRV 3.0L turbocharged V6, the final French GT legend.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -16959,6 +17365,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "捷豹高性能 SUV，5.0L V8 機增引擎，運動化底盤調校",
+        "notes_en": "Jaguar's high-performance SUV; 5.0L supercharged V8, sport-tuned chassis.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -17000,6 +17407,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "捷豹史上最強房車，5.0L V8 機增 600PS，紐柏林最速房車紀錄保持者",
+        "notes_en": "Jaguar's most powerful sedan ever; 5.0L supercharged V8 with 600 PS, holder of the Nürburgring sedan lap record.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -17041,6 +17449,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "捷豹高性能房車，5.0L V8 機增 550PS，後驅佈局提供純粹駕駛樂趣",
+        "notes_en": "Jaguar high-performance sedan; 5.0L supercharged V8, 550PS; RWD layout delivers pure driving engagement.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -17082,6 +17491,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "捷豹純電動跨界 SUV，90kWh 電池組位於底盤，重心極低",
+        "notes_en": "Jaguar all-electric crossover SUV; 90kWh battery pack mounted in the floor for a very low center of gravity.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -17123,6 +17533,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "路虎經典越野車 V8 版本，5.0L 機增引擎，公路性能大幅提升",
+        "notes_en": "V8 version of the classic Land Rover off-roader; 5.0L supercharged engine sharply lifts on-road performance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -17164,6 +17575,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "路虎高性能 SUV，5.0L V8 機增 575PS，氣壓懸吊配可調阻尼",
+        "notes_en": "Land Rover high-performance SUV; 5.0L supercharged V8, 575PS; air suspension with adjustable damping.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -17205,6 +17617,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "MINI 純電版本，32.6kWh 電池，靈活操控保留 MINI 卡丁車感",
+        "notes_en": "All-electric MINI; 32.6kWh battery; agile handling retains the MINI go-kart feel.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -17246,6 +17659,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "MINI Countryman 最強版本，2.0T 306PS，ALL4 四驅系統",
+        "notes_en": "Top Countryman variant; 2.0T, 306PS, ALL4 all-wheel-drive system.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -17287,6 +17701,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "賓利頂級 GT 跑車，W12 雙渦輪 659PS，48V 主動防傾桿",
+        "notes_en": "Bentley flagship GT; twin-turbo W12, 659PS; 48V active anti-roll bars.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -17328,6 +17743,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "賓利最快 SUV，W12 雙渦輪 635PS，48V 主動防傾桿，氣壓懸吊",
+        "notes_en": "Bentley's fastest SUV; twin-turbo W12, 635PS; 48V active anti-roll bars, air suspension.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -17369,6 +17785,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "勞斯萊斯首款純電車，120kWh 電池，魔毯般的行駛質感",
+        "notes_en": "Rolls-Royce's first all-electric car; 120kWh battery; magic-carpet ride quality.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -17410,6 +17827,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "麥拉倫油電超跑，V6 雙渦輪加電動馬達 680PS，碳纖維單體殼底盤",
+        "notes_en": "McLaren hybrid supercar; twin-turbo V6 plus electric motor, 680PS; carbon-fiber monocoque chassis.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -17451,6 +17869,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "麥拉倫敞篷極致跑車，無擋風玻璃設計，4.0L V8 雙渦輪 815PS",
+        "notes_en": "McLaren extreme roadster; windscreen-less design; 4.0L twin-turbo V8, 815PS.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -17492,6 +17911,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "法拉利前置引擎 GT 跑車，3.9L V8 雙渦輪 620PS，優雅義式設計",
+        "notes_en": "Ferrari front-engined GT; 3.9L twin-turbo V8, 620PS; elegant Italian design.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -17533,6 +17953,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "法拉利敞篷 GT，3.9L V8 雙渦輪 620PS，硬頂敞篷設計",
+        "notes_en": "Ferrari convertible GT; 3.9L twin-turbo V8, 620PS; retractable hardtop.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -17574,6 +17995,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "法拉利首款四門四座車型，6.5L V12 自然進氣 725PS，主動懸吊系統",
+        "notes_en": "Ferrari's first four-door, four-seat model; 6.5L naturally aspirated V12, 725PS; active suspension system.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -17615,6 +18037,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "藍寶堅尼旗艦油電超跑，V12 加三電動馬達 1015PS，碳纖維單體殼",
+        "notes_en": "Lamborghini flagship hybrid supercar; V12 plus three electric motors, 1015PS; carbon-fiber monocoque.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -17656,6 +18079,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "藍寶堅尼賽道取向超跑，V10 自然進氣 640PS，後驅佈局，大量碳纖維空力套件",
+        "notes_en": "Lamborghini track-focused supercar; naturally aspirated V10, 640PS; RWD layout; extensive carbon-fiber aero package.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -17697,6 +18121,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "藍寶堅尼公路取向後驅超跑，V10 自然進氣 640PS，兼顧賽道與日常",
+        "notes_en": "Lamborghini road-focused RWD supercar; naturally aspirated V10, 640PS; balances track ability with daily usability.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -17738,6 +18163,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "瑪莎拉蒂中置引擎超跑公路版，4.7L V8 自然進氣 460PS，源自 MC12 血統",
+        "notes_en": "Maserati mid-engined supercar, road version; 4.7L naturally aspirated V8, 460PS; derived from the MC12 bloodline.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -17779,6 +18205,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "帕加尼經典中置超跑，AMG V12 自然進氣 602PS，全碳纖維車身",
+        "notes_en": "Pagani classic mid-engined supercar; AMG naturally aspirated V12, 602PS; full carbon-fiber body.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -17820,6 +18247,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "愛快羅密歐緊湊型 SUV，1.5T 輕混動力，義式運動風格",
+        "notes_en": "Alfa Romeo compact SUV; 1.5T mild-hybrid powertrain; Italian sporting character.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -17861,6 +18289,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "飛雅特與馬自達 MX-5 共同開發，1.4T 渦輪 170PS，Bilstein 減震器",
+        "notes_en": "Fiat co-developed with the Mazda MX-5; 1.4T turbo, 170PS; Bilstein dampers.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -17902,6 +18331,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "寶獅純電小型車，50kWh 電池 156PS，低重心電池佈局",
+        "notes_en": "Peugeot all-electric subcompact; 50kWh battery, 156PS; low-mounted battery for a low center of gravity.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -17943,6 +18373,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "寶獅最強性能房車，1.6T 油電混合 360PS，四驅系統，低重心設計",
+        "notes_en": "Peugeot's most powerful performance sedan; 1.6T plug-in hybrid, 360PS; AWD system; low center of gravity.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -17984,6 +18415,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "雷諾純電動掀背車，60kWh 電池 220PS，CMF-EV 平台",
+        "notes_en": "Renault all-electric hatchback; 60kWh battery, 220PS; CMF-EV platform.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18025,6 +18457,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "雷諾平價純電小車，52kWh 電池 135PS，歐洲電動車銷量冠軍",
+        "notes_en": "Renault's budget all-electric city car; 52 kWh battery, 135 PS; best-selling EV in Europe.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18066,6 +18499,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "雪鐵龍運動版掀背車，2.0L 自然進氣 180PS，法式鋼砲",
+        "notes_en": "Citroën sport hatchback; 2.0L naturally aspirated, 180 PS; French hot hatch.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18107,6 +18541,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "斯柯達性能房車，2.0T 245PS，MQB 平台，DCC 自適應減震",
+        "notes_en": "Škoda performance sedan; 2.0T, 245 PS; MQB platform, DCC adaptive damping.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18148,6 +18583,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "斯柯達性能 SUV，2.0T 245PS，紐柏林最速七座 SUV 紀錄保持者",
+        "notes_en": "Škoda performance SUV; 2.0T, 245 PS; held the Nürburgring lap record for a seven-seat SUV.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18189,6 +18625,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "Cupra 旗艦性能跨界 SUV，2.5T 五缸 390PS，源自奧迪 RS3 引擎",
+        "notes_en": "Cupra's flagship performance crossover SUV; 2.5T five-cylinder, 390 PS; engine derived from the Audi RS3.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18230,6 +18667,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "Cupra 純電性能掀背車，MEB 平台 231PS，DCC 自適應減震",
+        "notes_en": "Cupra all-electric performance hatchback; MEB platform, 231 PS; DCC adaptive damping.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18271,6 +18709,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "富豪性能 SUV，2.0T 油電 421PS，Ohlins 可調減震器，金色剎車卡鉗",
+        "notes_en": "Volvo performance SUV; 2.0T hybrid, 421 PS; Öhlins adjustable dampers, gold brake calipers.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18312,6 +18751,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "富豪純電跨界 SUV，78kWh 電池雙馬達 408PS，CMA 平台",
+        "notes_en": "Volvo all-electric crossover SUV; 78 kWh battery, dual-motor 408 PS; CMA platform.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18353,6 +18793,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "極星油電混合 GT 跑車，2.0T 機增加渦輪加雙電動馬達 619PS，碳纖維車身",
+        "notes_en": "Polestar hybrid GT coupe; 2.0L supercharged-plus-turbo plus twin electric motors, 619 PS; carbon-fiber body.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18394,6 +18835,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "極星純電性能 SUV，111kWh 電池雙馬達 510PS，氣壓懸吊",
+        "notes_en": "Polestar all-electric performance SUV; 111 kWh battery, dual-motor 510 PS; air suspension.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18435,6 +18877,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "smart 性能版，0.9L 三缸渦輪 109PS，後置後驅佈局，極短軸距",
+        "notes_en": "smart performance version; 0.9L three-cylinder turbo, 109 PS; rear-engine, RWD layout; ultra-short wheelbase.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18476,6 +18919,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "達契亞超值跨界小車，1.0T 三缸 90PS，歐洲最暢銷車款之一",
+        "notes_en": "Dacia value crossover supermini; 1.0T three-cylinder, 90 PS; one of Europe's best-selling cars.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18517,6 +18961,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "德國手工跑車，BMW M5 V10 引擎 555PS，復古外觀配現代底盤",
+        "notes_en": "German hand-built sports car; BMW M5 V10 engine, 555 PS; retro styling on a modern chassis.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18558,6 +19003,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "荷蘭手工輕量超跑，奧迪 2.5T 五缸 400PS，僅重 695kg，馬力重量比驚人",
+        "notes_en": "Dutch hand-built lightweight supercar; Audi 2.5T five-cylinder, 400 PS; just 695 kg, with a staggering power-to-weight ratio.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18599,6 +19045,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "荷蘭手工超跑，奧迪 4.2L V8 400PS，航空風格內裝，限量生產",
+        "notes_en": "Dutch hand-built supercar; Audi 4.2L V8, 400 PS; aviation-style interior, limited production.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18640,6 +19087,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "ALPINA 高性能房車，基於 BMW 3 系列，3.0T 直六 462PS，獨家調校懸吊",
+        "notes_en": "ALPINA high-performance sedan; based on the BMW 3 Series; 3.0T inline-six, 462 PS; bespoke suspension tuning.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "confirmed",
@@ -18681,6 +19129,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "ALPINA 旗艦 SUV，基於 BMW X7，4.4T V8 621PS，主動防傾桿",
+        "notes_en": "ALPINA flagship SUV; based on the BMW X7; 4.4T V8, 621 PS; active anti-roll bars.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18722,6 +19171,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "巴博斯改裝極致房車，基於賓士 S 級，4.5L V8 雙渦輪 900PS",
+        "notes_en": "Brabus ultimate tuned sedan; based on the Mercedes S-Class; 4.5L twin-turbo V8, 900 PS.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18763,6 +19213,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "RUF 中置引擎超跑，3.8L 水平對臥六缸雙渦輪 700PS，自主底盤設計",
+        "notes_en": "RUF mid-engine supercar; 3.8L twin-turbo flat-six, 700 PS; in-house chassis design.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18804,6 +19255,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "RUF 自然進氣後驅跑車，4.0L 水平對臥六缸 510PS，碳纖維單體殼底盤",
+        "notes_en": "RUF naturally aspirated RWD sports car; 4.0L flat-six, 510 PS; carbon-fiber monocoque chassis.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18845,6 +19297,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "丹麥超級跑車，5.8L V8 機增加渦輪 1177PS，獨特可傾斜式尾翼",
+        "notes_en": "Danish hypercar; 5.8L supercharged-plus-turbo V8, 1177 PS; distinctive tilting rear wing.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18886,6 +19339,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "達拉拉首款公路車，Ford 2.3T 400PS，僅重 855kg，可拆式車頂與擋風玻璃",
+        "notes_en": "Dallara's first road car; Ford 2.3T, 400 PS; just 855 kg, with a removable roof and windshield.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18927,6 +19381,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "英國賽道用車，Ford 2.3T EcoBoost 425PS，僅重 795kg，巨大地面效應下壓力",
+        "notes_en": "British track car; Ford 2.3T EcoBoost, 425 PS; just 795 kg, with massive ground-effect downforce.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -18968,6 +19423,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "MG 電動敞篷跑車，雙馬達四驅可選，復古設計現代底盤",
+        "notes_en": "MG electric roadster; optional dual-motor AWD; retro design on a modern chassis.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19009,6 +19465,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "MG4 高性能雙馬達版，435匹馬力，電動鋼砲定位",
+        "notes_en": "High-performance dual-motor MG4; 435 hp, positioned as an electric hot hatch.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19050,6 +19507,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "比亞迪旗艦電動轎車，刀片電池，風阻係數0.233",
+        "notes_en": "BYD's flagship electric sedan; Blade Battery, 0.233 drag coefficient.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19091,6 +19549,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "比亞迪小型電動 SUV，刀片電池，出口多國暢銷車型",
+        "notes_en": "BYD compact electric SUV; Blade Battery, a strong seller exported to many markets.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19132,6 +19591,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "比亞迪入門電動掀背，e平台3.0，海洋系列熱銷車型",
+        "notes_en": "BYD entry-level electric hatch; e-Platform 3.0, best-seller in the Ocean series.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19173,6 +19633,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "蔚來旗艦電動轎車，空氣懸吊，150kWh電池可選，風阻0.208",
+        "notes_en": "NIO flagship electric sedan; air suspension, optional 150 kWh battery, 0.208 drag coefficient.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19214,6 +19675,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": true,
         "notes": "蔚來電動超跑，四馬達1360匹，紐柏林6分45秒紀錄，碳纖維車身",
+        "notes_en": "NIO electric hypercar; quad-motor 1360 hp, 6:45 Nürburgring record, carbon-fiber body.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19255,6 +19717,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "蔚來中型電動 SUV，二代平台，換電體系，空氣懸吊標配",
+        "notes_en": "NIO mid-size electric SUV; second-gen platform, battery-swap support, air suspension standard.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19296,6 +19759,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "小鵬中大型電動轎車，風阻係數0.236，XPILOT智能輔助駕駛",
+        "notes_en": "XPeng mid-to-large electric sedan; 0.236 drag coefficient, XPILOT driver assistance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19337,6 +19801,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "小鵬旗艦電動 SUV，800V架構，超快充，雙腔空氣懸吊可選",
+        "notes_en": "XPeng flagship electric SUV; 800V architecture, ultra-fast charging, optional dual-chamber air suspension.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19378,6 +19843,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "理想旗艦增程式六座 SUV，空氣懸吊+CDC，家庭豪華定位",
+        "notes_en": "Li Auto flagship six-seat range-extender SUV; air suspension with CDC, family-luxury positioning.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19419,6 +19885,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "極氪獵裝轎跑，雙馬達544匹，空氣懸吊，浩瀚架構",
+        "notes_en": "Zeekr shooting-brake coupe; dual-motor 544 hp, air suspension, SEA architecture.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19460,6 +19927,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "極氪純電豪華 MPV，雙馬達四驅，空氣懸吊，商務旗艦",
+        "notes_en": "Zeekr full-electric luxury MPV; dual-motor AWD, air suspension, executive flagship.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19501,6 +19969,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "領克高性能轎車，2.0T+愛信8AT，WTCR冠軍基因，Cyan賽車部門調校",
+        "notes_en": "Lynk & Co high-performance sedan; 2.0T with Aisin 8AT, WTCR-champion lineage, tuned by the Cyan Racing division.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19542,6 +20011,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "長安運動轎跑，1.5T藍鯨動力，掀背造型，主打年輕市場",
+        "notes_en": "Changan sporty coupe-sedan; 1.5T Blue Whale powertrain, fastback styling, aimed at younger buyers.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19583,6 +20053,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "長城坦克中大型越野 SUV，3.0T V6混動，非承載式車身，硬派越野",
+        "notes_en": "Great Wall Tank mid-to-large off-road SUV; 3.0T V6 hybrid, body-on-frame, hardcore off-roader.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19624,6 +20095,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "歐拉電動掀背，復古造型，長城檸檬平台，女性市場定位",
+        "notes_en": "ORA electric hatch; retro styling, Great Wall Lemon platform, targeted at the female market.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19665,6 +20137,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "紅旗純電全尺寸 SUV，雙馬達551匹，空氣懸吊，官方旗艦",
+        "notes_en": "Hongqi full-size electric SUV; dual-motor 551 hp, air suspension, brand flagship.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19706,6 +20179,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "五菱微型電動車，中國銷量冠軍，城市代步神車，後置後驅",
+        "notes_en": "Wuling micro EV; China's sales champion, an urban-commuter favorite, rear-engine RWD.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19747,6 +20221,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "廣汽埃安緊湊型電動 SUV，彈匣電池，超級快充可選",
+        "notes_en": "GAC Aion compact electric SUV; Magazine Battery, optional super-fast charging.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19788,6 +20263,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "霍頓經典澳洲肌肉車，6.0L LS2 V8，澳洲國民性能車",
+        "notes_en": "Classic Holden Australian muscle car; 6.0L LS2 V8, an Aussie everyman performance icon.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19829,6 +20305,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "霍頓 VF 世代最後澳製 Commodore，6.2L LS3 V8，MRC磁流變避震",
+        "notes_en": "Last Australian-built Commodore, the VF generation; 6.2L LS3 V8, MRC magnetic-ride dampers.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19870,6 +20347,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "HSV 旗艦性能車，6.2L LSA 機械增壓V8，585匹，澳洲性能之巔",
+        "notes_en": "HSV flagship performance car; 6.2L LSA supercharged V8, 585 hp, the peak of Australian performance.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19911,6 +20389,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "福特澳洲 Falcon FG 渦輪直六，4.0L Barra I6T，270kW，漂移神器",
+        "notes_en": "Ford Australia Falcon FG turbo inline-six; 4.0L Barra I6T, 270 kW, a drift legend.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19952,6 +20431,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "福特澳洲 BA Falcon V8，5.4L Boss 290 V8，經典澳洲後驅性能車",
+        "notes_en": "Ford Australia BA Falcon V8; 5.4L Boss 290 V8, a classic Aussie RWD performance car.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -19993,6 +20473,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "豐田 Hilux GR Sport，2.8L柴油渦輪，Monotube避震，澳洲最暢銷皮卡",
+        "notes_en": "Toyota Hilux GR Sport; 2.8L turbo-diesel, monotube dampers; Australia's best-selling pickup.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20034,6 +20515,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "HSV 高性能 Ute，6.2L LS3 V8，世界最快量產皮卡之一",
+        "notes_en": "HSV high-performance ute; 6.2L LS3 V8; one of the world's fastest production pickups.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20075,6 +20557,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "馬恆達印度旗艦 SUV，2.0T汽油/2.2柴油，ADAS系統，印度年度車型",
+        "notes_en": "Mahindra's Indian flagship SUV; 2.0T petrol / 2.2 diesel, ADAS suite; Indian Car of the Year.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20116,6 +20599,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "塔塔小型電動 SUV，印度最暢銷電動車，Ziptron技術，五星安全",
+        "notes_en": "Tata compact electric SUV; India's best-selling EV, Ziptron tech, five-star safety.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20157,6 +20641,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "鈴木 Swift 運動版，1.4T BoosterJet，輕量化掀背鋼砲，僅970公斤",
+        "notes_en": "Suzuki Swift Sport; 1.4T BoosterJet, lightweight hot hatch at just 970 kg.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20198,6 +20683,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "寶騰小型 SUV，基於吉利繽越，1.5T+7DCT，馬來西亞熱銷車型",
+        "notes_en": "Proton compact SUV based on the Geely Binyue; 1.5T + 7DCT; a Malaysian best-seller.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20239,6 +20725,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "寶騰入門國民車，1.3L自然進氣，馬來西亞國民轎車代表",
+        "notes_en": "Proton's entry-level people's car; 1.3L naturally aspirated; an iconic Malaysian sedan.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20280,6 +20767,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "第二國產車 Myvi，基於大發 DNGA 平台，馬來西亞銷量冠軍掀背車",
+        "notes_en": "Perodua Myvi, Malaysia's second national car; built on the Daihatsu DNGA platform; the country's best-selling hatchback.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20321,6 +20809,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "VinFast 越南電動中型 SUV，雙馬達四驅，賓尼法利納設計",
+        "notes_en": "VinFast VF 8, Vietnamese mid-size electric SUV; dual-motor AWD, Pininfarina design.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20362,6 +20851,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "VinFast 越南旗艦全尺寸電動 SUV，三排座，402匹雙馬達",
+        "notes_en": "VinFast VF 9, Vietnamese flagship full-size electric SUV; three-row seating, 402 hp dual-motor.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20403,6 +20893,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "塔塔中置引擎概念跑車，1.2T Revotron，MOFlex模組化平台，印度超跑夢",
+        "notes_en": "Tata mid-engined concept sports car; 1.2T Revotron, MOFlex modular platform; India's supercar dream.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20444,6 +20935,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "Cupra 電動跑旅 SUV，MEB平台，340匹雙馬達，西班牙運動品牌",
+        "notes_en": "Cupra electric crossover SUV; MEB platform, 340 hp dual-motor; Spanish performance brand.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20485,6 +20977,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "蓮花電動GT轎跑，905匹雙馬達，空氣懸吊+CDC，2.78秒百公里加速",
+        "notes_en": "Lotus electric GT sedan; 905 hp dual-motor, air suspension with CDC; 0-100 km/h in 2.78 s.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20526,6 +21019,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "蓮花首款電動 SUV，905匹R+版，主動空氣動力學，蓮花有史以來最快SUV",
+        "notes_en": "Lotus's first electric SUV; 905 hp in R+ form, active aerodynamics; the fastest Lotus SUV ever.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20567,6 +21061,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "MG HS 插電混動 SUV，1.5T+電機，純電續航52km，性價比高",
+        "notes_en": "MG HS plug-in hybrid SUV; 1.5T plus electric motor, 52 km electric range; strong value.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20608,6 +21103,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "smart 精靈 Brabus 高性能版，雙馬達428匹，吉利SEA平台，3.7秒破百",
+        "notes_en": "smart #1 Brabus high-performance edition; dual-motor 428 hp, Geely SEA platform; 0-100 km/h in 3.7 s.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20649,6 +21145,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "BMW 旗艦電動 SUV M性能版，619匹雙馬達，空氣懸吊，3.8秒百公里",
+        "notes_en": "BMW flagship electric SUV, M Performance; 619 hp dual-motor, air suspension; 0-100 km/h in 3.8 s.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20690,6 +21187,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "AMG 電動性能轎車，687匹雙馬達，後軸轉向，空氣懸吊標配",
+        "notes_en": "AMG electric performance sedan; 687 hp dual-motor, rear-axle steering, air suspension standard.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20731,6 +21229,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "奧迪旗艦電動 SUV，三馬達 S 版503匹，空氣懸吊，quattro電動四驅",
+        "notes_en": "Audi flagship electric SUV; tri-motor S version with 503 hp, air suspension, quattro electric AWD.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20772,6 +21271,7 @@ var CAR_PRESETS = {
         "damper_adjustable": true,
         "arb_adjustable": false,
         "notes": "保時捷全新電動 Macan，PPE平台，639匹 Turbo 版，後軸轉向，3.3秒破百",
+        "notes_en": "Porsche's all-new electric Macan; PPE platform, 639 hp Turbo version, rear-axle steering; 0-100 km/h in 3.3 s.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
@@ -20813,6 +21313,7 @@ var CAR_PRESETS = {
         "damper_adjustable": false,
         "arb_adjustable": false,
         "notes": "福斯電動復古 MPV，MEB平台，致敬經典 T1 廂型車，四驅339匹可選",
+        "notes_en": "Volkswagen electric retro MPV; MEB platform, homage to the classic T1 microbus; optional 339 hp AWD.",
         "confidence": {
             "spring_rate": "estimated",
             "weight_dist": "estimated",
