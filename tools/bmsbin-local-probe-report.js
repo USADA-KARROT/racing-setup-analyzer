@@ -45,6 +45,11 @@ const REPORT_FIELDS = [
   // → never confirmed; no rate value is ever emitted.
   'timebaseStatus', 'timebaseConfirmedCount', 'timebaseCandidateCount', 'timebaseSampleCountStable',
   'timebaseMonotonicStable', 'timebaseDeltaStable', 'timebaseChannelSyncStable', 'timebaseDropoutCount',
+  // Phase 3F-0 physical scaling (sanitized scalars only — status/counts/level, NEVER a scale factor,
+  // unit table, transform constant, or inferred km/h/g/deg/% from a real file). Real files carry NO
+  // scaling/unit evidence here → never confirmed; no scale/unit value is ever emitted.
+  'physicalScalingStatus', 'scalingConfirmedCount', 'scalingCandidateCount',
+  'scalingUnitsConfirmedCount', 'scalingManualHintCount', 'scalingEvidenceLevel',
 ];
 
 /** Run the pipeline on one file's bytes and return a sanitized summary (no raw values).
@@ -84,6 +89,11 @@ function summarizeFile(bytes, fns, opts = {}) {
     ? fns.evaluateBmsTimebaseConfirmation(rawStreamConf, structure, {}) : null;
   const tbAgg = (tbConf && tbConf.aggregateDecision) || {};
   const tbCrit = (tbConf && tbConf.criteria) || {};
+  // Phase 3F-0: physical scaling confirmation. NO scaling/unit/manual evidence supplied here, so real
+  // files are never confirmed and no scale factor / unit / inferred physical value is ever produced.
+  const psConf = (typeof fns.evaluateBmsPhysicalScalingConfirmation === 'function')
+    ? fns.evaluateBmsPhysicalScalingConfirmation(rawStreamConf, idConf, tbConf, {}) : null;
+  const psAgg = (psConf && psConf.aggregateDecision) || {};
   return {
     catalogDetected: !!(r.header && r.header.valid) && (r.channelCount || 0) > 0,
     channelCount: r.channelCount || 0,
@@ -132,8 +142,15 @@ function summarizeFile(bytes, fns, opts = {}) {
     timebaseDeltaStable: !!tbCrit.deltaStable,
     timebaseChannelSyncStable: !!tbCrit.channelSyncStable,
     timebaseDropoutCount: (tbConf && tbConf.dropoutCount) || 0,
+    physicalScalingStatus: psConf ? psConf.status : null,
+    scalingConfirmedCount: psAgg.confirmedCount || 0,
+    scalingCandidateCount: psAgg.candidateCount || 0,
+    scalingUnitsConfirmedCount: psAgg.unitsConfirmedCount || 0,
+    scalingManualHintCount: psAgg.manualHintCount || 0,
+    scalingEvidenceLevel: psConf ? psConf.evidenceLevel : null,
   };
-  // Deliberately omitted: sample values, raw bytes, byte offsets, channel labels, inferred Hz/rate — sanitized by construction.
+  // Deliberately omitted: sample values, raw bytes, byte offsets, channel labels, inferred Hz/rate,
+  // scale factors, unit tables, transform constants, inferred physical values — sanitized by construction.
 }
 
 /** Aggregate per-file summaries into statistics only. */
@@ -202,6 +219,12 @@ function aggregate(summaries) {
     timebaseDeltaStableFiles: cnt(s => s.timebaseDeltaStable),
     timebaseChannelSyncStableFiles: cnt(s => s.timebaseChannelSyncStable),
     timebaseDropoutCountRange: range(s => s.timebaseDropoutCount),
+    // Phase 3F-0 physical scaling (sanitized counts / histograms only; never a scale factor / unit)
+    physicalScalingStatusHistogram: summaries.reduce((h, s) => { const k = s.physicalScalingStatus || 'none'; h[k] = (h[k] || 0) + 1; return h; }, {}),
+    scalingConfirmedFiles: cnt(s => s.scalingConfirmedCount > 0),
+    scalingUnitsConfirmedFiles: cnt(s => s.scalingUnitsConfirmedCount > 0),
+    scalingManualHintFiles: cnt(s => s.scalingManualHintCount > 0),
+    scalingEvidenceLevelHistogram: summaries.reduce((h, s) => { const k = s.scalingEvidenceLevel || 'none'; h[k] = (h[k] || 0) + 1; return h; }, {}),
   };
 }
 
@@ -222,9 +245,9 @@ function readHead(fs, file, n) {
 function loadFns() {
   const fs = require('fs'), path = require('path'), vm = require('vm');
   const jsDir = path.join(__dirname, '..', 'renderer', 'js');
-  const files = ['bms-parser.js', 'telemetry-schema.js', 'telemetry-metadata.js', 'bms-probe.js', 'bms-raw-extract.js', 'bms-channel-link.js', 'bms-confirmation.js', 'bms-structure-discovery.js', 'bms-raw-stream-confirmation.js', 'bms-channel-identity-confirmation.js', 'bms-timebase-confirmation.js'];
+  const files = ['bms-parser.js', 'telemetry-schema.js', 'telemetry-metadata.js', 'bms-probe.js', 'bms-raw-extract.js', 'bms-channel-link.js', 'bms-confirmation.js', 'bms-structure-discovery.js', 'bms-raw-stream-confirmation.js', 'bms-channel-identity-confirmation.js', 'bms-timebase-confirmation.js', 'bms-physical-scaling-confirmation.js'];
   const src = files.map(f => fs.readFileSync(path.join(jsDir, f), 'utf8')).join('\n')
-    + '\nthis.__f = { parseBms, probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, buildTelemetryMetadata };';
+    + '\nthis.__f = { parseBms, probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, buildTelemetryMetadata };';
   const ctx = {}; vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'bms-bundle.js' });
   return ctx.__f;
 }
@@ -246,9 +269,9 @@ if (require.main === module) {
   const fns = loadFns();
   const summaries = files.map(f => {
     try { return summarizeFile(readHead(fs, f, 2 * 1024 * 1024), fns, { scanWindowBytes: 1024 * 1024 }); }
-    catch (e) { return { catalogDetected: false, channelCount: 0, candidateRegionCount: 0, bestEncodingHypothesis: null, timebaseCandidate: false, rawSeriesCount: 0, linkStatus: 'error', channelIdentityConfirmed: false, canonicalAvailable: false, confirmationStatus: 'error', confirmedCatalog: false, confirmedStructure: false, confirmedChannelIdentity: false, confirmedTimebase: false, confirmedPhysicalScaling: false, canonicalTelemetry: false, confirmationScore: 0, structureStatus: 'error', pointerTableCandidate: false, pointerTableMatchesCatalog: false, perChannelBlockHypothesis: false, interleavedHypothesis: false, candidateChannelBlocks: 0, blockCountRelation: 'unknown', structureConverged: false, rawStreamConfirmationStatus: 'error', confirmedRawStreamCount: 0, partialRawStreamCount: 0, rejectedRawStreamCount: 0, rawStreamSampleCountConsistent: false, rawStreamBlockLengthConsistent: false, rawStreamTimebasePrecheck: false, rawStreamCrossFileStable: false, channelIdentityStatus: 'error', identityCandidateCount: 0, identityConfirmedCount: 0, identityHypothesisCount: 0, identityLabeledUnverifiedCount: 0, identityEvidenceLevel: 'error', timebaseStatus: 'error', timebaseConfirmedCount: 0, timebaseCandidateCount: 0, timebaseSampleCountStable: false, timebaseMonotonicStable: false, timebaseDeltaStable: false, timebaseChannelSyncStable: false, timebaseDropoutCount: 0 }; }
+    catch (e) { return { catalogDetected: false, channelCount: 0, candidateRegionCount: 0, bestEncodingHypothesis: null, timebaseCandidate: false, rawSeriesCount: 0, linkStatus: 'error', channelIdentityConfirmed: false, canonicalAvailable: false, confirmationStatus: 'error', confirmedCatalog: false, confirmedStructure: false, confirmedChannelIdentity: false, confirmedTimebase: false, confirmedPhysicalScaling: false, canonicalTelemetry: false, confirmationScore: 0, structureStatus: 'error', pointerTableCandidate: false, pointerTableMatchesCatalog: false, perChannelBlockHypothesis: false, interleavedHypothesis: false, candidateChannelBlocks: 0, blockCountRelation: 'unknown', structureConverged: false, rawStreamConfirmationStatus: 'error', confirmedRawStreamCount: 0, partialRawStreamCount: 0, rejectedRawStreamCount: 0, rawStreamSampleCountConsistent: false, rawStreamBlockLengthConsistent: false, rawStreamTimebasePrecheck: false, rawStreamCrossFileStable: false, channelIdentityStatus: 'error', identityCandidateCount: 0, identityConfirmedCount: 0, identityHypothesisCount: 0, identityLabeledUnverifiedCount: 0, identityEvidenceLevel: 'error', timebaseStatus: 'error', timebaseConfirmedCount: 0, timebaseCandidateCount: 0, timebaseSampleCountStable: false, timebaseMonotonicStable: false, timebaseDeltaStable: false, timebaseChannelSyncStable: false, timebaseDropoutCount: 0, physicalScalingStatus: 'error', scalingConfirmedCount: 0, scalingCandidateCount: 0, scalingUnitsConfirmedCount: 0, scalingManualHintCount: 0, scalingEvidenceLevel: 'error' }; }
   });
-  console.log('# .bmsbin local reality check (Phase 3C-1 + 3D-0 + 3D-1 + 3D-2 + 3E-0 + 3E-1 timebase) — SANITIZED, statistics only');
+  console.log('# .bmsbin local reality check (Phase 3C-1 + 3D-0 + 3D-1 + 3D-2 + 3E-0 + 3E-1 + 3F-0 scaling) — SANITIZED, statistics only');
   console.log(JSON.stringify(aggregate(summaries), null, 2));
   console.log('\nReminder: statistics only. Real .bmsbin files and raw sample values are NEVER committed.');
 }
