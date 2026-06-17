@@ -23,10 +23,12 @@ const REPORT_FIELDS = [
   'timebaseCandidate', 'rawSeriesCount', 'linkStatus', 'channelIdentityConfirmed', 'canonicalAvailable',
 ];
 
-/** Run the pipeline on one file's bytes and return a sanitized summary (no raw values). */
-function summarizeFile(bytes, fns) {
+/** Run the pipeline on one file's bytes and return a sanitized summary (no raw values).
+ *  opts.scanWindowBytes caps how much post-catalog data is analysed (representative stats;
+ *  keeps the reality check fast on large multi-MB logs). */
+function summarizeFile(bytes, fns, opts = {}) {
   const r = fns.parseBms(bytes);
-  const probe = fns.probeBmsBinary(bytes);
+  const probe = fns.probeBmsBinary(bytes, opts.scanWindowBytes ? { scanWindowBytes: opts.scanWindowBytes } : {});
   const raw = fns.extractBmsRawCandidates(bytes, probe, { catalogChannelCount: r.channelCount });
   const link = fns.linkBmsRawCandidates(r, probe, raw, {});
   const meta = fns.buildTelemetryMetadata(Object.assign({}, r, { probe, raw, link }));
@@ -65,6 +67,19 @@ function aggregate(summaries) {
   };
 }
 
+/** Read only the first `n` bytes of a file (catalog + a sample window is enough for a
+ *  reality check; avoids loading multi-MB logs in full). */
+function readHead(fs, file, n) {
+  const fd = fs.openSync(file, 'r');
+  try {
+    const size = fs.fstatSync(fd).size;
+    const len = Math.min(n, size);
+    const buf = Buffer.alloc(len);
+    fs.readSync(fd, buf, 0, len, 0);
+    return new Uint8Array(buf);
+  } finally { fs.closeSync(fd); }
+}
+
 /** Load the renderer pipeline functions in Node via a vm bundle (same idea as the tests). */
 function loadFns() {
   const fs = require('fs'), path = require('path'), vm = require('vm');
@@ -92,7 +107,7 @@ if (require.main === module) {
   }
   const fns = loadFns();
   const summaries = files.map(f => {
-    try { return summarizeFile(new Uint8Array(fs.readFileSync(f)), fns); }
+    try { return summarizeFile(readHead(fs, f, 2 * 1024 * 1024), fns, { scanWindowBytes: 1024 * 1024 }); }
     catch (e) { return { catalogDetected: false, channelCount: 0, candidateRegionCount: 0, bestEncodingHypothesis: null, timebaseCandidate: false, rawSeriesCount: 0, linkStatus: 'error', channelIdentityConfirmed: false, canonicalAvailable: false }; }
   });
   console.log('# .bmsbin local reality check (Phase 3C-1) — SANITIZED, statistics only');
@@ -100,4 +115,4 @@ if (require.main === module) {
   console.log('\nReminder: statistics only. Real .bmsbin files and raw sample values are NEVER committed.');
 }
 
-module.exports = { summarizeFile, aggregate, loadFns, REPORT_FIELDS };
+module.exports = { summarizeFile, aggregate, loadFns, readHead, REPORT_FIELDS };
