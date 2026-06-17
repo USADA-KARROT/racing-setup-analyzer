@@ -24,6 +24,12 @@ const REPORT_FIELDS = [
   // Phase 3D-0 confirmation decision (per-file, no cross-file corpus → structure cannot confirm):
   'confirmationStatus', 'confirmedCatalog', 'confirmedStructure', 'confirmedChannelIdentity',
   'confirmedTimebase', 'confirmedPhysicalScaling', 'canonicalTelemetry', 'confirmationScore',
+  // Phase 3D-1 structure discovery (sanitized scalars only — counts/relations/flags, NEVER
+  // raw byte positions, sample values, or proprietary layout). Field names deliberately avoid
+  // the words "offset"/"samples" so the sanitization whitelist stays unambiguous.
+  'structureStatus', 'pointerTableCandidate', 'pointerTableMatchesCatalog',
+  'perChannelBlockHypothesis', 'interleavedHypothesis', 'candidateChannelBlocks',
+  'blockCountRelation', 'structureConverged',
 ];
 
 /** Run the pipeline on one file's bytes and return a sanitized summary (no raw values).
@@ -40,6 +46,13 @@ function summarizeFile(bytes, fns, opts = {}) {
   const conf = (typeof fns.evaluateBmsConfirmationEvidence === 'function')
     ? fns.evaluateBmsConfirmationEvidence(r, probe, raw, link, {}) : null;
   const dec = (conf && conf.decisions) || {};
+  // Phase 3D-1: sample-structure discovery (hypotheses only — never confirmed on real single files).
+  const structure = (typeof fns.discoverBmsSampleStructure === 'function')
+    ? fns.discoverBmsSampleStructure(bytes, r, probe, raw, link, conf, { catalogChannelCount: r.channelCount, scanWindowBytes: opts.scanWindowBytes || undefined }) : null;
+  const sh = (structure && structure.structureHypotheses) || [];
+  const tc = (structure && structure.channelTableCandidates) || [];
+  const pointerTable = tc.find(t => t.kind === 'offset_table' && t.targetsPlausible) || null;
+  const pce = (structure && structure.perChannelEvidence) || {};
   return {
     catalogDetected: !!(r.header && r.header.valid) && (r.channelCount || 0) > 0,
     channelCount: r.channelCount || 0,
@@ -58,6 +71,14 @@ function summarizeFile(bytes, fns, opts = {}) {
     confirmedPhysicalScaling: !!dec.canConfirmPhysicalScaling,
     canonicalTelemetry: !!dec.canonicalTelemetryPrerequisitesMet,
     confirmationScore: conf ? conf.scores.overallScore : 0,
+    structureStatus: structure ? structure.status : null,
+    pointerTableCandidate: !!pointerTable,
+    pointerTableMatchesCatalog: !!(pointerTable && pointerTable.relationToCatalogCount === 'matches'),
+    perChannelBlockHypothesis: sh.some(h => h.type === 'per_channel_blocks'),
+    interleavedHypothesis: sh.some(h => h.type === 'interleaved_channels'),
+    candidateChannelBlocks: pce.candidateChannelBlocks || 0,
+    blockCountRelation: pce.countRelation || 'unknown',
+    structureConverged: !!(structure && structure.convergence && structure.convergence.sampleStructureConverged),
   };
   // Deliberately omitted: sample values, raw bytes, byte offsets — sanitized by construction.
 }
@@ -99,6 +120,15 @@ function aggregate(summaries) {
     confirmationScoreRange: range(s => s.confirmationScore),
     corpusChannelCountStable,
     corpusCandidateRegionStable,
+    // Phase 3D-1 structure discovery (sanitized counts / ranges / histograms only)
+    pointerTableCandidateFound: cnt(s => s.pointerTableCandidate),
+    pointerTableMatchesCatalog: cnt(s => s.pointerTableMatchesCatalog),
+    perChannelBlockHypothesisFound: cnt(s => s.perChannelBlockHypothesis),
+    interleavedHypothesisFound: cnt(s => s.interleavedHypothesis),
+    structureConfirmed: cnt(s => s.structureConverged),
+    candidateChannelBlocksRange: range(s => s.candidateChannelBlocks),
+    structureStatusHistogram: summaries.reduce((h, s) => { const k = s.structureStatus || 'none'; h[k] = (h[k] || 0) + 1; return h; }, {}),
+    blockCountRelationHistogram: summaries.reduce((h, s) => { const k = s.blockCountRelation || 'unknown'; h[k] = (h[k] || 0) + 1; return h; }, {}),
   };
 }
 
@@ -119,9 +149,9 @@ function readHead(fs, file, n) {
 function loadFns() {
   const fs = require('fs'), path = require('path'), vm = require('vm');
   const jsDir = path.join(__dirname, '..', 'renderer', 'js');
-  const files = ['bms-parser.js', 'telemetry-schema.js', 'telemetry-metadata.js', 'bms-probe.js', 'bms-raw-extract.js', 'bms-channel-link.js', 'bms-confirmation.js'];
+  const files = ['bms-parser.js', 'telemetry-schema.js', 'telemetry-metadata.js', 'bms-probe.js', 'bms-raw-extract.js', 'bms-channel-link.js', 'bms-confirmation.js', 'bms-structure-discovery.js'];
   const src = files.map(f => fs.readFileSync(path.join(jsDir, f), 'utf8')).join('\n')
-    + '\nthis.__f = { parseBms, probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, buildTelemetryMetadata };';
+    + '\nthis.__f = { parseBms, probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, buildTelemetryMetadata };';
   const ctx = {}; vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'bms-bundle.js' });
   return ctx.__f;
 }
@@ -143,9 +173,9 @@ if (require.main === module) {
   const fns = loadFns();
   const summaries = files.map(f => {
     try { return summarizeFile(readHead(fs, f, 2 * 1024 * 1024), fns, { scanWindowBytes: 1024 * 1024 }); }
-    catch (e) { return { catalogDetected: false, channelCount: 0, candidateRegionCount: 0, bestEncodingHypothesis: null, timebaseCandidate: false, rawSeriesCount: 0, linkStatus: 'error', channelIdentityConfirmed: false, canonicalAvailable: false, confirmationStatus: 'error', confirmedCatalog: false, confirmedStructure: false, confirmedChannelIdentity: false, confirmedTimebase: false, confirmedPhysicalScaling: false, canonicalTelemetry: false, confirmationScore: 0 }; }
+    catch (e) { return { catalogDetected: false, channelCount: 0, candidateRegionCount: 0, bestEncodingHypothesis: null, timebaseCandidate: false, rawSeriesCount: 0, linkStatus: 'error', channelIdentityConfirmed: false, canonicalAvailable: false, confirmationStatus: 'error', confirmedCatalog: false, confirmedStructure: false, confirmedChannelIdentity: false, confirmedTimebase: false, confirmedPhysicalScaling: false, canonicalTelemetry: false, confirmationScore: 0, structureStatus: 'error', pointerTableCandidate: false, pointerTableMatchesCatalog: false, perChannelBlockHypothesis: false, interleavedHypothesis: false, candidateChannelBlocks: 0, blockCountRelation: 'unknown', structureConverged: false }; }
   });
-  console.log('# .bmsbin local reality check (Phase 3C-1 + 3D-0 criteria) — SANITIZED, statistics only');
+  console.log('# .bmsbin local reality check (Phase 3C-1 + 3D-0 criteria + 3D-1 structure) — SANITIZED, statistics only');
   console.log(JSON.stringify(aggregate(summaries), null, 2));
   console.log('\nReminder: statistics only. Real .bmsbin files and raw sample values are NEVER committed.');
 }
