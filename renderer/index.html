@@ -741,6 +741,13 @@ canvas{max-height:300px}
       <!-- RIGHT: Results -->
       <div class="space-y-4">
         <div x-show="result">
+          <!-- Credibility legend: 哪些數字是物理/模型/啟發式 -->
+          <div class="flex flex-wrap items-center gap-2 mb-3 text-[10px] text-slate-500">
+            <span x-text="t('tier.legend')"></span>
+            <span x-html="tierBadge('physics')"></span>
+            <span x-html="tierBadge('model')"></span>
+            <span x-html="tierBadge('heuristic')"></span>
+          </div>
           <!-- Delta display (when baseline is set) -->
           <div x-show="baseline && deltaResult" class="card2 p-4 mb-4" style="background:rgba(250,204,21,.06);border:1px solid rgba(250,204,21,.15)">
             <div class="text-center">
@@ -774,7 +781,7 @@ canvas{max-height:300px}
           <div class="card2 p-5 mb-4">
             <div class="text-center mb-3">
               <span class="text-2xl font-bold" :class="resultColor" x-text="resultLabel"></span>
-              <div class="text-xs text-slate-500 mt-1" x-text="'Understeer Gradient: ' + resultGradient"></div>
+              <div class="text-xs text-slate-500 mt-1"><span x-text="'Understeer Gradient: ' + resultGradient"></span> <span x-html="tierBadge('model')"></span></div>
             </div>
             <div class="relative mb-6">
               <div class="gauge-bar"></div>
@@ -807,7 +814,7 @@ canvas{max-height:300px}
           <!-- Lihpao G2 lap prediction (synced with calculation, uses current car setup) -->
           <div x-show="lihpaoResult && !lihpaoResult.error" class="card2 p-4 mb-4" style="background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.18)">
             <div class="flex items-center justify-between mb-2">
-              <div class="text-xs text-sky-300 font-semibold" x-text="t('ui.lihpaoG2Title')"></div>
+              <div class="text-xs text-sky-300 font-semibold"><span x-text="t('ui.lihpaoG2Title')"></span> <span x-html="tierBadge('model')"></span></div>
               <button class="text-[10px] px-2 py-0.5 rounded bg-slate-600 text-slate-300 hover:bg-slate-500" @click="currentTab='lihpao'" x-text="t('btn.lapDetail')"></button>
             </div>
             <template x-if="lihpaoResult">
@@ -825,7 +832,7 @@ canvas{max-height:300px}
 
           <!-- Roll Stiffness -->
           <div class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2">Roll Stiffness Distribution</div>
+            <div class="text-xs text-slate-400 mb-2"><span>Roll Stiffness Distribution</span> <span x-html="tierBadge('physics')"></span></div>
             <div class="flex items-center gap-2 mb-1">
               <span class="text-xs w-16 text-right text-sky-400" x-text="'F ' + (result?.roll_stiffness_dist_front || result?.mechanical?.roll_stiffness_dist_front || 50) + '%'"></span>
               <div class="flex-1 h-5 rounded overflow-hidden flex">
@@ -843,7 +850,7 @@ canvas{max-height:300px}
 
           <!-- Tire grip (all tiers now have tire data) -->
           <div x-show="result?.tire_grip" class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2" x-text="t('res.tireGrip')"></div>
+            <div class="text-xs text-slate-400 mb-2"><span x-text="t('res.tireGrip')"></span> <span x-html="tierBadge('heuristic')"></span></div>
             <div class="grid-4">
               <div class="corner-box"><div class="val" :class="gripColor(result?.tire_grip?.fl)" x-text="(result?.tire_grip?.fl*100).toFixed(1)+'%'"></div><div class="lbl">FL</div></div>
               <div class="corner-box"><div class="val" :class="gripColor(result?.tire_grip?.fr)" x-text="(result?.tire_grip?.fr*100).toFixed(1)+'%'"></div><div class="lbl">FR</div></div>
@@ -863,7 +870,7 @@ canvas{max-height:300px}
 
           <!-- Ride Quality (all tiers) -->
           <div x-show="result?.ride_frequency || result?.mechanical?.ride_frequency" class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2" x-text="t('res.rideFreq')"></div>
+            <div class="text-xs text-slate-400 mb-2"><span x-text="t('res.rideFreq')"></span> <span x-html="tierBadge('physics')"></span></div>
             <template x-if="(result?.ride_frequency || result?.mechanical?.ride_frequency)">
               <div>
                 <div class="grid-2 mb-2">
@@ -889,7 +896,7 @@ canvas{max-height:300px}
 
           <!-- LLTD Decomposition (all tiers) -->
           <div x-show="result?.lltd_decomposed || result?.mechanical?.lltd_decomposed" class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2" x-text="t('res.lltd')"></div>
+            <div class="text-xs text-slate-400 mb-2"><span x-text="t('res.lltd')"></span> <span x-html="tierBadge('physics')"></span></div>
             <template x-if="(result?.lltd_decomposed || result?.mechanical?.lltd_decomposed)">
               <div>
                 <div class="text-xs text-slate-500 mb-1"><span x-text="t('ui.geoSharePre')"></span><span class="font-mono text-slate-300" x-text="(result?.lltd_decomposed || result?.mechanical?.lltd_decomposed)?.geometric_pct_of_total + '%'"></span></div>
@@ -913,7 +920,7 @@ canvas{max-height:300px}
 
           <!-- Damping Analysis (Tier 3) -->
           <div x-show="tier === 3 && result?.damping" class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2" x-text="t('res.damping')"></div>
+            <div class="text-xs text-slate-400 mb-2"><span x-text="t('res.damping')"></span> <span x-html="tierBadge('physics')"></span></div>
             <div class="grid-2 mb-2">
               <div class="corner-box">
                 <div class="val" :class="{'text-green-400': result?.damping?.front_category==='street','text-yellow-400': result?.damping?.front_category==='track','text-red-400': result?.damping?.front_category==='race','text-slate-400': result?.damping?.front_category==='underdamped'}" x-text="result?.damping?.front_ratio"></div>
@@ -932,7 +939,7 @@ canvas{max-height:300px}
 
           <!-- Longitudinal Transfer (Tier 3) -->
           <div x-show="tier === 3 && result?.longitudinal_transfer && (result?.longitudinal_transfer?.braking || result?.longitudinal_transfer?.acceleration)" class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2" x-text="t('res.longTransfer')"></div>
+            <div class="text-xs text-slate-400 mb-2"><span x-text="t('res.longTransfer')"></span> <span x-html="tierBadge('physics')"></span></div>
             <div x-show="result?.longitudinal_transfer?.braking" class="mb-2">
               <div class="text-xs text-slate-500 mb-1" x-text="t('res.brake')"></div>
               <div class="flex items-center gap-2">
@@ -961,7 +968,7 @@ canvas{max-height:300px}
 
           <!-- Vehicle Dynamics (Tier 3) -->
           <div x-show="tier === 3 && result?.dynamics" class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2" x-text="t('res.vehDyn')"></div>
+            <div class="text-xs text-slate-400 mb-2"><span x-text="t('res.vehDyn')"></span> <span x-html="tierBadge('model')"></span></div>
             <div class="grid-2 text-xs mb-2">
               <div class="corner-box">
                 <div class="val text-sky-300" x-text="result?.dynamics?.slip_angle_front_deg + '°'"></div>
@@ -992,7 +999,7 @@ canvas{max-height:300px}
 
           <!-- Tier 3: Transient step-steer response (2-DOF bicycle) -->
           <div x-show="tier === 3 && result?.dynamics && transientResult" class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2">⚡ <span x-text="t('ui.trans.title')"></span></div>
+            <div class="text-xs text-slate-400 mb-2">⚡ <span x-text="t('ui.trans.title')"></span> <span x-html="tierBadge('model')"></span></div>
             <div class="flex flex-wrap gap-3 mb-2 text-[10px] items-center">
               <label class="flex items-center gap-1"><span class="text-slate-500" x-text="t('ui.trans.speed')"></span><input type="number" step="10" x-model.number="trans.speed_kmh" class="w-16"></label>
               <label class="flex items-center gap-1"><span class="text-slate-500" x-text="t('ui.trans.steer')"></span><input type="number" step="1" x-model.number="trans.steer_deg" class="w-14"></label>
@@ -1013,14 +1020,14 @@ canvas{max-height:300px}
 
           <!-- Tier 3: Contribution breakdown -->
           <div x-show="tier === 3 && result?.contribution" class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2" x-text="t('res.contrib')"></div>
+            <div class="text-xs text-slate-400 mb-2"><span x-text="t('res.contrib')"></span> <span x-html="tierBadge('model')"></span></div>
             <canvas id="contributionChart" height="180"></canvas>
           </div>
 
           <!-- Tier 3: Corner weight / Aero -->
           <div x-show="tier === 3" class="grid-2 mb-4">
             <div class="card2 p-4" x-show="result?.corner_weight">
-              <div class="text-xs text-slate-400 mb-2">Corner Weight</div>
+              <div class="text-xs text-slate-400 mb-2"><span>Corner Weight</span> <span x-html="tierBadge('physics')"></span></div>
               <div class="grid-4 mb-2">
                 <div class="corner-box"><div class="val text-sky-300" x-text="result?.corner_weight?.fl"></div><div class="lbl">FL</div></div>
                 <div class="corner-box"><div class="val text-sky-300" x-text="result?.corner_weight?.fr"></div><div class="lbl">FR</div></div>
@@ -1033,7 +1040,7 @@ canvas{max-height:300px}
               </div>
             </div>
             <div class="card2 p-4" x-show="result?.aero">
-              <div class="text-xs text-slate-400 mb-2"><span x-text="t('ui.aeroEffectAt')"></span><span x-text="result?.aero?.speed_kmh + ' km/h'"></span></div>
+              <div class="text-xs text-slate-400 mb-2"><span x-text="t('ui.aeroEffectAt')"></span><span x-text="result?.aero?.speed_kmh + ' km/h'"></span> <span x-html="tierBadge('model')"></span></div>
               <div class="flex justify-between text-sm mb-1">
                 <span><span x-text="t('ui.frontDownPre')"></span><span class="font-bold text-sky-400" x-text="result?.aero?.front_downforce_kg + ' kg'"></span></span>
                 <span><span x-text="t('ui.rearDownPre')"></span><span class="font-bold text-pink-400" x-text="result?.aero?.rear_downforce_kg + ' kg'"></span></span>
@@ -1146,7 +1153,7 @@ canvas{max-height:300px}
   <div class="grid-2">
     <!-- Left: Frequency ↔ Spring Rate -->
     <div class="card p-5">
-      <div class="section-title" x-text="t('sec.freqSpring')"></div>
+      <div class="section-title"><span x-text="t('sec.freqSpring')"></span> <span class="align-middle" x-html="tierBadge('physics')"></span></div>
 
       <!-- Mode toggle -->
       <div class="flex rounded-lg overflow-hidden border border-white/10 mb-4">
@@ -1210,7 +1217,7 @@ canvas{max-height:300px}
 
     <!-- Right: ARB Sizing -->
     <div class="card p-5">
-      <div class="section-title" x-text="t('sec.arb')"></div>
+      <div class="section-title"><span x-text="t('sec.arb')"></span> <span class="align-middle" x-html="tierBadge('physics')"></span></div>
       <div class="text-xs text-slate-500 mb-3" x-text="t('ui.arbBackCalc')"></div>
 
       <div class="grid grid-cols-2 gap-3 mb-4">
@@ -1266,7 +1273,7 @@ canvas{max-height:300px}
 
   <!-- Spring Rate Reference Table -->
   <div class="card p-5 mt-4" x-show="springTable.length>0">
-    <div class="section-title" x-text="t('sec.springTable')"></div>
+    <div class="section-title"><span x-text="t('sec.springTable')"></span> <span class="align-middle" x-html="tierBadge('physics')"></span></div>
     <div class="text-xs text-slate-500 mb-3"><span x-text="t('ui.springTblCornerMass')"></span><span x-text="springCalc.corner_mass"></span><span x-text="t('ui.springTblMr')"></span><span x-text="springCalc.motion_ratio"></span><span x-text="t('ui.springTblTire')"></span><span x-text="springCalc.tire_spring_rate"></span> N/mm</div>
     <table>
       <thead><tr>
@@ -1288,7 +1295,7 @@ canvas{max-height:300px}
 
   <!-- 2D Suspension Kinematics (front-view double wishbone) -->
   <div class="card p-5 mt-4">
-    <div class="section-title">📐 <span x-text="t('ui.kin.title')"></span></div>
+    <div class="section-title">📐 <span x-text="t('ui.kin.title')"></span> <span class="align-middle" x-html="tierBadge('physics')"></span></div>
     <div class="text-xs text-slate-500 mb-3" x-text="t('ui.kin.hint')"></div>
     <div class="grid-2 text-sm gap-4">
       <div>
@@ -1421,7 +1428,7 @@ canvas{max-height:300px}
   </div>
   <div class="grid-2">
     <div class="card p-5">
-      <div class="section-title" x-text="t('sec.tempGrip')"></div>
+      <div class="section-title"><span x-text="t('sec.tempGrip')"></span> <span class="align-middle" x-html="tierBadge('heuristic')"></span></div>
       <div class="flex flex-wrap gap-1.5 mb-3">
         <template x-for="c in compoundList" :key="c">
           <button class="text-[10px] px-2 py-1 rounded-full" :class="selCompounds.includes(c)?'bg-sky-500 text-white':'bg-slate-700 text-slate-300'" @click="toggleArr(selCompounds,c);drawTireGrip()" x-text="getTireParams(c)[3]"></button>
@@ -1430,7 +1437,7 @@ canvas{max-height:300px}
       <canvas id="tireGripChart" height="250"></canvas>
     </div>
     <div class="card p-5">
-      <div class="section-title" x-text="t('sec.presGrip')"></div>
+      <div class="section-title"><span x-text="t('sec.presGrip')"></span> <span class="align-middle" x-html="tierBadge('heuristic')"></span></div>
       <canvas id="tirePressureChart" height="250"></canvas>
       <div class="text-xs text-slate-500 mt-2" x-text="t('ui.presGripNote')"></div>
     </div>
@@ -1490,7 +1497,7 @@ canvas{max-height:300px}
 
     <!-- Result summary -->
     <div class="card p-5" x-show="lihpaoResult && !lihpaoResult.error">
-      <div class="section-title" x-text="t('sec.lihpaoResult')"></div>
+      <div class="section-title"><span x-text="t('sec.lihpaoResult')"></span> <span class="align-middle" x-html="tierBadge('model')"></span></div>
       <template x-if="lihpaoResult">
         <div>
           <div class="grid-2 gap-3 mb-3">
@@ -1971,6 +1978,15 @@ function app(){return{
   nm(o){ if(!o) return ''; return (this.lang==='zh' && o.name_zh) ? o.name_zh : (o.name || o.name_zh || ''); },
   // 資料驅動備註(車款/輪胎)：繁中用 notes，英文/日文用 notes_en（日文回退英文）
   noteOf(o){ if(!o) return ''; return (this.lang==='zh') ? (o.notes||'') : (o.notes_en||o.notes||''); },
+  // 可信度等級 badge：Physics(◆ 教科書硬公式) / Model(◈ 工程估算) / Heuristic(◇ 手調調味)。
+  // 重用既有 conf badge 的視覺語彙；以 x-html 嵌入，語言切換時隨 t() 自動重繪。
+  tierBadge(level){
+    const M={ physics:['bg-emerald-900/40','text-emerald-300','◆'],
+              model:['bg-sky-900/40','text-sky-300','◈'],
+              heuristic:['bg-amber-900/40','text-amber-300','◇'] };
+    const c=M[level]||M.model;
+    return '<span class="text-[9px] px-1.5 py-0.5 rounded-full '+c[0]+' '+c[1]+' whitespace-nowrap align-middle" title="'+this.t('tier.'+level+'Hint')+'">'+c[2]+' '+this.t('tier.'+level)+'</span>';
+  },
   // .tir Pacejka 真實胎模型匯入(使用者執行時載入自己的檔，不打包/不上傳)
   tirResult: null,
   tirParsed: null,
