@@ -16,6 +16,7 @@ const vm = require('vm');
 
 const jsDir = path.join(__dirname, '..', 'renderer', 'js');
 const src =
+  fs.readFileSync(path.join(jsDir, 'calibration.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'tire-data.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'dynamics-model.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'lihpao-laptime.js'), 'utf8') + '\n' +
@@ -30,6 +31,7 @@ const src =
   'solveStatic, solveAtTravel, kinematicsSweep, ' +
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
+  'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
 const ctx = {};
@@ -564,6 +566,50 @@ PKY4 = 2.0`;
   check('bms: channel name/source/description parsed', cat[0].name === 'accy' && cat[0].source === 'MS5.8' && cat[0].description === 'lateral acceleration');
   const r = M.parseBms(bytes);
   check('bms: detects validation channels (accy/yaw/steer)', r.validationChannels.lateral_accel && r.validationChannels.yaw_rate && r.validationChannels.steering);
+}
+
+// ── Calibration 層：每個常數 == 原始 inline 值 (抽常數時值不可變) ──
+console.log('\n[cal] Calibration 層：常數值鎖定 (calibration.js)');
+{
+  // 這些是被搬進 calibration.js 之前散落在 dynamics-model.js / lihpao-laptime.js
+  // 裡的原始 inline 值。任何一項對不上 = 抽常數時不小心改了行為,測試擋下。
+  const expected = {
+    US_NEUTRAL_BAND: 0.5,
+    US_NORM_SCALE: 4.0,
+    CORNERING_STIFFNESS_AY_REF_G: 1.0,
+    TIRE_GRIP_TO_US_GRADIENT_GAIN: 14,
+    WEIGHT_SHIFT_TO_US_GRADIENT: 0.2,
+    TIRE_WIDTH_GRIP_REF_MM: 245,
+    TIRE_WIDTH_GRIP_EXPONENT: 0.5,
+    PRESSURE_GRIP_LOSS_PER_BAR: 0.2,
+    LIHPAO_RADIUS_SCALE: 1.1,
+    TIRE_TEMP_TRACK_COEFF: 0.6,
+    TIRE_TEMP_EQUIL_TAU_LAPS: 1.6,
+    LAP_BALANCE_PENALTY_PER_DEGG: 0.012,
+    LAP_BALANCE_PENALTY_CAP: 0.04,
+    DRIVETRAIN_TRACTION_FRAC_2WD: 0.62,
+  };
+  for (const [k, v] of Object.entries(expected)) {
+    check(`cal: CAL.${k} === ${v}`, M.CAL[k] === v, `got ${M.CAL[k]}`);
+    check(`cal: CALIBRATION.${k}.value 對齊 CAL.${k}`,
+      !!M.CALIBRATION[k] && M.CALIBRATION[k].value === M.CAL[k]);
+  }
+  // 鍵集合完全一致(沒有遺漏/多餘的常數未被測試鎖定)
+  check('cal: CALIBRATION 鍵集合 == 測試預期',
+    Object.keys(M.CALIBRATION).sort().join(',') === Object.keys(expected).sort().join(','),
+    Object.keys(M.CALIBRATION).join(','));
+  // 每個常數 metadata 完整,且 value 落在自己宣告的 validRange 內
+  const TIERS = ['Physics', 'Model', 'Heuristic'];
+  let metaOk = true, bad = '';
+  for (const k of Object.keys(M.CALIBRATION)) {
+    const m = M.CALIBRATION[k];
+    const ok = typeof m.value === 'number' && m.unit && m.meaning
+      && Array.isArray(m.validRange) && m.validRange.length === 2
+      && TIERS.includes(m.tier)
+      && m.value >= m.validRange[0] && m.value <= m.validRange[1];
+    if (!ok) { metaOk = false; bad = k; }
+  }
+  check('cal: 每個常數 metadata 完整且 value 落在 validRange 內', metaOk, bad);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);

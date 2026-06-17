@@ -33,8 +33,8 @@ function roundN(val, n) {
 // 正 = 轉向不足(US), 負 = 轉向過度(OS)。一般量產車 +1~+4、賽車 0~+1.5、
 // 後置/中置可能微負。NEUTRAL 帶寬 ±0.5 deg/g。
 // ============================================================
-const US_NEUTRAL_BAND = 0.5;   // deg/g — 此帶內視為中性
-const US_NORM_SCALE = 4.0;     // deg/g 對應正規化 ±1 的滿刻度
+const US_NEUTRAL_BAND = CAL.US_NEUTRAL_BAND;   // deg/g — 此帶內視為中性 (見 calibration.js)
+const US_NORM_SCALE = CAL.US_NORM_SCALE;       // deg/g 對應正規化 ±1 的滿刻度 (見 calibration.js)
 function usTendency(degPerG) {
   if (degPerG > US_NEUTRAL_BAND) return ['Understeer', '轉向不足'];
   if (degPerG < -US_NEUTRAL_BAND) return ['Oversteer', '轉向過度'];
@@ -296,7 +296,7 @@ class Tier1BasicBalance {
     //   (a) 配重 — 車頭重 → 前軸單胎負載大 → 負載敏感度使 C_αf 偏低 → 轉向不足
     //   (b) LLTD/側傾剛性分配 — 前軸荷重轉移多 → C_αf 進一步下降 → 轉向不足
     // 取代舊式 (LLTD% − weight%)：舊式漏掉 (a)，導致前驅/車頭重車被誤判轉向過度。
-    const ayRef = 1.0; // g — 評估荷重轉移的參考側向加速度(校準後 LLTD 敏感度最合理)
+    const ayRef = CAL.CORNERING_STIFFNESS_AY_REF_G; // g — 評估荷重轉移的參考側向加速度(校準後 LLTD 敏感度最合理,見 calibration.js)
     const a4Ref = totalWeight * G / 4 / 1000; // 平均單胎靜載 (kN)，校準負載敏感度膝點
     const cAlphaF = axlePairCorneringStiffness(mF, totalDFzF, ayRef, a4Ref, p.tireModel);
     const cAlphaR = axlePairCorneringStiffness(mR, totalDFzR, ayRef, a4Ref, p.tireModel);
@@ -377,8 +377,8 @@ class TireModel {
     slick_hard: [100, 18, 1.02],
   };
 
-  // Reference tire width for normalization (mm)
-  static REFERENCE_WIDTH = 245;
+  // Reference tire width for normalization (mm) — 見 calibration.js
+  static REFERENCE_WIDTH = CAL.TIRE_WIDTH_GRIP_REF_MM;
 
   /**
    * Get tire parameters from either legacy compound name or trackday tire ID.
@@ -418,7 +418,7 @@ class TireModel {
    */
   static gripFactorPressure(pressureBar, optimalBar = 1.90) {
     const delta = Math.abs(pressureBar - optimalBar);
-    const factor = 1.0 - 0.2 * delta;
+    const factor = 1.0 - CAL.PRESSURE_GRIP_LOSS_PER_BAR * delta;
     return roundN(Math.max(0.5, Math.min(1.0, factor)), 4);
   }
 
@@ -432,7 +432,7 @@ class TireModel {
     const ref = referenceWidth || TireModel.REFERENCE_WIDTH;
     if (tireWidthMm <= 0 || ref <= 0) return 1.0;
     const ratio = tireWidthMm / ref;
-    const factor = Math.sqrt(ratio);
+    const factor = Math.pow(ratio, CAL.TIRE_WIDTH_GRIP_EXPONENT);
     return roundN(Math.max(0.8, Math.min(1.25, factor)), 4);
   }
 
@@ -576,8 +576,8 @@ class Tier2TireAware {
 
     // Tire-adjusted understeer gradient
     // 前/後抓地比失衡 → 平衡偏移 (deg/g)。gripRatio<1(前軸較弱) → 轉向不足(+)。
-    // 增益 14：前軸抓地少 10% ≈ +1.4 deg/g 偏移。
-    const tireUsShift = -(gripRatio - 1.0) * 14;
+    // 增益見 calibration.js TIRE_GRIP_TO_US_GRADIENT_GAIN：前軸抓地少 10% ≈ +1.4 deg/g 偏移。
+    const tireUsShift = -(gripRatio - 1.0) * CAL.TIRE_GRIP_TO_US_GRADIENT_GAIN;
     const adjustedUs = t1.understeer_gradient + tireUsShift;
     const adjustedNormalized = usNorm(adjustedUs);
     const [tendency, tendencyZh] = usTendency(adjustedUs);
@@ -766,8 +766,8 @@ class Tier3Complete {
       // toward the front gives the front axle more grip margin for the same
       // lateral demand → LESS understeer. Front-biased aero = high-speed
       // oversteer; rear-biased aero = high-speed understeer/stability.
-      // 0.2: 每 1% 有效配重前移 ≈ 0.2 deg/g 偏移(deg/g 尺度)。
-      aeroUsShift = -(effectiveFrontPct - (frontW / totalW * 100)) * 0.2;
+      // 每 1% 有效配重前移 ≈ 0.2 deg/g 偏移(見 calibration.js WEIGHT_SHIFT_TO_US_GRADIENT)。
+      aeroUsShift = -(effectiveFrontPct - (frontW / totalW * 100)) * CAL.WEIGHT_SHIFT_TO_US_GRADIENT;
     } else {
       effectiveFrontPct = t2.weight_front_pct ?? 50;
       aeroUsShift = 0;

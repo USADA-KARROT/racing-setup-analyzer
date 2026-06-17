@@ -31,7 +31,7 @@ const LIHPAO_G2 = {
   //   改裝半熱熔 GR Yaris(mu≈1.25/220kW) → 1:50.5 ≈ 真實紀錄 1:50.89(蘇彥銘)
   //   原廠街胎 GR Yaris(mu≈1.0) → ~2:00(較慢，符合「紀錄車多為改裝」的事實)
   // 絕對圈速取決於輸入規格(動力/抓地/空力/質量/改裝)，改裝車會正確預測更快。
-  radius_scale: 1.1,
+  radius_scale: CAL.LIHPAO_RADIUS_SCALE,  // 見 calibration.js
   // 段落序列(繞一圈)：corner = 過彎(半徑 m)，straight = 直線(長度 m)
   // 23 彎多為複合彎，這裡以 ~13 個速度決定點 + 連接直線表示，總長對齊 3500m。
   // 麗寶特徵：1 條主直線(~900m)、數個 hairpin、技術型中低速彎、Fire 區大落差。
@@ -112,7 +112,7 @@ class LihpaoLapSim {
     const m = mass_kg;
     const Fpower = v > 1 ? (power_kw * 1000 * 0.9) / v : (power_kw * 1000 * 0.9); // 0.9 傳動效率
     const N = m * this.G + 0.5 * this.RHO * (ClA || 0) * v * v;
-    const tractionFrac = this.car.drivetrain === 'AWD' ? 1.0 : 0.62; // 驅動軸荷重比
+    const tractionFrac = this.car.drivetrain === 'AWD' ? 1.0 : CAL.DRIVETRAIN_TRACTION_FRAC_2WD; // 驅動軸荷重比 (見 calibration.js)
     const Ftraction = mu * N * tractionFrac;
     const Fdrag = 0.5 * this.RHO * (this.car.CdA || 0.7) * v * v;
     const Froll = 0.015 * m * this.G;
@@ -206,9 +206,9 @@ class LihpaoStintSim {
     //   Teq = optimal + (track − 32)×0.6
     // 這樣光頭胎(optT 90-100)會正確熱到工作窗口(否則永遠發揮不出 peak)，
     // 而街胎在熱賽道會略過熱、在冷賽道剛好 —— 皆符合實況。
-    const Teq = optT + (trackC - 32) * 0.6;
+    const Teq = optT + (trackC - 32) * CAL.TIRE_TEMP_TRACK_COEFF;  // 見 calibration.js
     const Tstart = this.env.ambient_c + 5; // 出 pit 微溫
-    const tau = 1.6; // 圈，時間常數(~3-4 圈到平衡)
+    const tau = CAL.TIRE_TEMP_EQUIL_TAU_LAPS; // 圈，時間常數(~3-4 圈到平衡,見 calibration.js)
     return Teq + (Tstart - Teq) * Math.exp(-(lap - 1) / tau);
   }
 
@@ -352,7 +352,7 @@ function simulateLihpao(setup) {
   const CdA = area * 0.34; // 估：Cd≈0.34 × 正面積
 
   // 4) 平衡懲罰：偏離中性越多越慢(最多 ~4%)
-  const balance_penalty = Math.min(0.04, Math.abs(bal) * 0.012);
+  const balance_penalty = Math.min(CAL.LAP_BALANCE_PENALTY_CAP, Math.abs(bal) * CAL.LAP_BALANCE_PENALTY_PER_DEGG);
 
   // 5) 動力 + 佈局
   const layout = setup.layout || p.layout || 'RWD';
