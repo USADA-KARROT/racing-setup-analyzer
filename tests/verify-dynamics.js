@@ -29,6 +29,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'telemetry-metadata.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-probe.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-raw-extract.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-channel-link.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -38,7 +39,7 @@ const src =
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
-  'probeBmsBinary, extractBmsRawCandidates, ' +
+  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
@@ -920,6 +921,51 @@ console.log('\n[raw] .bmsbin raw time-series candidate extraction');
     && tm.capabilities.physicalScaling === false && tm.capabilities.handlingCorrelation === false && tm.capabilities.timeSeries === false);
   check('raw→metadata: rawExtraction summary attached (seriesCount + channelMapping not_mapped)',
     !!tm.rawExtraction && tm.rawExtraction.seriesCount > 0 && tm.rawExtraction.channelMapping === 'not_mapped');
+}
+
+// ── Phase 3C-0: channel-linking / scaling hypotheses (synthetic; hypotheses only) ──
+console.log('\n[link] .bmsbin channel-linking hypotheses');
+{
+  const code = (r, c) => r.diagnostics.some(d => d.code === c);
+  const bmsStub = (names) => ({ channels: names.map(nm => ({ name: nm })), channelCount: names.length });
+  const rawStub = (n, sampleCount = 600) => ({
+    rawSeriesCandidates: Array.from({ length: n }, (_, i) => ({ id: 'candidate_' + String(i + 1).padStart(3, '0'), encoding: 'int16le', sampleCount, samplePreview: [0, 1, 2, 3, 4], minRaw: 0, maxRaw: 100, meanRaw: 50, confidence: 'medium', notes: ['raw values only', 'not physically scaled', 'not mapped to canonical channel'] })),
+    timebaseCandidate: { present: true, sampleCount, medianDelta: 10, confidence: 'medium' },
+  });
+
+  // 1. no raw extraction → error
+  check('link: no raw extraction → error', code(M.linkBmsRawCandidates(bmsStub(['accy']), null, null), 'BMS_LINK_NO_RAW_EXTRACTION'));
+  // 2. no catalog → warning (raw still present)
+  check('link: no catalog → warning', code(M.linkBmsRawCandidates({ channels: [], channelCount: 0 }, null, rawStub(3)), 'BMS_LINK_NO_CATALOG'));
+
+  // 3. count match → count-match hypothesis (low-confidence order hypothesis)
+  const four = M.linkBmsRawCandidates(bmsStub(['accy', 'yaw', 'steer', 'speed']), { timebaseClues: [] }, rawStub(4));
+  check('link: count match → count-match info + low-confidence order hypothesis',
+    code(four, 'BMS_LINK_CHANNEL_COUNT_MATCH_CANDIDATE') && four.channelIdentityHypotheses[0].confidence === 'low' && four.channelIdentityHypotheses[0].possibleRawChannelName === 'accy');
+  // 5. no explicit mapping → identity unconfirmed
+  check('link: no explicit mapping → channel identity not confirmed',
+    code(four, 'BMS_LINK_CHANNEL_IDENTITY_NOT_CONFIRMED') && four.channelIdentityHypotheses.every(h => h.confidence !== 'high'));
+
+  // 4. explicit mapping → high-confidence identity (synthetic only)
+  const exMap = { candidate_001: { rawChannelName: 'accy', canonicalName: 'lateral_accel', scale: 0.01, offset: 0, unit: 'g' } };
+  const exr = M.linkBmsRawCandidates(bmsStub(['accy', 'yaw', 'steer', 'speed']), { timebaseClues: [] }, rawStub(4), { explicitMapping: exMap });
+  check('link: explicit mapping → high-confidence identity (synthetic case only)',
+    exr.channelIdentityHypotheses[0].confidence === 'high' && exr.channelIdentityHypotheses[0].possibleCanonicalName === 'lateral_accel');
+  // 6. explicit scale → scaling hypothesis (not validated)
+  check('link: explicit scale → scaling hypothesis (metadata_candidate)',
+    exr.scalingHypotheses[0].scale === 0.01 && exr.scalingHypotheses[0].method === 'metadata_candidate' && code(exr, 'BMS_LINK_SCALING_HYPOTHESIS_AVAILABLE'));
+  // 7. no scale → manual_required, physicalScaling false
+  check('link: no scale → manual_required + physicalScaling false',
+    four.scalingHypotheses[0].method === 'manual_required' && four.capabilities.physicalScaling === false);
+  // 8. canonicalPreview only with explicit identity+scale
+  check('link: canonicalPreview available only with explicit identity+scale',
+    four.canonicalPreview.available === false && exr.canonicalPreview.available === true);
+  // 9. handlingCorrelation / timeSeries / physicalScaling stay false even with explicit mapping
+  check('link: decode-grade capabilities stay false even with explicit mapping',
+    exr.capabilities.handlingCorrelation === false && exr.capabilities.timeSeries === false && exr.capabilities.physicalScaling === false);
+  // timebase hypothesis (candidate only, sample-count match)
+  check('link: timebase hypothesis formed (candidate only, sample-count match)',
+    four.timebaseHypotheses.length > 0 && four.timebaseHypotheses[0].sampleCountMatch === true && code(four, 'BMS_LINK_TIMEBASE_HYPOTHESIS_AVAILABLE'));
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
