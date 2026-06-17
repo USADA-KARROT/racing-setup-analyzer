@@ -63,9 +63,11 @@ Sample structure confirmed **and** the per-stream encoding/layout is reproducibl
 generic candidate). Not yet met.
 
 ### Channel identity confirmed — `canConfirmChannelIdentity`
-Requires **explicit** evidence: a channel index / offset table, a stable order with matching
-block count, a synthetic explicit mapping, or a user-confirmed manual mapping. Catalog-order
-*guessing* never qualifies. Not yet met.
+Requires **confirmed sample structure** AND **explicit** evidence: a channel index / offset
+table, a stable order with matching block count, a synthetic explicit mapping, or a
+user-confirmed manual mapping. Catalog-order *guessing* never qualifies, and explicit evidence
+alone is not sufficient — you cannot confirm a channel's identity without the structure it
+labels (so a single file, with or without an explicit mapping, cannot reach this). Not yet met.
 
 ### Timebase confirmed — `canConfirmTimebase`
 Requires confirmed sample structure **and** a monotonic counter whose sample count matches the
@@ -77,9 +79,12 @@ Not yet met.
 Requires confirmed identity **and** an explicit scale/offset (metadata, user-supplied, exported
 reference, or a known calibration table). Not yet met. → `capabilities.physicalScaling` `false`.
 
-### Canonical telemetry — `canBuildCanonicalTelemetry`
-Only when sample structure + channel identity + timebase + physical scaling are **all**
-confirmed. Not yet met — and out of scope to *build* even if it were.
+### Canonical telemetry prerequisites — `canonicalTelemetryPrerequisitesMet`
+True only when sample structure + channel identity + timebase + physical scaling are **all**
+confirmed. This is a *prerequisite* flag, **not** a directive to build telemetry and **not** a
+"telemetry-ready" claim — Phase 3D-0 never builds canonical streams, and the decode-grade
+capabilities stay `false` regardless. Not yet met on real data, and out of scope to *build*
+even if it were.
 
 ## Status semantics
 - `not_confirmed` — sample structure not confirmed (catalog may still be confirmable). The

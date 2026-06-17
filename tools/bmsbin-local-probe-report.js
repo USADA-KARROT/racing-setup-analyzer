@@ -56,7 +56,7 @@ function summarizeFile(bytes, fns, opts = {}) {
     confirmedChannelIdentity: !!dec.canConfirmChannelIdentity,
     confirmedTimebase: !!dec.canConfirmTimebase,
     confirmedPhysicalScaling: !!dec.canConfirmPhysicalScaling,
-    canonicalTelemetry: !!dec.canBuildCanonicalTelemetry,
+    canonicalTelemetry: !!dec.canonicalTelemetryPrerequisitesMet,
     confirmationScore: conf ? conf.scores.overallScore : 0,
   };
   // Deliberately omitted: sample values, raw bytes, byte offsets — sanitized by construction.
@@ -70,9 +70,11 @@ function aggregate(summaries) {
   const range = (sel) => summaries.length ? [Math.min(...summaries.map(sel)), Math.max(...summaries.map(sel))] : [0, 0];
   const channelCountRange = range(s => s.channelCount);
   const regionRange = range(s => s.candidateRegionCount);
-  // Cross-file (corpus) evidence — the reality-check signal a single file cannot give:
-  const corpusChannelCountStable = channelCountRange[0] === channelCountRange[1] && channelCountRange[0] > 0;
-  const corpusCandidateRegionStable = regionRange[1] > 0 && (regionRange[1] - regionRange[0]) <= Math.max(2, 0.2 * regionRange[1]);
+  // Cross-file (corpus) evidence — the reality-check signal a single file cannot give, so it
+  // requires at least 2 files; a single file never asserts cross-file stability.
+  const multiFile = summaries.length >= 2;
+  const corpusChannelCountStable = multiFile && channelCountRange[0] === channelCountRange[1] && channelCountRange[0] > 0;
+  const corpusCandidateRegionStable = multiFile && regionRange[1] > 0 && (regionRange[1] - regionRange[0]) <= Math.max(2, 0.2 * regionRange[1]);
   return {
     filesTested: summaries.length,
     catalogDetected: cnt(s => s.catalogDetected),

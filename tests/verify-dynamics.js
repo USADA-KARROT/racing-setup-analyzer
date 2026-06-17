@@ -1102,8 +1102,16 @@ console.log('\n[confirm] .bmsbin hypothesis→confirmed criteria');
   const c9 = M.evaluateBmsConfirmationEvidence(bmsStub(names85), probeMono, raw2, link85, {});
   check('confirm: real-data-like (85 ch / 2 raw, no corpus) → catalog only, status not_confirmed',
     c9.decisions.canConfirmCatalog === true && c9.decisions.canConfirmSampleStructure === false
-    && c9.decisions.canConfirmChannelIdentity === false && c9.decisions.canBuildCanonicalTelemetry === false
+    && c9.decisions.canConfirmChannelIdentity === false && c9.decisions.canonicalTelemetryPrerequisitesMet === false
     && c9.status === 'not_confirmed');
+
+  // 9b. (regression) single file + explicit mapping (high-conf id + metadata scale) but NO corpus
+  // → identity / scaling / canonical-prereq stay false because sample structure is unconfirmed.
+  const cNoCorpus = M.evaluateBmsConfirmationEvidence(bmsStub(names4), probeMono, raw4, linkEx, {});
+  check('confirm: explicit mapping but NO corpus → identity/scaling/canonical stay false (structure gates them)',
+    cNoCorpus.decisions.canConfirmSampleStructure === false && cNoCorpus.decisions.canConfirmChannelIdentity === false
+    && cNoCorpus.decisions.canConfirmPhysicalScaling === false && cNoCorpus.decisions.canonicalTelemetryPrerequisitesMet === false
+    && cNoCorpus.status === 'not_confirmed');
 
   // 10. handlingCorrelation / timeSeries / physicalScaling stay false even at confirmed_structure
   check('confirm: decode-grade capabilities stay false even when structure is confirmed',

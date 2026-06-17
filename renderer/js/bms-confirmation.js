@@ -16,7 +16,9 @@
  * Honesty of "confirmation": a single file can confirm a CATALOG but cannot prove cross-file
  * stability — so structure/region criteria require an `opts.corpus` (from the local reality
  * check). Channel identity requires EXPLICIT evidence (an offset/index table or an explicit
- * mapping); catalog ORDER is never explicit evidence.
+ * mapping) AND confirmed sample structure; catalog ORDER is never explicit evidence. Physical
+ * scaling chains off identity. `canonicalTelemetryPrerequisitesMet` only reports that every
+ * prerequisite is met — it is NOT a directive to build telemetry, and stays false on real data.
  */
 
 function evaluateBmsConfirmationEvidence(bmsResult, probeReport, rawExtraction, linkingReport, opts = {}) {
@@ -78,21 +80,31 @@ function evaluateBmsConfirmationEvidence(bmsResult, probeReport, rawExtraction, 
   const canConfirmCatalog = catalogStable;
   const canConfirmSampleStructure = catalogStable && structureEvidence;
   const canConfirmRawStreams = canConfirmSampleStructure && encodingConsistent;
-  const canConfirmChannelIdentity = catalogStable && explicitChannelMappingFound;
+  // Identity (and therefore scaling) is gated on confirmed sample structure: a single file —
+  // even with an explicit mapping — cannot confirm a channel's identity without the
+  // corpus-backed structure that mapping labels. Explicit evidence is necessary, not sufficient.
+  const canConfirmChannelIdentity = canConfirmSampleStructure && explicitChannelMappingFound;
   const canConfirmTimebase = canConfirmSampleStructure && timebaseConfirmed;
   const canConfirmPhysicalScaling = canConfirmChannelIdentity && scaleOffsetFound;
-  const canBuildCanonicalTelemetry = canConfirmSampleStructure && canConfirmChannelIdentity
+  // NOT a green light to build telemetry — Phase 3D-0 never builds canonical streams. This only
+  // reports that every confirmation prerequisite is met; it stays false on real data and never
+  // flips capabilities.timeSeries / physicalScaling / handlingCorrelation (which are pinned false).
+  const canonicalTelemetryPrerequisitesMet = canConfirmSampleStructure && canConfirmChannelIdentity
     && canConfirmTimebase && canConfirmPhysicalScaling;
 
   const decisions = {
     canConfirmCatalog, canConfirmSampleStructure, canConfirmRawStreams,
     canConfirmChannelIdentity, canConfirmTimebase, canConfirmPhysicalScaling,
-    canBuildCanonicalTelemetry,
+    canonicalTelemetryPrerequisitesMet,
   };
 
   // ── scores (0..1; weighted overall) ──
   const catalogScore = catalogStable ? (channelCountStable ? 1 : 0.7) : 0;
-  const structureScore = (candidateRegionStable ? 0.5 : 0) + (rawSeriesCountMatchesCatalog ? 0.5 : 0);
+  // structure confidence is corpus-led: the in-file count match alone (no corpus) is only a weak
+  // signal, so it cannot reach 0.5 without cross-file region stability.
+  const structureScore = candidateRegionStable
+    ? (rawSeriesCountMatchesCatalog ? 1 : 0.5)
+    : (rawSeriesCountMatchesCatalog ? 0.2 : 0);
   const timebaseScore = timebaseConfirmed ? 1 : (timebaseCandidatePresent ? 0.3 : 0);
   const channelMappingScore = explicitChannelMappingFound ? 1 : (catalogOrderHypothesisPresent ? 0.2 : 0);
   const scalingScore = scaleOffsetFound ? 1 : 0;
@@ -145,7 +157,7 @@ function evaluateBmsConfirmationEvidence(bmsResult, probeReport, rawExtraction, 
   if (!canConfirmChannelIdentity) diagnostics.push(D('warning', 'BMS_CONFIRM_CHANNEL_IDENTITY_NOT_CONFIRMED', 'telemetry.confirm.warning.channelIdentityNotConfirmed'));
   if (!canConfirmTimebase) diagnostics.push(D('warning', 'BMS_CONFIRM_TIMEBASE_NOT_CONFIRMED', 'telemetry.confirm.warning.timebaseNotConfirmed'));
   if (!canConfirmPhysicalScaling) diagnostics.push(D('warning', 'BMS_CONFIRM_SCALING_NOT_CONFIRMED', 'telemetry.confirm.warning.scalingNotConfirmed'));
-  if (!canBuildCanonicalTelemetry) diagnostics.push(D('warning', 'BMS_CONFIRM_CANONICAL_NOT_AVAILABLE', 'telemetry.confirm.warning.canonicalNotAvailable'));
+  if (!canonicalTelemetryPrerequisitesMet) diagnostics.push(D('warning', 'BMS_CONFIRM_CANONICAL_NOT_AVAILABLE', 'telemetry.confirm.warning.canonicalNotAvailable'));
   diagnostics.push(D('info', 'BMS_CONFIRM_CRITERIA_EVALUATED', 'telemetry.confirm.info.criteriaEvaluated', 'high'));
   if (nextEvidenceNeeded.length) diagnostics.push(D('info', 'BMS_CONFIRM_NEXT_EVIDENCE_NEEDED', 'telemetry.confirm.info.nextEvidenceNeeded', 'low'));
 
