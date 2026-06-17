@@ -30,6 +30,12 @@ const REPORT_FIELDS = [
   'structureStatus', 'pointerTableCandidate', 'pointerTableMatchesCatalog',
   'perChannelBlockHypothesis', 'interleavedHypothesis', 'candidateChannelBlocks',
   'blockCountRelation', 'structureConverged',
+  // Phase 3D-2 raw stream confirmation (sanitized scalars only — statuses/counts/flags, never
+  // raw bytes, sample values, or byte positions). Single-file runs carry no corpus, so confirmed
+  // raw stream count is always 0 here — exactly the honest single-file reality.
+  'rawStreamConfirmationStatus', 'confirmedRawStreamCount', 'partialRawStreamCount',
+  'rejectedRawStreamCount', 'rawStreamSampleCountConsistent', 'rawStreamBlockLengthConsistent',
+  'rawStreamTimebasePrecheck', 'rawStreamCrossFileStable',
 ];
 
 /** Run the pipeline on one file's bytes and return a sanitized summary (no raw values).
@@ -53,6 +59,11 @@ function summarizeFile(bytes, fns, opts = {}) {
   const tc = (structure && structure.channelTableCandidates) || [];
   const pointerTable = tc.find(t => t.kind === 'offset_table' && t.targetsPlausible) || null;
   const pce = (structure && structure.perChannelEvidence) || {};
+  // Phase 3D-2: raw stream confirmation (single-file → no corpus → never confirmed, by design).
+  const rawStreamConf = (typeof fns.evaluateBmsRawStreamConfirmation === 'function')
+    ? fns.evaluateBmsRawStreamConfirmation(r, probe, raw, structure, {}) : null;
+  const rsAgg = (rawStreamConf && rawStreamConf.aggregateDecision) || {};
+  const rsCrit = (rawStreamConf && rawStreamConf.criteria) || {};
   return {
     catalogDetected: !!(r.header && r.header.valid) && (r.channelCount || 0) > 0,
     channelCount: r.channelCount || 0,
@@ -79,6 +90,14 @@ function summarizeFile(bytes, fns, opts = {}) {
     candidateChannelBlocks: pce.candidateChannelBlocks || 0,
     blockCountRelation: pce.countRelation || 'unknown',
     structureConverged: !!(structure && structure.convergence && structure.convergence.sampleStructureConverged),
+    rawStreamConfirmationStatus: rawStreamConf ? rawStreamConf.status : null,
+    confirmedRawStreamCount: rsAgg.confirmedRawStreamCount || 0,
+    partialRawStreamCount: rsAgg.partialRawStreamCount || 0,
+    rejectedRawStreamCount: rsAgg.rejectedCandidateCount || 0,
+    rawStreamSampleCountConsistent: !!rsCrit.sampleCountConsistent,
+    rawStreamBlockLengthConsistent: !!rsCrit.blockLengthConsistent,
+    rawStreamTimebasePrecheck: !!rsCrit.timebasePrecheckPassed,
+    rawStreamCrossFileStable: !!rsCrit.crossFileStable,
   };
   // Deliberately omitted: sample values, raw bytes, byte offsets — sanitized by construction.
 }
@@ -129,6 +148,13 @@ function aggregate(summaries) {
     candidateChannelBlocksRange: range(s => s.candidateChannelBlocks),
     structureStatusHistogram: summaries.reduce((h, s) => { const k = s.structureStatus || 'none'; h[k] = (h[k] || 0) + 1; return h; }, {}),
     blockCountRelationHistogram: summaries.reduce((h, s) => { const k = s.blockCountRelation || 'unknown'; h[k] = (h[k] || 0) + 1; return h; }, {}),
+    // Phase 3D-2 raw stream confirmation (sanitized counts / ranges / histograms only)
+    rawStreamConfirmationStatusHistogram: summaries.reduce((h, s) => { const k = s.rawStreamConfirmationStatus || 'none'; h[k] = (h[k] || 0) + 1; return h; }, {}),
+    confirmedRawStreamCountRange: range(s => s.confirmedRawStreamCount),
+    rawStreamSampleCountConsistentFiles: cnt(s => s.rawStreamSampleCountConsistent),
+    rawStreamBlockLengthConsistentFiles: cnt(s => s.rawStreamBlockLengthConsistent),
+    rawStreamTimebasePrecheckFiles: cnt(s => s.rawStreamTimebasePrecheck),
+    rawStreamCrossFileStable: corpusCandidateRegionStable,
   };
 }
 
@@ -149,9 +175,9 @@ function readHead(fs, file, n) {
 function loadFns() {
   const fs = require('fs'), path = require('path'), vm = require('vm');
   const jsDir = path.join(__dirname, '..', 'renderer', 'js');
-  const files = ['bms-parser.js', 'telemetry-schema.js', 'telemetry-metadata.js', 'bms-probe.js', 'bms-raw-extract.js', 'bms-channel-link.js', 'bms-confirmation.js', 'bms-structure-discovery.js'];
+  const files = ['bms-parser.js', 'telemetry-schema.js', 'telemetry-metadata.js', 'bms-probe.js', 'bms-raw-extract.js', 'bms-channel-link.js', 'bms-confirmation.js', 'bms-structure-discovery.js', 'bms-raw-stream-confirmation.js'];
   const src = files.map(f => fs.readFileSync(path.join(jsDir, f), 'utf8')).join('\n')
-    + '\nthis.__f = { parseBms, probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, buildTelemetryMetadata };';
+    + '\nthis.__f = { parseBms, probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, buildTelemetryMetadata };';
   const ctx = {}; vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'bms-bundle.js' });
   return ctx.__f;
 }
@@ -173,9 +199,9 @@ if (require.main === module) {
   const fns = loadFns();
   const summaries = files.map(f => {
     try { return summarizeFile(readHead(fs, f, 2 * 1024 * 1024), fns, { scanWindowBytes: 1024 * 1024 }); }
-    catch (e) { return { catalogDetected: false, channelCount: 0, candidateRegionCount: 0, bestEncodingHypothesis: null, timebaseCandidate: false, rawSeriesCount: 0, linkStatus: 'error', channelIdentityConfirmed: false, canonicalAvailable: false, confirmationStatus: 'error', confirmedCatalog: false, confirmedStructure: false, confirmedChannelIdentity: false, confirmedTimebase: false, confirmedPhysicalScaling: false, canonicalTelemetry: false, confirmationScore: 0, structureStatus: 'error', pointerTableCandidate: false, pointerTableMatchesCatalog: false, perChannelBlockHypothesis: false, interleavedHypothesis: false, candidateChannelBlocks: 0, blockCountRelation: 'unknown', structureConverged: false }; }
+    catch (e) { return { catalogDetected: false, channelCount: 0, candidateRegionCount: 0, bestEncodingHypothesis: null, timebaseCandidate: false, rawSeriesCount: 0, linkStatus: 'error', channelIdentityConfirmed: false, canonicalAvailable: false, confirmationStatus: 'error', confirmedCatalog: false, confirmedStructure: false, confirmedChannelIdentity: false, confirmedTimebase: false, confirmedPhysicalScaling: false, canonicalTelemetry: false, confirmationScore: 0, structureStatus: 'error', pointerTableCandidate: false, pointerTableMatchesCatalog: false, perChannelBlockHypothesis: false, interleavedHypothesis: false, candidateChannelBlocks: 0, blockCountRelation: 'unknown', structureConverged: false, rawStreamConfirmationStatus: 'error', confirmedRawStreamCount: 0, partialRawStreamCount: 0, rejectedRawStreamCount: 0, rawStreamSampleCountConsistent: false, rawStreamBlockLengthConsistent: false, rawStreamTimebasePrecheck: false, rawStreamCrossFileStable: false }; }
   });
-  console.log('# .bmsbin local reality check (Phase 3C-1 + 3D-0 criteria + 3D-1 structure) — SANITIZED, statistics only');
+  console.log('# .bmsbin local reality check (Phase 3C-1 + 3D-0 criteria + 3D-1 structure + 3D-2 raw stream) — SANITIZED, statistics only');
   console.log(JSON.stringify(aggregate(summaries), null, 2));
   console.log('\nReminder: statistics only. Real .bmsbin files and raw sample values are NEVER committed.');
 }
