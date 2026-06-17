@@ -87,24 +87,38 @@ function buildTelemetryMetadata(bmsResult) {
     diagnostics: probe.diagnostics || [],
   } : null;
 
+  // Optional Phase 3B-1 raw extraction report (attached by the app at import time).
+  const raw = (bmsResult && bmsResult.raw) || null;
+  const rawCount = (raw && raw.rawSeriesCandidates) ? raw.rawSeriesCandidates.length : 0;
+  const rawCandidates = !hasError && rawCount > 0;
+  const rawSummary = raw ? {
+    seriesCount: rawCount,
+    bestEncoding: (raw.rawSeriesCandidates && raw.rawSeriesCandidates[0]) ? raw.rawSeriesCandidates[0].encoding : null,
+    channelMapping: raw.channelMapping ? raw.channelMapping.status : 'not_mapped',
+    timebasePresent: !!(raw.timebaseCandidate && raw.timebaseCandidate.present),
+    diagnostics: raw.diagnostics || [],
+  } : null;
+
   return {
     sourceType: 'bmsbin',
     sourceFileName: (bmsResult && bmsResult.fileName) || null,
     parser: 'parseBms',
-    status: hasError ? 'decode_error' : (sampleProbe ? 'probe_available' : 'catalog_only'),
+    status: hasError ? 'decode_error' : (rawCandidates ? 'raw_candidates_only' : (sampleProbe ? 'probe_available' : 'catalog_only')),
     importer: (bmsResult && bmsResult.header && bmsResult.header.importer) || null,
     channelCount: (bmsResult && bmsResult.channelCount) || 0,
     channels,
     requiredChannels,
     capabilities: {
       channelCatalog: !hasError,
-      sampleProbe,              // Phase 3B-0: candidate sample regions found (not decoded)
-      timeSeries: false,        // Phase 3B-1
-      physicalScaling: false,   // Phase 3B-1
-      lapSegmentation: false,   // Phase 3C
-      handlingCorrelation: false, // Phase 3C
+      sampleProbe,                  // Phase 3B-0: candidate sample regions found
+      rawTimeSeriesCandidates: rawCandidates, // Phase 3B-1: raw series extracted (not decoded)
+      timeSeries: false,            // Phase 3B-1+ (not confirmed usable telemetry)
+      physicalScaling: false,       // Phase 3C
+      lapSegmentation: false,       // Phase 3C
+      handlingCorrelation: false,   // Phase 3C
     },
     probe: probeSummary,
+    rawExtraction: rawSummary,
     diagnostics,
   };
 }

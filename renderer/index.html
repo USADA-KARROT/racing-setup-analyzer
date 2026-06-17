@@ -1473,7 +1473,7 @@ canvas{max-height:300px}
           <div>
             <div class="text-[10px] text-slate-400 mb-1 flex items-center gap-1.5">
               <span x-text="t('ui.telem.status')"></span>
-              <span class="px-1.5 py-0.5 rounded-full bg-amber-900/30 text-amber-300" x-text="telemetryMeta().status==='probe_available' ? t('ui.telem.statusProbe') : t('ui.telem.statusCatalog')"></span>
+              <span class="px-1.5 py-0.5 rounded-full bg-amber-900/30 text-amber-300" x-text="telemetryMeta().status==='raw_candidates_only' ? t('ui.telem.statusRaw') : (telemetryMeta().status==='probe_available' ? t('ui.telem.statusProbe') : t('ui.telem.statusCatalog'))"></span>
             </div>
             <!-- required validation channels, with matched raw channel names -->
             <div class="flex flex-wrap gap-2 mb-2">
@@ -1495,6 +1495,16 @@ canvas{max-height:300px}
                   <div class="text-[10px] text-slate-500"><span x-text="t('ui.telem.probe.bestConf')"></span> <span x-text="telemetryMeta().probe.bestConfidence"></span></div>
                   <template x-for="d in telemetryMeta().probe.diagnostics" :key="d.code">
                     <div class="text-[10px] px-2 py-1 rounded" :class="d.severity==='warning' ? 'bg-amber-900/20 text-amber-300/90' : (d.severity==='error' ? 'bg-red-900/20 text-red-300' : 'bg-slate-800/60 text-slate-500')" x-text="t(d.messageKey)"></div>
+                  </template>
+                  <!-- Phase 3B-1: raw extraction summary (raw-only; nothing decoded/mapped/scaled) -->
+                  <template x-if="telemetryMeta().rawExtraction && telemetryMeta().rawExtraction.seriesCount > 0">
+                    <div class="mt-1 pt-1 border-t border-white/5 space-y-1">
+                      <div class="text-[10px] text-slate-400"><span x-text="t('ui.telem.raw.title')"></span> · <span x-text="telemetryMeta().rawExtraction.seriesCount"></span> <span x-text="t('ui.telem.raw.seriesLabel')"></span></div>
+                      <div class="text-[10px] text-slate-500"><span x-text="t('ui.telem.raw.encoding')"></span> <span x-text="telemetryMeta().rawExtraction.bestEncoding"></span></div>
+                      <template x-for="d in telemetryMeta().rawExtraction.diagnostics" :key="d.code">
+                        <div class="text-[10px] px-2 py-1 rounded" :class="d.severity==='warning' ? 'bg-amber-900/20 text-amber-300/90' : (d.severity==='error' ? 'bg-red-900/20 text-red-300' : 'bg-slate-800/60 text-slate-500')" x-text="t(d.messageKey)"></div>
+                      </template>
+                    </div>
                   </template>
                 </div>
               </details>
@@ -2167,7 +2177,7 @@ function app(){return{
     const f=e.target.files && e.target.files[0]; if(!f) return;
     this.bmsResult={loading:true};
     const reader=new FileReader();
-    reader.onload=()=>{ try{ const bytes=new Uint8Array(reader.result); const r=(typeof parseBms==='function')?parseBms(bytes):null; if(!r||!r.header.valid){ this.bmsResult={error:true}; return; } if(f&&f.name) r.fileName=f.name; r.probe=(typeof probeBmsBinary==='function')?probeBmsBinary(bytes):null; this.bmsResult=r; }catch(err){ this.bmsResult={error:true}; } };
+    reader.onload=()=>{ try{ const bytes=new Uint8Array(reader.result); const r=(typeof parseBms==='function')?parseBms(bytes):null; if(!r||!r.header.valid){ this.bmsResult={error:true}; return; } if(f&&f.name) r.fileName=f.name; r.probe=(typeof probeBmsBinary==='function')?probeBmsBinary(bytes):null; r.raw=(typeof extractBmsRawCandidates==='function'&&r.probe)?extractBmsRawCandidates(bytes,r.probe,{catalogChannelCount:r.channelCount}):null; this.bmsResult=r; }catch(err){ this.bmsResult={error:true}; } };
     reader.onerror=()=>{ this.bmsResult={error:true}; };
     reader.readAsArrayBuffer(f);
   },

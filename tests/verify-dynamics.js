@@ -912,6 +912,14 @@ console.log('\n[raw] .bmsbin raw time-series candidate extraction');
   const full = new Uint8Array(Buffer.concat([Buffer.from('DarabImporter v.\0', 'ascii'), Buffer.alloc(8), strTok('TrackInfo'), Buffer.from([1, 2, 3, 4]), strTok('accy'), strTok('MS5.8'), sineB]));
   const er = M.extractBmsRawCandidates(full, M.probeBmsBinary(full));
   check('raw: end-to-end probe→extract yields candidates', er.rawSeriesCandidates.length > 0 && er.status === 'raw_candidates_only');
+
+  // raw → telemetry metadata integration (status advances, but never claims decoded)
+  const tm = M.buildTelemetryMetadata({ header: { importer: 'DarabImporter v.', valid: true }, channelCount: 4, channels: [{ name: 'accy' }, { name: 'yaw' }, { name: 'steer' }, { name: 'speed' }], probe: probeOf(rb), raw: rr });
+  check('raw→metadata: status raw_candidates_only + rawTimeSeriesCandidates true; physical/handling false',
+    tm.status === 'raw_candidates_only' && tm.capabilities.rawTimeSeriesCandidates === true
+    && tm.capabilities.physicalScaling === false && tm.capabilities.handlingCorrelation === false && tm.capabilities.timeSeries === false);
+  check('raw→metadata: rawExtraction summary attached (seriesCount + channelMapping not_mapped)',
+    !!tm.rawExtraction && tm.rawExtraction.seriesCount > 0 && tm.rawExtraction.channelMapping === 'not_mapped');
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
