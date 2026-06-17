@@ -477,6 +477,12 @@ PKY4 = 2.0`;
   const tirK = new M.Tier1BasicBalance(Object.assign({}, carP, { tireModel: M.parseTIR(SYN_TIR) })).calculate().understeer_gradient;
   check('tir: imported tire feeds handling model (K_us shifts)', Number.isFinite(tirK) && Math.abs(tirK - baseK) > 1e-6, `base ${baseK} → tir ${tirK}`);
   check('tir: default prediction unaffected without tireModel', new M.Tier1BasicBalance(carP).calculate().understeer_gradient === baseK);
+  // integration: imported peak μ overrides the Lihpao lap-sim base_mu
+  const lapSetup = { params: carP, tireParams: { front_compound: 'slick_soft', front_tire_width: 245 }, layout: 'RWD', power_kw: 250, stint: { laps: 3, cold_pressure_bar: 1.5 } };
+  const lapBase = M.simulateLihpao(lapSetup).inputs.base_mu;
+  const lapTir = M.simulateLihpao(Object.assign({}, lapSetup, { tirePeakMu: c.peakMu })).inputs.base_mu;
+  check('tir: peak μ feeds lap-sim base_mu (override)', Math.abs(lapTir - lapBase) > 1e-3, `base ${lapBase} → tir ${lapTir}`);
+  check('tir: lap sim unaffected without tirePeakMu', M.simulateLihpao(lapSetup).inputs.base_mu === lapBase);
 }
 
 // ─── 2D suspension kinematics (front-view double wishbone) — synthetic geometry ───
@@ -490,6 +496,35 @@ PKY4 = 2.0`;
   check('kin: camber gain magnitude sane (<0.1°/mm)', Math.abs(sw.camberGain_deg_per_mm) < 0.1);
   check('kin: camber curve smooth/monotonic (no branch-jump spike)', sw.curve.every((p, i, a) => i === 0 || p.camber_deg <= a[i - 1].camber_deg + 0.001));
   check('kin: roll center migrates with travel', sw.curve[0].rollCenterHeight_mm !== sw.curve[sw.curve.length - 1].rollCenterHeight_mm);
+}
+
+// ─── Reference-case validation (textbook directional facts + published ranges + formula cross-checks) ───
+// 來源: Milliken & Milliken RCVD ch.5-6; Gillespie Fundamentals ch.6; OptimumG Tech Tips.
+// 說明: 這是「對教科書關係/公開範圍」的驗證,非遙測校準(後者需解碼 .bmsbin 真實資料)。
+{
+  const ref = (over) => Object.assign({
+    front_spring_rate: 80, rear_spring_rate: 80, front_arb: 200, rear_arb: 200,
+    front_track: 1550, rear_track: 1550, front_motion_ratio: 1, rear_motion_ratio: 1,
+    weight_front_pct: 50, total_weight: 1300, cg_height: 480, wheelbase: 2600,
+  }, over || {});
+  const calc = (o) => new M.Tier1BasicBalance(ref(o)).calculate();
+  const balanced = calc({});
+  // textbook directional facts
+  check('ref: front-heavy car is more understeer (Milliken K_us)', calc({ weight_front_pct: 60 }).understeer_gradient > balanced.understeer_gradient);
+  check('ref: stiffer front ARB → more understeer', calc({ front_arb: 400 }).understeer_gradient > balanced.understeer_gradient);
+  check('ref: stiffer rear ARB → less understeer (toward oversteer)', calc({ rear_arb: 400 }).understeer_gradient < balanced.understeer_gradient);
+  // published range: street sports-car roll gradient
+  check('ref: street sports-car roll gradient in 2–6°/g', balanced.roll_gradient_deg_per_g >= 2 && balanced.roll_gradient_deg_per_g <= 6, `${balanced.roll_gradient_deg_per_g}°/g`);
+  // formula cross-check: ride frequency f = (1/2π)·√(k_eff/m_corner)
+  const rf = balanced.ride_frequency || (balanced.mechanical && balanced.mechanical.ride_frequency);
+  const kEffF = balanced.front_wheel_rate_effective || (balanced.mechanical && balanced.mechanical.front_wheel_rate_effective);
+  if (rf && kEffF) {
+    const mCornerF = 1300 * 0.50 / 2;                       // kg
+    const fExpected = (1 / (2 * Math.PI)) * Math.sqrt(kEffF * 1000 / mCornerF); // Hz
+    check('ref: ride frequency matches f=(1/2π)√(k_eff/m)', Math.abs(rf.front_hz - fExpected) < 0.05, `model ${rf.front_hz} vs textbook ${fExpected.toFixed(2)}`);
+  }
+  // stiffer springs raise ride frequency (OptimumG)
+  check('ref: stiffer springs raise ride frequency', (calc({ front_spring_rate: 160 }).ride_frequency || calc({ front_spring_rate: 160 }).mechanical.ride_frequency).front_hz > rf.front_hz);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);

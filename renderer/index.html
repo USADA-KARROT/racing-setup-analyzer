@@ -2544,6 +2544,7 @@ function app(){return{
       layout:L.layout, power_kw:L.power_kw, category:L.category,
       env:{ambient_c:L.ambient_c, track_c:L.track_c},
       stint:{laps:L.laps, fuel_start_kg:L.fuel_start, fuel_per_lap_kg:L.fuel_per_lap, cold_pressure_bar:L.cold_pressure},
+      tirePeakMu:(this.useTir && this.tirResult && !this.tirResult.error) ? this.tirResult.peakMu : undefined,
     });
     this.$nextTick(()=>this.drawLihpaoChart());
   },

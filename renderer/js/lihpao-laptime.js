@@ -339,6 +339,8 @@ function simulateLihpao(setup) {
     peak = TireModel.COMPOUNDS[compound][2]; optTemp = TireModel.COMPOUNDS[compound][0];
     optWin = TireModel.COMPOUNDS[compound][1];
   }
+  // 若使用者匯入真實 .tir 胎模型，用其實測 peak μ 取代資料庫估值(同步影響 base_mu 與 stint 的 peak_grip)
+  if (setup.tirePeakMu && setup.tirePeakMu > 0) peak = setup.tirePeakMu;
   const widthFactor = (tp.front_tire_width > 0 && typeof TireModel !== 'undefined')
     ? TireModel.gripFactorWidth(tp.front_tire_width) : 1.0;
   const base_mu = peak * widthFactor;
