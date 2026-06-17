@@ -107,38 +107,56 @@ function genericTireMetadata(compoundId) {
   };
 }
 
+/**
+ * Validate an imported .tir and report, at three severities, WHICH OUTPUTS it supports.
+ * It describes capability — it does NOT judge tyre quality (never "bad/invalid/incomplete").
+ *   error   = cannot compute lateral force at all (unusable)
+ *   warning = usable, but coverage is narrow or the data is not wired into an app output
+ *   info    = an available capability, or a wiring note
+ * Pure function; returns diagnostics[] consumed by importedTirMetadata + the UI.
+ */
+function validateTirModel(t) {
+  const diags = [];
+  const has = k => !!(t && t.raw && Object.prototype.hasOwnProperty.call(t.raw, k));
+  const D = (severity, code, messageKey, affectedOutputs, tier) =>
+    ({ severity, code, tier: tier || (severity === 'info' ? 'model' : 'heuristic'), messageKey, affectedOutputs: affectedOutputs || [] });
+
+  // ── error: cannot compute lateral Fy0 / Cα at all ──
+  if (!t || !t.raw) { diags.push(D('error', 'TIR_PARSE_FAILED', 'tire.error.parseFailed')); return diags; }
+  if (!has('PCY1')) { diags.push(D('error', 'TIR_MISSING_LATERAL', 'tire.error.missingLateral', ['corneringStiffness', 'peakMu'])); return diags; }
+  if (!has('PDY1')) diags.push(D('error', 'TIR_NO_PEAK', 'tire.error.noPeak', ['peakMu', 'corneringStiffness']));
+  if (typeof mfFy0 === 'function') {
+    const sample = mfFy0(t, 4 * Math.PI / 180, t.Fnom || 3000);
+    if (!Number.isFinite(sample)) diags.push(D('error', 'TIR_NONFINITE', 'tire.error.nonFinite', ['corneringStiffness', 'peakMu']));
+  }
+  if (diags.some(d => d.severity === 'error')) return diags;
+
+  const cov = tirCoverage(t);
+
+  // ── warning: usable but narrow / not wired into the app ──
+  diags.push(D('warning', 'TIR_GRIP_STILL_HEURISTIC', 'tire.info.gripStillHeuristic',
+    ['pressureGripCorrection', 'temperatureGripCorrection', 'widthGripCorrection', 'tireUsShift']));
+  diags.push(D('warning', 'TIR_LATERAL_ONLY', 'tire.warning.lateralOnly',
+    ['combinedSlip', 'aligningMoment', 'longitudinalForce']));
+  if (!cov.camberSensitivity) diags.push(D('warning', 'TIR_NO_CAMBER_MODEL', 'tire.warning.noCamberModel', ['corneringStiffness']));
+
+  // ── info: available capability / pressure-wiring note ──
+  if (cov.pressureModel) diags.push(D('info', 'TIR_PRESSURE_MODEL_UNUSED', 'tire.info.pressureModelUnused', ['pressureGripCorrection'], 'heuristic'));
+  else diags.push(D('info', 'TIR_NO_PRESSURE_MODEL', 'tire.warning.noPressureModel', ['pressureGripCorrection'], 'heuristic'));
+  if (cov.verticalStiffness) diags.push(D('info', 'TIR_VERTICAL_STIFFNESS_AVAILABLE', 'tire.info.verticalStiffnessAvailable', ['tireSpringRate']));
+  else diags.push(D('info', 'TIR_NO_VERTICAL_STIFFNESS', 'tire.warning.noVerticalStiffness', ['tireSpringRate'], 'heuristic'));
+  if (cov.loadSensitivity) diags.push(D('info', 'TIR_LOAD_SENSITIVITY_AVAILABLE', 'tire.info.loadSensitivityAvailable', ['corneringStiffness']));
+  return diags;
+}
+
 /** Metadata for an imported .tir tyre model. */
 function importedTirMetadata(t) {
   const coverage = tirCoverage(t);
+  const diagnostics = validateTirModel(t);
+  const hasError = diagnostics.some(d => d.severity === 'error');
   // "valid" = the lateral handling set is complete enough to drive Cα meaningfully.
   const core = coverage.lateralPureSlip && coverage.loadSensitivity && coverage.camberSensitivity && coverage.verticalStiffness;
-  const overallStatus = core ? 'imported_valid' : 'imported_partial';
-
-  const diagnostics = [];
-  // The headline honesty message: import upgrades Cα/μ only.
-  diagnostics.push({ severity: 'info', code: 'TIR_GRIP_STILL_HEURISTIC', tier: 'heuristic',
-    messageKey: 'tire.info.gripStillHeuristic',
-    affectedOutputs: ['pressureGripCorrection', 'temperatureGripCorrection', 'widthGripCorrection', 'tireUsShift'] });
-  if (overallStatus === 'imported_partial') {
-    diagnostics.push({ severity: 'warning', code: 'TIR_PARTIAL_COVERAGE', tier: 'heuristic',
-      messageKey: 'tire.warning.tirPartialCoverage', affectedOutputs: ['corneringStiffness'] });
-  }
-  if (!coverage.camberSensitivity) {
-    diagnostics.push({ severity: 'warning', code: 'TIR_NO_CAMBER_MODEL', tier: 'heuristic',
-      messageKey: 'tire.warning.noCamberModel', affectedOutputs: ['corneringStiffness'] });
-  }
-  if (!coverage.verticalStiffness) {
-    diagnostics.push({ severity: 'warning', code: 'TIR_NO_VERTICAL_STIFFNESS', tier: 'heuristic',
-      messageKey: 'tire.warning.noVerticalStiffness', affectedOutputs: ['tireSpringRate'] });
-  }
-  if (!coverage.pressureModel) {
-    diagnostics.push({ severity: 'info', code: 'TIR_NO_PRESSURE_MODEL', tier: 'heuristic',
-      messageKey: 'tire.warning.noPressureModel', affectedOutputs: ['pressureGripCorrection'] });
-  } else {
-    // File HAS pressure coeffs but the app still uses the heuristic grip correction.
-    diagnostics.push({ severity: 'info', code: 'TIR_PRESSURE_MODEL_UNUSED', tier: 'heuristic',
-      messageKey: 'tire.info.pressureModelUnused', affectedOutputs: ['pressureGripCorrection'] });
-  }
+  const overallStatus = hasError ? 'imported_error' : (core ? 'imported_valid' : 'imported_partial');
 
   return {
     sourceType: 'imported_tir',
@@ -182,5 +200,5 @@ function buildTireModelMetadata(opts = {}) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { buildTireModelMetadata, genericTireMetadata, importedTirMetadata, tirCoverage, TIRE_META_KEYS };
+  module.exports = { buildTireModelMetadata, genericTireMetadata, importedTirMetadata, validateTirModel, tirCoverage, TIRE_META_KEYS };
 }

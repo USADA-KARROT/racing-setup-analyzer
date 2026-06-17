@@ -29,7 +29,7 @@ const src =
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
   'parseTIR, mfFy0, tireCharacteristics, ' +
-  'buildTireModelMetadata, genericTireMetadata, importedTirMetadata, tirCoverage, ' +
+  'buildTireModelMetadata, genericTireMetadata, importedTirMetadata, validateTirModel, tirCoverage, ' +
   'solveStatic, solveAtTravel, kinematicsSweep, ' +
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
@@ -669,9 +669,9 @@ console.log('\n[tmeta] 輪胎模型 metadata');
     raw: { PCY1: 1.5, PDY1: 1.4, PDY2: -0.1, PKY1: -28, PKY2: 1.7 } };
   const p = M.buildTireModelMetadata({ useTir: true, tirParsed: partialTir });
   check('tmeta: partial .tir → overallStatus imported_partial', p.overallStatus === 'imported_partial');
-  check('tmeta: partial .tir → camber + partial-coverage warnings',
+  check('tmeta: partial .tir → camber + lateral-only warnings',
     p.diagnostics.some(d => d.code === 'TIR_NO_CAMBER_MODEL' && d.severity === 'warning')
-    && p.diagnostics.some(d => d.code === 'TIR_PARTIAL_COVERAGE'));
+    && p.diagnostics.some(d => d.code === 'TIR_LATERAL_ONLY' && d.severity === 'warning'));
   check('tmeta: partial .tir → missing pressure-model diagnostic',
     p.diagnostics.some(d => d.code === 'TIR_NO_PRESSURE_MODEL'));
 
@@ -686,6 +686,54 @@ console.log('\n[tmeta] 輪胎模型 metadata');
   M.buildTireModelMetadata({ useTir: true, tirParsed: validTir, compoundId: 'x' });
   check('tmeta: descriptor is pure — no prediction drift',
     new M.Tier1BasicBalance(carP2).calculate().understeer_gradient === before);
+}
+
+// ── Phase 2D: .tir validation diagnostics (error / warning / info) ──
+console.log('\n[tval] .tir validation diagnostics');
+{
+  const code = (arr, c) => arr.find(d => d.code === c);
+  const valid = { Fnom: 4000, name: 'V', nomPres_pa: 230000, verticalStiffness_Npm: 250000,
+    raw: { PCY1: 1.6, PDY1: 1.5, PDY2: -0.1, PKY1: -30, PKY2: 1.8, PKY3: 0.5, VERTICAL_STIFFNESS: 250000, PPY1: 0.5, NOMPRES: 230000 } };
+  const dv = M.validateTirModel(valid);
+  check('tval: valid → no error severity', !dv.some(d => d.severity === 'error'));
+  check('tval: valid → lateral-only is a warning (not an error)',
+    !!code(dv, 'TIR_LATERAL_ONLY') && code(dv, 'TIR_LATERAL_ONLY').severity === 'warning');
+  check('tval: valid → grip-still-heuristic is a warning',
+    !!code(dv, 'TIR_GRIP_STILL_HEURISTIC') && code(dv, 'TIR_GRIP_STILL_HEURISTIC').severity === 'warning');
+  check('tval: valid → vertical stiffness reported as info',
+    !!code(dv, 'TIR_VERTICAL_STIFFNESS_AVAILABLE') && code(dv, 'TIR_VERTICAL_STIFFNESS_AVAILABLE').severity === 'info');
+  check('tval: valid → load-sensitivity reported as info', !!code(dv, 'TIR_LOAD_SENSITIVITY_AVAILABLE'));
+  check('tval: valid → pressure-unused note is info (file has PPY)',
+    !!code(dv, 'TIR_PRESSURE_MODEL_UNUSED') && code(dv, 'TIR_PRESSURE_MODEL_UNUSED').severity === 'info');
+  check('tval: lateral-only flags combined slip + Mz + Fx',
+    code(dv, 'TIR_LATERAL_ONLY').affectedOutputs.includes('combinedSlip')
+    && code(dv, 'TIR_LATERAL_ONLY').affectedOutputs.includes('aligningMoment')
+    && code(dv, 'TIR_LATERAL_ONLY').affectedOutputs.includes('longitudinalForce'));
+
+  // errors: only when truly unusable
+  const dNull = M.validateTirModel(null);
+  check('tval: null → error TIR_PARSE_FAILED only', dNull.length === 1 && dNull[0].code === 'TIR_PARSE_FAILED' && dNull[0].severity === 'error');
+  const dNoLat = M.validateTirModel({ raw: { PDY1: 1.5 } });
+  check('tval: missing PCY1 → error TIR_MISSING_LATERAL (returns early)',
+    dNoLat.length === 1 && dNoLat[0].code === 'TIR_MISSING_LATERAL' && dNoLat[0].severity === 'error');
+  const dNoPeak = M.validateTirModel({ Fnom: 4000, raw: { PCY1: 1.6, PKY1: -30, PKY2: 1.8 } });
+  check('tval: missing PDY1 → error TIR_NO_PEAK', dNoPeak.some(d => d.code === 'TIR_NO_PEAK' && d.severity === 'error'));
+
+  // partial: narrow coverage → specific neutral diagnostics, no error
+  const partial = { nomPres_pa: 0, verticalStiffness_Npm: 0, raw: { PCY1: 1.5, PDY1: 1.4, PDY2: -0.1, PKY1: -28, PKY2: 1.7 } };
+  const dp = M.validateTirModel(partial);
+  check('tval: partial → no error severity', !dp.some(d => d.severity === 'error'));
+  check('tval: partial → no-camber warning + no-pressure/no-vertical info',
+    !!code(dp, 'TIR_NO_CAMBER_MODEL') && code(dp, 'TIR_NO_CAMBER_MODEL').severity === 'warning'
+    && !!code(dp, 'TIR_NO_PRESSURE_MODEL') && code(dp, 'TIR_NO_PRESSURE_MODEL').severity === 'info'
+    && !!code(dp, 'TIR_NO_VERTICAL_STIFFNESS') && code(dp, 'TIR_NO_VERTICAL_STIFFNESS').severity === 'info');
+
+  // wiring: metadata derives status from validation, and reuses its diagnostics
+  const metaErr = M.importedTirMetadata({ Fnom: 4000, raw: { PCY1: 1.6, PKY1: -30, PKY2: 1.8 } });
+  check('tval: importedTirMetadata(no PDY1) → overallStatus imported_error', metaErr.overallStatus === 'imported_error');
+  const bm = M.buildTireModelMetadata({ useTir: true, tirParsed: valid });
+  check('tval: buildTireModelMetadata diagnostics come from validateTirModel',
+    bm.diagnostics.some(d => d.code === 'TIR_LATERAL_ONLY'));
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
