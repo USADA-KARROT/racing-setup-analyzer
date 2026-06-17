@@ -469,6 +469,12 @@ PKY4 = 2.0`;
   check('tir: optimal slip angle 3–12°', c.optimalSlipAngle_deg >= 3 && c.optimalSlipAngle_deg <= 12, `${c.optimalSlipAngle_deg}°`);
   check('tir: cornering stiffness > 0', c.corneringStiffness_Ndeg > 0, `${c.corneringStiffness_Ndeg} N/deg`);
   check('tir: load sensitivity (μ falls as Fz rises)', c.muVsLoad[0].mu > c.muVsLoad[c.muVsLoad.length - 1].mu);
+  // integration: an imported tire actually drives the handling-balance model (optional path)
+  const carP = { front_spring_rate:60, rear_spring_rate:60, front_arb:0, rear_arb:0, front_track:1500, rear_track:1500, front_motion_ratio:1, rear_motion_ratio:1, weight_front_pct:55, total_weight:1300, cg_height:500, wheelbase:2600 };
+  const baseK = new M.Tier1BasicBalance(carP).calculate().understeer_gradient;
+  const tirK = new M.Tier1BasicBalance(Object.assign({}, carP, { tireModel: M.parseTIR(SYN_TIR) })).calculate().understeer_gradient;
+  check('tir: imported tire feeds handling model (K_us shifts)', Number.isFinite(tirK) && Math.abs(tirK - baseK) > 1e-6, `base ${baseK} → tir ${tirK}`);
+  check('tir: default prediction unaffected without tireModel', new M.Tier1BasicBalance(carP).calculate().understeer_gradient === baseK);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);

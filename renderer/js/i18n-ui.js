@@ -174,6 +174,7 @@ const UI_I18N = {
     'ui.tir.vertStiff': 'Vertical stiffness',
     'ui.tir.loadSens': 'Load sensitivity (peak μ vs Fz)',
     'ui.tir.applySpring': 'Apply as Tire Spring Rate',
+    'ui.tir.useInModel': 'Use this tire in the handling prediction',
     'ui.tir.error': 'Could not parse this .tir file',
     // — lihpao tab —
     'ui.lihpaoMassNote': 'Weight/grip/aero/balance taken from the “Handling Prediction” tab (current car and tire). Tire: ',
@@ -383,6 +384,7 @@ const UI_I18N = {
     'ui.tir.vertStiff': '垂直剛性',
     'ui.tir.loadSens': '負載敏感度（峰值 μ vs Fz）',
     'ui.tir.applySpring': '套用為輪胎彈簧率',
+    'ui.tir.useInModel': '在操控預測中使用此胎',
     'ui.tir.error': '無法解析此 .tir 檔',
     'ui.lihpaoMassNote': '車重/抓地/空力/平衡取自「轉向預測」分頁(目前車種與輪胎)。胎種：',
     'ui.lihpaoWarnNote': '⚠ 絕對圈速取決於輸入規格。賽道紀錄多為大改車，原廠車預測較慢屬正常。',
@@ -586,6 +588,7 @@ const UI_I18N = {
     'ui.tir.vertStiff': '縦剛性',
     'ui.tir.loadSens': '荷重感度（ピーク μ vs Fz）',
     'ui.tir.applySpring': 'タイヤばねレートに適用',
+    'ui.tir.useInModel': 'このタイヤをハンドリング予測に使用',
     'ui.tir.error': 'この .tir を解析できません',
     'ui.lihpaoMassNote': '車重/グリップ/エアロ/バランスは「ハンドリング予測」タブ（現在の車種とタイヤ）から取得。タイヤ：',
     'ui.lihpaoWarnNote': '⚠ 絶対ラップタイムは入力スペックに依存します。コースレコードは大改造車が多く、ノーマル車の予測が遅いのは正常です。',

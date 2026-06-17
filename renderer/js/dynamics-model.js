@@ -112,11 +112,17 @@ function usNorm(degPerG) {
  * @param {number} ayRefG 評估用的側向加速度 (g)
  * @param {number} a4RefKn 負載敏感度膝點(平均單胎靜載, kN)
  */
-function axlePairCorneringStiffness(axleMassKg, transferKgPerG, ayRefG, a4RefKn) {
+function axlePairCorneringStiffness(axleMassKg, transferKgPerG, ayRefG, a4RefKn, tireModel) {
   const halfStatic = axleMassKg / 2;            // 單胎靜態質量 (kg)
   const dt = transferKgPerG * ayRefG;           // ayRef 下單側轉移量 (kg)
   const fzOutKn = Math.max(0, halfStatic + dt) * G / 1000; // 外胎垂直力 (kN)
   const fzInKn = Math.max(0, halfStatic - dt) * G / 1000;  // 內胎
+  // 若使用者匯入真實 .tir 胎模型，改用其實測 MF cornering stiffness
+  // (對應上方知識文註記:做自己的車時要換成你輪胎的實測 Fz-Fy 數據)
+  if (tireModel && tireModel.raw && tireModel.raw.PCY1 !== undefined && typeof corneringStiffnessNdeg === 'function') {
+    return corneringStiffnessNdeg(tireModel, fzOutKn * 1000, 0)
+         + corneringStiffnessNdeg(tireModel, fzInKn * 1000, 0);
+  }
   return PacejkaTireModel.corneringStiffness(fzOutKn, 0, 'sport', a4RefKn)
        + PacejkaTireModel.corneringStiffness(fzInKn, 0, 'sport', a4RefKn);
 }
@@ -292,8 +298,8 @@ class Tier1BasicBalance {
     // 取代舊式 (LLTD% − weight%)：舊式漏掉 (a)，導致前驅/車頭重車被誤判轉向過度。
     const ayRef = 1.0; // g — 評估荷重轉移的參考側向加速度(校準後 LLTD 敏感度最合理)
     const a4Ref = totalWeight * G / 4 / 1000; // 平均單胎靜載 (kN)，校準負載敏感度膝點
-    const cAlphaF = axlePairCorneringStiffness(mF, totalDFzF, ayRef, a4Ref);
-    const cAlphaR = axlePairCorneringStiffness(mR, totalDFzR, ayRef, a4Ref);
+    const cAlphaF = axlePairCorneringStiffness(mF, totalDFzF, ayRef, a4Ref, p.tireModel);
+    const cAlphaR = axlePairCorneringStiffness(mR, totalDFzR, ayRef, a4Ref, p.tireModel);
     const usGradient = (cAlphaF > 0 && cAlphaR > 0)
       ? (mF * G / cAlphaF) - (mR * G / cAlphaR)
       : 0;
@@ -935,10 +941,16 @@ class Tier3Complete {
     const fCamberDyn = ap.front_camber_deg ?? -3.0;
     const rCamberDyn = ap.rear_camber_deg ?? -2.0;
 
-    const cAlphaF = 2 * PacejkaTireModel.corneringStiffness(
-      wF_N / 2 / 1000, fCamberDyn, tireCategoryT3(tpT3.front_compound), a4EffKn) * fWidthFactorT3; // N/deg per axle
-    const cAlphaR = 2 * PacejkaTireModel.corneringStiffness(
-      wR_N / 2 / 1000, rCamberDyn, tireCategoryT3(tpT3.rear_compound), a4EffKn) * rWidthFactorT3;
+    const tmDyn = this.params && this.params.tireModel;
+    const useTmDyn = tmDyn && tmDyn.raw && tmDyn.raw.PCY1 !== undefined && typeof corneringStiffnessNdeg === 'function';
+    const cAlphaF = useTmDyn
+      ? 2 * corneringStiffnessNdeg(tmDyn, wF_N / 2, fCamberDyn * Math.PI / 180) * fWidthFactorT3
+      : 2 * PacejkaTireModel.corneringStiffness(
+          wF_N / 2 / 1000, fCamberDyn, tireCategoryT3(tpT3.front_compound), a4EffKn) * fWidthFactorT3; // N/deg per axle
+    const cAlphaR = useTmDyn
+      ? 2 * corneringStiffnessNdeg(tmDyn, wR_N / 2, rCamberDyn * Math.PI / 180) * rWidthFactorT3
+      : 2 * PacejkaTireModel.corneringStiffness(
+          wR_N / 2 / 1000, rCamberDyn, tireCategoryT3(tpT3.rear_compound), a4EffKn) * rWidthFactorT3;
 
     // Slip angle required at 1 g lateral (deg): α = W·a_y / C_α
     const slipAngleFront = cAlphaF > 0 ? wF_N / cAlphaF : 0;

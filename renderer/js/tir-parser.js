@@ -118,6 +118,11 @@ function corneringStiffness_Nrad(t, Fz, gamma = 0, presPa) {
   return Math.abs((f1 - f0) / (2 * h));
 }
 
+/** Cornering stiffness magnitude at α=0 [N/deg] — for handling-balance models (K_us). */
+function corneringStiffnessNdeg(t, Fz, gamma = 0, presPa) {
+  return corneringStiffness_Nrad(t, Fz, gamma, presPa) * Math.PI / 180;
+}
+
 /**
  * Derived tire characteristics from the real model.
  * @returns peak μ, optimal slip angle, cornering stiffness (N/deg) at a load,
@@ -168,5 +173,5 @@ function tireCharacteristics(t, opts = {}) {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { parseTIR, mfFy0, corneringStiffness_Nrad, tireCharacteristics };
+  module.exports = { parseTIR, mfFy0, corneringStiffness_Nrad, corneringStiffnessNdeg, tireCharacteristics };
 }

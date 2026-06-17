@@ -1297,7 +1297,12 @@ canvas{max-height:300px}
             </template>
           </div>
         </div>
-        <button class="mt-3 text-[10px] px-3 py-1 rounded bg-sky-600 text-white hover:bg-sky-500" @click="applyTirSpring()" x-text="t('ui.tir.applySpring') + ' → ' + tirResult.verticalStiffness_Nmm + ' N/mm'"></button>
+        <div class="flex flex-wrap items-center gap-3 mt-3">
+          <button class="text-[10px] px-3 py-1 rounded bg-sky-600 text-white hover:bg-sky-500" @click="applyTirSpring()" x-text="t('ui.tir.applySpring') + ' → ' + tirResult.verticalStiffness_Nmm + ' N/mm'"></button>
+          <label class="flex items-center gap-1.5 text-[10px] text-slate-300 cursor-pointer">
+            <input type="checkbox" x-model="useTir"> <span x-text="t('ui.tir.useInModel')"></span>
+          </label>
+        </div>
       </div>
     </template>
   </div>
@@ -1851,17 +1856,21 @@ function app(){return{
   noteOf(o){ if(!o) return ''; return (this.lang==='zh') ? (o.notes||'') : (o.notes_en||o.notes||''); },
   // .tir Pacejka 真實胎模型匯入(使用者執行時載入自己的檔，不打包/不上傳)
   tirResult: null,
+  tirParsed: null,
+  useTir: false,
   importTir(e){
     const f = e.target.files && e.target.files[0]; if(!f) return;
     const reader = new FileReader();
     reader.onload = () => {
       try {
         const parsed = parseTIR(reader.result);
-        if(!parsed || !parsed.raw || parsed.raw.PCY1 === undefined){ this.tirResult = {error:true}; return; }
+        if(!parsed || !parsed.raw || parsed.raw.PCY1 === undefined){ this.tirResult = {error:true}; this.tirParsed = null; return; }
+        this.tirParsed = parsed;
         this.tirResult = tireCharacteristics(parsed);
-      } catch(err){ this.tirResult = {error:true}; }
+        this.useTir = true;
+      } catch(err){ this.tirResult = {error:true}; this.tirParsed = null; }
     };
-    reader.onerror = () => { this.tirResult = {error:true}; };
+    reader.onerror = () => { this.tirResult = {error:true}; this.tirParsed = null; };
     reader.readAsText(f);
   },
   applyTirSpring(){ if(this.tirResult && this.tirResult.verticalStiffness_Nmm){ this.pred.tire_spring_rate = Math.round(this.tirResult.verticalStiffness_Nmm); } },
@@ -2396,6 +2405,8 @@ function app(){return{
     }
     // 建構 tire_params (含胎寬)
     const tireParams = {...this.tire};
+    // 若使用者勾選「用匯入的真實胎」，把解析後的 .tir 掛到傳給模型的 params(不汙染 reactive pred)
+    const predP = (this.useTir && this.tirParsed) ? Object.assign({}, this.pred, { tireModel: this.tirParsed }) : this.pred;
     if(this.tier===1){
       // Tier 1 快速模式：使用 Tier 2 API，自動帶入建議胎壓和預設溫度
       const quickTire = {
@@ -2417,11 +2428,11 @@ function app(){return{
       quickTire.fr_pressure = ftire?.optimal_pressure_front_bar || 2.14;
       quickTire.rl_pressure = rtire?.optimal_pressure_rear_bar || 2.21;
       quickTire.rr_pressure = rtire?.optimal_pressure_rear_bar || 2.21;
-      this.result = api.predictTier2(this.pred, quickTire);
+      this.result = api.predictTier2(predP, quickTire);
     } else if(this.tier===2){
-      this.result = api.predictTier2(this.pred, tireParams);
+      this.result = api.predictTier2(predP, tireParams);
     } else {
-      this.result = api.predictTier3(this.pred, tireParams, this.adv);
+      this.result = api.predictTier3(predP, tireParams, this.adv);
     }
     if(this.tier===3 && this.result?.contribution) this.$nextTick(()=>{this.drawContribution();this.drawCornerWeight();this.drawGGDiagram()});
     // Reset advisor when prediction changes
