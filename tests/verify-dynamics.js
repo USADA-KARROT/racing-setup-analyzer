@@ -35,6 +35,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'bms-raw-stream-confirmation.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-channel-identity-confirmation.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-timebase-confirmation.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-physical-scaling-confirmation.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -44,7 +45,7 @@ const src =
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
-  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, ' +
+  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
@@ -1588,6 +1589,126 @@ console.log('\n[timebase] .bmsbin timebase confirmation criteria');
     && meta.capabilities.physicalScaling === false && meta.capabilities.unitsConfirmed === false && meta.capabilities.canonicalTelemetry === false && meta.capabilities.handlingCorrelation === false);
   check('timebase→metadata: no timebase → cap false, summary null',
     M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).capabilities.timebaseConfirmation === false);
+}
+
+// ── Phase 3F-0: physical scaling / units / canonical-value CRITERIA (synthetic; real never usable) ──
+console.log('\n[physical-scaling] .bmsbin physical scaling confirmation criteria');
+{
+  const code = (r, c) => r.diagnostics.some(d => d.code === c);
+  const rsConfirmed = { aggregateDecision: { canConfirmAnyRawStream: true } };
+  const rsConfirmable = { aggregateDecision: { canConfirmAnyRawStream: false } };
+  const idConfirmed = { status: 'confirmed_identity', aggregateDecision: { canConfirmAnyChannelIdentity: true } };
+  const idNot = { status: 'not_confirmed', aggregateDecision: { canConfirmAnyChannelIdentity: false } };
+  const tbConfirmed = { aggregateDecision: { canConfirmTimebase: true } };
+  const tbNot = { aggregateDecision: { canConfirmTimebase: false } };
+  const CORPUS = { fileCount: 3, candidateRegionStable: true, channelCountStable: true };
+  const scaleFull = { source: 'independent', independent: true, stable: true, transformType: 'linear', transformConfirmed: true };
+  const unitFull = { source: 'independent', independent: true, stable: true, unit: 'g' };
+  const ps = (rs, id, tb, opts) => M.evaluateBmsPhysicalScalingConfirmation(rs, id, tb, opts || {});
+
+  // A. no evidence → not_confirmed; physical/units/canonical caps false
+  const a = ps(rsConfirmable, idNot, tbNot, {});
+  check('scaling(A): no evidence → not_confirmed; physical/units caps false',
+    a.status === 'not_confirmed' && a.capabilities.physicalScaling === false && a.capabilities.unitsConfirmed === false
+    && a.capabilities.canonicalTelemetry === false && code(a, 'BMS_SCALING_NOT_CONFIRMED'));
+
+  // B. raw stream not confirmed (even with full scale+unit evidence) → not confirmed
+  const b = ps(rsConfirmable, idConfirmed, tbConfirmed, { corpus: CORPUS, scalingEvidence: scaleFull, unitEvidence: unitFull });
+  check('scaling(B): raw stream not confirmed → not confirmed; physicalScaling false',
+    b.aggregateDecision.canConfirmPhysicalScaling === false && b.capabilities.physicalScaling === false);
+
+  // C. channel identity not confirmed (even with scale evidence) → identity_missing, not confirmed
+  const c = ps(rsConfirmed, idNot, tbConfirmed, { corpus: CORPUS, scalingEvidence: scaleFull, unitEvidence: unitFull });
+  check('scaling(C): channel identity not confirmed → identity_missing, not confirmed',
+    c.status === 'identity_missing' && c.aggregateDecision.canConfirmPhysicalScaling === false);
+
+  // D. timebase missing for a time-indexed value → timebase_missing, not confirmed
+  const d = ps(rsConfirmed, idConfirmed, tbNot, { corpus: CORPUS, scalingEvidence: scaleFull, unitEvidence: unitFull });
+  check('scaling(D): timebase missing (time-indexed) → timebase_missing, not confirmed',
+    d.status === 'timebase_missing' && d.aggregateDecision.canConfirmPhysicalScaling === false);
+
+  // E. manual scale only → scale_hint_only; not confirmed; units/canonical false
+  const e = ps(rsConfirmable, idNot, tbNot, { manualScale: 0.01 });
+  check('scaling(E): manual scale only → scale_hint_only (fallback); not confirmed; units false',
+    e.status === 'scale_hint_only' && !!e.manualScaleHint && e.manualScaleHint.confirmed === false
+    && e.capabilities.physicalScaling === false && e.capabilities.unitsConfirmed === false && code(e, 'BMS_SCALING_MANUAL_FALLBACK_ONLY'));
+
+  // F. unit label only → unit_hint_only; not confirmed
+  const f = ps(rsConfirmable, idNot, tbNot, { unitEvidence: { source: 'channel_name', independent: false, unit: 'g' } });
+  check('scaling(F): unit label only → unit_hint_only, not confirmed',
+    f.status === 'unit_hint_only' && f.aggregateDecision.canConfirmPhysicalScaling === false);
+
+  // G. plausible range only → at most scale_candidate; never confirmed
+  const g = ps(rsConfirmed, idConfirmed, tbConfirmed, { corpus: CORPUS, plausibleRange: true });
+  check('scaling(G): plausible range only → candidate at most, not confirmed (range is supporting only)',
+    g.status === 'scale_candidate' && g.aggregateDecision.canConfirmPhysicalScaling === false && code(g, 'BMS_SCALING_PLAUSIBLE_RANGE_NOT_ENOUGH'));
+
+  // H. scale transform proposed but not stable/verified → transform_candidate, not confirmed
+  const h = ps(rsConfirmed, idConfirmed, tbConfirmed, { corpus: CORPUS, scalingEvidence: { source: 'independent', independent: true, stable: false, transformType: 'linear', transformConfirmed: false }, unitEvidence: unitFull });
+  check('scaling(H): transform proposed but not verified/stable → transform_candidate, not confirmed',
+    h.status === 'transform_candidate' && h.aggregateDecision.canConfirmPhysicalScaling === false);
+
+  // I. corpus-backed synthetic confirmed_scaling → confirmed; units + physical values (synthetic); overlay/Kus/handling/setup/canonical/timeSeries false
+  const i = ps(rsConfirmed, idConfirmed, tbConfirmed, { corpus: CORPUS, scalingEvidence: scaleFull, unitEvidence: unitFull });
+  check('scaling(I): all prereqs + independent scale + unit + verified transform → confirmed_scaling (synthetic); usable caps still false',
+    i.status === 'confirmed_scaling' && i.aggregateDecision.canConfirmPhysicalScaling === true
+    && i.unitsConfirmed === true && i.physicalValuesAvailable === true
+    && i.capabilities.canonicalTelemetry === false && i.capabilities.timeSeries === false
+    && i.capabilities.handlingCorrelation === false && i.capabilities.setupRecommendation === false && i.capabilities.overlayEnabled === false);
+
+  // J. canonical value eligibility (synthetic) — eligible but NOT produced/usable; no overlay/setup
+  check('scaling(J): synthetic confirmed → canonicalValueEligibility true but canonicalValues NOT available; no overlay',
+    i.canonicalValueEligibility === true && i.canonicalValuesAvailable === false && i.capabilities.overlayEnabled === false);
+
+  // R1 (adversarial review): the identity prereq must trust the authoritative aggregate decision, not
+  // a status string — an inconsistent identity object (status confirmed but aggregate false) must NOT confirm.
+  const idInconsistent = { status: 'confirmed_identity', aggregateDecision: { canConfirmAnyChannelIdentity: false } };
+  const r1 = ps(rsConfirmed, idInconsistent, tbConfirmed, { corpus: CORPUS, scalingEvidence: scaleFull, unitEvidence: unitFull });
+  check('scaling(R1): identity status string cannot override a false aggregate decision → not confirmed',
+    r1.status !== 'confirmed_scaling' && r1.aggregateDecision.canConfirmPhysicalScaling === false && r1.capabilities.physicalScaling === false);
+
+  // K. real/imported single-file path (no corpus) → never confirmed; physical/units/canonical false
+  const k = ps(rsConfirmable, idNot, tbNot, { scalingEvidence: scaleFull, unitEvidence: unitFull });
+  check('scaling(K): real single-file (no corpus) → never confirmed; physical/units/canonical caps false',
+    k.aggregateDecision.canConfirmPhysicalScaling === false && k.physicalValuesAvailable === false
+    && k.capabilities.physicalScaling === false && k.capabilities.unitsConfirmed === false && k.capabilities.canonicalTelemetry === false);
+
+  // L. manual scale cannot upgrade the real path
+  const l = ps(rsConfirmable, idNot, tbNot, { manualScale: 0.01, scalingEvidence: null });
+  check('scaling(L): real path + manual scale → fallback hint only; physicalScaling/units false',
+    l.status === 'scale_hint_only' && l.capabilities.physicalScaling === false && l.capabilities.unitsConfirmed === false);
+
+  // M. caps pinned false on every path (handling/setup/overlay/Kus/timeSeries/canonical)
+  check('scaling(M): handling/setup/overlay/timeSeries/canonical caps pinned false (all paths)',
+    [a, b, c, d, e, f, g, h, i, k, l].every(o => o.capabilities.handlingCorrelation === false && o.capabilities.setupRecommendation === false
+      && o.capabilities.overlayEnabled === false && o.capabilities.timeSeries === false && o.capabilities.canonicalTelemetry === false
+      && o.capabilities.physicalScalingConfirmation === true));
+
+  // bms-confirmation integration — feed helps ONLY with corpus; never opens decode caps
+  const bmsStub = { header: { valid: true }, channels: ['accy', 'yaw', 'steer', 'speed'].map(n => ({ name: n })), channelCount: 4 };
+  const rawStub = { rawSeriesCandidates: [{ id: 'candidate_001', encoding: 'int16le', sampleCount: 600 }], timebaseCandidate: { present: true, sampleCount: 600 } };
+  const probeMono = { timebaseClues: [{ type: 'monotonic_counter_candidate', runLength: 600, medianDelta: 10, confidence: 'medium' }] };
+  const exMap = { candidate_001: { rawChannelName: 'accy', canonicalName: 'lateral_accel', scale: 0.01, offset: 0, unit: 'g' } };
+  const linkEx = M.linkBmsRawCandidates(bmsStub, probeMono, rawStub, { explicitMapping: exMap });
+  const STABLE = { channelCountStable: true, candidateRegionStable: true, catalogDetectedAll: true, fileCount: 3 };
+  const structFeed = { confirmationFeed: { perChannelBlockCountCandidate: true } };
+  const sConfNoCorpus = M.evaluateBmsConfirmationEvidence(bmsStub, probeMono, rawStub, linkEx, { physicalScaling: i });
+  check('scaling→confirm: feed WITHOUT corpus → physical scaling not confirmed; decode caps false',
+    sConfNoCorpus.decisions.canConfirmPhysicalScaling === false
+    && sConfNoCorpus.capabilities.physicalScaling === false && sConfNoCorpus.capabilities.timeSeries === false && sConfNoCorpus.capabilities.handlingCorrelation === false);
+  const sConfCorpus = M.evaluateBmsConfirmationEvidence(bmsStub, probeMono, rawStub, linkEx, { structure: structFeed, physicalScaling: i, corpus: STABLE });
+  check('scaling→confirm: feed + corpus → physical scaling can confirm; decode-grade caps still false',
+    sConfCorpus.decisions.canConfirmPhysicalScaling === true
+    && sConfCorpus.capabilities.physicalScaling === false && sConfCorpus.capabilities.timeSeries === false && sConfCorpus.capabilities.handlingCorrelation === false);
+
+  // metadata integration (real path → conservative)
+  const real = ps(rsConfirmable, idNot, tbNot, {});
+  const meta = M.buildTelemetryMetadata({ header: { importer: 'DarabImporter v.', valid: true }, channelCount: 4, channels: bmsStub.channels, physicalScaling: real });
+  check('scaling→metadata: summary surfaced + physicalScaling/units/canonical caps false; overlay false',
+    !!meta.physicalScaling && meta.capabilities.physicalScalingConfirmation === true && meta.capabilities.physicalScaling === false
+    && meta.capabilities.unitsConfirmed === false && meta.capabilities.canonicalTelemetry === false && meta.capabilities.overlayEnabled === false && meta.capabilities.handlingCorrelation === false);
+  check('scaling→metadata: no scaling → cap false, summary null',
+    M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).capabilities.physicalScalingConfirmation === false);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
