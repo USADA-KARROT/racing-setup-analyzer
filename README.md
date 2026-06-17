@@ -43,6 +43,31 @@ Not every number the tool prints is equally trustworthy — and now it says so. 
 
 **Known boundaries.** No suspension hardpoint kinematics beyond the 2D front-view double-wishbone calculator; no transient model beyond a linear 2-DOF step-steer; one representative track for lap simulation; tyre coefficients are estimated unless you import your own `.tir` model. Preset chassis data is labelled per parameter (`confirmed` / `documented` / `estimated` / `unknown`) with an overall letter grade, so you can see how much of a given car is measured vs. inferred. The **Sensitivity** panel re-runs the balance while varying each uncertain input one at a time — it tells you how stable the answer is and which input matters most.
 
+## Tyre model workflow (imported .tir)
+
+You can import a real **Pacejka Magic Formula `.tir`** file at runtime (nothing is bundled or uploaded). The importer implements the **pure-slip lateral** set only, so an import is *not* a complete tyre model — and the UI is honest about exactly what it covers.
+
+**What an imported .tir drives** (badged ◈ Model, source = imported .tir):
+- Cornering stiffness Cα → the understeer-gradient prediction
+- Peak μ → the lap-sim base grip
+- Lateral-force vs slip-angle curve, and peak-μ vs vertical-load curve (Tyre Analysis tab)
+- Vertical stiffness → can be applied as the tyre spring rate
+
+**What stays a generic heuristic even with a .tir loaded** (badged ◇ Heuristic):
+- Temperature, pressure and tyre-width grip corrections
+- The grip-imbalance → understeer shift
+
+These are *not* upgraded by an import. The **Tyre Model Status** panel says so per output, so you always know which numbers are a measured model and which are still seasoning.
+
+**Not modelled at all:** combined slip, aligning moment (Mz), longitudinal force (Fx).
+
+**Import diagnostics** are graded, and describe *what the file supports* rather than judging the tyre:
+- **error** — the file can't produce effective lateral force (no `PCY1`, no peak, or the pure-slip evaluator yields ~zero force); the import is rejected.
+- **warning** — usable but narrow, or not wired into the app (lateral-only; pressure/temperature still heuristic; no camber coefficients).
+- **info** — an available capability (vertical stiffness, load-sensitivity curve) or a wiring note (a pressure model exists in the file but isn't used for the grip correction).
+
+**Reading the curves:** the two ◈ Model curves come straight from your `.tir`'s lateral fit; the temperature/pressure grip curves below them are the ◇ Heuristic app-level correction and are explicitly labelled "not from .tir" — don't read them as measured tyre data.
+
 ## Quick start
 
 ```bash
@@ -123,6 +148,31 @@ v1.4.0 · MIT-spirit personal/educational project · contributions and correctio
 
 **已知邊界：** 除 2D 前視雙 A 臂運動學外無懸吊硬點運動學；除線性 2-DOF step-steer 外無瞬態模型；單圈模擬只有一條代表性賽道；未匯入 `.tir` 時胎係數為估算。車庫底盤資料逐參數標示（`confirmed`/`documented`/`estimated`/`unknown`）+ 整體字母評級，一眼看出某台車多少是實測、多少是推估。**敏感度**面板把每個不確定輸入單獨變動重算平衡——告訴你答案有多穩、哪個輸入最關鍵。
 
+### 輪胎模型工作流程（匯入 .tir）
+
+可在執行時匯入真實的 **Pacejka Magic Formula `.tir`** 檔（不打包、不上傳）。匯入器只實作 **純側向（pure-slip lateral）**，所以匯入**不等於**完整真實胎——介面對自己涵蓋什麼很誠實。
+
+**匯入 .tir 會驅動**（標 ◈ Model，來源＝匯入 .tir）：
+- 轉向剛度 Cα → understeer gradient 預測
+- 峰值 μ → 單圈模擬基礎抓地
+- 側向力 vs 滑移角曲線、峰值 μ vs 垂直負載曲線（Tyre Analysis 分頁）
+- 垂直剛性 → 可套用為輪胎彈簧率
+
+**即使匯入 .tir 仍是通用啟發式**（標 ◇ Heuristic）：
+- 胎溫、胎壓、胎寬抓地修正
+- 抓地失衡 → 轉向偏移
+
+這些**不會**因匯入而升級。「輪胎模型狀態」面板會逐輸出標示，讓你隨時分得清哪些是實測模型、哪些只是調味。
+
+**完全未建模：** combined slip、回正力矩（Mz）、縱向力（Fx）。
+
+**匯入診斷**分級，且只描述「檔案支援什麼」而非評斷胎好壞：
+- **error**——無法產生有效側向力（缺 `PCY1`、無峰值、或純側向 evaluator 算出 ~0 力）；匯入被拒。
+- **warning**——可用但範圍窄或未接線（僅側向；胎壓/胎溫仍 heuristic；無外傾係數）。
+- **info**——可用能力（垂直剛性、負載敏感度曲線）或接線註記（檔案含胎壓模型但抓地修正未使用）。
+
+**如何看曲線：** 兩張 ◈ Model 曲線直接來自你 .tir 的側向擬合；其下的胎溫/胎壓抓地曲線是 ◇ Heuristic 的 app 層修正，已明確標「非來自 .tir」——別把它們當實測胎資料讀。
+
 ### 快速開始
 
 ```bash
@@ -172,6 +222,31 @@ npm test                      # 物理迴歸測試 (143 項)
 - **◇ Heuristic（経験則）** — 実データに合わせて手調整したゲイン/倍率（グリップ不均衡→バランス変化、タイヤ幅/空気圧/温度のグリップ係数、バランスペナルティ、駆動輪トラクション比）。すべて [`renderer/js/calibration.js`](renderer/js/calibration.js) にメタデータ付きで集約（値/単位/有効範囲/階層/校正に必要なデータ）——物理法則ではなく調整ノブ。参考値として扱う。
 
 **既知の境界：** 2D 前面ダブルウィッシュボーン計算機以外のサスペンション・ハードポイント運動学なし；線形 2-DOF ステアステップ以外の過渡モデルなし；ラップシミュレーションは代表的な 1 コースのみ；`.tir` 未読込時はタイヤ係数は推定値。プリセットのシャシーデータはパラメータごとに表示（`confirmed`/`documented`/`estimated`/`unknown`）＋総合レター評価。**感度**パネルは各不確実入力を単独で変動させバランスを再計算し、答えの安定性と最重要入力を示す。
+
+### タイヤモデルのワークフロー（.tir 読込）
+
+実行時に実際の **Pacejka Magic Formula `.tir`** を読み込めます（同梱・アップロードなし）。インポータは **純スリップ横方向（pure-slip lateral）** のみを実装するため、読込＝完全なタイヤモデルでは**ありません**——UI はカバー範囲を正直に示します。
+
+**読込 .tir が駆動するもの**（◈ Model、ソース＝読込 .tir）：
+- コーナリング剛性 Cα → アンダーステア勾配の予測
+- ピーク μ → ラップシムの基礎グリップ
+- 横力 vs スリップ角、ピーク μ vs 垂直荷重の曲線（Tyre Analysis タブ）
+- 縦剛性 → タイヤばねレートに適用可能
+
+**.tir を読み込んでも汎用ヒューリスティックのまま**（◇ Heuristic）：
+- 温度・空気圧・タイヤ幅のグリップ補正
+- グリップ不均衡 → ステア偏移
+
+これらは読込でも更新されません。「タイヤモデルの状態」パネルが出力ごとに表示します。
+
+**未モデル化：** 複合スリップ、セルフアライニングトルク（Mz）、前後力（Fx）。
+
+**インポート診断**は段階分けされ、タイヤの良し悪しではなく「ファイルが何を支援するか」を示します：
+- **error**——有効な横力を生成できない（`PCY1` なし、ピークなし、または純スリップ評価器が ~0 の力）；読込は拒否。
+- **warning**——使用可能だが範囲が狭い／アプリに未接続（横方向のみ；空気圧・温度は依然ヒューリスティック；キャンバー係数なし）。
+- **info**——利用可能な機能（縦剛性、荷重感度曲線）または接続メモ。
+
+**曲線の読み方：** 2 つの ◈ Model 曲線は .tir の横方向フィット由来；その下の温度/空気圧グリップ曲線は ◇ Heuristic のアプリ層補正で「.tir 由来ではない」と明示——実測タイヤデータとして読まないこと。
 
 ### クイックスタート
 
