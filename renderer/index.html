@@ -1538,6 +1538,29 @@ canvas{max-height:300px}
                 </div>
               </div>
             </template>
+            <!-- Phase 3D-1: sample-structure discovery. Per-channel blocks / offset-index table / interleaved are HYPOTHESES; convergence is never confirmed here. Never claims telemetry-ready. -->
+            <template x-if="telemetryMeta().structure">
+              <div class="mt-2 pt-2 border-t border-white/5">
+                <div class="text-[10px] text-slate-400 mb-1 flex items-center gap-1.5">
+                  <span x-text="t('ui.telem.struct.title')"></span>
+                  <span class="px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-400" x-text="t('ui.telem.struct.statusHyp')"></span>
+                </div>
+                <div class="flex flex-wrap gap-1.5 mb-1">
+                  <template x-for="row in [['ui.telem.struct.offsetTable', telemetryMeta().structure.offsetTableCandidate], ['ui.telem.struct.perChannel', telemetryMeta().structure.perChannelBlockCandidate], ['ui.telem.struct.interleaved', telemetryMeta().structure.interleavedCandidate], ['ui.telem.struct.convergence', telemetryMeta().structure.converged]]" :key="row[0]">
+                    <span class="px-1.5 py-0.5 rounded text-[10px]" :class="row[1] ? 'bg-sky-900/30 text-sky-300' : 'bg-slate-700 text-slate-500'" x-text="(row[1]?'• ':'– ') + t(row[0])"></span>
+                  </template>
+                </div>
+                <template x-if="telemetryMeta().structure.candidateChannelBlocks > 0">
+                  <div class="text-[10px] text-slate-500 mb-1"><span x-text="telemetryMeta().structure.candidateChannelBlocks"></span> / <span x-text="telemetryMeta().structure.expectedChannelCount"></span> <span x-text="t('ui.telem.struct.blocksLabel')"></span> · <span x-text="telemetryMeta().structure.countRelation"></span></div>
+                </template>
+                <div class="text-[10px] text-amber-300/80 mb-1" x-text="t('ui.telem.struct.note')"></div>
+                <div class="space-y-1">
+                  <template x-for="d in telemetryMeta().structure.diagnostics" :key="d.code">
+                    <div class="text-[10px] px-2 py-1 rounded" :class="d.severity==='warning' ? 'bg-amber-900/20 text-amber-300/90' : 'bg-slate-800/60 text-slate-500'" x-text="t(d.messageKey)"></div>
+                  </template>
+                </div>
+              </div>
+            </template>
           </div>
         </template>
         <details class="mt-2">
@@ -2094,6 +2117,7 @@ canvas{max-height:300px}
 <script src="js/bms-raw-extract.js"></script>
 <script src="js/bms-channel-link.js"></script>
 <script src="js/bms-confirmation.js"></script>
+<script src="js/bms-structure-discovery.js"></script>
 <script>
 const COLORS=['#38bdf8','#f472b6','#34d399','#facc15','#a78bfa','#fb923c','#22d3ee','#e879f9','#84cc16','#f87171'];
 
@@ -2208,7 +2232,7 @@ function app(){return{
     const f=e.target.files && e.target.files[0]; if(!f) return;
     this.bmsResult={loading:true};
     const reader=new FileReader();
-    reader.onload=()=>{ try{ const bytes=new Uint8Array(reader.result); const r=(typeof parseBms==='function')?parseBms(bytes):null; if(!r||!r.header.valid){ this.bmsResult={error:true}; return; } if(f&&f.name) r.fileName=f.name; r.probe=(typeof probeBmsBinary==='function')?probeBmsBinary(bytes):null; r.raw=(typeof extractBmsRawCandidates==='function'&&r.probe)?extractBmsRawCandidates(bytes,r.probe,{catalogChannelCount:r.channelCount}):null; r.link=(typeof linkBmsRawCandidates==='function'&&r.raw)?linkBmsRawCandidates(r,r.probe,r.raw,{}):null; r.confirmation=(typeof evaluateBmsConfirmationEvidence==='function'&&r.link)?evaluateBmsConfirmationEvidence(r,r.probe,r.raw,r.link,{}):null; this.bmsResult=r; }catch(err){ this.bmsResult={error:true}; } };
+    reader.onload=()=>{ try{ const bytes=new Uint8Array(reader.result); const r=(typeof parseBms==='function')?parseBms(bytes):null; if(!r||!r.header.valid){ this.bmsResult={error:true}; return; } if(f&&f.name) r.fileName=f.name; r.probe=(typeof probeBmsBinary==='function')?probeBmsBinary(bytes):null; r.raw=(typeof extractBmsRawCandidates==='function'&&r.probe)?extractBmsRawCandidates(bytes,r.probe,{catalogChannelCount:r.channelCount}):null; r.link=(typeof linkBmsRawCandidates==='function'&&r.raw)?linkBmsRawCandidates(r,r.probe,r.raw,{}):null; r.confirmation=(typeof evaluateBmsConfirmationEvidence==='function'&&r.link)?evaluateBmsConfirmationEvidence(r,r.probe,r.raw,r.link,{}):null; r.structure=(typeof discoverBmsSampleStructure==='function')?discoverBmsSampleStructure(bytes,r,r.probe,r.raw,r.link,r.confirmation,{catalogChannelCount:r.channelCount}):null; this.bmsResult=r; }catch(err){ this.bmsResult={error:true}; } };
     reader.onerror=()=>{ this.bmsResult={error:true}; };
     reader.readAsArrayBuffer(f);
   },

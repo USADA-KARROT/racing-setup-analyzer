@@ -123,6 +123,25 @@ function buildTelemetryMetadata(bmsResult) {
     diagnostics: confirmation.diagnostics || [],
   } : null;
 
+  // Optional Phase 3D-1 sample-structure discovery (attached by the app at import time).
+  // Surfaces structure HYPOTHESES (per-channel blocks / offset table / interleaved / compressed)
+  // WITHOUT changing the primary status or any decode-grade capability — never telemetry-ready.
+  const structure = (bmsResult && bmsResult.structure) || null;
+  const hasStructure = !hasError && !!structure;
+  const pce = (structure && structure.perChannelEvidence) || {};
+  const structureSummary = structure ? {
+    status: structure.status,
+    hypothesisTypes: (structure.structureHypotheses || []).map(h => h.type),
+    candidateChannelBlocks: pce.candidateChannelBlocks || 0,
+    countRelation: pce.countRelation || 'unknown',
+    expectedChannelCount: pce.expectedChannelCount || 0,
+    offsetTableCandidate: (structure.channelTableCandidates || []).some(t => t.kind === 'offset_table' && t.targetsPlausible),
+    perChannelBlockCandidate: !!(structure.confirmationFeed && structure.confirmationFeed.perChannelBlockCountCandidate),
+    interleavedCandidate: (structure.structureHypotheses || []).some(h => h.type === 'interleaved_channels'),
+    converged: !!(structure.convergence && structure.convergence.sampleStructureConverged),
+    diagnostics: structure.diagnostics || [],
+  } : null;
+
   return {
     sourceType: 'bmsbin',
     sourceFileName: (bmsResult && bmsResult.fileName) || null,
@@ -142,6 +161,7 @@ function buildTelemetryMetadata(bmsResult) {
       channelLinkingHypotheses: hasLink,      // Phase 3C-0: identity/timebase hypotheses
       scalingHypotheses: !!(link && (link.scalingHypotheses || []).length > 0), // Phase 3C-0
       confirmationCriteria: hasConfirmation,  // Phase 3D-0: hypothesis→confirmed decision present
+      sampleStructureDiscovery: hasStructure, // Phase 3D-1: structure hypotheses present (not confirmed)
       timeSeries: false,            // not confirmed usable telemetry
       physicalScaling: false,       // Phase 3D+ (no value conversion yet)
       lapSegmentation: false,       // later
@@ -151,6 +171,7 @@ function buildTelemetryMetadata(bmsResult) {
     rawExtraction: rawSummary,
     linking: linkSummary,
     confirmation: confirmationSummary,
+    structure: structureSummary,
     diagnostics,
   };
 }

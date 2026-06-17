@@ -49,6 +49,14 @@ function evaluateBmsConfirmationEvidence(bmsResult, probeReport, rawExtraction, 
   const rawSeriesCountMatchesCatalog = channelCount > 0 && rawCount > 0
     && Math.abs(rawCount - channelCount) <= Math.max(1, 0.1 * channelCount);
 
+  // Optional Phase 3D-1 structure-discovery feed: a per-channel block count that matches the
+  // catalog is a STRONGER in-file structure signal than the raw-series-count heuristic. It is
+  // still only an in-file signal — it can substitute for rawSeriesCountMatchesCatalog, but is
+  // ALWAYS AND-ed with the corpus cross-file region stability below, so real data (no corpus)
+  // stays not-confirmed. It never flips a decode-grade capability.
+  const structFeed = (opts.structure && opts.structure.confirmationFeed) || null;
+  const perChannelBlockEvidence = !!(structFeed && structFeed.perChannelBlockCountCandidate === true);
+
   // encoding reproducible across the surfaced series (in-file shape check)
   const encodingConsistent = rawCount > 0 && rawSeries.every(s => s.encoding === rawSeries[0].encoding);
 
@@ -65,8 +73,11 @@ function evaluateBmsConfirmationEvidence(bmsResult, probeReport, rawExtraction, 
     || tbHyps.length > 0;
   const timebaseSampleCountMatch = tbHyps.length > 0 && tbHyps.every(h => h.sampleCountMatch === true);
 
-  // structure evidence (before the catalog gate) — both the cross-file and in-file parts
-  const structureEvidence = candidateRegionStable && rawSeriesCountMatchesCatalog;
+  // structure evidence (before the catalog gate) — both the cross-file and in-file parts. The
+  // in-file part is satisfied by EITHER the raw-series-count heuristic OR a matching per-channel
+  // block count from 3D-1 structure discovery; the cross-file part (corpus) is mandatory either way.
+  const inFileStructureSignal = rawSeriesCountMatchesCatalog || perChannelBlockEvidence;
+  const structureEvidence = candidateRegionStable && inFileStructureSignal;
   // a counter is only a confirmed *sample clock* once the structure it clocks is resolved
   const timebaseConfirmed = structureEvidence && timebaseCandidatePresent && timebaseSampleCountMatch;
 
@@ -103,8 +114,8 @@ function evaluateBmsConfirmationEvidence(bmsResult, probeReport, rawExtraction, 
   // structure confidence is corpus-led: the in-file count match alone (no corpus) is only a weak
   // signal, so it cannot reach 0.5 without cross-file region stability.
   const structureScore = candidateRegionStable
-    ? (rawSeriesCountMatchesCatalog ? 1 : 0.5)
-    : (rawSeriesCountMatchesCatalog ? 0.2 : 0);
+    ? (inFileStructureSignal ? 1 : 0.5)
+    : (inFileStructureSignal ? 0.2 : 0);
   const timebaseScore = timebaseConfirmed ? 1 : (timebaseCandidatePresent ? 0.3 : 0);
   const channelMappingScore = explicitChannelMappingFound ? 1 : (catalogOrderHypothesisPresent ? 0.2 : 0);
   const scalingScore = scaleOffsetFound ? 1 : 0;
