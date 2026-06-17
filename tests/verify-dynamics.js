@@ -31,6 +31,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'bms-raw-extract.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-channel-link.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-confirmation.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-structure-discovery.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -40,7 +41,7 @@ const src =
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
-  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, ' +
+  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
@@ -1130,6 +1131,153 @@ console.log('\n[confirm] .bmsbin hypothesis→confirmed criteria');
     && cm.capabilities.timeSeries === false && cm.capabilities.physicalScaling === false && cm.capabilities.handlingCorrelation === false);
   check('confirm→metadata: no confirmation → confirmationCriteria false, confirmation null',
     M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).capabilities.confirmationCriteria === false);
+}
+
+// ── Phase 3D-1: sample-structure discovery (synthetic; hypotheses only, never converged) ──
+console.log('\n[struct] .bmsbin sample-structure discovery');
+{
+  const code = (r, c) => r.diagnostics.some(d => d.code === c);
+  const strTok = (s) => { const b = Buffer.from(s + '\0', 'ascii'); const L = Buffer.alloc(2); L.writeUInt16LE(b.length, 0); return Buffer.concat([L, b]); };
+  // synthetic catalog (NO real telemetry) — header + N TrackInfo-delimited channel tokens
+  const catalog = (names) => {
+    const parts = [Buffer.from('DarabImporter v.\0', 'ascii'), Buffer.alloc(8)];
+    for (const c of names) parts.push(strTok('TrackInfo'), Buffer.from([1, 2, 3, 4]), strTok(c), strTok('MS5.8'), strTok(c + ' d'));
+    return parts;
+  };
+  const u32arr = (vals) => { const b = Buffer.alloc(vals.length * 4); vals.forEach((v, i) => b.writeUInt32LE(v >>> 0, i * 4)); return b; };
+  const names85 = Array.from({ length: 85 }, (_, i) => 'ch' + i);
+  const pipeline = (bytes) => {
+    const r = M.parseBms(bytes);
+    const probe = M.probeBmsBinary(bytes);
+    const raw = M.extractBmsRawCandidates(bytes, probe, { catalogChannelCount: r.channelCount });
+    const link = M.linkBmsRawCandidates(r, probe, raw, {});
+    const conf = M.evaluateBmsConfirmationEvidence(r, probe, raw, link, {});
+    const structure = M.discoverBmsSampleStructure(bytes, r, probe, raw, link, conf, { catalogChannelCount: r.channelCount });
+    return { r, probe, raw, link, conf, structure };
+  };
+
+  // 1. catalog-only (no sample region / no raw series) → hypotheses only, not converged
+  const co = pipeline(new Uint8Array(Buffer.concat(catalog(names85))));
+  check('struct: catalog-only (no raw) → hypotheses-only + not converged + warning',
+    co.structure.status === 'structure_hypotheses_only' && co.structure.inputs.rawSeriesCandidateCount === 0
+    && co.structure.convergence.sampleStructureConverged === false && code(co.structure, 'BMS_STRUCT_HYPOTHESES_ONLY'));
+
+  // 2. 85-entry monotonic in-range offset table → offset_table candidate matching catalog count
+  const catParts = catalog(names85);
+  const catLen = Buffer.concat(catParts).length;
+  const dataStart = catLen + 85 * 4;
+  const dataBlob = Buffer.alloc(85 * 200);                       // in-range targets live here (zeros)
+  const offsets = []; for (let i = 0; i < 85; i++) offsets.push(dataStart + i * 200);
+  const offFx = new Uint8Array(Buffer.concat([...catParts, u32arr(offsets), dataBlob]));
+  const offRes = pipeline(offFx);
+  const ot = offRes.structure.channelTableCandidates.find(t => t.kind === 'offset_table');
+  check('struct: 85-entry in-range offset table → candidate matches catalog (targets plausible)',
+    !!ot && ot.entryCount === 85 && ot.relationToCatalogCount === 'matches' && ot.targetsPlausible === true
+    && offRes.structure.structureHypotheses.some(h => h.type === 'offset_table') && code(offRes.structure, 'BMS_STRUCT_OFFSET_TABLE_CANDIDATE'));
+
+  // 3. offset table whose targets fall outside the file → candidate present but NOT confirmed
+  const badOffsets = []; for (let i = 0; i < 85; i++) badOffsets.push(1000000000 + i * 1000);
+  const badFx = new Uint8Array(Buffer.concat([...catParts, u32arr(badOffsets)]));
+  const badRes = pipeline(badFx);
+  const badOt = badRes.structure.channelTableCandidates.find(t => t.kind === 'offset_table');
+  check('struct: offset table with out-of-file targets → not confirmed (targetsPlausible false)',
+    !!badOt && badOt.targetsPlausible === false && code(badRes.structure, 'BMS_STRUCT_OFFSET_TABLE_NOT_CONFIRMED')
+    && badRes.structure.convergence.sampleStructureConverged === false
+    && badRes.structure.confirmationFeed.perChannelBlockCountCandidate === false);
+
+  // 4. 85 length-prefixed blocks → per_channel_blocks hypothesis (count matches catalog)
+  const blkParts = catalog(names85);
+  for (let c = 0; c < 85; c++) { const L = 200; const blk = Buffer.alloc(2 + L); blk.writeUInt16LE(L, 0); for (let k = 0; k < L / 2; k++) blk.writeInt16LE(Math.round(1000 * Math.sin((c * 7 + k) / 15)), 2 + k * 2); blkParts.push(blk); }
+  const blkRes = pipeline(new Uint8Array(Buffer.concat(blkParts)));
+  check('struct: 85 length-prefixed blocks → per_channel_blocks hypothesis matching catalog',
+    blkRes.structure.structureHypotheses.some(h => h.type === 'per_channel_blocks')
+    && blkRes.structure.perChannelEvidence.candidateChannelBlocks === 85 && blkRes.structure.perChannelEvidence.countRelation === 'matches'
+    && blkRes.structure.confirmationFeed.perChannelBlockCountCandidate === true && code(blkRes.structure, 'BMS_STRUCT_PER_CHANNEL_NOT_CONFIRMED'));
+
+  // 5. interleaved 85-lane data → interleaved_channels hypothesis. Each lane (channel) is a smooth
+  // sine over rows, but lanes have very different DC offsets so reading CONTIGUOUSLY is jumpy —
+  // that is what distinguishes genuine interleaving from a single contiguous smooth series.
+  const ilParts = catalog(names85); const rows = 200, N = 85, stride = N * 2; const ilBuf = Buffer.alloc(rows * stride);
+  const laneOffset = []; for (let c = 0; c < N; c++) laneOffset.push((((c * 101) % 64) - 32) * 40);
+  for (let rr = 0; rr < rows; rr++) for (let c = 0; c < N; c++) ilBuf.writeInt16LE(laneOffset[c] + Math.round(300 * Math.sin(rr / 11)), rr * stride + c * 2);
+  ilParts.push(ilBuf);
+  const ilRes = pipeline(new Uint8Array(Buffer.concat(ilParts)));
+  check('struct: interleaved 85-lane data → interleaved_channels hypothesis',
+    ilRes.structure.structureHypotheses.some(h => h.type === 'interleaved_channels') && code(ilRes.structure, 'BMS_STRUCT_INTERLEAVED_NOT_CONFIRMED'));
+
+  // 6. random region → compressed_or_sparse hypothesis (honest "no stable structure")
+  const rndParts = catalog(names85); const rb = Buffer.alloc(20000); let x = 987654321;
+  for (let i = 0; i < rb.length; i++) { x = (x * 1103515245 + 12345) & 0x7fffffff; rb[i] = (x >> 16) & 0xff; }
+  rndParts.push(rb);
+  const rndRes = pipeline(new Uint8Array(Buffer.concat(rndParts)));
+  check('struct: random region → compressed_or_sparse hypothesis',
+    rndRes.structure.structureHypotheses.some(h => h.type === 'compressed_or_sparse'));
+
+  // 7. confirmation feed WITHOUT a corpus → sample structure stays not-confirmed, caps false
+  const cNoCorpus = M.evaluateBmsConfirmationEvidence(blkRes.r, blkRes.probe, blkRes.raw, blkRes.link, { structure: blkRes.structure });
+  check('struct→confirm: per-channel feed but NO corpus → structure NOT confirmed, decode caps false',
+    cNoCorpus.decisions.canConfirmSampleStructure === false
+    && cNoCorpus.capabilities.timeSeries === false && cNoCorpus.capabilities.physicalScaling === false && cNoCorpus.capabilities.handlingCorrelation === false);
+
+  // 8. confirmation feed WITH a corpus → structure CAN be confirmed (feed substitutes for raw-count); caps still false
+  const STABLE = { channelCountStable: true, candidateRegionStable: true, catalogDetectedAll: true };
+  const cCorpus = M.evaluateBmsConfirmationEvidence(blkRes.r, blkRes.probe, blkRes.raw, blkRes.link, { corpus: STABLE, structure: blkRes.structure });
+  check('struct→confirm: per-channel feed + corpus → structure can confirm; decode-grade caps still false',
+    cCorpus.decisions.canConfirmSampleStructure === true
+    && cCorpus.capabilities.timeSeries === false && cCorpus.capabilities.physicalScaling === false && cCorpus.capabilities.handlingCorrelation === false);
+
+  // 9. red lines across every fixture: discovery cap on, decode-grade caps off, never converged
+  check('struct: decode-grade caps false + sampleStructureDiscovery true + never converged (all fixtures)',
+    [co, offRes, badRes, blkRes, ilRes, rndRes].every(o =>
+      o.structure.capabilities.sampleStructureDiscovery === true
+      && o.structure.capabilities.timeSeries === false && o.structure.capabilities.physicalScaling === false && o.structure.capabilities.handlingCorrelation === false
+      && o.structure.convergence.sampleStructureConverged === false));
+
+  // 10. never names a canonical channel (structure is layout-only)
+  check('struct: report never names a canonical channel / decoded series',
+    !/canonicalName|lateral_accel|"accy"|accy_values/.test(JSON.stringify(blkRes.structure)));
+
+  // 11. structure → telemetry metadata integration (surfaced; decode-grade caps stay false)
+  const sm = M.buildTelemetryMetadata(Object.assign({}, blkRes.r, { probe: blkRes.probe, raw: blkRes.raw, link: blkRes.link, confirmation: blkRes.conf, structure: blkRes.structure }));
+  check('struct→metadata: structure summary surfaced + sampleStructureDiscovery cap true; decode caps false',
+    !!sm.structure && sm.structure.perChannelBlockCandidate === true && sm.capabilities.sampleStructureDiscovery === true
+    && sm.capabilities.timeSeries === false && sm.capabilities.physicalScaling === false && sm.capabilities.handlingCorrelation === false);
+  check('struct→metadata: no structure → sampleStructureDiscovery false, structure null',
+    M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).capabilities.sampleStructureDiscovery === false);
+
+  // ── regression coverage for the adversarial-review findings ──
+
+  // R1 (finding #1): per-channel blocks that do NOT start byte-aligned to the catalog-end estimate
+  // (a coincidental junk prefix in between) must STILL be found — the block walk searches all starts.
+  const misParts = catalog(names85);
+  misParts.push(new Uint8Array([2, 0, 0xAA, 0xBB, 0, 0]));  // u16 len=2, payload, then len=0 → 1-block coincidental walk
+  for (let c = 0; c < 85; c++) { const L = 200; const blk = new Uint8Array(2 + L); blk[0] = L & 0xff; blk[1] = (L >> 8) & 0xff; const dv = new DataView(blk.buffer); for (let k = 0; k < L / 2; k++) dv.setInt16(2 + k * 2, Math.round(1000 * Math.sin((c * 7 + k) / 15)), true); misParts.push(blk); }
+  const misRes = pipeline(new Uint8Array(Buffer.concat(misParts.map(p => Buffer.from(p)))));
+  check('struct(R1): misaligned per-channel blocks (junk prefix) still found via full start search',
+    misRes.structure.perChannelEvidence.candidateChannelBlocks === 85 && misRes.structure.perChannelEvidence.countRelation === 'matches'
+    && misRes.structure.structureHypotheses.some(h => h.type === 'per_channel_blocks'));
+
+  // R2 (finding #2): a 0-based sequential index table must be a channel_index_table, NOT a
+  // 'matches' offset_table (a pure +1 run is an index, not a byte-offset/pointer table).
+  const idxParts = catalog(names85); const idxBuf = Buffer.alloc(85 * 4); for (let i = 0; i < 85; i++) idxBuf.writeUInt32LE(i, i * 4);
+  idxParts.push(idxBuf, Buffer.alloc(2000));
+  const idxRes = pipeline(new Uint8Array(Buffer.concat(idxParts)));
+  check('struct(R2): sequential index run → channel_index_table, not a matches offset_table',
+    idxRes.structure.channelTableCandidates.some(t => t.kind === 'channel_index_table')
+    && !idxRes.structure.channelTableCandidates.some(t => t.kind === 'offset_table' && t.targetsPlausible && t.relationToCatalogCount === 'matches'));
+
+  // R3 (finding #3): a SINGLE contiguous smooth series (not interleaved) must NOT be reported as
+  // interleaved_channels — contiguous reading of a single series is smooth, so the discriminator rejects it.
+  const sglParts = catalog(names85); const sgl = Buffer.alloc(30000); for (let k = 0; k < 15000; k++) sgl.writeInt16LE(Math.round(8000 * Math.sin(k / 500)), k * 2);
+  sglParts.push(sgl);
+  const sglRes = pipeline(new Uint8Array(Buffer.concat(sglParts)));
+  check('struct(R3): single contiguous smooth series → NOT mislabelled interleaved_channels',
+    !sglRes.structure.structureHypotheses.some(h => h.type === 'interleaved_channels'));
+
+  // R4 (finding #4): random data must NOT yield a plausible offset_table (min run length 16 cuts
+  // chance increasing runs); it should land on compressed_or_sparse, not a spurious pointer table.
+  check('struct(R4): random region yields no targetsPlausible offset_table candidate',
+    !rndRes.structure.channelTableCandidates.some(t => t.kind === 'offset_table' && t.targetsPlausible));
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
