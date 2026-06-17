@@ -814,6 +814,33 @@ canvas{max-height:300px}
             </div>
           </div>
 
+          <!-- US gradient sensitivity (one-at-a-time): how stable is the answer -->
+          <div x-show="sensitivityResult" class="card2 p-4 mb-4">
+            <div class="text-xs text-slate-400 mb-2"><span x-text="t('sens.title')"></span> <span x-html="tierBadge('model')"></span></div>
+            <template x-if="sensitivityResult">
+              <div>
+                <div class="text-xs text-slate-300 mb-1">
+                  <span x-text="t('sens.base')"></span>
+                  <span class="font-mono font-bold" x-text="(sensitivityResult.base>0?'+':'')+sensitivityResult.base+' deg/g'"></span>
+                  <span class="text-slate-600 mx-1">·</span>
+                  <span x-text="t('sens.range')"></span>
+                  <span class="font-mono text-slate-300" x-text="(sensitivityResult.lo>0?'+':'')+sensitivityResult.lo+' ~ '+(sensitivityResult.hi>0?'+':'')+sensitivityResult.hi"></span>
+                </div>
+                <div class="text-xs text-amber-300 mb-2"><span x-text="t('sens.most')"></span> <span class="font-semibold" x-text="t('sens.'+sensitivityResult.most.key)"></span></div>
+                <div class="space-y-1">
+                  <template x-for="row in sensitivityResult.rows" :key="row.key">
+                    <div class="flex items-center gap-2 text-[10px]">
+                      <span class="w-32 shrink-0 text-slate-500 truncate" :title="t('sens.'+row.key)" x-text="t('sens.'+row.key)"></span>
+                      <div class="flex-1 h-2 rounded bg-slate-700 overflow-hidden"><div class="h-full bg-sky-500" :style="'width:'+(sensitivityResult.most.swing>0?Math.round(row.swing/sensitivityResult.most.swing*100):0)+'%'"></div></div>
+                      <span class="w-14 text-right font-mono text-slate-400" x-text="'±'+(row.swing/2).toFixed(2)"></span>
+                    </div>
+                  </template>
+                </div>
+                <div class="text-[10px] text-slate-600 mt-2" x-text="t('sens.note')"></div>
+              </div>
+            </template>
+          </div>
+
           <!-- Lihpao G2 lap prediction (synced with calculation, uses current car setup) -->
           <div x-show="lihpaoResult && !lihpaoResult.error" class="card2 p-4 mb-4" style="background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.18)">
             <div class="flex items-center justify-between mb-2">
@@ -2087,6 +2114,7 @@ function app(){return{
   tireOptions:[],
   adv:{fl_weight:112.5,fr_weight:114.5,rl_weight:170,rr_weight:173,speed_kmh:180,frontal_area:1.2,front_downforce_coeff:1.3,rear_downforce_coeff:1.5,front_bump_force:80,front_rebound_force:120,rear_bump_force:100,rear_rebound_force:150,damper_ref_speed:0.3,front_camber_deg:-3.7,rear_camber_deg:-2.5,front_toe_deg:-0.1,rear_toe_deg:0.3,braking_g:0,accel_g:0},
   result:null,
+  sensitivityResult:null, // {base, lo, hi, most:{key,swing}, rows:[{key,low,high,swing}]}
   baseline:null,      // {tier, params, tire, adv, baselineUSG, baselineNorm}
   deltaResult:null,   // {delta_us, delta_norm, rel_norm, delta_tendency_zh, entry_delta, exit_delta}
   contribChart:null,
@@ -2597,10 +2625,23 @@ function app(){return{
     if(this.tire.sameFrontRear){
       this.tire.rear_compound = this.tire.front_compound;
     }
-    // 建構 tire_params (含胎寬)
-    const tireParams = {...this.tire};
     // 若使用者勾選「用匯入的真實胎」，把解析後的 .tir 掛到傳給模型的 params(不汙染 reactive pred)
     const predP = (this.useTir && this.tirParsed) ? Object.assign({}, this.pred, { tireModel: this.tirParsed }) : this.pred;
+    this.result = this._runModel(predP);
+    if(this.tier===3 && this.result?.contribution) this.$nextTick(()=>{this.drawContribution();this.drawCornerWeight();this.drawGGDiagram()});
+    // Reset advisor when prediction changes
+    this.advisorResult=null;
+    // Auto-compare against baseline if set (Tier 1 & 2 are compatible since both use Tier 2 API)
+    const compatibleTier = (t) => t <= 2 ? 2 : t;
+    if(this.baseline && compatibleTier(this.baseline.tier) === compatibleTier(this.tier)) this.computeDelta();
+    else this.deltaResult = null;
+    // 簡版敏感度分析(one-at-a-time)：告訴你這個答案有多穩
+    this.sensitivityResult = this.computeSensitivity();
+    // 同步算麗寶單圈預測(用當下這台車的設定)，預測結果區直接顯示
+    this.runLihpao();
+  },
+  // 跑模型(依目前 tier 選 API)；predP 由呼叫端建構(可含 perturbation / 匯入胎模型)。
+  _runModel(predP){
     if(this.tier===1){
       // Tier 1 快速模式：使用 Tier 2 API，自動帶入建議胎壓和預設溫度
       const quickTire = {
@@ -2611,7 +2652,6 @@ function app(){return{
         front_tire_width: this.tire.front_tire_width,
         rear_tire_width: this.tire.rear_tire_width,
       };
-      // 使用最佳溫度和建議胎壓（從輪胎資料庫自動帶入）
       const ftire = this.tireOptions.find(t=>t.id===this.tire.front_compound);
       const rtire = this.tireOptions.find(t=>t.id===this.tire.rear_compound);
       quickTire.fl_temp = ftire?.optimal_temp || 80;
@@ -2622,21 +2662,56 @@ function app(){return{
       quickTire.fr_pressure = ftire?.optimal_pressure_front_bar || 2.14;
       quickTire.rl_pressure = rtire?.optimal_pressure_rear_bar || 2.21;
       quickTire.rr_pressure = rtire?.optimal_pressure_rear_bar || 2.21;
-      this.result = api.predictTier2(predP, quickTire);
+      return api.predictTier2(predP, quickTire);
     } else if(this.tier===2){
-      this.result = api.predictTier2(predP, tireParams);
-    } else {
-      this.result = api.predictTier3(predP, tireParams, this.adv);
+      return api.predictTier2(predP, {...this.tire});
     }
-    if(this.tier===3 && this.result?.contribution) this.$nextTick(()=>{this.drawContribution();this.drawCornerWeight();this.drawGGDiagram()});
-    // Reset advisor when prediction changes
-    this.advisorResult=null;
-    // Auto-compare against baseline if set (Tier 1 & 2 are compatible since both use Tier 2 API)
-    const compatibleTier = (t) => t <= 2 ? 2 : t;
-    if(this.baseline && compatibleTier(this.baseline.tier) === compatibleTier(this.tier)) this.computeDelta();
-    else this.deltaResult = null;
-    // 同步算麗寶單圈預測(用當下這台車的設定)，預測結果區直接顯示
-    this.runLihpao();
+    return api.predictTier3(predP, {...this.tire}, this.adv);
+  },
+  // 取目前 tier 的頭條 understeer gradient(與 resultGradient getter 同邏輯)
+  _gradOf(r){
+    if(!r) return null;
+    if(this.tier===3 && r.prediction) return r.prediction.steady_state?.understeer_gradient;
+    return r.adjusted_understeer_gradient ?? r.understeer_gradient ?? null;
+  },
+  // 套用 perturbation 重算頭條 gradient(複製 pred，不汙染 reactive 狀態)
+  _gradWith(override){
+    const pred = Object.assign({}, this.pred, override || {});
+    const predP = (this.useTir && this.tirParsed) ? Object.assign({}, pred, { tireModel: this.tirParsed }) : pred;
+    const g = parseFloat(this._gradOf(this._runModel(predP)));
+    return isNaN(g) ? null : g;
+  },
+  // 簡版 one-at-a-time 敏感度：對最易填錯+高影響的輸入做 ± 重算，回報範圍與最敏感項。
+  computeSensitivity(){
+    const base = parseFloat(this._gradOf(this.result));
+    if(isNaN(base)) return null;
+    const P = this.pred;
+    const r2 = v => Math.round(v*100)/100;
+    // [key, override(sign)]：sign = +1 / −1。CG/重量/ARB/彈簧是使用者最易填錯的輸入；
+    // cornering stiffness 是頭條 gradient 的主要物理驅動(經 corneringStiffnessScale 鉤子)。
+    const targets = [
+      ['ca',      s => ({ corneringStiffnessScale: 1 + 0.10*s })],
+      ['cg',      s => ({ cg_height: P.cg_height + 20*s })],
+      ['fweight', s => ({ weight_front_pct: P.weight_front_pct + 1*s })],
+      ['farb',    s => ({ front_arb: (P.front_arb||0) * (1 + 0.15*s) })],
+      ['rarb',    s => ({ rear_arb:  (P.rear_arb||0)  * (1 + 0.15*s) })],
+      ['fspring', s => ({ front_spring_rate: P.front_spring_rate * (1 + 0.10*s) })],
+      ['rspring', s => ({ rear_spring_rate:  P.rear_spring_rate  * (1 + 0.10*s) })],
+    ];
+    let lo=base, hi=base, most=null;
+    const rows=[];
+    for(const [key, ov] of targets){
+      const gm=this._gradWith(ov(-1)), gp=this._gradWith(ov(1));
+      const vals=[gm,gp].filter(v=>v!=null);
+      if(!vals.length) continue;
+      const tlo=Math.min(...vals), thi=Math.max(...vals), swing=thi-tlo;
+      lo=Math.min(lo,tlo); hi=Math.max(hi,thi);
+      if(!most || swing>most.swing) most={key, swing};
+      rows.push({ key, low:r2(tlo), high:r2(thi), swing:r2(swing) });
+    }
+    if(!rows.length || !most) return null;
+    rows.sort((a,b)=>b.swing-a.swing);
+    return { base:r2(base), lo:r2(lo), hi:r2(hi), most:{key:most.key, swing:r2(most.swing)}, rows };
   },
 
   runLihpao(){

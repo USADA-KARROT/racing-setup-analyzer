@@ -612,5 +612,22 @@ console.log('\n[cal] Calibration 層：常數值鎖定 (calibration.js)');
   check('cal: 每個常數 metadata 完整且 value 落在 validRange 內', metaOk, bad);
 }
 
+// ── corneringStiffnessScale 鉤子（供 UI 敏感度分析 ±重算用）──
+console.log('\n[sens] corneringStiffnessScale 鉤子');
+{
+  const tp = { front_compound: 'semi_slick', rear_compound: 'semi_slick' };
+  const base = new M.Tier2TireAware(gt3, tp).calculate();
+  const one  = new M.Tier2TireAware(Object.assign({}, gt3, { corneringStiffnessScale: 1 }), tp).calculate();
+  const s08  = new M.Tier2TireAware(Object.assign({}, gt3, { corneringStiffnessScale: 0.8 }), tp).calculate();
+  // 帶 scale=1 與不帶完全一致 → 預設不影響正常預測(opt-in)
+  check('sens: corneringStiffnessScale 預設(=1) 不改變 understeer_gradient',
+    one.understeer_gradient === base.understeer_gradient,
+    `base ${base.understeer_gradient} vs scale1 ${one.understeer_gradient}`);
+  // K_us = W_f/(C_αf·s) − W_r/(C_αr·s) = K_us0/s → 縮 0.8 時 |Kus| 放大 1/0.8
+  check('sens: cornering stiffness ×0.8 → Kus ≈ Kus0/0.8',
+    approx(s08.understeer_gradient, base.understeer_gradient / 0.8, 2),
+    `got ${s08.understeer_gradient}, want ${(base.understeer_gradient / 0.8).toFixed(3)}`);
+}
+
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
 process.exit(fail > 0 ? 1 : 0);

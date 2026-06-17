@@ -298,8 +298,10 @@ class Tier1BasicBalance {
     // 取代舊式 (LLTD% − weight%)：舊式漏掉 (a)，導致前驅/車頭重車被誤判轉向過度。
     const ayRef = CAL.CORNERING_STIFFNESS_AY_REF_G; // g — 評估荷重轉移的參考側向加速度(校準後 LLTD 敏感度最合理,見 calibration.js)
     const a4Ref = totalWeight * G / 4 / 1000; // 平均單胎靜載 (kN)，校準負載敏感度膝點
-    const cAlphaF = axlePairCorneringStiffness(mF, totalDFzF, ayRef, a4Ref, p.tireModel);
-    const cAlphaR = axlePairCorneringStiffness(mR, totalDFzR, ayRef, a4Ref, p.tireModel);
+    // 可選的 cornering-stiffness 縮放(預設 1)：供 UI 的敏感度分析 ±重算用，正常預測不受影響。
+    const caScale = p.corneringStiffnessScale || 1;
+    const cAlphaF = axlePairCorneringStiffness(mF, totalDFzF, ayRef, a4Ref, p.tireModel) * caScale;
+    const cAlphaR = axlePairCorneringStiffness(mR, totalDFzR, ayRef, a4Ref, p.tireModel) * caScale;
     const usGradient = (cAlphaF > 0 && cAlphaR > 0)
       ? (mF * G / cAlphaF) - (mR * G / cAlphaR)
       : 0;
