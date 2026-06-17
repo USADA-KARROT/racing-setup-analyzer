@@ -142,6 +142,21 @@ function buildTelemetryMetadata(bmsResult) {
     diagnostics: structure.diagnostics || [],
   } : null;
 
+  // Optional Phase 3D-2 raw-stream confirmation (attached by the app at import time). Surfaces the
+  // raw-stream confirmation decision WITHOUT changing the primary status or any decode-grade
+  // capability — a confirmed raw stream STRUCTURE is still not channel identity / physical values.
+  const rawStream = (bmsResult && bmsResult.rawStreamConfirmation) || null;
+  const hasRawStream = !hasError && !!rawStream;
+  const rawStreamSummary = rawStream ? {
+    status: rawStream.status,
+    confirmedRawStreamCount: rawStream.aggregateDecision ? rawStream.aggregateDecision.confirmedRawStreamCount : 0,
+    partialRawStreamCount: rawStream.aggregateDecision ? rawStream.aggregateDecision.partialRawStreamCount : 0,
+    rejectedCandidateCount: rawStream.aggregateDecision ? rawStream.aggregateDecision.rejectedCandidateCount : 0,
+    canConfirmAnyRawStream: !!(rawStream.aggregateDecision && rawStream.aggregateDecision.canConfirmAnyRawStream),
+    crossFileStable: !!(rawStream.criteria && rawStream.criteria.crossFileStable),
+    diagnostics: rawStream.diagnostics || [],
+  } : null;
+
   return {
     sourceType: 'bmsbin',
     sourceFileName: (bmsResult && bmsResult.fileName) || null,
@@ -162,6 +177,7 @@ function buildTelemetryMetadata(bmsResult) {
       scalingHypotheses: !!(link && (link.scalingHypotheses || []).length > 0), // Phase 3C-0
       confirmationCriteria: hasConfirmation,  // Phase 3D-0: hypothesis→confirmed decision present
       sampleStructureDiscovery: hasStructure, // Phase 3D-1: structure hypotheses present (not confirmed)
+      rawStreamConfirmation: hasRawStream,    // Phase 3D-2: raw-stream confirmation criteria present
       timeSeries: false,            // not confirmed usable telemetry
       physicalScaling: false,       // Phase 3D+ (no value conversion yet)
       lapSegmentation: false,       // later
@@ -172,6 +188,7 @@ function buildTelemetryMetadata(bmsResult) {
     linking: linkSummary,
     confirmation: confirmationSummary,
     structure: structureSummary,
+    rawStreamConfirmation: rawStreamSummary,
     diagnostics,
   };
 }

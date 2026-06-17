@@ -90,7 +90,15 @@ function evaluateBmsConfirmationEvidence(bmsResult, probeReport, rawExtraction, 
   // ── decisions (conservative AND-chains) ──
   const canConfirmCatalog = catalogStable;
   const canConfirmSampleStructure = catalogStable && structureEvidence;
-  const canConfirmRawStreams = canConfirmSampleStructure && encodingConsistent;
+  // Optional Phase 3D-2 raw-stream confirmation feed. It can ONLY help confirm raw streams, and
+  // only when its own corpus gate is satisfied (≥2 files + stable regions) — so a single real
+  // file (no corpus) can never flip this true, and it never touches identity/scaling/decode caps.
+  const rsConf = opts.rawStreamConfirmation || null;
+  const rawStreamConfirmationFeed = !!(rsConf
+    && rsConf.aggregateDecision && rsConf.aggregateDecision.canConfirmAnyRawStream
+    && rsConf.confirmationFeed && rsConf.confirmationFeed.rawStreamsConfirmed
+    && opts.corpus && opts.corpus.fileCount >= 2);
+  const canConfirmRawStreams = canConfirmSampleStructure && (encodingConsistent || rawStreamConfirmationFeed);
   // Identity (and therefore scaling) is gated on confirmed sample structure: a single file —
   // even with an explicit mapping — cannot confirm a channel's identity without the
   // corpus-backed structure that mapping labels. Explicit evidence is necessary, not sufficient.
