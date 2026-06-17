@@ -1114,6 +1114,14 @@ console.log('\n[confirm] .bmsbin hypothesis→confirmed criteria');
   check('confirm: report schema (scores + blockers + nextEvidenceNeeded + canonical blocked)',
     typeof c9.scores.overallScore === 'number' && Array.isArray(c9.blockers) && c9.blockers.length > 0
     && Array.isArray(c9.nextEvidenceNeeded) && code(c9, 'BMS_CONFIRM_CANONICAL_NOT_AVAILABLE'));
+
+  // confirmation → telemetry metadata integration (surfaced, but never changes decode-grade caps)
+  const cm = M.buildTelemetryMetadata({ header: { importer: 'DarabImporter v.', valid: true }, channelCount: 4, channels: names4.map(n => ({ name: n })), probe: { candidateRegions: [{ start: 0, end: 100, length: 100, confidence: 'high' }], timebaseClues: [] }, raw: raw4, link: link4, confirmation: c9 });
+  check('confirm→metadata: confirmation summary surfaced + confirmationCriteria cap true; decode-grade false',
+    !!cm.confirmation && cm.confirmation.status === 'not_confirmed' && cm.capabilities.confirmationCriteria === true
+    && cm.capabilities.timeSeries === false && cm.capabilities.physicalScaling === false && cm.capabilities.handlingCorrelation === false);
+  check('confirm→metadata: no confirmation → confirmationCriteria false, confirmation null',
+    M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).capabilities.confirmationCriteria === false);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);

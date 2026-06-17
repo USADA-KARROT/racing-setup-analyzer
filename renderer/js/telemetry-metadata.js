@@ -109,6 +109,20 @@ function buildTelemetryMetadata(bmsResult) {
     diagnostics: link.diagnostics || [],
   } : null;
 
+  // Optional Phase 3D-0 confirmation decision (attached by the app at import time). Surfaces
+  // the hypothesis→confirmed decision WITHOUT changing the primary status or any decode-grade
+  // capability — a confirmed catalog / structure is still not confirmed telemetry.
+  const confirmation = (bmsResult && bmsResult.confirmation) || null;
+  const hasConfirmation = !hasError && !!confirmation;
+  const confirmationSummary = confirmation ? {
+    status: confirmation.status,
+    overallScore: confirmation.scores ? confirmation.scores.overallScore : 0,
+    decisions: confirmation.decisions || {},
+    blockers: confirmation.blockers || [],
+    nextEvidenceNeeded: confirmation.nextEvidenceNeeded || [],
+    diagnostics: confirmation.diagnostics || [],
+  } : null;
+
   return {
     sourceType: 'bmsbin',
     sourceFileName: (bmsResult && bmsResult.fileName) || null,
@@ -127,6 +141,7 @@ function buildTelemetryMetadata(bmsResult) {
       rawTimeSeriesCandidates: rawCandidates, // Phase 3B-1: raw series extracted (not decoded)
       channelLinkingHypotheses: hasLink,      // Phase 3C-0: identity/timebase hypotheses
       scalingHypotheses: !!(link && (link.scalingHypotheses || []).length > 0), // Phase 3C-0
+      confirmationCriteria: hasConfirmation,  // Phase 3D-0: hypothesis→confirmed decision present
       timeSeries: false,            // not confirmed usable telemetry
       physicalScaling: false,       // Phase 3D+ (no value conversion yet)
       lapSegmentation: false,       // later
@@ -135,6 +150,7 @@ function buildTelemetryMetadata(bmsResult) {
     probe: probeSummary,
     rawExtraction: rawSummary,
     linking: linkSummary,
+    confirmation: confirmationSummary,
     diagnostics,
   };
 }
