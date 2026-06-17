@@ -1023,6 +1023,17 @@ console.log('\n[tool] local validation reporter — fixture-safe / sanitized out
   // 6. defense-in-depth — serialized output carries no raw-content field name at all
   check('tool: serialized summary+aggregate names no raw-content field',
     !hasForbidden(JSON.stringify(s) + JSON.stringify(agg)));
+
+  // 7. Phase 3D-0 confirmation fields present, sanitized scalars, and honest (catalog yes / structure no without a corpus)
+  check('tool: summary carries sanitized confirmation decision (catalog confirmed, structure not, no decode)',
+    typeof s.confirmationStatus === 'string' && s.confirmedCatalog === true && s.confirmedStructure === false
+    && s.canonicalTelemetry === false && typeof s.confirmationScore === 'number');
+
+  // 8. aggregate reports confirmation counts + cross-file corpus evidence as scalars/histograms (still sanitized)
+  check('tool: aggregate reports confirmation counts + corpus booleans (sanitized)',
+    typeof agg.confirmedCatalog === 'number' && agg.confirmedStructure === 0
+    && typeof agg.corpusChannelCountStable === 'boolean' && typeof agg.corpusCandidateRegionStable === 'boolean'
+    && agg.confirmationStatusHistogram && Object.values(agg.confirmationStatusHistogram).every(x => typeof x === 'number'));
 }
 
 // ── Phase 3D-0: hypothesis→confirmed criteria (synthetic; decisions, never decoded values) ──
