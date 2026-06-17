@@ -19,9 +19,11 @@ const src =
   fs.readFileSync(path.join(jsDir, 'tire-data.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'dynamics-model.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'lihpao-laptime.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'tir-parser.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
+  'parseTIR, mfFy0, tireCharacteristics, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
 const ctx = {};
@@ -425,6 +427,48 @@ console.log('\n[22] 胎種抓地排序 — 光頭胎應比街胎快 (回歸「�
     layout: 'AWD', power_kw: 300, env: { ambient_c: 28, track_c: 38 }, stint: { laps: 10, cold_pressure_bar: 1.35 } });
   check('光頭胎在熱賽道達工作窗口 (峰值抓地>85%)', Math.max(...r.laps.map(l => l.grip_factor)) > 0.85,
     `peak grip ${(Math.max(...r.laps.map(l => l.grip_factor)) * 100).toFixed(0)}%`);
+}
+
+// ─── .tir Pacejka MF6.2 importer — synthetic-coefficient unit tests (no proprietary data) ───
+{
+  const SYN_TIR = `[MDI_HEADER]
+FILE_TYPE ='tir'
+[MODEL]
+FITTYP = 62
+[DIMENSION]
+UNLOADED_RADIUS = 0.30
+WIDTH = 0.20
+ASPECT_RATIO = 0.50
+RIM_RADIUS = 0.20
+[OPERATING_CONDITIONS]
+INFLPRES = 200000
+NOMPRES = 200000
+[VERTICAL]
+FNOMIN = 4000
+VERTICAL_STIFFNESS = 250000   $ synthetic, expect 250 N/mm
+[LATERAL_COEFFICIENTS]
+PCY1 = 1.6
+PDY1 = 1.5
+PDY2 = -0.10
+PEY1 = 0.0
+PKY1 = -40
+PKY2 = 2.0
+PKY4 = 2.0`;
+  const t = M.parseTIR(SYN_TIR);
+  check('tir: FNOMIN parsed', t.Fnom === 4000, `got ${t.Fnom}`);
+  check('tir: vertical stiffness → N/mm', approx(t.verticalStiffness_Nmm, 250, 0.5), `got ${t.verticalStiffness_Nmm}`);
+  check('tir: dims (width) parsed', t.dims.width_m === 0.20, `got ${t.dims.width_m}`);
+  check('tir: lateral coeff PCY1 parsed', t.raw.PCY1 === 1.6, `got ${t.raw.PCY1}`);
+  check('tir: comment stripped from value', t.raw.VERTICAL_STIFFNESS === 250000, `got ${t.raw.VERTICAL_STIFFNESS}`);
+  const fy2 = M.mfFy0(t, 2 * Math.PI / 180, 4000);
+  const fy6 = M.mfFy0(t, 6 * Math.PI / 180, 4000);
+  check('tir: ISO sign (α>0 → Fy<0)', fy6 < 0, `Fy(6°)=${fy6.toFixed(0)}`);
+  check('tir: Fy rises toward peak (|Fy(2°)|<|Fy(6°)|)', Math.abs(fy2) < Math.abs(fy6));
+  const c = M.tireCharacteristics(t);
+  check('tir: peak μ ≈ PDY1 (1.3–1.7)', c.peakMu > 1.3 && c.peakMu < 1.7, `μ=${c.peakMu}`);
+  check('tir: optimal slip angle 3–12°', c.optimalSlipAngle_deg >= 3 && c.optimalSlipAngle_deg <= 12, `${c.optimalSlipAngle_deg}°`);
+  check('tir: cornering stiffness > 0', c.corneringStiffness_Ndeg > 0, `${c.corneringStiffness_Ndeg} N/deg`);
+  check('tir: load sensitivity (μ falls as Fz rises)', c.muVsLoad[0].mu > c.muVsLoad[c.muVsLoad.length - 1].mu);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
