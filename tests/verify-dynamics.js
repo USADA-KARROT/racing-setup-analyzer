@@ -966,6 +966,14 @@ console.log('\n[link] .bmsbin channel-linking hypotheses');
   // timebase hypothesis (candidate only, sample-count match)
   check('link: timebase hypothesis formed (candidate only, sample-count match)',
     four.timebaseHypotheses.length > 0 && four.timebaseHypotheses[0].sampleCountMatch === true && code(four, 'BMS_LINK_TIMEBASE_HYPOTHESIS_AVAILABLE'));
+
+  // link → telemetry metadata integration (status advances, decode-grade caps stay false)
+  const tlm = M.buildTelemetryMetadata({ header: { importer: 'DarabImporter v.', valid: true }, channelCount: 4, channels: [{ name: 'accy' }, { name: 'yaw' }, { name: 'steer' }, { name: 'speed' }], probe: { candidateRegions: [{ start: 0, end: 100, length: 100, confidence: 'high' }], timebaseClues: [] }, raw: rawStub(4), link: four });
+  check('link→metadata: status linking_hypotheses_only + linking/scaling caps true; decode-grade false',
+    tlm.status === 'linking_hypotheses_only' && tlm.capabilities.channelLinkingHypotheses === true && tlm.capabilities.scalingHypotheses === true
+    && tlm.capabilities.physicalScaling === false && tlm.capabilities.handlingCorrelation === false && tlm.capabilities.timeSeries === false);
+  check('link→metadata: linking summary attached (identity not confirmed, no canonical preview)',
+    !!tlm.linking && tlm.linking.channelIdentityConfirmed === false && tlm.linking.canonicalPreviewAvailable === false);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);

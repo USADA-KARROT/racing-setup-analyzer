@@ -99,11 +99,24 @@ function buildTelemetryMetadata(bmsResult) {
     diagnostics: raw.diagnostics || [],
   } : null;
 
+  // Optional Phase 3C-0 channel-linking hypotheses (attached by the app at import time).
+  const link = (bmsResult && bmsResult.link) || null;
+  const hasLink = !hasError && !!(link && (link.channelIdentityHypotheses || []).length > 0);
+  const linkSummary = link ? {
+    identityCount: (link.channelIdentityHypotheses || []).length,
+    channelIdentityConfirmed: false, // 3C-0 never confirms identity
+    canonicalPreviewAvailable: !!(link.canonicalPreview && link.canonicalPreview.available),
+    diagnostics: link.diagnostics || [],
+  } : null;
+
   return {
     sourceType: 'bmsbin',
     sourceFileName: (bmsResult && bmsResult.fileName) || null,
     parser: 'parseBms',
-    status: hasError ? 'decode_error' : (rawCandidates ? 'raw_candidates_only' : (sampleProbe ? 'probe_available' : 'catalog_only')),
+    status: hasError ? 'decode_error'
+      : (hasLink ? 'linking_hypotheses_only'
+        : (rawCandidates ? 'raw_candidates_only'
+          : (sampleProbe ? 'probe_available' : 'catalog_only'))),
     importer: (bmsResult && bmsResult.header && bmsResult.header.importer) || null,
     channelCount: (bmsResult && bmsResult.channelCount) || 0,
     channels,
@@ -112,13 +125,16 @@ function buildTelemetryMetadata(bmsResult) {
       channelCatalog: !hasError,
       sampleProbe,                  // Phase 3B-0: candidate sample regions found
       rawTimeSeriesCandidates: rawCandidates, // Phase 3B-1: raw series extracted (not decoded)
-      timeSeries: false,            // Phase 3B-1+ (not confirmed usable telemetry)
-      physicalScaling: false,       // Phase 3C
-      lapSegmentation: false,       // Phase 3C
-      handlingCorrelation: false,   // Phase 3C
+      channelLinkingHypotheses: hasLink,      // Phase 3C-0: identity/timebase hypotheses
+      scalingHypotheses: !!(link && (link.scalingHypotheses || []).length > 0), // Phase 3C-0
+      timeSeries: false,            // not confirmed usable telemetry
+      physicalScaling: false,       // Phase 3D+ (no value conversion yet)
+      lapSegmentation: false,       // later
+      handlingCorrelation: false,   // later
     },
     probe: probeSummary,
     rawExtraction: rawSummary,
+    linking: linkSummary,
     diagnostics,
   };
 }
