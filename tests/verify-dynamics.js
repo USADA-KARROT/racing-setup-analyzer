@@ -34,6 +34,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'bms-structure-discovery.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-raw-stream-confirmation.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-channel-identity-confirmation.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-timebase-confirmation.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -43,7 +44,7 @@ const src =
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
-  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, ' +
+  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
@@ -1484,6 +1485,109 @@ console.log('\n[channel-identity] .bmsbin channel identity confirmation criteria
     && meta.capabilities.physicalScaling === false && meta.capabilities.canonicalTelemetry === false && meta.capabilities.handlingCorrelation === false && meta.capabilities.setupRecommendation === false);
   check('identity→metadata: no identity → cap false, summary null',
     M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).capabilities.channelIdentityConfirmation === false);
+}
+
+// ── Phase 3E-1: timebase confirmation CRITERIA (synthetic; structural only, real never confirmed) ──
+console.log('\n[timebase] .bmsbin timebase confirmation criteria');
+{
+  const code = (r, c) => r.diagnostics.some(d => d.code === c);
+  const rsConfirmed = { aggregateDecision: { canConfirmAnyRawStream: true }, confirmationFeed: {} };
+  const rsConfirmable = { aggregateDecision: { canConfirmAnyRawStream: false }, confirmationFeed: {} };
+  const structNoCounter = { confirmationFeed: { timebaseRelationCandidate: false } };
+  const CORPUS = { fileCount: 3, candidateRegionStable: true, channelCountStable: true };
+  const allStruct = { sampleCountStable: true, monotonicCounterStable: true, deltaStable: true, channelSyncStable: true, gapCount: 0, dropoutCount: 0 };
+  const tb = (rs, struct, opts) => M.evaluateBmsTimebaseConfirmation(rs, struct, opts || {});
+
+  // A. no evidence → not_confirmed
+  const a = tb(rsConfirmable, structNoCounter, {});
+  check('timebase(A): no evidence → not_confirmed, confirmed false',
+    a.status === 'not_confirmed' && a.capabilities.timebaseConfirmed === false && code(a, 'BMS_TIMEBASE_NOT_CONFIRMED'));
+
+  // B. sample-count only → sample_count_candidate
+  const b = tb(rsConfirmable, structNoCounter, { corpus: CORPUS, timebaseEvidence: { sampleCountStable: true } });
+  check('timebase(B): sample-count only → sample_count_candidate, confirmed false',
+    b.status === 'sample_count_candidate' && b.aggregateDecision.canConfirmTimebase === false);
+
+  // C. monotonic counter only → monotonic_candidate
+  const c = tb(rsConfirmable, structNoCounter, { corpus: CORPUS, timebaseEvidence: { monotonicCounterStable: true } });
+  check('timebase(C): monotonic counter only → monotonic_candidate, confirmed false',
+    c.status === 'monotonic_candidate' && c.aggregateDecision.canConfirmTimebase === false);
+
+  // D. delta stable but no corpus → delta_candidate
+  const d = tb(rsConfirmable, structNoCounter, { timebaseEvidence: { deltaStable: true } });
+  check('timebase(D): delta stable, no corpus → delta_candidate, confirmed false',
+    d.status === 'delta_candidate' && d.aggregateDecision.canConfirmTimebase === false);
+
+  // E. manual sample-rate only → insufficient_evidence (fallback hint), confirmed/units/scaling/timeSeries false
+  const e = tb(rsConfirmable, structNoCounter, { manualSampleRate: 1000 });
+  check('timebase(E): manual sample-rate only → fallback hint, not confirmed; units/scaling/timeSeries false',
+    e.status === 'insufficient_evidence' && !!e.manualSampleRateHint && e.manualSampleRateHint.confirmed === false
+    && e.capabilities.timebaseConfirmed === false && e.capabilities.unitsConfirmed === false
+    && e.capabilities.physicalScaling === false && e.capabilities.timeSeries === false && code(e, 'BMS_TIMEBASE_MANUAL_FALLBACK_ONLY'));
+
+  // F. raw stream NOT confirmed → even all-structural + corpus → confirmable at most, not confirmed
+  const f = tb(rsConfirmable, structNoCounter, { corpus: CORPUS, timebaseEvidence: allStruct });
+  check('timebase(F): raw stream not confirmed → confirmable_timebase at most, not confirmed',
+    f.status === 'confirmable_timebase' && f.aggregateDecision.canConfirmTimebase === false);
+
+  // G. corpus-backed synthetic confirmed_timebase; decode/units/canonical/handling/setup caps false
+  const g = tb(rsConfirmed, structNoCounter, { corpus: CORPUS, timebaseEvidence: allStruct });
+  check('timebase(G): corpus + confirmed raw stream + full structural → confirmed_timebase (synthetic); caps false',
+    g.status === 'confirmed_timebase' && g.aggregateDecision.canConfirmTimebase === true
+    && g.capabilities.physicalScaling === false && g.capabilities.unitsConfirmed === false && g.capabilities.canonicalTelemetry === false
+    && g.capabilities.timeSeries === false && g.capabilities.handlingCorrelation === false && g.capabilities.setupRecommendation === false);
+
+  // H. dropout / gap → blocks confirmed even with corpus + confirmed raw stream
+  const h = tb(rsConfirmed, structNoCounter, { corpus: CORPUS, timebaseEvidence: Object.assign({}, allStruct, { gapCount: 2 }) });
+  check('timebase(H): gaps/dropouts → not confirmed_timebase + gaps-detected diagnostic',
+    h.status !== 'confirmed_timebase' && h.aggregateDecision.canConfirmTimebase === false && code(h, 'BMS_TIMEBASE_GAPS_DETECTED'));
+
+  // H2 (adversarial review): a non-finite gap/dropout count means "gaps unknown" and must NOT
+  // collapse to 0 / confirm — the guard whose only job is to block must fail closed.
+  const hNaN = tb(rsConfirmed, structNoCounter, { corpus: CORPUS, timebaseEvidence: Object.assign({}, allStruct, { gapCount: NaN }) });
+  const hDropNaN = tb(rsConfirmed, structNoCounter, { corpus: CORPUS, timebaseEvidence: Object.assign({}, allStruct, { dropoutCount: NaN }) });
+  check('timebase(H2): NaN gap/dropout count → fails closed (not confirmed), never coerced to 0',
+    hNaN.status !== 'confirmed_timebase' && hNaN.aggregateDecision.canConfirmTimebase === false && hNaN.criteria.gapsClear === false
+    && hDropNaN.aggregateDecision.canConfirmTimebase === false);
+
+  // I. single-file (no corpus) → never confirmed; no inferred Hz / rate emitted
+  const i = tb(rsConfirmed, structNoCounter, { timebaseEvidence: allStruct });
+  // no rate VALUE leaks: manualSampleRateHint stays null (none supplied) and no numeric "<n>Hz" token appears
+  check('timebase(I): single file (no corpus) → never confirmed; no inferred Hz/rate value emitted',
+    i.aggregateDecision.canConfirmTimebase === false && i.status !== 'confirmed_timebase'
+    && i.manualSampleRateHint === null && !/\d+\s*hz/i.test(JSON.stringify(i)));
+
+  // F2/red-line: capabilities pinned false on EVERY path (incl. confirmed)
+  check('timebase(red-line): physical/units/canonical/timeSeries/handling/setup caps pinned false (all paths)',
+    [a, b, c, d, e, f, g, h, i].every(o => o.capabilities.physicalScaling === false && o.capabilities.unitsConfirmed === false
+      && o.capabilities.canonicalTelemetry === false && o.capabilities.timeSeries === false
+      && o.capabilities.handlingCorrelation === false && o.capabilities.setupRecommendation === false
+      && o.capabilities.timebaseConfirmation === true));
+
+  // bms-confirmation integration — feed helps ONLY with corpus; never opens decode caps
+  const bmsStub = { header: { valid: true }, channels: ['accy', 'yaw', 'steer', 'speed'].map(n => ({ name: n })), channelCount: 4 };
+  const rawStub = { rawSeriesCandidates: [{ id: 'candidate_001', encoding: 'int16le', sampleCount: 600 }], timebaseCandidate: { present: true, sampleCount: 600 } };
+  const probeMono = { timebaseClues: [{ type: 'monotonic_counter_candidate', runLength: 600, medianDelta: 10, confidence: 'medium' }] };
+  const link4 = M.linkBmsRawCandidates(bmsStub, probeMono, rawStub, {});
+  const STABLE = { channelCountStable: true, candidateRegionStable: true, catalogDetectedAll: true, fileCount: 3 };
+  const structFeed = { confirmationFeed: { perChannelBlockCountCandidate: true } };
+  const tConfNoCorpus = M.evaluateBmsConfirmationEvidence(bmsStub, probeMono, rawStub, link4, { timebase: g });
+  check('timebase→confirm: feed WITHOUT corpus → timebase not confirmed; decode caps false',
+    tConfNoCorpus.decisions.canConfirmTimebase === false
+    && tConfNoCorpus.capabilities.timeSeries === false && tConfNoCorpus.capabilities.physicalScaling === false && tConfNoCorpus.capabilities.handlingCorrelation === false);
+  const tConfCorpus = M.evaluateBmsConfirmationEvidence(bmsStub, probeMono, rawStub, link4, { structure: structFeed, timebase: g, corpus: STABLE });
+  check('timebase→confirm: feed + corpus → timebase can confirm; decode caps still false',
+    tConfCorpus.decisions.canConfirmTimebase === true
+    && tConfCorpus.capabilities.timeSeries === false && tConfCorpus.capabilities.physicalScaling === false && tConfCorpus.capabilities.handlingCorrelation === false);
+
+  // J. telemetry metadata integration (real path → conservative)
+  const real = tb(rsConfirmable, structNoCounter, {});
+  const meta = M.buildTelemetryMetadata({ header: { importer: 'DarabImporter v.', valid: true }, channelCount: 4, channels: bmsStub.channels, timebase: real });
+  check('timebase→metadata: summary surfaced + timebaseConfirmed false; physical/units/canonical/handling caps false',
+    !!meta.timebase && meta.capabilities.timebaseConfirmation === true && meta.capabilities.timebaseConfirmed === false
+    && meta.capabilities.physicalScaling === false && meta.capabilities.unitsConfirmed === false && meta.capabilities.canonicalTelemetry === false && meta.capabilities.handlingCorrelation === false);
+  check('timebase→metadata: no timebase → cap false, summary null',
+    M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).capabilities.timebaseConfirmation === false);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
