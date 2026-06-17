@@ -841,6 +841,32 @@ canvas{max-height:300px}
             </template>
           </div>
 
+          <!-- Tyre model status: which outputs are imported-model vs heuristic fallback (Phase 2C) -->
+          <div x-show="result" class="card2 p-4 mb-4">
+            <div class="text-xs text-slate-400 mb-2 flex items-center gap-2 flex-wrap">
+              <span x-text="t('tire.status.title')"></span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full" :class="tireModelMeta().sourceType==='imported_tir' ? 'bg-sky-900/40 text-sky-300' : 'bg-slate-700 text-slate-300'" x-text="t('tire.status.'+tireModelMeta().overallStatus)"></span>
+            </div>
+            <!-- per-output contribution list (the core: what's imported model vs heuristic) -->
+            <div class="space-y-1">
+              <template x-for="(c, key) in tireModelMeta().contributions" :key="key">
+                <div class="flex items-center gap-2 text-[10px]">
+                  <span class="w-36 shrink-0 text-slate-400" x-text="t('tire.out.'+key)"></span>
+                  <span class="flex-1 truncate" :class="c.fallback ? 'text-amber-400/80' : 'text-slate-500'" x-text="t('tire.src.'+c.source) + (c.fallback ? ' · ' + t('tire.status.fallback') : '')"></span>
+                  <span class="shrink-0" x-html="tierBadge(c.tier)"></span>
+                </div>
+              </template>
+            </div>
+            <!-- diagnostics: honesty warnings (warning = amber, info = muted) -->
+            <template x-if="tireModelMeta().diagnostics.length">
+              <div class="mt-2 space-y-1">
+                <template x-for="d in tireModelMeta().diagnostics" :key="d.code">
+                  <div class="text-[10px] px-2 py-1 rounded" :class="d.severity==='warning' ? 'bg-amber-900/20 text-amber-300/90' : 'bg-slate-800/60 text-slate-500'" x-text="t(d.messageKey)"></div>
+                </template>
+              </div>
+            </template>
+          </div>
+
           <!-- Lihpao G2 lap prediction (synced with calculation, uses current car setup) -->
           <div x-show="lihpaoResult && !lihpaoResult.error" class="card2 p-4 mb-4" style="background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.18)">
             <div class="flex items-center justify-between mb-2">
