@@ -1264,6 +1264,73 @@ canvas{max-height:300px}
       </tbody>
     </table>
   </div>
+
+  <!-- 2D Suspension Kinematics (front-view double wishbone) -->
+  <div class="card p-5 mt-4">
+    <div class="section-title">📐 <span x-text="t('ui.kin.title')"></span></div>
+    <div class="text-xs text-slate-500 mb-3" x-text="t('ui.kin.hint')"></div>
+    <div class="grid-2 text-sm gap-4">
+      <div>
+        <div class="text-[10px] font-semibold text-sky-400 mb-1" x-text="t('ui.kin.lowerArm')"></div>
+        <div class="grid grid-cols-2 gap-2">
+          <div><label class="text-[10px] text-slate-500" x-text="t('ui.kin.innerY')"></label><input type="number" x-model.number="kin.lai_y" class="w-full"></div>
+          <div><label class="text-[10px] text-slate-500" x-text="t('ui.kin.innerZ')"></label><input type="number" x-model.number="kin.lai_z" class="w-full"></div>
+          <div><label class="text-[10px] text-slate-500" x-text="t('ui.kin.bjY')"></label><input type="number" x-model.number="kin.lbj_y" class="w-full"></div>
+          <div><label class="text-[10px] text-slate-500" x-text="t('ui.kin.bjZ')"></label><input type="number" x-model.number="kin.lbj_z" class="w-full"></div>
+        </div>
+      </div>
+      <div>
+        <div class="text-[10px] font-semibold text-green-400 mb-1" x-text="t('ui.kin.upperArm')"></div>
+        <div class="grid grid-cols-2 gap-2">
+          <div><label class="text-[10px] text-slate-500" x-text="t('ui.kin.innerY')"></label><input type="number" x-model.number="kin.uai_y" class="w-full"></div>
+          <div><label class="text-[10px] text-slate-500" x-text="t('ui.kin.innerZ')"></label><input type="number" x-model.number="kin.uai_z" class="w-full"></div>
+          <div><label class="text-[10px] text-slate-500" x-text="t('ui.kin.bjY')"></label><input type="number" x-model.number="kin.ubj_y" class="w-full"></div>
+          <div><label class="text-[10px] text-slate-500" x-text="t('ui.kin.bjZ')"></label><input type="number" x-model.number="kin.ubj_z" class="w-full"></div>
+        </div>
+      </div>
+      <div>
+        <div class="text-[10px] font-semibold text-pink-400 mb-1" x-text="t('ui.kin.wheelCenter')"></div>
+        <div class="grid grid-cols-2 gap-2">
+          <div><label class="text-[10px] text-slate-500" x-text="t('ui.kin.y')"></label><input type="number" x-model.number="kin.wc_y" class="w-full"></div>
+          <div><label class="text-[10px] text-slate-500" x-text="t('ui.kin.z')"></label><input type="number" x-model.number="kin.wc_z" class="w-full"></div>
+        </div>
+      </div>
+      <div>
+        <div class="text-[10px] font-semibold text-purple-400 mb-1" x-text="t('ui.kin.contactPatch')"></div>
+        <div class="grid grid-cols-2 gap-2">
+          <div><label class="text-[10px] text-slate-500" x-text="t('ui.kin.y')"></label><input type="number" x-model.number="kin.cp_y" class="w-full"></div>
+          <div><label class="text-[10px] text-slate-500" x-text="t('ui.kin.z')"></label><input type="number" x-model.number="kin.cp_z" class="w-full"></div>
+        </div>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-2 mt-3">
+      <div><label class="text-[10px] text-slate-500" x-text="t('ui.kin.staticCamber')"></label><input type="number" step="0.1" x-model.number="kin.static_camber" class="w-full"></div>
+      <div><label class="text-[10px] text-slate-500" x-text="t('ui.kin.travel')"></label><input type="number" step="5" x-model.number="kin.travel" class="w-full"></div>
+    </div>
+    <template x-if="kinResult && kinResult.static.rollCenterHeight_mm !== null">
+      <div class="mt-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="card2 p-3"><div class="text-[10px] text-slate-500" x-text="t('ui.kin.rcHeight')"></div><div class="text-lg font-bold text-yellow-400" x-text="kinResult.static.rollCenterHeight_mm + ' mm'"></div></div>
+          <div class="card2 p-3"><div class="text-[10px] text-slate-500" x-text="t('ui.kin.camberGain')"></div><div class="text-lg font-bold text-sky-400" x-text="(kinResult.camberGain_deg_per_mm !== null ? kinResult.camberGain_deg_per_mm : '–') + ' °/mm'"></div></div>
+        </div>
+        <table class="mt-3">
+          <thead><tr><th x-text="t('ui.kin.travelCol')"></th><th x-text="t('ui.kin.camberCol')"></th><th x-text="t('ui.kin.rcCol')"></th></tr></thead>
+          <tbody>
+            <template x-for="pt in kinResult.curve" :key="pt.dz_mm">
+              <tr>
+                <td class="font-mono text-xs" x-text="(pt.dz_mm>0?'+':'') + pt.dz_mm + ' mm'"></td>
+                <td class="font-mono text-xs" x-text="pt.camber_deg + '°'"></td>
+                <td class="font-mono text-xs" x-text="pt.rollCenterHeight_mm + ' mm'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+    </template>
+    <template x-if="!kinResult || kinResult.static.rollCenterHeight_mm === null">
+      <div class="text-xs text-amber-400 mt-3" x-text="t('ui.kin.invalid')"></div>
+    </template>
+  </div>
 </div>
 
 <!-- ==================== TAB: Tire Analysis ==================== -->
@@ -1838,6 +1905,7 @@ canvas{max-height:300px}
 <script src="js/lihpao-laptime.js"></script>
 <script src="js/api.js"></script>
 <script src="js/tir-parser.js"></script>
+<script src="js/kinematics.js"></script>
 <script>
 const COLORS=['#38bdf8','#f472b6','#34d399','#facc15','#a78bfa','#fb923c','#22d3ee','#e879f9','#84cc16','#f87171'];
 
@@ -1874,6 +1942,17 @@ function app(){return{
     reader.readAsText(f);
   },
   applyTirSpring(){ if(this.tirResult && this.tirResult.verticalStiffness_Nmm){ this.pred.tire_spring_rate = Math.round(this.tirResult.verticalStiffness_Nmm); } },
+  // 2D 懸吊運動學(雙 A 臂前視)— 硬點預設為合理範例,使用者可改
+  kin: { lai_y:150, lai_z:130, lbj_y:580, lbj_z:110, uai_y:230, uai_z:350, ubj_y:560, ubj_z:400, wc_y:620, wc_z:305, cp_y:625, cp_z:0, static_camber:-3.0, travel:40 },
+  get kinResult(){
+    try {
+      if(typeof kinematicsSweep!=='function') return null;
+      const k=this.kin;
+      const hp={ lai:{y:k.lai_y,z:k.lai_z}, lbj:{y:k.lbj_y,z:k.lbj_z}, uai:{y:k.uai_y,z:k.uai_z}, ubj:{y:k.ubj_y,z:k.ubj_z}, wc:{y:k.wc_y,z:k.wc_z}, cp:{y:k.cp_y,z:k.cp_z} };
+      const tv=Math.max(5,Math.abs(k.travel)||40);
+      return kinematicsSweep(hp,{ staticCamberDeg:k.static_camber||0, travel_mm:tv, step_mm:Math.max(2,tv/4) });
+    } catch(e){ return null; }
+  },
   currentTab:'predict',
   tabs:[
     {id:'predict',key:'tab.predict'},

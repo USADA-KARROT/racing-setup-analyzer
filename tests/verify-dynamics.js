@@ -20,10 +20,12 @@ const src =
   fs.readFileSync(path.join(jsDir, 'dynamics-model.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'lihpao-laptime.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'tir-parser.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'kinematics.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
   'parseTIR, mfFy0, tireCharacteristics, ' +
+  'solveStatic, solveAtTravel, kinematicsSweep, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
 const ctx = {};
@@ -475,6 +477,19 @@ PKY4 = 2.0`;
   const tirK = new M.Tier1BasicBalance(Object.assign({}, carP, { tireModel: M.parseTIR(SYN_TIR) })).calculate().understeer_gradient;
   check('tir: imported tire feeds handling model (K_us shifts)', Number.isFinite(tirK) && Math.abs(tirK - baseK) > 1e-6, `base ${baseK} → tir ${tirK}`);
   check('tir: default prediction unaffected without tireModel', new M.Tier1BasicBalance(carP).calculate().understeer_gradient === baseK);
+}
+
+// ─── 2D suspension kinematics (front-view double wishbone) — synthetic geometry ───
+{
+  const hp = { lai:{y:150,z:130}, lbj:{y:580,z:110}, uai:{y:230,z:350}, ubj:{y:560,z:400}, wc:{y:620,z:305}, cp:{y:625,z:0} };
+  const sw = M.kinematicsSweep(hp, { staticCamberDeg: -3.0, travel_mm: 40, step_mm: 10 });
+  const mid = sw.curve.find(p => p.dz_mm === 0);
+  check('kin: roll-center height in 0–150mm', sw.static.rollCenterHeight_mm >= 0 && sw.static.rollCenterHeight_mm <= 150, `RC ${sw.static.rollCenterHeight_mm}`);
+  check('kin: ride height (dz=0) returns static camber', Math.abs(mid.camber_deg - (-3.0)) < 0.02, `got ${mid.camber_deg}`);
+  check('kin: camber gain negative (more neg camber in bump)', sw.camberGain_deg_per_mm < 0, `${sw.camberGain_deg_per_mm}`);
+  check('kin: camber gain magnitude sane (<0.1°/mm)', Math.abs(sw.camberGain_deg_per_mm) < 0.1);
+  check('kin: camber curve smooth/monotonic (no branch-jump spike)', sw.curve.every((p, i, a) => i === 0 || p.camber_deg <= a[i - 1].camber_deg + 0.001));
+  check('kin: roll center migrates with travel', sw.curve[0].rollCenterHeight_mm !== sw.curve[sw.curve.length - 1].rollCenterHeight_mm);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
