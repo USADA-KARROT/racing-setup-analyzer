@@ -479,6 +479,11 @@ PKY4 = 2.0`;
   check('tir: optimal slip angle 3–12°', c.optimalSlipAngle_deg >= 3 && c.optimalSlipAngle_deg <= 12, `${c.optimalSlipAngle_deg}°`);
   check('tir: cornering stiffness > 0', c.corneringStiffness_Ndeg > 0, `${c.corneringStiffness_Ndeg} N/deg`);
   check('tir: load sensitivity (μ falls as Fz rises)', c.muVsLoad[0].mu > c.muVsLoad[c.muVsLoad.length - 1].mu);
+  // Phase 2E curve-data generator: fyCurve drives the Fy-vs-slip chart
+  check('tir: fyCurve generated (0–15°, |Fy| rises from ~0 toward peak)',
+    Array.isArray(c.fyCurve) && c.fyCurve.length > 10
+    && c.fyCurve[0].alpha_deg === 0
+    && Math.abs(c.fyCurve[0].fy_N) < Math.abs(c.fyCurve[c.fyCurve.length - 1].fy_N));
   // integration: an imported tire actually drives the handling-balance model (optional path)
   const carP = { front_spring_rate:60, rear_spring_rate:60, front_arb:0, rear_arb:0, front_track:1500, rear_track:1500, front_motion_ratio:1, rear_motion_ratio:1, weight_front_pct:55, total_weight:1300, cg_height:500, wheelbase:2600 };
   const baseK = new M.Tier1BasicBalance(carP).calculate().understeer_gradient;

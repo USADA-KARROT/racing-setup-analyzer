@@ -1440,13 +1440,14 @@ canvas{max-height:300px}
           <div class="card2 p-3"><div class="text-[10px] text-slate-500" x-text="t('ui.tir.corneringStiffness')"></div><div class="text-lg font-bold text-green-400" x-text="tirResult.corneringStiffness_Ndeg + ' N/°'"></div></div>
           <div class="card2 p-3"><div class="text-[10px] text-slate-500" x-text="t('ui.tir.vertStiff')"></div><div class="text-lg font-bold text-yellow-400" x-text="tirResult.verticalStiffness_Nmm + ' N/mm'"></div></div>
         </div>
+        <!-- Phase 2E: .tir model curves (lateral pure-slip), labelled ◈ Model -->
         <div class="mt-3">
-          <div class="text-[10px] text-slate-500 mb-1" x-text="t('ui.tir.loadSens')"></div>
-          <div class="flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-mono text-slate-400">
-            <template x-for="p in tirResult.muVsLoad" :key="p.Fz_N">
-              <span><span class="text-slate-500" x-text="(p.Fz_N/1000).toFixed(1)+'kN'"></span>:<span class="text-slate-300 ml-0.5" x-text="p.mu"></span></span>
-            </template>
+          <div class="text-[10px] text-slate-400 mb-2 flex items-center gap-1.5"><span x-text="t('ui.tir.modelCurves')"></span> <span x-html="tierBadge('model')"></span></div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div class="card2 p-3"><div class="text-[10px] text-slate-500 mb-1" x-text="t('ui.tir.chartFy')"></div><canvas id="tirFyChart" height="170"></canvas></div>
+            <div class="card2 p-3"><div class="text-[10px] text-slate-500 mb-1" x-text="t('ui.tir.chartMu')"></div><canvas id="tirMuChart" height="170"></canvas></div>
           </div>
+          <div class="text-[10px] text-slate-600 mt-1" x-text="t('ui.tir.pureSlipNote')"></div>
         </div>
         <div class="flex flex-wrap items-center gap-3 mt-3">
           <button class="text-[10px] px-3 py-1 rounded bg-sky-600 text-white hover:bg-sky-500" @click="applyTirSpring()" x-text="t('ui.tir.applySpring') + ' → ' + tirResult.verticalStiffness_Nmm + ' N/mm'"></button>
@@ -1482,6 +1483,8 @@ canvas{max-height:300px}
       </div>
     </template>
   </div>
+  <!-- App-level grip correction (generic heuristic) — explicitly separated from the .tir model curves above -->
+  <div class="text-[10px] text-amber-300/70 mb-1" x-text="t('ui.tir.heuristicNote')"></div>
   <div class="grid-2">
     <div class="card p-5">
       <div class="section-title"><span x-text="t('sec.tempGrip')"></span> <span class="align-middle" x-html="tierBadge('heuristic')"></span></div>
@@ -2084,6 +2087,7 @@ function app(){return{
         this.tirParsed = parsed;
         this.tirResult = tireCharacteristics(parsed);
         this.useTir = true;
+        this.$nextTick(()=>this.drawTirCurves());
       } catch(err){ this.tirResult = {error:true}; this.tirParsed = null; }
     };
     reader.onerror = () => { this.tirResult = {error:true}; this.tirParsed = null; };
@@ -2179,7 +2183,7 @@ function app(){return{
   // Tire analysis
   compoundList:['yokohama_ad08r','bridgestone_re71rs','michelin_cup2','pirelli_trofeo_r','federal_rsrr','nankang_ar1','michelin_ps4s','slick_soft'],
   selCompounds:['yokohama_ad08r','michelin_cup2','federal_rsrr'],
-  tireGripChartObj:null,tirePressChartObj:null,
+  tireGripChartObj:null,tirePressChartObj:null,tirFyChartObj:null,tirMuChartObj:null,
   // Advisor
   advisorResult:null,
   // Spring Calculator
@@ -2651,7 +2655,7 @@ function app(){return{
 
   switchTab(id){
     this.currentTab=id;
-    if(id==='tire') this.$nextTick(()=>{this.drawTireGrip();this.drawTirePress()});
+    if(id==='tire') this.$nextTick(()=>{this.drawTireGrip();this.drawTirePress();this.drawTirCurves()});
     if(id==='advisor' && this.result && !this.advisorResult) this.runAdvisor();
     if(id==='spring' && !this.springTable.length) this.runSpringCalc();
   },
@@ -3126,6 +3130,21 @@ function app(){return{
     return p ? [...p, id] : [95,20,1.0,id];
   },
 
+  // Phase 2E：把匯入 .tir 既有的曲線資料(fyCurve / muVsLoad)畫出來。不改任何輪胎數學。◈ Model。
+  drawTirCurves(){
+    if(!this.tirResult || this.tirResult.error) return;
+    const axis=(x,y)=>({responsive:true,animation:false,showLine:true,plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:x,color:'#94a3b8',font:{size:9}},grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8',font:{size:9}}},y:{title:{display:true,text:y,color:'#94a3b8',font:{size:9}},grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8',font:{size:9}}}}});
+    const fc=document.getElementById('tirFyChart');
+    if(fc){ if(this.tirFyChartObj)this.tirFyChartObj.destroy();
+      const pts=(this.tirResult.fyCurve||[]).map(p=>({x:p.alpha_deg,y:Math.abs(p.fy_N)}));
+      this.tirFyChartObj=new Chart(fc.getContext('2d'),{type:'scatter',data:{datasets:[{data:pts,borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,.12)',fill:true,pointRadius:0,tension:.3}]},options:axis(this.t('ui.chart.slipAngleDeg'),this.t('ui.chart.lateralForceN'))});
+    }
+    const mc=document.getElementById('tirMuChart');
+    if(mc){ if(this.tirMuChartObj)this.tirMuChartObj.destroy();
+      const pts=(this.tirResult.muVsLoad||[]).map(p=>({x:Math.round(p.Fz_N/100)/10,y:p.mu}));
+      this.tirMuChartObj=new Chart(mc.getContext('2d'),{type:'scatter',data:{datasets:[{data:pts,borderColor:'#f472b6',backgroundColor:'rgba(244,114,182,.12)',fill:true,pointRadius:0,tension:.3}]},options:axis(this.t('ui.chart.vertLoadKn'),this.t('ui.chart.peakMuAxis'))});
+    }
+  },
   drawTireGrip(){
     const ctx=document.getElementById('tireGripChart');if(!ctx)return;
     if(this.tireGripChartObj)this.tireGripChartObj.destroy();
