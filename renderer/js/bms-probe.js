@@ -225,8 +225,10 @@ function probeBmsBinary(bytes, opts = {}) {
     }
     const strides = _strideCandidates(bytes, best.start, best.end);
     if (strides.length) report.candidateStructures.push({ type: 'unknown', confidence: 'low', evidence: ['repeating byte stride candidate(s): ' + strides.join(', ')] });
-    report.timebaseClues = _timebaseClues(dv, best.start, best.end, byteLen);
   }
+  // Timebase scan runs over the WHOLE post-catalog region (a monotonic counter is not
+  // "smooth" and so won't be flagged as a sample region, but is still a valid clue).
+  report.timebaseClues = _timebaseClues(dv, scanStart, scanEnd, byteLen);
   if (!report.timebaseClues.length) report.diagnostics.push(D('warning', 'BMS_PROBE_TIMEBASE_NOT_CONFIRMED', 'telemetry.probe.warning.timebaseNotConfirmed'));
 
   // ── standing honesty warnings + low-confidence flag ──

@@ -27,6 +27,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'bms-parser.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'telemetry-schema.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'telemetry-metadata.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-probe.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -36,6 +37,7 @@ const src =
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
+  'probeBmsBinary, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
@@ -803,6 +805,53 @@ console.log('\n[telemetry] .bmsbin catalog metadata + diagnostics');
   // integrates with the parseBms-shaped object
   check('telemetry: consumes parseBms shape (header/channelCount/channels)',
     M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'steer' }] }).requiredChannels.steering.rawName === 'steer');
+}
+
+// ── Phase 3B-0: .bmsbin binary sample-block probe (synthetic fixtures, clean-room) ──
+console.log('\n[probe] .bmsbin binary sample-block probe');
+{
+  const strTok = (s) => { const b = Buffer.from(s + '\0', 'ascii'); const L = Buffer.alloc(2); L.writeUInt16LE(b.length, 0); return Buffer.concat([L, b]); };
+  // synthetic .bmsbin-like buffer — NO real telemetry data, only structure
+  function makeBms({ channels = ['accy', 'yaw', 'steer', 'speed'], int16 = 0, counter = 0, randomBytes = 0, darab = true } = {}) {
+    const parts = [Buffer.from(darab ? 'DarabImporter v.\0' : 'XYZImporter v.\0', 'ascii'), Buffer.alloc(8)];
+    for (const c of channels) parts.push(strTok('TrackInfo'), Buffer.from([1, 2, 3, 4]), strTok(c), strTok('MS5.8'), strTok(c + ' desc'));
+    if (int16 > 0) { const b = Buffer.alloc(int16 * 2); for (let k = 0; k < int16; k++) b.writeInt16LE(Math.round(2000 * Math.sin(k / 20)), k * 2); parts.push(b); }
+    if (counter > 0) { const b = Buffer.alloc(counter * 4); for (let k = 0; k < counter; k++) b.writeUInt32LE(1000 + k * 10, k * 4); parts.push(b); }
+    if (randomBytes > 0) { const b = Buffer.alloc(randomBytes); let x = 12345; for (let i = 0; i < randomBytes; i++) { x = (x * 1103515245 + 12345) & 0x7fffffff; b[i] = (x >> 16) & 0xff; } parts.push(b); }
+    return new Uint8Array(Buffer.concat(parts));
+  }
+  const code = (r, c) => r.diagnostics.some(d => d.code === c);
+
+  // 1. empty → error
+  check('probe: empty file → error BMS_PROBE_EMPTY_FILE',
+    code(M.probeBmsBinary(new Uint8Array(0)), 'BMS_PROBE_EMPTY_FILE'));
+  // 2. non-Darab header → error
+  check('probe: non-Darab header → error BMS_PROBE_INVALID_HEADER',
+    code(M.probeBmsBinary(makeBms({ darab: false, int16: 800 })), 'BMS_PROBE_INVALID_HEADER'));
+  // 3. catalog only → catalog found + no sample region
+  const catOnly = M.probeBmsBinary(makeBms({ int16: 0 }));
+  check('probe: catalog-only → catalog found + no-sample-region warning + no regions',
+    code(catOnly, 'BMS_PROBE_CATALOG_REGION_FOUND') && code(catOnly, 'BMS_PROBE_NO_SAMPLE_REGION_FOUND') && catOnly.candidateRegions.length === 0);
+  // 4. catalog + numeric int16 region → candidate region + int16 encoding
+  const withNum = M.probeBmsBinary(makeBms({ int16: 2000 }));
+  check('probe: catalog + numeric region → candidate binary region found',
+    withNum.candidateRegions.length > 0 && code(withNum, 'BMS_PROBE_BINARY_REGION_FOUND'));
+  check('probe: numeric region → int16le encoding flagged plausible',
+    !!withNum.candidateEncodings.int16le && withNum.candidateEncodings.int16le.plausible === true);
+  // 5. monotonic counter region → timebase clue candidate
+  const withCounter = M.probeBmsBinary(makeBms({ int16: 0, counter: 600 }));
+  check('probe: monotonic counter → timebase clue candidate',
+    withCounter.timebaseClues.some(c => c.type === 'monotonic_counter_candidate'));
+  // 6. random region → no decoded claim, still probe_only
+  const withRandom = M.probeBmsBinary(makeBms({ int16: 0, randomBytes: 6000 }));
+  check('probe: random region → probe_only + scaling-not-decoded warning',
+    withRandom.status === 'probe_only' && code(withRandom, 'BMS_PROBE_SCALING_NOT_DECODED'));
+  // 7. schema stable + never claims decoded
+  check('probe: report schema stable (probe_only, arrays, unknowns)',
+    withNum.status === 'probe_only' && Array.isArray(withNum.candidateRegions) && typeof withNum.candidateEncodings === 'object'
+    && Array.isArray(withNum.timebaseClues) && Array.isArray(withNum.unknowns) && withNum.unknowns.length > 0);
+  check('probe: always honest — probe-only + time-series-not-confirmed diagnostics',
+    code(withNum, 'BMS_PROBE_ONLY') && code(withNum, 'BMS_PROBE_TIMESERIES_NOT_CONFIRMED'));
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
