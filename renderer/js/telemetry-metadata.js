@@ -73,22 +73,38 @@ function buildTelemetryMetadata(bmsResult) {
     requiredChannels[k] = (map[k] && map[k].present) ? map[k] : { present: false, rawName: null };
   }
 
+  // Optional Phase 3B-0 probe report (attached by the app at import time). Catalog-only
+  // unless the probe found candidate sample regions → then a conservative 'probe_available'.
+  const probe = (bmsResult && bmsResult.probe) || null;
+  const probeRegions = (probe && probe.candidateRegions) ? probe.candidateRegions.length : 0;
+  const sampleProbe = !hasError && probeRegions > 0;
+  const RANK = { low: 0, medium: 1, high: 2 };
+  const probeSummary = probe ? {
+    regionCount: probeRegions,
+    bestConfidence: (probe.candidateRegions || []).reduce((b, r) => (RANK[r.confidence] > RANK[b] ? r.confidence : b), 'low'),
+    hasTimebaseClue: (probe.timebaseClues || []).length > 0,
+    encodingCandidates: Object.keys(probe.candidateEncodings || {}).filter(k => probe.candidateEncodings[k] && probe.candidateEncodings[k].plausible),
+    diagnostics: probe.diagnostics || [],
+  } : null;
+
   return {
     sourceType: 'bmsbin',
     sourceFileName: (bmsResult && bmsResult.fileName) || null,
     parser: 'parseBms',
-    status: hasError ? 'decode_error' : 'catalog_only',
+    status: hasError ? 'decode_error' : (sampleProbe ? 'probe_available' : 'catalog_only'),
     importer: (bmsResult && bmsResult.header && bmsResult.header.importer) || null,
     channelCount: (bmsResult && bmsResult.channelCount) || 0,
     channels,
     requiredChannels,
     capabilities: {
       channelCatalog: !hasError,
-      timeSeries: false,        // Phase 3B
-      physicalScaling: false,   // Phase 3B
+      sampleProbe,              // Phase 3B-0: candidate sample regions found (not decoded)
+      timeSeries: false,        // Phase 3B-1
+      physicalScaling: false,   // Phase 3B-1
       lapSegmentation: false,   // Phase 3C
       handlingCorrelation: false, // Phase 3C
     },
+    probe: probeSummary,
     diagnostics,
   };
 }

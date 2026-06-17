@@ -852,6 +852,16 @@ console.log('\n[probe] .bmsbin binary sample-block probe');
     && Array.isArray(withNum.timebaseClues) && Array.isArray(withNum.unknowns) && withNum.unknowns.length > 0);
   check('probe: always honest — probe-only + time-series-not-confirmed diagnostics',
     code(withNum, 'BMS_PROBE_ONLY') && code(withNum, 'BMS_PROBE_TIMESERIES_NOT_CONFIRMED'));
+
+  // probe → telemetry metadata integration (status advances conservatively, no decode claim)
+  const tmeta = M.buildTelemetryMetadata({ header: { importer: 'DarabImporter v.', valid: true }, channelCount: 4, channels: [{ name: 'accy' }, { name: 'yaw' }, { name: 'steer' }, { name: 'speed' }], probe: withNum });
+  check('probe→metadata: status probe_available + sampleProbe true, decoding still false',
+    tmeta.status === 'probe_available' && tmeta.capabilities.sampleProbe === true
+    && tmeta.capabilities.timeSeries === false && tmeta.capabilities.handlingCorrelation === false);
+  check('probe→metadata: probe summary attached (regionCount + diagnostics)',
+    !!tmeta.probe && tmeta.probe.regionCount > 0 && Array.isArray(tmeta.probe.diagnostics));
+  check('probe→metadata: no probe → stays catalog_only, sampleProbe false',
+    M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).status === 'catalog_only');
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
