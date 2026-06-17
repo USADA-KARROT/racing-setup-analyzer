@@ -25,6 +25,8 @@ const src =
   fs.readFileSync(path.join(jsDir, 'kinematics.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'transient.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-parser.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'telemetry-schema.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'telemetry-metadata.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -33,6 +35,7 @@ const src =
   'solveStatic, solveAtTravel, kinematicsSweep, ' +
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
+  'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
@@ -749,6 +752,57 @@ console.log('\n[tval] .tir validation diagnostics');
   const bm = M.buildTireModelMetadata({ useTir: true, tirParsed: valid });
   check('tval: buildTireModelMetadata diagnostics come from validateTirModel',
     bm.diagnostics.some(d => d.code === 'TIR_LATERAL_ONLY'));
+}
+
+// ── Phase 3A: telemetry catalog metadata + diagnostics (catalog-only, clean-room) ──
+console.log('\n[telemetry] .bmsbin catalog metadata + diagnostics');
+{
+  const mk = (names, valid = true) => ({ header: { importer: valid ? 'DarabImporter v.' : 'XYZ', valid }, channelCount: names.length, channels: names.map(n => ({ name: n })) });
+
+  // canonical mapping returns the matched RAW name, not just a boolean
+  const map = M.mapTelemetryChannels([{ name: 'accy' }, { name: 'yaw' }, { name: 'steer' }, { name: 'speed' }, { name: 'vwheel_fl' }, { name: 'trvdam_rl' }, { name: 'R_H_Front' }]);
+  check('telemetry: canonical mapping returns matched raw name',
+    map.lateral_accel.rawName === 'accy' && map.yaw_rate.rawName === 'yaw' && map.steering.rawName === 'steer' && map.speed.rawName === 'speed');
+  check('telemetry: maps wheel-speed / damper / ride-height',
+    map.wheel_speed_fl.rawName === 'vwheel_fl' && map.damper_rl.rawName === 'trvdam_rl' && map.ride_height_front.rawName === 'R_H_Front');
+
+  // full catalog → catalog_only, capabilities limited to channelCatalog
+  const full = M.buildTelemetryMetadata(mk(['accy', 'accx', 'yaw', 'steer', 'speed', 'vwheel_fl', 'trvdam_fl', 'R_H_Front']));
+  check('telemetry: valid catalog → status catalog_only', full.status === 'catalog_only');
+  check('telemetry: capabilities — catalog true, all decoding false',
+    full.capabilities.channelCatalog === true && full.capabilities.timeSeries === false
+    && full.capabilities.physicalScaling === false && full.capabilities.handlingCorrelation === false);
+  check('telemetry: required channels carry raw names',
+    full.requiredChannels.lateral_accel.rawName === 'accy' && full.requiredChannels.speed.rawName === 'speed');
+  check('telemetry: catalog-only emits time-series-not-decoded warning',
+    full.diagnostics.some(d => d.code === 'TELEM_TIMESERIES_NOT_DECODED' && d.severity === 'warning'));
+  check('telemetry: full core → validation-detected + ready-for-3B info',
+    full.diagnostics.some(d => d.code === 'TELEM_VALIDATION_CHANNELS_DETECTED' && d.severity === 'info')
+    && full.diagnostics.some(d => d.code === 'TELEM_READY_FOR_3B'));
+
+  // missing core channels → individual warnings (accy present → no lateral warning)
+  const partial = M.buildTelemetryMetadata(mk(['accy']));
+  check('telemetry: missing yaw/steer/speed → warnings; lateral present → no lateral warning',
+    partial.diagnostics.some(d => d.code === 'TELEM_NO_YAW_RATE' && d.severity === 'warning')
+    && partial.diagnostics.some(d => d.code === 'TELEM_NO_STEERING')
+    && partial.diagnostics.some(d => d.code === 'TELEM_NO_SPEED')
+    && !partial.diagnostics.some(d => d.code === 'TELEM_NO_LATERAL_ACCEL'));
+  check('telemetry: partial still catalog_only (no time-series)',
+    partial.status === 'catalog_only' && partial.capabilities.timeSeries === false);
+
+  // non-Darab → single error, decode_error status
+  const bad = M.buildTelemetryMetadata(mk(['accy'], false));
+  check('telemetry: non-Darab → error TELEM_NOT_DARAB + decode_error',
+    bad.status === 'decode_error' && bad.diagnostics.length === 1
+    && bad.diagnostics[0].code === 'TELEM_NOT_DARAB' && bad.diagnostics[0].severity === 'error');
+  // zero channels → error
+  const empty = M.buildTelemetryMetadata(mk([]));
+  check('telemetry: zero channels → error TELEM_NO_CHANNELS',
+    empty.diagnostics.some(d => d.code === 'TELEM_NO_CHANNELS' && d.severity === 'error'));
+
+  // integrates with the parseBms-shaped object
+  check('telemetry: consumes parseBms shape (header/channelCount/channels)',
+    M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'steer' }] }).requiredChannels.steering.rawName === 'steer');
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
