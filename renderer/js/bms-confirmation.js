@@ -118,7 +118,15 @@ function evaluateBmsConfirmationEvidence(bmsResult, probeReport, rawExtraction, 
     && tbConf.capabilities && tbConf.capabilities.timebaseConfirmed === true
     && opts.corpus && opts.corpus.fileCount >= 2);
   const canConfirmTimebase = canConfirmSampleStructure && (timebaseConfirmed || timebaseFeed);
-  const canConfirmPhysicalScaling = canConfirmChannelIdentity && scaleOffsetFound;
+  // Optional Phase 3F-0 physical-scaling feed. Like the other feeds it can ONLY help confirm scaling,
+  // and only when corpus-backed (its own confirmed_scaling already requires a corpus + confirmed raw
+  // stream + confirmed identity + confirmed timebase + independent scale & unit). Absent → no effect
+  // (backward-compatible). Never opens decode-grade caps (capabilities below stay pinned false).
+  const psConf = opts.physicalScaling || null;
+  const physicalScalingFeed = !!(psConf && psConf.status === 'confirmed_scaling'
+    && psConf.capabilities && psConf.capabilities.physicalScaling === true
+    && opts.corpus && opts.corpus.fileCount >= 2);
+  const canConfirmPhysicalScaling = canConfirmChannelIdentity && (scaleOffsetFound || physicalScalingFeed);
   // NOT a green light to build telemetry — Phase 3D-0 never builds canonical streams. This only
   // reports that every confirmation prerequisite is met; it stays false on real data and never
   // flips capabilities.timeSeries / physicalScaling / handlingCorrelation (which are pinned false).

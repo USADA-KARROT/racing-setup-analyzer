@@ -194,6 +194,28 @@ function buildTelemetryMetadata(bmsResult) {
     diagnostics: timebase.diagnostics || [],
   } : null;
 
+  // Optional Phase 3F-0 physical scaling confirmation (attached by the app at import time). Surfaces
+  // the scaling / units / canonical-value-eligibility decision. On real imported data it is never
+  // confirmed (no corpus → no confirmed raw stream/identity/timebase), so physical values / units /
+  // canonical telemetry remain unavailable; manual scale is only a fallback hint.
+  const scaling = (bmsResult && bmsResult.physicalScaling) || null;
+  const hasScaling = !hasError && !!scaling;
+  const scAgg = (scaling && scaling.aggregateDecision) || {};
+  const scalingConfirmed = !!scAgg.canConfirmPhysicalScaling;       // synthetic-only; false on real data
+  const scalingUnitsConfirmed = !!(scaling && scaling.unitsConfirmed);
+  const scalingSummary = scaling ? {
+    status: scaling.status,
+    physicalScalingConfirmed: scalingConfirmed,
+    unitsConfirmed: scalingUnitsConfirmed,
+    physicalValuesAvailable: !!scaling.physicalValuesAvailable,
+    canonicalValueEligibility: !!scaling.canonicalValueEligibility,
+    canonicalValuesAvailable: false,
+    manualScaleHint: !!scaling.manualScaleHint,
+    candidateCount: scAgg.candidateCount || 0,
+    confirmedCount: scAgg.confirmedCount || 0,
+    diagnostics: scaling.diagnostics || [],
+  } : null;
+
   return {
     sourceType: 'bmsbin',
     sourceFileName: (bmsResult && bmsResult.fileName) || null,
@@ -219,10 +241,12 @@ function buildTelemetryMetadata(bmsResult) {
       channelIdentityConfirmed: !!idAgg.canConfirmAnyChannelIdentity, // false on all real data
       timebaseConfirmation: hasTimebase,        // Phase 3E-1: timebase confirmation criteria present
       timebaseConfirmed: !!tbAgg.canConfirmTimebase, // structural only; false on all real data
+      physicalScalingConfirmation: hasScaling,  // Phase 3F-0: scaling confirmation criteria present
+      physicalScaling: scalingConfirmed,        // Phase 3F-0: synthetic-only true; false on all real data
+      unitsConfirmed: scalingUnitsConfirmed,    // Phase 3F-0: synthetic-only true; false on all real data
       timeSeries: false,            // not confirmed usable telemetry
-      physicalScaling: false,       // Phase 3D+ (no value conversion yet)
-      canonicalTelemetry: false,    // no canonical telemetry produced
-      unitsConfirmed: false,        // no units
+      canonicalTelemetry: false,    // never produced / usable yet (eligibility ≠ available)
+      overlayEnabled: false,        // no overlay
       setupRecommendation: false,   // no setup advice from telemetry
       lapSegmentation: false,       // later
       handlingCorrelation: false,   // later
@@ -235,6 +259,7 @@ function buildTelemetryMetadata(bmsResult) {
     rawStreamConfirmation: rawStreamSummary,
     channelIdentity: identitySummary,
     timebase: timebaseSummary,
+    physicalScaling: scalingSummary,
     diagnostics,
   };
 }
