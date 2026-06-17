@@ -36,6 +36,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'bms-channel-identity-confirmation.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-timebase-confirmation.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-physical-scaling-confirmation.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-telemetry-readiness.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -45,7 +46,7 @@ const src =
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
-  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, ' +
+  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, evaluateBmsTelemetryReadiness, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
@@ -1709,6 +1710,118 @@ console.log('\n[physical-scaling] .bmsbin physical scaling confirmation criteria
     && meta.capabilities.unitsConfirmed === false && meta.capabilities.canonicalTelemetry === false && meta.capabilities.overlayEnabled === false && meta.capabilities.handlingCorrelation === false);
   check('scaling→metadata: no scaling → cap false, summary null',
     M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).capabilities.physicalScalingConfirmation === false);
+}
+
+// ── Phase 3F-1: telemetry readiness GATE (synthetic; real never ready; readiness ≠ analysis) ──
+console.log('\n[telemetry-readiness] .bmsbin telemetry readiness gate');
+{
+  const code = (r, c) => r.diagnostics.some(d => d.code === c);
+  const rsC = { aggregateDecision: { canConfirmAnyRawStream: true } }, rsN = { aggregateDecision: { canConfirmAnyRawStream: false } };
+  const idC = { aggregateDecision: { canConfirmAnyChannelIdentity: true } }, idN = { aggregateDecision: { canConfirmAnyChannelIdentity: false } };
+  const tbC = { aggregateDecision: { canConfirmTimebase: true } }, tbN = { aggregateDecision: { canConfirmTimebase: false } };
+  const psC = { aggregateDecision: { canConfirmPhysicalScaling: true }, unitsConfirmed: true, canonicalValueEligibility: true };
+  const psN = { aggregateDecision: { canConfirmPhysicalScaling: false }, unitsConfirmed: false, canonicalValueEligibility: false };
+  const CORPUS = { fileCount: 3, candidateRegionStable: true, channelCountStable: true };
+  const chans = ['speed', 'steering', 'lateral_accel', 'yaw_rate', 'brake_or_longitudinal_accel'];
+  const qualGood = { sampleRateAdequate: true, syncQualityAdequate: true, dropoutOk: true, noiseOk: true };
+  const rd = (rs, id, tb, ps, opts) => M.evaluateBmsTelemetryReadiness(rs, id, tb, ps, opts || {});
+
+  // A. no evidence → not_ready
+  const a = rd(rsN, idN, tbN, psN, {});
+  check('readiness(A): no evidence → not_ready; readiness/handlingAnalysis caps false',
+    a.status === 'not_ready' && a.capabilities.telemetryReadiness === false && a.capabilities.handlingAnalysis === false && code(a, 'BMS_READINESS_NOT_READY'));
+
+  // B. canonical/scaling missing (even with quality + channels) → insufficient_prerequisites
+  const b = rd(rsC, idC, tbC, psN, { corpus: CORPUS, confirmedChannels: chans, qualityEvidence: qualGood });
+  check('readiness(B): canonical/scaling missing → insufficient_prerequisites, not ready',
+    b.status === 'insufficient_prerequisites' && b.aggregateDecision.canBeReadyForAnalysis === false);
+
+  // C. required channels missing → missing_required_channels
+  const c = rd(rsC, idC, tbC, psC, { corpus: CORPUS, confirmedChannels: [], qualityEvidence: qualGood });
+  check('readiness(C): required channels missing → missing_required_channels, not ready',
+    c.status === 'missing_required_channels' && c.aggregateDecision.canBeReadyForAnalysis === false);
+
+  // E. timebase missing → insufficient_prerequisites
+  const e = rd(rsC, idC, tbN, psN, { corpus: CORPUS, confirmedChannels: chans, qualityEvidence: qualGood });
+  check('readiness(E): timebase missing → insufficient_prerequisites, not ready',
+    e.status === 'insufficient_prerequisites' && e.aggregateDecision.canBeReadyForAnalysis === false);
+
+  // F/G/H/I. quality blocked → quality_blocked (ready false)
+  const fq = rd(rsC, idC, tbC, psC, { corpus: CORPUS, confirmedChannels: chans, qualityEvidence: { sampleRateAdequate: false, syncQualityAdequate: true, dropoutOk: true, noiseOk: true } });
+  const gq = rd(rsC, idC, tbC, psC, { corpus: CORPUS, confirmedChannels: chans, qualityEvidence: { sampleRateAdequate: true, syncQualityAdequate: false, dropoutOk: true, noiseOk: true } });
+  const hq = rd(rsC, idC, tbC, psC, { corpus: CORPUS, confirmedChannels: chans, qualityEvidence: { sampleRateAdequate: true, syncQualityAdequate: true, dropoutOk: false, noiseOk: true } });
+  const iq = rd(rsC, idC, tbC, psC, { corpus: CORPUS, confirmedChannels: chans, qualityEvidence: { sampleRateAdequate: true, syncQualityAdequate: true, dropoutOk: true, noiseOk: false } });
+  check('readiness(F-I): sample-rate / sync / dropout / noise blocked → quality_blocked, not ready',
+    [fq, gq, hq, iq].every(o => o.status === 'quality_blocked' && o.aggregateDecision.canBeReadyForAnalysis === false));
+
+  // H2 (fail-closed): dropout/quality UNKNOWN must not be ready
+  const unk = rd(rsC, idC, tbC, psC, { corpus: CORPUS, confirmedChannels: chans, qualityEvidence: { sampleRateAdequate: true, syncQualityAdequate: true } });
+  check('readiness(H2): unknown dropout/noise quality → fail-closed, not ready',
+    unk.dropoutQuality === 'unknown' && unk.aggregateDecision.canBeReadyForAnalysis === false);
+
+  // R1 (adversarial review): any single confirmation prerequisite present (incl. units-only) → reports
+  // insufficient_prerequisites, never the lower not_ready — the ladder must be symmetric across prereqs.
+  const r1 = rd(rsN, idN, tbN, { aggregateDecision: { canConfirmPhysicalScaling: false }, unitsConfirmed: true, canonicalValueEligibility: false }, {});
+  check('readiness(R1): units-only prereq → insufficient_prerequisites (ladder symmetric), still not ready',
+    r1.status === 'insufficient_prerequisites' && r1.aggregateDecision.canBeReadyForAnalysis === false);
+
+  // J. partial readiness (some channels confirmed)
+  const j = rd(rsC, idC, tbC, psC, { corpus: CORPUS, confirmedChannels: ['speed', 'steering', 'lateral_accel'], qualityEvidence: qualGood });
+  check('readiness(J): some required channels confirmed → partial_readiness, not ready',
+    j.status === 'partial_readiness' && j.readyChannelCount === 3 && j.missingRequiredChannelCount === 2 && j.aggregateDecision.canBeReadyForAnalysis === false);
+
+  // K. confirmable_readiness — prereqs + channels met, quality not fully confirmed (none blocked)
+  const k = rd(rsC, idC, tbC, psC, { corpus: CORPUS, confirmedChannels: chans, qualityEvidence: { sampleRateAdequate: true } });
+  check('readiness(K): prereqs + channels met, quality not fully confirmed → confirmable_readiness, not ready',
+    k.status === 'confirmable_readiness' && k.aggregateDecision.canBeReadyForAnalysis === false);
+
+  // L. real single-file → not_ready; no handling/overlay
+  const l = rd(rsN, idN, tbN, psN, {});
+  check('readiness(L): real single-file → not_ready; handlingAnalysis/overlay caps false',
+    l.aggregateDecision.canBeReadyForAnalysis === false && l.capabilities.handlingAnalysis === false && l.capabilities.overlayEnabled === false);
+
+  // M. synthetic ready_for_analysis; downstream analysis/overlay/Kus/handling/setup caps false
+  const m = rd(rsC, idC, tbC, psC, { corpus: CORPUS, confirmedChannels: chans, qualityEvidence: qualGood });
+  check('readiness(M): all prereqs + channels + quality pass → ready_for_analysis (synthetic); analysis caps false',
+    m.status === 'ready_for_analysis' && m.aggregateDecision.canBeReadyForAnalysis === true
+    && m.capabilities.handlingAnalysis === false && m.capabilities.overlayEnabled === false && m.capabilities.kus === false
+    && m.capabilities.handlingCorrelation === false && m.capabilities.setupRecommendation === false && m.capabilities.canonicalTelemetry === false);
+
+  // N. caps pinned false on every path (analysis/overlay/Kus/handling/setup)
+  check('readiness(N): handlingAnalysis/overlay/Kus/handling/setup caps pinned false (all paths)',
+    [a, b, c, e, fq, j, k, l, m].every(o => o.capabilities.handlingAnalysis === false && o.capabilities.overlayEnabled === false
+      && o.capabilities.kus === false && o.capabilities.handlingCorrelation === false && o.capabilities.setupRecommendation === false
+      && o.capabilities.telemetryReadiness === (o.status === 'ready_for_analysis')));
+
+  // bms-confirmation integration — readiness feed only flips telemetryReadyForAnalysis with full prereqs + corpus
+  const bmsStub = { header: { valid: true }, channels: ['accy', 'yaw', 'steer', 'speed'].map(n => ({ name: n })), channelCount: 4 };
+  const rawStub = { rawSeriesCandidates: [{ id: 'candidate_001', encoding: 'int16le', sampleCount: 600 }], timebaseCandidate: { present: true, sampleCount: 600 } };
+  const probeMono = { timebaseClues: [{ type: 'monotonic_counter_candidate', runLength: 600, medianDelta: 10, confidence: 'medium' }] };
+  const exMap = { candidate_001: { rawChannelName: 'accy', canonicalName: 'lateral_accel', scale: 0.01, offset: 0, unit: 'g' } };
+  const linkEx = M.linkBmsRawCandidates(bmsStub, probeMono, rawStub, { explicitMapping: exMap });
+  const STABLE = { channelCountStable: true, candidateRegionStable: true, catalogDetectedAll: true, fileCount: 3 };
+  const structFeed = { confirmationFeed: { perChannelBlockCountCandidate: true } };
+  const idFeed = { status: 'confirmed_identity', aggregateDecision: { canConfirmAnyChannelIdentity: true }, capabilities: { channelIdentityConfirmed: true } };
+  const tbFeed = { status: 'confirmed_timebase', aggregateDecision: { canConfirmTimebase: true }, capabilities: { timebaseConfirmed: true } };
+  const psFeed = { status: 'confirmed_scaling', aggregateDecision: { canConfirmPhysicalScaling: true }, unitsConfirmed: true, canonicalValueEligibility: true, capabilities: { physicalScaling: true } };
+  const rConfNoCorpus = M.evaluateBmsConfirmationEvidence(bmsStub, probeMono, rawStub, linkEx, { readiness: m });
+  check('readiness→confirm: feed WITHOUT corpus → telemetryReadyForAnalysis false; decode caps false',
+    rConfNoCorpus.decisions.telemetryReadyForAnalysis === false
+    && rConfNoCorpus.capabilities.timeSeries === false && rConfNoCorpus.capabilities.physicalScaling === false && rConfNoCorpus.capabilities.handlingCorrelation === false);
+  const rConfCorpus = M.evaluateBmsConfirmationEvidence(bmsStub, probeMono, rawStub, linkEx, { structure: structFeed, channelIdentity: idFeed, timebase: tbFeed, physicalScaling: psFeed, readiness: m, corpus: STABLE });
+  check('readiness→confirm: feed + full prereqs + corpus → telemetryReadyForAnalysis true; decode caps still false',
+    rConfCorpus.decisions.telemetryReadyForAnalysis === true
+    && rConfCorpus.capabilities.timeSeries === false && rConfCorpus.capabilities.physicalScaling === false && rConfCorpus.capabilities.handlingCorrelation === false);
+
+  // O. telemetry metadata integration (real path → conservative)
+  const real = rd(rsN, idN, tbN, psN, {});
+  const meta = M.buildTelemetryMetadata({ header: { importer: 'DarabImporter v.', valid: true }, channelCount: 4, channels: bmsStub.channels, readiness: real });
+  check('readiness→metadata: summary surfaced + telemetryReady false; handlingAnalysis/overlay/Kus/setup caps false',
+    !!meta.readiness && meta.capabilities.telemetryReadinessConfirmation === true && meta.capabilities.telemetryReady === false
+    && meta.capabilities.handlingAnalysis === false && meta.capabilities.overlayEnabled === false && meta.capabilities.kus === false
+    && meta.capabilities.setupRecommendation === false && meta.capabilities.canonicalTelemetry === false);
+  check('readiness→metadata: no readiness → cap false, summary null',
+    M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).readiness === null);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
