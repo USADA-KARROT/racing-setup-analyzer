@@ -22,12 +22,14 @@ const src =
   fs.readFileSync(path.join(jsDir, 'tir-parser.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'kinematics.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'transient.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-parser.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
   'parseTIR, mfFy0, tireCharacteristics, ' +
   'solveStatic, solveAtTravel, kinematicsSweep, ' +
   'transient2DOF, estimateIz, ' +
+  'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
 const ctx = {};
@@ -543,6 +545,25 @@ PKY4 = 2.0`;
   check('trans: yaw natural frequency 0.4–3Hz', tr.naturalFreq_hz > 0.4 && tr.naturalFreq_hz < 3, `${tr.naturalFreq_hz}`);
   check('trans: steady yaw gain matches Gillespie V/(L+Kus·V²/g) (<5%)', Math.abs(tr.yawGain_1_s - gainG) / gainG < 0.05, `model ${tr.yawGain_1_s} vs ${gainG.toFixed(3)}`);
   check('trans: invalid input returns null', M.transient2DOF({ mass: 0, Iz: 0, a: 1, b: 1, Cf: 1, Cr: 1, V: 0, steer: 0 }) === null);
+}
+
+// ─── .bmsbin (DarabImporter) telemetry channel-catalog parser — synthetic buffer (no proprietary data) ───
+{
+  const str = (s) => { const b = Buffer.from(s + '\0', 'ascii'); const L = Buffer.alloc(2); L.writeUInt16LE(b.length, 0); return Buffer.concat([L, b]); };
+  const syn = Buffer.concat([
+    Buffer.from('DarabImporter v.\0', 'ascii'), Buffer.alloc(8),
+    str('TrackInfo'), Buffer.from([0x01, 0x02, 0x03, 0x04]), str('accy'), Buffer.from([0, 0]), str('MS5.8'), str('lateral acceleration'),
+    str('TrackInfo'), Buffer.from([0x05, 0x06]), str('yaw'), str('MS5.8'), str('yaw rate'),
+    str('TrackInfo'), Buffer.from([0x07, 0x08]), str('steer'), str('MS5.8'), str('steering angle'),
+  ]);
+  const bytes = new Uint8Array(syn);
+  const h = M.parseBmsHeader(bytes);
+  check('bms: header identifies DarabImporter', h.valid === true && /Darab/.test(h.importer), h.importer);
+  const cat = M.parseBmsCatalog(bytes);
+  check('bms: catalog finds all 3 channels', cat.length === 3, `got ${cat.length}`);
+  check('bms: channel name/source/description parsed', cat[0].name === 'accy' && cat[0].source === 'MS5.8' && cat[0].description === 'lateral acceleration');
+  const r = M.parseBms(bytes);
+  check('bms: detects validation channels (accy/yaw/steer)', r.validationChannels.lateral_accel && r.validationChannels.yaw_rate && r.validationChannels.steering);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
