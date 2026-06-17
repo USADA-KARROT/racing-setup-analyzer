@@ -133,10 +133,20 @@ function evaluateBmsConfirmationEvidence(bmsResult, probeReport, rawExtraction, 
   const canonicalTelemetryPrerequisitesMet = canConfirmSampleStructure && canConfirmChannelIdentity
     && canConfirmTimebase && canConfirmPhysicalScaling;
 
+  // Optional Phase 3F-1 telemetry-readiness feed — a GATE, not analysis. It can only report that the
+  // dataset is ready for a LATER analysis phase, and only when every confirmation prerequisite is met
+  // AND the readiness module says ready AND there is a corpus. Absent → no effect (backward-compatible).
+  // It NEVER enables handling analysis / overlay / Kus / setup (those capabilities stay pinned false).
+  const rdyConf = opts.readiness || null;
+  const readinessFeed = !!(rdyConf && rdyConf.status === 'ready_for_analysis'
+    && rdyConf.capabilities && rdyConf.capabilities.telemetryReadiness === true
+    && opts.corpus && opts.corpus.fileCount >= 2);
+  const telemetryReadyForAnalysis = canonicalTelemetryPrerequisitesMet && readinessFeed;
+
   const decisions = {
     canConfirmCatalog, canConfirmSampleStructure, canConfirmRawStreams,
     canConfirmChannelIdentity, canConfirmTimebase, canConfirmPhysicalScaling,
-    canonicalTelemetryPrerequisitesMet,
+    canonicalTelemetryPrerequisitesMet, telemetryReadyForAnalysis,
   };
 
   // ── scores (0..1; weighted overall) ──

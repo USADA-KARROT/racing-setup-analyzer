@@ -216,6 +216,29 @@ function buildTelemetryMetadata(bmsResult) {
     diagnostics: scaling.diagnostics || [],
   } : null;
 
+  // Optional Phase 3F-1 telemetry readiness (attached by the app at import time). A GATE, not analysis.
+  // On real imported data it is never ready (raw stream / identity / timebase / scaling not confirmed);
+  // handling analysis / overlay / Kus / setup remain disabled regardless. Readiness ≠ analysis result.
+  const readiness = (bmsResult && bmsResult.readiness) || null;
+  const hasReadiness = !hasError && !!readiness;
+  const rdAgg = (readiness && readiness.aggregateDecision) || {};
+  const telemetryReady = !!rdAgg.canBeReadyForAnalysis;            // synthetic-only; false on real data
+  const readinessSummary = readiness ? {
+    status: readiness.status,
+    readinessLevel: readiness.readinessLevel,
+    telemetryReady,
+    analysisProfile: readiness.analysisProfile,
+    requiredChannelCount: readiness.requiredChannelCount || 0,
+    readyChannelCount: readiness.readyChannelCount || 0,
+    missingRequiredChannelCount: readiness.missingRequiredChannelCount || 0,
+    sampleRateAdequacy: readiness.sampleRateAdequacy,
+    syncQuality: readiness.syncQuality,
+    dropoutQuality: readiness.dropoutQuality,
+    handlingAnalysisEnabled: false,
+    blockers: readiness.blockers || [],
+    diagnostics: readiness.diagnostics || [],
+  } : null;
+
   return {
     sourceType: 'bmsbin',
     sourceFileName: (bmsResult && bmsResult.fileName) || null,
@@ -244,9 +267,13 @@ function buildTelemetryMetadata(bmsResult) {
       physicalScalingConfirmation: hasScaling,  // Phase 3F-0: scaling confirmation criteria present
       physicalScaling: scalingConfirmed,        // Phase 3F-0: synthetic-only true; false on all real data
       unitsConfirmed: scalingUnitsConfirmed,    // Phase 3F-0: synthetic-only true; false on all real data
+      telemetryReadinessConfirmation: hasReadiness, // Phase 3F-1: readiness gate criteria present
+      telemetryReady,                           // Phase 3F-1: synthetic-only true; false on all real data
       timeSeries: false,            // not confirmed usable telemetry
       canonicalTelemetry: false,    // never produced / usable yet (eligibility ≠ available)
+      handlingAnalysis: false,      // readiness is a gate, not analysis
       overlayEnabled: false,        // no overlay
+      kus: false,                   // no Kus / understeer gradient
       setupRecommendation: false,   // no setup advice from telemetry
       lapSegmentation: false,       // later
       handlingCorrelation: false,   // later
@@ -260,6 +287,7 @@ function buildTelemetryMetadata(bmsResult) {
     channelIdentity: identitySummary,
     timebase: timebaseSummary,
     physicalScaling: scalingSummary,
+    readiness: readinessSummary,
     diagnostics,
   };
 }
