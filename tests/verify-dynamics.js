@@ -33,6 +33,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'bms-confirmation.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-structure-discovery.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-raw-stream-confirmation.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-channel-identity-confirmation.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -42,7 +43,7 @@ const src =
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
-  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, ' +
+  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
@@ -1398,6 +1399,91 @@ console.log('\n[raw-stream] .bmsbin raw stream confirmation criteria');
   const evtCand = evt.rs.rawStreamCandidates.find(c => c.sourceHypothesisType === 'per_channel_blocks');
   check('rawstream(R1): equal-prefix / variable-tail blocks → NOT confirmed_structure (whole-run length check)',
     !!evtCand && evtCand.status !== 'confirmed_structure' && evt.rs.aggregateDecision.canConfirmAnyRawStream === false);
+}
+
+// ── Phase 3E-0: channel identity confirmation CRITERIA (synthetic; real data never confirmed) ──
+console.log('\n[channel-identity] .bmsbin channel identity confirmation criteria');
+{
+  const code = (r, c) => r.diagnostics.some(d => d.code === c);
+  const bms = { channelCount: 85 };
+  const bmsNamed = { channelCount: 4, channels: [{ name: 'accy' }, { name: 'yaw' }, { name: 'steer' }, { name: 'speed' }] };
+  const struct = {};
+  const rsConfirmed = { aggregateDecision: { canConfirmAnyRawStream: true } };
+  const rsConfirmable = { aggregateDecision: { canConfirmAnyRawStream: false } };
+  const CORPUS = { fileCount: 3, candidateRegionStable: true, channelCountStable: true };
+  const ev = (e) => ({ identityEvidence: [e] });
+  const indep = { ref: 's1', kind: 'independent_mapping', mappingStable: true, independentOfScaling: true, independentOfOverlay: true, independentOfSetup: true, label: 'syntheticA' };
+
+  // A. shape-only → hypothesis_only (never higher), not confirmed
+  const a = M.evaluateBmsChannelIdentityConfirmation(bms, rsConfirmed, struct, Object.assign({ corpus: CORPUS }, ev({ ref: 's1', kind: 'shape', label: 'looksLikeSpeed' })));
+  check('identity(A): shape-only → hypothesis_only, not confirmed',
+    a.status === 'hypothesis_only' && a.capabilities.channelIdentityConfirmed === false && code(a, 'BMS_IDENTITY_SHAPE_INSUFFICIENT'));
+
+  // B. label-only (no proven stream relation) → labeled_unverified, not confirmed
+  const b = M.evaluateBmsChannelIdentityConfirmation(bms, rsConfirmed, struct, Object.assign({ corpus: CORPUS }, ev({ ref: 's1', kind: 'label_string', label: 'ch_throttle' })));
+  check('identity(B): label-only → labeled_unverified, not confirmed',
+    b.status === 'labeled_unverified' && b.capabilities.channelIdentityConfirmed === false && code(b, 'BMS_IDENTITY_LABEL_UNVERIFIED'));
+
+  // C. independent mapping but raw stream NOT confirmed → confirmable_identity, not confirmed
+  const c = M.evaluateBmsChannelIdentityConfirmation(bms, rsConfirmable, struct, Object.assign({ corpus: CORPUS }, ev(indep)));
+  check('identity(C): independent mapping but raw stream not confirmed → confirmable_identity, not confirmed',
+    c.status === 'confirmable_identity' && c.aggregateDecision.canConfirmAnyChannelIdentity === false);
+
+  // D. corpus + confirmed raw stream + independent mapping (synthetic) → confirmed_identity; decode caps false
+  const d = M.evaluateBmsChannelIdentityConfirmation(bms, rsConfirmed, struct, Object.assign({ corpus: CORPUS }, ev(indep)));
+  check('identity(D): corpus + confirmed raw stream + independent mapping → confirmed_identity (synthetic); decode caps false',
+    d.status === 'confirmed_identity' && d.aggregateDecision.canConfirmAnyChannelIdentity === true
+    && d.capabilities.physicalScaling === false && d.capabilities.canonicalTelemetry === false && d.capabilities.timeSeries === false && d.capabilities.handlingCorrelation === false);
+  // R1 (adversarial review): unknowns[0] must agree with the decision — never assert "not confirmed" when confirmed,
+  // but still always disclaim physical values / canonical telemetry on every path.
+  check('identity(R1): unknowns[] is consistent with the decision on both paths',
+    !/not confirmed/.test(d.unknowns[0]) && d.unknowns.includes('no canonical telemetry produced')
+    && /not confirmed/.test(c.unknowns[0]) && c.unknowns.includes('physical values not available'));
+
+  // E. single file (no corpus) even with independent mapping + confirmed raw stream → never confirmed
+  const e = M.evaluateBmsChannelIdentityConfirmation(bms, rsConfirmed, struct, ev(indep));
+  check('identity(E): no corpus (single file) → never confirmed_identity',
+    e.status !== 'confirmed_identity' && e.aggregateDecision.canConfirmAnyChannelIdentity === false);
+
+  // E2. mapping that depends on scaling → not independent → candidate at most
+  const nonIndep = { ref: 's1', kind: 'independent_mapping', mappingStable: true, independentOfScaling: false, independentOfOverlay: true, independentOfSetup: true };
+  const e2 = M.evaluateBmsChannelIdentityConfirmation(bms, rsConfirmed, struct, Object.assign({ corpus: CORPUS }, ev(nonIndep)));
+  check('identity(E2): mapping depends on scaling → candidate at most, not confirmed',
+    e2.status === 'candidate' && e2.aggregateDecision.canConfirmAnyChannelIdentity === false);
+
+  // F. physical/canonical/handling/setup/units caps pinned false even at confirmed_identity
+  check('identity(F): physical/canonical/handling/setup/units caps pinned false (even confirmed_identity)',
+    d.capabilities.physicalScaling === false && d.capabilities.canonicalTelemetry === false && d.capabilities.handlingCorrelation === false
+    && d.capabilities.setupRecommendation === false && d.capabilities.unitsConfirmed === false && d.capabilities.channelIdentityConfirmation === true);
+
+  // G. real path (catalog has names, NO identity evidence) → not_confirmed, no candidates, no channel names leaked
+  const real = M.evaluateBmsChannelIdentityConfirmation(bmsNamed, rsConfirmable, struct, {});
+  check('identity(G): real path (no evidence) → not_confirmed, 0 candidates',
+    real.status === 'not_confirmed' && real.identityCandidates.length === 0 && code(real, 'BMS_IDENTITY_NOT_CONFIRMED'));
+  check('identity(G): real path never names a channel (no speed/brake/throttle/steering/accy from catalog)',
+    !/speed|brake|throttle|steering|accy|accx|yaw_rate/i.test(JSON.stringify(real)));
+
+  // bms-confirmation integration — identity feed helps ONLY with a corpus; never opens decode caps
+  const link4 = M.linkBmsRawCandidates(bmsNamed, { timebaseClues: [] }, { rawSeriesCandidates: [{ id: 'candidate_001', encoding: 'int16le', sampleCount: 600 }], timebaseCandidate: { present: true, sampleCount: 600 } }, {});
+  const rawStub = { rawSeriesCandidates: [{ id: 'candidate_001', encoding: 'int16le', sampleCount: 600 }], timebaseCandidate: { present: true, sampleCount: 600 } };
+  const STABLE = { channelCountStable: true, candidateRegionStable: true, catalogDetectedAll: true, fileCount: 3 };
+  const structFeed = { confirmationFeed: { perChannelBlockCountCandidate: true } };
+  const confNoCorpus = M.evaluateBmsConfirmationEvidence({ header: { valid: true }, channels: bmsNamed.channels, channelCount: 4 }, { timebaseClues: [] }, rawStub, link4, { channelIdentity: d });
+  check('identity→confirm: feed WITHOUT corpus → channel identity not confirmed; decode caps false',
+    confNoCorpus.decisions.canConfirmChannelIdentity === false
+    && confNoCorpus.capabilities.timeSeries === false && confNoCorpus.capabilities.physicalScaling === false && confNoCorpus.capabilities.handlingCorrelation === false);
+  const confCorpus = M.evaluateBmsConfirmationEvidence({ header: { valid: true }, channels: bmsNamed.channels, channelCount: 4 }, { timebaseClues: [] }, rawStub, link4, { structure: structFeed, channelIdentity: d, corpus: STABLE });
+  check('identity→confirm: feed + corpus → channel identity can confirm; decode caps still false',
+    confCorpus.decisions.canConfirmChannelIdentity === true
+    && confCorpus.capabilities.timeSeries === false && confCorpus.capabilities.physicalScaling === false && confCorpus.capabilities.handlingCorrelation === false);
+
+  // telemetry metadata integration (real path → conservative)
+  const meta = M.buildTelemetryMetadata({ header: { importer: 'DarabImporter v.', valid: true }, channelCount: 4, channels: bmsNamed.channels, channelIdentity: real });
+  check('identity→metadata: surfaced + channelIdentityConfirmed false; physical/canonical/handling/setup caps false',
+    !!meta.channelIdentity && meta.capabilities.channelIdentityConfirmation === true && meta.capabilities.channelIdentityConfirmed === false
+    && meta.capabilities.physicalScaling === false && meta.capabilities.canonicalTelemetry === false && meta.capabilities.handlingCorrelation === false && meta.capabilities.setupRecommendation === false);
+  check('identity→metadata: no identity → cap false, summary null',
+    M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).capabilities.channelIdentityConfirmation === false);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
