@@ -30,6 +30,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'bms-probe.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-raw-extract.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-channel-link.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-confirmation.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -39,7 +40,7 @@ const src =
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
-  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, ' +
+  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
@@ -1022,6 +1023,86 @@ console.log('\n[tool] local validation reporter — fixture-safe / sanitized out
   // 6. defense-in-depth — serialized output carries no raw-content field name at all
   check('tool: serialized summary+aggregate names no raw-content field',
     !hasForbidden(JSON.stringify(s) + JSON.stringify(agg)));
+}
+
+// ── Phase 3D-0: hypothesis→confirmed criteria (synthetic; decisions, never decoded values) ──
+console.log('\n[confirm] .bmsbin hypothesis→confirmed criteria');
+{
+  const code = (r, c) => r.diagnostics.some(d => d.code === c);
+  const bmsStub = (names) => ({ header: { valid: true }, channels: names.map(nm => ({ name: nm })), channelCount: names.length });
+  const rawStub = (n, sampleCount = 600) => ({
+    rawSeriesCandidates: Array.from({ length: n }, (_, i) => ({ id: 'candidate_' + String(i + 1).padStart(3, '0'), encoding: 'int16le', sampleCount, minRaw: 0, maxRaw: 100, meanRaw: 50, confidence: 'medium' })),
+    timebaseCandidate: { present: true, sampleCount, medianDelta: 10, confidence: 'medium' },
+  });
+  const probeMono = { timebaseClues: [{ type: 'monotonic_counter_candidate', runLength: 600, medianDelta: 10, confidence: 'medium' }] };
+  const STABLE = { channelCountStable: true, candidateRegionStable: true, catalogDetectedAll: true };
+  const names4 = ['accy', 'yaw', 'steer', 'speed'];
+  const exMap = { candidate_001: { rawChannelName: 'accy', canonicalName: 'lateral_accel', scale: 0.01, offset: 0, unit: 'g' } };
+  const exMapNoScale = { candidate_001: { rawChannelName: 'accy', canonicalName: 'lateral_accel' } };
+
+  // 1. catalog-only → catalog confirmed, sample structure not confirmed
+  const c1 = M.evaluateBmsConfirmationEvidence(bmsStub(names4), null, null, null, {});
+  check('confirm: catalog-only → catalog confirmed, structure not, status not_confirmed',
+    c1.decisions.canConfirmCatalog === true && c1.decisions.canConfirmSampleStructure === false
+    && c1.status === 'not_confirmed' && code(c1, 'BMS_CONFIRM_CATALOG_CONFIRMED'));
+
+  const raw4 = rawStub(4);
+  const link4 = M.linkBmsRawCandidates(bmsStub(names4), probeMono, raw4, {});
+
+  // 2. unstable candidate regions (matching counts, but region layout not stable) → structure not confirmed
+  const c2 = M.evaluateBmsConfirmationEvidence(bmsStub(names4), probeMono, raw4, link4, { corpus: { channelCountStable: true, candidateRegionStable: false, catalogDetectedAll: true } });
+  check('confirm: unstable candidate regions → sample structure not confirmed',
+    c2.decisions.canConfirmSampleStructure === false && code(c2, 'BMS_CONFIRM_STRUCTURE_NOT_CONFIRMED'));
+
+  // 3. stable per-channel structure (corpus stable + raw count matches catalog) → structure can be confirmed
+  const c3 = M.evaluateBmsConfirmationEvidence(bmsStub(names4), probeMono, raw4, link4, { corpus: STABLE });
+  check('confirm: stable regions + matching raw count → sample structure can be confirmed',
+    c3.decisions.canConfirmSampleStructure === true && (c3.status === 'partially_confirmed' || c3.status === 'confirmed_structure'));
+
+  // 4. explicit synthetic channel mapping → channel identity can be confirmed
+  const linkEx = M.linkBmsRawCandidates(bmsStub(names4), probeMono, raw4, { explicitMapping: exMap });
+  const c4 = M.evaluateBmsConfirmationEvidence(bmsStub(names4), probeMono, raw4, linkEx, { corpus: STABLE });
+  check('confirm: explicit mapping → channel identity can be confirmed (synthetic)',
+    c4.decisions.canConfirmChannelIdentity === true);
+
+  // 5. no explicit mapping → channel identity remains false (catalog order is not enough)
+  check('confirm: no explicit mapping → channel identity stays false',
+    c3.decisions.canConfirmChannelIdentity === false && code(c3, 'BMS_CONFIRM_CHANNEL_IDENTITY_NOT_CONFIRMED'));
+
+  // 6. monotonic counter with sample-count match (+ resolved structure) → timebase can be confirmed
+  check('confirm: monotonic counter + sample-count match → timebase can be confirmed',
+    c3.evidence.timebaseConfirmed === true && c3.decisions.canConfirmTimebase === true);
+
+  // 7. no scale table → physicalScaling remains false (even with confirmed identity)
+  const linkNoScale = M.linkBmsRawCandidates(bmsStub(names4), probeMono, raw4, { explicitMapping: exMapNoScale });
+  const c7 = M.evaluateBmsConfirmationEvidence(bmsStub(names4), probeMono, raw4, linkNoScale, { corpus: STABLE });
+  check('confirm: no scale table → physical scaling stays false',
+    c7.decisions.canConfirmChannelIdentity === true && c7.decisions.canConfirmPhysicalScaling === false
+    && c7.capabilities.physicalScaling === false);
+
+  // 8. explicit synthetic scale table → scaling criteria can be confirmed (synthetic); cap stays false
+  check('confirm: explicit scale → scaling criteria confirmed (synthetic), physicalScaling cap still false',
+    c4.decisions.canConfirmPhysicalScaling === true && c4.capabilities.physicalScaling === false);
+
+  // 9. real-data-like aggregate (85 catalog / 2 raw, no corpus, no explicit) → not confirmed
+  const names85 = Array.from({ length: 85 }, (_, i) => 'ch' + i);
+  const raw2 = rawStub(2);
+  const link85 = M.linkBmsRawCandidates(bmsStub(names85), probeMono, raw2, {});
+  const c9 = M.evaluateBmsConfirmationEvidence(bmsStub(names85), probeMono, raw2, link85, {});
+  check('confirm: real-data-like (85 ch / 2 raw, no corpus) → catalog only, status not_confirmed',
+    c9.decisions.canConfirmCatalog === true && c9.decisions.canConfirmSampleStructure === false
+    && c9.decisions.canConfirmChannelIdentity === false && c9.decisions.canBuildCanonicalTelemetry === false
+    && c9.status === 'not_confirmed');
+
+  // 10. handlingCorrelation / timeSeries / physicalScaling stay false even at confirmed_structure
+  check('confirm: decode-grade capabilities stay false even when structure is confirmed',
+    c4.capabilities.handlingCorrelation === false && c4.capabilities.timeSeries === false
+    && c4.capabilities.physicalScaling === false && c4.capabilities.confirmationCriteria === true);
+
+  // schema: scores present, canonical blocked, blockers + next-evidence emitted
+  check('confirm: report schema (scores + blockers + nextEvidenceNeeded + canonical blocked)',
+    typeof c9.scores.overallScore === 'number' && Array.isArray(c9.blockers) && c9.blockers.length > 0
+    && Array.isArray(c9.nextEvidenceNeeded) && code(c9, 'BMS_CONFIRM_CANONICAL_NOT_AVAILABLE'));
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
