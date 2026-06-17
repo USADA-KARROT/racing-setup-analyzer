@@ -21,11 +21,13 @@ const src =
   fs.readFileSync(path.join(jsDir, 'lihpao-laptime.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'tir-parser.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'kinematics.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'transient.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
   'parseTIR, mfFy0, tireCharacteristics, ' +
   'solveStatic, solveAtTravel, kinematicsSweep, ' +
+  'transient2DOF, estimateIz, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
 const ctx = {};
@@ -525,6 +527,22 @@ PKY4 = 2.0`;
   }
   // stiffer springs raise ride frequency (OptimumG)
   check('ref: stiffer springs raise ride frequency', (calc({ front_spring_rate: 160 }).ride_frequency || calc({ front_spring_rate: 160 }).mechanical.ride_frequency).front_hz > rf.front_hz);
+}
+
+// ─── 2-DOF transient bicycle model (step steer) — Gillespie / Milliken cross-check ───
+{
+  const mass = 1300, L = 2.6, wf = 0.52, a = (1 - wf) * L, bb = wf * L;
+  const Cf = 1400 * 180 / Math.PI, Cr = 1500 * 180 / Math.PI;     // N/rad
+  const V = 100 / 3.6, steer = 3 * Math.PI / 180;
+  const tr = M.transient2DOF({ mass, Iz: M.estimateIz(mass, a, bb), a, b: bb, Cf, Cr, V, steer });
+  const g = 9.81, Wf = mass * g * bb / L, Wr = mass * g * a / L, KusRad = Wf / Cf - Wr / Cr;
+  const gainG = V / (L + KusRad * V * V / g);                      // Gillespie steady r/δ [1/s]
+  check('trans: response is stable', tr.stable === true);
+  check('trans: yaw response time 0.05–0.6s', tr.responseTime90_s > 0.03 && tr.responseTime90_s < 0.6, `${tr.responseTime90_s}`);
+  check('trans: yaw-mode damping 0.3–1.2', tr.dampingRatio > 0.3 && tr.dampingRatio < 1.2, `${tr.dampingRatio}`);
+  check('trans: yaw natural frequency 0.4–3Hz', tr.naturalFreq_hz > 0.4 && tr.naturalFreq_hz < 3, `${tr.naturalFreq_hz}`);
+  check('trans: steady yaw gain matches Gillespie V/(L+Kus·V²/g) (<5%)', Math.abs(tr.yawGain_1_s - gainG) / gainG < 0.05, `model ${tr.yawGain_1_s} vs ${gainG.toFixed(3)}`);
+  check('trans: invalid input returns null', M.transient2DOF({ mass: 0, Iz: 0, a: 1, b: 1, Cf: 1, Cr: 1, V: 0, steer: 0 }) === null);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);

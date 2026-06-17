@@ -990,6 +990,27 @@ canvas{max-height:300px}
             <div class="text-[10px] text-slate-600 mt-1" x-text="t('ui.dynNote')"></div>
           </div>
 
+          <!-- Tier 3: Transient step-steer response (2-DOF bicycle) -->
+          <div x-show="tier === 3 && result?.dynamics && transientResult" class="card2 p-4 mb-4">
+            <div class="text-xs text-slate-400 mb-2">⚡ <span x-text="t('ui.trans.title')"></span></div>
+            <div class="flex flex-wrap gap-3 mb-2 text-[10px] items-center">
+              <label class="flex items-center gap-1"><span class="text-slate-500" x-text="t('ui.trans.speed')"></span><input type="number" step="10" x-model.number="trans.speed_kmh" class="w-16"></label>
+              <label class="flex items-center gap-1"><span class="text-slate-500" x-text="t('ui.trans.steer')"></span><input type="number" step="1" x-model.number="trans.steer_deg" class="w-14"></label>
+            </div>
+            <template x-if="transientResult">
+              <div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-center">
+                  <div><div class="text-[10px] text-slate-500" x-text="t('ui.trans.responseTime')"></div><div class="font-bold text-sky-300" x-text="(transientResult.responseTime90_s!=null?transientResult.responseTime90_s:'–')+' s'"></div></div>
+                  <div><div class="text-[10px] text-slate-500" x-text="t('ui.trans.overshoot')"></div><div class="font-bold text-pink-300" x-text="transientResult.overshoot_pct+'%'"></div></div>
+                  <div><div class="text-[10px] text-slate-500" x-text="t('ui.trans.naturalFreq')"></div><div class="font-bold text-green-300" x-text="(transientResult.naturalFreq_hz!=null?transientResult.naturalFreq_hz:'–')+' Hz'"></div></div>
+                  <div><div class="text-[10px] text-slate-500" x-text="t('ui.trans.damping')"></div><div class="font-bold text-yellow-300" x-text="transientResult.dampingRatio!=null?transientResult.dampingRatio:'–'"></div></div>
+                </div>
+                <div class="text-[10px] text-slate-500 mt-2"><span x-text="t('ui.trans.steadyYaw')"></span> <span class="font-mono text-slate-300" x-text="transientResult.steadyYawRate_deg_s+' °/s'"></span> · <span x-text="t('ui.trans.yawGain')"></span> <span class="font-mono text-slate-300" x-text="transientResult.yawGain_1_s+' 1/s'"></span></div>
+                <div class="text-[10px] text-slate-600 mt-1" x-text="t('ui.trans.note')"></div>
+              </div>
+            </template>
+          </div>
+
           <!-- Tier 3: Contribution breakdown -->
           <div x-show="tier === 3 && result?.contribution" class="card2 p-4 mb-4">
             <div class="text-xs text-slate-400 mb-2" x-text="t('res.contrib')"></div>
@@ -1906,6 +1927,7 @@ canvas{max-height:300px}
 <script src="js/api.js"></script>
 <script src="js/tir-parser.js"></script>
 <script src="js/kinematics.js"></script>
+<script src="js/transient.js"></script>
 <script>
 const COLORS=['#38bdf8','#f472b6','#34d399','#facc15','#a78bfa','#fb923c','#22d3ee','#e879f9','#84cc16','#f87171'];
 
@@ -1951,6 +1973,20 @@ function app(){return{
       const hp={ lai:{y:k.lai_y,z:k.lai_z}, lbj:{y:k.lbj_y,z:k.lbj_z}, uai:{y:k.uai_y,z:k.uai_z}, ubj:{y:k.ubj_y,z:k.ubj_z}, wc:{y:k.wc_y,z:k.wc_z}, cp:{y:k.cp_y,z:k.cp_z} };
       const tv=Math.max(5,Math.abs(k.travel)||40);
       return kinematicsSweep(hp,{ staticCamberDeg:k.static_camber||0, travel_mm:tv, step_mm:Math.max(2,tv/4) });
+    } catch(e){ return null; }
+  },
+  // 瞬態 2-DOF 階躍轉向反應(用當前預測的側偏剛度,含匯入真胎)
+  trans: { speed_kmh:100, steer_deg:5 },
+  get transientResult(){
+    try {
+      if(typeof transient2DOF!=='function') return null;
+      const d = this.result && this.result.dynamics;
+      if(!d || d.cornering_stiffness_front_n_deg==null) return null;
+      const m=this.pred.total_weight, L=(this.pred.wheelbase||2600)/1000, wf=(this.pred.weight_front_pct||50)/100;
+      const a=(1-wf)*L, b=wf*L;
+      const Cf=d.cornering_stiffness_front_n_deg*180/Math.PI, Cr=d.cornering_stiffness_rear_n_deg*180/Math.PI;
+      const V=Math.max(10,this.trans.speed_kmh||100)/3.6;
+      return transient2DOF({ mass:m, Iz:estimateIz(m,a,b), a, b, Cf, Cr, V, steer:(this.trans.steer_deg||5)*Math.PI/180 });
     } catch(e){ return null; }
   },
   currentTab:'predict',
