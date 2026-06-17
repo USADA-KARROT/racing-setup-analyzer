@@ -179,16 +179,20 @@ function _blockWalk(dv, byteLen, start, end) {
     // Keep the longest run over all candidate starts — do NOT stop at the first nonzero walk,
     // or a short coincidental walk from `start` would mask the real (misaligned) block run.
     for (let s0 = start; s0 < s0Cap; s0++) {
-      let cur = s0, count = 0;
+      let cur = s0, count = 0, minGap = Infinity, maxGap = -Infinity;
       const boundaries = [];
       while (cur + hdr <= end && cur + hdr <= byteLen) {
         const len = readLen(cur);
         if (len < 2 || len > maxBlock || cur + hdr + len > end) break;
         if (boundaries.length < 8) boundaries.push(cur);
-        cur += hdr + len; count++;
+        const gap = hdr + len;                          // block stride, tracked over the WHOLE run
+        if (gap < minGap) minGap = gap; if (gap > maxGap) maxGap = gap;
+        cur += gap; count++;
         if (count > 200000) break; // runaway guard
       }
-      if (count > best.count) best = { hdr, count, boundaries, firstStart: s0 };
+      // full-run length consistency — covers every block, not just the first 8 boundaries
+      const lengthConsistent = count >= 3 && maxGap > 0 && (maxGap - minGap) <= Math.max(1, 0.02 * maxGap);
+      if (count > best.count) best = { hdr, count, boundaries, firstStart: s0, minGap, maxGap, lengthConsistent };
     }
   }
   return best;
@@ -293,16 +297,18 @@ function discoverBmsSampleStructure(bytes, bmsResult, probeReport, rawExtraction
   if (report.channelTableCandidates.some(t => t.kind === 'channel_index_table')) report.diagnostics.push(D('info', 'BMS_STRUCT_INDEX_TABLE_CANDIDATE', 'telemetry.struct.info.indexTableCandidate', 'low'));
 
   // ── 2. length-prefixed per-channel block walk ──
-  let blockCount = 0;
+  let blockCount = 0, blockLengthConsistent = false;
   if (regionLen >= 16) {
     const walk = _blockWalk(dv, byteLen, mainStart, mainEnd);
     blockCount = walk.count;
+    blockLengthConsistent = !!walk.lengthConsistent;   // full-run, every block (not just the first 8)
     for (const off of walk.boundaries) report.blockBoundaryCandidates.push({ offset: off, method: 'length_prefixed_walk', headerBytes: walk.hdr, confidence: 'low' });
     if (blockCount > 0) report.diagnostics.push(D('info', 'BMS_STRUCT_BLOCK_BOUNDARY_CANDIDATE', 'telemetry.struct.info.blockBoundaryCandidate', 'low'));
   }
   const blockRelation = _relationToCatalog(blockCount, channelCount);
   report.perChannelEvidence.candidateChannelBlocks = blockCount;
   report.perChannelEvidence.countRelation = blockRelation;
+  report.perChannelEvidence.blockLengthConsistent = blockLengthConsistent; // whole-run equal-length signal for 3D-2
 
   // ── 3. interleaved layout check (stride = channelCount × sample width) ──
   let interleavedHit = null;
