@@ -976,5 +976,53 @@ console.log('\n[link] .bmsbin channel-linking hypotheses');
     !!tlm.linking && tlm.linking.channelIdentityConfirmed === false && tlm.linking.canonicalPreviewAvailable === false);
 }
 
+// ── Phase 3C-1: local validation reporter stays fixture-safe (sanitized by construction) ──
+console.log('\n[tool] local validation reporter — fixture-safe / sanitized output');
+{
+  const reporter = require(path.join(__dirname, '..', 'tools', 'bmsbin-local-probe-report.js'));
+  const strTok = (s) => { const b = Buffer.from(s + '\0', 'ascii'); const L = Buffer.alloc(2); L.writeUInt16LE(b.length, 0); return Buffer.concat([L, b]); };
+  // synthetic .bmsbin-like fixture — NO real telemetry, only a catalog token + a sine int16 region
+  const sine = Buffer.alloc(4000); for (let k = 0; k < 2000; k++) sine.writeInt16LE(Math.round(2000 * Math.sin(k / 20)), k * 2);
+  const fixture = new Uint8Array(Buffer.concat([
+    Buffer.from('DarabImporter v.\0', 'ascii'), Buffer.alloc(8),
+    strTok('TrackInfo'), Buffer.from([1, 2, 3, 4]), strTok('accy'), strTok('MS5.8'), sine,
+  ]));
+  // names that would betray raw-content leakage (sample values, raw bytes, byte offsets)
+  const FORBIDDEN = ['samplePreview', 'sampleValues', 'rawBytes', 'bytes', 'offset', 'minRaw', 'maxRaw', 'meanRaw', 'preview', 'samples'];
+  const hasForbidden = (str) => FORBIDDEN.some(bad => str.toLowerCase().includes(bad.toLowerCase()));
+
+  // 1. the whitelist itself can never name a raw-content field
+  check('tool: REPORT_FIELDS whitelist names no raw-content field',
+    reporter.REPORT_FIELDS.length > 0 && reporter.REPORT_FIELDS.every(f => !hasForbidden(f)));
+
+  // 2. summarizeFile emits only whitelisted keys
+  const s = reporter.summarizeFile(fixture, M, { scanWindowBytes: 64 * 1024 });
+  const keys = Object.keys(s);
+  check('tool: summarizeFile emits only whitelisted REPORT_FIELDS',
+    keys.length > 0 && keys.every(k => reporter.REPORT_FIELDS.includes(k)));
+
+  // 3. every summary value is a sanitized scalar — no array/object can carry a raw series
+  check('tool: summary values are scalars only (no raw arrays/objects)',
+    keys.every(k => { const v = s[k]; return v === null || ['boolean', 'number', 'string'].includes(typeof v); }));
+
+  // 4. the summary still reflects a real pipeline run, and never claims decoding
+  check('tool: summary reflects pipeline run + claims no decode',
+    s.catalogDetected === true && typeof s.linkStatus === 'string'
+    && s.channelIdentityConfirmed === false && s.canonicalAvailable === false);
+
+  // 5. aggregate is statistics only — counts / 2-element ranges / name→count histograms
+  const agg = reporter.aggregate([s, s]);
+  const aggOk = Object.values(agg).every(v => {
+    if (Array.isArray(v)) return v.length <= 2 && v.every(x => typeof x === 'number');      // ranges
+    if (v && typeof v === 'object') return Object.values(v).every(x => typeof x === 'number'); // histograms
+    return v === null || ['number', 'string', 'boolean'].includes(typeof v);
+  });
+  check('tool: aggregate emits counts/ranges/histograms only (no raw arrays)', aggOk && agg.filesTested === 2);
+
+  // 6. defense-in-depth — serialized output carries no raw-content field name at all
+  check('tool: serialized summary+aggregate names no raw-content field',
+    !hasForbidden(JSON.stringify(s) + JSON.stringify(agg)));
+}
+
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
 process.exit(fail > 0 ? 1 : 0);
