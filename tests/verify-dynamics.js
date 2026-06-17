@@ -21,6 +21,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'dynamics-model.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'lihpao-laptime.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'tir-parser.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'tire-metadata.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'kinematics.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'transient.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-parser.js'), 'utf8') + '\n' +
@@ -28,6 +29,7 @@ const src =
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
   'parseTIR, mfFy0, tireCharacteristics, ' +
+  'buildTireModelMetadata, genericTireMetadata, importedTirMetadata, tirCoverage, ' +
   'solveStatic, solveAtTravel, kinematicsSweep, ' +
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
@@ -627,6 +629,63 @@ console.log('\n[sens] corneringStiffnessScale 鉤子');
   check('sens: cornering stiffness ×0.8 → Kus ≈ Kus0/0.8',
     approx(s08.understeer_gradient, base.understeer_gradient / 0.8, 2),
     `got ${s08.understeer_gradient}, want ${(base.understeer_gradient / 0.8).toFixed(3)}`);
+}
+
+// ── Phase 2B: tyre-model credibility metadata (source / coverage / per-output tier) ──
+console.log('\n[tmeta] 輪胎模型 metadata');
+{
+  // generic (no import): Cα is a model (generic Pacejka), grip factors are heuristic
+  const g = M.buildTireModelMetadata({ useTir: false, tirParsed: null, compoundId: 'michelin_cup2' });
+  check('tmeta: generic → sourceType/overallStatus generic', g.sourceType === 'generic' && g.overallStatus === 'generic');
+  check('tmeta: generic → Cα = model/generic_pacejka',
+    g.contributions.corneringStiffness.tier === 'model' && g.contributions.corneringStiffness.source === 'generic_pacejka');
+  check('tmeta: generic → pressure/temp/width grip are heuristic',
+    g.contributions.pressureGripCorrection.tier === 'heuristic'
+    && g.contributions.temperatureGripCorrection.tier === 'heuristic'
+    && g.contributions.widthGripCorrection.tier === 'heuristic');
+  check('tmeta: generic → no fallback flags (nothing better was expected)',
+    Object.values(g.fallbackUsed).every(v => v === false));
+
+  // imported .tir (valid): lateral + load + camber + vertical stiffness present
+  const validTir = { name: 'SynA', mfVersion: '6.2', nomPres_pa: 230000, verticalStiffness_Npm: 250000,
+    raw: { PCY1: 1.6, PDY1: 1.5, PDY2: -0.1, PKY1: -30, PKY2: 1.8, PKY3: 0.5, VERTICAL_STIFFNESS: 250000, PPY1: 0.5, NOMPRES: 230000 } };
+  const i = M.buildTireModelMetadata({ useTir: true, tirParsed: validTir });
+  check('tmeta: imported → sourceType imported_tir, status valid',
+    i.sourceType === 'imported_tir' && i.overallStatus === 'imported_valid');
+  check('tmeta: imported → Cα & peak μ upgraded to model/imported_tir',
+    i.contributions.corneringStiffness.tier === 'model' && i.contributions.corneringStiffness.source === 'imported_tir'
+    && i.contributions.peakMu.tier === 'model' && i.contributions.peakMu.source === 'imported_tir');
+  check('tmeta: imported → pressure/temp/width/tireUsShift STILL heuristic + fallback',
+    ['pressureGripCorrection', 'temperatureGripCorrection', 'widthGripCorrection', 'tireUsShift'].every(k =>
+      i.contributions[k].tier === 'heuristic' && i.contributions[k].fallback === true && i.fallbackUsed[k] === true));
+  check('tmeta: imported → coverage lateral true; Fx/Mz/combined false',
+    i.coverage.lateralPureSlip === true && i.coverage.longitudinalForce === false
+    && i.coverage.aligningMoment === false && i.coverage.combinedSlip === false);
+  check('tmeta: imported → emits "grip still heuristic" honesty diagnostic',
+    i.diagnostics.some(d => d.code === 'TIR_GRIP_STILL_HEURISTIC'));
+
+  // imported .tir (partial): missing camber + vertical stiffness + pressure
+  const partialTir = { name: 'SynB', nomPres_pa: 0, verticalStiffness_Npm: 0,
+    raw: { PCY1: 1.5, PDY1: 1.4, PDY2: -0.1, PKY1: -28, PKY2: 1.7 } };
+  const p = M.buildTireModelMetadata({ useTir: true, tirParsed: partialTir });
+  check('tmeta: partial .tir → overallStatus imported_partial', p.overallStatus === 'imported_partial');
+  check('tmeta: partial .tir → camber + partial-coverage warnings',
+    p.diagnostics.some(d => d.code === 'TIR_NO_CAMBER_MODEL' && d.severity === 'warning')
+    && p.diagnostics.some(d => d.code === 'TIR_PARTIAL_COVERAGE'));
+  check('tmeta: partial .tir → missing pressure-model diagnostic',
+    p.diagnostics.some(d => d.code === 'TIR_NO_PRESSURE_MODEL'));
+
+  // end-to-end: a real parseTIR feeds the descriptor
+  const MINI_TIR = "[LATERAL]\nPCY1 = 1.6\nPDY1 = 1.5\nPDY2 = -0.1\nPKY1 = -30\nPKY2 = 1.8\nPKY3 = 0.5\nVERTICAL_STIFFNESS = 250000\nNOMPRES = 230000\nPPY1 = 0.5\n";
+  const r = M.buildTireModelMetadata({ useTir: true, tirParsed: M.parseTIR(MINI_TIR) });
+  check('tmeta: parseTIR → imported_tir descriptor', r.sourceType === 'imported_tir' && r.overallStatus === 'imported_valid');
+
+  // purity: building the descriptor must not change predictions
+  const carP2 = { front_spring_rate: 60, rear_spring_rate: 60, front_arb: 0, rear_arb: 0, front_track: 1500, rear_track: 1500, front_motion_ratio: 1, rear_motion_ratio: 1, weight_front_pct: 55, total_weight: 1300, cg_height: 500, wheelbase: 2600 };
+  const before = new M.Tier1BasicBalance(carP2).calculate().understeer_gradient;
+  M.buildTireModelMetadata({ useTir: true, tirParsed: validTir, compoundId: 'x' });
+  check('tmeta: descriptor is pure — no prediction drift',
+    new M.Tier1BasicBalance(carP2).calculate().understeer_gradient === before);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);

@@ -1989,6 +1989,7 @@ canvas{max-height:300px}
 <script src="js/lihpao-laptime.js"></script>
 <script src="js/api.js"></script>
 <script src="js/tir-parser.js"></script>
+<script src="js/tire-metadata.js"></script>
 <script src="js/kinematics.js"></script>
 <script src="js/transient.js"></script>
 <script src="js/bms-parser.js"></script>
@@ -2063,6 +2064,15 @@ function app(){return{
     reader.readAsText(f);
   },
   applyTirSpring(){ if(this.tirResult && this.tirResult.verticalStiffness_Nmm){ this.pred.tire_spring_rate = Math.round(this.tirResult.verticalStiffness_Nmm); } },
+  // Phase 2B：目前作用中的輪胎模型 credibility 描述子(來源/涵蓋/逐輸出可信度)。
+  // 純描述,不改任何計算結果。2C 會用它渲染狀態面板。
+  tireModelMeta(){
+    return buildTireModelMetadata({
+      useTir: this.useTir,
+      tirParsed: this.tirParsed,
+      compoundId: this.tire && this.tire.front_compound,
+    });
+  },
   // 2D 懸吊運動學(雙 A 臂前視)— 硬點預設為合理範例,使用者可改
   kin: { lai_y:150, lai_z:130, lbj_y:580, lbj_z:110, uai_y:230, uai_z:350, ubj_y:560, ubj_z:400, wc_y:620, wc_z:305, cp_y:625, cp_z:0, static_camber:-3.0, travel:40 },
   get kinResult(){
