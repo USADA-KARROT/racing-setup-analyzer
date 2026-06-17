@@ -2001,7 +2001,10 @@ function app(){return{
   langs:[{id:'en',label:'EN'},{id:'zh',label:'繁'},{id:'ja',label:'日'}],
   setLang(l){ this.lang=l; try{localStorage.setItem('lang',l)}catch(e){} if(this.carPresets.length) this.loadPresets(); if(this.advisorResult && this.result) this.runAdvisor(); },
   t(k){ const D=(typeof I18N!=='undefined')?I18N:null; if(!D) return k;
-        return (D[this.lang]&&D[this.lang][k]) || (D.en&&D.en[k]) || k; },
+        const L=D[this.lang];
+        if(L && k in L) return L[k];          // 尊重「刻意空字串」翻譯(如 EN ui.lapPost='')，不誤當缺漏
+        if(D.en && k in D.en) return D.en[k]; // 真的缺鍵才回退英文
+        return k; },
   // 把模型回傳的英文傾向(Understeer/Oversteer/Neutral)轉成目前語言
   tnd(tendencyEn){ return this.t('us.'+(tendencyEn||'Neutral')); },
   // 資料驅動名稱(車款/輪胎)：英文/日文模式用英文 name，繁中用 name_zh
