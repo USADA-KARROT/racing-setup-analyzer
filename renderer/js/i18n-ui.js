@@ -56,6 +56,7 @@ const UI_I18N = {
     'tire.error.missingLateral': 'No lateral coefficients (PCY1) — cannot compute cornering stiffness or peak μ.',
     'tire.error.noPeak': 'No peak-grip coefficient (PDY1) — cannot derive peak μ.',
     'tire.error.nonFinite': 'Lateral-force evaluation returned a non-finite value — this .tir cannot be used.',
+    'tire.error.noEffectiveLateralForce': 'The imported .tir does not produce effective lateral force with the current pure-slip evaluator.',
     // — credibility tier badges (Physics / Model / Heuristic) —
     'tier.legend': 'How much to trust each number:',
     'tier.physics': 'Physics',
@@ -375,6 +376,7 @@ const UI_I18N = {
     'tire.error.missingLateral': '無側向係數（PCY1）——無法計算轉向剛度或峰值 μ。',
     'tire.error.noPeak': '無峰值抓地係數（PDY1）——無法推導峰值 μ。',
     'tire.error.nonFinite': '側向力計算結果為非有限值——此 .tir 無法使用。',
+    'tire.error.noEffectiveLateralForce': '目前的純側向模型無法從此 .tir 產生有效側向力。',
     // — 可信度等級 badge（物理 / 模型 / 啟發式）—
     'tier.legend': '每個數字該信幾分：',
     'tier.physics': '物理',
@@ -664,6 +666,7 @@ const UI_I18N = {
     'tire.error.missingLateral': '横方向係数（PCY1）がありません——コーナリング剛性やピーク μ を計算できません。',
     'tire.error.noPeak': 'ピークグリップ係数（PDY1）がありません——ピーク μ を導出できません。',
     'tire.error.nonFinite': '横力の計算結果が非有限値です——この .tir は使用できません。',
+    'tire.error.noEffectiveLateralForce': '現在の純スリップ評価器では、この .tir から有効な横力を生成できません。',
     // — 信頼度バッジ（物理 / モデル / ヒューリスティック）—
     'tier.legend': '各数値の信頼度：',
     'tier.physics': '物理',

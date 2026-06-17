@@ -653,7 +653,7 @@ console.log('\n[tmeta] 輪胎模型 metadata');
 
   // imported .tir (valid): lateral + load + camber + vertical stiffness present
   const validTir = { name: 'SynA', mfVersion: '6.2', nomPres_pa: 230000, verticalStiffness_Npm: 250000,
-    raw: { PCY1: 1.6, PDY1: 1.5, PDY2: -0.1, PKY1: -30, PKY2: 1.8, PKY3: 0.5, VERTICAL_STIFFNESS: 250000, PPY1: 0.5, NOMPRES: 230000 } };
+    raw: { PCY1: 1.6, PDY1: 1.5, PDY2: -0.1, PKY1: -30, PKY2: 1.8, PKY3: 0.5, PKY4: 2.0, VERTICAL_STIFFNESS: 250000, PPY1: 0.5, NOMPRES: 230000 } };
   const i = M.buildTireModelMetadata({ useTir: true, tirParsed: validTir });
   check('tmeta: imported → sourceType imported_tir, status valid',
     i.sourceType === 'imported_tir' && i.overallStatus === 'imported_valid');
@@ -671,7 +671,7 @@ console.log('\n[tmeta] 輪胎模型 metadata');
 
   // imported .tir (partial): missing camber + vertical stiffness + pressure
   const partialTir = { name: 'SynB', nomPres_pa: 0, verticalStiffness_Npm: 0,
-    raw: { PCY1: 1.5, PDY1: 1.4, PDY2: -0.1, PKY1: -28, PKY2: 1.7 } };
+    raw: { PCY1: 1.5, PDY1: 1.4, PDY2: -0.1, PKY1: -28, PKY2: 1.7, PKY4: 2.0 } };
   const p = M.buildTireModelMetadata({ useTir: true, tirParsed: partialTir });
   check('tmeta: partial .tir → overallStatus imported_partial', p.overallStatus === 'imported_partial');
   check('tmeta: partial .tir → camber + lateral-only warnings',
@@ -681,7 +681,7 @@ console.log('\n[tmeta] 輪胎模型 metadata');
     p.diagnostics.some(d => d.code === 'TIR_NO_PRESSURE_MODEL'));
 
   // end-to-end: a real parseTIR feeds the descriptor
-  const MINI_TIR = "[LATERAL]\nPCY1 = 1.6\nPDY1 = 1.5\nPDY2 = -0.1\nPKY1 = -30\nPKY2 = 1.8\nPKY3 = 0.5\nVERTICAL_STIFFNESS = 250000\nNOMPRES = 230000\nPPY1 = 0.5\n";
+  const MINI_TIR = "[LATERAL]\nPCY1 = 1.6\nPDY1 = 1.5\nPDY2 = -0.1\nPKY1 = -30\nPKY2 = 1.8\nPKY3 = 0.5\nPKY4 = 2.0\nVERTICAL_STIFFNESS = 250000\nNOMPRES = 230000\nPPY1 = 0.5\n";
   const r = M.buildTireModelMetadata({ useTir: true, tirParsed: M.parseTIR(MINI_TIR) });
   check('tmeta: parseTIR → imported_tir descriptor', r.sourceType === 'imported_tir' && r.overallStatus === 'imported_valid');
 
@@ -698,7 +698,7 @@ console.log('\n[tval] .tir validation diagnostics');
 {
   const code = (arr, c) => arr.find(d => d.code === c);
   const valid = { Fnom: 4000, name: 'V', nomPres_pa: 230000, verticalStiffness_Npm: 250000,
-    raw: { PCY1: 1.6, PDY1: 1.5, PDY2: -0.1, PKY1: -30, PKY2: 1.8, PKY3: 0.5, VERTICAL_STIFFNESS: 250000, PPY1: 0.5, NOMPRES: 230000 } };
+    raw: { PCY1: 1.6, PDY1: 1.5, PDY2: -0.1, PKY1: -30, PKY2: 1.8, PKY3: 0.5, PKY4: 2.0, VERTICAL_STIFFNESS: 250000, PPY1: 0.5, NOMPRES: 230000 } };
   const dv = M.validateTirModel(valid);
   check('tval: valid → no error severity', !dv.some(d => d.severity === 'error'));
   check('tval: valid → lateral-only is a warning (not an error)',
@@ -725,13 +725,23 @@ console.log('\n[tval] .tir validation diagnostics');
   check('tval: missing PDY1 → error TIR_NO_PEAK', dNoPeak.some(d => d.code === 'TIR_NO_PEAK' && d.severity === 'error'));
 
   // partial: narrow coverage → specific neutral diagnostics, no error
-  const partial = { nomPres_pa: 0, verticalStiffness_Npm: 0, raw: { PCY1: 1.5, PDY1: 1.4, PDY2: -0.1, PKY1: -28, PKY2: 1.7 } };
+  const partial = { nomPres_pa: 0, verticalStiffness_Npm: 0, raw: { PCY1: 1.5, PDY1: 1.4, PDY2: -0.1, PKY1: -28, PKY2: 1.7, PKY4: 2.0 } };
   const dp = M.validateTirModel(partial);
   check('tval: partial → no error severity', !dp.some(d => d.severity === 'error'));
   check('tval: partial → no-camber warning + no-pressure/no-vertical info',
     !!code(dp, 'TIR_NO_CAMBER_MODEL') && code(dp, 'TIR_NO_CAMBER_MODEL').severity === 'warning'
     && !!code(dp, 'TIR_NO_PRESSURE_MODEL') && code(dp, 'TIR_NO_PRESSURE_MODEL').severity === 'info'
     && !!code(dp, 'TIR_NO_VERTICAL_STIFFNESS') && code(dp, 'TIR_NO_VERTICAL_STIFFNESS').severity === 'info');
+
+  // degenerate: PCY1+PDY1 present but no PKY stiffness terms → Fy0 ≡ 0 (result-driven reject)
+  const degenerate = { Fnom: 4000, raw: { PCY1: 1.6, PDY1: 1.5, PDY2: -0.1 } };
+  const dd = M.validateTirModel(degenerate);
+  check('tval: degenerate (Fy0≡0) → error TIR_NO_EFFECTIVE_LATERAL_FORCE',
+    dd.some(d => d.code === 'TIR_NO_EFFECTIVE_LATERAL_FORCE' && d.severity === 'error'));
+  check('tval: degenerate → importedTirMetadata overallStatus imported_error (never imported_valid)',
+    M.importedTirMetadata(degenerate).overallStatus === 'imported_error');
+  check('tval: valid (non-degenerate) → NO effective-lateral-force error',
+    !M.validateTirModel(valid).some(d => d.code === 'TIR_NO_EFFECTIVE_LATERAL_FORCE'));
 
   // wiring: metadata derives status from validation, and reuses its diagnostics
   const metaErr = M.importedTirMetadata({ Fnom: 4000, raw: { PCY1: 1.6, PKY1: -30, PKY2: 1.8 } });

@@ -126,8 +126,22 @@ function validateTirModel(t) {
   if (!has('PCY1')) { diags.push(D('error', 'TIR_MISSING_LATERAL', 'tire.error.missingLateral', ['corneringStiffness', 'peakMu'])); return diags; }
   if (!has('PDY1')) diags.push(D('error', 'TIR_NO_PEAK', 'tire.error.noPeak', ['peakMu', 'corneringStiffness']));
   if (typeof mfFy0 === 'function') {
-    const sample = mfFy0(t, 4 * Math.PI / 180, t.Fnom || 3000);
-    if (!Number.isFinite(sample)) diags.push(D('error', 'TIR_NONFINITE', 'tire.error.nonFinite', ['corneringStiffness', 'peakMu']));
+    const Fz = t.Fnom || 3000;
+    let maxFy = 0, anyNaN = false;
+    for (let d = 1; d <= 14; d++) {
+      const fy = mfFy0(t, d * Math.PI / 180, Fz);
+      if (!Number.isFinite(fy)) anyNaN = true; else if (Math.abs(fy) > maxFy) maxFy = Math.abs(fy);
+    }
+    const ca = (typeof corneringStiffnessNdeg === 'function') ? corneringStiffnessNdeg(t, Fz, 0) : null;
+    const peakMuApprox = Fz > 0 ? maxFy / Fz : 0;
+    if (anyNaN || (ca != null && !Number.isFinite(ca))) {
+      diags.push(D('error', 'TIR_NONFINITE', 'tire.error.nonFinite', ['corneringStiffness', 'peakMu']));
+    } else if (peakMuApprox <= 0.05 || (ca != null && Math.abs(ca) <= 1)) {
+      // Result-driven (not tied to any single coefficient): the pure-slip evaluator
+      // yields no effective lateral force — e.g. missing PKY/PDY stiffness terms make
+      // Fy0 ≡ 0 — so Cα / peak μ / the Fy curve would all be meaningless.
+      diags.push(D('error', 'TIR_NO_EFFECTIVE_LATERAL_FORCE', 'tire.error.noEffectiveLateralForce', ['corneringStiffness', 'peakMu', 'fyCurve']));
+    }
   }
   if (diags.some(d => d.severity === 'error')) return diags;
 
