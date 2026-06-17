@@ -32,6 +32,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'bms-channel-link.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-confirmation.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-structure-discovery.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-raw-stream-confirmation.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -41,7 +42,7 @@ const src =
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
-  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, ' +
+  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
@@ -1278,6 +1279,125 @@ console.log('\n[struct] .bmsbin sample-structure discovery');
   // chance increasing runs); it should land on compressed_or_sparse, not a spurious pointer table.
   check('struct(R4): random region yields no targetsPlausible offset_table candidate',
     !rndRes.structure.channelTableCandidates.some(t => t.kind === 'offset_table' && t.targetsPlausible));
+}
+
+// ── Phase 3D-2: raw stream confirmation criteria (synthetic; structure only, corpus-gated) ──
+console.log('\n[raw-stream] .bmsbin raw stream confirmation criteria');
+{
+  const code = (r, c) => r.diagnostics.some(d => d.code === c);
+  const strTok = (s) => { const b = Buffer.from(s + '\0', 'ascii'); const L = Buffer.alloc(2); L.writeUInt16LE(b.length, 0); return Buffer.concat([L, b]); };
+  const catalog = (names) => { const parts = [Buffer.from('DarabImporter v.\0', 'ascii'), Buffer.alloc(8)]; for (const c of names) parts.push(strTok('TrackInfo'), Buffer.from([1, 2, 3, 4]), strTok(c), strTok('MS5.8'), strTok(c + ' d')); return parts; };
+  const names85 = Array.from({ length: 85 }, (_, i) => 'ch' + i);
+  const CORPUS = { fileCount: 3, candidateRegionStable: true, channelCountStable: true };
+  const pipe = (bytes, opts = {}) => {
+    const r = M.parseBms(bytes);
+    const probe = M.probeBmsBinary(bytes);
+    const raw = M.extractBmsRawCandidates(bytes, probe, { catalogChannelCount: r.channelCount });
+    const link = M.linkBmsRawCandidates(r, probe, raw, {});
+    const structure = M.discoverBmsSampleStructure(bytes, r, probe, raw, link, null, { catalogChannelCount: r.channelCount });
+    const rs = M.evaluateBmsRawStreamConfirmation(r, probe, raw, structure, opts);
+    return { r, probe, raw, link, structure, rs };
+  };
+  const perChannelEqual = () => { const parts = catalog(names85); for (let c = 0; c < 85; c++) { const L = 200; const blk = Buffer.alloc(2 + L); blk.writeUInt16LE(L, 0); for (let k = 0; k < L / 2; k++) blk.writeInt16LE(Math.round(1000 * Math.sin((c * 7 + k) / 15)), 2 + k * 2); parts.push(blk); } return new Uint8Array(Buffer.concat(parts)); };
+  const perChannelVariable = () => { const parts = catalog(names85); for (let c = 0; c < 85; c++) { const L = 100 + (c % 5) * 40; const blk = Buffer.alloc(2 + L); blk.writeUInt16LE(L, 0); for (let k = 0; k < L / 2; k++) blk.writeInt16LE(Math.round(1000 * Math.sin((c * 7 + k) / 15)), 2 + k * 2); parts.push(blk); } return new Uint8Array(Buffer.concat(parts)); };
+  const interleaved = () => { const parts = catalog(names85); const rows = 200, N = 85, stride = N * 2; const buf = Buffer.alloc(rows * stride); const off = []; for (let c = 0; c < N; c++) off.push((((c * 101) % 64) - 32) * 40); for (let rr = 0; rr < rows; rr++) for (let c = 0; c < N; c++) buf.writeInt16LE(off[c] + Math.round(300 * Math.sin(rr / 11)), rr * stride + c * 2); parts.push(buf); return new Uint8Array(Buffer.concat(parts)); };
+  const singleSmooth = () => { const parts = catalog(names85); const sgl = Buffer.alloc(30000); for (let k = 0; k < 15000; k++) sgl.writeInt16LE(Math.round(8000 * Math.sin(k / 500)), k * 2); parts.push(sgl); return new Uint8Array(Buffer.concat(parts)); };
+  const badOffsetTable = () => { const cat = catalog(names85); const b = Buffer.alloc(85 * 4); for (let i = 0; i < 85; i++) b.writeUInt32LE((1000000000 + i * 1000) >>> 0, i * 4); return new Uint8Array(Buffer.concat([...cat, b])); };
+  const catalogOnly = () => new Uint8Array(Buffer.concat(catalog(names85)));
+
+  // 1. catalog-only (no stream-bearing hypothesis) → not confirmed
+  const co = pipe(catalogOnly());
+  check('rawstream: catalog-only → not confirmed, no confirmable stream',
+    co.rs.aggregateDecision.canConfirmAnyRawStream === false && co.rs.status !== 'raw_stream_structure_confirmed');
+
+  // 2. single-file per-channel blocks (strong in-file, NO corpus) → confirmable but aggregate NOT confirmed
+  const pcNoCorpus = pipe(perChannelEqual());
+  const pcCand = pcNoCorpus.rs.rawStreamCandidates.find(c => c.sourceHypothesisType === 'per_channel_blocks');
+  check('rawstream: single-file per-channel blocks → confirmable, aggregate not confirmed (corpus required)',
+    !!pcCand && pcCand.status === 'confirmable' && pcNoCorpus.rs.aggregateDecision.canConfirmAnyRawStream === false
+    && code(pcNoCorpus.rs, 'BMS_RAW_STREAM_CROSS_FILE_REQUIRED'));
+
+  // 3. corpus + per-channel + consistent block length → confirmed_structure
+  const pcCorpus = pipe(perChannelEqual(), { corpus: CORPUS });
+  const pcCand2 = pcCorpus.rs.rawStreamCandidates.find(c => c.sourceHypothesisType === 'per_channel_blocks');
+  check('rawstream: corpus + consistent per-channel blocks → confirmed_structure + raw_stream_structure_confirmed',
+    !!pcCand2 && pcCand2.status === 'confirmed_structure' && pcCorpus.rs.aggregateDecision.canConfirmAnyRawStream === true
+    && pcCorpus.rs.status === 'raw_stream_structure_confirmed');
+
+  // 4. per-channel count matches but block length inconsistent (even WITH corpus) → not confirmed
+  const pcVar = pipe(perChannelVariable(), { corpus: CORPUS });
+  const pcVarCand = pcVar.rs.rawStreamCandidates.find(c => c.sourceHypothesisType === 'per_channel_blocks');
+  check('rawstream: matching count but inconsistent block length → candidate_only, not confirmed',
+    !!pcVarCand && pcVarCand.status === 'candidate_only' && pcVar.rs.aggregateDecision.canConfirmAnyRawStream === false);
+
+  // 5. corpus + interleaved layout → confirmed_structure
+  const ilCorpus = pipe(interleaved(), { corpus: CORPUS });
+  const ilCand = ilCorpus.rs.rawStreamCandidates.find(c => c.sourceHypothesisType === 'interleaved_channels');
+  check('rawstream: corpus + interleaved layout → confirmed_structure',
+    !!ilCand && ilCand.status === 'confirmed_structure' && ilCorpus.rs.aggregateDecision.canConfirmAnyRawStream === true);
+
+  // 6. single contiguous smooth series (3D-1 rejects interleaved here) → no stream confirmed
+  const sgl = pipe(singleSmooth(), { corpus: CORPUS });
+  check('rawstream: single contiguous smooth series → no interleaved stream, not confirmed',
+    !sgl.rs.rawStreamCandidates.some(c => c.sourceHypothesisType === 'interleaved_channels' && c.status !== 'rejected')
+    && sgl.rs.aggregateDecision.canConfirmAnyRawStream === false);
+
+  // 7. offset table is boundary evidence → rejected as a raw stream, not confirmed
+  const bot = pipe(badOffsetTable(), { corpus: CORPUS });
+  const botCand = bot.rs.rawStreamCandidates.find(c => c.sourceHypothesisType === 'offset_table');
+  check('rawstream: offset table → rejected as raw stream (boundary evidence), not confirmed',
+    (!botCand || botCand.status === 'rejected') && bot.rs.aggregateDecision.canConfirmAnyRawStream === false);
+
+  // 8. red lines: decode-grade capabilities false on every path; rawStreamConfirmation cap true
+  check('rawstream: decode-grade capabilities stay false (timeSeries/physicalScaling/handlingCorrelation)',
+    [co, pcNoCorpus, pcCorpus, pcVar, ilCorpus, sgl, bot].every(o =>
+      o.rs.capabilities.timeSeries === false && o.rs.capabilities.physicalScaling === false && o.rs.capabilities.handlingCorrelation === false
+      && o.rs.capabilities.rawStreamConfirmation === true));
+  // 9. no overclaim: always warns identity + physical values, never names a channel / scaled value
+  check('rawstream: always warns identity + physical values unavailable; never names a channel/value',
+    code(pcCorpus.rs, 'BMS_RAW_STREAM_CHANNEL_IDENTITY_NOT_CONFIRMED') && code(pcCorpus.rs, 'BMS_RAW_STREAM_PHYSICAL_VALUES_NOT_AVAILABLE')
+    && !/lateral_accel|"accy"|canonicalName|"scaled"/.test(JSON.stringify(pcCorpus.rs)));
+
+  // 10. bms-confirmation integration — the raw-stream feed helps ONLY with a corpus (fileCount ≥ 2)
+  const linkPc = M.linkBmsRawCandidates(pcCorpus.r, pcCorpus.probe, pcCorpus.raw, {});
+  const confNoCorpus = M.evaluateBmsConfirmationEvidence(pcCorpus.r, pcCorpus.probe, pcCorpus.raw, linkPc, { structure: pcCorpus.structure, rawStreamConfirmation: pcCorpus.rs });
+  const confCorpus = M.evaluateBmsConfirmationEvidence(pcCorpus.r, pcCorpus.probe, pcCorpus.raw, linkPc, { structure: pcCorpus.structure, rawStreamConfirmation: pcCorpus.rs, corpus: CORPUS });
+  check('rawstream→confirm: feed WITHOUT corpus → raw streams not confirmed; decode caps false',
+    confNoCorpus.decisions.canConfirmRawStreams === false
+    && confNoCorpus.capabilities.timeSeries === false && confNoCorpus.capabilities.physicalScaling === false && confNoCorpus.capabilities.handlingCorrelation === false);
+  check('rawstream→confirm: feed + corpus (fileCount≥2) → raw streams can confirm; decode caps still false',
+    confCorpus.decisions.canConfirmRawStreams === true
+    && confCorpus.capabilities.timeSeries === false && confCorpus.capabilities.physicalScaling === false && confCorpus.capabilities.handlingCorrelation === false);
+
+  // 11. real-data-like (no corpus, no clean per-channel/interleaved structure) → not confirmed
+  const realish = pipe(singleSmooth());
+  check('rawstream: real-data-like (no corpus, no clean structure) → not confirmed',
+    realish.rs.status === 'not_confirmed' && realish.rs.aggregateDecision.canConfirmAnyRawStream === false);
+
+  // 12. telemetry metadata integration (surfaced; decode caps false)
+  const meta = M.buildTelemetryMetadata(Object.assign({}, pcCorpus.r, { probe: pcCorpus.probe, raw: pcCorpus.raw, link: linkPc, structure: pcCorpus.structure, rawStreamConfirmation: pcCorpus.rs }));
+  check('rawstream→metadata: summary surfaced + rawStreamConfirmation cap true; decode caps false',
+    !!meta.rawStreamConfirmation && meta.capabilities.rawStreamConfirmation === true
+    && meta.capabilities.timeSeries === false && meta.capabilities.physicalScaling === false && meta.capabilities.handlingCorrelation === false);
+  check('rawstream→metadata: no raw stream confirmation → cap false, summary null',
+    M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).capabilities.rawStreamConfirmation === false);
+
+  // R1 (adversarial review): a stream whose FIRST 8 blocks are equal-length but whose tail varies
+  // wildly must NOT reach confirmed_structure — block-length consistency is judged over the WHOLE run.
+  const eqPrefixVarTail = () => {
+    const parts = catalog(names85);
+    for (let c = 0; c < 85; c++) {
+      const L = c < 8 ? 200 : (60 + 2 * ((c * 37) % 450));   // first 8 equal, rest highly variable (even)
+      const blk = Buffer.alloc(2 + L); blk.writeUInt16LE(L, 0);
+      for (let k = 0; k < L / 2; k++) blk.writeInt16LE(Math.round(1000 * Math.sin((c * 7 + k) / 15)), 2 + k * 2);
+      parts.push(blk);
+    }
+    return new Uint8Array(Buffer.concat(parts));
+  };
+  const evt = pipe(eqPrefixVarTail(), { corpus: CORPUS });
+  const evtCand = evt.rs.rawStreamCandidates.find(c => c.sourceHypothesisType === 'per_channel_blocks');
+  check('rawstream(R1): equal-prefix / variable-tail blocks → NOT confirmed_structure (whole-run length check)',
+    !!evtCand && evtCand.status !== 'confirmed_structure' && evt.rs.aggregateDecision.canConfirmAnyRawStream === false);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
