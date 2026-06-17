@@ -28,6 +28,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'telemetry-schema.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'telemetry-metadata.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-probe.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-raw-extract.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -37,7 +38,7 @@ const src =
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
-  'probeBmsBinary, ' +
+  'probeBmsBinary, extractBmsRawCandidates, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
@@ -862,6 +863,55 @@ console.log('\n[probe] .bmsbin binary sample-block probe');
     !!tmeta.probe && tmeta.probe.regionCount > 0 && Array.isArray(tmeta.probe.diagnostics));
   check('probe→metadata: no probe → stays catalog_only, sampleProbe false',
     M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).status === 'catalog_only');
+}
+
+// ── Phase 3B-1: raw time-series candidate extraction (synthetic; raw-only, no decode) ──
+console.log('\n[raw] .bmsbin raw time-series candidate extraction');
+{
+  const code = (r, c) => r.diagnostics.some(d => d.code === c);
+  const mkInt16 = (vals) => { const b = Buffer.alloc(vals.length * 2); vals.forEach((v, i) => b.writeInt16LE(v, i * 2)); return new Uint8Array(b); };
+  const probeOf = (bytes, opts = {}) => ({
+    probeVersion: '3B-0',
+    candidateRegions: [{ start: 0, end: bytes.length, length: bytes.length, confidence: opts.conf || 'high', evidence: {} }],
+    timebaseClues: opts.timebase ? [{ type: 'monotonic_counter_candidate', runLength: opts.timebase, medianDelta: 10, confidence: 'medium' }] : [],
+  });
+
+  // 1. no probe report → error
+  check('raw: no probe report → error', code(M.extractBmsRawCandidates(mkInt16([1, 2, 3]), null), 'BMS_RAW_NO_PROBE_REPORT'));
+  // 2. probe with no candidate region → error + no extraction
+  const noRegion = M.extractBmsRawCandidates(mkInt16([1, 2, 3]), { probeVersion: '3B-0', candidateRegions: [], timebaseClues: [] });
+  check('raw: no candidate region → error + no series', code(noRegion, 'BMS_RAW_NO_CANDIDATE_REGION') && noRegion.rawSeriesCandidates.length === 0);
+  // 3+4. int16 ramp 0..999 → candidate found + stats correct
+  const ramp = []; for (let i = 0; i < 1000; i++) ramp.push(i); const rb = mkInt16(ramp);
+  const rr = M.extractBmsRawCandidates(rb, probeOf(rb));
+  check('raw: numeric region → raw series candidate found', rr.rawSeriesCandidates.length > 0 && code(rr, 'BMS_RAW_SERIES_CANDIDATES_FOUND'));
+  const c1 = rr.rawSeriesCandidates[0];
+  check('raw: int16le stats correct (min/max/mean of 0..999)',
+    c1.encoding === 'int16le' && c1.minRaw === 0 && c1.maxRaw === 999 && Math.abs(c1.meanRaw - 499.5) < 0.01);
+  check('raw: series carries raw-only notes (no scaling / no mapping)',
+    c1.notes.includes('raw values only') && c1.notes.includes('not physically scaled') && c1.notes.includes('not mapped to canonical channel'));
+  // 5. timebase clue → candidate only
+  const tb = M.extractBmsRawCandidates(rb, probeOf(rb, { timebase: 600 }));
+  check('raw: timebase clue → candidate only (not a confirmed timestamp)',
+    tb.timebaseCandidate.present === true && tb.timebaseCandidate.notes.some(n => /not a confirmed timestamp/.test(n)) && tb.capabilities.timeSeries === false);
+  // 6. interleaved data → interleaved layout hypothesis
+  const recs = 500; const ibuf = Buffer.alloc(recs * 8);
+  for (let k = 0; k < recs; k++) { ibuf.writeInt16LE(k, k * 8); ibuf.writeInt16LE(0x0500, k * 8 + 2); ibuf.writeInt16LE(Math.round(1000 * Math.sin(k / 15)), k * 8 + 4); ibuf.writeInt16LE(0, k * 8 + 6); }
+  const ir = M.extractBmsRawCandidates(new Uint8Array(ibuf), probeOf(new Uint8Array(ibuf)));
+  check('raw: interleaved data → interleaved layout hypothesis (≥2 channels)',
+    ir.extractionAttempts.some(a => a.layoutHypothesis === 'interleaved' && a.evidence.plausibleSeriesCount >= 2));
+  // 7-9. red lines hold
+  check('raw: channel mapping stays not_mapped', rr.channelMapping.status === 'not_mapped');
+  check('raw: physicalScaling + handlingCorrelation + timeSeries stay false',
+    rr.capabilities.physicalScaling === false && rr.capabilities.handlingCorrelation === false && rr.capabilities.timeSeries === false);
+  check('raw: rawTimeSeriesCandidates true + status raw_candidates_only',
+    rr.capabilities.rawTimeSeriesCandidates === true && rr.status === 'raw_candidates_only');
+  // end-to-end: real probe → extract
+  const strTok = (s) => { const b = Buffer.from(s + '\0', 'ascii'); const L = Buffer.alloc(2); L.writeUInt16LE(b.length, 0); return Buffer.concat([L, b]); };
+  const sineB = Buffer.alloc(4000); for (let k = 0; k < 2000; k++) sineB.writeInt16LE(Math.round(2000 * Math.sin(k / 20)), k * 2);
+  const full = new Uint8Array(Buffer.concat([Buffer.from('DarabImporter v.\0', 'ascii'), Buffer.alloc(8), strTok('TrackInfo'), Buffer.from([1, 2, 3, 4]), strTok('accy'), strTok('MS5.8'), sineB]));
+  const er = M.extractBmsRawCandidates(full, M.probeBmsBinary(full));
+  check('raw: end-to-end probe→extract yields candidates', er.rawSeriesCandidates.length > 0 && er.status === 'raw_candidates_only');
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
