@@ -33,6 +33,16 @@ The model is built on standard references — Milliken & Milliken *Race Car Vehi
 
 > ⚠️ **Accuracy note.** Absolute lap times depend entirely on the inputs you give it (power, grip, aero, mass). Published circuit records are usually set by heavily-modified cars, so a stock-spec prediction being slower is correct, not a bug. The tool's strength is **relative** comparison (how a setup change moves the car) and the **tyre-stint sweet-spot** analysis. Methodology transfers across cars; absolute numbers do not — especially for FSAE, where you must fit your own tyre data.
 
+## Model boundaries & credibility tiers
+
+Not every number the tool prints is equally trustworthy — and now it says so. Each result carries a badge:
+
+- **◆ Physics** — textbook formulas from first principles (wheel rate, ride frequency, roll stiffness/gradient, damping ratio, geometric/elastic LLTD split, suspension kinematics). Exact for the inputs given.
+- **◈ Model** — physically-grounded engineering estimates (understeer gradient, cornering stiffness, characteristic/critical speed, yaw gain, transient response, lap time). Directionally reliable; approximate in absolute terms.
+- **◇ Heuristic** — gains/multipliers hand-tuned against real data (tyre grip → balance shift, tyre width/pressure/temperature grip factors, lap-balance penalty, drivetrain traction fraction). These all live in [`renderer/js/calibration.js`](renderer/js/calibration.js) with full metadata (value, unit, valid range, tier, what data could calibrate them) — tuning knobs, not laws of physics. Treat as indicative.
+
+**Known boundaries.** No suspension hardpoint kinematics beyond the 2D front-view double-wishbone calculator; no transient model beyond a linear 2-DOF step-steer; one representative track for lap simulation; tyre coefficients are estimated unless you import your own `.tir` model. Preset chassis data is labelled per parameter (`confirmed` / `documented` / `estimated` / `unknown`) with an overall letter grade, so you can see how much of a given car is measured vs. inferred. The **Sensitivity** panel re-runs the balance while varying each uncertain input one at a time — it tells you how stable the answer is and which input matters most.
+
 ## Quick start
 
 ```bash
@@ -44,7 +54,7 @@ npm start
 open renderer/index.html        # macOS
 # (no server needed — pure client-side JS)
 
-# Run the physics regression tests (74 assertions)
+# Run the physics regression tests (143 assertions)
 npm test
 ```
 
@@ -103,12 +113,22 @@ v1.4.0 · MIT-spirit personal/educational project · contributions and correctio
 
 > ⚠️ **準確度說明:** 絕對圈速完全取決於你輸入的規格(動力/抓地/空力/質量)。賽道紀錄多為大改車,所以原廠規格預測較慢是正確的、不是 bug。本工具的強項在**相對比較**(setup 改了車往哪邊動)與**胎壓甜蜜點**分析。方法論可跨車移植,絕對數值不行——FSAE 尤其必須換上你自己的輪胎數據。
 
+### 模型邊界與可信度分層
+
+不是每個數字都同等可信——現在工具會誠實標示。每個結果都帶 badge：
+
+- **◆ Physics（物理）** — 由基本原理推導的教科書公式（wheel rate、ride frequency、側傾剛性/梯度、阻尼比、幾何/彈性 LLTD 分解、懸吊運動學）。對給定輸入精確。
+- **◈ Model（模型）** — 有物理依據的工程估算（understeer gradient、cornering stiffness、特徵/臨界速度、yaw gain、瞬態反應、單圈時間）。方向可靠、絕對值近似。
+- **◇ Heuristic（啟發式）** — 對標真實數據手調的增益/倍率（抓地失衡→平衡偏移、胎寬/胎壓/溫度抓地因子、平衡懲罰、驅動軸牽引比）。全部集中在 [`renderer/js/calibration.js`](renderer/js/calibration.js) 並附 metadata（值/單位/合理範圍/等級/可被什麼資料校正）——是可調旋鈕，不是物理定律，僅供參考。
+
+**已知邊界：** 除 2D 前視雙 A 臂運動學外無懸吊硬點運動學；除線性 2-DOF step-steer 外無瞬態模型；單圈模擬只有一條代表性賽道；未匯入 `.tir` 時胎係數為估算。車庫底盤資料逐參數標示（`confirmed`/`documented`/`estimated`/`unknown`）+ 整體字母評級，一眼看出某台車多少是實測、多少是推估。**敏感度**面板把每個不確定輸入單獨變動重算平衡——告訴你答案有多穩、哪個輸入最關鍵。
+
 ### 快速開始
 
 ```bash
 npm install && npm start      # 桌面 (Electron)
 open renderer/index.html      # 或直接瀏覽器開,免伺服器
-npm test                      # 物理迴歸測試 (74 項)
+npm test                      # 物理迴歸測試 (143 項)
 ```
 
 ---
@@ -143,10 +163,20 @@ npm test                      # 物理迴歸測試 (74 項)
 
 > ⚠️ **精度に関する注意:** 絶対的なラップタイムは入力仕様(パワー/グリップ/エアロ/重量)に完全に依存する。サーキット記録は大幅改造車によるものが多いため、ノーマル仕様の予測が遅くなるのは正しく、バグではない。本ツールの強みは**相対比較**(セットアップ変更で車がどちらに動くか)と**タイヤスイートスポット**解析にある。方法論は車種を超えて移植できるが、絶対値はできない——特に FSAE では自分のタイヤデータが必須。
 
+### モデルの境界と信頼度の階層
+
+すべての数値が同等に信頼できるわけではない——今はそれを明示する。各結果にバッジが付く：
+
+- **◆ Physics（物理）** — 基本原理から導く教科書的な式（wheel rate、ride frequency、ロール剛性/勾配、減衰比、幾何/弾性 LLTD 分解、サスペンション運動学）。与えた入力に対しては正確。
+- **◈ Model（モデル）** — 物理的根拠のある工学的推定（アンダーステア勾配、コーナリング剛性、特性/臨界速度、ヨーゲイン、過渡応答、ラップタイム）。方向性は信頼でき、絶対値は近似。
+- **◇ Heuristic（経験則）** — 実データに合わせて手調整したゲイン/倍率（グリップ不均衡→バランス変化、タイヤ幅/空気圧/温度のグリップ係数、バランスペナルティ、駆動輪トラクション比）。すべて [`renderer/js/calibration.js`](renderer/js/calibration.js) にメタデータ付きで集約（値/単位/有効範囲/階層/校正に必要なデータ）——物理法則ではなく調整ノブ。参考値として扱う。
+
+**既知の境界：** 2D 前面ダブルウィッシュボーン計算機以外のサスペンション・ハードポイント運動学なし；線形 2-DOF ステアステップ以外の過渡モデルなし；ラップシミュレーションは代表的な 1 コースのみ；`.tir` 未読込時はタイヤ係数は推定値。プリセットのシャシーデータはパラメータごとに表示（`confirmed`/`documented`/`estimated`/`unknown`）＋総合レター評価。**感度**パネルは各不確実入力を単独で変動させバランスを再計算し、答えの安定性と最重要入力を示す。
+
 ### クイックスタート
 
 ```bash
 npm install && npm start      # デスクトップ (Electron)
 open renderer/index.html      # またはブラウザで直接(サーバー不要)
-npm test                      # 物理回帰テスト (74 項目)
+npm test                      # 物理回帰テスト (143 項目)
 ```
