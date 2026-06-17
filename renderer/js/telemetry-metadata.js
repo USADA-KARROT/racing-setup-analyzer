@@ -175,6 +175,25 @@ function buildTelemetryMetadata(bmsResult) {
     diagnostics: identity.diagnostics || [],
   } : null;
 
+  // Optional Phase 3E-1 timebase confirmation (attached by the app at import time). Surfaces the
+  // STRUCTURAL timebase decision without changing the primary status or any decode-grade capability —
+  // on real imported data it is never confirmed, and physical values / units / canonical telemetry
+  // remain unavailable regardless. A confirmed timebase is structural only (not physical time).
+  const timebase = (bmsResult && bmsResult.timebase) || null;
+  const hasTimebase = !hasError && !!timebase;
+  const tbAgg = (timebase && timebase.aggregateDecision) || {};
+  const timebaseSummary = timebase ? {
+    status: timebase.status,
+    timebaseConfirmed: !!tbAgg.canConfirmTimebase,   // structural only; false on all real data
+    candidateCount: tbAgg.candidateCount || 0,
+    confirmedCount: tbAgg.confirmedCount || 0,
+    manualSampleRateHint: !!timebase.manualSampleRateHint,
+    physicalValuesAvailable: false,
+    unitsConfirmed: false,
+    canonicalTelemetry: false,
+    diagnostics: timebase.diagnostics || [],
+  } : null;
+
   return {
     sourceType: 'bmsbin',
     sourceFileName: (bmsResult && bmsResult.fileName) || null,
@@ -198,6 +217,8 @@ function buildTelemetryMetadata(bmsResult) {
       rawStreamConfirmation: hasRawStream,    // Phase 3D-2: raw-stream confirmation criteria present
       channelIdentityConfirmation: hasIdentity, // Phase 3E-0: identity confirmation criteria present
       channelIdentityConfirmed: !!idAgg.canConfirmAnyChannelIdentity, // false on all real data
+      timebaseConfirmation: hasTimebase,        // Phase 3E-1: timebase confirmation criteria present
+      timebaseConfirmed: !!tbAgg.canConfirmTimebase, // structural only; false on all real data
       timeSeries: false,            // not confirmed usable telemetry
       physicalScaling: false,       // Phase 3D+ (no value conversion yet)
       canonicalTelemetry: false,    // no canonical telemetry produced
@@ -213,6 +234,7 @@ function buildTelemetryMetadata(bmsResult) {
     structure: structureSummary,
     rawStreamConfirmation: rawStreamSummary,
     channelIdentity: identitySummary,
+    timebase: timebaseSummary,
     diagnostics,
   };
 }

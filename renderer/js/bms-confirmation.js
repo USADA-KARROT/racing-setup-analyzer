@@ -110,7 +110,14 @@ function evaluateBmsConfirmationEvidence(bmsResult, probeReport, rawExtraction, 
   // even with an explicit mapping — cannot confirm a channel's identity without the
   // corpus-backed structure that mapping labels. Explicit evidence is necessary, not sufficient.
   const canConfirmChannelIdentity = canConfirmSampleStructure && (explicitChannelMappingFound || channelIdentityFeed);
-  const canConfirmTimebase = canConfirmSampleStructure && timebaseConfirmed;
+  // Optional Phase 3E-1 timebase feed. Like the other feeds it can ONLY help confirm timebase, and
+  // only when corpus-backed (its own confirmed_timebase already requires a corpus + a confirmed raw
+  // stream). Absent → no effect (backward-compatible). Never opens decode/units caps.
+  const tbConf = opts.timebase || null;
+  const timebaseFeed = !!(tbConf && tbConf.status === 'confirmed_timebase'
+    && tbConf.capabilities && tbConf.capabilities.timebaseConfirmed === true
+    && opts.corpus && opts.corpus.fileCount >= 2);
+  const canConfirmTimebase = canConfirmSampleStructure && (timebaseConfirmed || timebaseFeed);
   const canConfirmPhysicalScaling = canConfirmChannelIdentity && scaleOffsetFound;
   // NOT a green light to build telemetry — Phase 3D-0 never builds canonical streams. This only
   // reports that every confirmation prerequisite is met; it stays false on real data and never
