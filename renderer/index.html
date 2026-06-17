@@ -131,11 +131,14 @@ canvas{max-height:300px}
         </div>
       </div>
     </template>
-    <!-- Data confidence badges -->
+    <!-- Data confidence: overall letter grade + per-parameter badges -->
     <template x-if="streetCarDetail?.confidence">
-      <div class="flex gap-2 mt-3 flex-wrap">
+      <div class="flex items-center gap-2 mt-3 flex-wrap">
+        <span class="text-[10px] text-slate-400" x-text="t('conf.grade')"></span>
+        <span class="text-xs font-bold px-2 py-0.5 rounded bg-slate-800" :class="confGrade(streetCarDetail.confidence)?.cls" x-text="confGrade(streetCarDetail.confidence)?.letter"></span>
+        <span class="text-slate-600 mx-0.5">│</span>
         <template x-for="(level, key) in streetCarDetail.confidence" :key="key">
-          <span class="text-[10px] px-2 py-0.5 rounded-full" :class="level==='confirmed'?'bg-green-900/30 text-green-400':level==='estimated'?'bg-yellow-900/30 text-yellow-400':'bg-red-900/30 text-red-400'" x-text="key + ': ' + (level==='confirmed'?t('conf.confirmed'):level==='estimated'?t('conf.estimated'):t('conf.unknown'))"></span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full" :class="confLevelClass(level)" :title="t('conf.'+level)" x-text="confFieldLabel(key) + ': ' + t('conf.'+level)"></span>
         </template>
       </div>
     </template>
@@ -1986,6 +1989,29 @@ function app(){return{
               heuristic:['bg-amber-900/40','text-amber-300','◇'] };
     const c=M[level]||M.model;
     return '<span class="text-[9px] px-1.5 py-0.5 rounded-full '+c[0]+' '+c[1]+' whitespace-nowrap align-middle" title="'+this.t('tier.'+level+'Hint')+'">'+c[2]+' '+this.t('tier.'+level)+'</span>';
+  },
+  // 街車 preset 資料可信度(metadata 已存在於 car-presets 的 confidence 物件)。
+  // 4 級：confirmed(實測/確認) > documented(文件記載) > estimated(估算) > unknown(無資料)。
+  confLevelClass(level){
+    return level==='confirmed'  ? 'bg-green-900/30 text-green-400'
+         : level==='documented' ? 'bg-sky-900/30 text-sky-400'
+         : level==='estimated'  ? 'bg-yellow-900/30 text-yellow-400'
+         : 'bg-red-900/30 text-red-400';
+  },
+  confFieldLabel(key){
+    const M={ spring_rate:'Spring', weight_dist:'Weight', track_width:'Track', arb:'ARB', cg_height:'CG', motion_ratio:'MR' };
+    return M[key] || key;
+  },
+  // 各參數等級加權平均 → 整體字母評級(confirmed 3 / documented 2 / estimated 1 / unknown 0)
+  confGrade(conf){
+    if(!conf) return null;
+    const W={ confirmed:3, documented:2, estimated:1, unknown:0 };
+    const vals=Object.values(conf).filter(v=>v in W);
+    if(!vals.length) return null;
+    const avg=vals.reduce((a,v)=>a+W[v],0)/vals.length;
+    const letter = avg>=2.5?'A':avg>=2.0?'B':avg>=1.5?'C':avg>=1.0?'D':'E';
+    const cls = avg>=2.0?'text-green-400':avg>=1.5?'text-yellow-400':'text-red-400';
+    return { letter, cls, avg: Math.round(avg*100)/100 };
   },
   // .tir Pacejka 真實胎模型匯入(使用者執行時載入自己的檔，不打包/不上傳)
   tirResult: null,

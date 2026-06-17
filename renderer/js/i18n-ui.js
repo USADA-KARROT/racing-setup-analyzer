@@ -8,8 +8,10 @@ const UI_I18N = {
   en: {
     // — confidence levels (badge) —
     'conf.confirmed': 'Confirmed',
+    'conf.documented': 'Documented',
     'conf.estimated': 'Estimated',
     'conf.unknown': 'No public data',
+    'conf.grade': 'Data confidence:',
     // — credibility tier badges (Physics / Model / Heuristic) —
     'tier.legend': 'How much to trust each number:',
     'tier.physics': 'Physics',
@@ -272,8 +274,10 @@ const UI_I18N = {
   },
   zh: {
     'conf.confirmed': '已確認',
+    'conf.documented': '文件記載',
     'conf.estimated': '估算',
     'conf.unknown': '無公開數據',
+    'conf.grade': '資料可信度：',
     // — 可信度等級 badge（物理 / 模型 / 啟發式）—
     'tier.legend': '每個數字該信幾分：',
     'tier.physics': '物理',
@@ -506,8 +510,10 @@ const UI_I18N = {
   },
   ja: {
     'conf.confirmed': '確認済',
+    'conf.documented': '文献記載',
     'conf.estimated': '推定',
     'conf.unknown': '公開データなし',
+    'conf.grade': 'データ信頼度：',
     // — 信頼度バッジ（物理 / モデル / ヒューリスティック）—
     'tier.legend': '各数値の信頼度：',
     'tier.physics': '物理',
