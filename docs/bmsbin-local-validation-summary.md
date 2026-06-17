@@ -67,6 +67,15 @@ hypothesis layer holds on real data before anything is built on top of it.
   criteria a mapping must meet before it could ever be called *confirmed*. No value conversion,
   no model-vs-actual overlay, no Kus until those criteria exist and are met on real data.
 
+> **Update (Phase 3D-0 done):** the explicit confirmation criteria are now written down and
+> implemented — see [`docs/bmsbin-confirmation-criteria.md`](bmsbin-confirmation-criteria.md)
+> and `renderer/js/bms-confirmation.js`. The reporter now also emits per-file confirmation
+> decisions and cross-file corpus booleans (`corpusChannelCountStable` /
+> `corpusCandidateRegionStable`). On this dataset the evaluator lands exactly where the verdict
+> above expects: **catalog confirmable; sample structure / channel identity / timebase / physical
+> scaling not confirmed.** Physical scaling, canonical telemetry and model-vs-actual remain out
+> of scope until those criteria actually pass on real data.
+
 ## Tooling note
 `tools/bmsbin-local-probe-report.js` reads only a 2 MB file head and caps the probe scan to a
 1 MB window (`scanWindowBytes`), so the full 65-file dataset runs in ~30 s without loading any
