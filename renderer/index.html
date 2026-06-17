@@ -1468,12 +1468,27 @@ canvas{max-height:300px}
     <template x-if="bmsResult && !bmsResult.error && !bmsResult.loading">
       <div class="mt-3 text-xs">
         <div class="text-slate-300 mb-2"><span class="font-bold" x-text="bmsResult.channelCount"></span> <span x-text="t('ui.bms.channels')"></span> <span class="text-slate-500 ml-1" x-text="'· ' + bmsResult.header.importer"></span></div>
-        <div class="flex flex-wrap gap-2 mb-2">
-          <template x-for="entry in Object.entries(bmsResult.validationChannels)" :key="entry[0]">
-            <span class="px-1.5 py-0.5 rounded text-[10px]" :class="entry[1] ? 'bg-green-900/30 text-green-400' : 'bg-slate-700 text-slate-500'" x-text="(entry[1]?'✓ ':'– ') + entry[0]"></span>
-          </template>
-        </div>
-        <div class="text-[10px] text-amber-400/80" x-text="t('ui.bms.ready')"></div>
+        <!-- Phase 3A: telemetry catalog status — honest about catalog-only vs not-decoded -->
+        <template x-if="telemetryMeta()">
+          <div>
+            <div class="text-[10px] text-slate-400 mb-1 flex items-center gap-1.5">
+              <span x-text="t('ui.telem.status')"></span>
+              <span class="px-1.5 py-0.5 rounded-full bg-amber-900/30 text-amber-300" x-text="t('ui.telem.statusCatalog')"></span>
+            </div>
+            <!-- required validation channels, with matched raw channel names -->
+            <div class="flex flex-wrap gap-2 mb-2">
+              <template x-for="entry in Object.entries(telemetryMeta().requiredChannels)" :key="entry[0]">
+                <span class="px-1.5 py-0.5 rounded text-[10px]" :class="entry[1].present ? 'bg-green-900/30 text-green-400' : 'bg-slate-700 text-slate-500'" x-text="(entry[1].present?'✓ ':'– ') + entry[0] + (entry[1].rawName ? ' ← '+entry[1].rawName : '')"></span>
+              </template>
+            </div>
+            <div class="text-[10px] text-amber-300/80 mb-1" x-text="t('ui.telem.catalogOnly')"></div>
+            <div class="space-y-1">
+              <template x-for="d in telemetryMeta().diagnostics" :key="d.code">
+                <div class="text-[10px] px-2 py-1 rounded" :class="d.severity==='warning' ? 'bg-amber-900/20 text-amber-300/90' : (d.severity==='error' ? 'bg-red-900/20 text-red-300' : 'bg-slate-800/60 text-slate-500')" x-text="t(d.messageKey)"></div>
+              </template>
+            </div>
+          </div>
+        </template>
         <details class="mt-2">
           <summary class="text-[10px] text-slate-500 cursor-pointer" x-text="t('ui.bms.showAll')"></summary>
           <div class="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px] font-mono text-slate-400" style="max-height:10rem;overflow-y:auto">
@@ -2132,6 +2147,8 @@ function app(){return{
   },
   // .bmsbin 遙測通道目錄(使用者執行時載入自己的檔，不打包/不上傳)
   bmsResult: null,
+  // Phase 3A：目前匯入 .bmsbin 的遙測描述子（catalog-only；逐點時間序列尚未解碼）。
+  telemetryMeta(){ return (typeof buildTelemetryMetadata==='function' && this.bmsResult && !this.bmsResult.error && !this.bmsResult.loading) ? buildTelemetryMetadata(this.bmsResult) : null; },
   importBms(e){
     const f=e.target.files && e.target.files[0]; if(!f) return;
     this.bmsResult={loading:true};
