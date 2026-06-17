@@ -157,6 +157,24 @@ function buildTelemetryMetadata(bmsResult) {
     diagnostics: rawStream.diagnostics || [],
   } : null;
 
+  // Optional Phase 3E-0 channel-identity confirmation (attached by the app at import time). Surfaces
+  // the identity DECISION without changing the primary status or any decode-grade capability — on
+  // real imported data (no independent evidence) it is always not_confirmed, and physical values /
+  // timebase / canonical telemetry remain unavailable regardless.
+  const identity = (bmsResult && bmsResult.channelIdentity) || null;
+  const hasIdentity = !hasError && !!identity;
+  const idAgg = (identity && identity.aggregateDecision) || {};
+  const identitySummary = identity ? {
+    status: identity.status,
+    channelIdentityConfirmed: !!idAgg.canConfirmAnyChannelIdentity,   // false on all real data
+    confirmedIdentityCount: idAgg.confirmedIdentityCount || 0,
+    candidateCount: idAgg.candidateCount || 0,
+    physicalValuesAvailable: false,
+    timebaseConfirmed: false,
+    canonicalTelemetry: false,
+    diagnostics: identity.diagnostics || [],
+  } : null;
+
   return {
     sourceType: 'bmsbin',
     sourceFileName: (bmsResult && bmsResult.fileName) || null,
@@ -178,8 +196,13 @@ function buildTelemetryMetadata(bmsResult) {
       confirmationCriteria: hasConfirmation,  // Phase 3D-0: hypothesis→confirmed decision present
       sampleStructureDiscovery: hasStructure, // Phase 3D-1: structure hypotheses present (not confirmed)
       rawStreamConfirmation: hasRawStream,    // Phase 3D-2: raw-stream confirmation criteria present
+      channelIdentityConfirmation: hasIdentity, // Phase 3E-0: identity confirmation criteria present
+      channelIdentityConfirmed: !!idAgg.canConfirmAnyChannelIdentity, // false on all real data
       timeSeries: false,            // not confirmed usable telemetry
       physicalScaling: false,       // Phase 3D+ (no value conversion yet)
+      canonicalTelemetry: false,    // no canonical telemetry produced
+      unitsConfirmed: false,        // no units
+      setupRecommendation: false,   // no setup advice from telemetry
       lapSegmentation: false,       // later
       handlingCorrelation: false,   // later
     },
@@ -189,6 +212,7 @@ function buildTelemetryMetadata(bmsResult) {
     confirmation: confirmationSummary,
     structure: structureSummary,
     rawStreamConfirmation: rawStreamSummary,
+    channelIdentity: identitySummary,
     diagnostics,
   };
 }

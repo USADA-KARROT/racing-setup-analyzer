@@ -99,10 +99,17 @@ function evaluateBmsConfirmationEvidence(bmsResult, probeReport, rawExtraction, 
     && rsConf.confirmationFeed && rsConf.confirmationFeed.rawStreamsConfirmed
     && opts.corpus && opts.corpus.fileCount >= 2);
   const canConfirmRawStreams = canConfirmSampleStructure && (encodingConsistent || rawStreamConfirmationFeed);
+  // Optional Phase 3E-0 channel-identity feed. Like the raw-stream feed, it can ONLY help confirm
+  // identity, and only when corpus-backed (its own confirmed_identity already requires a corpus +
+  // a confirmed raw stream). Absent → no effect (backward-compatible). Never opens decode caps.
+  const idConf = opts.channelIdentity || null;
+  const channelIdentityFeed = !!(idConf && idConf.status === 'confirmed_identity'
+    && idConf.capabilities && idConf.capabilities.channelIdentityConfirmed === true
+    && opts.corpus && opts.corpus.fileCount >= 2);
   // Identity (and therefore scaling) is gated on confirmed sample structure: a single file —
   // even with an explicit mapping — cannot confirm a channel's identity without the
   // corpus-backed structure that mapping labels. Explicit evidence is necessary, not sufficient.
-  const canConfirmChannelIdentity = canConfirmSampleStructure && explicitChannelMappingFound;
+  const canConfirmChannelIdentity = canConfirmSampleStructure && (explicitChannelMappingFound || channelIdentityFeed);
   const canConfirmTimebase = canConfirmSampleStructure && timebaseConfirmed;
   const canConfirmPhysicalScaling = canConfirmChannelIdentity && scaleOffsetFound;
   // NOT a green light to build telemetry — Phase 3D-0 never builds canonical streams. This only
