@@ -38,6 +38,7 @@ parseBms (3A)
   → evaluateBmsMeasuredExtraction (3G-0B)
   → evaluateBmsConfirmationEvidence (3D-0 HUB — runs LAST, aggregates all feeds)
   → evaluateBmsCanonicalAdapterEligibility (3G-1 — canonical-adapter BOUNDARY gate; after the hub, one-way, NOT fed back upstream)
+  → evaluateBmsPrivateCorpusBoundary (3G-2 — private-corpus POLICY gate; consumes a sanitized MANIFEST, not the chain; single-file import → not_available; one-way)
   → buildTelemetryMetadata (3A — merged, UI-facing descriptor)
 ```
 
@@ -66,6 +67,7 @@ so a single real file is fail-closed by construction regardless of feed wiring.
 | `bms-extraction-eligibility.js` | 3G-0A | gate | extraction input-contract + eligibility GATE |
 | `bms-measured-extraction-harness.js` | 3G-0B | gate | **synthetic** measured-extraction harness |
 | `bms-canonical-adapter-eligibility.js` | 3G-1 | gate | real canonical-series adapter **boundary** / eligibility (after hub; one-way, not fed back) |
+| `bms-private-corpus-boundary.js` | 3G-2 | gate | private real-corpus **boundary** / evidence-ingestion policy (manifest safety; local-only; one-way) |
 | `bms-confirmation.js` | 3D-0 | **hub** | aggregates all feeds → confirmation decision |
 | `telemetry-metadata.js` | 3A | aggregation | merges everything into the UI-facing descriptor |
 
@@ -110,6 +112,7 @@ shape change fails a test rather than silently spreading.
 - **3G-0A eligibility:** `not_eligible < prerequisites_unmet < canonical_series_unavailable < required_channels_unavailable < partial_eligibility < segmentation_prerequisites_unmet < window_prerequisites_unmet < corpus_unavailable < eligible_for_extraction`
 - **3G-0B measured extraction:** `not_available < blocked_by_eligibility < blocked_real_path < insufficient_synthetic_series < segmentation_candidate < windows_candidate < steady_state_candidate < tendency_proxy_candidate < extracted_synthetic`
 - **3G-1 canonical adapter:** `not_available < blocked_by_prerequisites < raw_stream_missing < identity_missing < timebase_missing < scaling_missing < units_missing < corpus_missing < adapter_contract_candidate < synthetic_adapter_ready`
+- **3G-2 private corpus:** `not_available < private_corpus_disabled < manifest_missing < manifest_invalid < unsafe_manifest < insufficient_file_count < sanitized_evidence_missing < sanitized_evidence_candidate < private_corpus_boundary_ready`
 - **3D-0 hub:** `not_confirmed < partially_confirmed < confirmed_structure`
 
 The top of every ladder (`confirmed_*` / `ready_for_analysis` / `eligible_for_extraction` /
@@ -157,6 +160,13 @@ the **single authoritative `capabilities` block the UI reads**. The hub addition
    byte, decoded sequence, or proprietary fingerprint.
 5. Real `.bmsbin` files (and any proprietary binary) **never** enter the repo; tests use synthetic
    fixtures only.
+6. The private-corpus boundary (3G-2) consumes only a sanitized **manifest** (descriptor), never real
+   files. A manifest that commits/exposes raw files, raw bytes, decoded sequences, file names,
+   offsets, or fingerprints — or carries any identifying field (path / file name / hash / offset /
+   sample rate / channel name) — is rejected (unsafe/invalid). `private_corpus_boundary_ready` means
+   ONLY that sanitized evidence is safe to ingest; it does NOT confirm raw stream / identity /
+   timebase / scaling / units, and `canonicalAdapterEligible` / `canonicalTelemetry` / `timeSeries`
+   stay false. `realDataUsed` is always false.
 
 ## Synthetic vs real boundary
 
@@ -173,6 +183,16 @@ future canonical measured-series adapter. On a real single file it is always blo
 fixture reaches `synthetic_adapter_ready`, and even then NO real canonical series is built and
 `canonicalTelemetry` / `timeSeries` / `measuredExtraction` stay false (`realDataUsed` always false).
 The adapter runs AFTER the hub and is one-way — it never feeds back into the upstream gates.
+
+Phase 3G-2 adds the private-corpus **boundary** — the first layer that may let *real, local* data
+contribute evidence. Crucially it consumes only a sanitized **manifest** (a descriptor of safe,
+high-level fields), never the real files: real telemetry stays on the user's machine and never
+enters the repo. A real, local, safe, corpus-backed manifest with complete sanitized evidence MAY
+reach `private_corpus_boundary_ready` — but that means ONLY that sanitized evidence is safe to
+ingest. It does NOT confirm raw stream / identity / timebase / scaling / units, does NOT make the
+canonical adapter eligible, and produces NO canonical series. Whether this evidence can later upgrade
+any confirmation is a future phase's decision; 3G-2 is one-way and never makes any upstream
+confirmation `confirmed`. `realDataUsed` is always false.
 
 ## Reporter (`tools/bmsbin-local-probe-report.js`)
 
