@@ -247,7 +247,7 @@ function buildTelemetryMetadata(bmsResult) {
   const hasExtraction = !hasError && !!extraction;
   const exAgg = (extraction && extraction.aggregateDecision) || {};
   const extractionEligible = !!exAgg.canBeEligibleForExtraction;   // synthetic-only; false on real data
-  const extractionSummary = extraction ? {
+  const extractionSummary = hasExtraction ? {
     status: extraction.status,
     eligibilityLevel: extraction.eligibilityLevel,
     extractionEligible,

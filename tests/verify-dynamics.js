@@ -1891,10 +1891,14 @@ console.log('\n[extract-eligibility] .bmsbin measured handling-response extracti
     && f.capabilities.measuredHandlingResponse === false && f.capabilities.handlingAnalysis === false && f.capabilities.kus === false
     && f.capabilities.overlayEnabled === false && f.capabilities.modelVsActual === false && f.capabilities.canonicalTelemetry === false);
 
-  // F2. eligibility requires a corpus — full evidence but no corpus → not eligible
+  // F2 (review R1/L1 regression): full evidence but no corpus → corpus_unavailable — the nearest-to-
+  // eligible, monotonic rung (not the lower prerequisites_unmet); still not eligible, candidate counted,
+  // with actionable next-evidence + a corpus diagnostic instead of an empty / mislabelled report.
   const f2 = ex(readyRd, { canonicalSeriesEvidence: fullCse, segmentationEvidence: fullSeg });
-  check('extract(F2): full evidence but no corpus → not eligible_for_extraction',
-    f2.status !== 'eligible_for_extraction' && f2.aggregateDecision.canBeEligibleForExtraction === false);
+  check('extract(F2): full evidence but no corpus → corpus_unavailable (not eligible, candidate=1, next-evidence + diag)',
+    f2.status === 'corpus_unavailable' && f2.capabilities.extractionEligible === false
+    && f2.aggregateDecision.canBeEligibleForExtraction === false && f2.aggregateDecision.candidateCount === 1
+    && f2.nextEvidenceNeeded.includes('cross-file corpus evidence') && code(f2, 'BMS_EXTRACT_CORPUS_REQUIRED'));
 
   // G. caps pinned false on every path
   check('extract(G): measuredHandlingResponse/handling/overlay/Kus/modelVsActual caps pinned false (all paths)',

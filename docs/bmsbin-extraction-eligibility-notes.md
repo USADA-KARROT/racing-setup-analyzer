@@ -64,6 +64,7 @@ not_eligible
   < partial_eligibility            (some — not all — required channels canonical)
   < segmentation_prerequisites_unmet
   < window_prerequisites_unmet
+  < corpus_unavailable             (every contract check passes; only the cross-file corpus is missing)
   < eligible_for_extraction        (synthetic only)
 ```
 

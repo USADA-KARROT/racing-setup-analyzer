@@ -472,6 +472,7 @@ const UI_I18N = {
     'telemetry.extract.warning.requiredChannelsUnavailable': 'Required canonical channels for extraction are missing.',
     'telemetry.extract.warning.segmentationPrereqsUnmet': 'Corner-segmentation prerequisites are not met.',
     'telemetry.extract.warning.windowPrereqsUnmet': 'Entry/mid/exit window prerequisites are not met.',
+    'telemetry.extract.warning.corpusRequired': 'All input-contract checks pass, but a cross-file corpus is still required.',
     'telemetry.extract.warning.contractNotExtraction': 'This is an input-contract eligibility gate, not extraction.',
     'telemetry.extract.warning.noMeasuredResponse': 'No measured handling response, tendency, Kus, overlay or model-vs-actual is produced.',
     // — lihpao tab —
@@ -977,6 +978,7 @@ const UI_I18N = {
     'telemetry.extract.warning.requiredChannelsUnavailable': '缺少萃取所需的 canonical 通道。',
     'telemetry.extract.warning.segmentationPrereqsUnmet': '彎道分段的前置條件未滿足。',
     'telemetry.extract.warning.windowPrereqsUnmet': 'entry／mid／exit 視窗前置條件未滿足。',
+    'telemetry.extract.warning.corpusRequired': '所有輸入契約檢查皆通過,但仍需跨檔語料(corpus)。',
     'telemetry.extract.warning.contractNotExtraction': '這是輸入契約資格閘門，不是萃取。',
     'telemetry.extract.warning.noMeasuredResponse': '不產生任何操控反應、tendency、Kus、疊圖或 model-vs-actual。',
     'ui.lihpaoMassNote': '車重/抓地/空力/平衡取自「轉向預測」分頁(目前車種與輪胎)。胎種：',
@@ -1476,6 +1478,7 @@ const UI_I18N = {
     'telemetry.extract.warning.requiredChannelsUnavailable': '抽出に必要な canonical チャンネルが不足しています。',
     'telemetry.extract.warning.segmentationPrereqsUnmet': 'コーナー分割の前提条件が満たされていません。',
     'telemetry.extract.warning.windowPrereqsUnmet': 'entry／mid／exit ウィンドウの前提条件が満たされていません。',
+    'telemetry.extract.warning.corpusRequired': 'すべての入力契約チェックは通過しましたが、複数ファイルのコーパスがまだ必要です。',
     'telemetry.extract.warning.contractNotExtraction': 'これは入力契約の適格性ゲートであり、抽出ではありません。',
     'telemetry.extract.warning.noMeasuredResponse': '操作応答・tendency・Kus・オーバーレイ・model-vs-actual は一切生成しません。',
     'ui.lihpaoMassNote': '車重/グリップ/エアロ/バランスは「ハンドリング予測」タブ（現在の車種とタイヤ）から取得。タイヤ：',

@@ -44,7 +44,7 @@ const _MIN_CORNER_EVENTS = 3;
 const _EX_RANK = {
   not_eligible: 0, prerequisites_unmet: 1, canonical_series_unavailable: 2,
   required_channels_unavailable: 3, partial_eligibility: 4, segmentation_prerequisites_unmet: 5,
-  window_prerequisites_unmet: 6, eligible_for_extraction: 7,
+  window_prerequisites_unmet: 6, corpus_unavailable: 7, eligible_for_extraction: 8,
 };
 
 // INPUT CONTRACT — what a measured handling-response extraction (3G-0B) requires as input.
@@ -141,6 +141,10 @@ function evaluateBmsExtractionEligibility(readiness, opts = {}) {
   // ── status ladder (fail-closed; nearest-to-eligible first) ──
   let status;
   if (eligible) status = 'eligible_for_extraction';
+  // every contract sub-check passes; only the cross-file corpus is missing — the nearest-to-eligible
+  // non-eligible rung (kept distinct from prerequisites_unmet so the ladder stays monotonic and the
+  // candidate count / next-evidence reflect "one corpus away", not "prerequisites missing").
+  else if (readinessReady && canonicalSeriesAvailable && requiredChannelsAvailable && segmentationPrerequisitesMet && windowPrerequisitesMet && !corpusOk) status = 'corpus_unavailable';
   else if (readinessReady && canonicalSeriesAvailable && requiredChannelsAvailable && segmentationPrerequisitesMet && !windowPrerequisitesMet) status = 'window_prerequisites_unmet';
   else if (readinessReady && canonicalSeriesAvailable && requiredChannelsAvailable && !segmentationPrerequisitesMet) status = 'segmentation_prerequisites_unmet';
   else if (readinessReady && canonicalSeriesAvailable && !requiredChannelsAvailable) status = eligibleChannelCount > 0 ? 'partial_eligibility' : 'required_channels_unavailable';
@@ -165,6 +169,7 @@ function evaluateBmsExtractionEligibility(readiness, opts = {}) {
   if (readinessReady && canonicalSeriesAvailable && !requiredChannelsAvailable) nextEvidenceNeeded.push('remaining required canonical channels');
   if (readinessReady && !segmentationPrerequisitesMet) nextEvidenceNeeded.push('detectable corner events for segmentation');
   if (readinessReady && !windowPrerequisitesMet) nextEvidenceNeeded.push('separable entry/mid/exit windows + steady-state');
+  if (status === 'corpus_unavailable') nextEvidenceNeeded.push('cross-file corpus evidence');
 
   const aggregateDecision = {
     canBeEligibleForExtraction: eligible,
@@ -196,6 +201,7 @@ function evaluateBmsExtractionEligibility(readiness, opts = {}) {
   if (readinessReady && canonicalSeriesAvailable && !requiredChannelsAvailable) diagnostics.push(D('warning', 'BMS_EXTRACT_REQUIRED_CHANNELS_UNAVAILABLE', 'telemetry.extract.warning.requiredChannelsUnavailable'));
   if (readinessReady && !segmentationPrerequisitesMet) diagnostics.push(D('warning', 'BMS_EXTRACT_SEGMENTATION_PREREQS_UNMET', 'telemetry.extract.warning.segmentationPrereqsUnmet'));
   if (readinessReady && !windowPrerequisitesMet) diagnostics.push(D('warning', 'BMS_EXTRACT_WINDOW_PREREQS_UNMET', 'telemetry.extract.warning.windowPrereqsUnmet'));
+  if (status === 'corpus_unavailable') diagnostics.push(D('warning', 'BMS_EXTRACT_CORPUS_REQUIRED', 'telemetry.extract.warning.corpusRequired'));
   diagnostics.push(D('warning', 'BMS_EXTRACT_CONTRACT_NOT_EXTRACTION', 'telemetry.extract.warning.contractNotExtraction'));
   diagnostics.push(D('warning', 'BMS_EXTRACT_NO_MEASURED_RESPONSE', 'telemetry.extract.warning.noMeasuredResponse'));
   if (nextEvidenceNeeded.length) diagnostics.push(D('info', 'BMS_EXTRACT_NEXT_EVIDENCE_NEEDED', 'telemetry.extract.info.nextEvidenceNeeded', 'low'));
