@@ -40,6 +40,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'bms-extraction-eligibility.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-measured-extraction-harness.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-canonical-adapter-eligibility.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-private-corpus-boundary.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -49,7 +50,7 @@ const src =
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
-  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, evaluateBmsTelemetryReadiness, evaluateBmsExtractionEligibility, EXTRACTION_INPUT_CONTRACT, EXTRACTION_OUTPUT_CONTRACT, evaluateBmsMeasuredExtraction, evaluateBmsCanonicalAdapterEligibility, CANONICAL_ADAPTER_CONTRACT, ' +
+  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, evaluateBmsTelemetryReadiness, evaluateBmsExtractionEligibility, EXTRACTION_INPUT_CONTRACT, EXTRACTION_OUTPUT_CONTRACT, evaluateBmsMeasuredExtraction, evaluateBmsCanonicalAdapterEligibility, CANONICAL_ADAPTER_CONTRACT, evaluateBmsPrivateCorpusBoundary, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
@@ -998,7 +999,8 @@ console.log('\n[tool] local validation reporter — fixture-safe / sanitized out
     strTok('TrackInfo'), Buffer.from([1, 2, 3, 4]), strTok('accy'), strTok('MS5.8'), sine,
   ]));
   // names that would betray raw-content leakage (sample values, raw bytes, byte offsets)
-  const FORBIDDEN = ['samplePreview', 'sampleValues', 'rawBytes', 'bytes', 'offset', 'minRaw', 'maxRaw', 'meanRaw', 'preview', 'samples'];
+  const FORBIDDEN = ['samplePreview', 'sampleValues', 'rawBytes', 'bytes', 'offset', 'minRaw', 'maxRaw', 'meanRaw', 'preview', 'samples',
+    'fingerprint', 'sha256', 'absolutePath', 'localPath', 'fileName', 'channelName'];   // 3G-2: also reject corpus-manifest identifying leaks
   const hasForbidden = (str) => FORBIDDEN.some(bad => str.toLowerCase().includes(bad.toLowerCase()));
 
   // 1. the whitelist itself can never name a raw-content field
@@ -1064,6 +1066,13 @@ console.log('\n[tool] local validation reporter — fixture-safe / sanitized out
     && s.canonicalAdapterEligibleCount === 0 && s.canonicalAdapterRealDataUsed === false
     && typeof agg.canonicalAdapterReadyFiles === 'number' && agg.canonicalAdapterReadyFiles === 0
     && agg.canonicalAdapterStatusHistogram && Object.values(agg.canonicalAdapterStatusHistogram).every(x => typeof x === 'number'));
+
+  // 12. Phase 3G-2 private corpus present, sanitized scalars, honest (single-file import → not_available; no manifest leak)
+  check('tool: summary carries sanitized private-corpus boundary (not available on single file, realDataUsed false)',
+    typeof s.privateCorpusStatus === 'string' && s.privateCorpusStatus === 'not_available'
+    && s.privateCorpusEvidenceAvailableCount === 0 && s.privateCorpusRealDataUsed === false
+    && typeof agg.privateCorpusBoundaryReadyFiles === 'number' && agg.privateCorpusBoundaryReadyFiles === 0
+    && agg.privateCorpusStatusHistogram && Object.values(agg.privateCorpusStatusHistogram).every(x => typeof x === 'number'));
 }
 
 // ── Phase 3D-0: hypothesis→confirmed criteria (synthetic; decisions, never decoded values) ──
@@ -2192,13 +2201,89 @@ console.log('\n[canonical-adapter] .bmsbin real canonical-series adapter boundar
     && oStr.capabilities.canonicalAdapterEligible === false && oOk.status === 'synthetic_adapter_ready');
 }
 
+// ── Phase 3G-2: private real-corpus BOUNDARY / evidence-ingestion POLICY (manifest safety; local-only;
+//    real files never in repo; sanitized evidence only; boundary-ready is NOT confirmed telemetry) ──
+console.log('\n[private-corpus] .bmsbin private real-corpus boundary / evidence-ingestion policy');
+{
+  const code = (r, c) => r.diagnostics.some(d => d.code === c);
+  const CAPS = ['rawStreamConfirmed', 'identityConfirmed', 'timebaseConfirmed', 'scalingConfirmed', 'unitsConfirmed', 'canonicalAdapterEligible', 'canonicalTelemetry', 'timeSeries', 'measuredExtraction', 'measuredHandlingResponse', 'handlingAnalysis', 'overlayEnabled', 'kus', 'handlingCorrelation', 'setupRecommendation', 'modelVsActual'];
+  const cf = o => CAPS.every(k => o.capabilities[k] === false);
+  const safe = (over) => Object.assign({ sanitizedOnly: true, fileCount: 5, formatFamily: 'darab', sourceType: 'bmsbin', rawFilesCommitted: false, rawBytesExposed: false, decodedSequencesExposed: false, fileNamesExposed: false, offsetsExposed: false, fingerprintsExposed: false }, over || {});
+  const fullEv = { hasRawStreamEvidence: true, hasIdentityEvidence: true, hasTimebaseEvidence: true, hasScalingEvidence: true, hasUnitsEvidence: true, hasCorpusEvidence: true };
+  const ALLOW = { allowPrivateLocalCorpus: true };
+  const pc = (m, o) => M.evaluateBmsPrivateCorpusBoundary(m, o || {});
+
+  // A. no inputs
+  const a = pc(null, {});
+  check('pcorpus(A): no inputs → not_available; canUse false; caps false; realDataUsed false',
+    a.status === 'not_available' && a.aggregateDecision.canUsePrivateCorpusEvidence === false && cf(a) && a.realDataUsed === false && a.capabilities.privateCorpusEvidenceAvailable === false);
+
+  // B-D. policy / manifest gates
+  check('pcorpus(B): manifest but policy disabled → private_corpus_disabled', pc(safe(), {}).status === 'private_corpus_disabled');
+  check('pcorpus(C): policy on, no manifest → manifest_missing', pc(null, ALLOW).status === 'manifest_missing');
+  check('pcorpus(D): manifest without sanitizedOnly → manifest_invalid', pc({ fileCount: 5 }, ALLOW).status === 'manifest_invalid');
+
+  // E-J. unsafe exposure flags
+  check('pcorpus(E): rawFilesCommitted → unsafe_manifest', pc(safe({ rawFilesCommitted: true }), ALLOW).status === 'unsafe_manifest');
+  check('pcorpus(F): rawBytesExposed → unsafe_manifest', pc(safe({ rawBytesExposed: true }), ALLOW).status === 'unsafe_manifest');
+  check('pcorpus(G): decodedSequencesExposed → unsafe_manifest', pc(safe({ decodedSequencesExposed: true }), ALLOW).status === 'unsafe_manifest');
+  check('pcorpus(H): fileNamesExposed → unsafe_manifest', pc(safe({ fileNamesExposed: true }), ALLOW).status === 'unsafe_manifest');
+  check('pcorpus(I): offsetsExposed → unsafe_manifest', pc(safe({ offsetsExposed: true }), ALLOW).status === 'unsafe_manifest');
+  check('pcorpus(J): fingerprintsExposed → unsafe_manifest', pc(safe({ fingerprintsExposed: true }), ALLOW).status === 'unsafe_manifest');
+
+  // K. insufficient file count
+  check('pcorpus(K): fileCount<2 → insufficient_file_count', pc(safe({ fileCount: 1 }), ALLOW).status === 'insufficient_file_count');
+
+  // L. sanitized evidence missing
+  check('pcorpus(L): no sanitizedEvidence → sanitized_evidence_missing', pc(safe(), ALLOW).status === 'sanitized_evidence_missing');
+
+  // M. partial sanitized evidence → candidate (still no upstream confirmation)
+  const m = pc(safe(), Object.assign({ sanitizedEvidence: { hasRawStreamEvidence: true, hasIdentityEvidence: true } }, ALLOW));
+  check('pcorpus(M): partial evidence → sanitized_evidence_candidate; no confirmation; caps false',
+    m.status === 'sanitized_evidence_candidate' && cf(m) && m.capabilities.privateCorpusEvidenceAvailable === false);
+
+  // N. private corpus boundary ready — evidence available but NO confirmation / canonical / analysis cap
+  const n = pc(safe(), Object.assign({ sanitizedEvidence: fullEv }, ALLOW));
+  check('pcorpus(N): safe manifest + complete evidence + policy → private_corpus_boundary_ready; evidence available; ALL confirm/canonical/analysis caps false; realDataUsed false',
+    n.status === 'private_corpus_boundary_ready' && n.aggregateDecision.canUsePrivateCorpusEvidence === true && n.capabilities.privateCorpusEvidenceAvailable === true
+    && cf(n) && n.realDataUsed === false && code(n, 'BMS_PCORPUS_BOUNDARY_READY'));
+
+  // O. identifying fields → manifest_invalid (rejected before any boundary pass)
+  check('pcorpus(O): hash / path / fileName / channelNames → manifest_invalid',
+    pc(safe({ hash: 'abc123' }), ALLOW).status === 'manifest_invalid'
+    && pc(safe({ path: '/Users/x/real.bmsbin' }), ALLOW).status === 'manifest_invalid'
+    && pc(safe({ fileName: 'real.bmsbin' }), ALLOW).status === 'manifest_invalid'
+    && pc(safe({ channelNames: ['accy'] }), ALLOW).status === 'manifest_invalid');
+
+  // P. non-finite / non-numeric file count → fail-closed (never ready)
+  check('pcorpus(P): NaN / non-numeric fileCount → fail-closed (not boundary_ready)',
+    pc(safe({ fileCount: NaN }), Object.assign({ sanitizedEvidence: fullEv }, ALLOW)).status !== 'private_corpus_boundary_ready'
+    && pc(safe({ fileCount: '5' }), Object.assign({ sanitizedEvidence: fullEv }, ALLOW)).status !== 'private_corpus_boundary_ready');
+
+  // Q. one-way — running the boundary does not mutate the manifest / evidence inputs
+  const qm = safe(), qe = { sanitizedEvidence: fullEv };
+  const qmBefore = JSON.stringify(qm), qeBefore = JSON.stringify(qe.sanitizedEvidence);
+  pc(qm, Object.assign({}, qe, ALLOW));
+  check('pcorpus(Q): one-way — does not mutate manifest / sanitized-evidence inputs',
+    JSON.stringify(qm) === qmBefore && JSON.stringify(qe.sanitizedEvidence) === qeBefore);
+
+  // R. telemetry-metadata integration (single-file import path → not_available; conservative; modelVsActual pinned false)
+  const realPc = pc(null, {});
+  const meta = M.buildTelemetryMetadata({ header: { importer: 'DarabImporter v.', valid: true }, channelCount: 4, channels: ['accy', 'yaw', 'steer', 'speed'].map(x => ({ name: x })), privateCorpus: realPc });
+  check('pcorpus→metadata: summary surfaced + privateCorpusEvidenceAvailable false; canonicalTelemetry/timeSeries/modelVsActual false',
+    !!meta.privateCorpus && meta.capabilities.privateCorpusBoundaryCriteria === true && meta.capabilities.privateCorpusEvidenceAvailable === false
+    && meta.capabilities.canonicalTelemetry === false && meta.capabilities.timeSeries === false && meta.capabilities.modelVsActual === false);
+  check('pcorpus→metadata: no privateCorpus → cap false, summary null',
+    M.buildTelemetryMetadata({ header: { importer: 'D', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).privateCorpus === null);
+}
+
 // ── Phase 3R-0: trust-chain INVARIANTS (regression guards locking the Phase 3 red lines) ──
 console.log('\n[invariants] Phase 3 trust-chain red-line invariants');
 {
   const GATED = ['physicalScaling', 'unitsConfirmed', 'canonicalTelemetry', 'telemetryReady', 'telemetryReadiness',
     'extractionEligible', 'measuredExtraction', 'measuredExtractionSynthetic', 'measuredHandlingResponse',
     'handlingAnalysis', 'overlayEnabled', 'kus', 'handlingCorrelation', 'setupRecommendation', 'modelVsActual',
-    'timeSeries', 'lapSegmentation', 'canonicalAdapterEligible'];
+    'timeSeries', 'lapSegmentation', 'canonicalAdapterEligible', 'privateCorpusEvidenceAvailable'];
   const noGated = o => !!(o && o.capabilities) && GATED.every(k => o.capabilities[k] === undefined || o.capabilities[k] === false);
 
   // real/imported single-file path: build the whole chain with empty opts (the importBms / reporter call shape)
@@ -2214,7 +2299,8 @@ console.log('\n[invariants] Phase 3 trust-chain red-line invariants');
   const measext = M.evaluateBmsMeasuredExtraction(eligibility, {});
   const hub = M.evaluateBmsConfirmationEvidence(realBms, probe, rawX, link, { readiness, extractionEligibility: eligibility, measuredExtraction: measext });
   const adapter = M.evaluateBmsCanonicalAdapterEligibility(hub, readiness, eligibility, measext, {});
-  const meta = M.buildTelemetryMetadata(Object.assign({}, realBms, { rawStreamConfirmation: rawStream, channelIdentity: identity, timebase, physicalScaling: scaling, readiness, extractionEligibility: eligibility, measuredExtraction: measext, confirmation: hub, canonicalAdapter: adapter, probe, raw: rawX, link }));
+  const pcorpus = M.evaluateBmsPrivateCorpusBoundary(null, {});   // single-file import path: no corpus manifest
+  const meta = M.buildTelemetryMetadata(Object.assign({}, realBms, { rawStreamConfirmation: rawStream, channelIdentity: identity, timebase, physicalScaling: scaling, readiness, extractionEligibility: eligibility, measuredExtraction: measext, confirmation: hub, canonicalAdapter: adapter, privateCorpus: pcorpus, probe, raw: rawX, link }));
 
   // A. real path fail-closed at every layer (gates + hub decisions)
   check('invariant(A): real path fail-closed (readiness not_ready / eligibility not_eligible / measext blocked / hub not_confirmed)',
@@ -2223,16 +2309,17 @@ console.log('\n[invariants] Phase 3 trust-chain red-line invariants');
     && hub.decisions.canConfirmChannelIdentity === false && hub.decisions.canConfirmTimebase === false
     && hub.decisions.canConfirmPhysicalScaling === false && hub.decisions.canonicalTelemetryPrerequisitesMet === false
     && hub.decisions.telemetryReadyForAnalysis === false && hub.decisions.measuredExtractionEligible === false && hub.decisions.measuredExtractionSynthetic === false
-    && adapter.status === 'raw_stream_missing' && adapter.aggregateDecision.canEnterCanonicalAdapter === false && adapter.realDataUsed === false);
+    && adapter.status === 'raw_stream_missing' && adapter.aggregateDecision.canEnterCanonicalAdapter === false && adapter.realDataUsed === false
+    && pcorpus.status === 'not_available' && pcorpus.aggregateDecision.canUsePrivateCorpusEvidence === false && pcorpus.realDataUsed === false);
 
   // B. no gated capability true on the real path — at any layer or in the merged metadata
   // merged-metadata leg asserts every red-line cap is EXPLICITLY false (not merely absent) — closes
   // the noGated undefined-leniency gap for caps the UI-authoritative block must carry (incl. modelVsActual).
   const META_RED = ['physicalScaling', 'unitsConfirmed', 'canonicalTelemetry', 'telemetryReady', 'extractionEligible',
     'measuredExtraction', 'measuredExtractionSynthetic', 'measuredHandlingResponse', 'handlingAnalysis', 'overlayEnabled',
-    'kus', 'handlingCorrelation', 'setupRecommendation', 'modelVsActual', 'timeSeries', 'lapSegmentation', 'canonicalAdapterEligible'];
+    'kus', 'handlingCorrelation', 'setupRecommendation', 'modelVsActual', 'timeSeries', 'lapSegmentation', 'canonicalAdapterEligible', 'privateCorpusEvidenceAvailable'];
   check('invariant(B): no gated capability true on real path (all layers + every merged-metadata red-line cap === false)',
-    [rawStream, identity, timebase, scaling, readiness, eligibility, measext, hub, adapter].every(noGated) && noGated(meta)
+    [rawStream, identity, timebase, scaling, readiness, eligibility, measext, hub, adapter, pcorpus].every(noGated) && noGated(meta)
     && META_RED.every(k => meta.capabilities[k] === false));
 
   // C. confirmation hub pins decode caps false literally on every path
