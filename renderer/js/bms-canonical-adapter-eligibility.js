@@ -60,6 +60,7 @@ const CANONICAL_ADAPTER_CONTRACT = {
  */
 function evaluateBmsCanonicalAdapterEligibility(confirmation, readiness, extractionEligibility, measuredExtraction, opts = {}) {
   const D = (severity, code, messageKey, confidence) => ({ severity, code, messageKey, confidence: confidence || 'medium' });
+  if (!opts || typeof opts !== 'object') opts = {};   // null/garbage opts → fail-closed (no corpus, non-synthetic)
 
   const hasAnyInput = !!(confirmation || readiness || extractionEligibility || measuredExtraction);
   const readinessObj = (readiness && typeof readiness === 'object') ? readiness : null;
@@ -71,7 +72,7 @@ function evaluateBmsCanonicalAdapterEligibility(confirmation, readiness, extract
   const timebaseConfirmed = ri.timebaseConfirmed === true;
   const scalingConfirmed = ri.scalingConfirmed === true;
   const unitsConfirmed = ri.unitsConfirmed === true;
-  const corpusOk = !!(opts.corpus && opts.corpus.fileCount >= 2);
+  const corpusOk = !!(opts.corpus && Number.isFinite(opts.corpus.fileCount) && opts.corpus.fileCount >= 2);
   const corpusConfirmed = corpusOk && ri.hasCorpusEvidence === true;
   const readinessReady = !!(readinessObj && readinessObj.aggregateDecision && readinessObj.aggregateDecision.canBeReadyForAnalysis === true);
   const extractionEligibilityReady = !!(extractionEligibility && extractionEligibility.status === 'eligible_for_extraction'

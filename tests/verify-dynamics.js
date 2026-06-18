@@ -2175,6 +2175,21 @@ console.log('\n[canonical-adapter] .bmsbin real canonical-series adapter boundar
     && meta.capabilities.canonicalTelemetry === false && meta.capabilities.timeSeries === false && meta.capabilities.modelVsActual === false);
   check('cadapter→metadata: no canonicalAdapter → cap false, summary null',
     M.buildTelemetryMetadata({ header: { importer: 'D', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).canonicalAdapter === null);
+
+  // N (review CA-1 regression): null / garbage opts → fail-closed (no throw; never adapter-ready)
+  let nThrew = false, nStatus = null, nGarbage = null;
+  try { nStatus = M.evaluateBmsCanonicalAdapterEligibility(confStub, mkRd(ALL, true), eligElig, synMx, null).status; } catch (e) { nThrew = true; }
+  try { nGarbage = M.evaluateBmsCanonicalAdapterEligibility(confStub, mkRd(ALL, true), eligElig, synMx, 'x').status; } catch (e) { nThrew = true; }
+  check('cadapter(N): null/garbage opts → fail-closed (no throw; not synthetic_adapter_ready)',
+    nThrew === false && nStatus !== 'synthetic_adapter_ready' && nGarbage !== 'synthetic_adapter_ready');
+
+  // O (review CA-LOW-1 hardening): non-numeric corpus.fileCount → corpus not confirmed (fail-closed)
+  const oStr = ca(confStub, mkRd(ALL, true), eligElig, synMx, { corpus: { fileCount: '5' }, syntheticOnly: true });
+  const oArr = ca(confStub, mkRd(ALL, true), eligElig, synMx, { corpus: { fileCount: [3] }, syntheticOnly: true });
+  const oOk = ca(confStub, mkRd(ALL, true), eligElig, synMx, { corpus: { fileCount: 3 }, syntheticOnly: true });
+  check('cadapter(O): non-numeric corpus.fileCount → not synthetic_adapter_ready; numeric still works',
+    oStr.status !== 'synthetic_adapter_ready' && oArr.status !== 'synthetic_adapter_ready'
+    && oStr.capabilities.canonicalAdapterEligible === false && oOk.status === 'synthetic_adapter_ready');
 }
 
 // ── Phase 3R-0: trust-chain INVARIANTS (regression guards locking the Phase 3 red lines) ──
