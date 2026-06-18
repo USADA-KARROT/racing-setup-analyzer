@@ -2066,6 +2066,31 @@ console.log('\n[measured-extraction] .bmsbin synthetic measured-extraction harne
   // M. prior-phase regression (real path unchanged)
   check('measext(M): prior phases real path unchanged (eligibility not_eligible, readiness not_ready)',
     notEligible.status === 'not_eligible' && notEligible.capabilities.extractionEligible === false && notReadyRd.status === 'not_ready');
+
+  // N (review B1 regression): degenerate requiredChannels must not bypass validation / crash
+  let nCrashed = false, nStatus = null;
+  try { nStatus = mx(eligible, { syntheticOnly: true, corpus: CORPUS, syntheticCanonicalSeries: {}, extractionProfile: { requiredChannels: [] } }).status; }
+  catch (e) { nCrashed = true; }
+  check('measext(N): empty requiredChannels + empty series → insufficient_synthetic_series (no crash)',
+    nCrashed === false && nStatus === 'insufficient_synthetic_series');
+
+  // O (review B3 regression): NaN-interleaved mid speed must fail steady-state (fail-closed)
+  const nanSeries = (() => { const s = mkSeries(3, 1.0); for (let i = 0; i < s.speed.length; i++) if (i % 2) s.speed[i] = NaN; return s; })();
+  const o = mx(eligible, SYN({ syntheticCanonicalSeries: nanSeries }));
+  check('measext(O): NaN-interleaved mid speed → steady-state fail-closed (0 steady; not extracted); caps false',
+    o.steadyStateWindowCount === 0 && o.status !== 'extracted_synthetic' && capsFalse(o));
+
+  // P (review A2/B2 regression): out-of-range / negative segmentHints rejected; only in-bounds hint kept
+  const hintSeries = Object.assign(mkSeries(2, 1.0), { segmentHints: [{ cornerId: 1, startIdx: 5, endIdx: 18 }, { cornerId: 2, startIdx: 100, endIdx: 100000 }, { cornerId: 3, startIdx: -5, endIdx: 8 }] });
+  const p = mx(eligible, SYN({ syntheticCanonicalSeries: hintSeries }));
+  const seriesLen = hintSeries.lateral_accel.length;
+  check('measext(P): out-of-range/negative segmentHints rejected; segments stay within bounds; realDataUsed false',
+    p.cornerSegments.length === 1 && p.cornerSegments.every(c => c.startIdx >= 0 && c.endIdx <= seriesLen && c.sampleCount <= seriesLen) && p.realDataUsed === false);
+
+  // Q (review A1/B4 regression): confidence collapses to medium|low only (dead ternary removed)
+  const big = mx(eligible, SYN({ syntheticCanonicalSeries: mkSeries(5, 1.0) }));
+  check('measext(Q): extracted confidence is medium|low only',
+    ['low', 'medium'].includes(d.confidence) && ['low', 'medium'].includes(big.confidence));
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);

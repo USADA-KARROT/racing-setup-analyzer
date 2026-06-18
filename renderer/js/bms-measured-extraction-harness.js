@@ -45,6 +45,7 @@ const _MEX = {
   STEADY_LATG_BUCKET: 0.15,   // max lateral_accel spread within a steady-state window (abstract)
   NEUTRAL_RATIO: 1.0,         // baseline |steering|/|lateral_accel| ratio for the neutral proxy
   PROXY_BAND: 0.15,           // ±band around NEUTRAL_RATIO that counts as neutral_like
+  STEADY_SAMPLES_MEDIUM: 24,  // total steady-state samples for 'medium' proxy confidence (else 'low')
 };
 
 const _MEX_RANK = {
@@ -54,7 +55,7 @@ const _MEX_RANK = {
 };
 
 function _mean(a) { return a.length ? a.reduce((s, x) => s + x, 0) / a.length : 0; }
-function _spread(a) { if (!a.length) return 0; let lo = a[0], hi = a[0]; for (const x of a) { if (x < lo) lo = x; if (x > hi) hi = x; } return hi - lo; }
+function _spread(a) { if (!a.length) return 0; let lo = a[0], hi = a[0]; for (const x of a) { if (!Number.isFinite(x)) return Infinity; if (x < lo) lo = x; if (x > hi) hi = x; } return hi - lo; }
 function _slice(a, s, e) { return Array.isArray(a) ? a.slice(s, e) : []; }
 
 /**
@@ -79,8 +80,13 @@ function evaluateBmsMeasuredExtraction(extractionEligibility, opts = {}) {
   const requiredChannels = (opts.extractionProfile && Array.isArray(opts.extractionProfile.requiredChannels))
     ? opts.extractionProfile.requiredChannels : _MEX_PROFILES[profileKey];
 
-  const validSeries = !!(series && requiredChannels.every(k => Array.isArray(series[k]))
-    && requiredChannels.every(k => series[k].length >= _MEX.MIN_SAMPLES));
+  // A valid series must carry the core handling channels as long-enough arrays, REGARDLESS of the
+  // supplied profile — so a degenerate profile (e.g. requiredChannels:[]) can never vacuously pass the
+  // gate and let the harness read an undefined channel (would otherwise throw on series.lateral_accel).
+  const coreChannels = ['speed', 'steering', 'lateral_accel', 'yaw_rate'];
+  const seriesChannelOk = k => Array.isArray(series && series[k]) && series[k].length >= _MEX.MIN_SAMPLES;
+  const validSeries = !!(series && requiredChannels.length > 0
+    && coreChannels.every(seriesChannelOk) && requiredChannels.every(seriesChannelOk));
 
   // harness outputs (all empty unless the synthetic harness actually runs)
   let cornerSegments = [];
@@ -104,7 +110,7 @@ function evaluateBmsMeasuredExtraction(extractionEligibility, opts = {}) {
     // 1) corner segmentation — explicit synthetic hints, else |lateral_accel| over threshold
     if (Array.isArray(series.segmentHints) && series.segmentHints.length) {
       cornerSegments = series.segmentHints
-        .filter(h => Number.isFinite(h.startIdx) && Number.isFinite(h.endIdx) && h.endIdx > h.startIdx)
+        .filter(h => Number.isFinite(h.startIdx) && Number.isFinite(h.endIdx) && h.startIdx >= 0 && h.endIdx <= n && h.endIdx > h.startIdx)
         .map((h, i) => ({ cornerId: h.cornerId != null ? h.cornerId : (i + 1), startIdx: h.startIdx, endIdx: h.endIdx, sampleCount: h.endIdx - h.startIdx }));
     } else {
       let cid = 0, runStart = -1;
@@ -159,7 +165,7 @@ function evaluateBmsMeasuredExtraction(extractionEligibility, opts = {}) {
       const usable = perWindow.filter(w => w.label !== 'insufficient_quality');
       tendencyProxyCount = usable.length;
       const totalSteadySamples = steadyWindows.reduce((s, c) => s + (c.mid.endIdx - c.mid.startIdx), 0);
-      confidence = totalSteadySamples >= 24 ? 'medium' : (totalSteadySamples >= 9 ? 'low' : 'low');
+      confidence = totalSteadySamples >= _MEX.STEADY_SAMPLES_MEDIUM ? 'medium' : 'low';
       // aggregate label — majority of usable per-window proxies, else insufficient_quality
       let aggLabel = 'insufficient_quality';
       if (usable.length) {
