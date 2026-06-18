@@ -38,6 +38,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'bms-physical-scaling-confirmation.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-telemetry-readiness.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-extraction-eligibility.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-measured-extraction-harness.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -47,7 +48,7 @@ const src =
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
-  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, evaluateBmsTelemetryReadiness, evaluateBmsExtractionEligibility, EXTRACTION_INPUT_CONTRACT, EXTRACTION_OUTPUT_CONTRACT, ' +
+  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, evaluateBmsTelemetryReadiness, evaluateBmsExtractionEligibility, EXTRACTION_INPUT_CONTRACT, EXTRACTION_OUTPUT_CONTRACT, evaluateBmsMeasuredExtraction, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
@@ -1048,6 +1049,13 @@ console.log('\n[tool] local validation reporter — fixture-safe / sanitized out
     && s.extractionEligibleCount === 0 && typeof s.extractionEligibleChannelCount === 'number'
     && typeof agg.eligibleForExtractionFiles === 'number' && agg.eligibleForExtractionFiles === 0
     && agg.extractionEligibilityStatusHistogram && Object.values(agg.extractionEligibilityStatusHistogram).every(x => typeof x === 'number'));
+
+  // 10. Phase 3G-0B measured extraction present, sanitized scalars, honest (real file blocked, never extracted, realDataUsed false)
+  check('tool: summary carries sanitized measured extraction (real file blocked, 0 corners, realDataUsed false, no tendency)',
+    typeof s.measuredExtractionStatus === 'string' && s.measuredExtractionStatus !== 'extracted_synthetic'
+    && s.measuredExtractionCornerCount === 0 && s.measuredExtractionRealDataUsed === false
+    && typeof agg.measuredExtractionSyntheticFiles === 'number' && agg.measuredExtractionSyntheticFiles === 0
+    && agg.measuredExtractionStatusHistogram && Object.values(agg.measuredExtractionStatusHistogram).every(x => typeof x === 'number'));
 }
 
 // ── Phase 3D-0: hypothesis→confirmed criteria (synthetic; decisions, never decoded values) ──
@@ -1943,6 +1951,121 @@ console.log('\n[extract-eligibility] .bmsbin measured handling-response extracti
     && meta.capabilities.measuredHandlingResponse === false && meta.capabilities.handlingAnalysis === false && meta.capabilities.overlayEnabled === false);
   check('extract→metadata: no extraction → cap false, summary null',
     M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).extractionEligibility === null);
+}
+
+// ── Phase 3G-0B: SYNTHETIC measured-extraction harness (gate-first; real path always blocked;
+//    synthetic-only; tendency is a proxy, never Kus/model-vs-actual/setup) ──
+console.log('\n[measured-extraction] .bmsbin synthetic measured-extraction harness');
+{
+  const code = (r, c) => r.diagnostics.some(d => d.code === c);
+  const CORPUS = { fileCount: 3, candidateRegionStable: true, channelCountStable: true };
+  const chans = ['speed', 'steering', 'lateral_accel', 'yaw_rate', 'brake_or_longitudinal_accel'];
+  const qualGood = { sampleRateAdequate: true, syncQualityAdequate: true, dropoutOk: true, noiseOk: true };
+  const readyRd = M.evaluateBmsTelemetryReadiness(
+    { aggregateDecision: { canConfirmAnyRawStream: true } }, { aggregateDecision: { canConfirmAnyChannelIdentity: true } },
+    { aggregateDecision: { canConfirmTimebase: true } }, { aggregateDecision: { canConfirmPhysicalScaling: true }, unitsConfirmed: true, canonicalValueEligibility: true },
+    { corpus: CORPUS, confirmedChannels: chans, qualityEvidence: qualGood });
+  const eligible = M.evaluateBmsExtractionEligibility(readyRd, { corpus: CORPUS, canonicalSeriesEvidence: { canonicalChannels: chans, timeAligned: true, gapFree: true, knownSampleRate: true }, segmentationEvidence: { cornerEventsDetectable: true, cornerEventCount: 6, entryMidExitSeparable: true, steadyStateIdentifiable: true } });
+  const notReadyRd = M.evaluateBmsTelemetryReadiness({ aggregateDecision: { canConfirmAnyRawStream: false } }, { aggregateDecision: { canConfirmAnyChannelIdentity: false } }, { aggregateDecision: { canConfirmTimebase: false } }, { aggregateDecision: { canConfirmPhysicalScaling: false }, unitsConfirmed: false, canonicalValueEligibility: false }, {});
+  const notEligible = M.evaluateBmsExtractionEligibility(notReadyRd, {});
+  const mx = (elig, opts) => M.evaluateBmsMeasuredExtraction(elig, opts || {});
+  const caps = ['measuredExtraction', 'measuredHandlingResponse', 'handlingAnalysis', 'overlayEnabled', 'kus', 'handlingCorrelation', 'setupRecommendation', 'modelVsActual', 'canonicalTelemetry', 'timeSeries'];
+  const capsFalse = o => caps.every(k => o.capabilities[k] === false);
+  // synthetic canonical series builder (SYNTHETIC fixture only — straight + corner with a steady mid)
+  const mkSeries = (corners, ratio) => { const speed = [], steering = [], lateral_accel = [], yaw_rate = [], timeIndex = []; let t = 0; for (let c = 0; c < corners; c++) { for (let i = 0; i < 5; i++) { timeIndex.push(t++); speed.push(100); steering.push(0); lateral_accel.push(0); yaw_rate.push(0); } for (let i = 0; i < 15; i++) { timeIndex.push(t++); let lg; if (i < 4) lg = 0.4 + 0.05 * i; else if (i < 11) lg = 0.55; else lg = 0.55 - 0.1 * (i - 10); lateral_accel.push(lg); speed.push(80); steering.push(lg * ratio); yaw_rate.push(lg * 0.5); } } return { timeIndex, speed, steering, lateral_accel, yaw_rate }; };
+  const series = mkSeries(3, 1.0);
+  const SYN = opts => Object.assign({ syntheticOnly: true, corpus: CORPUS }, opts);
+
+  // A. no eligibility / not eligible → not_available / blocked_by_eligibility
+  const a = mx(null, {});
+  check('measext(A): no eligibility → not_available; harness/analysis caps false; realDataUsed false',
+    a.status === 'not_available' && a.capabilities.measuredExtractionSynthetic === false && capsFalse(a) && a.realDataUsed === false && code(a, 'BMS_MEXT_NOT_AVAILABLE'));
+  const a2 = mx(notEligible, {});
+  check('measext(A2): not eligible → blocked_by_eligibility; no segments/tendency; caps false',
+    a2.status === 'blocked_by_eligibility' && a2.cornerCount === 0 && a2.measuredTendencyProxy === null && capsFalse(a2));
+
+  // B. real path: eligible but not flagged synthetic, even WITH a series → blocked_real_path
+  const b = mx(eligible, { syntheticCanonicalSeries: series });
+  check('measext(B): eligible but not syntheticOnly (real path) → blocked_real_path; empty segments; null tendency; realDataUsed false',
+    b.status === 'blocked_real_path' && b.cornerSegments.length === 0 && b.measuredTendencyProxy === null && b.realDataUsed === false && capsFalse(b));
+
+  // C. eligible + syntheticOnly but no series → insufficient_synthetic_series
+  const c = mx(eligible, { syntheticOnly: true, corpus: CORPUS });
+  check('measext(C): syntheticOnly but no series → insufficient_synthetic_series; null tendency; caps false',
+    c.status === 'insufficient_synthetic_series' && c.measuredTendencyProxy === null && capsFalse(c));
+
+  // D. synthetic segmentation → full extraction on this series
+  const d = mx(eligible, SYN({ syntheticCanonicalSeries: series }));
+  check('measext(D): synthetic series → segmented; cornerCount>0; syntheticOnly true; realDataUsed false',
+    d.cornerCount > 0 && d.syntheticOnly === true && d.realDataUsed === false);
+  check('measext(D2): full synthetic series → extracted_synthetic',
+    d.status === 'extracted_synthetic');
+
+  // E. entry/mid/exit windows
+  check('measext(E): entry/mid/exit window counts > 0',
+    d.entryWindowCount > 0 && d.midWindowCount > 0 && d.exitWindowCount > 0);
+
+  // F. steady-state pass
+  check('measext(F): steady-state windows > 0; confidence present',
+    d.steadyStateWindowCount > 0 && d.confidence !== 'none');
+
+  // G. steady-state insufficient (unstable mid speed) → not extracted, no steady windows
+  const unstable = (() => { const s = mkSeries(3, 1.0); for (let i = 0; i < s.speed.length; i++) s.speed[i] = 80 + (i % 2 ? 40 : 0); return s; })();
+  const g = mx(eligible, SYN({ syntheticCanonicalSeries: unstable }));
+  check('measext(G): unstable mid → steady-state blocked (0 steady windows; not extracted_synthetic); caps false',
+    g.steadyStateWindowCount === 0 && g.status !== 'extracted_synthetic' && capsFalse(g));
+
+  // H. tendency proxy synthetic-only & explicitly not Kus/setup/model-vs-actual
+  check('measext(H): tendency proxy marked syntheticOnly/notKus/notSetupAdvice/notModelVsActual; count>0',
+    !!d.measuredTendencyProxy && d.measuredTendencyProxy.syntheticOnly === true && d.measuredTendencyProxy.notKus === true
+    && d.measuredTendencyProxy.notSetupAdvice === true && d.measuredTendencyProxy.notModelVsActual === true && d.tendencyProxyCount > 0);
+  // H2. synthetic ratio drives understeer_like / oversteer_like proxy label
+  const us = mx(eligible, SYN({ syntheticCanonicalSeries: mkSeries(3, 1.4) }));
+  const os = mx(eligible, SYN({ syntheticCanonicalSeries: mkSeries(3, 0.6) }));
+  check('measext(H2): synthetic ratio → understeer_like / oversteer_like proxy (synthetic proxy only)',
+    us.measuredTendencyProxy.label === 'understeer_like_proxy' && os.measuredTendencyProxy.label === 'oversteer_like_proxy');
+
+  // I. synthetic extracted but downstream caps remain false
+  check('measext(I): extracted_synthetic → measuredExtractionSynthetic true; all analysis/real caps false',
+    d.status === 'extracted_synthetic' && d.capabilities.measuredExtractionSynthetic === true && d.capabilities.measuredExtraction === false && capsFalse(d));
+
+  // J. real/blocked path leaks nothing (no segments, no tendency, syntheticOnly false)
+  check('measext(J): real/blocked path → empty segments, null tendency, syntheticOnly false',
+    b.cornerSegments.length === 0 && b.measuredTendencyProxy === null && b.syntheticOnly === false
+    && a2.cornerSegments.length === 0 && a2.measuredTendencyProxy === null);
+
+  // confirmation integration — feed only flips measuredExtractionSynthetic with full prereqs + corpus
+  const bmsStub = { header: { valid: true }, channels: ['accy', 'yaw', 'steer', 'speed'].map(n => ({ name: n })), channelCount: 4 };
+  const rawStub = { rawSeriesCandidates: [{ id: 'candidate_001', encoding: 'int16le', sampleCount: 600 }], timebaseCandidate: { present: true, sampleCount: 600 } };
+  const probeMono = { timebaseClues: [{ type: 'monotonic_counter_candidate', runLength: 600, medianDelta: 10, confidence: 'medium' }] };
+  const exMap = { candidate_001: { rawChannelName: 'accy', canonicalName: 'lateral_accel', scale: 0.01, offset: 0, unit: 'g' } };
+  const linkEx = M.linkBmsRawCandidates(bmsStub, probeMono, rawStub, { explicitMapping: exMap });
+  const STABLE = { channelCountStable: true, candidateRegionStable: true, catalogDetectedAll: true, fileCount: 3 };
+  const structFeed = { confirmationFeed: { perChannelBlockCountCandidate: true } };
+  const idFeed = { status: 'confirmed_identity', aggregateDecision: { canConfirmAnyChannelIdentity: true }, capabilities: { channelIdentityConfirmed: true } };
+  const tbFeed = { status: 'confirmed_timebase', aggregateDecision: { canConfirmTimebase: true }, capabilities: { timebaseConfirmed: true } };
+  const psFeed = { status: 'confirmed_scaling', aggregateDecision: { canConfirmPhysicalScaling: true }, unitsConfirmed: true, canonicalValueEligibility: true, capabilities: { physicalScaling: true } };
+  const mxNoCorpus = M.evaluateBmsConfirmationEvidence(bmsStub, probeMono, rawStub, linkEx, { measuredExtraction: d });
+  check('measext→confirm: feed WITHOUT corpus/prereqs → measuredExtractionSynthetic false; decode caps false',
+    mxNoCorpus.decisions.measuredExtractionSynthetic === false
+    && mxNoCorpus.capabilities.timeSeries === false && mxNoCorpus.capabilities.physicalScaling === false && mxNoCorpus.capabilities.handlingCorrelation === false);
+  const mxCorpus = M.evaluateBmsConfirmationEvidence(bmsStub, probeMono, rawStub, linkEx, { structure: structFeed, channelIdentity: idFeed, timebase: tbFeed, physicalScaling: psFeed, readiness: readyRd, extractionEligibility: eligible, measuredExtraction: d, corpus: STABLE });
+  check('measext→confirm: feed + full prereqs + corpus → measuredExtractionSynthetic true; decode caps still false',
+    mxCorpus.decisions.measuredExtractionSynthetic === true
+    && mxCorpus.capabilities.timeSeries === false && mxCorpus.capabilities.physicalScaling === false && mxCorpus.capabilities.handlingCorrelation === false);
+
+  // metadata integration (real path → conservative)
+  const realMx = mx(notEligible, {});
+  const meta = M.buildTelemetryMetadata({ header: { importer: 'DarabImporter v.', valid: true }, channelCount: 4, channels: bmsStub.channels, measuredExtraction: realMx });
+  check('measext→metadata: summary surfaced + measuredExtractionSynthetic false; harness/real/handling/overlay caps false',
+    !!meta.measuredExtraction && meta.capabilities.measuredExtractionHarness === true && meta.capabilities.measuredExtractionSynthetic === false
+    && meta.capabilities.measuredExtraction === false && meta.capabilities.measuredHandlingResponse === false && meta.capabilities.overlayEnabled === false);
+  check('measext→metadata: no measuredExtraction → cap false, summary null',
+    M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).measuredExtraction === null);
+
+  // M. prior-phase regression (real path unchanged)
+  check('measext(M): prior phases real path unchanged (eligibility not_eligible, readiness not_ready)',
+    notEligible.status === 'not_eligible' && notEligible.capabilities.extractionEligible === false && notReadyRd.status === 'not_ready');
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
