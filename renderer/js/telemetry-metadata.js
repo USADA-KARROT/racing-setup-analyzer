@@ -285,6 +285,26 @@ function buildTelemetryMetadata(bmsResult) {
     diagnostics: measExt.diagnostics || [],
   } : null;
 
+  // Optional Phase 3G-1 canonical-adapter eligibility (attached by the app at import time). A BOUNDARY
+  // check, not extraction. On real imported data it is never adapter-ready (confirmed raw stream /
+  // identity / timebase / scaling / units / corpus are missing); no real canonical series / time-series
+  // / measured extraction is produced; realDataUsed is always false.
+  const cadapter = (bmsResult && bmsResult.canonicalAdapter) || null;
+  const hasCadapter = !hasError && !!cadapter;
+  const caAgg = (cadapter && cadapter.aggregateDecision) || {};
+  const canonicalAdapterEligible = !!caAgg.canEnterCanonicalAdapter;   // synthetic-only; false on real data
+  const canonicalAdapterSummary = hasCadapter ? {
+    status: cadapter.status,
+    adapterEligibilityLevel: cadapter.adapterEligibilityLevel,
+    canonicalAdapterEligible,
+    realDataUsed: false,
+    prerequisites: cadapter.prerequisites || {},
+    blockerCount: caAgg.blockerCount || 0,
+    canonicalSeriesAvailable: false,
+    blockers: cadapter.blockers || [],
+    diagnostics: cadapter.diagnostics || [],
+  } : null;
+
   return {
     sourceType: 'bmsbin',
     sourceFileName: (bmsResult && bmsResult.fileName) || null,
@@ -320,7 +340,9 @@ function buildTelemetryMetadata(bmsResult) {
       measuredExtractionHarness: hasMeasExt,    // Phase 3G-0B: synthetic harness criteria present
       measuredExtractionSynthetic,              // Phase 3G-0B: synthetic-only true; false on all real data
       measuredExtraction: false,                // real measured extraction never produced (synthetic harness only)
-      measuredHandlingResponse: false,          // 3G-0A/0B are a contract gate + synthetic harness, not a real response
+      canonicalAdapterEligibilityCriteria: hasCadapter, // Phase 3G-1: canonical-adapter boundary gate present
+      canonicalAdapterEligible,                 // Phase 3G-1: synthetic-only true; false on all real data
+      measuredHandlingResponse: false,          // 3G-0A/0B/3G-1 are gates/harness, not a real response
       timeSeries: false,            // not confirmed usable telemetry
       canonicalTelemetry: false,    // never produced / usable yet (eligibility ≠ available)
       handlingAnalysis: false,      // readiness is a gate, not analysis
@@ -343,6 +365,7 @@ function buildTelemetryMetadata(bmsResult) {
     readiness: readinessSummary,
     extractionEligibility: extractionSummary,
     measuredExtraction: measuredExtractionSummary,
+    canonicalAdapter: canonicalAdapterSummary,
     diagnostics,
   };
 }
