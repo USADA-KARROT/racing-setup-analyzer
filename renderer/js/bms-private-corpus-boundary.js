@@ -48,6 +48,12 @@ const _UNSAFE_FLAG_KEYS = [
   'fileNamesExposed', 'offsetsExposed', 'fingerprintsExposed',
 ];
 
+// An accepted free-form descriptor string (formatFamily / sourceType) must not carry an identifying
+// VALUE — a path, a hash, a hex offset, or a proprietary file extension. The key denylist alone is
+// not enough (a leak can hide in an allowed field). Matches: any slash, 0x-hex, a sha/md5 token, a
+// long hex run, or a known vendor extension. Plain tokens like 'darab' / 'bmsbin' / 'csv' do NOT match.
+const _VALUE_LEAK_RE = /[/\\]|0x[0-9a-f]+|\b(sha\d*|md5)\b|[0-9a-f]{16,}|\.(bmsbin|tir|pds|cvp|pvp|mch|fnl|bin|dat)\b/i;
+
 const _PC_RANK = {
   not_available: 0, private_corpus_disabled: 1, manifest_missing: 2, manifest_invalid: 3,
   unsafe_manifest: 4, insufficient_file_count: 5, sanitized_evidence_missing: 6,
@@ -86,12 +92,17 @@ function evaluateBmsPrivateCorpusBoundary(corpusManifest, opts = {}) {
     return v !== undefined && v !== null && v !== false && !(typeof v === 'string' && v === '');
   }) : false;
   const sanitizedOnly = !!(manifest && manifest.sanitizedOnly === true);
+  // free-form descriptor fields must not carry an identifying value (path / hash / hex / file ext)
+  const freeFormStrings = manifest ? [manifest.formatFamily, manifest.sourceType].filter(v => typeof v === 'string') : [];
+  const hasLeakyValue = freeFormStrings.some(v => _VALUE_LEAK_RE.test(v));
+  // exposure flags fail CLOSED: ANY truthy value (not only the boolean true) is a self-declared exposure
   const unsafeFlags = {};
-  for (const k of _UNSAFE_FLAG_KEYS) unsafeFlags[k] = !!(manifest && manifest[k] === true);
+  for (const k of _UNSAFE_FLAG_KEYS) unsafeFlags[k] = !!(manifest && manifest[k]);
   const anyUnsafeFlag = Object.values(unsafeFlags).some(v => v === true);
 
-  // a structurally valid manifest is a sanitized descriptor: explicit sanitizedOnly + no identifying keys
-  const manifestStructurallyValid = !!(manifest && sanitizedOnly && !hasForbiddenKey);
+  // a structurally valid manifest is a sanitized descriptor: explicit sanitizedOnly + no identifying
+  // keys + no identifying value in an accepted free-form field
+  const manifestStructurallyValid = !!(manifest && sanitizedOnly && !hasForbiddenKey && !hasLeakyValue);
 
   const rawFileCount = (manifest && Number.isFinite(manifest.fileCount)) ? manifest.fileCount : null;
   const fileCountOk = rawFileCount !== null && rawFileCount >= _MIN_CORPUS_FILES;

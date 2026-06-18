@@ -2275,6 +2275,18 @@ console.log('\n[private-corpus] .bmsbin private real-corpus boundary / evidence-
     && meta.capabilities.canonicalTelemetry === false && meta.capabilities.timeSeries === false && meta.capabilities.modelVsActual === false);
   check('pcorpus→metadata: no privateCorpus → cap false, summary null',
     M.buildTelemetryMetadata({ header: { importer: 'D', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).privateCorpus === null);
+
+  // S (review PC-1 regression): truthy non-boolean exposure flag → unsafe_manifest (fail-closed, not fail-open)
+  check('pcorpus(S): truthy non-boolean exposure flag (1 / "true" / {}) → unsafe_manifest',
+    pc(safe({ rawFilesCommitted: 1 }), Object.assign({ sanitizedEvidence: fullEv }, ALLOW)).status === 'unsafe_manifest'
+    && pc(safe({ rawBytesExposed: 'true' }), Object.assign({ sanitizedEvidence: fullEv }, ALLOW)).status === 'unsafe_manifest'
+    && pc(safe({ fingerprintsExposed: {} }), Object.assign({ sanitizedEvidence: fullEv }, ALLOW)).status === 'unsafe_manifest');
+
+  // T (review PC-2 regression): identifying value in an accepted free-form field → manifest_invalid; plain token still ready
+  check('pcorpus(T): path / hash / file-ext in formatFamily / sourceType → manifest_invalid; plain token still ready',
+    pc(safe({ formatFamily: '/Users/x/secret.bmsbin' }), Object.assign({ sanitizedEvidence: fullEv }, ALLOW)).status === 'manifest_invalid'
+    && pc(safe({ sourceType: 'sha256:deadbeefdeadbeef' }), Object.assign({ sanitizedEvidence: fullEv }, ALLOW)).status === 'manifest_invalid'
+    && pc(safe({ formatFamily: 'darab', sourceType: 'bmsbin' }), Object.assign({ sanitizedEvidence: fullEv }, ALLOW)).status === 'private_corpus_boundary_ready');
 }
 
 // ── Phase 3R-0: trust-chain INVARIANTS (regression guards locking the Phase 3 red lines) ──
