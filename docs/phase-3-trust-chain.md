@@ -39,6 +39,7 @@ parseBms (3A)
   → evaluateBmsConfirmationEvidence (3D-0 HUB — runs LAST, aggregates all feeds)
   → evaluateBmsCanonicalAdapterEligibility (3G-1 — canonical-adapter BOUNDARY gate; after the hub, one-way, NOT fed back upstream)
   → evaluateBmsPrivateCorpusBoundary (3G-2 — private-corpus POLICY gate; consumes a sanitized MANIFEST, not the chain; single-file import → not_available; one-way)
+  → evaluateBmsSanitizedEvidenceAdapter (3G-3 — sanitized-evidence adapter DRY-RUN shape; consumes the 3G-2 boundary + a sanitized abstract-scope descriptor; single-file import → boundary_not_ready; one-way, NOT fed back upstream)
   → buildTelemetryMetadata (3A — merged, UI-facing descriptor)
 ```
 
@@ -68,6 +69,7 @@ so a single real file is fail-closed by construction regardless of feed wiring.
 | `bms-measured-extraction-harness.js` | 3G-0B | gate | **synthetic** measured-extraction harness |
 | `bms-canonical-adapter-eligibility.js` | 3G-1 | gate | real canonical-series adapter **boundary** / eligibility (after hub; one-way, not fed back) |
 | `bms-private-corpus-boundary.js` | 3G-2 | gate | private real-corpus **boundary** / evidence-ingestion policy (manifest safety; local-only; one-way) |
+| `bms-sanitized-evidence-adapter.js` | 3G-3 | gate | sanitized-evidence adapter **dry-run shape** (consumes 3G-2 boundary + abstract-scope descriptor; dry-run only; one-way, not fed back) |
 | `bms-confirmation.js` | 3D-0 | **hub** | aggregates all feeds → confirmation decision |
 | `telemetry-metadata.js` | 3A | aggregation | merges everything into the UI-facing descriptor |
 
@@ -113,6 +115,7 @@ shape change fails a test rather than silently spreading.
 - **3G-0B measured extraction:** `not_available < blocked_by_eligibility < blocked_real_path < insufficient_synthetic_series < segmentation_candidate < windows_candidate < steady_state_candidate < tendency_proxy_candidate < extracted_synthetic`
 - **3G-1 canonical adapter:** `not_available < blocked_by_prerequisites < raw_stream_missing < identity_missing < timebase_missing < scaling_missing < units_missing < corpus_missing < adapter_contract_candidate < synthetic_adapter_ready`
 - **3G-2 private corpus:** `not_available < private_corpus_disabled < manifest_missing < manifest_invalid < unsafe_manifest < insufficient_file_count < sanitized_evidence_missing < sanitized_evidence_candidate < private_corpus_boundary_ready`
+- **3G-3 sanitized-evidence adapter:** `not_available < boundary_not_ready < evidence_missing < evidence_invalid < unsafe_evidence < insufficient_scope < partial_adapter_shape < adapter_shape_candidate < dry_run_ready`
 - **3D-0 hub:** `not_confirmed < partially_confirmed < confirmed_structure`
 
 The top of every ladder (`confirmed_*` / `ready_for_analysis` / `eligible_for_extraction` /
@@ -167,6 +170,17 @@ the **single authoritative `capabilities` block the UI reads**. The hub addition
    ONLY that sanitized evidence is safe to ingest; it does NOT confirm raw stream / identity /
    timebase / scaling / units, and `canonicalAdapterEligible` / `canonicalTelemetry` / `timeSeries`
    stay false. `realDataUsed` is always false.
+7. The sanitized-evidence adapter (3G-3) consumes only the 3G-2 boundary result + a sanitized **abstract-
+   scope descriptor** (whitelisted scope keys + safety flags), never raw / decoded / identifying values.
+   Evidence that exposes raw bytes / decoded sequences / file names / paths / offsets / fingerprints /
+   sample values / channel names / timing / hashes — or carries any identifying field, unknown scope, or
+   leaky scope value — is rejected (unsafe/invalid). It consumes the boundary via a **dual check** (status
+   string `private_corpus_boundary_ready` AND feed flag `privateCorpusBoundaryReady === true`); neither
+   alone passes. `dry_run_ready` means ONLY that sanitized evidence was arranged into an adapter-consumable
+   DRY-RUN shape — it does NOT confirm raw stream / identity / timebase / scaling / units, does NOT make
+   the canonical adapter eligible, and `adapterEvidenceShapeAvailable` is the ONLY cap it may flip true
+   (`canonicalAdapterEligible` / `canonicalTelemetry` / `timeSeries` / `measuredExtraction` stay false).
+   One-way: never mutates the boundary or any upstream result. `realDataUsed` is always false.
 
 ## Synthetic vs real boundary
 
@@ -194,6 +208,21 @@ canonical adapter eligible, and produces NO canonical series. Whether this evide
 any confirmation is a future phase's decision; 3G-2 is one-way and never makes any upstream
 confirmation `confirmed`. `realDataUsed` is always false.
 
+Phase 3G-3 adds the sanitized-evidence adapter **dry-run shape** — the question *after* 3G-2 is "can
+the sanitized evidence that passed the boundary be arranged into the SHAPE a future canonical-series
+adapter would consume?" It consumes the 3G-2 boundary result plus a sanitized **abstract-scope
+descriptor** (whitelisted scope keys: `raw_stream_structure` / `channel_identity` / `timebase` /
+`physical_scaling` / `units` / `corpus_consistency` / `quality`, plus safety flags) — never raw /
+decoded / identifying values. The ladder climbs `boundary_not_ready` (single-file import) → … →
+`adapter_shape_candidate` (core scopes present) → `dry_run_ready` (every scope present, safe,
+sanitized). `dry_run_ready` is the explicit point of the trap: it means ONLY that sanitized evidence
+was shaped for a *future* adapter as a DRY RUN. It does NOT confirm raw stream / identity / timebase /
+scaling / units, does NOT make the canonical adapter eligible, and produces NO canonical series /
+time-series / measured extraction — `adapterEvidenceShapeAvailable` is the sole cap it may flip true.
+Whether this shaped evidence can later upgrade any confirmation is a future phase's (3G-4 / Phase 4)
+decision; 3G-3 is one-way and never makes any upstream confirmation `confirmed`. `realDataUsed` is
+always false.
+
 ## Reporter (`tools/bmsbin-local-probe-report.js`)
 
 Single-file, no-corpus stance: a single real file can confirm a catalog but never cross-file
@@ -207,7 +236,7 @@ literal needs no refactor). Runs only over files the user explicitly points at.
 | Test | Locks |
 |---|---|
 | A | real path fail-closed at every layer (gates + hub decisions) |
-| B | no gated cap true on real path (all layers + merged metadata) |
+| B | no gated cap true on real path (all layers incl. 3G-3 + merged metadata; `adapterEvidenceShapeAvailable` in the red-line set) |
 | C | hub pins timeSeries/physicalScaling/handlingCorrelation false |
 | D | bad/empty input fail-closed (no throw, no gated cap) |
 | E | reporter summary key set === REPORT_FIELDS; all scalar |
@@ -222,8 +251,12 @@ Per-phase behavior is additionally covered by the `[telemetry-readiness]`,
 
 ## Forward note — real-canonical-extraction phase
 
-Phase 3G-1 has already built the canonical-adapter **boundary** (the doorway), but real extraction
-itself has not started. When it does, it will edit the gate modules and `telemetry-metadata.js`.
+Phase 3G-1 built the canonical-adapter **boundary** (the doorway), 3G-2 the private-corpus
+**boundary** (the local evidence-ingestion policy), and 3G-3 the sanitized-evidence adapter
+**dry-run shape** (arranging that evidence for a future adapter) — but real extraction itself has
+not started. The natural next step is **3G-4 — real-canonical-extraction eligibility / confirmation
+bridge** (whether 3G-3's dry-run-shaped evidence may, over a corpus, begin to *upgrade* a
+confirmation). When real extraction does start, it will edit the gate modules and `telemetry-metadata.js`.
 Preserve: the fail-closed real path (no corpus on a single file ⇒ nothing confirmed); the
 string-vs-boolean dual gates (don't let a new status satisfy a check the boolean shouldn't); and
 the capability pins — a decode/analysis cap (`canonicalTelemetry` / `timeSeries` / `measuredExtraction`
