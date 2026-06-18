@@ -60,6 +60,11 @@ const REPORT_FIELDS = [
   // never eligible; required-channel keys are an abstract profile schema, never emitted as names.)
   'extractionEligibilityStatus', 'extractionEligibilityLevel', 'extractionEligibleCount',
   'extractionEligibleChannelCount', 'extractionMissingRequiredChannelCount',
+  // Phase 3G-0B synthetic measured-extraction harness (sanitized scalars only — status/level/counts +
+  // a realDataUsed=false flag, NEVER a real corner segment, window, sample index, corner timing,
+  // tendency, channel name, or physical value. Real files are blocked → never extracted_synthetic.)
+  'measuredExtractionStatus', 'measuredExtractionLevel', 'measuredExtractionCornerCount',
+  'measuredExtractionExtractedCornerCount', 'measuredExtractionRealDataUsed',
 ];
 
 /** Run the pipeline on one file's bytes and return a sanitized summary (no raw values).
@@ -115,6 +120,11 @@ function summarizeFile(bytes, fns, opts = {}) {
   const exConf = (typeof fns.evaluateBmsExtractionEligibility === 'function')
     ? fns.evaluateBmsExtractionEligibility(rdConf, {}) : null;
   const exAgg = (exConf && exConf.aggregateDecision) || {};
+  // Phase 3G-0B: synthetic measured-extraction harness. Run with NO synthetic series and not flagged
+  // synthetic, so a real file is always blocked (never extracted_synthetic) and no real corner /
+  // window / timing / tendency is ever produced; realDataUsed stays false.
+  const mxConf = (typeof fns.evaluateBmsMeasuredExtraction === 'function')
+    ? fns.evaluateBmsMeasuredExtraction(exConf, {}) : null;
   return {
     catalogDetected: !!(r.header && r.header.valid) && (r.channelCount || 0) > 0,
     channelCount: r.channelCount || 0,
@@ -182,6 +192,11 @@ function summarizeFile(bytes, fns, opts = {}) {
     extractionEligibleCount: exAgg.eligibleCount || 0,
     extractionEligibleChannelCount: exConf ? (exConf.eligibleChannelCount || 0) : 0,
     extractionMissingRequiredChannelCount: exConf ? (exConf.missingRequiredChannelCount || 0) : 0,
+    measuredExtractionStatus: mxConf ? mxConf.status : null,
+    measuredExtractionLevel: mxConf ? mxConf.extractionLevel : null,
+    measuredExtractionCornerCount: mxConf ? (mxConf.cornerCount || 0) : 0,
+    measuredExtractionExtractedCornerCount: mxConf ? (mxConf.extractedCornerCount || 0) : 0,
+    measuredExtractionRealDataUsed: mxConf ? !!mxConf.realDataUsed : false,
   };
   // Deliberately omitted: sample values, raw bytes, byte offsets, channel labels/mapping, inferred
   // Hz/rate, scale factors, unit tables, transform constants, inferred physical values, analysis
@@ -270,6 +285,10 @@ function aggregate(summaries) {
     extractionEligibilityStatusHistogram: summaries.reduce((h, s) => { const k = s.extractionEligibilityStatus || 'none'; h[k] = (h[k] || 0) + 1; return h; }, {}),
     eligibleForExtractionFiles: cnt(s => s.extractionEligibleCount > 0),
     extractionEligibleChannelCountRange: range(s => s.extractionEligibleChannelCount),
+    // Phase 3G-0B measured extraction (sanitized counts / histograms; never a corner/window/tendency)
+    measuredExtractionStatusHistogram: summaries.reduce((h, s) => { const k = s.measuredExtractionStatus || 'none'; h[k] = (h[k] || 0) + 1; return h; }, {}),
+    measuredExtractionSyntheticFiles: cnt(s => s.measuredExtractionStatus === 'extracted_synthetic'),
+    measuredExtractionRealDataUsedFiles: cnt(s => s.measuredExtractionRealDataUsed),
   };
 }
 
@@ -290,9 +309,9 @@ function readHead(fs, file, n) {
 function loadFns() {
   const fs = require('fs'), path = require('path'), vm = require('vm');
   const jsDir = path.join(__dirname, '..', 'renderer', 'js');
-  const files = ['bms-parser.js', 'telemetry-schema.js', 'telemetry-metadata.js', 'bms-probe.js', 'bms-raw-extract.js', 'bms-channel-link.js', 'bms-confirmation.js', 'bms-structure-discovery.js', 'bms-raw-stream-confirmation.js', 'bms-channel-identity-confirmation.js', 'bms-timebase-confirmation.js', 'bms-physical-scaling-confirmation.js', 'bms-telemetry-readiness.js', 'bms-extraction-eligibility.js'];
+  const files = ['bms-parser.js', 'telemetry-schema.js', 'telemetry-metadata.js', 'bms-probe.js', 'bms-raw-extract.js', 'bms-channel-link.js', 'bms-confirmation.js', 'bms-structure-discovery.js', 'bms-raw-stream-confirmation.js', 'bms-channel-identity-confirmation.js', 'bms-timebase-confirmation.js', 'bms-physical-scaling-confirmation.js', 'bms-telemetry-readiness.js', 'bms-extraction-eligibility.js', 'bms-measured-extraction-harness.js'];
   const src = files.map(f => fs.readFileSync(path.join(jsDir, f), 'utf8')).join('\n')
-    + '\nthis.__f = { parseBms, probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, evaluateBmsTelemetryReadiness, evaluateBmsExtractionEligibility, buildTelemetryMetadata };';
+    + '\nthis.__f = { parseBms, probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, evaluateBmsTelemetryReadiness, evaluateBmsExtractionEligibility, evaluateBmsMeasuredExtraction, buildTelemetryMetadata };';
   const ctx = {}; vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'bms-bundle.js' });
   return ctx.__f;
 }
@@ -314,9 +333,9 @@ if (require.main === module) {
   const fns = loadFns();
   const summaries = files.map(f => {
     try { return summarizeFile(readHead(fs, f, 2 * 1024 * 1024), fns, { scanWindowBytes: 1024 * 1024 }); }
-    catch (e) { return { catalogDetected: false, channelCount: 0, candidateRegionCount: 0, bestEncodingHypothesis: null, timebaseCandidate: false, rawSeriesCount: 0, linkStatus: 'error', channelIdentityConfirmed: false, canonicalAvailable: false, confirmationStatus: 'error', confirmedCatalog: false, confirmedStructure: false, confirmedChannelIdentity: false, confirmedTimebase: false, confirmedPhysicalScaling: false, canonicalTelemetry: false, confirmationScore: 0, structureStatus: 'error', pointerTableCandidate: false, pointerTableMatchesCatalog: false, perChannelBlockHypothesis: false, interleavedHypothesis: false, candidateChannelBlocks: 0, blockCountRelation: 'unknown', structureConverged: false, rawStreamConfirmationStatus: 'error', confirmedRawStreamCount: 0, partialRawStreamCount: 0, rejectedRawStreamCount: 0, rawStreamSampleCountConsistent: false, rawStreamBlockLengthConsistent: false, rawStreamTimebasePrecheck: false, rawStreamCrossFileStable: false, channelIdentityStatus: 'error', identityCandidateCount: 0, identityConfirmedCount: 0, identityHypothesisCount: 0, identityLabeledUnverifiedCount: 0, identityEvidenceLevel: 'error', timebaseStatus: 'error', timebaseConfirmedCount: 0, timebaseCandidateCount: 0, timebaseSampleCountStable: false, timebaseMonotonicStable: false, timebaseDeltaStable: false, timebaseChannelSyncStable: false, timebaseDropoutCount: 0, physicalScalingStatus: 'error', scalingConfirmedCount: 0, scalingCandidateCount: 0, scalingUnitsConfirmedCount: 0, scalingManualHintCount: 0, scalingEvidenceLevel: 'error', readinessStatus: 'error', readinessLevel: 'error', readinessReadyCount: 0, readyChannelCount: 0, missingRequiredChannelCount: 0, readinessSampleRateAdequacy: 'error', readinessSyncQuality: 'error', readinessDropoutQuality: 'error', extractionEligibilityStatus: 'error', extractionEligibilityLevel: 'error', extractionEligibleCount: 0, extractionEligibleChannelCount: 0, extractionMissingRequiredChannelCount: 0 }; }
+    catch (e) { return { catalogDetected: false, channelCount: 0, candidateRegionCount: 0, bestEncodingHypothesis: null, timebaseCandidate: false, rawSeriesCount: 0, linkStatus: 'error', channelIdentityConfirmed: false, canonicalAvailable: false, confirmationStatus: 'error', confirmedCatalog: false, confirmedStructure: false, confirmedChannelIdentity: false, confirmedTimebase: false, confirmedPhysicalScaling: false, canonicalTelemetry: false, confirmationScore: 0, structureStatus: 'error', pointerTableCandidate: false, pointerTableMatchesCatalog: false, perChannelBlockHypothesis: false, interleavedHypothesis: false, candidateChannelBlocks: 0, blockCountRelation: 'unknown', structureConverged: false, rawStreamConfirmationStatus: 'error', confirmedRawStreamCount: 0, partialRawStreamCount: 0, rejectedRawStreamCount: 0, rawStreamSampleCountConsistent: false, rawStreamBlockLengthConsistent: false, rawStreamTimebasePrecheck: false, rawStreamCrossFileStable: false, channelIdentityStatus: 'error', identityCandidateCount: 0, identityConfirmedCount: 0, identityHypothesisCount: 0, identityLabeledUnverifiedCount: 0, identityEvidenceLevel: 'error', timebaseStatus: 'error', timebaseConfirmedCount: 0, timebaseCandidateCount: 0, timebaseSampleCountStable: false, timebaseMonotonicStable: false, timebaseDeltaStable: false, timebaseChannelSyncStable: false, timebaseDropoutCount: 0, physicalScalingStatus: 'error', scalingConfirmedCount: 0, scalingCandidateCount: 0, scalingUnitsConfirmedCount: 0, scalingManualHintCount: 0, scalingEvidenceLevel: 'error', readinessStatus: 'error', readinessLevel: 'error', readinessReadyCount: 0, readyChannelCount: 0, missingRequiredChannelCount: 0, readinessSampleRateAdequacy: 'error', readinessSyncQuality: 'error', readinessDropoutQuality: 'error', extractionEligibilityStatus: 'error', extractionEligibilityLevel: 'error', extractionEligibleCount: 0, extractionEligibleChannelCount: 0, extractionMissingRequiredChannelCount: 0, measuredExtractionStatus: 'error', measuredExtractionLevel: 'error', measuredExtractionCornerCount: 0, measuredExtractionExtractedCornerCount: 0, measuredExtractionRealDataUsed: false }; }
   });
-  console.log('# .bmsbin local reality check (Phase 3C-1 + 3D-0 + 3D-1 + 3D-2 + 3E-0 + 3E-1 + 3F-0 + 3F-1 + 3G-0A extraction eligibility) — SANITIZED, statistics only');
+  console.log('# .bmsbin local reality check (Phase 3C-1 + 3D-0 + 3D-1 + 3D-2 + 3E-0 + 3E-1 + 3F-0 + 3F-1 + 3G-0A + 3G-0B synthetic measured-extraction harness) — SANITIZED, statistics only');
   console.log(JSON.stringify(aggregate(summaries), null, 2));
   console.log('\nReminder: statistics only. Real .bmsbin files and raw sample values are NEVER committed.');
 }
