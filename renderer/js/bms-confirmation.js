@@ -154,10 +154,22 @@ function evaluateBmsConfirmationEvidence(bmsResult, probeReport, rawExtraction, 
     && opts.corpus && opts.corpus.fileCount >= 2);
   const measuredExtractionEligible = telemetryReadyForAnalysis && extractionEligibilityFeed;
 
+  // Optional Phase 3G-0B measured-extraction harness feed — a SYNTHETIC harness, not real extraction.
+  // It can only report that the SYNTHETIC harness ran end-to-end, and only when measured extraction is
+  // eligible AND the harness reports extracted_synthetic AND there is a corpus. Absent → no effect
+  // (backward-compatible). Real imported data never reaches extracted_synthetic (and never becomes
+  // measuredExtractionEligible), so this stays false on real data. It opens NO decode/analysis cap.
+  const mxConf = opts.measuredExtraction || null;
+  const measuredExtractionFeed = !!(mxConf && mxConf.status === 'extracted_synthetic'
+    && mxConf.capabilities && mxConf.capabilities.measuredExtractionSynthetic === true
+    && opts.corpus && opts.corpus.fileCount >= 2);
+  const measuredExtractionSynthetic = measuredExtractionEligible && measuredExtractionFeed;
+
   const decisions = {
     canConfirmCatalog, canConfirmSampleStructure, canConfirmRawStreams,
     canConfirmChannelIdentity, canConfirmTimebase, canConfirmPhysicalScaling,
     canonicalTelemetryPrerequisitesMet, telemetryReadyForAnalysis, measuredExtractionEligible,
+    measuredExtractionSynthetic,
   };
 
   // ── scores (0..1; weighted overall) ──

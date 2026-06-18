@@ -261,6 +261,30 @@ function buildTelemetryMetadata(bmsResult) {
     diagnostics: extraction.diagnostics || [],
   } : null;
 
+  // Optional Phase 3G-0B measured-extraction harness (attached by the app at import time). A SYNTHETIC
+  // harness, not real extraction. On real imported data it is never available (eligibility gate not
+  // passed + no synthetic series); no real measured handling response / tendency / Kus / overlay /
+  // model-vs-actual is produced; realDataUsed is always false.
+  const measExt = (bmsResult && bmsResult.measuredExtraction) || null;
+  const hasMeasExt = !hasError && !!measExt;
+  const mxAgg = (measExt && measExt.aggregateDecision) || {};
+  const measuredExtractionSynthetic = !!mxAgg.canExtractSynthetic;   // synthetic-only; false on real data
+  const measuredExtractionSummary = hasMeasExt ? {
+    status: measExt.status,
+    extractionLevel: measExt.extractionLevel,
+    measuredExtractionSynthetic,
+    syntheticOnly: !!measExt.syntheticOnly,
+    realDataUsed: false,
+    cornerCount: measExt.cornerCount || 0,
+    extractedCornerCount: measExt.extractedCornerCount || 0,
+    steadyStateWindowCount: measExt.steadyStateWindowCount || 0,
+    tendencyProxyCount: measExt.tendencyProxyCount || 0,
+    measuredResponseAvailable: false,
+    handlingAnalysisEnabled: false,
+    blockers: measExt.blockers || [],
+    diagnostics: measExt.diagnostics || [],
+  } : null;
+
   return {
     sourceType: 'bmsbin',
     sourceFileName: (bmsResult && bmsResult.fileName) || null,
@@ -293,7 +317,10 @@ function buildTelemetryMetadata(bmsResult) {
       telemetryReady,                           // Phase 3F-1: synthetic-only true; false on all real data
       extractionEligibilityCriteria: hasExtraction, // Phase 3G-0A: extraction input-contract gate present
       extractionEligible,                       // Phase 3G-0A: synthetic-only true; false on all real data
-      measuredHandlingResponse: false,          // Phase 3G-0A is a contract gate, not extraction
+      measuredExtractionHarness: hasMeasExt,    // Phase 3G-0B: synthetic harness criteria present
+      measuredExtractionSynthetic,              // Phase 3G-0B: synthetic-only true; false on all real data
+      measuredExtraction: false,                // real measured extraction never produced (synthetic harness only)
+      measuredHandlingResponse: false,          // 3G-0A/0B are a contract gate + synthetic harness, not a real response
       timeSeries: false,            // not confirmed usable telemetry
       canonicalTelemetry: false,    // never produced / usable yet (eligibility ≠ available)
       handlingAnalysis: false,      // readiness is a gate, not analysis
@@ -314,6 +341,7 @@ function buildTelemetryMetadata(bmsResult) {
     physicalScaling: scalingSummary,
     readiness: readinessSummary,
     extractionEligibility: extractionSummary,
+    measuredExtraction: measuredExtractionSummary,
     diagnostics,
   };
 }
