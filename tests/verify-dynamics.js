@@ -39,6 +39,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'bms-telemetry-readiness.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-extraction-eligibility.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-measured-extraction-harness.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-canonical-adapter-eligibility.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -48,7 +49,7 @@ const src =
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
-  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, evaluateBmsTelemetryReadiness, evaluateBmsExtractionEligibility, EXTRACTION_INPUT_CONTRACT, EXTRACTION_OUTPUT_CONTRACT, evaluateBmsMeasuredExtraction, ' +
+  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, evaluateBmsTelemetryReadiness, evaluateBmsExtractionEligibility, EXTRACTION_INPUT_CONTRACT, EXTRACTION_OUTPUT_CONTRACT, evaluateBmsMeasuredExtraction, evaluateBmsCanonicalAdapterEligibility, CANONICAL_ADAPTER_CONTRACT, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
@@ -1056,6 +1057,13 @@ console.log('\n[tool] local validation reporter — fixture-safe / sanitized out
     && s.measuredExtractionCornerCount === 0 && s.measuredExtractionRealDataUsed === false
     && typeof agg.measuredExtractionSyntheticFiles === 'number' && agg.measuredExtractionSyntheticFiles === 0
     && agg.measuredExtractionStatusHistogram && Object.values(agg.measuredExtractionStatusHistogram).every(x => typeof x === 'number'));
+
+  // 11. Phase 3G-1 canonical adapter present, sanitized scalars, honest (real file blocked at boundary, never ready)
+  check('tool: summary carries sanitized canonical-adapter eligibility (real file blocked, never ready, realDataUsed false)',
+    typeof s.canonicalAdapterStatus === 'string' && s.canonicalAdapterStatus !== 'synthetic_adapter_ready'
+    && s.canonicalAdapterEligibleCount === 0 && s.canonicalAdapterRealDataUsed === false
+    && typeof agg.canonicalAdapterReadyFiles === 'number' && agg.canonicalAdapterReadyFiles === 0
+    && agg.canonicalAdapterStatusHistogram && Object.values(agg.canonicalAdapterStatusHistogram).every(x => typeof x === 'number'));
 }
 
 // ── Phase 3D-0: hypothesis→confirmed criteria (synthetic; decisions, never decoded values) ──
@@ -2093,13 +2101,89 @@ console.log('\n[measured-extraction] .bmsbin synthetic measured-extraction harne
     ['low', 'medium'].includes(d.confidence) && ['low', 'medium'].includes(big.confidence));
 }
 
+// ── Phase 3G-1: real canonical-series adapter BOUNDARY / eligibility gate (real path always blocked;
+//    synthetic-only adapter-ready; boundary check, never a real canonical series) ──
+console.log('\n[canonical-adapter] .bmsbin real canonical-series adapter boundary / eligibility gate');
+{
+  const code = (r, c) => r.diagnostics.some(d => d.code === c);
+  const CORPUS = { fileCount: 3, candidateRegionStable: true, channelCountStable: true };
+  const ANALYSIS = ['canonicalTelemetry', 'timeSeries', 'measuredExtraction', 'measuredHandlingResponse', 'handlingAnalysis', 'overlayEnabled', 'kus', 'handlingCorrelation', 'setupRecommendation', 'modelVsActual'];
+  const cf = o => ANALYSIS.every(k => o.capabilities[k] === false);
+  const mkRd = (inputs, ready) => ({ status: ready ? 'ready_for_analysis' : 'not_ready', inputs, aggregateDecision: { canBeReadyForAnalysis: !!ready }, capabilities: { telemetryReadiness: !!ready, handlingAnalysis: false } });
+  const ALL = { rawStreamConfirmed: true, identityConfirmed: true, timebaseConfirmed: true, scalingConfirmed: true, unitsConfirmed: true, canonicalEligible: true, hasCorpusEvidence: true };
+  const without = (k) => { const c = Object.assign({}, ALL); c[k] = false; return c; };
+  const eligElig = { status: 'eligible_for_extraction', capabilities: { extractionEligible: true } };
+  const synMx = { capabilities: { measuredExtractionSynthetic: true } };
+  const confStub = { decisions: { canConfirmCatalog: true } };
+  const ca = (conf, rd, elig, mxr, opts) => M.evaluateBmsCanonicalAdapterEligibility(conf, rd, elig, mxr, opts || {});
+
+  // A. no inputs
+  const a = ca(null, null, null, null, {});
+  check('cadapter(A): no inputs → not_available; canEnter false; caps false; realDataUsed false',
+    a.status === 'not_available' && a.aggregateDecision.canEnterCanonicalAdapter === false && cf(a) && a.realDataUsed === false && a.capabilities.canonicalAdapterEligible === false);
+
+  // B. real/imported path (readiness all-false)
+  const realRd = mkRd({ rawStreamConfirmed: false, identityConfirmed: false, timebaseConfirmed: false, scalingConfirmed: false, unitsConfirmed: false, canonicalEligible: false, hasCorpusEvidence: false }, false);
+  const b = ca(confStub, realRd, M.evaluateBmsExtractionEligibility(realRd, {}), null, {});
+  check('cadapter(B): real path → raw_stream_missing; not eligible; canonicalTelemetry/timeSeries/measuredExtraction false; realDataUsed false',
+    b.status === 'raw_stream_missing' && b.capabilities.canonicalAdapterEligible === false && b.capabilities.canonicalTelemetry === false && b.capabilities.timeSeries === false && b.capabilities.measuredExtraction === false && b.realDataUsed === false && cf(b));
+
+  // C-G. missing prerequisite ladder (first-missing wins)
+  const c = ca(confStub, mkRd(without('rawStreamConfirmed'), false), eligElig, synMx, { corpus: CORPUS });
+  check('cadapter(C): missing raw stream → raw_stream_missing', c.status === 'raw_stream_missing' && cf(c));
+  const d = ca(confStub, mkRd(without('identityConfirmed'), false), eligElig, synMx, { corpus: CORPUS });
+  check('cadapter(D): missing identity → identity_missing', d.status === 'identity_missing' && cf(d));
+  const e = ca(confStub, mkRd(without('timebaseConfirmed'), false), eligElig, synMx, { corpus: CORPUS });
+  check('cadapter(E): missing timebase → timebase_missing', e.status === 'timebase_missing' && cf(e));
+  const fsc = ca(confStub, mkRd(without('scalingConfirmed'), false), eligElig, synMx, { corpus: CORPUS });
+  check('cadapter(F): missing scaling → scaling_missing', fsc.status === 'scaling_missing' && cf(fsc));
+  const g = ca(confStub, mkRd(without('unitsConfirmed'), false), eligElig, synMx, { corpus: CORPUS });
+  check('cadapter(G): missing units → units_missing', g.status === 'units_missing' && cf(g));
+
+  // H. all inputs but no corpus (opts.corpus absent) → corpus_missing
+  const h = ca(confStub, mkRd(ALL, true), eligElig, synMx, {});
+  check('cadapter(H): missing cross-file corpus → corpus_missing', h.status === 'corpus_missing' && cf(h));
+
+  // I. all prerequisites + corpus but NOT syntheticOnly → adapter_contract_candidate (real path never ready)
+  const i = ca(confStub, mkRd(ALL, true), eligElig, synMx, { corpus: CORPUS });
+  check('cadapter(I): all prereqs but not syntheticOnly → adapter_contract_candidate; not eligible; canonicalTelemetry false; realDataUsed false',
+    i.status === 'adapter_contract_candidate' && i.capabilities.canonicalAdapterEligible === false && i.capabilities.canonicalTelemetry === false && i.realDataUsed === false && cf(i) && code(i, 'BMS_CADAPTER_REAL_PATH_BLOCKED'));
+
+  // J. synthetic adapter ready (all prereqs + corpus + syntheticOnly)
+  const j = ca(confStub, mkRd(ALL, true), eligElig, synMx, { corpus: CORPUS, syntheticOnly: true });
+  check('cadapter(J): all prereqs + corpus + syntheticOnly → synthetic_adapter_ready; eligible true; realDataUsed false; analysis caps false',
+    j.status === 'synthetic_adapter_ready' && j.aggregateDecision.canEnterCanonicalAdapter === true && j.capabilities.canonicalAdapterEligible === true && j.realDataUsed === false && cf(j)
+    && j.capabilities.canonicalTelemetry === false && j.capabilities.timeSeries === false && j.capabilities.measuredHandlingResponse === false);
+
+  // K. NaN / invalid evidence → fail-closed
+  const k = ca(confStub, mkRd({ rawStreamConfirmed: NaN, identityConfirmed: 'yes', timebaseConfirmed: 1, scalingConfirmed: true, unitsConfirmed: true, hasCorpusEvidence: true }, true), eligElig, synMx, { corpus: CORPUS, syntheticOnly: true });
+  check('cadapter(K): NaN/invalid evidence → fail-closed (not synthetic_adapter_ready); caps false',
+    k.status !== 'synthetic_adapter_ready' && k.capabilities.canonicalAdapterEligible === false && cf(k));
+
+  // L. one-way feed — running the adapter does not mutate upstream reports
+  const rdL = mkRd(ALL, true); const eligL = M.evaluateBmsExtractionEligibility(rdL, {});
+  const rdBefore = JSON.stringify(rdL), eligBefore = JSON.stringify(eligL);
+  ca(confStub, rdL, eligL, synMx, { corpus: CORPUS, syntheticOnly: true });
+  check('cadapter(L): one-way feed — adapter does not mutate readiness / extraction-eligibility',
+    JSON.stringify(rdL) === rdBefore && JSON.stringify(eligL) === eligBefore);
+
+  // M. telemetry-metadata integration (real path conservative; modelVsActual stays pinned false)
+  const realA = ca(confStub, realRd, M.evaluateBmsExtractionEligibility(realRd, {}), null, {});
+  const meta = M.buildTelemetryMetadata({ header: { importer: 'DarabImporter v.', valid: true }, channelCount: 4, channels: ['accy', 'yaw', 'steer', 'speed'].map(n => ({ name: n })), canonicalAdapter: realA });
+  check('cadapter→metadata: summary surfaced + canonicalAdapterEligible false; canonicalTelemetry/timeSeries/modelVsActual false',
+    !!meta.canonicalAdapter && meta.capabilities.canonicalAdapterEligibilityCriteria === true && meta.capabilities.canonicalAdapterEligible === false
+    && meta.capabilities.canonicalTelemetry === false && meta.capabilities.timeSeries === false && meta.capabilities.modelVsActual === false);
+  check('cadapter→metadata: no canonicalAdapter → cap false, summary null',
+    M.buildTelemetryMetadata({ header: { importer: 'D', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).canonicalAdapter === null);
+}
+
 // ── Phase 3R-0: trust-chain INVARIANTS (regression guards locking the Phase 3 red lines) ──
 console.log('\n[invariants] Phase 3 trust-chain red-line invariants');
 {
   const GATED = ['physicalScaling', 'unitsConfirmed', 'canonicalTelemetry', 'telemetryReady', 'telemetryReadiness',
     'extractionEligible', 'measuredExtraction', 'measuredExtractionSynthetic', 'measuredHandlingResponse',
     'handlingAnalysis', 'overlayEnabled', 'kus', 'handlingCorrelation', 'setupRecommendation', 'modelVsActual',
-    'timeSeries', 'lapSegmentation'];
+    'timeSeries', 'lapSegmentation', 'canonicalAdapterEligible'];
   const noGated = o => !!(o && o.capabilities) && GATED.every(k => o.capabilities[k] === undefined || o.capabilities[k] === false);
 
   // real/imported single-file path: build the whole chain with empty opts (the importBms / reporter call shape)
@@ -2114,7 +2198,8 @@ console.log('\n[invariants] Phase 3 trust-chain red-line invariants');
   const eligibility = M.evaluateBmsExtractionEligibility(readiness, {});
   const measext = M.evaluateBmsMeasuredExtraction(eligibility, {});
   const hub = M.evaluateBmsConfirmationEvidence(realBms, probe, rawX, link, { readiness, extractionEligibility: eligibility, measuredExtraction: measext });
-  const meta = M.buildTelemetryMetadata(Object.assign({}, realBms, { rawStreamConfirmation: rawStream, channelIdentity: identity, timebase, physicalScaling: scaling, readiness, extractionEligibility: eligibility, measuredExtraction: measext, confirmation: hub, probe, raw: rawX, link }));
+  const adapter = M.evaluateBmsCanonicalAdapterEligibility(hub, readiness, eligibility, measext, {});
+  const meta = M.buildTelemetryMetadata(Object.assign({}, realBms, { rawStreamConfirmation: rawStream, channelIdentity: identity, timebase, physicalScaling: scaling, readiness, extractionEligibility: eligibility, measuredExtraction: measext, confirmation: hub, canonicalAdapter: adapter, probe, raw: rawX, link }));
 
   // A. real path fail-closed at every layer (gates + hub decisions)
   check('invariant(A): real path fail-closed (readiness not_ready / eligibility not_eligible / measext blocked / hub not_confirmed)',
@@ -2122,16 +2207,17 @@ console.log('\n[invariants] Phase 3 trust-chain red-line invariants');
     && hub.decisions.canConfirmSampleStructure === false && hub.decisions.canConfirmRawStreams === false
     && hub.decisions.canConfirmChannelIdentity === false && hub.decisions.canConfirmTimebase === false
     && hub.decisions.canConfirmPhysicalScaling === false && hub.decisions.canonicalTelemetryPrerequisitesMet === false
-    && hub.decisions.telemetryReadyForAnalysis === false && hub.decisions.measuredExtractionEligible === false && hub.decisions.measuredExtractionSynthetic === false);
+    && hub.decisions.telemetryReadyForAnalysis === false && hub.decisions.measuredExtractionEligible === false && hub.decisions.measuredExtractionSynthetic === false
+    && adapter.status === 'raw_stream_missing' && adapter.aggregateDecision.canEnterCanonicalAdapter === false && adapter.realDataUsed === false);
 
   // B. no gated capability true on the real path — at any layer or in the merged metadata
   // merged-metadata leg asserts every red-line cap is EXPLICITLY false (not merely absent) — closes
   // the noGated undefined-leniency gap for caps the UI-authoritative block must carry (incl. modelVsActual).
   const META_RED = ['physicalScaling', 'unitsConfirmed', 'canonicalTelemetry', 'telemetryReady', 'extractionEligible',
     'measuredExtraction', 'measuredExtractionSynthetic', 'measuredHandlingResponse', 'handlingAnalysis', 'overlayEnabled',
-    'kus', 'handlingCorrelation', 'setupRecommendation', 'modelVsActual', 'timeSeries', 'lapSegmentation'];
+    'kus', 'handlingCorrelation', 'setupRecommendation', 'modelVsActual', 'timeSeries', 'lapSegmentation', 'canonicalAdapterEligible'];
   check('invariant(B): no gated capability true on real path (all layers + every merged-metadata red-line cap === false)',
-    [rawStream, identity, timebase, scaling, readiness, eligibility, measext, hub].every(noGated) && noGated(meta)
+    [rawStream, identity, timebase, scaling, readiness, eligibility, measext, hub, adapter].every(noGated) && noGated(meta)
     && META_RED.every(k => meta.capabilities[k] === false));
 
   // C. confirmation hub pins decode caps false literally on every path
