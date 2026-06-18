@@ -37,6 +37,7 @@ parseBms (3A)
   → evaluateBmsExtractionEligibility (3G-0A)
   → evaluateBmsMeasuredExtraction (3G-0B)
   → evaluateBmsConfirmationEvidence (3D-0 HUB — runs LAST, aggregates all feeds)
+  → evaluateBmsCanonicalAdapterEligibility (3G-1 — canonical-adapter BOUNDARY gate; after the hub, one-way, NOT fed back upstream)
   → buildTelemetryMetadata (3A — merged, UI-facing descriptor)
 ```
 
@@ -64,6 +65,7 @@ so a single real file is fail-closed by construction regardless of feed wiring.
 | `bms-telemetry-readiness.js` | 3F-1 | gate | data-quality / readiness GATE |
 | `bms-extraction-eligibility.js` | 3G-0A | gate | extraction input-contract + eligibility GATE |
 | `bms-measured-extraction-harness.js` | 3G-0B | gate | **synthetic** measured-extraction harness |
+| `bms-canonical-adapter-eligibility.js` | 3G-1 | gate | real canonical-series adapter **boundary** / eligibility (after hub; one-way, not fed back) |
 | `bms-confirmation.js` | 3D-0 | **hub** | aggregates all feeds → confirmation decision |
 | `telemetry-metadata.js` | 3A | aggregation | merges everything into the UI-facing descriptor |
 
@@ -107,6 +109,7 @@ shape change fails a test rather than silently spreading.
 - **3F-1 readiness:** `not_ready < insufficient_prerequisites < missing_required_channels < quality_blocked < partial_readiness < candidate_readiness < confirmable_readiness < ready_for_analysis`
 - **3G-0A eligibility:** `not_eligible < prerequisites_unmet < canonical_series_unavailable < required_channels_unavailable < partial_eligibility < segmentation_prerequisites_unmet < window_prerequisites_unmet < corpus_unavailable < eligible_for_extraction`
 - **3G-0B measured extraction:** `not_available < blocked_by_eligibility < blocked_real_path < insufficient_synthetic_series < segmentation_candidate < windows_candidate < steady_state_candidate < tendency_proxy_candidate < extracted_synthetic`
+- **3G-1 canonical adapter:** `not_available < blocked_by_prerequisites < raw_stream_missing < identity_missing < timebase_missing < scaling_missing < units_missing < corpus_missing < adapter_contract_candidate < synthetic_adapter_ready`
 - **3D-0 hub:** `not_confirmed < partially_confirmed < confirmed_structure`
 
 The top of every ladder (`confirmed_*` / `ready_for_analysis` / `eligible_for_extraction` /
@@ -143,10 +146,12 @@ the **single authoritative `capabilities` block the UI reads**. The hub addition
    `physicalScaling, unitsConfirmed, canonicalTelemetry, telemetryReady, extractionEligible,
    measuredExtraction, measuredExtractionSynthetic, measuredHandlingResponse, handlingAnalysis,
    overlayEnabled, kus, handlingCorrelation, setupRecommendation, modelVsActual, timeSeries,
-   lapSegmentation`.
+   lapSegmentation, canonicalAdapterEligible`.
 3. A synthetic `extracted_synthetic` opens **only** `measuredExtractionSynthetic` /
-   `measuredExtractionHarness`; `realDataUsed` stays false; **no** analysis/overlay/Kus/setup/
-   model-vs-actual cap flips.
+   `measuredExtractionHarness`, and a synthetic `synthetic_adapter_ready` (3G-1) opens **only**
+   `canonicalAdapterEligible`; in both cases `realDataUsed` stays false, NO real canonical series is
+   built, and **no** canonicalTelemetry / timeSeries / measuredExtraction / analysis / overlay / Kus /
+   setup / model-vs-actual cap flips.
 4. The reporter emits **only sanitized scalars** (the `REPORT_FIELDS` whitelist) — never a real
    sample, sample index, exact timing, corner window, tendency, channel name, physical value, raw
    byte, decoded sequence, or proprietary fingerprint.
@@ -162,13 +167,20 @@ result*. The measured-tendency output is an explicit proxy — one of `understee
 `notKus / notSetupAdvice / notModelVsActual`; the UI/i18n surface the honest disclaimer and show no
 green badge for a real path.
 
+Phase 3G-1 adds the canonical-adapter **boundary** — whether real data is even eligible to enter a
+future canonical measured-series adapter. On a real single file it is always blocked
+(`raw_stream_missing` / … / `corpus_missing`); only a synthetic, fully-confirmed, corpus-backed
+fixture reaches `synthetic_adapter_ready`, and even then NO real canonical series is built and
+`canonicalTelemetry` / `timeSeries` / `measuredExtraction` stay false (`realDataUsed` always false).
+The adapter runs AFTER the hub and is one-way — it never feeds back into the upstream gates.
+
 ## Reporter (`tools/bmsbin-local-probe-report.js`)
 
 Single-file, no-corpus stance: a single real file can confirm a catalog but never cross-file
 stability, so every `confirmed*` count is 0 and `confirmationStatus` is `not_confirmed`. Output is
-71 sanitized scalar `REPORT_FIELDS`. The per-file error fallback must keep the **same key set** as
-`REPORT_FIELDS` (locked by `[invariants] (F)` as a drift guard, so the inline literal needs no
-refactor). Runs only over files the user explicitly points at.
+the sanitized scalar `REPORT_FIELDS` whitelist only. The per-file error fallback must keep the
+**same key set** as `REPORT_FIELDS` (locked by `[invariants] (F)` as a drift guard, so the inline
+literal needs no refactor). Runs only over files the user explicitly points at.
 
 ## Invariant test index (`tests/verify-dynamics.js` → `[invariants]`)
 
@@ -190,9 +202,12 @@ Per-phase behavior is additionally covered by the `[telemetry-readiness]`,
 
 ## Forward note — real-canonical-extraction phase
 
-When real extraction begins, it will edit the gate modules and `telemetry-metadata.js`. Preserve:
-the fail-closed real path (no corpus on a single file ⇒ nothing confirmed); the
+Phase 3G-1 has already built the canonical-adapter **boundary** (the doorway), but real extraction
+itself has not started. When it does, it will edit the gate modules and `telemetry-metadata.js`.
+Preserve: the fail-closed real path (no corpus on a single file ⇒ nothing confirmed); the
 string-vs-boolean dual gates (don't let a new status satisfy a check the boolean shouldn't); and
-the capability pins — a decode/analysis cap may turn true **only** once real decode is genuinely
-proven (confirmed canonical values + corpus), never merely because a summary surfaced. Until then,
-real data stays unavailable, and `v1.7.0 — Telemetry Validation Workflow` waits.
+the capability pins — a decode/analysis cap (`canonicalTelemetry` / `timeSeries` / `measuredExtraction`
+/ `canonicalAdapterEligible` on real data) may turn true **only** once real decode is genuinely
+proven (confirmed canonical values + corpus), never merely because a summary surfaced or the adapter
+boundary was reached. Until then, real data stays unavailable, and `v1.7.0 — Telemetry Validation
+Workflow` waits.
