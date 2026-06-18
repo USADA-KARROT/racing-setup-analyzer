@@ -2290,13 +2290,143 @@ console.log('\n[private-corpus] .bmsbin private real-corpus boundary / evidence-
     && pc(safe({ formatFamily: 'darab', sourceType: 'bmsbin' }), Object.assign({ sanitizedEvidence: fullEv }, ALLOW)).status === 'private_corpus_boundary_ready');
 }
 
+// ── Phase 3G-3: sanitized-evidence adapter DRY-RUN shape (arranges sanitized aggregate evidence into
+//    an adapter-consumable dry-run shape; NOT extraction, NOT confirmation; dry_run_ready ≠ telemetry
+//    confirmed; real/single-file path always boundary_not_ready) ──
+console.log('\n[sanitized-evidence-adapter] .bmsbin sanitized-evidence adapter dry-run shape');
+{
+  const code = (r, c) => r.diagnostics.some(d => d.code === c);
+  const CAPS = ['rawStreamConfirmed', 'identityConfirmed', 'timebaseConfirmed', 'scalingConfirmed', 'unitsConfirmed', 'canonicalAdapterEligible', 'canonicalTelemetry', 'timeSeries', 'measuredExtraction', 'measuredHandlingResponse', 'handlingAnalysis', 'overlayEnabled', 'kus', 'handlingCorrelation', 'setupRecommendation', 'modelVsActual'];
+  const cf = o => CAPS.every(k => o.capabilities[k] === false);
+  const ALLSCOPES = ['raw_stream_structure', 'channel_identity', 'timebase', 'physical_scaling', 'units', 'corpus_consistency', 'quality'];
+  const readyPcb = { status: 'private_corpus_boundary_ready', confirmationFeed: { privateCorpusBoundaryReady: true }, sourceType: 'bmsbin' };
+  const notReadyPcb = M.evaluateBmsPrivateCorpusBoundary(null, {});  // not_available (single-file import path)
+  const ev = (over) => Object.assign({ sanitizedOnly: true, evidenceScopes: ALLSCOPES.slice() }, over || {});
+  const sa = (pcb, o) => M.evaluateBmsSanitizedEvidenceAdapter(pcb, o || {});
+
+  // A. no inputs → not_available
+  const a = sa(null, {});
+  check('sadapter(A): no inputs → not_available; canProvide false; caps false; realDataUsed false',
+    a.status === 'not_available' && a.aggregateDecision.canProvideAdapterEvidenceShape === false && cf(a) && a.realDataUsed === false && a.capabilities.adapterEvidenceShapeAvailable === false);
+
+  // B. 3G-2 boundary not ready → boundary_not_ready (real/single-file import lands here)
+  check('sadapter(B): 3G-2 boundary not ready → boundary_not_ready', sa(notReadyPcb, { sanitizedEvidence: ev() }).status === 'boundary_not_ready');
+
+  // C. evidence missing
+  check('sadapter(C): boundary ready, no evidence → evidence_missing', sa(readyPcb, {}).status === 'evidence_missing');
+
+  // D. evidence invalid (no sanitizedOnly)
+  check('sadapter(D): evidence without sanitizedOnly → evidence_invalid', sa(readyPcb, { sanitizedEvidence: { evidenceScopes: ALLSCOPES } }).status === 'evidence_invalid');
+
+  // E-N. unsafe exposure flags (each fails closed to unsafe_evidence)
+  check('sadapter(E): rawBytesExposed → unsafe_evidence', sa(readyPcb, { sanitizedEvidence: ev({ rawBytesExposed: true }) }).status === 'unsafe_evidence');
+  check('sadapter(F): decodedSequencesExposed → unsafe_evidence', sa(readyPcb, { sanitizedEvidence: ev({ decodedSequencesExposed: true }) }).status === 'unsafe_evidence');
+  check('sadapter(G): fileNamesExposed → unsafe_evidence', sa(readyPcb, { sanitizedEvidence: ev({ fileNamesExposed: true }) }).status === 'unsafe_evidence');
+  check('sadapter(H): pathsExposed → unsafe_evidence', sa(readyPcb, { sanitizedEvidence: ev({ pathsExposed: true }) }).status === 'unsafe_evidence');
+  check('sadapter(I): offsetsExposed → unsafe_evidence', sa(readyPcb, { sanitizedEvidence: ev({ offsetsExposed: true }) }).status === 'unsafe_evidence');
+  check('sadapter(J): fingerprintsExposed → unsafe_evidence', sa(readyPcb, { sanitizedEvidence: ev({ fingerprintsExposed: true }) }).status === 'unsafe_evidence');
+  check('sadapter(K): sampleValuesExposed → unsafe_evidence', sa(readyPcb, { sanitizedEvidence: ev({ sampleValuesExposed: true }) }).status === 'unsafe_evidence');
+  check('sadapter(L): channelNamesExposed → unsafe_evidence', sa(readyPcb, { sanitizedEvidence: ev({ channelNamesExposed: true }) }).status === 'unsafe_evidence');
+  check('sadapter(M): timingExposed → unsafe_evidence', sa(readyPcb, { sanitizedEvidence: ev({ timingExposed: true }) }).status === 'unsafe_evidence');
+  check('sadapter(N): hashesExposed → unsafe_evidence', sa(readyPcb, { sanitizedEvidence: ev({ hashesExposed: true }) }).status === 'unsafe_evidence');
+
+  // O. insufficient scope (empty scope list)
+  check('sadapter(O): no scope present → insufficient_scope', sa(readyPcb, { sanitizedEvidence: ev({ evidenceScopes: [] }) }).status === 'insufficient_scope');
+
+  // P. partial adapter shape (core incomplete) — still no upstream confirmation
+  const p = sa(readyPcb, { sanitizedEvidence: ev({ evidenceScopes: ['raw_stream_structure'] }) });
+  check('sadapter(P): only one scope → partial_adapter_shape; no confirmation; caps false',
+    p.status === 'partial_adapter_shape' && cf(p) && p.capabilities.adapterEvidenceShapeAvailable === false);
+
+  // Q. adapter shape candidate (core present, not all) — still no upstream confirmation
+  const q = sa(readyPcb, { sanitizedEvidence: ev({ evidenceScopes: ['raw_stream_structure', 'channel_identity', 'timebase'] }) });
+  check('sadapter(Q): core scopes present, not all → adapter_shape_candidate; no confirmation; caps false',
+    q.status === 'adapter_shape_candidate' && cf(q) && q.capabilities.adapterEvidenceShapeAvailable === false);
+
+  // R. dry-run ready — shape available but NO confirmation / canonical / analysis cap
+  const r = sa(readyPcb, { sanitizedEvidence: ev() });
+  check('sadapter(R): all scopes + safe + boundary ready → dry_run_ready; shape available; ALL confirm/canonical/analysis caps false; realDataUsed false',
+    r.status === 'dry_run_ready' && r.aggregateDecision.canProvideAdapterEvidenceShape === true && r.capabilities.adapterEvidenceShapeAvailable === true
+    && r.capabilities.rawStreamConfirmed === false && r.capabilities.identityConfirmed === false && r.capabilities.timebaseConfirmed === false
+    && r.capabilities.scalingConfirmed === false && r.capabilities.unitsConfirmed === false && r.capabilities.canonicalAdapterEligible === false
+    && cf(r) && r.realDataUsed === false && code(r, 'BMS_SADAPTER_DRY_RUN_READY'));
+
+  // S. identifying value rejection (forbidden key / leaky scope / unknown scope) → evidence_invalid
+  check('sadapter(S): hash / fileName / channelNames key OR leaky/unknown scope → evidence_invalid',
+    sa(readyPcb, { sanitizedEvidence: ev({ hash: 'abc123' }) }).status === 'evidence_invalid'
+    && sa(readyPcb, { sanitizedEvidence: ev({ fileName: 'real.bmsbin' }) }).status === 'evidence_invalid'
+    && sa(readyPcb, { sanitizedEvidence: ev({ channelNames: ['accy'] }) }).status === 'evidence_invalid'
+    && sa(readyPcb, { sanitizedEvidence: ev({ evidenceScopes: ['/Users/x/real.bmsbin'] }) }).status === 'evidence_invalid'
+    && sa(readyPcb, { sanitizedEvidence: ev({ evidenceScopes: ['bogus_scope'] }) }).status === 'evidence_invalid');
+
+  // T. non-finite / malformed → fail-closed (never dry_run_ready)
+  check('sadapter(T): malformed evidence → fail-closed (not dry_run_ready)',
+    sa(readyPcb, { sanitizedEvidence: ev({ evidenceScopes: 'notarray' }) }).status === 'insufficient_scope'
+    && sa(readyPcb, { sanitizedEvidence: null }).status === 'evidence_missing'
+    && sa(readyPcb, null).status === 'evidence_missing'
+    && sa(readyPcb, 'garbage').status === 'evidence_missing');
+
+  // T2. forged boundary: status string OR feed flag alone → not ready (dual check, anti-forgery)
+  check('sadapter(T2): only-status / only-feed forged boundary → boundary_not_ready (dual check)',
+    sa({ status: 'private_corpus_boundary_ready', confirmationFeed: { privateCorpusBoundaryReady: false } }, { sanitizedEvidence: ev() }).status === 'boundary_not_ready'
+    && sa({ status: 'sanitized_evidence_candidate', confirmationFeed: { privateCorpusBoundaryReady: true } }, { sanitizedEvidence: ev() }).status === 'boundary_not_ready');
+
+  // U. one-way — running the adapter does not mutate the boundary result or the sanitized-evidence input
+  const ub = JSON.parse(JSON.stringify(readyPcb)), ue = { sanitizedEvidence: ev() };
+  const ubBefore = JSON.stringify(ub), ueBefore = JSON.stringify(ue.sanitizedEvidence);
+  sa(ub, ue);
+  check('sadapter(U): one-way — does not mutate boundary / sanitized-evidence inputs',
+    JSON.stringify(ub) === ubBefore && JSON.stringify(ue.sanitizedEvidence) === ueBefore);
+
+  // V. telemetry-metadata integration (single-file import path → boundary_not_ready; conservative; modelVsActual pinned false)
+  const realSa = sa(notReadyPcb, {});
+  const metaSa = M.buildTelemetryMetadata({ header: { importer: 'DarabImporter v.', valid: true }, channelCount: 4, channels: ['accy', 'yaw', 'steer', 'speed'].map(x => ({ name: x })), sanitizedEvidenceAdapter: realSa });
+  check('sadapter→metadata: summary surfaced + adapterEvidenceShapeAvailable false; canonicalTelemetry/timeSeries/modelVsActual false',
+    !!metaSa.sanitizedEvidenceAdapter && metaSa.capabilities.sanitizedEvidenceAdapterCriteria === true && metaSa.capabilities.adapterEvidenceShapeAvailable === false
+    && metaSa.capabilities.canonicalTelemetry === false && metaSa.capabilities.timeSeries === false && metaSa.capabilities.modelVsActual === false);
+  check('sadapter→metadata: no sanitizedEvidenceAdapter → cap false, summary null',
+    M.buildTelemetryMetadata({ header: { importer: 'D', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).sanitizedEvidenceAdapter === null);
+
+  // W. canonical gate shape present (status/aggregateDecision/confirmationFeed/capabilities/diagnostics/unknowns)
+  check('sadapter(W): canonical gate shape present on every path',
+    [a, sa(notReadyPcb, {}), r].every(o => typeof o.status === 'string' && o.aggregateDecision && typeof o.aggregateDecision === 'object'
+      && o.confirmationFeed && o.capabilities && Array.isArray(o.diagnostics) && Array.isArray(o.unknowns) && o.realDataUsed === false));
+
+  // X. i18n: every diagnostic messageKey + the UI panel keys resolve in EN / 繁中 / JA (no missing string)
+  const uiSrc = fs.readFileSync(path.join(jsDir, 'i18n-ui.js'), 'utf8');
+  const langCount = (key) => (uiSrc.match(new RegExp("'" + key.replace(/\./g, '\\.') + "'\\s*:", 'g')) || []).length;
+  const diagKeysOk = [a, sa(notReadyPcb, {}), sa(readyPcb, {}), sa(readyPcb, { sanitizedEvidence: ev({ rawBytesExposed: true }) }), r]
+    .flatMap(o => o.diagnostics.map(d => d.messageKey)).every(k => langCount(k) === 3);
+  const uiKeysOk = ['ui.telem.sadapter.title', 'ui.telem.sadapter.statusNot', 'ui.telem.sadapter.dryRunNote', 'ui.telem.sadapter.noConfirm', 'ui.telem.sadapter.noRealSeries', 'ui.telem.sadapter.sanitizedOnly', 'ui.telem.sadapter.noAnalysis'].every(k => langCount(k) === 3);
+  check('sadapter(X): all diagnostic + UI panel keys resolve in EN/繁中/JA (3 each)', diagKeysOk && uiKeysOk);
+
+  // Y. reporter sanitized — single-file path carries boundary_not_ready, sanitized scalars only, realDataUsed false
+  const reporterY = require(path.join(__dirname, '..', 'tools', 'bmsbin-local-probe-report.js'));
+  const strTokY = (s) => { const b = Buffer.from(s + '\0', 'ascii'); const L = Buffer.alloc(2); L.writeUInt16LE(b.length, 0); return Buffer.concat([L, b]); };
+  const sineY = Buffer.alloc(4000); for (let k = 0; k < 2000; k++) sineY.writeInt16LE(Math.round(2000 * Math.sin(k / 20)), k * 2);
+  const fixtureY = new Uint8Array(Buffer.concat([Buffer.from('DarabImporter v.\0', 'ascii'), Buffer.alloc(8), strTokY('TrackInfo'), Buffer.from([1, 2, 3, 4]), strTokY('accy'), strTokY('MS5.8'), sineY]));
+  const smY = reporterY.summarizeFile(fixtureY, M, { scanWindowBytes: 64 * 1024 });
+  const aggY = reporterY.aggregate([smY]);
+  check('sadapter(Y): reporter sanitized — boundary_not_ready, shape-available 0, realDataUsed false, scalar histogram',
+    smY.sanitizedEvidenceAdapterStatus === 'boundary_not_ready' && smY.sanitizedEvidenceAdapterShapeAvailableCount === 0
+    && smY.sanitizedEvidenceAdapterRealDataUsed === false && aggY.sanitizedEvidenceAdapterDryRunReadyFiles === 0
+    && aggY.sanitizedEvidenceAdapterStatusHistogram && Object.values(aggY.sanitizedEvidenceAdapterStatusHistogram).every(x => typeof x === 'number'));
+
+  // Z. prior-phase regression — feeding the adapter does not change the 3G-2 boundary result
+  const zPcb = M.evaluateBmsPrivateCorpusBoundary(null, {});
+  const zBefore = JSON.stringify(zPcb);
+  sa(zPcb, { sanitizedEvidence: ev() });
+  check('sadapter(Z): one-way downstream — 3G-2 boundary result unchanged after adapter runs',
+    JSON.stringify(zPcb) === zBefore && zPcb.status === 'not_available');
+}
+
 // ── Phase 3R-0: trust-chain INVARIANTS (regression guards locking the Phase 3 red lines) ──
 console.log('\n[invariants] Phase 3 trust-chain red-line invariants');
 {
   const GATED = ['physicalScaling', 'unitsConfirmed', 'canonicalTelemetry', 'telemetryReady', 'telemetryReadiness',
     'extractionEligible', 'measuredExtraction', 'measuredExtractionSynthetic', 'measuredHandlingResponse',
     'handlingAnalysis', 'overlayEnabled', 'kus', 'handlingCorrelation', 'setupRecommendation', 'modelVsActual',
-    'timeSeries', 'lapSegmentation', 'canonicalAdapterEligible', 'privateCorpusEvidenceAvailable'];
+    'timeSeries', 'lapSegmentation', 'canonicalAdapterEligible', 'privateCorpusEvidenceAvailable', 'adapterEvidenceShapeAvailable'];
   const noGated = o => !!(o && o.capabilities) && GATED.every(k => o.capabilities[k] === undefined || o.capabilities[k] === false);
 
   // real/imported single-file path: build the whole chain with empty opts (the importBms / reporter call shape)
@@ -2313,7 +2443,8 @@ console.log('\n[invariants] Phase 3 trust-chain red-line invariants');
   const hub = M.evaluateBmsConfirmationEvidence(realBms, probe, rawX, link, { readiness, extractionEligibility: eligibility, measuredExtraction: measext });
   const adapter = M.evaluateBmsCanonicalAdapterEligibility(hub, readiness, eligibility, measext, {});
   const pcorpus = M.evaluateBmsPrivateCorpusBoundary(null, {});   // single-file import path: no corpus manifest
-  const meta = M.buildTelemetryMetadata(Object.assign({}, realBms, { rawStreamConfirmation: rawStream, channelIdentity: identity, timebase, physicalScaling: scaling, readiness, extractionEligibility: eligibility, measuredExtraction: measext, confirmation: hub, canonicalAdapter: adapter, privateCorpus: pcorpus, probe, raw: rawX, link }));
+  const sadapter = M.evaluateBmsSanitizedEvidenceAdapter(pcorpus, {});   // single-file path: 3G-2 boundary not ready → boundary_not_ready
+  const meta = M.buildTelemetryMetadata(Object.assign({}, realBms, { rawStreamConfirmation: rawStream, channelIdentity: identity, timebase, physicalScaling: scaling, readiness, extractionEligibility: eligibility, measuredExtraction: measext, confirmation: hub, canonicalAdapter: adapter, privateCorpus: pcorpus, sanitizedEvidenceAdapter: sadapter, probe, raw: rawX, link }));
 
   // A. real path fail-closed at every layer (gates + hub decisions)
   check('invariant(A): real path fail-closed (readiness not_ready / eligibility not_eligible / measext blocked / hub not_confirmed)',
@@ -2323,16 +2454,17 @@ console.log('\n[invariants] Phase 3 trust-chain red-line invariants');
     && hub.decisions.canConfirmPhysicalScaling === false && hub.decisions.canonicalTelemetryPrerequisitesMet === false
     && hub.decisions.telemetryReadyForAnalysis === false && hub.decisions.measuredExtractionEligible === false && hub.decisions.measuredExtractionSynthetic === false
     && adapter.status === 'raw_stream_missing' && adapter.aggregateDecision.canEnterCanonicalAdapter === false && adapter.realDataUsed === false
-    && pcorpus.status === 'not_available' && pcorpus.aggregateDecision.canUsePrivateCorpusEvidence === false && pcorpus.realDataUsed === false);
+    && pcorpus.status === 'not_available' && pcorpus.aggregateDecision.canUsePrivateCorpusEvidence === false && pcorpus.realDataUsed === false
+    && sadapter.status === 'boundary_not_ready' && sadapter.aggregateDecision.canProvideAdapterEvidenceShape === false && sadapter.realDataUsed === false);
 
   // B. no gated capability true on the real path — at any layer or in the merged metadata
   // merged-metadata leg asserts every red-line cap is EXPLICITLY false (not merely absent) — closes
   // the noGated undefined-leniency gap for caps the UI-authoritative block must carry (incl. modelVsActual).
   const META_RED = ['physicalScaling', 'unitsConfirmed', 'canonicalTelemetry', 'telemetryReady', 'extractionEligible',
     'measuredExtraction', 'measuredExtractionSynthetic', 'measuredHandlingResponse', 'handlingAnalysis', 'overlayEnabled',
-    'kus', 'handlingCorrelation', 'setupRecommendation', 'modelVsActual', 'timeSeries', 'lapSegmentation', 'canonicalAdapterEligible', 'privateCorpusEvidenceAvailable'];
+    'kus', 'handlingCorrelation', 'setupRecommendation', 'modelVsActual', 'timeSeries', 'lapSegmentation', 'canonicalAdapterEligible', 'privateCorpusEvidenceAvailable', 'adapterEvidenceShapeAvailable'];
   check('invariant(B): no gated capability true on real path (all layers + every merged-metadata red-line cap === false)',
-    [rawStream, identity, timebase, scaling, readiness, eligibility, measext, hub, adapter, pcorpus].every(noGated) && noGated(meta)
+    [rawStream, identity, timebase, scaling, readiness, eligibility, measext, hub, adapter, pcorpus, sadapter].every(noGated) && noGated(meta)
     && META_RED.every(k => meta.capabilities[k] === false));
 
   // C. confirmation hub pins decode caps false literally on every path
