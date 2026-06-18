@@ -2,3 +2,16 @@
 **/.DS_Store
 node_modules/
 build/
+
+# Clean-room (Phase 3 red line #5): proprietary telemetry / vendor binary data NEVER enters the repo.
+# Real .bmsbin and vendor formats are only ever read locally; tests use synthetic fixtures only.
+*.bmsbin
+*.pds
+*.cvp
+*.pvp
+*.mch
+*.tir
+*.fnl
+
+# Local-only work artifact (translation cache)
+.i18n-cache/

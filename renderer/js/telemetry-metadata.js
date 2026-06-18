@@ -329,6 +329,7 @@ function buildTelemetryMetadata(bmsResult) {
       setupRecommendation: false,   // no setup advice from telemetry
       lapSegmentation: false,       // later
       handlingCorrelation: false,   // later
+      modelVsActual: false,         // later — pinned false so the UI-authoritative block is complete
     },
     probe: probeSummary,
     rawExtraction: rawSummary,

@@ -40,10 +40,12 @@ parseBms (3A)
   → buildTelemetryMetadata (3A — merged, UI-facing descriptor)
 ```
 
-Call sites: `renderer/index.html` `importBms()` runs this chain with **empty opts** (no corpus,
-no synthetic series); `tools/bmsbin-local-probe-report.js` runs it the same way over user-pointed
-real files for a sanitized reality check. Neither ever passes a corpus, so a single real file is
-fail-closed by construction.
+Call sites differ in detail but share the load-bearing invariant: `renderer/index.html`
+`importBms()` runs the full chain and passes every gate feed into the 3D-0 hub **last**, but with
+**no `corpus`** and **no synthetic series**; `tools/bmsbin-local-probe-report.js` (`summarizeFile`)
+runs the same modules over user-pointed real files but calls the hub **early with empty opts `{}`**
+(feeds omitted). The invariant that matters is that **neither call site ever passes a `corpus`** —
+so a single real file is fail-closed by construction regardless of feed wiring.
 
 ## Module catalog
 
@@ -155,9 +157,10 @@ the **single authoritative `capabilities` block the UI reads**. The hub addition
 
 `syntheticOnly` / `realDataUsed === false` originate in the 3G-0B harness. `extracted_synthetic`
 means the harness ran end-to-end **on a synthetic fixture** — it is *the harness, not an analysis
-result*. The measured-tendency output is an explicit `understeer/oversteer/neutral_like` **proxy**
-flagged `notKus / notSetupAdvice / notModelVsActual`; the UI/i18n surface the honest disclaimer and
-show no green badge for a real path.
+result*. The measured-tendency output is an explicit proxy — one of `understeer_like_proxy` /
+`oversteer_like_proxy` / `neutral_like_proxy` / `insufficient_quality` — flagged
+`notKus / notSetupAdvice / notModelVsActual`; the UI/i18n surface the honest disclaimer and show no
+green badge for a real path.
 
 ## Reporter (`tools/bmsbin-local-probe-report.js`)
 
@@ -180,6 +183,7 @@ refactor). Runs only over files the user explicitly points at.
 | G | synthetic extracted_synthetic opens only harness caps; realDataUsed false |
 | H | dual-gate: forged status/cap → blocked; eligible+series w/o syntheticOnly → blocked_real_path |
 | I | canonical gate shape on 3E-0…3G-0B |
+| J | clean-room: no proprietary telemetry / vendor binary in the repo tree (red line #5; backed by `.gitignore`) |
 
 Per-phase behavior is additionally covered by the `[telemetry-readiness]`,
 `[extract-eligibility]`, `[measured-extraction]`, `[tool]`, etc. blocks.

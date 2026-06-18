@@ -2125,11 +2125,14 @@ console.log('\n[invariants] Phase 3 trust-chain red-line invariants');
     && hub.decisions.telemetryReadyForAnalysis === false && hub.decisions.measuredExtractionEligible === false && hub.decisions.measuredExtractionSynthetic === false);
 
   // B. no gated capability true on the real path — at any layer or in the merged metadata
-  check('invariant(B): no gated capability true on real path (all layers + merged metadata)',
+  // merged-metadata leg asserts every red-line cap is EXPLICITLY false (not merely absent) — closes
+  // the noGated undefined-leniency gap for caps the UI-authoritative block must carry (incl. modelVsActual).
+  const META_RED = ['physicalScaling', 'unitsConfirmed', 'canonicalTelemetry', 'telemetryReady', 'extractionEligible',
+    'measuredExtraction', 'measuredExtractionSynthetic', 'measuredHandlingResponse', 'handlingAnalysis', 'overlayEnabled',
+    'kus', 'handlingCorrelation', 'setupRecommendation', 'modelVsActual', 'timeSeries', 'lapSegmentation'];
+  check('invariant(B): no gated capability true on real path (all layers + every merged-metadata red-line cap === false)',
     [rawStream, identity, timebase, scaling, readiness, eligibility, measext, hub].every(noGated) && noGated(meta)
-    && meta.capabilities.timeSeries === false && meta.capabilities.canonicalTelemetry === false && meta.capabilities.handlingAnalysis === false
-    && meta.capabilities.measuredHandlingResponse === false && meta.capabilities.telemetryReady === false && meta.capabilities.extractionEligible === false
-    && meta.capabilities.measuredExtraction === false && meta.capabilities.measuredExtractionSynthetic === false && meta.capabilities.physicalScaling === false);
+    && META_RED.every(k => meta.capabilities[k] === false));
 
   // C. confirmation hub pins decode caps false literally on every path
   check('invariant(C): hub pins timeSeries/physicalScaling/handlingCorrelation false',
@@ -2190,6 +2193,19 @@ console.log('\n[invariants] Phase 3 trust-chain red-line invariants');
   check('invariant(I): canonical gate shape on 3E-0..3G-0B (status/aggregateDecision/confirmationFeed/capabilities/diagnostics/unknowns)',
     [identity, timebase, scaling, readiness, eligibility, measext].every(o => typeof o.status === 'string' && o.aggregateDecision && typeof o.aggregateDecision === 'object'
       && o.confirmationFeed && o.capabilities && Array.isArray(o.diagnostics) && Array.isArray(o.unknowns)));
+
+  // J. clean-room (red line #5 enforcement): no proprietary telemetry / vendor binary in the repo tree
+  const PROPRIETARY = /\.(bmsbin|pds|cvp|pvp|mch|tir|fnl)$/i;
+  const walk = (dir, acc) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (['node_modules', '.git', '.i18n-cache', 'build'].includes(e.name)) continue;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) walk(p, acc); else if (PROPRIETARY.test(e.name)) acc.push(p);
+    }
+    return acc;
+  };
+  const leaked = walk(path.join(__dirname, '..'), []);
+  check('invariant(J): no proprietary telemetry / vendor binary (.bmsbin/.tir/.pds/...) in repo tree (clean-room #5)', leaked.length === 0);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
