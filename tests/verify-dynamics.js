@@ -41,6 +41,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'bms-measured-extraction-harness.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-canonical-adapter-eligibility.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-private-corpus-boundary.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-sanitized-evidence-adapter.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -50,7 +51,7 @@ const src =
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
-  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, evaluateBmsTelemetryReadiness, evaluateBmsExtractionEligibility, EXTRACTION_INPUT_CONTRACT, EXTRACTION_OUTPUT_CONTRACT, evaluateBmsMeasuredExtraction, evaluateBmsCanonicalAdapterEligibility, CANONICAL_ADAPTER_CONTRACT, evaluateBmsPrivateCorpusBoundary, ' +
+  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, evaluateBmsTelemetryReadiness, evaluateBmsExtractionEligibility, EXTRACTION_INPUT_CONTRACT, EXTRACTION_OUTPUT_CONTRACT, evaluateBmsMeasuredExtraction, evaluateBmsCanonicalAdapterEligibility, CANONICAL_ADAPTER_CONTRACT, evaluateBmsPrivateCorpusBoundary, evaluateBmsSanitizedEvidenceAdapter, SANITIZED_EVIDENCE_ADAPTER_CONTRACT, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
