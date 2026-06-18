@@ -1746,6 +1746,27 @@ canvas{max-height:300px}
                 </div>
               </div>
             </template>
+            <!-- Phase 3G-3: sanitized-evidence adapter DRY-RUN shape (not extraction, not confirmation). Arranges sanitized aggregate evidence into the shape a future canonical adapter could consume, as a DRY RUN only. Does NOT confirm raw stream/identity/timebase/scaling/units, does NOT make the canonical adapter eligible, and produces NO canonical series/time-series/measured extraction; no green badge implying telemetry confirmed; no overlay/Kus/model-vs-actual/setup. -->
+            <template x-if="telemetryMeta().sanitizedEvidenceAdapter">
+              <div class="mt-2 pt-2 border-t border-white/5">
+                <div class="text-[10px] text-slate-400 mb-1 flex items-center gap-1.5">
+                  <span x-text="t('ui.telem.sadapter.title')"></span>
+                  <span class="px-1.5 py-0.5 rounded-full bg-slate-700 text-slate-400" x-text="t('ui.telem.sadapter.statusNot')"></span>
+                </div>
+                <div class="text-[10px] text-amber-300/80 mb-1" x-text="t('ui.telem.sadapter.dryRunNote')"></div>
+                <div class="flex flex-wrap gap-1.5 mb-1">
+                  <span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-700 text-slate-500" x-text="'– ' + t('ui.telem.sadapter.noConfirm')"></span>
+                  <span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-700 text-slate-500" x-text="'– ' + t('ui.telem.sadapter.noRealSeries')"></span>
+                  <span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-700 text-slate-500" x-text="'– ' + t('ui.telem.sadapter.sanitizedOnly')"></span>
+                  <span class="px-1.5 py-0.5 rounded text-[10px] bg-slate-700 text-slate-500" x-text="'– ' + t('ui.telem.sadapter.noAnalysis')"></span>
+                </div>
+                <div class="space-y-1">
+                  <template x-for="d in telemetryMeta().sanitizedEvidenceAdapter.diagnostics" :key="d.code">
+                    <div class="text-[10px] px-2 py-1 rounded" :class="d.severity==='error' ? 'bg-red-900/30 text-red-400' : (d.severity==='warning' ? 'bg-amber-900/20 text-amber-300/90' : 'bg-slate-800/60 text-slate-500')" x-text="t(d.messageKey)"></div>
+                  </template>
+                </div>
+              </div>
+            </template>
           </div>
         </template>
         <details class="mt-2">
@@ -2312,6 +2333,7 @@ canvas{max-height:300px}
 <script src="js/bms-measured-extraction-harness.js"></script>
 <script src="js/bms-canonical-adapter-eligibility.js"></script>
 <script src="js/bms-private-corpus-boundary.js"></script>
+<script src="js/bms-sanitized-evidence-adapter.js"></script>
 <script>
 const COLORS=['#38bdf8','#f472b6','#34d399','#facc15','#a78bfa','#fb923c','#22d3ee','#e879f9','#84cc16','#f87171'];
 
@@ -2426,7 +2448,7 @@ function app(){return{
     const f=e.target.files && e.target.files[0]; if(!f) return;
     this.bmsResult={loading:true};
     const reader=new FileReader();
-    reader.onload=()=>{ try{ const bytes=new Uint8Array(reader.result); const r=(typeof parseBms==='function')?parseBms(bytes):null; if(!r||!r.header.valid){ this.bmsResult={error:true}; return; } if(f&&f.name) r.fileName=f.name; r.probe=(typeof probeBmsBinary==='function')?probeBmsBinary(bytes):null; r.raw=(typeof extractBmsRawCandidates==='function'&&r.probe)?extractBmsRawCandidates(bytes,r.probe,{catalogChannelCount:r.channelCount}):null; r.link=(typeof linkBmsRawCandidates==='function'&&r.raw)?linkBmsRawCandidates(r,r.probe,r.raw,{}):null; r.structure=(typeof discoverBmsSampleStructure==='function')?discoverBmsSampleStructure(bytes,r,r.probe,r.raw,r.link,null,{catalogChannelCount:r.channelCount}):null; r.rawStreamConfirmation=(typeof evaluateBmsRawStreamConfirmation==='function')?evaluateBmsRawStreamConfirmation(r,r.probe,r.raw,r.structure,{}):null; r.channelIdentity=(typeof evaluateBmsChannelIdentityConfirmation==='function')?evaluateBmsChannelIdentityConfirmation(r,r.rawStreamConfirmation,r.structure,{}):null; r.timebase=(typeof evaluateBmsTimebaseConfirmation==='function')?evaluateBmsTimebaseConfirmation(r.rawStreamConfirmation,r.structure,{}):null; r.physicalScaling=(typeof evaluateBmsPhysicalScalingConfirmation==='function')?evaluateBmsPhysicalScalingConfirmation(r.rawStreamConfirmation,r.channelIdentity,r.timebase,{}):null; r.readiness=(typeof evaluateBmsTelemetryReadiness==='function')?evaluateBmsTelemetryReadiness(r.rawStreamConfirmation,r.channelIdentity,r.timebase,r.physicalScaling,{}):null; r.extractionEligibility=(typeof evaluateBmsExtractionEligibility==='function')?evaluateBmsExtractionEligibility(r.readiness,{}):null; r.measuredExtraction=(typeof evaluateBmsMeasuredExtraction==='function')?evaluateBmsMeasuredExtraction(r.extractionEligibility,{}):null; r.confirmation=(typeof evaluateBmsConfirmationEvidence==='function'&&r.link)?evaluateBmsConfirmationEvidence(r,r.probe,r.raw,r.link,{structure:r.structure,rawStreamConfirmation:r.rawStreamConfirmation,channelIdentity:r.channelIdentity,timebase:r.timebase,physicalScaling:r.physicalScaling,readiness:r.readiness,extractionEligibility:r.extractionEligibility,measuredExtraction:r.measuredExtraction}):null; r.canonicalAdapter=(typeof evaluateBmsCanonicalAdapterEligibility==='function')?evaluateBmsCanonicalAdapterEligibility(r.confirmation,r.readiness,r.extractionEligibility,r.measuredExtraction,{}):null; r.privateCorpus=(typeof evaluateBmsPrivateCorpusBoundary==='function')?evaluateBmsPrivateCorpusBoundary(null,{}):null; this.bmsResult=r; }catch(err){ this.bmsResult={error:true}; } };
+    reader.onload=()=>{ try{ const bytes=new Uint8Array(reader.result); const r=(typeof parseBms==='function')?parseBms(bytes):null; if(!r||!r.header.valid){ this.bmsResult={error:true}; return; } if(f&&f.name) r.fileName=f.name; r.probe=(typeof probeBmsBinary==='function')?probeBmsBinary(bytes):null; r.raw=(typeof extractBmsRawCandidates==='function'&&r.probe)?extractBmsRawCandidates(bytes,r.probe,{catalogChannelCount:r.channelCount}):null; r.link=(typeof linkBmsRawCandidates==='function'&&r.raw)?linkBmsRawCandidates(r,r.probe,r.raw,{}):null; r.structure=(typeof discoverBmsSampleStructure==='function')?discoverBmsSampleStructure(bytes,r,r.probe,r.raw,r.link,null,{catalogChannelCount:r.channelCount}):null; r.rawStreamConfirmation=(typeof evaluateBmsRawStreamConfirmation==='function')?evaluateBmsRawStreamConfirmation(r,r.probe,r.raw,r.structure,{}):null; r.channelIdentity=(typeof evaluateBmsChannelIdentityConfirmation==='function')?evaluateBmsChannelIdentityConfirmation(r,r.rawStreamConfirmation,r.structure,{}):null; r.timebase=(typeof evaluateBmsTimebaseConfirmation==='function')?evaluateBmsTimebaseConfirmation(r.rawStreamConfirmation,r.structure,{}):null; r.physicalScaling=(typeof evaluateBmsPhysicalScalingConfirmation==='function')?evaluateBmsPhysicalScalingConfirmation(r.rawStreamConfirmation,r.channelIdentity,r.timebase,{}):null; r.readiness=(typeof evaluateBmsTelemetryReadiness==='function')?evaluateBmsTelemetryReadiness(r.rawStreamConfirmation,r.channelIdentity,r.timebase,r.physicalScaling,{}):null; r.extractionEligibility=(typeof evaluateBmsExtractionEligibility==='function')?evaluateBmsExtractionEligibility(r.readiness,{}):null; r.measuredExtraction=(typeof evaluateBmsMeasuredExtraction==='function')?evaluateBmsMeasuredExtraction(r.extractionEligibility,{}):null; r.confirmation=(typeof evaluateBmsConfirmationEvidence==='function'&&r.link)?evaluateBmsConfirmationEvidence(r,r.probe,r.raw,r.link,{structure:r.structure,rawStreamConfirmation:r.rawStreamConfirmation,channelIdentity:r.channelIdentity,timebase:r.timebase,physicalScaling:r.physicalScaling,readiness:r.readiness,extractionEligibility:r.extractionEligibility,measuredExtraction:r.measuredExtraction}):null; r.canonicalAdapter=(typeof evaluateBmsCanonicalAdapterEligibility==='function')?evaluateBmsCanonicalAdapterEligibility(r.confirmation,r.readiness,r.extractionEligibility,r.measuredExtraction,{}):null; r.privateCorpus=(typeof evaluateBmsPrivateCorpusBoundary==='function')?evaluateBmsPrivateCorpusBoundary(null,{}):null; r.sanitizedEvidenceAdapter=(typeof evaluateBmsSanitizedEvidenceAdapter==='function')?evaluateBmsSanitizedEvidenceAdapter(r.privateCorpus,{}):null; this.bmsResult=r; }catch(err){ this.bmsResult={error:true}; } };
     reader.onerror=()=>{ this.bmsResult={error:true}; };
     reader.readAsArrayBuffer(f);
   },
