@@ -305,6 +305,28 @@ function buildTelemetryMetadata(bmsResult) {
     diagnostics: cadapter.diagnostics || [],
   } : null;
 
+  // Optional Phase 3G-2 private-corpus boundary (attached by the app at import time). A local-only
+  // evidence-ingestion POLICY check, not extraction. On the single-file import path it is not_available
+  // (no corpus manifest); it never confirms telemetry, never makes canonical telemetry available, and
+  // realDataUsed is always false.
+  const pcorpus = (bmsResult && bmsResult.privateCorpus) || null;
+  const hasPcorpus = !hasError && !!pcorpus;
+  const pcAgg = (pcorpus && pcorpus.aggregateDecision) || {};
+  const privateCorpusEvidenceAvailable = !!pcAgg.canUsePrivateCorpusEvidence;   // safe-boundary only
+  const privateCorpusSummary = hasPcorpus ? {
+    status: pcorpus.status,
+    boundaryLevel: pcorpus.boundaryLevel,
+    privateCorpusEvidenceAvailable,
+    realDataUsed: false,
+    manifestSummary: pcorpus.manifestSummary || null,
+    evidenceSummary: pcorpus.evidenceSummary || {},
+    blockerCount: pcAgg.blockerCount || 0,
+    rawStreamConfirmed: false, identityConfirmed: false, timebaseConfirmed: false,
+    scalingConfirmed: false, unitsConfirmed: false, canonicalTelemetry: false,
+    blockers: pcorpus.blockers || [],
+    diagnostics: pcorpus.diagnostics || [],
+  } : null;
+
   return {
     sourceType: 'bmsbin',
     sourceFileName: (bmsResult && bmsResult.fileName) || null,
@@ -342,7 +364,9 @@ function buildTelemetryMetadata(bmsResult) {
       measuredExtraction: false,                // real measured extraction never produced (synthetic harness only)
       canonicalAdapterEligibilityCriteria: hasCadapter, // Phase 3G-1: canonical-adapter boundary gate present
       canonicalAdapterEligible,                 // Phase 3G-1: synthetic-only true; false on all real data
-      measuredHandlingResponse: false,          // 3G-0A/0B/3G-1 are gates/harness, not a real response
+      privateCorpusBoundaryCriteria: hasPcorpus, // Phase 3G-2: private-corpus boundary policy present
+      privateCorpusEvidenceAvailable,           // Phase 3G-2: safe-boundary only; false on the single-file import path
+      measuredHandlingResponse: false,          // 3G-0A/0B/3G-1/3G-2 are gates/policy, not a real response
       timeSeries: false,            // not confirmed usable telemetry
       canonicalTelemetry: false,    // never produced / usable yet (eligibility ≠ available)
       handlingAnalysis: false,      // readiness is a gate, not analysis
@@ -366,6 +390,7 @@ function buildTelemetryMetadata(bmsResult) {
     extractionEligibility: extractionSummary,
     measuredExtraction: measuredExtractionSummary,
     canonicalAdapter: canonicalAdapterSummary,
+    privateCorpus: privateCorpusSummary,
     diagnostics,
   };
 }
