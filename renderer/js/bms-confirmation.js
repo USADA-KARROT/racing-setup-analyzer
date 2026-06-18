@@ -143,10 +143,21 @@ function evaluateBmsConfirmationEvidence(bmsResult, probeReport, rawExtraction, 
     && opts.corpus && opts.corpus.fileCount >= 2);
   const telemetryReadyForAnalysis = canonicalTelemetryPrerequisitesMet && readinessFeed;
 
+  // Optional Phase 3G-0A extraction-eligibility feed — an input-contract GATE, not extraction. It can
+  // only report that the dataset is eligible to ENTER a later measured handling-response extraction
+  // phase, and only when telemetry is ready for analysis AND the eligibility module says
+  // eligible_for_extraction AND there is a corpus. Absent → no effect (backward-compatible). It NEVER
+  // enables extraction / measured tendency / Kus / overlay / model-vs-actual (caps stay pinned false).
+  const exConf = opts.extractionEligibility || null;
+  const extractionEligibilityFeed = !!(exConf && exConf.status === 'eligible_for_extraction'
+    && exConf.capabilities && exConf.capabilities.extractionEligible === true
+    && opts.corpus && opts.corpus.fileCount >= 2);
+  const measuredExtractionEligible = telemetryReadyForAnalysis && extractionEligibilityFeed;
+
   const decisions = {
     canConfirmCatalog, canConfirmSampleStructure, canConfirmRawStreams,
     canConfirmChannelIdentity, canConfirmTimebase, canConfirmPhysicalScaling,
-    canonicalTelemetryPrerequisitesMet, telemetryReadyForAnalysis,
+    canonicalTelemetryPrerequisitesMet, telemetryReadyForAnalysis, measuredExtractionEligible,
   };
 
   // ── scores (0..1; weighted overall) ──

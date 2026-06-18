@@ -239,6 +239,28 @@ function buildTelemetryMetadata(bmsResult) {
     diagnostics: readiness.diagnostics || [],
   } : null;
 
+  // Optional Phase 3G-0A measured extraction eligibility (attached by the app at import time). An
+  // input-contract GATE, not extraction. On real imported data it is never eligible (telemetry
+  // readiness is never ready); measured handling response / tendency / Kus / overlay / model-vs-actual
+  // remain disabled regardless. Eligibility ≠ a measured handling response.
+  const extraction = (bmsResult && bmsResult.extractionEligibility) || null;
+  const hasExtraction = !hasError && !!extraction;
+  const exAgg = (extraction && extraction.aggregateDecision) || {};
+  const extractionEligible = !!exAgg.canBeEligibleForExtraction;   // synthetic-only; false on real data
+  const extractionSummary = extraction ? {
+    status: extraction.status,
+    eligibilityLevel: extraction.eligibilityLevel,
+    extractionEligible,
+    extractionProfile: extraction.extractionProfile,
+    requiredChannelCount: extraction.requiredChannelCount || 0,
+    eligibleChannelCount: extraction.eligibleChannelCount || 0,
+    missingRequiredChannelCount: extraction.missingRequiredChannelCount || 0,
+    measuredResponseAvailable: false,
+    handlingAnalysisEnabled: false,
+    blockers: extraction.blockers || [],
+    diagnostics: extraction.diagnostics || [],
+  } : null;
+
   return {
     sourceType: 'bmsbin',
     sourceFileName: (bmsResult && bmsResult.fileName) || null,
@@ -269,6 +291,9 @@ function buildTelemetryMetadata(bmsResult) {
       unitsConfirmed: scalingUnitsConfirmed,    // Phase 3F-0: synthetic-only true; false on all real data
       telemetryReadinessConfirmation: hasReadiness, // Phase 3F-1: readiness gate criteria present
       telemetryReady,                           // Phase 3F-1: synthetic-only true; false on all real data
+      extractionEligibilityCriteria: hasExtraction, // Phase 3G-0A: extraction input-contract gate present
+      extractionEligible,                       // Phase 3G-0A: synthetic-only true; false on all real data
+      measuredHandlingResponse: false,          // Phase 3G-0A is a contract gate, not extraction
       timeSeries: false,            // not confirmed usable telemetry
       canonicalTelemetry: false,    // never produced / usable yet (eligibility ≠ available)
       handlingAnalysis: false,      // readiness is a gate, not analysis
@@ -288,6 +313,7 @@ function buildTelemetryMetadata(bmsResult) {
     timebase: timebaseSummary,
     physicalScaling: scalingSummary,
     readiness: readinessSummary,
+    extractionEligibility: extractionSummary,
     diagnostics,
   };
 }
