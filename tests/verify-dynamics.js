@@ -37,6 +37,7 @@ const src =
   fs.readFileSync(path.join(jsDir, 'bms-timebase-confirmation.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-physical-scaling-confirmation.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-telemetry-readiness.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-extraction-eligibility.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
@@ -46,7 +47,7 @@ const src =
   'transient2DOF, estimateIz, ' +
   'parseBmsHeader, parseBmsCatalog, parseBms, ' +
   'mapTelemetryChannels, telemetryChannelDescriptor, buildTelemetryMetadata, validateTelemetryCatalog, ' +
-  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, evaluateBmsTelemetryReadiness, ' +
+  'probeBmsBinary, extractBmsRawCandidates, linkBmsRawCandidates, evaluateBmsConfirmationEvidence, discoverBmsSampleStructure, evaluateBmsRawStreamConfirmation, evaluateBmsChannelIdentityConfirmation, evaluateBmsTimebaseConfirmation, evaluateBmsPhysicalScalingConfirmation, evaluateBmsTelemetryReadiness, evaluateBmsExtractionEligibility, EXTRACTION_INPUT_CONTRACT, EXTRACTION_OUTPUT_CONTRACT, ' +
   'CAL, CALIBRATION, ' +
   'LIHPAO_G2, LihpaoLapSim, LihpaoStintSim, simulateLihpao };';
 
@@ -1040,6 +1041,13 @@ console.log('\n[tool] local validation reporter — fixture-safe / sanitized out
     typeof agg.confirmedCatalog === 'number' && agg.confirmedStructure === 0
     && typeof agg.corpusChannelCountStable === 'boolean' && typeof agg.corpusCandidateRegionStable === 'boolean'
     && agg.confirmationStatusHistogram && Object.values(agg.confirmationStatusHistogram).every(x => typeof x === 'number'));
+
+  // 9. Phase 3G-0A extraction eligibility present, sanitized scalars, honest (real single file never eligible)
+  check('tool: summary carries sanitized extraction eligibility (not eligible, 0 eligible, no measured values)',
+    typeof s.extractionEligibilityStatus === 'string' && s.extractionEligibilityStatus === 'not_eligible'
+    && s.extractionEligibleCount === 0 && typeof s.extractionEligibleChannelCount === 'number'
+    && typeof agg.eligibleForExtractionFiles === 'number' && agg.eligibleForExtractionFiles === 0
+    && agg.extractionEligibilityStatusHistogram && Object.values(agg.extractionEligibilityStatusHistogram).every(x => typeof x === 'number'));
 }
 
 // ── Phase 3D-0: hypothesis→confirmed criteria (synthetic; decisions, never decoded values) ──
@@ -1822,6 +1830,115 @@ console.log('\n[telemetry-readiness] .bmsbin telemetry readiness gate');
     && meta.capabilities.setupRecommendation === false && meta.capabilities.canonicalTelemetry === false);
   check('readiness→metadata: no readiness → cap false, summary null',
     M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).readiness === null);
+}
+
+// ── Phase 3G-0A: measured handling-response extraction-eligibility GATE (input contract, not
+//    extraction; synthetic-only eligible; real never eligible; eligibility ≠ extraction) ──
+console.log('\n[extract-eligibility] .bmsbin measured handling-response extraction eligibility gate');
+{
+  const code = (r, c) => r.diagnostics.some(d => d.code === c);
+  const CORPUS = { fileCount: 3, candidateRegionStable: true, channelCountStable: true };
+  const chans = ['speed', 'steering', 'lateral_accel', 'yaw_rate', 'brake_or_longitudinal_accel'];
+  const qualGood = { sampleRateAdequate: true, syncQualityAdequate: true, dropoutOk: true, noiseOk: true };
+  // a synthetic ready_for_analysis readiness — the only state eligibility can gate on
+  const readyRd = M.evaluateBmsTelemetryReadiness(
+    { aggregateDecision: { canConfirmAnyRawStream: true } }, { aggregateDecision: { canConfirmAnyChannelIdentity: true } },
+    { aggregateDecision: { canConfirmTimebase: true } }, { aggregateDecision: { canConfirmPhysicalScaling: true }, unitsConfirmed: true, canonicalValueEligibility: true },
+    { corpus: CORPUS, confirmedChannels: chans, qualityEvidence: qualGood });
+  // a real single-file readiness — never ready
+  const notReadyRd = M.evaluateBmsTelemetryReadiness(
+    { aggregateDecision: { canConfirmAnyRawStream: false } }, { aggregateDecision: { canConfirmAnyChannelIdentity: false } },
+    { aggregateDecision: { canConfirmTimebase: false } }, { aggregateDecision: { canConfirmPhysicalScaling: false }, unitsConfirmed: false, canonicalValueEligibility: false }, {});
+  const ex = (rd, opts) => M.evaluateBmsExtractionEligibility(rd, opts || {});
+  const fullCse = { canonicalChannels: chans, timeAligned: true, gapFree: true, knownSampleRate: true };
+  const fullSeg = { cornerEventsDetectable: true, cornerEventCount: 6, entryMidExitSeparable: true, steadyStateIdentifiable: true };
+
+  // A. real not-ready readiness → not_eligible; all extraction/analysis caps false
+  const a = ex(notReadyRd, {});
+  check('extract(A): real not-ready readiness → not_eligible; extraction/measuredHandlingResponse/handling caps false',
+    a.status === 'not_eligible' && a.capabilities.extractionEligible === false && a.capabilities.measuredHandlingResponse === false
+    && a.capabilities.handlingAnalysis === false && a.aggregateDecision.canBeEligibleForExtraction === false && code(a, 'BMS_EXTRACT_NOT_ELIGIBLE'));
+
+  // B. ready but no canonical series evidence → canonical_series_unavailable
+  const b = ex(readyRd, { corpus: CORPUS });
+  check('extract(B): ready but no canonical measured series → canonical_series_unavailable, not eligible',
+    b.status === 'canonical_series_unavailable' && b.aggregateDecision.canBeEligibleForExtraction === false);
+
+  // C. ready + canonical series but required channels absent → required_channels_unavailable
+  const c = ex(readyRd, { corpus: CORPUS, canonicalSeriesEvidence: { canonicalChannels: ['throttle'], timeAligned: true, gapFree: true, knownSampleRate: true } });
+  check('extract(C): ready + canonical series but required channels absent → required_channels_unavailable',
+    c.status === 'required_channels_unavailable' && c.eligibleChannelCount === 0 && c.aggregateDecision.canBeEligibleForExtraction === false);
+
+  // C2. partial required channels → partial_eligibility
+  const c2 = ex(readyRd, { corpus: CORPUS, canonicalSeriesEvidence: { canonicalChannels: ['speed', 'steering', 'lateral_accel'], timeAligned: true, gapFree: true, knownSampleRate: true } });
+  check('extract(C2): ready + canonical series + some required channels → partial_eligibility',
+    c2.status === 'partial_eligibility' && c2.eligibleChannelCount === 3 && c2.missingRequiredChannelCount === 2 && c2.aggregateDecision.canBeEligibleForExtraction === false);
+
+  // D. channels present but too few corner events → segmentation_prerequisites_unmet
+  const d = ex(readyRd, { corpus: CORPUS, canonicalSeriesEvidence: fullCse, segmentationEvidence: { cornerEventsDetectable: true, cornerEventCount: 1, entryMidExitSeparable: true, steadyStateIdentifiable: true } });
+  check('extract(D): channels present but too few corner events → segmentation_prerequisites_unmet',
+    d.status === 'segmentation_prerequisites_unmet' && d.aggregateDecision.canBeEligibleForExtraction === false);
+
+  // E. segmentation ok but entry/mid/exit windows not separable → window_prerequisites_unmet
+  const e = ex(readyRd, { corpus: CORPUS, canonicalSeriesEvidence: fullCse, segmentationEvidence: { cornerEventsDetectable: true, cornerEventCount: 6, entryMidExitSeparable: false, steadyStateIdentifiable: true } });
+  check('extract(E): segmentation ok but windows not separable → window_prerequisites_unmet',
+    e.status === 'window_prerequisites_unmet' && e.aggregateDecision.canBeEligibleForExtraction === false);
+
+  // F. fully satisfied (synthetic) → eligible_for_extraction; extraction/analysis caps STILL false
+  const f = ex(readyRd, { corpus: CORPUS, canonicalSeriesEvidence: fullCse, segmentationEvidence: fullSeg });
+  check('extract(F): all prerequisites satisfied (synthetic) → eligible_for_extraction; extraction/analysis caps false',
+    f.status === 'eligible_for_extraction' && f.aggregateDecision.canBeEligibleForExtraction === true && f.capabilities.extractionEligible === true
+    && f.capabilities.measuredHandlingResponse === false && f.capabilities.handlingAnalysis === false && f.capabilities.kus === false
+    && f.capabilities.overlayEnabled === false && f.capabilities.modelVsActual === false && f.capabilities.canonicalTelemetry === false);
+
+  // F2. eligibility requires a corpus — full evidence but no corpus → not eligible
+  const f2 = ex(readyRd, { canonicalSeriesEvidence: fullCse, segmentationEvidence: fullSeg });
+  check('extract(F2): full evidence but no corpus → not eligible_for_extraction',
+    f2.status !== 'eligible_for_extraction' && f2.aggregateDecision.canBeEligibleForExtraction === false);
+
+  // G. caps pinned false on every path
+  check('extract(G): measuredHandlingResponse/handling/overlay/Kus/modelVsActual caps pinned false (all paths)',
+    [a, b, c, c2, d, e, f, f2].every(o => o.capabilities.measuredHandlingResponse === false && o.capabilities.handlingAnalysis === false
+      && o.capabilities.overlayEnabled === false && o.capabilities.kus === false && o.capabilities.handlingCorrelation === false
+      && o.capabilities.setupRecommendation === false && o.capabilities.modelVsActual === false && o.capabilities.canonicalTelemetry === false
+      && o.capabilities.extractionEligible === (o.status === 'eligible_for_extraction')));
+
+  // H. input/output contract schema exported and measured-only (proxy, not Kus / model-vs-actual)
+  const inC = M.EXTRACTION_INPUT_CONTRACT, outC = M.EXTRACTION_OUTPUT_CONTRACT;
+  check('extract(H): input contract names required channels (abstract) + segmentation prerequisites',
+    !!inC && Array.isArray(inC.canonicalSeries.requiredChannels) && inC.canonicalSeries.requiredChannels.includes('lateral_accel')
+    && Array.isArray(inC.segmentation.prerequisites) && inC.segmentation.prerequisites.includes('entry_mid_exit_separable'));
+  check('extract(H2): output contract is measured-only proxy — not full Kus / model-vs-actual / setup',
+    !!outC && outC.measuredTendency.metric === 'understeer_oversteer_proxy'
+    && outC.redLines.includes('not_full_kus') && outC.redLines.includes('not_model_vs_actual') && outC.redLines.includes('not_setup_recommendation'));
+
+  // I. bms-confirmation integration — feed only flips measuredExtractionEligible with full prereqs + corpus
+  const bmsStub = { header: { valid: true }, channels: ['accy', 'yaw', 'steer', 'speed'].map(n => ({ name: n })), channelCount: 4 };
+  const rawStub = { rawSeriesCandidates: [{ id: 'candidate_001', encoding: 'int16le', sampleCount: 600 }], timebaseCandidate: { present: true, sampleCount: 600 } };
+  const probeMono = { timebaseClues: [{ type: 'monotonic_counter_candidate', runLength: 600, medianDelta: 10, confidence: 'medium' }] };
+  const exMap = { candidate_001: { rawChannelName: 'accy', canonicalName: 'lateral_accel', scale: 0.01, offset: 0, unit: 'g' } };
+  const linkEx = M.linkBmsRawCandidates(bmsStub, probeMono, rawStub, { explicitMapping: exMap });
+  const STABLE = { channelCountStable: true, candidateRegionStable: true, catalogDetectedAll: true, fileCount: 3 };
+  const structFeed = { confirmationFeed: { perChannelBlockCountCandidate: true } };
+  const idFeed = { status: 'confirmed_identity', aggregateDecision: { canConfirmAnyChannelIdentity: true }, capabilities: { channelIdentityConfirmed: true } };
+  const tbFeed = { status: 'confirmed_timebase', aggregateDecision: { canConfirmTimebase: true }, capabilities: { timebaseConfirmed: true } };
+  const psFeed = { status: 'confirmed_scaling', aggregateDecision: { canConfirmPhysicalScaling: true }, unitsConfirmed: true, canonicalValueEligibility: true, capabilities: { physicalScaling: true } };
+  const exNoCorpus = M.evaluateBmsConfirmationEvidence(bmsStub, probeMono, rawStub, linkEx, { extractionEligibility: f });
+  check('extract→confirm: feed WITHOUT corpus → measuredExtractionEligible false; decode caps false',
+    exNoCorpus.decisions.measuredExtractionEligible === false
+    && exNoCorpus.capabilities.timeSeries === false && exNoCorpus.capabilities.physicalScaling === false && exNoCorpus.capabilities.handlingCorrelation === false);
+  const exCorpus = M.evaluateBmsConfirmationEvidence(bmsStub, probeMono, rawStub, linkEx, { structure: structFeed, channelIdentity: idFeed, timebase: tbFeed, physicalScaling: psFeed, readiness: readyRd, extractionEligibility: f, corpus: STABLE });
+  check('extract→confirm: feed + full prereqs + corpus → measuredExtractionEligible true; decode caps still false',
+    exCorpus.decisions.measuredExtractionEligible === true
+    && exCorpus.capabilities.timeSeries === false && exCorpus.capabilities.physicalScaling === false && exCorpus.capabilities.handlingCorrelation === false);
+
+  // J. telemetry metadata integration (real path → conservative)
+  const meta = M.buildTelemetryMetadata({ header: { importer: 'DarabImporter v.', valid: true }, channelCount: 4, channels: bmsStub.channels, extractionEligibility: a });
+  check('extract→metadata: summary surfaced + extractionEligible false; measuredHandlingResponse/handling/overlay caps false',
+    !!meta.extractionEligibility && meta.capabilities.extractionEligibilityCriteria === true && meta.capabilities.extractionEligible === false
+    && meta.capabilities.measuredHandlingResponse === false && meta.capabilities.handlingAnalysis === false && meta.capabilities.overlayEnabled === false);
+  check('extract→metadata: no extraction → cap false, summary null',
+    M.buildTelemetryMetadata({ header: { importer: 'DarabImporter', valid: true }, channelCount: 1, channels: [{ name: 'accy' }] }).extractionEligibility === null);
 }
 
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
