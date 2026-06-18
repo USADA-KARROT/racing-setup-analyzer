@@ -2093,5 +2093,104 @@ console.log('\n[measured-extraction] .bmsbin synthetic measured-extraction harne
     ['low', 'medium'].includes(d.confidence) && ['low', 'medium'].includes(big.confidence));
 }
 
+// ── Phase 3R-0: trust-chain INVARIANTS (regression guards locking the Phase 3 red lines) ──
+console.log('\n[invariants] Phase 3 trust-chain red-line invariants');
+{
+  const GATED = ['physicalScaling', 'unitsConfirmed', 'canonicalTelemetry', 'telemetryReady', 'telemetryReadiness',
+    'extractionEligible', 'measuredExtraction', 'measuredExtractionSynthetic', 'measuredHandlingResponse',
+    'handlingAnalysis', 'overlayEnabled', 'kus', 'handlingCorrelation', 'setupRecommendation', 'modelVsActual',
+    'timeSeries', 'lapSegmentation'];
+  const noGated = o => !!(o && o.capabilities) && GATED.every(k => o.capabilities[k] === undefined || o.capabilities[k] === false);
+
+  // real/imported single-file path: build the whole chain with empty opts (the importBms / reporter call shape)
+  const realBms = { header: { valid: true }, channels: ['accy', 'yaw', 'steer', 'speed'].map(n => ({ name: n })), channelCount: 4 };
+  const probe = {}, rawX = { rawSeriesCandidates: [] };
+  const link = M.linkBmsRawCandidates(realBms, probe, rawX, {});
+  const rawStream = M.evaluateBmsRawStreamConfirmation(realBms, probe, rawX, null, {});
+  const identity = M.evaluateBmsChannelIdentityConfirmation(realBms, rawStream, null, {});
+  const timebase = M.evaluateBmsTimebaseConfirmation(rawStream, null, {});
+  const scaling = M.evaluateBmsPhysicalScalingConfirmation(rawStream, identity, timebase, {});
+  const readiness = M.evaluateBmsTelemetryReadiness(rawStream, identity, timebase, scaling, {});
+  const eligibility = M.evaluateBmsExtractionEligibility(readiness, {});
+  const measext = M.evaluateBmsMeasuredExtraction(eligibility, {});
+  const hub = M.evaluateBmsConfirmationEvidence(realBms, probe, rawX, link, { readiness, extractionEligibility: eligibility, measuredExtraction: measext });
+  const meta = M.buildTelemetryMetadata(Object.assign({}, realBms, { rawStreamConfirmation: rawStream, channelIdentity: identity, timebase, physicalScaling: scaling, readiness, extractionEligibility: eligibility, measuredExtraction: measext, confirmation: hub, probe, raw: rawX, link }));
+
+  // A. real path fail-closed at every layer (gates + hub decisions)
+  check('invariant(A): real path fail-closed (readiness not_ready / eligibility not_eligible / measext blocked / hub not_confirmed)',
+    readiness.status === 'not_ready' && eligibility.status === 'not_eligible' && measext.status === 'blocked_by_eligibility' && hub.status === 'not_confirmed'
+    && hub.decisions.canConfirmSampleStructure === false && hub.decisions.canConfirmRawStreams === false
+    && hub.decisions.canConfirmChannelIdentity === false && hub.decisions.canConfirmTimebase === false
+    && hub.decisions.canConfirmPhysicalScaling === false && hub.decisions.canonicalTelemetryPrerequisitesMet === false
+    && hub.decisions.telemetryReadyForAnalysis === false && hub.decisions.measuredExtractionEligible === false && hub.decisions.measuredExtractionSynthetic === false);
+
+  // B. no gated capability true on the real path — at any layer or in the merged metadata
+  check('invariant(B): no gated capability true on real path (all layers + merged metadata)',
+    [rawStream, identity, timebase, scaling, readiness, eligibility, measext, hub].every(noGated) && noGated(meta)
+    && meta.capabilities.timeSeries === false && meta.capabilities.canonicalTelemetry === false && meta.capabilities.handlingAnalysis === false
+    && meta.capabilities.measuredHandlingResponse === false && meta.capabilities.telemetryReady === false && meta.capabilities.extractionEligible === false
+    && meta.capabilities.measuredExtraction === false && meta.capabilities.measuredExtractionSynthetic === false && meta.capabilities.physicalScaling === false);
+
+  // C. confirmation hub pins decode caps false literally on every path
+  check('invariant(C): hub pins timeSeries/physicalScaling/handlingCorrelation false',
+    hub.capabilities.timeSeries === false && hub.capabilities.physicalScaling === false && hub.capabilities.handlingCorrelation === false);
+
+  // D. robustness: bad/empty input is fail-closed (no throw; no gated cap)
+  let robustOk = true;
+  const badCalls = [
+    () => M.evaluateBmsExtractionEligibility(null, {}),
+    () => M.evaluateBmsExtractionEligibility(undefined, {}),
+    () => M.evaluateBmsMeasuredExtraction(null, {}),
+    () => M.evaluateBmsMeasuredExtraction({ status: 'eligible_for_extraction', capabilities: { extractionEligible: true } }, { syntheticOnly: true, syntheticCanonicalSeries: null }),
+    () => M.evaluateBmsTelemetryReadiness(null, null, null, null, {}),
+  ];
+  for (const fn of badCalls) { try { const r = fn(); if (r && !noGated(r)) robustOk = false; } catch (e) { robustOk = false; } }
+  check('invariant(D): bad/empty input fail-closed (no throw, no gated cap)', robustOk);
+
+  // E. reporter: summarizeFile output key set === REPORT_FIELDS, all scalar
+  const reporter = require(path.join(__dirname, '..', 'tools', 'bmsbin-local-probe-report.js'));
+  const strTok = (s) => { const b = Buffer.from(s + '\0', 'ascii'); const L = Buffer.alloc(2); L.writeUInt16LE(b.length, 0); return Buffer.concat([L, b]); };
+  const sine = Buffer.alloc(4000); for (let k = 0; k < 2000; k++) sine.writeInt16LE(Math.round(2000 * Math.sin(k / 20)), k * 2);
+  const fixture = new Uint8Array(Buffer.concat([Buffer.from('DarabImporter v.\0', 'ascii'), Buffer.alloc(8), strTok('TrackInfo'), Buffer.from([1, 2, 3, 4]), strTok('accy'), strTok('MS5.8'), sine]));
+  const sm = reporter.summarizeFile(fixture, M, { scanWindowBytes: 64 * 1024 });
+  const smKeys = new Set(Object.keys(sm)), rf = new Set(reporter.REPORT_FIELDS);
+  check('invariant(E): reporter summary key set === REPORT_FIELDS; all scalar',
+    smKeys.size === rf.size && [...rf].every(k => smKeys.has(k)) && Object.keys(sm).every(k => { const v = sm[k]; return v === null || ['string', 'number', 'boolean'].includes(typeof v); }));
+
+  // F. reporter error-fallback literal key set === REPORT_FIELDS (drift guard; static check, no refactor)
+  const repSrc = fs.readFileSync(path.join(__dirname, '..', 'tools', 'bmsbin-local-probe-report.js'), 'utf8');
+  const fbMatch = repSrc.match(/catch \(e\) \{ return \{([\s\S]*?)\}; \}/);
+  const fbKeys = fbMatch ? new Set([...fbMatch[1].matchAll(/(\w+):/g)].map(x => x[1])) : new Set();
+  check('invariant(F): reporter error-fallback key set === REPORT_FIELDS (drift guard)',
+    fbKeys.size === rf.size && [...rf].every(k => fbKeys.has(k)));
+
+  // G. synthetic extracted_synthetic opens ONLY measuredExtractionSynthetic/Harness; realDataUsed false
+  const CORPUS = { fileCount: 3, candidateRegionStable: true, channelCountStable: true };
+  const chans = ['speed', 'steering', 'lateral_accel', 'yaw_rate', 'brake_or_longitudinal_accel'];
+  const readyRd = M.evaluateBmsTelemetryReadiness({ aggregateDecision: { canConfirmAnyRawStream: true } }, { aggregateDecision: { canConfirmAnyChannelIdentity: true } }, { aggregateDecision: { canConfirmTimebase: true } }, { aggregateDecision: { canConfirmPhysicalScaling: true }, unitsConfirmed: true, canonicalValueEligibility: true }, { corpus: CORPUS, confirmedChannels: chans, qualityEvidence: { sampleRateAdequate: true, syncQualityAdequate: true, dropoutOk: true, noiseOk: true } });
+  const elig = M.evaluateBmsExtractionEligibility(readyRd, { corpus: CORPUS, canonicalSeriesEvidence: { canonicalChannels: chans, timeAligned: true, gapFree: true, knownSampleRate: true }, segmentationEvidence: { cornerEventsDetectable: true, cornerEventCount: 6, entryMidExitSeparable: true, steadyStateIdentifiable: true } });
+  const mk = (c, ratio) => { const speed = [], steering = [], lateral_accel = [], yaw_rate = [], timeIndex = []; let t = 0; for (let k = 0; k < c; k++) { for (let i = 0; i < 5; i++) { timeIndex.push(t++); speed.push(100); steering.push(0); lateral_accel.push(0); yaw_rate.push(0); } for (let i = 0; i < 15; i++) { timeIndex.push(t++); let lg; if (i < 4) lg = 0.4 + 0.05 * i; else if (i < 11) lg = 0.55; else lg = 0.55 - 0.1 * (i - 10); lateral_accel.push(lg); speed.push(80); steering.push(lg * ratio); yaw_rate.push(lg * 0.5); } } return { timeIndex, speed, steering, lateral_accel, yaw_rate }; };
+  const synEx = M.evaluateBmsMeasuredExtraction(elig, { syntheticOnly: true, corpus: CORPUS, syntheticCanonicalSeries: mk(3, 1.0) });
+  const onlySynthFlip = synEx.capabilities.measuredExtractionSynthetic === true && synEx.capabilities.measuredExtractionHarness === true
+    && synEx.capabilities.measuredHandlingResponse === false && synEx.capabilities.handlingAnalysis === false && synEx.capabilities.overlayEnabled === false
+    && synEx.capabilities.kus === false && synEx.capabilities.handlingCorrelation === false && synEx.capabilities.setupRecommendation === false
+    && synEx.capabilities.modelVsActual === false && synEx.capabilities.canonicalTelemetry === false && synEx.capabilities.timeSeries === false && synEx.capabilities.measuredExtraction === false;
+  check('invariant(G): synthetic extracted_synthetic opens only measuredExtractionSynthetic/Harness; realDataUsed false',
+    synEx.status === 'extracted_synthetic' && synEx.realDataUsed === false && onlySynthFlip);
+
+  // H. dual-gate adversarial: only-status/only-cap → blocked_by_eligibility; eligible+series w/o syntheticOnly → blocked_real_path
+  const onlyStatus = M.evaluateBmsMeasuredExtraction({ status: 'eligible_for_extraction', capabilities: { extractionEligible: false } }, { syntheticOnly: true, corpus: CORPUS, syntheticCanonicalSeries: mk(3, 1.0) });
+  const onlyCap = M.evaluateBmsMeasuredExtraction({ status: 'not_eligible', capabilities: { extractionEligible: true } }, { syntheticOnly: true, corpus: CORPUS, syntheticCanonicalSeries: mk(3, 1.0) });
+  const realSeries = M.evaluateBmsMeasuredExtraction(elig, { syntheticCanonicalSeries: mk(3, 1.0) });
+  check('invariant(H): dual-gate — only-status/only-cap → blocked_by_eligibility; eligible+series w/o syntheticOnly → blocked_real_path',
+    onlyStatus.status === 'blocked_by_eligibility' && onlyCap.status === 'blocked_by_eligibility' && realSeries.status === 'blocked_real_path'
+    && [onlyStatus, onlyCap, realSeries].every(o => o.realDataUsed === false && noGated(o)));
+
+  // I. shape-contract: canonical gate shape present on 3E-0..3G-0B
+  check('invariant(I): canonical gate shape on 3E-0..3G-0B (status/aggregateDecision/confirmationFeed/capabilities/diagnostics/unknowns)',
+    [identity, timebase, scaling, readiness, eligibility, measext].every(o => typeof o.status === 'string' && o.aggregateDecision && typeof o.aggregateDecision === 'object'
+      && o.confirmationFeed && o.capabilities && Array.isArray(o.diagnostics) && Array.isArray(o.unknowns)));
+}
+
 console.log(`\n========= 結果: ${pass} passed, ${fail} failed =========`);
 process.exit(fail > 0 ? 1 : 0);
