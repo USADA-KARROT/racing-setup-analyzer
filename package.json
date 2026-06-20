@@ -5,7 +5,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node tests/verify-dynamics.js",
+    "test": "node tests/verify-dynamics.js && node tests/telemetry-core.test.js && node tests/telemetry-view.test.js && node tests/telemetry-plot.test.js && node tests/telemetry-interact.test.js && node tools/validate-against-telemetry.js --selftest",
     "build:mac": "electron-builder --mac",
     "build:win": "electron-builder --win",
     "build:all": "electron-builder --mac --win"

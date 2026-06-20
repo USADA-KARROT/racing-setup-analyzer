@@ -42,7 +42,9 @@ const src =
   fs.readFileSync(path.join(jsDir, 'bms-canonical-adapter-eligibility.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-private-corpus-boundary.js'), 'utf8') + '\n' +
   fs.readFileSync(path.join(jsDir, 'bms-sanitized-evidence-adapter.js'), 'utf8') + '\n' +
+  fs.readFileSync(path.join(jsDir, 'bms-channel-dictionary.js'), 'utf8') + '\n' +
   'this.__exports = { Tier1BasicBalance, Tier2TireAware, Tier3Complete, TireModel, ' +
+  'buildBmsIdentityCard, matchBmsChannel, BOSCH_CHANNEL_DICTIONARY, DIAGNOSTIC_COVERAGE_GROUPS, BMS_IDENTITY_LIMITATIONS, ' +
   'PacejkaTireModel, SetupAdvisor, SpringCalculator, TireSpringEstimator, ' +
   'compareWithBaseline, roundN, TRACKDAY_TIRES, ' +
   'parseTIR, mfFy0, tireCharacteristics, ' +
@@ -592,6 +594,80 @@ PKY4 = 2.0`;
   check('bms: channel name/source/description parsed', cat[0].name === 'accy' && cat[0].source === 'MS5.8' && cat[0].description === 'lateral acceleration');
   const r = M.parseBms(bytes);
   check('bms: detects validation channels (accy/yaw/steer)', r.validationChannels.lateral_accel && r.validationChannels.yaw_rate && r.validationChannels.steering);
+}
+
+// ── D1-0B: Bosch BMS Identity / Channel Inventory card (dictionary + identity; decodes nothing) ──
+console.log('\n[bmsid] D1-0B Bosch channel dictionary + identity card');
+{
+  const s = (x) => { const b = Buffer.from(x + '\0', 'ascii'); const L = Buffer.alloc(2); L.writeUInt16LE(b.length, 0); return Buffer.concat([L, b]); };
+  const ti = Buffer.from([0x01, 0x02, 0x03, 0x04]);
+  const ch3 = (n, src, d) => Buffer.concat([s('TrackInfo'), ti, s(n), s(src), s(d)]);
+  const ch2 = (n, src) => Buffer.concat([s('TrackInfo'), ti, s(n), s(src)]);   // C60 style: no description
+  const syn = Buffer.concat([
+    Buffer.from('DarabImporter v.\0', 'ascii'), Buffer.alloc(8),
+    ch3('speed', 'MS5.8', 'car speed'), ch3('steer', 'MS5.8', 'steering angle'),
+    ch3('accy', 'MS5.8', 'lateral acceleration'), ch3('accx', 'MS5.8', 'longitudinal acceleration'),
+    ch3('yaw', 'MS5.8', 'yaw rate'), ch3('nmot', 'MS5.8', 'engine speed'),
+    ch3('pbrake_f', 'MS5.8', 'brake pressure front'), ch3('pbrake_r', 'MS5.8', 'brake pressure rear'),
+    ch3('vwheel_fl', 'MS5.8', 'wheel speed front left'), ch3('vwheel_fr', 'MS5.8', 'wheel speed front right'),
+    ch3('vwheel_rl', 'MS5.8', 'wheel speed rear left'), ch3('vwheel_rr', 'MS5.8', 'wheel speed rear right'),
+    ch3('gear', 'MS5.8', 'selected gear'), ch3('tmot', 'MS5.8', 'engine temperature'),
+    ch3('toil', 'MS5.8', 'oil temperature'), ch3('trvdam_fl', 'MS5.8', 'damper position front left'),
+    ch3('ugs', 'MS5.8', 'ADC input voltage gearshift sensor'),               // must NOT map to gear
+    ch3('ags_target_engine_speed', 'MS5.8', 'Megaline AGS target engine speed'), // must NOT map to engine_rpm
+    ch2('R_H_Front', 'C60'), ch2('Road_FL', 'C60'),                          // inferred, no description
+    ch3('some_unknown_ch', 'MS5.8', 'no description'),                       // unmapped
+  ]);
+  const bytes = new Uint8Array(syn);
+  const rr = M.parseBms(bytes);
+  const card = M.buildBmsIdentityCard(rr, { fileName: 'synthetic.bmsbin', fileSize: bytes.length });
+
+  // (1) identity card data produced from a synthetic Darab catalog
+  check('bmsid: card built from synthetic Darab catalog', !!card && card.cardVersion === 'D1-0B');
+  check('bmsid: format detected = Bosch WinDarab / DarabImporter', card.fileIdentity.formatDetected === 'Bosch WinDarab / DarabImporter' && card.fileIdentity.headerValid === true);
+  check('bmsid: file identity carries name + size', card.fileIdentity.fileName === 'synthetic.bmsbin' && card.fileIdentity.fileSize === bytes.length);
+  check('bmsid: source summary lists MS5.8 + C60', card.sourceSummary.sources.indexOf('MS5.8') !== -1 && card.sourceSummary.sources.indexOf('C60') !== -1 && card.sourceSummary.channelCount === rr.channelCount);
+
+  // (2) dictionary maps core diagnostic channels to canonical concepts (high confidence)
+  const inv = {}; for (const i of card.channelInventory) inv[i.name] = i;
+  const hi = (name, concept) => !!inv[name] && inv[name].concept === concept && inv[name].confidence === 'high';
+  check('bmsid: speed → vehicle_speed (high)', hi('speed', 'vehicle_speed'));
+  check('bmsid: steer → steering_angle (high)', hi('steer', 'steering_angle'));
+  check('bmsid: accy → lateral_acceleration (high)', hi('accy', 'lateral_acceleration'));
+  check('bmsid: accx → longitudinal_acceleration (high)', hi('accx', 'longitudinal_acceleration'));
+  check('bmsid: yaw → yaw_rate (high)', hi('yaw', 'yaw_rate'));
+  check('bmsid: nmot → engine_rpm (high)', hi('nmot', 'engine_rpm'));
+  check('bmsid: pbrake_f → brake_pressure_front (high)', hi('pbrake_f', 'brake_pressure_front'));
+  check('bmsid: pbrake_r → brake_pressure_rear (high)', hi('pbrake_r', 'brake_pressure_rear'));
+  check('bmsid: vwheel_* → wheel_speed_FL/FR/RL/RR (high)',
+    hi('vwheel_fl', 'wheel_speed_FL') && hi('vwheel_fr', 'wheel_speed_FR') && hi('vwheel_rl', 'wheel_speed_RL') && hi('vwheel_rr', 'wheel_speed_RR'));
+
+  // (3) unknown / non-target channels stay unmapped — no throw, confidence 'unknown'
+  check('bmsid: unmapped channel → unknown (no fail)', !!inv['some_unknown_ch'] && inv['some_unknown_ch'].concept === null && inv['some_unknown_ch'].confidence === 'unknown');
+  check('bmsid: ugs NOT treated as gear value', !!inv['ugs'] && inv['ugs'].concept !== 'gear');
+  check('bmsid: ags_*_engine_speed NOT treated as engine_rpm (name-gated)', !!inv['ags_target_engine_speed'] && inv['ags_target_engine_speed'].concept !== 'engine_rpm');
+
+  // (4) R_H_* / Road_* → low-confidence inferred channels
+  check('bmsid: R_H_Front → ride_height, low-confidence inferred', !!inv['R_H_Front'] && inv['R_H_Front'].concept === 'ride_height' && inv['R_H_Front'].confidence === 'low');
+  check('bmsid: Road_FL → road_suspension, low-confidence inferred', !!inv['Road_FL'] && inv['Road_FL'].concept === 'road_suspension' && inv['Road_FL'].confidence === 'low');
+  const cov = {}; for (const c of card.diagnosticCoverage) cov[c.key] = c;
+  check('bmsid: coverage marks vehicle_speed/yaw_rate found', cov['vehicle_speed'].status === 'found' && cov['yaw_rate'].status === 'found');
+  check('bmsid: coverage marks ride_height uncertain (low only)', cov['ride_height'].status === 'uncertain');
+
+  // (5) ALL forbidden capabilities false (presence ≠ values); only identity inventory true
+  const cap = card.capabilities;
+  check('bmsid: forbidden caps all false (timeSeries/physicalValues/scaling/units/modelVsActual/kus/handlingAnalysis/setupFromRaw)',
+    cap.timeSeries === false && cap.physicalValues === false && cap.scaling === false && cap.units === false &&
+    cap.modelVsActual === false && cap.kus === false && cap.measuredHandlingAnalysis === false && cap.setupRecommendationFromRaw === false &&
+    cap.channelIdentityInventory === true);
+  const lim = card.limitations;
+  check('bmsid: limitations pin presence-only / nothing decoded',
+    lim.rawSamplesDecoded === false && lim.timeSeriesAvailable === false && lim.physicalScalingDecoded === false && lim.unitsDecoded === false && lim.presenceConfirmedOnly === true);
+
+  // fail-closed on garbage input
+  const bad = M.buildBmsIdentityCard(null, {});
+  check('bmsid: null input → fail-closed (format null, caps false, 0 channels)',
+    !!bad && bad.fileIdentity.formatDetected === null && bad.capabilities.timeSeries === false && bad.capabilities.channelIdentityInventory === true && bad.sourceSummary.channelCount === 0);
 }
 
 // ── Calibration 層：每個常數 == 原始 inline 值 (抽常數時值不可變) ──

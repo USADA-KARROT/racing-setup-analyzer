@@ -1468,6 +1468,64 @@ canvas{max-height:300px}
     <template x-if="bmsResult && !bmsResult.error && !bmsResult.loading">
       <div class="mt-3 text-xs">
         <div class="text-slate-300 mb-2"><span class="font-bold" x-text="bmsResult.channelCount"></span> <span x-text="t('ui.bms.channels')"></span> <span class="text-slate-500 ml-1" x-text="'· ' + bmsResult.header.importer"></span></div>
+        <!-- D1-0B: Bosch BMS Identity / Channel Inventory card (L1 identity only — decodes nothing) -->
+        <template x-if="bmsIdentity()">
+          <div class="mb-3 rounded-lg border border-sky-900/40 bg-sky-950/20 p-3">
+            <div class="text-[11px] font-bold text-sky-300 mb-2" x-text="t('ui.bmsid.title')"></div>
+            <!-- 1. file identity -->
+            <div class="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px] text-slate-400 mb-2">
+              <div><span class="text-slate-500" x-text="t('ui.bmsid.format')+':'"></span> <span class="text-sky-300" x-text="bmsIdentity().fileIdentity.formatDetected || '—'"></span></div>
+              <div><span class="text-slate-500" x-text="t('ui.bmsid.valid')+':'"></span> <span :class="bmsIdentity().fileIdentity.headerValid?'text-green-400':'text-red-400'" x-text="bmsIdentity().fileIdentity.headerValid?t('ui.bmsid.yes'):t('ui.bmsid.no')"></span></div>
+              <div class="truncate"><span class="text-slate-500" x-text="t('ui.bmsid.file')+':'"></span> <span x-text="bmsIdentity().fileIdentity.fileName || '—'"></span></div>
+              <div><span class="text-slate-500" x-text="t('ui.bmsid.size')+':'"></span> <span x-text="fmtBytes(bmsIdentity().fileIdentity.fileSize)"></span></div>
+            </div>
+            <!-- 2. source summary -->
+            <div class="text-[10px] text-slate-400 mb-2">
+              <span class="text-slate-500" x-text="t('ui.bmsid.sources')+':'"></span>
+              <template x-for="s in bmsIdentity().sourceSummary.sources" :key="s"><span class="px-1.5 py-0.5 rounded bg-slate-700 text-slate-200 ml-1" x-text="s"></span></template>
+              <span class="ml-2 text-slate-500" x-text="t('ui.bmsid.channels')+':'"></span> <span class="font-bold text-slate-200" x-text="bmsIdentity().sourceSummary.channelCount"></span>
+            </div>
+            <!-- 3. diagnostic channel coverage -->
+            <div class="text-[10px] text-slate-500 mb-1" x-text="t('ui.bmsid.coverage')"></div>
+            <div class="flex flex-wrap gap-1 mb-2">
+              <template x-for="cov in bmsIdentity().diagnosticCoverage" :key="cov.key">
+                <span class="px-1.5 py-0.5 rounded text-[10px]" :class="cov.status==='found' ? 'bg-green-900/30 text-green-400' : (cov.status==='uncertain' ? 'bg-amber-900/30 text-amber-300' : 'bg-slate-800 text-slate-600')" x-text="(cov.status==='found'?'✓ ':(cov.status==='uncertain'?'? ':'– ')) + t('ui.bmsid.concept.'+cov.key)"></span>
+              </template>
+            </div>
+            <!-- 4. channel inventory (collapsible) -->
+            <details class="mb-2">
+              <summary class="text-[10px] text-slate-400 cursor-pointer"><span x-text="t('ui.bmsid.inventory')"></span> (<span x-text="bmsIdentity().channelInventory.length"></span>)</summary>
+              <div class="mt-1 max-h-60 overflow-y-auto">
+                <table class="w-full text-[10px] text-slate-400">
+                  <thead><tr class="text-slate-500 text-left">
+                    <th class="pr-2" x-text="t('ui.bmsid.col.name')"></th>
+                    <th class="pr-2" x-text="t('ui.bmsid.col.source')"></th>
+                    <th class="pr-2" x-text="t('ui.bmsid.col.concept')"></th>
+                    <th x-text="t('ui.bmsid.col.conf')"></th>
+                  </tr></thead>
+                  <tbody>
+                    <template x-for="ch in bmsIdentity().channelInventory" :key="ch.name">
+                      <tr class="border-t border-slate-800/60">
+                        <td class="pr-2 font-mono text-slate-300" x-text="ch.name"></td>
+                        <td class="pr-2 text-slate-500" x-text="ch.source||'—'"></td>
+                        <td class="pr-2" x-text="ch.concept ? t('ui.bmsid.concept.'+ch.concept) : '—'"></td>
+                        <td><span class="px-1 rounded text-[9px]" :class="ch.confidence==='high'?'bg-green-900/30 text-green-400':(ch.confidence==='medium'?'bg-sky-900/30 text-sky-300':(ch.confidence==='low'?'bg-amber-900/30 text-amber-300':'bg-slate-800 text-slate-600'))" x-text="t('ui.bmsid.conf.'+ch.confidence)"></span></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+              </div>
+            </details>
+            <!-- 5. explicit limitation block -->
+            <div class="text-[10px] text-amber-300/90 bg-amber-900/15 rounded px-2 py-1.5 space-y-0.5">
+              <div x-text="t('ui.bmsid.lim.noSamples')"></div>
+              <div x-text="t('ui.bmsid.lim.noTimeSeries')"></div>
+              <div x-text="t('ui.bmsid.lim.noScaling')"></div>
+              <div x-text="t('ui.bmsid.lim.presenceOnly')"></div>
+              <div class="text-sky-300/90" x-text="t('ui.bmsid.lim.useExport')"></div>
+            </div>
+          </div>
+        </template>
         <!-- Phase 3A: telemetry catalog status — honest about catalog-only vs not-decoded -->
         <template x-if="telemetryMeta()">
           <div>
@@ -2300,12 +2358,129 @@ canvas{max-height:300px}
 
 </div>
 
+<!-- ===== Telemetry CSV Evidence viewer (V1 Step 2B): import + mapping + fail-closed preflight. No curves / no yaw metrics / no model overlay. ===== -->
+<div x-show="currentTab==='telemetry'" x-transition>
+  <div class="card p-5 mb-4">
+    <div class="section-title">📈 <span x-text="t('ui.telem.title')"></span></div>
+    <div class="text-xs text-slate-500 mb-3" x-text="t('ui.telem.hint')"></div>
+    <div class="flex flex-wrap items-center gap-3 mb-2">
+      <label class="text-xs text-slate-400" x-text="t('ui.telem.profile')"></label>
+      <select class="bg-slate-800 text-xs rounded px-2 py-1" @change="telemSetProfile($event.target.value)">
+        <template x-for="p in telemProfiles()" :key="p.id"><option :value="p.id" :selected="telem.profileId===p.id" x-text="p.labelKey?t(p.labelKey):p.label"></option></template>
+      </select>
+      <input type="file" accept=".csv,.txt" @change="importCSV($event)" class="text-xs">
+      <button class="text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600" x-show="telem.imported" @click="telemUnload()" x-text="t('ui.telem.unload')"></button>
+    </div>
+    <div x-show="telem.error" class="text-xs text-red-400" x-text="telem.error"></div>
+    <div x-show="telem.imported && telem.importSummary" class="text-xs text-slate-300 mt-2 space-y-1">
+      <div><span class="text-slate-200" x-text="telem.importSummary.fileName"></span> · <span x-text="telem.importSummary.rowCount"></span> <span x-text="t('ui.telem.rows')"></span> · <span x-text="telem.importSummary.columnCount"></span> <span x-text="t('ui.telem.cols')"></span><template x-if="telem.importSummary.sampleRateHz"> · <span x-text="telem.importSummary.sampleRateHz+' Hz'"></span></template><template x-if="telem.importSummary.timeRange"> · <span x-text="telem.importSummary.timeRange.duration.toFixed(1)+' s'"></span></template></div>
+      <template x-for="w in telem.importSummary.warnings"><div class="text-amber-400" x-text="'⚠ '+telemDiag(w)"></div></template>
+      <template x-for="er in telem.importSummary.errors"><div class="text-red-400" x-text="'⛔ '+telemDiag(er)"></div></template>
+    </div>
+  </div>
+
+  <div class="card p-5 mb-4" x-show="telem.imported">
+    <div class="section-title text-sm" x-text="t('ui.telem.map.title')"></div>
+    <div class="overflow-x-auto"><table class="w-full text-xs">
+      <thead class="text-slate-500"><tr>
+        <th class="text-left p-1" x-text="t('ui.telem.map.col')"></th>
+        <th class="text-left p-1" x-text="t('ui.telem.map.canonical')"></th>
+        <th class="text-left p-1" x-text="t('ui.telem.map.unit')"></th>
+        <th class="text-left p-1" x-text="t('ui.telem.map.status')"></th>
+        <th class="text-left p-1" x-text="t('ui.telem.map.confirm')"></th>
+      </tr></thead>
+      <tbody>
+        <template x-for="row in telem.mappingRows" :key="row.columnId">
+          <tr class="border-t border-slate-800">
+            <td class="p-1 text-slate-200" x-text="row.rawHeader"></td>
+            <td class="p-1">
+              <select class="bg-slate-800 rounded px-1 py-0.5" @change="telemEdit(row.columnId,'canonicalName',$event.target.value)">
+                <template x-for="c in telemCanonOptions()" :key="c"><option :value="c" :selected="(row.effectiveCanonical||'')===c" x-text="c||t('ui.telem.map.unmapped')"></option></template>
+              </select>
+              <span class="text-slate-600 ml-1" x-show="row.matchType && row.matchType!=='none'" x-text="t('ui.telem.match.'+row.matchType)"></span>
+            </td>
+            <td class="p-1"><span x-text="row.rawUnit||'—'"></span><template x-if="row.unitSample"><span class="text-slate-500" x-text="' → '+row.unitSample.canonicalUnit"></span></template></td>
+            <td class="p-1"><span :class="telemGradeClass(row.status)" x-text="telemGradeText(row.status)"></span></td>
+            <td class="p-1"><input type="checkbox" :checked="row.confirmed" :disabled="!row.effectiveCanonical" @change="telemEdit(row.columnId,'confirmed',$event.target.checked)"></td>
+          </tr>
+        </template>
+      </tbody>
+    </table></div>
+  </div>
+
+  <div class="card p-5" x-show="telem.imported && telem.preflight">
+    <div class="section-title text-sm" x-text="t('ui.telem.pf.title')"></div>
+    <div class="text-xs mb-2"><span x-text="t('ui.telem.pf.grade')"></span>: <span class="font-semibold" :class="telemGradeClass(telem.preflight.grade)" x-text="telemGradeText(telem.preflight.grade)"></span></div>
+    <template x-for="b in telem.preflight.blockers"><div class="text-xs text-red-400" x-text="'⛔ '+telemDiag(b)"></div></template>
+    <template x-for="a in telem.preflight.assumptions"><div class="text-xs text-amber-400" x-text="'⚠ '+telemDiag(a)"></div></template>
+    <div class="mt-3 text-xs">
+      <div class="text-slate-500 mb-1" x-text="t('ui.telem.cap.title')"></div>
+      <template x-for="c in telem.capabilities" :key="c.key">
+        <div><span :class="c.available?'text-emerald-400':'text-slate-500'" x-text="(c.available?'✓ ':'— ')+t(c.labelKey)"></span><template x-if="c.reasonKey"><span class="text-slate-600" x-text="' · '+t(c.reasonKey)"></span></template></div>
+      </template>
+    </div>
+  </div>
+
+  <div class="card p-5" x-show="telem.imported">
+    <div class="section-title text-sm" x-text="t('ui.telem.plot.title')"></div>
+    <div class="flex flex-wrap gap-1.5 text-xs mb-2">
+      <template x-for="row in telem.mappingRows" :key="row.columnId">
+        <button type="button" @click="telemTogglePlot(row.columnId)"
+          class="px-2 py-0.5 rounded border border-slate-700"
+          :class="telem.plotChannels.includes(row.columnId)?'bg-sky-600 text-white border-sky-500':'bg-slate-800 text-slate-300 hover:bg-slate-700'"
+          x-text="row.rawName + (row.effectiveCanonical?' ('+row.effectiveCanonical+')':'')"></button>
+      </template>
+    </div>
+    <label class="text-xs inline-flex items-center gap-1.5 mb-2 text-slate-400">
+      <input type="checkbox" :checked="telem.plotUseCanonical" @change="telemToggleCanonical($event.target.checked)">
+      <span x-text="telem.plotUseCanonical ? t('ui.telem.plot.canonical') : t('ui.telem.plot.raw')"></span>
+    </label>
+    <div class="text-xs text-slate-500 mb-2" x-show="!telem.plotChannels.length" x-text="t('ui.telem.plot.empty')"></div>
+    <div class="text-xs mb-1 flex flex-wrap gap-x-3 gap-y-0.5 items-center" style="min-height:18px" x-show="telem.readout && telem.plotChannels.length">
+      <span class="text-slate-400" x-text="(telem.cursorPinned?'📌 ':'')+t('ui.telem.plot.at')+' '+telemFmt(telem.readout&&telem.readout.time)+((telem.readout&&telem.readout.xUnit)?' '+telem.readout.xUnit:'')+((telem.readout)?' · '+t('ui.telem.plot.row')+' '+telem.readout.row:'')"></span>
+      <template x-for="l in (telem.readout?telem.readout.lanes:[])" :key="l.columnId">
+        <span><span class="text-slate-500" x-text="(l.canonicalName||l.rawName)+':'"></span> <span class="font-mono text-slate-200" x-text="telemFmt(l.value)+(l.unit?' '+l.unit:'')"></span></span>
+      </template>
+    </div>
+    <div style="overflow-x:auto; width:100%"
+      x-effect="currentTab; telem.imported; telem.plotChannels.length; telem.plotUseCanonical; $nextTick(()=>{ if(currentTab==='telemetry' && telem.imported) telemPlotDraw(); })">
+      <canvas x-ref="telemCanvas" style="display:block; cursor:crosshair; touch-action:pan-y"
+        @mousemove="telemPointerMove($event)" @mousedown.prevent="telemPointerDown($event)" @mouseup="telemPointerUp()"
+        @mouseenter="telemPointerEnter()" @mouseleave="telemPointerLeave()"
+        @touchstart="telemPointerDown($event)" @touchmove="telemPointerMove($event)" @touchend="telemPointerUp()"></canvas>
+    </div>
+    <div class="text-[11px] text-slate-600 mt-1" x-show="telem.plotChannels.length" x-text="t('ui.telem.plot.hint2')+' · '+t('ui.telem.plot.note')"></div>
+    <div class="mt-3 rounded border border-slate-700 bg-slate-800/40 p-2 text-xs" x-show="telem.summary">
+      <div class="flex items-center justify-between mb-1">
+        <span class="text-slate-300 font-semibold" x-text="t('ui.telem.plot.selection')"></span>
+        <button type="button" class="text-slate-400 hover:text-slate-200" @click="telemClearSelection()" x-text="t('ui.telem.plot.clear')"></button>
+      </div>
+      <div class="text-slate-400 mb-1" x-show="telem.summary" x-text="telemFmt(telem.summary&&telem.summary.startTime)+' → '+telemFmt(telem.summary&&telem.summary.endTime)+((telem.summary&&telem.summary.xUnit)?' '+telem.summary.xUnit:'')+' · Δ'+telemFmt(telem.summary&&telem.summary.duration)+' · '+(telem.summary&&telem.summary.rowCount)+' '+t('ui.telem.rows')"></div>
+      <table class="w-full">
+        <thead><tr class="text-slate-500 text-left"><th class="font-normal pr-2" x-text="t('ui.telem.sum.ch')"></th><th class="font-normal pr-2 text-right" x-text="t('ui.telem.sum.min')"></th><th class="font-normal pr-2 text-right" x-text="t('ui.telem.sum.max')"></th><th class="font-normal pr-2 text-right" x-text="t('ui.telem.sum.mean')"></th><th class="font-normal text-right" x-text="t('ui.telem.sum.n')"></th></tr></thead>
+        <tbody>
+          <template x-for="l in (telem.summary?telem.summary.lanes:[])" :key="l.rawName">
+            <tr class="text-slate-200">
+              <td class="pr-2" x-text="(l.canonicalName||l.rawName)+(l.unit?' ['+l.unit+']':'')"></td>
+              <td class="pr-2 text-right font-mono" x-text="telemFmt(l.min)"></td>
+              <td class="pr-2 text-right font-mono" x-text="telemFmt(l.max)"></td>
+              <td class="pr-2 text-right font-mono" x-text="telemFmt(l.mean)"></td>
+              <td class="text-right font-mono text-slate-400" x-text="l.count"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 </main>
 
 <script src="js/i18n.js"></script>
 <script src="js/i18n-guide.js"></script>
 <script src="js/i18n-ui.js"></script>
 <script src="js/i18n-advisor.js"></script>
+<script src="js/i18n-csv.js"></script>
 <script src="js/calibration.js"></script>
 <script src="js/tire-data.js"></script>
 <script src="js/dynamics-model.js"></script>
@@ -2318,6 +2493,10 @@ canvas{max-height:300px}
 <script src="js/transient.js"></script>
 <script src="js/bms-parser.js"></script>
 <script src="js/telemetry-schema.js"></script>
+<script src="js/telemetry-core.js"></script>
+<script src="js/telemetry-view.js"></script>
+<script src="js/telemetry-plot.js"></script>
+<script src="js/telemetry-interact.js"></script>
 <script src="js/telemetry-metadata.js"></script>
 <script src="js/bms-probe.js"></script>
 <script src="js/bms-raw-extract.js"></script>
@@ -2334,8 +2513,15 @@ canvas{max-height:300px}
 <script src="js/bms-canonical-adapter-eligibility.js"></script>
 <script src="js/bms-private-corpus-boundary.js"></script>
 <script src="js/bms-sanitized-evidence-adapter.js"></script>
+<script src="js/bms-channel-dictionary.js"></script>
 <script>
 const COLORS=['#38bdf8','#f472b6','#34d399','#facc15','#a78bfa','#fb923c','#22d3ee','#e879f9','#84cc16','#f87171'];
+
+// Telemetry CSV viewer (V1 Step 2B): heavy parsed arrays (9000×N values) live HERE, OUTSIDE Alpine's
+// reactive proxy — only small view-models are exposed to Alpine. importToken cancels stale async reads.
+const telemetryDataHolder = { session: null, importToken: 0, ro: null, lastW: null,
+  layout: null, timeValues: null, timeIndex: null, laneReaders: null, cursorTime: null, selection: null,
+  dragging: false, dragStartPx: null, dragCurrPx: null, pointerInside: false, raf: 0 };
 
 function app(){return{
   // === i18n (English primary / 繁中 / 日本語) ===
@@ -2444,14 +2630,160 @@ function app(){return{
   bmsResult: null,
   // Phase 3A：目前匯入 .bmsbin 的遙測描述子（catalog-only；逐點時間序列尚未解碼）。
   telemetryMeta(){ return (typeof buildTelemetryMetadata==='function' && this.bmsResult && !this.bmsResult.error && !this.bmsResult.loading) ? buildTelemetryMetadata(this.bmsResult) : null; },
+  bmsIdentity(){ return (this.bmsResult && !this.bmsResult.error && !this.bmsResult.loading && this.bmsResult.identityCard) ? this.bmsResult.identityCard : null; },
+  fmtBytes(n){ if(typeof n!=='number'||!isFinite(n)) return '—'; if(n<1024) return n+' B'; if(n<1048576) return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(1)+' MB'; },
   importBms(e){
     const f=e.target.files && e.target.files[0]; if(!f) return;
     this.bmsResult={loading:true};
     const reader=new FileReader();
-    reader.onload=()=>{ try{ const bytes=new Uint8Array(reader.result); const r=(typeof parseBms==='function')?parseBms(bytes):null; if(!r||!r.header.valid){ this.bmsResult={error:true}; return; } if(f&&f.name) r.fileName=f.name; r.probe=(typeof probeBmsBinary==='function')?probeBmsBinary(bytes):null; r.raw=(typeof extractBmsRawCandidates==='function'&&r.probe)?extractBmsRawCandidates(bytes,r.probe,{catalogChannelCount:r.channelCount}):null; r.link=(typeof linkBmsRawCandidates==='function'&&r.raw)?linkBmsRawCandidates(r,r.probe,r.raw,{}):null; r.structure=(typeof discoverBmsSampleStructure==='function')?discoverBmsSampleStructure(bytes,r,r.probe,r.raw,r.link,null,{catalogChannelCount:r.channelCount}):null; r.rawStreamConfirmation=(typeof evaluateBmsRawStreamConfirmation==='function')?evaluateBmsRawStreamConfirmation(r,r.probe,r.raw,r.structure,{}):null; r.channelIdentity=(typeof evaluateBmsChannelIdentityConfirmation==='function')?evaluateBmsChannelIdentityConfirmation(r,r.rawStreamConfirmation,r.structure,{}):null; r.timebase=(typeof evaluateBmsTimebaseConfirmation==='function')?evaluateBmsTimebaseConfirmation(r.rawStreamConfirmation,r.structure,{}):null; r.physicalScaling=(typeof evaluateBmsPhysicalScalingConfirmation==='function')?evaluateBmsPhysicalScalingConfirmation(r.rawStreamConfirmation,r.channelIdentity,r.timebase,{}):null; r.readiness=(typeof evaluateBmsTelemetryReadiness==='function')?evaluateBmsTelemetryReadiness(r.rawStreamConfirmation,r.channelIdentity,r.timebase,r.physicalScaling,{}):null; r.extractionEligibility=(typeof evaluateBmsExtractionEligibility==='function')?evaluateBmsExtractionEligibility(r.readiness,{}):null; r.measuredExtraction=(typeof evaluateBmsMeasuredExtraction==='function')?evaluateBmsMeasuredExtraction(r.extractionEligibility,{}):null; r.confirmation=(typeof evaluateBmsConfirmationEvidence==='function'&&r.link)?evaluateBmsConfirmationEvidence(r,r.probe,r.raw,r.link,{structure:r.structure,rawStreamConfirmation:r.rawStreamConfirmation,channelIdentity:r.channelIdentity,timebase:r.timebase,physicalScaling:r.physicalScaling,readiness:r.readiness,extractionEligibility:r.extractionEligibility,measuredExtraction:r.measuredExtraction}):null; r.canonicalAdapter=(typeof evaluateBmsCanonicalAdapterEligibility==='function')?evaluateBmsCanonicalAdapterEligibility(r.confirmation,r.readiness,r.extractionEligibility,r.measuredExtraction,{}):null; r.privateCorpus=(typeof evaluateBmsPrivateCorpusBoundary==='function')?evaluateBmsPrivateCorpusBoundary(null,{}):null; r.sanitizedEvidenceAdapter=(typeof evaluateBmsSanitizedEvidenceAdapter==='function')?evaluateBmsSanitizedEvidenceAdapter(r.privateCorpus,{}):null; this.bmsResult=r; }catch(err){ this.bmsResult={error:true}; } };
+    reader.onload=()=>{ try{ const bytes=new Uint8Array(reader.result); const r=(typeof parseBms==='function')?parseBms(bytes):null; if(!r||!r.header.valid){ this.bmsResult={error:true}; return; } if(f&&f.name) r.fileName=f.name; r.probe=(typeof probeBmsBinary==='function')?probeBmsBinary(bytes):null; r.raw=(typeof extractBmsRawCandidates==='function'&&r.probe)?extractBmsRawCandidates(bytes,r.probe,{catalogChannelCount:r.channelCount}):null; r.link=(typeof linkBmsRawCandidates==='function'&&r.raw)?linkBmsRawCandidates(r,r.probe,r.raw,{}):null; r.structure=(typeof discoverBmsSampleStructure==='function')?discoverBmsSampleStructure(bytes,r,r.probe,r.raw,r.link,null,{catalogChannelCount:r.channelCount}):null; r.rawStreamConfirmation=(typeof evaluateBmsRawStreamConfirmation==='function')?evaluateBmsRawStreamConfirmation(r,r.probe,r.raw,r.structure,{}):null; r.channelIdentity=(typeof evaluateBmsChannelIdentityConfirmation==='function')?evaluateBmsChannelIdentityConfirmation(r,r.rawStreamConfirmation,r.structure,{}):null; r.timebase=(typeof evaluateBmsTimebaseConfirmation==='function')?evaluateBmsTimebaseConfirmation(r.rawStreamConfirmation,r.structure,{}):null; r.physicalScaling=(typeof evaluateBmsPhysicalScalingConfirmation==='function')?evaluateBmsPhysicalScalingConfirmation(r.rawStreamConfirmation,r.channelIdentity,r.timebase,{}):null; r.readiness=(typeof evaluateBmsTelemetryReadiness==='function')?evaluateBmsTelemetryReadiness(r.rawStreamConfirmation,r.channelIdentity,r.timebase,r.physicalScaling,{}):null; r.extractionEligibility=(typeof evaluateBmsExtractionEligibility==='function')?evaluateBmsExtractionEligibility(r.readiness,{}):null; r.measuredExtraction=(typeof evaluateBmsMeasuredExtraction==='function')?evaluateBmsMeasuredExtraction(r.extractionEligibility,{}):null; r.confirmation=(typeof evaluateBmsConfirmationEvidence==='function'&&r.link)?evaluateBmsConfirmationEvidence(r,r.probe,r.raw,r.link,{structure:r.structure,rawStreamConfirmation:r.rawStreamConfirmation,channelIdentity:r.channelIdentity,timebase:r.timebase,physicalScaling:r.physicalScaling,readiness:r.readiness,extractionEligibility:r.extractionEligibility,measuredExtraction:r.measuredExtraction}):null; r.canonicalAdapter=(typeof evaluateBmsCanonicalAdapterEligibility==='function')?evaluateBmsCanonicalAdapterEligibility(r.confirmation,r.readiness,r.extractionEligibility,r.measuredExtraction,{}):null; r.privateCorpus=(typeof evaluateBmsPrivateCorpusBoundary==='function')?evaluateBmsPrivateCorpusBoundary(null,{}):null; r.sanitizedEvidenceAdapter=(typeof evaluateBmsSanitizedEvidenceAdapter==='function')?evaluateBmsSanitizedEvidenceAdapter(r.privateCorpus,{}):null; r.fileSize=bytes.length; r.identityCard=(typeof buildBmsIdentityCard==='function')?buildBmsIdentityCard(r,{fileName:r.fileName,fileSize:bytes.length}):null; this.bmsResult=r; }catch(err){ this.bmsResult={error:true}; } };
     reader.onerror=()=>{ this.bmsResult={error:true}; };
     reader.readAsArrayBuffer(f);
   },
+  // ── Telemetry CSV Evidence viewer (V1 Step 2B): THIN wiring. All parsing/grading/preflight logic
+  //    lives in TelemetryCore/TelemetryView; the heavy session sits in `telemetryDataHolder` (non-reactive).
+  //    Only these small view-models are reactive. (no curves / no yaw metrics / no model overlay here)
+  telem:{ imported:false, error:null, profileId:'custom', importSummary:null, mappingRows:[], preflight:null, capabilities:[], plotChannels:[], plotUseCanonical:true, readout:null, summary:null, cursorPinned:false },
+  telemProfiles(){ return (typeof TelemetryView!=='undefined') ? Object.values(TelemetryView.VEHICLE_PROFILES).map(p=>({id:p.id,label:p.label,labelKey:p.labelKey})) : []; },
+  telemCanonOptions(){ return (typeof TelemetryCore!=='undefined') ? [''].concat(Object.keys(TelemetryCore.CHANNEL_PATTERNS)) : []; },
+  importCSV(e){
+    const f=e.target.files && e.target.files[0]; if(!f) return;
+    if(typeof TelemetryCore==='undefined' || typeof TelemetryView==='undefined'){ this.telem.error='telemetry-core not loaded'; e.target.value=''; return; }
+    const token=++telemetryDataHolder.importToken; this.telem.error=null;
+    const reader=new FileReader();
+    reader.onload=()=>{ if(token!==telemetryDataHolder.importToken) return; // stale import cancelled
+      try{ const parsed=TelemetryCore.parseCsv(reader.result);
+        if(parsed.errors && parsed.errors.length){ // fatal parse errors (e.g. CSV_UNCLOSED_QUOTE / EMPTY / NO_ROWS) → not a usable dataset
+          const msg=parsed.errors.map(e=>(e&&(e.message||e.code))||String(e)).join('; ');
+          this.telemUnload();        // clear any prior session FIRST (telemUnload resets this.telem)
+          this.telem.error=msg;      // …THEN surface this import's fatal error (order matters)
+          return;                    // do NOT build a session or run preflight
+        }
+        telemetryDataHolder.session=TelemetryView.newSession(f.name||null, parsed, this.telem.profileId);
+        this.telem.imported=true; this.telemRefresh();
+      }catch(err){ this.telem.error=String((err&&err.message)||err); this.telemUnload(); } };
+    reader.onerror=()=>{ if(token===telemetryDataHolder.importToken) this.telem.error='file read error'; };
+    reader.readAsText(f);
+    e.target.value=''; // clean-room: do not retain the file path/handle
+  },
+  telemRefresh(){ const s=telemetryDataHolder.session; if(!s) return;
+    this.telem.importSummary=TelemetryView.buildImportSummary(s);
+    this.telem.mappingRows =TelemetryView.buildMappingRows(s);
+    this.telem.preflight   =TelemetryView.buildPreflightSummary(s);
+    this.telem.capabilities=TelemetryView.buildCapabilityRows(s); },
+  telemEdit(columnId, field, value){ const s=telemetryDataHolder.session; if(!s) return;
+    const edit={}; edit[field]=(field==='sign'||field==='offset')?Number(value):(field==='confirmed'?!!value:(value===''?null:value));
+    telemetryDataHolder.session=TelemetryView.applyMappingEdit(s, columnId, edit); this.telemRefresh(); },
+  telemSetProfile(id){ this.telem.profileId=id; const s=telemetryDataHolder.session;
+    if(s){ telemetryDataHolder.session=TelemetryView.setProfile(s, id); this.telemRefresh(); } },
+  telemUnload(){ telemetryDataHolder.importToken++; telemetryDataHolder.session=null; // cancel in-flight read + release
+    if(telemetryDataHolder.ro){ telemetryDataHolder.ro.disconnect(); telemetryDataHolder.ro=null; } telemetryDataHolder.lastW=null;
+    Object.assign(telemetryDataHolder, { layout:null, timeValues:null, timeIndex:null, laneReaders:null, cursorTime:null, selection:null, dragging:false, dragStartPx:null, dragCurrPx:null, pointerInside:false });
+    const cv=this.$refs.telemCanvas; if(cv){ const c=cv.getContext('2d'); if(c) c.clearRect(0,0,cv.width,cv.height); cv.width=0; cv.height=0; cv.style.width=''; cv.style.height=''; }
+    this.telem={ imported:false, error:null, profileId:'custom', importSummary:null, mappingRows:[], preflight:null, capabilities:[], plotChannels:[], plotUseCanonical:true, readout:null, summary:null, cursorPinned:false }; },
+  telemTogglePlot(id){ const a=this.telem.plotChannels; const i=a.indexOf(id); if(i>=0) a.splice(i,1); else a.push(id); },
+  telemToggleCanonical(v){ this.telem.plotUseCanonical=!!v; },
+  // Multi-channel canvas plot (V1 Step 3). Pure geometry in TelemetryPlot.plotLayout +
+  // interaction math in TelemetryInteract (both unit-tested); this sizes the canvas, runs
+  // buildCurveData→plotLayout, stashes the raw readers/timeValues the cursor & selection need,
+  // and wires a width-gated ResizeObserver. Cursor/selection drawing lives in telemRender.
+  telemPlotDraw(){
+    const s=telemetryDataHolder.session; const cv=this.$refs.telemCanvas;
+    if(!s || !cv || !this.telem.imported || typeof TelemetryPlot==='undefined' || typeof TelemetryView==='undefined') return;
+    const host=cv.parentElement; const cssW=Math.max(240, (host && host.clientWidth) || cv.clientWidth || 640);
+    const chans=this.telem.plotChannels.slice();
+    const n=chans.length; const cssH = n ? (n*110 + 34) : 150;
+    const dpr=window.devicePixelRatio || 1;
+    cv.style.width=cssW+'px'; cv.style.height=cssH+'px';
+    cv.style.maxWidth='none'; cv.style.maxHeight='none'; // override app-wide `canvas{max-height:300px}` (other charts)
+    const cd=TelemetryView.buildCurveData(s,{ channels:chans, targetPoints:Math.round(cssW), useCanonical:this.telem.plotUseCanonical });
+    const layout=TelemetryPlot.plotLayout({ cssW, cssH, dpr }, cd);
+    cv.width=layout.backing.w; cv.height=layout.backing.h;
+    // stash everything the interaction layer needs (non-reactive)
+    telemetryDataHolder.layout=layout;
+    telemetryDataHolder.laneReaders=TelemetryView.buildLaneReaders(s,{ channels:chans, useCanonical:this.telem.plotUseCanonical });
+    const xc=cd.x.columnId, xf=(cd.x.factor==null?1:cd.x.factor);
+    const rawTimeValues = (xc!=null && s.parsed.columns[xc])
+      ? s.parsed.columns[xc].values.map(v=> v==null?null:v*xf)
+      : Array.from({length:s.parsed.rowCount},(_,i)=>i);
+    telemetryDataHolder.timeValues = rawTimeValues;                                  // raw (may contain nulls / a reset)
+    // ONE shared valid-time index for BOTH cursor and selection (maps to RAW rows; fail-closed on reset).
+    telemetryDataHolder.timeIndex = TelemetryInteract.buildTimeIndex(rawTimeValues);
+    telemetryDataHolder.lastW=cssW;
+    this.telemRender();
+    if(!telemetryDataHolder.ro && typeof ResizeObserver!=='undefined' && host){
+      let raf=0; const self=this;
+      telemetryDataHolder.ro=new ResizeObserver(()=>{ if(raf) return;
+        raf=requestAnimationFrame(()=>{ raf=0; const w=Math.max(240,(host && host.clientWidth)||640);
+          // width-gated: redraw only when the box WIDTH changes — our own height change must not loop
+          if(w!==telemetryDataHolder.lastW && self.telem.imported && self.currentTab==='telemetry') self.telemPlotDraw(); }); });
+      telemetryDataHolder.ro.observe(host);
+    }
+  },
+  // ── (iii-b) interaction: cursor readout + range-select, everything mapped to RAW rows ──
+  telemRender(){ // base curves + selection band + cursor overlay (single-canvas redraw)
+    const layout=telemetryDataHolder.layout; const cv=this.$refs.telemCanvas;
+    if(!layout || !cv) return; const ctx=cv.getContext('2d'); if(!ctx) return;
+    TelemetryPlot.drawCurves(ctx, layout);
+    let sel=telemetryDataHolder.selection;
+    if(telemetryDataHolder.dragging && telemetryDataHolder.dragStartPx!=null && telemetryDataHolder.dragCurrPx!=null)
+      sel=TelemetryInteract.selectionFromPixels(telemetryDataHolder.dragStartPx, telemetryDataHolder.dragCurrPx, layout, telemetryDataHolder.timeIndex);
+    if(sel) TelemetryPlot.drawSelection(ctx, layout, sel);
+    const ct=telemetryDataHolder.cursorTime;
+    if(ct!=null){ const cl=(this.telem.readout?this.telem.readout.lanes:[]).map(l=>({columnId:l.columnId, value:l.value}));
+      TelemetryPlot.drawCursor(ctx, layout, ct, cl, null, { dim: !telemetryDataHolder.pointerInside && !this.telem.cursorPinned }); }
+  },
+  telemScheduleRedraw(){ if(telemetryDataHolder.raf) return; const self=this;
+    telemetryDataHolder.raf=requestAnimationFrame(()=>{ telemetryDataHolder.raf=0; self.telemRender(); }); },
+  telemPxFromEvent(e){ const cv=this.$refs.telemCanvas; if(!cv) return null; const r=cv.getBoundingClientRect();
+    const cx=(e.touches&&e.touches[0])?e.touches[0].clientX:e.clientX; return cx-r.left; },
+  telemUpdateReadout(time){ const lr=telemetryDataHolder.laneReaders, ti=telemetryDataHolder.timeIndex, L=telemetryDataHolder.layout;
+    if(time==null || !lr || !ti || !ti.usable){ this.telem.readout=null; return; } // unusable timebase → no cursor readout
+    const cur=TelemetryInteract.computeCursorValues(time, ti, lr);
+    this.telem.readout={ row:cur.row, time:cur.time, xUnit:(L&&L.x)?L.x.unit:'', xKind:(L&&L.x)?L.x.kind:'index',
+      lanes:cur.lanes.map(l=>({columnId:l.columnId, rawName:l.rawName, canonicalName:l.canonicalName, unit:l.unit, value:l.value })) }; },
+  telemPointerMove(e){ const layout=telemetryDataHolder.layout; if(!layout||layout.empty) return;
+    const px=this.telemPxFromEvent(e); if(px==null) return;
+    if(telemetryDataHolder.dragging){ telemetryDataHolder.dragCurrPx=px; this.telemScheduleRedraw(); return; }
+    if(this.telem.cursorPinned) return; // pinned cursor: hover doesn't move it
+    telemetryDataHolder.cursorTime=TelemetryInteract.pixelToTime(px, layout);
+    this.telemUpdateReadout(telemetryDataHolder.cursorTime); this.telemScheduleRedraw(); },
+  telemPointerEnter(){ telemetryDataHolder.pointerInside=true; },
+  telemPointerLeave(){ telemetryDataHolder.pointerInside=false;
+    if(telemetryDataHolder.dragging) this.telemPointerUp();
+    this.telemScheduleRedraw(); }, // keep last cursor value but dim it
+  telemPointerDown(e){ const layout=telemetryDataHolder.layout; if(!layout||layout.empty) return;
+    const px=this.telemPxFromEvent(e); if(px==null) return;
+    telemetryDataHolder.dragging=true; telemetryDataHolder.dragStartPx=px; telemetryDataHolder.dragCurrPx=px; telemetryDataHolder.pointerInside=true; },
+  telemPointerUp(){ const layout=telemetryDataHolder.layout;
+    if(!telemetryDataHolder.dragging) return;
+    telemetryDataHolder.dragging=false;
+    const a=telemetryDataHolder.dragStartPx, b=telemetryDataHolder.dragCurrPx;
+    telemetryDataHolder.dragStartPx=null; telemetryDataHolder.dragCurrPx=null;
+    if(a==null||b==null||Math.abs(b-a)<4){ // tap / click → toggle a pinned cursor at a
+      if(a!=null && layout){ telemetryDataHolder.cursorTime=TelemetryInteract.pixelToTime(a, layout);
+        this.telem.cursorPinned=!this.telem.cursorPinned; this.telemUpdateReadout(telemetryDataHolder.cursorTime); }
+      this.telemScheduleRedraw(); return; }
+    const ti=telemetryDataHolder.timeIndex;
+    if(ti && !ti.usable){ this.telemScheduleRedraw(); return; } // unusable timebase (reset) → no range-select (fail closed)
+    const sel=TelemetryInteract.selectionFromPixels(a, b, layout, ti);
+    telemetryDataHolder.selection=sel; this.telemBuildSummary(sel); this.telemScheduleRedraw(); },
+  telemBuildSummary(sel){ const lr=telemetryDataHolder.laneReaders, L=telemetryDataHolder.layout;
+    if(!sel || !lr){ this.telem.summary=null; return; }
+    const sum=TelemetryInteract.summarizeSelection(sel.startIndex, sel.endIndex, lr);
+    const dur=(sel.endTime!=null&&sel.startTime!=null)?(sel.endTime-sel.startTime):null;
+    this.telem.summary={ startTime:sel.startTime, endTime:sel.endTime, duration:dur, rowCount:sum.rowCount,
+      xKind:(L&&L.x)?L.x.kind:'index', xUnit:(L&&L.x)?L.x.unit:'',
+      lanes:sum.lanes.map(l=>({rawName:l.rawName, canonicalName:l.canonicalName, unit:l.unit, count:l.count, min:l.min, max:l.max, mean:l.mean })) }; },
+  telemClearSelection(){ telemetryDataHolder.selection=null; this.telem.summary=null; this.telemScheduleRedraw(); },
+  telemFmt(v){ if(v==null) return '—'; const a=Math.abs(v); if(a!==0&&(a<0.01||a>=100000)) return v.toExponential(1); return (Math.round(v*1000)/1000).toString(); },
+  telemGradeClass(g){ return g==='definition_confirmed'?'text-emerald-400':(g==='provisional'?'text-amber-400':(g==='blocked'?'text-red-400':'text-slate-500')); },
+  telemGradeText(g){ return this.t('ui.telem.grade.'+(g||'unknown')); }, // grade/status machine value → localized label
+  // diagnostic {code,params,message} → localized text (template interpolation; English message as fallback for unknown codes)
+  telemDiag(d){ if(d==null) return ''; if(typeof d==='string') return d; const code=d.code||''; const key='ui.telem.diag.'+code; const tpl=this.t(key);
+    // fixed fallback order: localized key → English message → code → generic; a missing {param} is kept verbatim (never silently blanked, so stray placeholders stay findable)
+    const base=(tpl!==key)?tpl:(d.message||code||this.t('ui.telem.diag.WARNING')); const p=d.params||{};
+    return base.replace(/\{(\w+)\}/g,(m,k)=>(p[k]!=null?String(p[k]):m)); },
   currentTab:'predict',
   tabs:[
     {id:'predict',key:'tab.predict'},
@@ -2459,6 +2791,7 @@ function app(){return{
     {id:'spring',key:'tab.spring'},
     {id:'tire',key:'tab.tire'},
     {id:'lihpao',key:'tab.lihpao'},
+    {id:'telemetry',key:'tab.telemetry'},
     {id:'guide',key:'tab.guide'},
   ],
   tier:1,
