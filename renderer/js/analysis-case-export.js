@@ -43,7 +43,7 @@
       if (schema === 'boolean') { if (t !== 'boolean') { errors.push('not_boolean:' + pathStr); return null; } return value; }
       if (schema === 'string') { if (t !== 'string') { errors.push('not_string:' + pathStr); return null; } }
       if (t === 'number') { if (!_isFiniteNum(value)) { errors.push('not_finite:' + pathStr); return null; } return value; }
-      if (t === 'string') { if (pathStr.indexOf('createdAt') === -1 && _looksLikePath(value)) { errors.push('private_leaf:' + pathStr); return null; } return value; }
+      if (t === 'string') { if (_looksLikePath(value)) { errors.push('private_leaf:' + pathStr); return null; } return value; } // EVERY string leaf is path-checked (no createdAt exemption — ISO timestamps start with a digit, never match)
       if (t === 'boolean') return value;
       errors.push('bad_scalar:' + pathStr); return null;
     }

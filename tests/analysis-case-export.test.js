@@ -67,5 +67,9 @@ const input = {
 (() => { const bad = JSON.parse(JSON.stringify(input)); bad.blockers = [{ code: 'x', detail: [0,1,2,3,4,5,6,7,8,9,10] }]; chk('numeric detail array rejected', EX.exportAnalysisCase(bad).ok === false); })();
 // CP2 re-review #6: sparse array serializes deterministically and round-trips (no export-accept/parse-reject drift)
 (() => { const sp = new Array(5); sp[2]='a'; sp[4]='b'; const r = EX.exportAnalysisCase({ meta:{}, warnings: sp }); const p = EX.parseAnalysisCaseExport(JSON.stringify(r.bundle)); chk('sparse array round-trip stable', deepEq(p.bundle, r.bundle) && r.bundle.warnings.length === 5); })();
+// CP3: private file path via createdAt (or any string leaf) must be rejected (no exemption)
+(() => { chk('case.createdAt private path rejected', EX.exportAnalysisCase({case:{createdAt:'/Users/alice/private/run.csv'}}).ok===false); })();
+(() => { chk('calib.createdAt private path rejected', EX.exportAnalysisCase({calibration:{entries:[{calibrationType:'speed_scale',source:'s',confidence:'high',verified:true,createdAt:'/home/bob/secret.bmsbin'}]}}).ok===false); })();
+(() => { chk('ISO timestamp createdAt still passes (no false positive)', EX.exportAnalysisCase({case:{createdAt:'2026-06-21T00:00:00Z'},meta:{exportedAt:'2026-06-21T12:34:56.789Z'}}).ok===true); })();
 console.log(`analysis-case-export: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
