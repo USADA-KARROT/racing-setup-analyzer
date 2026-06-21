@@ -32,7 +32,9 @@
 
   // ── recursive closed-schema validator ──
   // schema: 'scalar' | 'string' | 'number' | 'boolean' | {obj:{k:schema}} | {arr:itemSchema} | {boolMap:true}
-  function _val(value, schema, pathStr, errors) {
+  function _val(value, schema, pathStr, errors, depth) {
+    depth = depth || 0;
+    if (depth > 32) { errors.push('too_deep:' + pathStr); return null; }
     if (schema === 'scalar' || schema === 'string' || schema === 'number' || schema === 'boolean') {
       if (value == null) return (schema === 'scalar') ? null : (errors.push('null:' + pathStr), null);
       var t = typeof value;
@@ -49,7 +51,7 @@
       if (!Array.isArray(value)) { errors.push('not_array:' + pathStr); return []; }
       var cap = schema.max != null ? schema.max : MAX_ARRAY;
       if (value.length > cap) { errors.push('array_too_long:' + pathStr); return []; }
-      return value.map(function (x, i) { return _val(x, schema.arr, pathStr + '[' + i + ']', errors); });
+      return value.map(function (x, i) { return _val(x, schema.arr, pathStr + '[' + i + ']', errors, depth + 1); });
     }
     if (schema && schema.boolMap) {
       if (value == null) return {};
@@ -66,7 +68,7 @@
         if (!Object.prototype.hasOwnProperty.call(schema.obj, k)) { errors.push('unknown_key:' + pathStr + '.' + k); return; } // CLOSED
       });
       if (schema.req) schema.req.forEach(function (rk) { if (!(rk in value)) errors.push('missing_required:' + pathStr + '.' + rk); });
-      Object.keys(schema.obj).forEach(function (k) { if (k in value) out[k] = _val(value[k], schema.obj[k], pathStr + '.' + k, errors); });
+      Object.keys(schema.obj).forEach(function (k) { if (k in value) out[k] = _val(value[k], schema.obj[k], pathStr + '.' + k, errors, depth + 1); });
       return out;
     }
     errors.push('bad_schema:' + pathStr); return null;
@@ -130,22 +132,26 @@
   }
 
   function exportAnalysisCase(input) {
-    var errors = [];
-    if (input != null && typeof input === 'object' && !Array.isArray(input)) {
-      Object.keys(input).forEach(function (k) { if (INPUT_ALLOWLIST.indexOf(k) === -1) errors.push('unknown_input_key:' + k); }); // CLOSED input
-    } else { errors.push('input_not_object'); }
-    var bundle = _val(_assemble(input), BUNDLE_SCHEMA, '', errors);
-    return { ok: errors.length === 0, bundle: bundle, errors: errors };
+    try {
+      var errors = [];
+      if (input != null && typeof input === 'object' && !Array.isArray(input)) {
+        Object.keys(input).forEach(function (k) { if (INPUT_ALLOWLIST.indexOf(k) === -1) errors.push('unknown_input_key:' + k); }); // CLOSED input
+      } else { errors.push('input_not_object'); }
+      var bundle = _val(_assemble(input), BUNDLE_SCHEMA, '', errors);
+      return { ok: errors.length === 0, bundle: bundle, errors: errors };
+    } catch (e) { return { ok: false, bundle: null, errors: ['export_exception'] }; } // exotic/getter/Proxy → fail-closed, never throw
   }
 
   function parseAnalysisCaseExport(json) {
     var obj;
     try { obj = typeof json === 'string' ? JSON.parse(json) : json; } catch (e) { return { ok: false, errors: ['invalid_json'], bundle: null }; }
     if (obj == null || typeof obj !== 'object' || Array.isArray(obj)) return { ok: false, errors: ['bundle_not_object'], bundle: null };
-    var errors = [];
-    if (obj.bundleSchemaVersion !== BUNDLE_SCHEMA_VERSION) errors.push('incompatible_bundle_schema_version');
-    var bundle = _val(obj, BUNDLE_SCHEMA, '', errors); // SAME closed schema (no drift; unknown key anywhere rejected)
-    return { ok: errors.length === 0, errors: errors, bundle: bundle };
+    try {
+      var errors = [];
+      if (obj.bundleSchemaVersion !== BUNDLE_SCHEMA_VERSION) errors.push('incompatible_bundle_schema_version');
+      var bundle = _val(obj, BUNDLE_SCHEMA, '', errors); // SAME closed schema (no drift; unknown key anywhere rejected)
+      return { ok: errors.length === 0, errors: errors, bundle: bundle };
+    } catch (e) { return { ok: false, errors: ['parse_exception'], bundle: null }; }
   }
 
   var api = { exportAnalysisCase: exportAnalysisCase, parseAnalysisCaseExport: parseAnalysisCaseExport, BUNDLE_SCHEMA_VERSION: BUNDLE_SCHEMA_VERSION, INPUT_ALLOWLIST: INPUT_ALLOWLIST };
