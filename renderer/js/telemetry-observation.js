@@ -182,8 +182,102 @@
     };
   }
 
+  // ── canonical-session path (R2.3): authoritative recompute from evidence; legacy path above unchanged ──
+  function _validProj(p) { return p && typeof p.scale === 'number' && isFinite(p.scale) && p.scale !== 0 && typeof p.offset === 'number' && isFinite(p.offset) && (p.sign === 1 || p.sign === -1); }
+  function _validateCanonicalStructure(s) {
+    var reasons = [];
+    if (!Array.isArray(s.mappingEntries)) reasons.push('no_mapping_entries');
+    if (!s.channels || typeof s.channels !== 'object') reasons.push('no_channels');
+    if (!Array.isArray(s.time)) reasons.push('no_time');
+    var n = (s.time || []).length;
+    for (var i = 0; i < (s.time || []).length; i++) { if (s.time[i] != null && !(typeof s.time[i] === 'number' && isFinite(s.time[i]))) { reasons.push('non_finite_time'); break; } }
+    REQUIRED.forEach(function (canon) { var ch = s.channels && s.channels[canon]; if (ch) { if (!Array.isArray(ch.values) || ch.values.length !== n) reasons.push('length_mismatch:' + canon); } });
+    var w = s.windowRequest;
+    if (w && w.startTime != null && w.endTime != null) { if (!(isFinite(w.startTime) && isFinite(w.endTime) && w.endTime >= w.startTime)) reasons.push('bad_window_bounds'); }
+    return { ok: reasons.length === 0, reasons: reasons };
+  }
+  function _deriveEligibility(mappingEntries) {
+    var byCanon = {}, byCol = {};
+    (mappingEntries || []).forEach(function (e) { byCanon[e.canonicalChannel] = (byCanon[e.canonicalChannel] || 0) + 1; byCol[e.rawColumnId] = (byCol[e.rawColumnId] || 0) + 1; });
+    var out = {};
+    REQUIRED.forEach(function (canon) {
+      var es = (mappingEntries || []).filter(function (m) { return m.canonicalChannel === canon; });
+      var ok = es.length === 1 && es[0].userConfirmed === true && _validProj(es[0].projection) && byCanon[canon] === 1 && byCol[es[0].rawColumnId] === 1;
+      out[canon] = { eligible: ok, reason: ok ? null : (es.length === 0 ? 'unmapped' : (es.length > 1 || byCanon[canon] > 1 ? 'duplicate_canonical' : (!es[0].userConfirmed ? 'not_user_confirmed' : (!_validProj(es[0].projection) ? 'bad_projection' : 'duplicate_column')))) };
+    });
+    return out;
+  }
+  function _channelsView(s, elig) {
+    var out = {};
+    REQUIRED.forEach(function (canon) { var e = (s.mappingEntries || []).filter(function (m) { return m.canonicalChannel === canon; })[0]; out[canon] = { available: !!(elig[canon] && elig[canon].eligible), rawName: e ? e.rawName : null, status: e ? (e.userConfirmed ? 'definition_confirmed' : 'provisional') : 'absent', rawUnit: e ? e.rawUnit : null }; });
+    ['throttle', 'brake', 'track_position', 'lap', 'time'].forEach(function (canon) { var e = (s.mappingEntries || []).filter(function (m) { return m.canonicalChannel === canon; })[0]; out[canon] = { available: !!e || (canon === 'time' && (s.time || []).length > 0), rawName: e ? e.rawName : null, status: e ? 'definition_confirmed' : (canon === 'time' && (s.time || []).length > 0 ? 'present' : 'absent'), rawUnit: e ? e.rawUnit : null }; });
+    return out;
+  }
+  function _bundle(s) { var ch = s.channels || {}; return { time: s.time || [], speed: (ch.speed || {}).values || [], yawRate: (ch.yaw_rate || {}).values || [], steer: (ch.steering || {}).values || [], lateralAccel: (ch.lateral_accel || {}).values || [], steerUnit: (ch.steering || {}).unit || '(raw)', timebaseStatus: s.timebaseStatus }; }
+  function _sliceCanon(s, win) { var b = _bundle(s); var lo = win.startTime != null ? win.startTime : -Infinity, hi = win.endTime != null ? win.endTime : Infinity; var idx = []; for (var i = 0; i < b.time.length; i++) { if (b.time[i] != null && b.time[i] >= lo && b.time[i] <= hi) idx.push(i); } var pick = function (a) { return idx.map(function (i) { return a[i]; }); }; return { time: pick(b.time), yawRate: pick(b.yawRate), steer: pick(b.steer), speed: pick(b.speed), lateralAccel: pick(b.lateralAccel), steerUnit: b.steerUnit }; }
+  function _computeSteeringInputs(steer, time, steerUnit) {
+    steer = steer || []; time = time || [];
+    var absSteer = []; for (var i = 0; i < steer.length; i++) { if (steer[i] != null && isFinite(steer[i])) absSteer.push(Math.abs(steer[i])); }
+    absSteer.sort(function (a, b) { return a - b; });
+    var scale = absSteer.length ? absSteer[Math.floor(0.95 * (absSteer.length - 1))] : 0; var deadband = (scale || 0) * 0.02;
+    var reversals = 0, lastSign = 0, absDeltas = [];
+    for (var j = 1; j < steer.length; j++) { if (steer[j] == null || steer[j - 1] == null) { lastSign = 0; continue; } var d = steer[j] - steer[j - 1]; if (Math.abs(d) <= deadband) continue; absDeltas.push(Math.abs(d)); var sg = d > 0 ? 1 : -1; if (lastSign !== 0 && sg !== lastSign) reversals++; lastSign = sg; }
+    absDeltas.sort(function (a, b) { return a - b; }); var abruptness = absDeltas.length ? absDeltas[Math.floor(0.95 * (absDeltas.length - 1))] : null;
+    var t0 = null, t1 = null; for (var k = 0; k < time.length; k++) { if (time[k] != null) { if (t0 == null) t0 = time[k]; t1 = time[k]; } }
+    var durationS = (t0 != null && t1 != null && t1 > t0) ? (t1 - t0) : null;
+    return { steeringChannelAvailable: true, steeringReversalCount: reversals, steeringReversalRatePerS: durationS ? reversals / durationS : null, steeringAbruptnessP95: abruptness, steerUnit: steerUnit || '(raw)', durationS: durationS };
+  }
+  function _driverInputsFromSession(s, series) {
+    var di = _computeSteeringInputs(series.steer, series.time, series.steerUnit);
+    var has = function (canon) { return (s.mappingEntries || []).some(function (m) { return m.canonicalChannel === canon; }); };
+    di.pedalChannelsAvailable = { throttle: has('throttle'), brake: has('brake') };
+    di.trackPositionAvailable = has('track_position');
+    di.lapSegmentationAvailable = has('lap');
+    return di;
+  }
+  function _observeCanonical(s, opts) {
+    var AW = _req('./analysis-window.js', typeof AnalysisWindow !== 'undefined' ? AnalysisWindow : undefined);
+    var CR = _req('./calibration-registry.js', typeof CalibrationRegistry !== 'undefined' ? CalibrationRegistry : undefined);
+    var warnings = [], blockedReasons = [];
+    var sv = _validateCanonicalStructure(s);
+    if (!sv.ok) return _unavailable('malformed_session', sv.reasons.map(function (r) { return _blocker('MALFORMED_CANONICAL_SESSION', r); }));
+    var elig = _deriveEligibility(s.mappingEntries);
+    var channels = _channelsView(s, elig);
+    if (s.timebaseStatus === 'blocked') blockedReasons.push(_blocker('TELEMETRY_TIMEBASE_BLOCKED', 'global reset'));
+    REQUIRED.forEach(function (canon) { if (!elig[canon] || !elig[canon].eligible) { var rs = elig[canon] ? elig[canon].reason : 'unmapped'; blockedReasons.push(_blocker(rs === 'unmapped' ? 'REQUIRED_CHANNEL_MISSING' : 'REQUIRED_CHANNEL_NOT_ELIGIBLE', canon + ' (' + rs + ')')); } });
+    if (blockedReasons.length) return _unavailable('preflight_blocked', blockedReasons, channels, warnings);
+    var calCap = CR.deriveCalibrationCapability(CR.buildCalibrationSet(s.calibrationSet || []));
+    var higher = { signedResponseEligible: calCap.signedResponseEligible, calibratedMagnitudeEligible: calCap.calibratedMagnitudeEligible, roadWheelMetricsEligible: calCap.roadWheelMetricsEligible };
+    var win = AW.validateAnalysisWindow(_bundle(s), s.windowRequest, AW.normalizeYawOptions(opts));
+    var selectedWindow = { startTime: win.startTime, endTime: win.endTime, sampleCount: win.sampleCount, applied: s.windowRequest != null };
+    var quality = { grade: win.quality, sampleRateHz: s.sampleRateHz || null, sampleCount: (s.time || []).length, timebaseStatus: s.timebaseStatus };
+    if (!win.valid) {
+      return { valid: false, quality: quality, channels: channels, selectedWindow: selectedWindow, observedTendency: 'unavailable', observedMetrics: null, driverInputs: _driverInputsFromSession(s, _sliceCanon(s, win)), evidence: { reason: 'window_invalid', detail: win.rejectionReasons }, confidence: null, method: 'speed_dependent_yaw_per_steer_trend', limitations: LIMITATIONS, confounders: CONFOUNDERS, calibrationCapability: higher, blockedReasons: win.rejectionReasons.map(function (r) { return _blocker(String(r).indexOf('timebase') === 0 ? 'TELEMETRY_TIMEBASE_BLOCKED' : 'ANALYSIS_WINDOW_INVALID', r); }), warnings: warnings, credibility: 'Unavailable' };
+    }
+    var series = _sliceCanon(s, win);
+    var driverInputs = _driverInputsFromSession(s, series);
+    var yawResp = TY.computeObservedYawResponse({ time: series.time, yawRate: series.yawRate, steer: series.steer, speed: series.speed, lateralAccel: series.lateralAccel, steerUnit: series.steerUnit }, AW.normalizeYawOptions(opts));
+    if (!yawResp.available) {
+      return { valid: false, quality: quality, channels: channels, selectedWindow: selectedWindow, observedTendency: 'unavailable', observedMetrics: { yawResponseReason: yawResp.reason, sampleCounts: yawResp.sampleCounts }, driverInputs: driverInputs, evidence: { reason: 'yaw_response_unavailable', detail: yawResp.reason }, confidence: null, method: 'speed_dependent_yaw_per_steer_trend', limitations: LIMITATIONS, confounders: CONFOUNDERS, calibrationCapability: higher, blockedReasons: [_blocker('OBSERVED_YAW_RESPONSE_UNAVAILABLE', yawResp.reason)], warnings: warnings, credibility: 'Unavailable' };
+    }
+    var derived = _deriveTendency(yawResp, opts);
+    var metricName = (yawResp.dispersion && yawResp.dispersion.metric) || '';
+    if (FORBIDDEN_NAMES.some(function (f) { return metricName.toLowerCase().indexOf(f) !== -1; })) return _unavailable('forbidden_metric_name_guard', [_blocker('FORBIDDEN_METRIC_NAME', metricName)], channels, warnings);
+    return {
+      valid: derived.tendency !== 'unavailable', quality: quality, channels: channels, selectedWindow: selectedWindow,
+      observedTendency: derived.tendency,
+      observedMetrics: { metric: metricName, dispersion: yawResp.dispersion, speedBins: yawResp.speedBins, thresholds: yawResp.thresholds, sampleCounts: yawResp.sampleCounts, units: yawResp.units },
+      driverInputs: driverInputs, evidence: derived.evidence, confidence: derived.confidence,
+      method: 'speed_dependent_yaw_per_steer_trend', limitations: LIMITATIONS, confounders: CONFOUNDERS,
+      calibrationCapability: higher, blockedReasons: [], warnings: warnings, credibility: 'Heuristic',
+    };
+  }
+
   function observeTelemetry(session, window, opts) {
-    try { return _observeInner(session, window, opts || {}); }
+    try {
+      if (session && session.kind === 'canonical_telemetry_session') return _observeCanonical(session, opts || {});
+      return _observeInner(session, window, opts || {});
+    }
     catch (e) { return _unavailable('observation_exception', [_blocker('OBSERVATION_EXCEPTION', String(e && e.message || e))]); }
   }
   function _observeInner(session, window, opts) {
