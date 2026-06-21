@@ -76,5 +76,11 @@ const input = {
 (() => { chk('Date section rejected', EX.exportAnalysisCase({window:new Date()}).ok===false); })();
 (() => { chk('RegExp section rejected', EX.exportAnalysisCase({mapping:/x/}).ok===false); })();
 (() => { const v=EX.exportAnalysisCase({observation:{valid:true,blockedReasons:[{code:'x',detail:['a']}]}}); chk('plain observation still valid + normalized', v.ok===true && deepEq(v.bundle.observation.blockedReasons[0].detail,['a'])); })();
+// CP3 #3: exotic objects as ARRAY ITEMS (blockers/entries) and meta must be rejected (no Object.assign laundering)
+(() => { class B{constructor(){this.code='X';this.detail=['safe'];}} chk('class-instance blocker item rejected', EX.exportAnalysisCase({blockers:[new B()]}).ok===false); })();
+(() => { chk('Date blocker item rejected', EX.exportAnalysisCase({blockers:[new Date()]}).ok===false); })();
+(() => { class B{constructor(){this.rawColumnId=1;}} chk('class-instance mapping entry rejected', EX.exportAnalysisCase({mapping:{entries:[new B()]}}).ok===false); })();
+(() => { class C{constructor(){this.note='x';}} chk('class-instance meta rejected', EX.exportAnalysisCase({meta:new C()}).ok===false); })();
+(() => { const v=EX.exportAnalysisCase({blockers:[{code:'x',scope:'global',detail:['reset']}]}); chk('plain blocker still valid', v.ok===true && deepEq(v.bundle.blockers[0].detail,['reset'])); })();
 console.log(`analysis-case-export: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
