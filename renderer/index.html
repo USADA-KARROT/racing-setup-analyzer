@@ -2580,7 +2580,44 @@ canvas{max-height:300px}
   </div>
   <div class="text-xs text-slate-400 mb-3">First end-to-end analysis vertical slice: canonical setup → model prediction → telemetry observation → model-vs-actual → race-engineer & driver-coach guidance. Every value is labelled by how it was derived; blocked features state why.</div>
   <div x-show="analysisError" class="text-red-400 text-sm mb-3" x-text="analysisError"></div>
-  <div x-show="!analysisView && !analysisError" class="text-slate-500 text-sm">Click <b>Load Demo Analysis Case</b> to run the full pipeline on synthetic data.</div>
+
+  <!-- Import real/imported telemetry → map channels → run the SAME production pipeline (R2.3) -->
+  <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700 mb-4" id="importTelemetryPanel">
+    <div class="text-xs text-slate-400 mb-2">Import Telemetry (CSV) → map channels → run the SAME analysis pipeline</div>
+    <textarea x-model="importCsvText" rows="3" placeholder="paste CSV: time [s],speed [m/s],yaw_rate [rad/s],steering [deg],accy [m/s2]" class="w-full text-xs bg-slate-900 border border-slate-700 rounded p-2 mb-2 font-mono"></textarea>
+    <div class="flex gap-2 mb-2">
+      <button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" @click="loadSampleImportCsv()">Load sample CSV</button>
+      <button id="importTelemetryBtn" class="px-2 py-1 rounded bg-sky-700 hover:bg-sky-600 text-xs font-semibold" @click="importTelemetryCsv()">Import</button>
+    </div>
+    <div x-show="importError" class="text-red-400 text-xs mb-2" x-text="importError"></div>
+    <template x-if="importedChannels.length">
+      <div>
+        <div class="text-xs text-slate-400 mb-1">Map raw columns → canonical channels, then confirm identity:</div>
+        <template x-for="ch in importedChannels" :key="ch.rawColumnId">
+          <div class="flex items-center gap-2 text-xs mb-1">
+            <span class="w-40 truncate" x-text="ch.rawName + (ch.rawUnit?(' ['+ch.rawUnit+']'):'')"></span>
+            <select x-model="ch.assigned" class="bg-slate-900 border border-slate-700 rounded px-1 py-0.5">
+              <option value="">(unmapped)</option>
+              <option value="speed">speed</option>
+              <option value="lateral_accel">lateral_accel</option>
+              <option value="yaw_rate">yaw_rate</option>
+              <option value="steering">steering</option>
+              <option value="throttle">throttle</option>
+              <option value="brake">brake</option>
+              <option value="track_position">track_position</option>
+              <option value="lap">lap</option>
+              <option value="time">time</option>
+            </select>
+            <label class="flex items-center gap-1"><input type="checkbox" x-model="ch.confirmed"> <span>confirm</span></label>
+          </div>
+        </template>
+        <button id="runImportedAnalysis" class="mt-2 px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm font-semibold" @click="runImportedAnalysis()">Build Case &amp; Run Analysis</button>
+        <div class="text-[11px] text-slate-500 mt-1">Required confirmed: speed, lateral_accel, yaw_rate, steering. Unconfirmed identity → observation blocked (the session stays inspectable; measured magnitude / road-wheel metrics stay blocked).</div>
+      </div>
+    </template>
+  </div>
+
+  <div x-show="!analysisView && !analysisError" class="text-slate-500 text-sm">Click <b>Load Demo Analysis Case</b> for synthetic data, or import a CSV above — both run the same pipeline.</div>
 
   <template x-if="analysisView">
    <div class="space-y-4" id="analysisWorkspaceView">
@@ -2792,6 +2829,37 @@ function app(){return{
       this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, { suspensionNormalizationView: demo.suspensionNormalizationView });
       this.analysisError = null;
     } catch(e){ this.analysisError = String((e&&e.message)||e); this.analysisView=null; }
+  },
+  // R2.3 import workflow — UI calls services only; no physics recompute, no UI-side capability derivation
+  importCsvText: '',
+  importError: null,
+  importedChannels: [],
+  _importedBundle: null,
+  canonicalChannelOptions: (typeof ChannelMapping!=='undefined' && ChannelMapping.CANONICAL_CHANNELS) ? ChannelMapping.CANONICAL_CHANNELS : ['speed','lateral_accel','yaw_rate','steering','throttle','brake','track_position','lap','time'],
+  loadSampleImportCsv(){ try { this.importCsvText = (typeof DemoAnalysisCase!=='undefined') ? DemoAnalysisCase.buildDemoTelemetryCsv() : ''; this.importError=null; } catch(e){ this.importError=String((e&&e.message)||e); } },
+  importTelemetryCsv(){
+    try {
+      this.importError=null; this.importedChannels=[]; this._importedBundle=null;
+      if (typeof TelemetryImportAdapter==='undefined' || typeof ChannelMapping==='undefined'){ this.importError='import modules not loaded'; return; }
+      var r = TelemetryImportAdapter.importTelemetry({ format:'csv', text:this.importCsvText });
+      if (!r.ok){ this.importError = (r.parseErrors && r.parseErrors[0] && r.parseErrors[0].code) || 'import_failed'; return; }
+      this._importedBundle = r;
+      var sug = {}; (ChannelMapping.buildChannelMapping(r.rawChannels, []).suggestions || []).forEach(function(s){ if (s.canonicalChannel) sug[s.rawColumnId]=s.canonicalChannel; });
+      // array-item properties (Alpine-reactive for the select/checkbox bindings)
+      this.importedChannels = r.rawChannels.map(function(c){ return { rawColumnId:c.rawColumnId, rawName:c.rawName, rawUnit:c.rawUnit, assigned: sug[c.rawColumnId] || '', confirmed: false }; });
+    } catch(e){ this.importError=String((e&&e.message)||e); }
+  },
+  runImportedAnalysis(){
+    try {
+      this.importError=null;
+      if (typeof CanonicalTelemetrySession==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof DemoAnalysisCase==='undefined'){ this.importError='analysis modules not loaded'; return; }
+      var assignments = this.importedChannels.filter(function(c){ return c.assigned; }).map(function(c){ return { rawColumnId:c.rawColumnId, canonicalChannel:c.assigned, userConfirmed: c.confirmed===true }; });
+      var mapping = ChannelMapping.buildChannelMapping(this._importedBundle.rawChannels, assignments);
+      var session = CanonicalTelemetrySession.buildCanonicalSession(this._importedBundle, mapping, [], null, { sessionId:'imported_session' });
+      var demo = DemoAnalysisCase.buildDemoAnalysisCase(); // vehicle/setup binding; imported telemetry session
+      var ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, session, null, {});
+      this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, {});
+    } catch(e){ this.importError=String((e&&e.message)||e); this.analysisView=null; }
   },
   fmt(v){ return (v==null || (typeof v==='number' && !isFinite(v))) ? '—' : (typeof v==='number' ? (Math.round(v*100)/100) : v); },
   credBadge(level){
