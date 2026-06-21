@@ -104,7 +104,7 @@
     return { caseId: c.caseId || null, schemaVersion: c.schemaVersion || null, modelId: ms.modelId || null, modelVersion: ms.modelVersion || null, calibrationVersion: ms.calibrationVersion || null, canonicalContractVersion: ms.canonicalContractVersion || null, vehicleProfileId: vb.profileId || null, telemetrySessionId: tb.sessionId || null, modelInputEligible: cap.modelInputEligible === true, title: md.title || null, createdAt: md.createdAt || null };
   }
   // normalize a blocker detail (string/array/object) to a bounded scalar array
-  function _detailArr(d) { if (d == null) return []; var arr = Array.isArray(d) ? d : [d]; var out = []; for (var i = 0; i < arr.length && out.length < 16; i++) { var x = arr[i]; out.push((x == null || typeof x === 'object') ? '[non_scalar_detail]' : x); } return out; }
+  function _detailArr(d) { if (d == null) return []; return (Array.isArray(d) ? d : [d]).slice(0, 16); } // wrap only; non-scalar items are left for the closed validator to REJECT (no transform/placeholder)
   function _blocker(b) { b = (b && typeof b === 'object' && !Array.isArray(b)) ? b : {}; return Object.assign({}, b, { detail: _detailArr(b.detail) }); }
 
   function _normBlockers(arr) { if (arr == null) return []; if (!Array.isArray(arr)) return arr; return arr.map(_blocker); }
@@ -117,7 +117,7 @@
     return {
       bundleSchemaVersion: BUNDLE_SCHEMA_VERSION,
       meta: Object.assign({ bundleSchemaVersion: BUNDLE_SCHEMA_VERSION }, input.meta || {}),
-      case: _caseSummary(input.case),                                  // scalar summary (no deep case object)
+      case: input.case !== undefined ? input.case : {},                // PASS-THROUGH scalar summary (caller builds it via caseSummary()); closed-validated, no transform
       mapping: input.mapping !== undefined ? input.mapping : { entries: [] },        // passed THROUGH → schema rejects unknowns
       calibration: input.calibration !== undefined ? input.calibration : { entries: [] },
       window: input.window !== undefined ? input.window : {},
@@ -136,6 +136,7 @@
       var errors = [];
       if (input != null && typeof input === 'object' && !Array.isArray(input)) {
         Object.keys(input).forEach(function (k) { if (INPUT_ALLOWLIST.indexOf(k) === -1) errors.push('unknown_input_key:' + k); }); // CLOSED input
+        if (input.case != null && (typeof input.case !== 'object' || Array.isArray(input.case))) errors.push('case_not_object');
       } else { errors.push('input_not_object'); }
       var bundle = _val(_assemble(input), BUNDLE_SCHEMA, '', errors);
       return { ok: errors.length === 0, bundle: bundle, errors: errors };
@@ -154,7 +155,7 @@
     } catch (e) { return { ok: false, errors: ['parse_exception'], bundle: null }; }
   }
 
-  var api = { exportAnalysisCase: exportAnalysisCase, parseAnalysisCaseExport: parseAnalysisCaseExport, BUNDLE_SCHEMA_VERSION: BUNDLE_SCHEMA_VERSION, INPUT_ALLOWLIST: INPUT_ALLOWLIST };
+  var api = { exportAnalysisCase: exportAnalysisCase, parseAnalysisCaseExport: parseAnalysisCaseExport, caseSummary: _caseSummary, BUNDLE_SCHEMA_VERSION: BUNDLE_SCHEMA_VERSION, INPUT_ALLOWLIST: INPUT_ALLOWLIST };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.AnalysisCaseExport = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

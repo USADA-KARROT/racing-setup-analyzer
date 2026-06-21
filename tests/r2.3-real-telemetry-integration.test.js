@@ -55,7 +55,7 @@ function assignAll(confirmed) {
   // export round trip
   const bundleInput = {
     meta: { exportedAt: '2026-06-21T00:00:00Z', appModelVersion: 'v1.6.0' },
-    case: demoCase, mapping: { entries: mapping.mappingEntries }, calibration: { entries: [] },
+    case: EX.caseSummary(demoCase), mapping: { entries: mapping.mappingEntries }, calibration: { entries: [] },
     window: session.advisory.validatedWindow,
     observation: { valid: ws.observation.valid, observedTendency: ws.observation.observedTendency, confidence: ws.observation.confidence, method: ws.observation.method, metric: ws.observation.observedMetrics.metric, limitations: ws.observation.limitations, confounders: ws.observation.confounders, credibility: ws.observation.credibility, blockedReasons: ws.observation.blockedReasons },
     comparison: { valid: ws.comparison.valid, predictedTendency: ws.comparison.predictedTendency, observedTendency: ws.comparison.observedTendency, differenceClass: ws.comparison.differenceClass, confidence: ws.comparison.confidence, assumptions: ws.comparison.assumptions, modelTelemetryComparisonEligible: ws.comparison.modelTelemetryComparisonEligible, credibility: ws.comparison.credibility, blockedReasons: ws.comparison.blockedReasons },
