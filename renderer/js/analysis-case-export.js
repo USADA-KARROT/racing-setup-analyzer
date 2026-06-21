@@ -107,7 +107,7 @@
   }
   // normalize a blocker detail (string/array/object) to a bounded scalar array
   function _detailArr(d) { if (d == null) return []; return (Array.isArray(d) ? d : [d]).slice(0, 16); } // wrap only; non-scalar items are left for the closed validator to REJECT (no transform/placeholder)
-  function _blocker(b) { b = (b && typeof b === 'object' && !Array.isArray(b)) ? b : {}; return Object.assign({}, b, { detail: _detailArr(b.detail) }); }
+  function _blocker(b) { return _isPlainObject(b) ? Object.assign({}, b, { detail: _detailArr(b.detail) }) : b; } // non-plain (Date/RegExp/class/array) passes through → _val REJECTS it (no laundering)
 
   function _normBlockers(arr) { if (arr == null) return []; if (!Array.isArray(arr)) return arr; return arr.map(_blocker); }
   // shallow-copy each section (keep ALL keys so the closed schema can REJECT unknowns — never silently omit);
@@ -120,7 +120,7 @@
     if (_isPlainObject(cmp)) cmp.blockedReasons = _normBlockers(cmp.blockedReasons);
     return {
       bundleSchemaVersion: BUNDLE_SCHEMA_VERSION,
-      meta: Object.assign({ bundleSchemaVersion: BUNDLE_SCHEMA_VERSION }, input.meta || {}),
+      meta: input.meta === undefined ? { bundleSchemaVersion: BUNDLE_SCHEMA_VERSION } : (_isPlainObject(input.meta) ? Object.assign({ bundleSchemaVersion: BUNDLE_SCHEMA_VERSION }, input.meta) : input.meta), // non-plain meta passes through → _val REJECTS it
       case: input.case !== undefined ? input.case : {},                // PASS-THROUGH scalar summary (caller builds it via caseSummary()); closed-validated, no transform
       mapping: input.mapping !== undefined ? input.mapping : { entries: [] },        // passed THROUGH → schema rejects unknowns
       calibration: input.calibration !== undefined ? input.calibration : { entries: [] },
