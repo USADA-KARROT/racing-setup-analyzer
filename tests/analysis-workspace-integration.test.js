@@ -50,7 +50,8 @@ chk('cap: model ran', cap.modelRan === true);
 chk('cap: telemetry observable', cap.telemetryObservable === true);
 chk('cap: comparison eligible', cap.modelTelemetryComparisonEligible === true);
 chk('cap: RE directional eligible', cap.raceEngineerDirectionalEligible === true);
-chk('cap: quantitative blocked', cap.quantitativeSetupRecommendationEligible === false);
+chk('cap: quantitative recommendation eligible (model-grounded, R2.5)', cap.quantitativeSetupRecommendationEligible === true);
+chk('cap: setup A/B eligible', cap.setupAbEligible === true);
 chk('cap: driver coaching eligible', cap.driverCoachingEligible === true);
 
 // ── case never written back to (R2.1D stays valid) ──
@@ -62,7 +63,7 @@ chk('case intact: comparison eligibility NOT on the case', demo.analysisCase.cap
 const view = VM.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, { suspensionNormalizationView: demo.suspensionNormalizationView });
 chk('view: ok', view.ok === true);
 chk('view A: case header status complete', view.caseHeader.overallStatus === 'analysis_complete_directional', view.caseHeader.overallStatus);
-chk('view B: capability summary lists 12 flags', view.capabilitySummary.length === 12);
+chk('view B: capability summary lists 12 flags', view.capabilitySummary.length === 13);
 chk('view C: setup inputs front wheel rate present + Derived', view.setupInputs.frontWheelRate.value > 0 && view.setupInputs.frontWheelRate.credibility === 'Derived');
 chk('view C: front basis ground identity', /ground/.test(view.setupInputs.frontWheelRate.basis || ''));
 chk('view C: rear basis spring element', /spring element/.test(view.setupInputs.rearWheelRate.basis || ''));

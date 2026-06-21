@@ -1,0 +1,69 @@
+/**
+ * setup-ab.js — R2.5 §A/B: model-grounded comparison of TWO setups (PURE).
+ *
+ * compareSetups(caseA, caseB, opts) runs the SAME model (via AX.runAnalysisCase with the injected runner) on
+ * two AnalysisCases and reports the PREDICTED deltas (understeer gradient, roll-stiffness distribution, total
+ * roll stiffness, wheel rates, tendency). This is a model PREDICTION (credibility 'Model'), NOT a measured
+ * result and NOT a lap-time claim — it is a what-if, never proof that a setup is faster.
+ *
+ * RED LINES: pure; never mutates inputs; both runs must be valid model runs, else blocked; no measured/laptime
+ * claim; deltas are b − a.
+ *
+ * UMD: Node require / Electron renderer global (SetupAB).
+ */
+(function (root) {
+  'use strict';
+
+  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+  var AX = _req('./analysis-execution.js', typeof AnalysisExecution !== 'undefined' ? AnalysisExecution : undefined);
+
+  var METRICS = ['understeer_gradient', 'roll_stiffness_dist_front', 'total_roll_stiffness', 'front_wheel_rate', 'rear_wheel_rate'];
+  var ASSUMPTIONS = Object.freeze([
+    'model_grounded_prediction_not_measured',
+    'same_model_version_both_setups',
+    'no_laptime_claim',
+    'steady_state_single_point_model',
+  ]);
+
+  function _isFiniteNum(v) { return typeof v === 'number' && isFinite(v); }
+  function _blocker(code, detail) { return { code: code, scope: 'setup_ab', severity: 'info', detail: detail || null }; }
+
+  function _side(exec) {
+    var s = (exec && exec.modelResultSnapshot) || {};
+    var out = { tendency: s.tendency != null ? s.tendency : null };
+    METRICS.forEach(function (m) { out[m] = _isFiniteNum(s[m]) ? s[m] : null; });
+    return out;
+  }
+
+  function compareSetups(caseA, caseB, opts) {
+    opts = opts || {};
+    try {
+      if (!AX) return { valid: false, blockedReasons: [_blocker('ANALYSIS_EXECUTION_UNAVAILABLE')], credibility: 'Unavailable' };
+      var ea = AX.runAnalysisCase(caseA, opts);
+      var eb = AX.runAnalysisCase(caseB, opts);
+      var blocked = [];
+      if (!ea || ea.valid !== true) blocked.push(_blocker('SETUP_A_MODEL_RUN_FAILED', ea ? ea.blockedReasons : 'absent'));
+      if (!eb || eb.valid !== true) blocked.push(_blocker('SETUP_B_MODEL_RUN_FAILED', eb ? eb.blockedReasons : 'absent'));
+      if (blocked.length) {
+        return { valid: false, a: ea && ea.valid ? _side(ea) : null, b: eb && eb.valid ? _side(eb) : null, deltas: null, directionalSummary: null, assumptions: ASSUMPTIONS, blockedReasons: blocked, credibility: 'Unavailable' };
+      }
+      var a = _side(ea), b = _side(eb);
+      var deltas = {};
+      METRICS.forEach(function (m) { deltas[m] = (_isFiniteNum(a[m]) && _isFiniteNum(b[m])) ? (b[m] - a[m]) : null; });
+      deltas.tendencyChange = (a.tendency !== b.tendency) ? { from: a.tendency, to: b.tendency } : null;
+      // directional summary from the understeer-gradient delta (deg/g): more positive = more understeer
+      var dK = deltas.understeer_gradient;
+      var directionalSummary = (dK == null) ? 'unavailable' : (Math.abs(dK) < 0.05 ? 'no_meaningful_balance_change' : (dK > 0 ? 'b_more_understeer' : 'b_more_oversteer'));
+      return {
+        valid: true, a: a, b: b, deltas: deltas, directionalSummary: directionalSummary,
+        assumptions: ASSUMPTIONS, blockedReasons: [], credibility: 'Model',
+      };
+    } catch (e) {
+      return { valid: false, a: null, b: null, deltas: null, directionalSummary: null, assumptions: ASSUMPTIONS, blockedReasons: [_blocker('SETUP_AB_EXCEPTION', String(e && e.message || e))], credibility: 'Unavailable' };
+    }
+  }
+
+  var api = { compareSetups: compareSetups, METRICS: METRICS, ASSUMPTIONS: ASSUMPTIONS };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (root) root.SetupAB = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
