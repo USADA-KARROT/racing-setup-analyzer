@@ -108,5 +108,23 @@ let directionalWithoutCal;
   chk('viewmodel: measuredMetrics blocked w/o calibration', vNo.measuredMetrics.available === false && vNo.measuredMetrics.measuredKUs.value === null);
 })();
 
+// ── 8) stale-binding guard is AUTHORITATIVE: observation re-derives the steering binding from mappingEntries,
+//        never trusting a forged/stale session.steeringBinding ──
+(() => {
+  const sess = session(steeringCals());
+  sess.steeringBinding = { rawColumnId: 99, projectionSignature: 'forged' }; // forge the advisory binding to garbage
+  const ws = WS.runAnalysisWorkspace(demoCase, sess, null, { modelRunner: runner });
+  chk('forged s.steeringBinding ignored — measured still works (re-derived from mappingEntries)', ws.capability.measuredKUsEligible === true);
+})();
+(() => {
+  // calibration bound to a WRONG projection signature, with session.steeringBinding forged to MATCH it →
+  // observation re-derives the real binding from mappingEntries and blocks (the forged binding cannot unlock it)
+  const wrongBind = { rawColumnId: 3, projectionSignature: CM.projectionSignature({ scale: 7, offset: 0, sign: 1 }) };
+  const sess = session(steeringCals({ binding: wrongBind }));
+  sess.steeringBinding = wrongBind; // forge advisory to match the wrong calibration
+  const ws = WS.runAnalysisWorkspace(demoCase, sess, null, { modelRunner: runner });
+  chk('forged binding matching a wrong calibration → still blocked', ws.capability.calibratedMagnitudeEligible === false && ws.capability.measuredKUsEligible === false);
+})();
+
 console.log(`r2.4-measured-metrics-integration: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

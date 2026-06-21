@@ -265,7 +265,11 @@
     if (s.timebaseStatus === 'blocked') blockedReasons.push(_blocker('TELEMETRY_TIMEBASE_BLOCKED', 'global reset'));
     REQUIRED.forEach(function (canon) { if (!elig[canon] || !elig[canon].eligible) { var rs = elig[canon] ? elig[canon].reason : 'unmapped'; blockedReasons.push(_blocker(rs === 'unmapped' ? 'REQUIRED_CHANNEL_MISSING' : 'REQUIRED_CHANNEL_NOT_ELIGIBLE', canon + ' (' + rs + ')')); } });
     if (blockedReasons.length) return _unavailable('preflight_blocked', blockedReasons, channels, warnings);
-    var calCap = CR.deriveCalibrationCapability(CR.buildCalibrationSet(s.calibrationSet || []), { sessionId: s.sessionId || null, steeringBinding: s.steeringBinding || null });
+    // RE-DERIVE the steering binding from the AUTHORITATIVE mappingEntries (never trust the advisory s.steeringBinding;
+    // a forged/stale binding must not unlock magnitude) — same evidence used for channel eligibility above.
+    var _steerEntries = (s.mappingEntries || []).filter(function (e) { return e.canonicalChannel === 'steering'; });
+    var _steerBinding = (_steerEntries.length === 1 && _steerEntries[0].projection) ? { rawColumnId: _steerEntries[0].rawColumnId, projectionSignature: CR.projectionSignature(_steerEntries[0].projection) } : null;
+    var calCap = CR.deriveCalibrationCapability(CR.buildCalibrationSet(s.calibrationSet || []), { sessionId: s.sessionId || null, steeringBinding: _steerBinding });
     var higher = { signedResponseEligible: calCap.signedResponseEligible, calibratedMagnitudeEligible: calCap.calibratedMagnitudeEligible, roadWheelMetricsEligible: calCap.roadWheelMetricsEligible };
     var win = AW.validateAnalysisWindow(_bundle(s), s.windowRequest, AW.normalizeYawOptions(opts));
     var selectedWindow = { startTime: win.startTime, endTime: win.endTime, sampleCount: win.sampleCount, applied: s.windowRequest != null };
