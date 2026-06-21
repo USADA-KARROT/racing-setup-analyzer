@@ -82,5 +82,9 @@ const input = {
 (() => { class B{constructor(){this.rawColumnId=1;}} chk('class-instance mapping entry rejected', EX.exportAnalysisCase({mapping:{entries:[new B()]}}).ok===false); })();
 (() => { class C{constructor(){this.note='x';}} chk('class-instance meta rejected', EX.exportAnalysisCase({meta:new C()}).ok===false); })();
 (() => { const v=EX.exportAnalysisCase({blockers:[{code:'x',scope:'global',detail:['reset']}]}); chk('plain blocker still valid', v.ok===true && deepEq(v.bundle.blockers[0].detail,['reset'])); })();
+// R2.6: trackIntelligence section is closed (capped corners, closed phase schema, no raw arrays)
+(() => { const ti={eligible:true,lapCount:2,credibility:'Heuristic',corners:[{cornerId:'c0',lapId:1,samples:18,summary:'ok',confidence:'low',trackPosRange:[0,100],timeRange:[0,1],entry:{sufficient:true,qualitative:'few_secondary_corrections',confidence:'low'},mid:{sufficient:false,reason:'insufficient_samples',samples:2},exit:{sufficient:true,qualitative:'few_secondary_corrections',confidence:'low'}}],limitations:['x'],cannotConclude:[],blockedReasons:[]}; chk('trackIntelligence section exports closed', EX.exportAnalysisCase({meta:{},trackIntelligence:ti}).ok===true); })();
+(() => { const ti={eligible:true,corners:[{cornerId:'c0',secret:{values:[1,2,3]}}]}; chk('unknown corner key rejected', EX.exportAnalysisCase({meta:{},trackIntelligence:ti}).ok===false); })();
+(() => { const c={cornerId:'c0',lapId:1,samples:1,summary:'x',confidence:'low',trackPosRange:[0,1],timeRange:[0,1],entry:{sufficient:true,confidence:'low'},mid:{sufficient:true,confidence:'low'},exit:{sufficient:true,confidence:'low'}}; const ti={eligible:true,corners:Array.from({length:100},()=>c)}; chk('over-cap corners (>64) rejected', EX.exportAnalysisCase({meta:{},trackIntelligence:ti}).ok===false); })();
 console.log(`analysis-case-export: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

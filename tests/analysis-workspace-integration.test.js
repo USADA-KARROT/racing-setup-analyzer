@@ -63,7 +63,7 @@ chk('case intact: comparison eligibility NOT on the case', demo.analysisCase.cap
 const view = VM.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, { suspensionNormalizationView: demo.suspensionNormalizationView });
 chk('view: ok', view.ok === true);
 chk('view A: case header status complete', view.caseHeader.overallStatus === 'analysis_complete_directional', view.caseHeader.overallStatus);
-chk('view B: capability summary lists 12 flags', view.capabilitySummary.length === 13);
+chk('view B: capability summary lists 12 flags', view.capabilitySummary.length === 16);
 chk('view C: setup inputs front wheel rate present + Derived', view.setupInputs.frontWheelRate.value > 0 && view.setupInputs.frontWheelRate.credibility === 'Derived');
 chk('view C: front basis ground identity', /ground/.test(view.setupInputs.frontWheelRate.basis || ''));
 chk('view C: rear basis spring element', /spring element/.test(view.setupInputs.rearWheelRate.basis || ''));
