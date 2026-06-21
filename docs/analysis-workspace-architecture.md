@@ -41,7 +41,8 @@ UI: `renderer/index.html` gains an **Analysis Workspace** tab + **Load Demo Anal
 | `raceEngineerInspectionEligible` | a model prediction exists | ✓ |
 | `raceEngineerDirectionalEligible` | comparison eligible + actionable difference | ✓ |
 | `driverCoachingEligible` | steering channel + driver inputs present | ✓ |
-| `quantitativeSetupRecommendationEligible` | **always false (first version)** — no validated click→rate mapping | ✗ (blocked) |
+| `quantitativeSetupRecommendationEligible` | **R2.5**: a non-degenerate balance lever exists (probed); model-grounded PHYSICAL-unit recommendations (Nm/deg, N/mm, %). Hardware *clicks* stay gated (no validated click→rate mapping). | ✓ (R2.5) |
+| `setupAbEligible` | **R2.5**: model runnable → a two-setup what-if comparison (predicted deltas, credibility Model, no lap-time claim) | ✓ (R2.5) |
 
 ## Trust boundary & honesty constraints
 

@@ -46,6 +46,7 @@ const withParam = (key, mul) => { const c = baseCase(); const p = c.modelSnapsho
   const bad = baseCase(); bad.modelSnapshot.canonicalInputSnapshot.frontWheelRateNmm.value = NaN;
   const r = AB.compareSetups(baseCase(), bad, { modelRunner: runner });
   chk('invalid B → blocked', r.valid === false && r.blockedReasons.some(b => b.code === 'SETUP_B_MODEL_RUN_FAILED'));
+  chk('blocked A/B still carries plausibilityWarnings (consistent shape)', Array.isArray(r.plausibilityWarnings));
 })();
 
 // no runner → blocked, never throws

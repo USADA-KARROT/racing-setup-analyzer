@@ -63,7 +63,7 @@
       if (!ea || ea.valid !== true) blocked.push(_blocker('SETUP_A_MODEL_RUN_FAILED', ea ? ea.blockedReasons : 'absent'));
       if (!eb || eb.valid !== true) blocked.push(_blocker('SETUP_B_MODEL_RUN_FAILED', eb ? eb.blockedReasons : 'absent'));
       if (blocked.length) {
-        return { valid: false, a: ea && ea.valid ? _side(ea) : null, b: eb && eb.valid ? _side(eb) : null, deltas: null, directionalSummary: null, assumptions: ASSUMPTIONS, blockedReasons: blocked, credibility: 'Unavailable' };
+        return { valid: false, a: ea && ea.valid ? _side(ea) : null, b: eb && eb.valid ? _side(eb) : null, deltas: null, directionalSummary: null, plausibilityWarnings: _plausibilityWarnings(caseA, caseB), assumptions: ASSUMPTIONS, blockedReasons: blocked, credibility: 'Unavailable' };
       }
       var a = _side(ea), b = _side(eb);
       var deltas = {};
@@ -78,7 +78,7 @@
         assumptions: ASSUMPTIONS, blockedReasons: [], credibility: 'Model',
       };
     } catch (e) {
-      return { valid: false, a: null, b: null, deltas: null, directionalSummary: null, assumptions: ASSUMPTIONS, blockedReasons: [_blocker('SETUP_AB_EXCEPTION', String(e && e.message || e))], credibility: 'Unavailable' };
+      return { valid: false, a: null, b: null, deltas: null, directionalSummary: null, plausibilityWarnings: [], assumptions: ASSUMPTIONS, blockedReasons: [_blocker('SETUP_AB_EXCEPTION', String(e && e.message || e))], credibility: 'Unavailable' };
     }
   }
 
