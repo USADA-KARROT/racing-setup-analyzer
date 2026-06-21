@@ -71,5 +71,10 @@ const input = {
 (() => { chk('case.createdAt private path rejected', EX.exportAnalysisCase({case:{createdAt:'/Users/alice/private/run.csv'}}).ok===false); })();
 (() => { chk('calib.createdAt private path rejected', EX.exportAnalysisCase({calibration:{entries:[{calibrationType:'speed_scale',source:'s',confidence:'high',verified:true,createdAt:'/home/bob/secret.bmsbin'}]}}).ok===false); })();
 (() => { chk('ISO timestamp createdAt still passes (no false positive)', EX.exportAnalysisCase({case:{createdAt:'2026-06-21T00:00:00Z'},meta:{exportedAt:'2026-06-21T12:34:56.789Z'}}).ok===true); })();
+// CP3 #2: exotic objects (Date/RegExp/Map/class instance) as a section must be REJECTED, not coerced to {}
+(() => { class C{constructor(){this.valid=true;}} chk('class-instance observation rejected', EX.exportAnalysisCase({observation:new C()}).ok===false); })();
+(() => { chk('Date section rejected', EX.exportAnalysisCase({window:new Date()}).ok===false); })();
+(() => { chk('RegExp section rejected', EX.exportAnalysisCase({mapping:/x/}).ok===false); })();
+(() => { const v=EX.exportAnalysisCase({observation:{valid:true,blockedReasons:[{code:'x',detail:['a']}]}}); chk('plain observation still valid + normalized', v.ok===true && deepEq(v.bundle.observation.blockedReasons[0].detail,['a'])); })();
 console.log(`analysis-case-export: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

@@ -29,6 +29,8 @@
   ];
   function _looksLikePath(s) { for (var i = 0; i < _PATH_LIKE_RE.length; i++) { if (_PATH_LIKE_RE[i].test(s)) return true; } return false; }
   function _isFiniteNum(v) { return typeof v === 'number' && isFinite(v); }
+  // a section/object must be a PLAIN object — Date/RegExp/Map/class instances (own-enumerable-key-empty) must NOT slip through as {}
+  function _isPlainObject(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; }
 
   // ── recursive closed-schema validator ──
   // schema: 'scalar' | 'string' | 'number' | 'boolean' | {obj:{k:schema}} | {arr:itemSchema} | {boolMap:true}
@@ -55,14 +57,14 @@
     }
     if (schema && schema.boolMap) {
       if (value == null) return {};
-      if (typeof value !== 'object' || Array.isArray(value)) { errors.push('not_object:' + pathStr); return {}; }
+      if (!_isPlainObject(value)) { errors.push('not_object:' + pathStr); return {}; }
       var bm = {};
       Object.keys(value).forEach(function (k) { if (typeof value[k] !== 'boolean') errors.push('not_boolean:' + pathStr + '.' + k); else bm[k] = value[k]; });
       return bm;
     }
     if (schema && schema.obj) {
       if (value == null) return null;
-      if (typeof value !== 'object' || Array.isArray(value)) { errors.push('not_object:' + pathStr); return {}; }
+      if (!_isPlainObject(value)) { errors.push('not_object:' + pathStr); return {}; }
       var out = {};
       Object.keys(value).forEach(function (k) {
         if (!Object.prototype.hasOwnProperty.call(schema.obj, k)) { errors.push('unknown_key:' + pathStr + '.' + k); return; } // CLOSED
@@ -112,8 +114,10 @@
   // only the `case` is summarized to scalars, and blocker detail is normalized to a bounded scalar array.
   function _assemble(input) {
     input = input || {};
-    var obs = Object.assign({}, input.observation || {}); obs.blockedReasons = _normBlockers(obs.blockedReasons);
-    var cmp = Object.assign({}, input.comparison || {}); cmp.blockedReasons = _normBlockers(cmp.blockedReasons);
+    var obs = input.observation === undefined ? {} : (_isPlainObject(input.observation) ? Object.assign({}, input.observation) : input.observation); // non-plain (Date/class) passes through so _val REJECTS it (no Object.assign laundering)
+    if (_isPlainObject(obs)) obs.blockedReasons = _normBlockers(obs.blockedReasons);
+    var cmp = input.comparison === undefined ? {} : (_isPlainObject(input.comparison) ? Object.assign({}, input.comparison) : input.comparison);
+    if (_isPlainObject(cmp)) cmp.blockedReasons = _normBlockers(cmp.blockedReasons);
     return {
       bundleSchemaVersion: BUNDLE_SCHEMA_VERSION,
       meta: Object.assign({ bundleSchemaVersion: BUNDLE_SCHEMA_VERSION }, input.meta || {}),
@@ -136,7 +140,7 @@
       var errors = [];
       if (input != null && typeof input === 'object' && !Array.isArray(input)) {
         Object.keys(input).forEach(function (k) { if (INPUT_ALLOWLIST.indexOf(k) === -1) errors.push('unknown_input_key:' + k); }); // CLOSED input
-        if (input.case != null && (typeof input.case !== 'object' || Array.isArray(input.case))) errors.push('case_not_object');
+        if (input.case != null && !_isPlainObject(input.case)) errors.push('case_not_object');
       } else { errors.push('input_not_object'); }
       var bundle = _val(_assemble(input), BUNDLE_SCHEMA, '', errors);
       return { ok: errors.length === 0, bundle: bundle, errors: errors };
