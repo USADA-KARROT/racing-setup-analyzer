@@ -59,5 +59,9 @@ const input = {
 (() => { const r=EX.exportAnalysisCase({calibrationSet:[{values:[1,2,3]}]}); chk('calibrationSet alias rejected', r.ok===false); })();
 (() => { const r=EX.exportAnalysisCase({case:{},analysisCase:{deep:{values:[1,2,3]}}}); chk('analysisCase alias rejected', r.ok===false && !JSON.stringify(r.bundle||{}).includes('values')); })();
 (() => { const r=EX.exportAnalysisCase({mapping:''}); chk('malformed mapping section rejected', r.ok===false && r.errors.some(e=>e==='not_object:.mapping')); })();
+// CP2 re-review #4: exotic input (getter/Proxy that throws) → fail-closed, never throws
+(() => { const g={}; Object.defineProperty(g,'detail',{enumerable:true,get(){throw new Error('boom');}}); let threw=false,r; try{ r=EX.exportAnalysisCase({blockers:[g]}); }catch(e){ threw=true; } chk('getter-throws blocker → no throw, ok false', threw===false && r.ok===false); })();
+(() => { let threw=false; try{ EX.exportAnalysisCase({blockers:[{code:'x',detail:(function(){var c={};c.s=c;return c;})()}]}); }catch(e){ threw=true; } chk('cyclic detail → no throw', threw===false); })();
+(() => { let threw=false,r; try{ r=EX.parseAnalysisCaseExport('not json'); }catch(e){ threw=true; } chk('parse invalid json → no throw, ok false', threw===false && r.ok===false); })();
 console.log(`analysis-case-export: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
