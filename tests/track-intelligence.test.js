@@ -123,5 +123,20 @@ function sessionFrom(csv, confirmFn) {
   chk('garbage → no throw, blocked', threw === false);
 })();
 
+// CP2 fix: a CONFIRMED but all-null track_position is blocked (data gate), not eligible with [null,null] ranges
+(() => {
+  const me = ['time','speed','yaw_rate','steering','lateral_accel','track_position','lap'].map((c,i)=>({rawColumnId:i,canonicalChannel:c,userConfirmed:true,projection:{scale:1,offset:0,sign:1}}));
+  const N=30, arr=(v)=>Array.from({length:N},()=>v);
+  const ch={time:{values:Array.from({length:N},(_,i)=>i*0.05)},speed:{values:arr(30)},yaw_rate:{values:arr(0.1)},steering:{values:arr(0.05)},lateral_accel:{values:arr(6)},track_position:{values:arr(null)},lap:{values:arr(1)}};
+  const sess={kind:'canonical_telemetry_session',mappingEntries:me,channels:ch,time:ch.time.values,dataProvenance:'synthetic'};
+  const ti = TI.deriveTrackIntelligence(sess,{valid:true},{},{});
+  chk('null track_position → INSUFFICIENT_TRACK_POSITION_DATA', ti.eligible===false && ti.blockedReasons.some(b=>b.code==='INSUFFICIENT_TRACK_POSITION_DATA'));
+})();
+// CP2 fix: the driver-behaviour framing limitation is ALWAYS present, even when blocked
+(() => {
+  const { sess, obs } = sessionFrom(buildCornerCsv(), (c) => c !== 'lap'); // blocked (no lap)
+  const ti = TI.deriveTrackIntelligence(sess, obs, {}, {});
+  chk('blocked result carries framing limitation', ti.eligible===false && ti.limitations.indexOf('driver_behaviour_not_a_corner_or_setup_finding') !== -1 && ti.limitations.indexOf('raw_steering_input_not_road_wheel_angle') !== -1);
+})();
 console.log(`track-intelligence: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

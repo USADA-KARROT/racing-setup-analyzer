@@ -43,6 +43,8 @@
     return byCanon === 1 && byCol === 1;
   }
   function _pctl(sortedAsc, q) { if (!sortedAsc.length) return 0; return sortedAsc[Math.floor(q * (sortedAsc.length - 1))]; }
+  function _firstFinite(a, s, e) { for (var i = s; i <= e; i++) if (_isFiniteNum(a[i])) return a[i]; return null; }
+  function _lastFinite(a, s, e) { for (var i = e; i >= s; i--) if (_isFiniteNum(a[i])) return a[i]; return null; }
   function _blocker(code, detail) { return { code: code, scope: 'track_intelligence', severity: 'info', detail: detail || null }; }
 
   // per-phase RAW steering behaviour — SAME definitions as telemetry-observation (deadband = 2% of p95 |steer|)
@@ -86,8 +88,8 @@
     var elevatedPhase = [['entry', entry], ['mid', mid], ['exit', exit]].filter(function (p) { return p[1].sufficient && p[1].qualitative === 'elevated_secondary_corrections'; }).map(function (p) { return p[0]; });
     return {
       cornerId: 'corner_' + cornerId, lapId: lapId,
-      trackPosRange: [_isFiniteNum(arrs.tp[s]) ? arrs.tp[s] : null, _isFiniteNum(arrs.tp[e]) ? arrs.tp[e] : null],
-      timeRange: [_isFiniteNum(arrs.time[s]) ? arrs.time[s] : null, _isFiniteNum(arrs.time[e]) ? arrs.time[e] : null],
+      trackPosRange: [_firstFinite(arrs.tp, s, e), _lastFinite(arrs.tp, s, e)],
+      timeRange: [_firstFinite(arrs.time, s, e), _lastFinite(arrs.time, s, e)],
       samples: samples, entry: entry, mid: mid, exit: exit,
       summary: elevatedPhase.length ? ('corrections_elevated_in_' + elevatedPhase.join('_')) : 'corrections_within_normal_range',
       confidence: 'low',
@@ -100,7 +102,8 @@
   }
 
   function _result(eligible, tpOk, lapOk, stOk, lapCount, corners, blockedReasons, cannotConclude, dataProvenance, credibility) {
-    var lims = eligible ? ['driver_behaviour_not_a_corner_or_setup_finding', 'raw_steering_input_not_road_wheel_angle', 'heuristic_short_window', 'data_provenance_' + (dataProvenance || 'unverified')] : [];
+    var lims = ['driver_behaviour_not_a_corner_or_setup_finding', 'raw_steering_input_not_road_wheel_angle']; // ALWAYS carried (the framing of what corner coaching is)
+    if (eligible) lims = lims.concat(['heuristic_short_window', 'data_provenance_' + (dataProvenance || 'unverified')]);
     return {
       valid: eligible === true, eligible: eligible === true,
       trackPositionConfirmed: tpOk === true, lapSegmentationConfirmed: lapOk === true, steeringConfirmed: stOk === true,
@@ -133,6 +136,8 @@
       lat = (ch.lateral_accel || {}).values || [], speed = (ch.speed || {}).values || [], time = session.time || [];
     var n = Math.min(lap.length, tp.length, steer.length, lat.length, speed.length, time.length);
     if (n < TH.MIN_CORNER_SAMPLES) return _result(false, tpOk, lapOk, stOk, 0, [], [_blocker('INSUFFICIENT_SAMPLES', 'too few aligned samples for corner segmentation')], cannotConclude, session.dataProvenance || null, 'Unavailable');
+    var tpFinite = 0; for (var q = 0; q < n; q++) if (_isFiniteNum(tp[q])) tpFinite++;
+    if (tpFinite < TH.MIN_CORNER_SAMPLES) return _result(false, tpOk, lapOk, stOk, 0, [], [_blocker('INSUFFICIENT_TRACK_POSITION_DATA', 'track position confirmed but too few finite values to attribute corners')], cannotConclude, session.dataProvenance || null, 'Unavailable');
 
     // data-adaptive thresholds
     var absLat = [], spd = [], lapSet = {};

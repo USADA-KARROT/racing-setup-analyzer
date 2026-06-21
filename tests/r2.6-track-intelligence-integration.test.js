@@ -77,6 +77,8 @@ function cornerSession(confirmFn) {
   chk('export: round-trips', p.ok === true);
   chk('export: no raw sample arrays leaked', JSON.stringify(r.bundle).indexOf('"values"') === -1);
   chk('export: still rejects an unknown trackIntelligence key', EX.exportAnalysisCase({ meta: {}, trackIntelligence: Object.assign({}, ws.trackIntelligence, { secret: true }) }).ok === false);
+  const wsBlocked = WS.runAnalysisWorkspace(demoCase(), cornerSession((c) => c !== 'lap'), null, { modelRunner: runner });
+  chk('export: a BLOCKED trackIntelligence also round-trips (closed)', EX.exportAnalysisCase({ meta: {}, trackIntelligence: wsBlocked.trackIntelligence }).ok === true, wsBlocked.trackIntelligence.blockedReasons);
 })();
 
 console.log(`r2.6-track-intelligence-integration: ${pass} passed, ${fail} failed`);

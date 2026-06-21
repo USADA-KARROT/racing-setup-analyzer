@@ -82,7 +82,7 @@
   var MAPPING_ENTRY = { obj: { rawColumnId: 'number', rawName: 'string', canonicalChannel: 'string', userConfirmed: 'boolean', projection: { obj: { scale: 'number', offset: 'number', sign: 'number' }, req: ['scale', 'offset', 'sign'] }, rawUnit: 'scalar', canonicalUnit: 'scalar' }, req: ['rawColumnId', 'rawName', 'canonicalChannel', 'projection'] };
   var CALIB_ENTRY = { obj: { calibrationType: 'string', value: 'scalar', unit: 'scalar', source: 'string', confidence: 'string', verified: 'boolean', applicableSessionIds: { arr: 'string' }, createdAt: 'string' }, req: ['calibrationType', 'source', 'confidence', 'verified', 'createdAt'] };
   var TI_PHASE = { obj: { sufficient: 'boolean', qualitative: 'scalar', reversalRatePerS: 'scalar', abruptnessP95: 'scalar', confidence: 'scalar', note: 'scalar', reason: 'scalar', samples: 'scalar' } };
-  var TI_CORNER = { obj: { cornerId: 'scalar', lapId: 'scalar', samples: 'scalar', summary: 'scalar', confidence: 'scalar', trackPosRange: { arr: 'number', max: 2 }, timeRange: { arr: 'number', max: 2 }, entry: TI_PHASE, mid: TI_PHASE, exit: TI_PHASE } };
+  var TI_CORNER = { obj: { cornerId: 'scalar', lapId: 'scalar', samples: 'scalar', summary: 'scalar', confidence: 'scalar', trackPosRange: { arr: 'scalar', max: 2 }, timeRange: { arr: 'scalar', max: 2 }, entry: TI_PHASE, mid: TI_PHASE, exit: TI_PHASE } };
   var TRACK_INTEL = { obj: { available: 'boolean', valid: 'boolean', eligible: 'boolean', trackPositionConfirmed: 'boolean', lapSegmentationConfirmed: 'boolean', steeringConfirmed: 'boolean', lapCount: 'scalar', segmentationBasis: 'scalar', dataProvenance: 'scalar', credibility: 'scalar', corners: { arr: TI_CORNER, max: 64 }, limitations: { arr: 'string' }, cannotConclude: { arr: 'string' }, blockedReasons: { arr: BLOCKER } } };
   var BUNDLE_SCHEMA = { obj: {
     bundleSchemaVersion: 'string',
@@ -114,6 +114,7 @@
   function _blocker(b) { return _isPlainObject(b) ? Object.assign({}, b, { detail: _detailArr(b.detail) }) : b; } // non-plain (Date/RegExp/class/array) passes through → _val REJECTS it (no laundering)
 
   function _normBlockers(arr) { if (arr == null) return []; if (!Array.isArray(arr)) return arr; return arr.map(_blocker); }
+  function _normTrackIntel(ti) { if (ti === undefined) return {}; if (!_isPlainObject(ti)) return ti; var out = Object.assign({}, ti); if ('blockedReasons' in out) out.blockedReasons = _normBlockers(out.blockedReasons); return out; }
   // shallow-copy each section (keep ALL keys so the closed schema can REJECT unknowns — never silently omit);
   // only the `case` is summarized to scalars, and blocker detail is normalized to a bounded scalar array.
   function _assemble(input) {
@@ -133,7 +134,7 @@
       comparison: cmp,
       raceEngineer: input.raceEngineer !== undefined ? input.raceEngineer : {},
       driverCoach: input.driverCoach !== undefined ? input.driverCoach : {},
-      trackIntelligence: input.trackIntelligence !== undefined ? input.trackIntelligence : {},
+      trackIntelligence: _normTrackIntel(input.trackIntelligence),
       capability: input.capability !== undefined ? input.capability : {},
       blockers: _normBlockers(input.blockers),
       warnings: input.warnings !== undefined ? input.warnings : [],
