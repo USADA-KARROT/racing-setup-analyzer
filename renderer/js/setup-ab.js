@@ -16,6 +16,7 @@
 
   function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
   var AX = _req('./analysis-execution.js', typeof AnalysisExecution !== 'undefined' ? AnalysisExecution : undefined);
+  var QR = _req('./quantitative-setup-recommendation.js', typeof QuantitativeSetupRecommendation !== 'undefined' ? QuantitativeSetupRecommendation : undefined);
 
   var METRICS = ['understeer_gradient', 'roll_stiffness_dist_front', 'total_roll_stiffness', 'front_wheel_rate', 'rear_wheel_rate'];
   var ASSUMPTIONS = Object.freeze([
@@ -28,6 +29,23 @@
   function _isFiniteNum(v) { return typeof v === 'number' && isFinite(v); }
   function _blocker(code, detail) { return { code: code, scope: 'setup_ab', severity: 'info', detail: detail || null }; }
 
+  // a known setup parameter outside its plausible motorsport range is flagged (non-blocking — A/B is a what-if,
+  // but the user must know the what-if is implausible rather than read it as a clean model result).
+  function _plausibilityWarnings(caseA, caseB) {
+    // resolve LAZILY at call time (browser load order may put this module before quantitative-setup-recommendation.js)
+    var qr = QR || (typeof QuantitativeSetupRecommendation !== 'undefined' ? QuantitativeSetupRecommendation : ((root && root.QuantitativeSetupRecommendation) || null));
+    if (!qr || !qr.PARAMETERS) return [];
+    var out = [];
+    [['a', caseA], ['b', caseB]].forEach(function (pair) {
+      var snap = pair[1] && pair[1].modelSnapshot && pair[1].modelSnapshot.canonicalInputSnapshot;
+      if (!snap) return;
+      Object.keys(qr.PARAMETERS).forEach(function (k) {
+        var pp = snap[k]; var rng = qr.PARAMETERS[k].range;
+        if (pp && _isFiniteNum(pp.value) && rng && (pp.value < rng[0] || pp.value > rng[1])) out.push({ setup: pair[0], parameter: k, value: pp.value, range: rng });
+      });
+    });
+    return out;
+  }
   function _side(exec) {
     var s = (exec && exec.modelResultSnapshot) || {};
     var out = { tendency: s.tendency != null ? s.tendency : null };
@@ -56,6 +74,7 @@
       var directionalSummary = (dK == null) ? 'unavailable' : (Math.abs(dK) < 0.05 ? 'no_meaningful_balance_change' : (dK > 0 ? 'b_more_understeer' : 'b_more_oversteer'));
       return {
         valid: true, a: a, b: b, deltas: deltas, directionalSummary: directionalSummary,
+        plausibilityWarnings: _plausibilityWarnings(caseA, caseB),
         assumptions: ASSUMPTIONS, blockedReasons: [], credibility: 'Model',
       };
     } catch (e) {

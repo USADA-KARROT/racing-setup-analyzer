@@ -51,5 +51,12 @@ const withParam = (key, mul) => { const c = baseCase(); const p = c.modelSnapsho
 // no runner → blocked, never throws
 (() => { let threw = false, r; try { r = AB.compareSetups(baseCase(), baseCase(), {}); } catch (e) { threw = true; } chk('no runner → no throw, blocked', threw === false && r.valid === false); })();
 
+// CP1 re-review fix: an out-of-range what-if is flagged (non-blocking) so it is not read as a clean model result
+(() => {
+  const r = AB.compareSetups(baseCase(), withParam('frontArbRollStiffnessNmDeg', 3), { modelRunner: runner }); // ~1190 → in range
+  chk('in-range what-if: no plausibility warning', Array.isArray(r.plausibilityWarnings) && r.plausibilityWarnings.length === 0);
+  const r2 = AB.compareSetups(baseCase(), withParam('frontArbRollStiffnessNmDeg', 25), { modelRunner: runner }); // ~9900 → out of range
+  chk('out-of-range what-if: plausibility warning', r2.plausibilityWarnings.some(w => w.parameter === 'frontArbRollStiffnessNmDeg'), r2.plausibilityWarnings);
+})();
 console.log(`setup-ab: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

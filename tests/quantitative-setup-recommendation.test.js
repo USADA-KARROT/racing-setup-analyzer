@@ -101,5 +101,10 @@ const baseCase = () => DEMO.buildDemoAnalysisCase().analysisCase;
   chk('near-upper baseline: in-range or blocked (never out-of-range)', (r.available === true && r.recommendedValue >= 0 && r.recommendedValue <= 3000) || r.available === false, r.recommendedValue);
 })();
 
+// CP1 re-review fix: sideEffects reports ALL tracked metrics (incl unchanged = 0), unambiguously
+(() => {
+  const r = QR.recommendSetupChange({ analysisCase: baseCase(), target: { metric: 'roll_stiffness_dist_front', delta: 0.5 }, parameterKey: 'frontArbRollStiffnessNmDeg', runner });
+  chk('sideEffects include an unchanged (zero) metric', r.available === true && r.sideEffects.some(s => s.delta === 0), r.sideEffects);
+})();
 console.log(`quantitative-setup-recommendation: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
