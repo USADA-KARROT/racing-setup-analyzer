@@ -117,7 +117,7 @@
       var sideEffects = OTHER_METRICS.filter(function (m) { return m !== target.metric; }).map(function (m) {
         var d = (_isFiniteNum(after.snapshot[m]) && _isFiniteNum(base.snapshot[m])) ? (after.snapshot[m] - base.snapshot[m]) : null;
         return { metric: m, delta: d };
-      }).filter(function (s) { return s.delta != null && Math.abs(s.delta) > 1e-9; });
+      }).filter(function (s) { return s.delta != null; }); // report ALL tracked metrics (incl unchanged = 0), drop only unavailable
 
       var limitations = LIMITATIONS.slice();
       if (Math.abs(recommendedDelta) > Math.abs(baseValue) * 0.5) limitations.push('large_extrapolation_beyond_local_linearity');

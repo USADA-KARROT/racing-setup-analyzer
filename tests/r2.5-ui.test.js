@@ -60,6 +60,7 @@ chk('A/B state', /abResult:/.test(html));
 // CP1 fix: leverType surfaced (ballast vs suspension)
 chk('quantitative shows leverType', /quantitativeRecommendation\.leverType/.test(html));
 chk('ballast lever flagged materially different', /ballast\/weight move/.test(html));
+chk('A/B shows plausibility warnings', /abResult\.plausibilityWarnings/.test(html) && /implausible what-if/.test(html));
 
 console.log(`r2.5-ui: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

@@ -2791,6 +2791,9 @@ canvas{max-height:300px}
         <div class="text-xs space-y-1">
           <div>Predicted balance change (B vs A): <b class="text-sky-300" x-text="abResult.directionalSummary"></b> <span x-html="credBadge('Model')"></span></div>
           <div class="text-slate-400" x-text="'&Delta; understeer '+fmt(abResult.deltas.understeer_gradient)+' deg/g &middot; &Delta; roll-dist '+fmt(abResult.deltas.roll_stiffness_dist_front)+' % &middot; &Delta; total roll '+fmt(abResult.deltas.total_roll_stiffness)+' Nm/deg'"></div>
+          <template x-if="abResult.plausibilityWarnings &amp;&amp; abResult.plausibilityWarnings.length">
+            <div class="text-[11px] text-amber-400/80">&#9888; implausible what-if: <template x-for="w in abResult.plausibilityWarnings" :key="w.parameter+w.setup"><span class="mr-2" x-text="w.parameter+'='+fmt(w.value)+' (range '+w.range[0]+'-'+w.range[1]+')'"></span></template></div>
+          </template>
           <div class="text-[10px] text-slate-500">Model what-if prediction &mdash; not measured, not a lap-time claim.</div>
         </div>
       </template>
