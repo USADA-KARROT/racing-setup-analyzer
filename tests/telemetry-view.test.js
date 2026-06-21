@@ -98,6 +98,32 @@ const session = V.newSession('session.csv', parsed, 'custom');
   chk('caps: setupRecommendation blocked', byKey.setupRecommendation.available === false);
 })();
 
+// ── V2 wiring: buildYawResponseData (selection range scope + fail-closed) ──
+(() => {
+  let head = 'time[s],speed[km/h],steer[deg],accy[g],yaw[deg/s]\n';
+  let rows = [];
+  for (let i = 0; i < 30; i++) rows.push([(i * 0.05).toFixed(2), 180, 20, 1.4, 23].join(','));
+  let s = V.newSession('yaw.csv', Core.parseCsv(head + rows.join('\n')), 'custom');
+  s = V.applyMappingEdit(s, 1, { confirmed: true }); // speed
+  s = V.applyMappingEdit(s, 2, { confirmed: true }); // steer→steering
+  s = V.applyMappingEdit(s, 3, { confirmed: true }); // accy→lateral_accel
+  s = V.applyMappingEdit(s, 4, { confirmed: true }); // yaw→yaw_rate
+  const full = V.buildYawResponseData(s, { speedFloorPercentile: 0 });
+  chk('yaw-wire: four channels resolved → available', full.available === true, full.reason);
+  chk('yaw-wire: channels annotated with raw names', full.channels && full.channels.steering === 'steer' && full.channels.yaw_rate === 'yaw', full.channels);
+  chk('yaw-wire: steering kept RAW (unit deg, scatter steer=20, never ratio-divided)', full.units.steer === 'deg' && full.scatter.every(p => p.steer === 20), full.units);
+  // selection scope: a sub-window restricts the analysed sample count (pure re-analysis, no re-parse)
+  const ranged = V.buildYawResponseData(s, { speedFloorPercentile: 0, range: { startIndex: 0, endIndex: 14 } });
+  chk('yaw-wire: range scopes total to the window', ranged.sampleCounts.total === 15 && ranged.sampleCounts.total < full.sampleCounts.total, { r: ranged.sampleCounts.total, f: full.sampleCounts.total });
+  // malformed range (end<start) ignored → full series
+  const bad = V.buildYawResponseData(s, { speedFloorPercentile: 0, range: { startIndex: 5, endIndex: 2 } });
+  chk('yaw-wire: malformed range ignored (full series)', bad.sampleCounts.total === full.sampleCounts.total, { b: bad.sampleCounts.total });
+  // missing required channels → fail-closed
+  const partial = V.newSession('p.csv', Core.parseCsv('time[s],speed[km/h]\n0,100\n0.05,101'), 'custom');
+  const miss = V.buildYawResponseData(partial, {});
+  chk('yaw-wire: missing channels → channels_missing fail-closed', miss.available === false && miss.reason === 'channels_missing', miss.reason);
+})();
+
 // ── buildCurveData (V1 Step 3-i): pure curve-data prep ──
 (() => {
   // 1. no decimation when rows <= target

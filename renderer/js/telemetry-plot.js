@@ -328,7 +328,81 @@
     ctx.restore();
   }
 
-  var api = { plotLayout, drawCurves, drawSelection, drawCursor, linScale, padDomain, ticks, fmt, PALETTE, DEFAULT_THEME, DEFAULT_OPTS };
+  /**
+   * scatterLayout(viewport, yawData, opts) → PURE geometry for the V2 Observed Yaw-Response scatter.
+   *  yawData = TelemetryView.buildYawResponseData output (scatter:[{steer,yawRate,speed}], speedBins, units).
+   *  X = RAW steering, Y = yaw rate (rad/s). Points are coloured by which speed bin they fall in.
+   *  No model line, no fit, no ratio conversion — descriptive only.
+   */
+  function scatterLayout(viewport, yawData, opts) {
+    opts = mergeOpts(opts);
+    var cssW = Math.max(1, viewport.cssW || 0), cssH = Math.max(1, viewport.cssH || 0);
+    var dpr = Math.min(opts.dprCap, Math.max(1, viewport.dpr || 1));
+    var pad = opts.padding, theme = opts.theme || DEFAULT_THEME;
+    var base = { css: { w: cssW, h: cssH }, dpr: dpr, backing: { w: Math.round(cssW * dpr), h: Math.round(cssH * dpr) } };
+    var pts = (yawData && yawData.scatter) || [];
+    var plotArea = { x: pad.left, y: pad.top, w: Math.max(1, cssW - pad.left - pad.right), h: Math.max(1, cssH - pad.top - pad.bottom - opts.axisH) };
+    base.plotArea = plotArea;
+    if (!pts.length) { base.empty = true; base.reason = (yawData && yawData.reason) || 'no-data'; base.points = []; base.x = null; base.y = null; base.bins = []; return base; }
+    var xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity;
+    for (var i = 0; i < pts.length; i++) { var p = pts[i]; if (p.steer < xmin) xmin = p.steer; if (p.steer > xmax) xmax = p.steer; if (p.yawRate < ymin) ymin = p.yawRate; if (p.yawRate > ymax) ymax = p.yawRate; }
+    var xd = padDomain(xmin, xmax, opts.yPadFrac) || [xmin - 1, xmax + 1];
+    var yd = padDomain(ymin, ymax, opts.yPadFrac) || [ymin - 1, ymax + 1];
+    var xs = linScale(xd[0], xd[1], plotArea.x, plotArea.x + plotArea.w);
+    var ys = linScale(yd[0], yd[1], plotArea.y + plotArea.h, plotArea.y);
+    base.empty = false;
+    var bins = ((yawData && yawData.speedBins) || []).map(function (b, idx) { return { start: b.speedStart, end: b.speedEnd, color: theme.palette[idx % theme.palette.length], n: b.n }; });
+    function colorForSpeed(sp) { for (var k = 0; k < bins.length; k++) { if (sp >= bins[k].start && (sp < bins[k].end || k === bins.length - 1)) return bins[k].color; } return bins.length ? bins[bins.length - 1].color : theme.palette[0]; }
+    var units = (yawData && yawData.units) || {};
+    base.x = { name: 'steering', unit: units.steer || '', scale: xs, ticks: ticks(xd[0], xd[1], opts.xTicks).map(function (v) { return { v: v, px: xs.to(v) }; }) };
+    base.y = { name: 'yaw rate', unit: units.yawRate || 'rad/s', scale: ys, ticks: ticks(yd[0], yd[1], opts.yTicks).map(function (v) { return { v: v, px: ys.to(v) }; }) };
+    base.zeroX = (xd[0] <= 0 && 0 <= xd[1]) ? xs.to(0) : null;
+    base.zeroY = (yd[0] <= 0 && 0 <= yd[1]) ? ys.to(0) : null;
+    base.points = pts.map(function (p) { return { px: xs.to(p.steer), py: ys.to(p.yawRate), color: colorForSpeed(p.speed), speed: p.speed }; });
+    base.bins = bins;
+    return base;
+  }
+
+  /**
+   * drawScatter(ctx, layout, theme) — paint the scatter `layout`. Not unit-tested (visual). Caller
+   * sizes the canvas to layout.backing/css; this applies the dpr transform itself.
+   */
+  function drawScatter(ctx, layout, theme) {
+    theme = theme ? Object.assign({}, DEFAULT_THEME, theme) : DEFAULT_THEME;
+    var dpr = layout.dpr || 1;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, layout.css.w, layout.css.h);
+    if (theme.bg) { ctx.fillStyle = theme.bg; ctx.fillRect(0, 0, layout.css.w, layout.css.h); }
+    ctx.font = '11px -apple-system, system-ui, sans-serif'; ctx.textBaseline = 'middle';
+    if (layout.empty) { ctx.fillStyle = theme.textDim; ctx.textAlign = 'center'; ctx.fillText('No steady-state points to plot', layout.css.w / 2, layout.css.h / 2); ctx.textAlign = 'left'; return; }
+    var pa = layout.plotArea;
+    ctx.strokeStyle = theme.laneBorder; ctx.lineWidth = 1; ctx.strokeRect(pa.x + 0.5, pa.y + 0.5, pa.w - 1, pa.h - 1);
+    // y grid + labels
+    ctx.fillStyle = theme.textDim; ctx.textAlign = 'right';
+    layout.y.ticks.forEach(function (t) { var py = Math.round(t.px) + 0.5; if (py < pa.y - 0.5 || py > pa.y + pa.h + 0.5) return; ctx.strokeStyle = theme.grid; ctx.beginPath(); ctx.moveTo(pa.x, py); ctx.lineTo(pa.x + pa.w, py); ctx.stroke(); ctx.fillStyle = theme.textDim; ctx.fillText(fmt(t.v), pa.x - 6, py); });
+    // x grid + labels
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    layout.x.ticks.forEach(function (t) { var px = Math.round(t.px) + 0.5; if (px < pa.x - 0.5 || px > pa.x + pa.w + 0.5) return; ctx.strokeStyle = theme.grid; ctx.beginPath(); ctx.moveTo(px, pa.y); ctx.lineTo(px, pa.y + pa.h); ctx.stroke(); ctx.fillStyle = theme.textDim; ctx.fillText(fmt(t.v), px, pa.y + pa.h + 4); });
+    ctx.textBaseline = 'middle';
+    // zero references
+    if (layout.zeroX != null) { var zx = Math.round(layout.zeroX) + 0.5; ctx.strokeStyle = theme.zero; ctx.beginPath(); ctx.moveTo(zx, pa.y); ctx.lineTo(zx, pa.y + pa.h); ctx.stroke(); }
+    if (layout.zeroY != null) { var zy = Math.round(layout.zeroY) + 0.5; ctx.strokeStyle = theme.zero; ctx.beginPath(); ctx.moveTo(pa.x, zy); ctx.lineTo(pa.x + pa.w, zy); ctx.stroke(); }
+    // points
+    ctx.globalAlpha = 0.6;
+    for (var i = 0; i < layout.points.length; i++) { var p = layout.points[i]; if (p.px < pa.x || p.px > pa.x + pa.w || p.py < pa.y || p.py > pa.y + pa.h) continue; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.px, p.py, 2.2, 0, Math.PI * 2); ctx.fill(); }
+    ctx.globalAlpha = 1;
+    // axis titles
+    ctx.fillStyle = theme.text; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+    ctx.fillText(layout.x.name + (layout.x.unit ? ' [' + layout.x.unit + ']' : ''), layout.css.w - 4, pa.y + pa.h + 14);
+    ctx.textAlign = 'left'; ctx.fillText(layout.y.name + (layout.y.unit ? ' [' + layout.y.unit + ']' : ''), 4, 2);
+    // legend (speed bins)
+    if (layout.bins && layout.bins.length) {
+      var lx = pa.x + 8, ly = pa.y + 10; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      for (var b = 0; b < layout.bins.length; b++) { var bn = layout.bins[b]; ctx.fillStyle = bn.color; ctx.fillRect(lx, ly - 4, 8, 8); ctx.fillStyle = theme.textDim; ctx.fillText(fmt(bn.start) + '–' + fmt(bn.end), lx + 12, ly); ly += 14; }
+    }
+  }
+
+  var api = { plotLayout, drawCurves, drawSelection, drawCursor, scatterLayout, drawScatter, linScale, padDomain, ticks, fmt, PALETTE, DEFAULT_THEME, DEFAULT_OPTS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.TelemetryPlot = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

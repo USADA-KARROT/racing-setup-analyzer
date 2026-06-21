@@ -22,6 +22,9 @@
   let _core = null;
   if (typeof module !== 'undefined' && module.exports) { try { _core = require('./telemetry-core.js'); } catch (e) { _core = null; } }
   const Core = _core || (typeof TelemetryCore !== 'undefined' ? TelemetryCore : null);
+  let _yaw = null;
+  if (typeof module !== 'undefined' && module.exports) { try { _yaw = require('./telemetry-yaw.js'); } catch (e) { _yaw = null; } }
+  const Yaw = _yaw || (typeof TelemetryYaw !== 'undefined' ? TelemetryYaw : null);
 
   // ── vehicle research profiles (documented context ONLY; NOT app defaults; never auto-confirm channels) ──
   const VEHICLE_PROFILES = {
@@ -275,7 +278,76 @@
     });
   }
 
-  const api = { VEHICLE_PROFILES, profileContext, newSession, applyMappingEdit, setProfile, toCoreDefinitions, buildImportSummary, buildMappingRows, buildPreflightSummary, buildCapabilityRows, buildCurveData, buildLaneReaders };
+  // ── V2: Observed Yaw-Response (Step yaw). Resolves yaw(rad/s) / speed(m/s) / lateral_accel(m/s²)
+  //    canonically, but keeps steering RAW (deliberately NOT converted to road-wheel and NOT divided
+  //    by any ratio — that's V2.1, behind a user-confirmed ratio). Feeds TelemetryYaw and returns its
+  //    descriptive result, annotated with which raw channels were resolved. Fail-closed if any of the
+  //    four required canonicals is missing.
+  const _TIME_NAMES_Y = ['time', 'xtime', 't', 'timestamp'];
+  function _columnForCanonical(session, canon) {
+    const cols = session.parsed.columns;
+    for (let i = 0; i < cols.length; i++) {
+      const d = session.definitions[i] || {};
+      const eff = d.canonicalName !== undefined ? d.canonicalName : _autoCanonical(session, i);
+      if (eff === canon) return i;
+    }
+    return -1;
+  }
+  function _canonicalSeries(session, columnId) {
+    const r = buildLaneReaders(session, { channels: [columnId], useCanonical: true })[0];
+    const f = r.factor == null ? 1 : r.factor;
+    return { values: r.values.map(v => (v == null ? null : v * f)), unit: r.unit };
+  }
+  function buildYawResponseData(session, opts) {
+    if (!Yaw || !session) return { available: false, reason: 'unavailable', channels: null };
+    const cols = session.parsed.columns;
+    const yawCol = _columnForCanonical(session, 'yaw_rate');
+    const steerCol = _columnForCanonical(session, 'steering');
+    const speedCol = _columnForCanonical(session, 'speed');
+    const ayCol = _columnForCanonical(session, 'lateral_accel');
+    let timeVals = null;
+    for (let i = 0; i < cols.length; i++) {
+      if (_TIME_NAMES_Y.includes(cols[i].rawName.toLowerCase())) {
+        const uc = Core.classifyUnit(cols[i].rawUnit, 'time');
+        const tf = uc.support === 'supported' ? uc.factor : 1;
+        timeVals = cols[i].values.map(v => (v == null ? null : v * tf));
+        break;
+      }
+    }
+    const channels = {
+      yaw_rate: yawCol >= 0 ? cols[yawCol].rawName : null,
+      steering: steerCol >= 0 ? cols[steerCol].rawName : null,
+      speed: speedCol >= 0 ? cols[speedCol].rawName : null,
+      lateral_accel: ayCol >= 0 ? cols[ayCol].rawName : null,
+      hasTime: !!timeVals,
+    };
+    if (yawCol < 0 || steerCol < 0 || speedCol < 0 || ayCol < 0) {
+      return { available: false, reason: 'channels_missing', channels };
+    }
+    const yawS = _canonicalSeries(session, yawCol);
+    const speedS = _canonicalSeries(session, speedCol);
+    const ayS = _canonicalSeries(session, ayCol);
+    // steering: RAW values + RAW unit, never converted (no canonical, no ratio division)
+    const steerUnit = (session.definitions[steerCol] && session.definitions[steerCol].unit !== undefined)
+      ? session.definitions[steerCol].unit : (cols[steerCol].rawUnit || '');
+    const steerVals = cols[steerCol].values;
+    const time = timeVals || cols[steerCol].values.map((_v, i) => i); // no time column → row index (uniform dt)
+    const series = { time: time, yawRate: yawS.values, steer: steerVals, speed: speedS.values, lateralAccel: ayS.values, steerUnit: steerUnit || '(raw)' };
+    // optional selection scope: restrict to a contiguous RAW row window [startIndex,endIndex] (inclusive).
+    // Slices every channel identically so the core sees a self-consistent sub-series. A missing/malformed
+    // range (or end<start) is ignored → full series. This is pure re-analysis; nothing is re-parsed.
+    const rg = opts && opts.range;
+    if (rg && Number.isInteger(rg.startIndex) && Number.isInteger(rg.endIndex) && rg.endIndex >= rg.startIndex) {
+      const a = Math.max(0, rg.startIndex), b = rg.endIndex + 1;
+      series.time = series.time.slice(a, b); series.yawRate = series.yawRate.slice(a, b);
+      series.steer = series.steer.slice(a, b); series.speed = series.speed.slice(a, b);
+      series.lateralAccel = series.lateralAccel.slice(a, b);
+    }
+    const out = Yaw.computeObservedYawResponse(series, opts || {});
+    return Object.assign({}, out, { channels: channels });
+  }
+
+  const api = { VEHICLE_PROFILES, profileContext, newSession, applyMappingEdit, setProfile, toCoreDefinitions, buildImportSummary, buildMappingRows, buildPreflightSummary, buildCapabilityRows, buildCurveData, buildLaneReaders, buildYawResponseData };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.TelemetryView = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

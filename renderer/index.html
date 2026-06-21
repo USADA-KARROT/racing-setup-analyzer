@@ -2472,6 +2472,104 @@ canvas{max-height:300px}
       </table>
     </div>
   </div>
+
+  <div class="card p-5" x-show="telem.imported && telemYawAvailable()">
+    <div class="section-title text-sm" x-text="t('ui.telem.yaw.title')"></div>
+    <div class="text-[11px] text-slate-500 mb-2" x-text="t('ui.telem.yaw.subtitle')"></div>
+    <div class="flex items-center flex-wrap gap-1.5 text-xs mb-3">
+      <span class="text-slate-400" x-text="t('ui.telem.yaw.strictness')+':'"></span>
+      <template x-for="sv in ['loose','normal','strict']" :key="sv">
+        <button type="button" @click="telemSetStrictness(sv)"
+          class="px-2 py-0.5 rounded border border-slate-700"
+          :class="telem.yawStrictness===sv?'bg-sky-600 text-white border-sky-500':'bg-slate-800 text-slate-300 hover:bg-slate-700'"
+          x-text="t('ui.telem.yaw.strict.'+sv)"></button>
+      </template>
+    </div>
+    <template x-if="!(telem.yawData && telem.yawData.available)">
+      <div class="text-xs text-amber-400 mb-2" x-text="t('ui.telem.yaw.na')+' — '+t('ui.telem.yaw.reason.'+((telem.yawData&&telem.yawData.reason)||'unavailable'))"></div>
+    </template>
+    <template x-if="telem.yawData && telem.yawData.available">
+      <div class="text-xs space-y-1 mb-3">
+        <div class="flex flex-wrap gap-x-3 text-slate-300">
+          <span><span class="text-slate-500" x-text="t('ui.telem.yaw.samples')+':'"></span>
+            <span x-text="t('ui.telem.yaw.total')+' '+telem.yawData.sampleCounts.total"></span> ·
+            <span x-text="t('ui.telem.yaw.valid')+' '+telem.yawData.sampleCounts.valid"></span> ·
+            <span x-text="t('ui.telem.yaw.steady')+' '+telem.yawData.sampleCounts.steadyState"></span></span>
+          <span><span class="text-slate-500" x-text="t('ui.telem.yaw.passRate')+':'"></span>
+            <span x-text="telemYawPassRate()"></span></span>
+        </div>
+        <div class="text-slate-400">
+          <span class="text-slate-500" x-text="t('ui.telem.yaw.excluded')+':'"></span>
+          <span x-text="t('ui.telem.yaw.ex.invalid')+' '+telem.yawData.sampleCounts.excluded.invalid"></span> ·
+          <span x-text="t('ui.telem.yaw.ex.lowSpeed')+' '+telem.yawData.sampleCounts.excluded.lowSpeed"></span> ·
+          <span x-text="t('ui.telem.yaw.ex.lowActivity')+' '+telem.yawData.sampleCounts.excluded.lowActivity"></span> ·
+          <span x-text="t('ui.telem.yaw.ex.unsteadySteering')+' '+telem.yawData.sampleCounts.excluded.unsteadySteering"></span> ·
+          <span x-text="t('ui.telem.yaw.ex.unsteadySpeed')+' '+telem.yawData.sampleCounts.excluded.unsteadySpeed"></span> ·
+          <span x-text="t('ui.telem.yaw.ex.shortSegment')+' '+telem.yawData.sampleCounts.excluded.shortSegment"></span>
+        </div>
+        <div class="text-slate-400">
+          <span class="text-slate-500" x-text="t('ui.telem.yaw.filters')+':'"></span>
+          <span x-text="t('ui.telem.yaw.th.lateralActivity')+' '+telemFmt(telem.yawData.thresholds.lateralActivity)"></span> ·
+          <span x-text="t('ui.telem.yaw.th.steeringRateMax')+' '+telemFmt(telem.yawData.thresholds.steeringRateMax)"></span> ·
+          <span x-text="t('ui.telem.yaw.th.speedRateMax')+' '+telemFmt(telem.yawData.thresholds.speedRateMax)"></span> ·
+          <span x-text="t('ui.telem.yaw.th.speedFloor')+' '+telemFmt(telem.yawData.thresholds.speedFloor)"></span>
+        </div>
+        <div class="text-slate-300">
+          <span class="text-slate-500" x-text="t('ui.telem.yaw.dispersion')+':'"></span>
+          <span class="text-slate-600" x-text="' · '+t('ui.telem.yaw.dir.neutral')+' '+telem.yawData.dispersion.neutralCount+' · '+t('ui.telem.yaw.th.minAbsSteer')+' '+telemFmt(telem.yawData.thresholds.minAbsSteer)"></span>
+        </div>
+        <div class="text-slate-300 pl-3">
+          <span class="text-slate-500" x-text="t('ui.telem.yaw.dir.combined')+':'"></span>
+          <span x-text="t('ui.telem.yaw.median')+' '+telemFmt(telem.yawData.dispersion.combined.yawPerSteerStats.median)"></span> ·
+          <span x-text="t('ui.telem.yaw.iqr')+' '+telemFmt(telem.yawData.dispersion.combined.yawPerSteerStats.iqr)"></span> ·
+          <span x-text="t('ui.telem.yaw.mad')+' '+telemFmt(telem.yawData.dispersion.combined.yawPerSteerStats.mad)"></span> ·
+          <span x-text="t('ui.telem.yaw.cv')+' '+telemYawCv(telem.yawData.dispersion.combined.yawPerSteerStats.cv)"></span> ·
+          <span x-text="t('ui.telem.yaw.n')+' '+telem.yawData.dispersion.combined.count"></span>
+        </div>
+        <template x-for="side in ['positive','negative']" :key="side">
+          <div class="pl-3" :class="telem.yawData.dispersion[side].available?'text-slate-400':'text-slate-600'">
+            <span class="text-slate-500" x-text="t('ui.telem.yaw.dir.'+side)+':'"></span>
+            <template x-if="telem.yawData.dispersion[side].available">
+              <span><span x-text="t('ui.telem.yaw.bin.medYaw')+' '+telemFmt(telem.yawData.dispersion[side].medianYawRate)"></span> · <span x-text="t('ui.telem.yaw.bin.medSteer')+' '+telemFmt(telem.yawData.dispersion[side].medianSteer)"></span> · <span x-text="t('ui.telem.yaw.bin.medRatio')+' '+telemFmt(telem.yawData.dispersion[side].yawPerSteerStats.median)"></span> · <span x-text="t('ui.telem.yaw.n')+' '+telem.yawData.dispersion[side].count"></span></span>
+            </template>
+            <template x-if="!telem.yawData.dispersion[side].available">
+              <span x-text="t('ui.telem.yaw.dir.fewSide')+' ('+telem.yawData.dispersion[side].count+')'"></span>
+            </template>
+          </div>
+        </template>
+        <div class="text-[11px] text-slate-600" x-text="t('ui.telem.yaw.dirNote')"></div>
+      </div>
+    </template>
+    <template x-if="telem.yawData && telem.yawData.available && telem.yawData.speedBins.length">
+      <table class="w-full text-xs mb-3">
+        <thead><tr class="text-slate-500 text-left">
+          <th class="font-normal pr-2" x-text="t('ui.telem.yaw.bin.speed')"></th>
+          <th class="font-normal pr-2" x-text="t('ui.telem.yaw.bin.dir')"></th>
+          <th class="font-normal pr-2 text-right" x-text="t('ui.telem.yaw.bin.medYaw')"></th>
+          <th class="font-normal pr-2 text-right" x-text="t('ui.telem.yaw.bin.medSteer')"></th>
+          <th class="font-normal pr-2 text-right" x-text="t('ui.telem.yaw.bin.medRatio')"></th>
+          <th class="font-normal text-right" x-text="t('ui.telem.yaw.n')"></th>
+        </tr></thead>
+        <tbody>
+          <template x-for="row in telemYawBinRows()" :key="row.key">
+            <tr :class="row.cls">
+              <td class="pr-2 font-mono" x-text="row.speed"></td>
+              <td class="pr-2" x-text="row.dir"></td>
+              <td class="pr-2 text-right font-mono" x-text="row.medYaw"></td>
+              <td class="pr-2 text-right font-mono" x-text="row.medSteer"></td>
+              <td class="pr-2 text-right font-mono" x-text="row.medRatio"></td>
+              <td class="text-right font-mono text-slate-400" x-text="row.n"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </template>
+    <div style="overflow-x:auto; width:100%"
+      x-effect="currentTab; telem.imported; telem.yawData; telem.yawStrictness; $nextTick(()=>{ if(currentTab==='telemetry' && telem.imported && telemYawAvailable()) telemYawDraw(); })">
+      <canvas x-ref="telemYawCanvas" style="display:block"></canvas>
+    </div>
+    <div class="text-[11px] text-slate-600 mt-1" x-text="t('ui.telem.yaw.scatter')+' · '+t('ui.telem.yaw.note')"></div>
+  </div>
 </div>
 
 </main>
@@ -2494,6 +2592,7 @@ canvas{max-height:300px}
 <script src="js/bms-parser.js"></script>
 <script src="js/telemetry-schema.js"></script>
 <script src="js/telemetry-core.js"></script>
+<script src="js/telemetry-yaw.js"></script>
 <script src="js/telemetry-view.js"></script>
 <script src="js/telemetry-plot.js"></script>
 <script src="js/telemetry-interact.js"></script>
@@ -2642,8 +2741,9 @@ function app(){return{
   },
   // ── Telemetry CSV Evidence viewer (V1 Step 2B): THIN wiring. All parsing/grading/preflight logic
   //    lives in TelemetryCore/TelemetryView; the heavy session sits in `telemetryDataHolder` (non-reactive).
-  //    Only these small view-models are reactive. (no curves / no yaw metrics / no model overlay here)
-  telem:{ imported:false, error:null, profileId:'custom', importSummary:null, mappingRows:[], preflight:null, capabilities:[], plotChannels:[], plotUseCanonical:true, readout:null, summary:null, cursorPinned:false },
+  //    Only these small view-models are reactive. (curves V1 + observed yaw-response scatter V2 are wired;
+  //    still NO model overlay / NO K_us here — descriptive only.)
+  telem:{ imported:false, error:null, profileId:'custom', importSummary:null, mappingRows:[], preflight:null, capabilities:[], plotChannels:[], plotUseCanonical:true, readout:null, summary:null, cursorPinned:false, yawData:null, yawStrictness:'normal' },
   telemProfiles(){ return (typeof TelemetryView!=='undefined') ? Object.values(TelemetryView.VEHICLE_PROFILES).map(p=>({id:p.id,label:p.label,labelKey:p.labelKey})) : []; },
   telemCanonOptions(){ return (typeof TelemetryCore!=='undefined') ? [''].concat(Object.keys(TelemetryCore.CHANNEL_PATTERNS)) : []; },
   importCSV(e){
@@ -2670,7 +2770,8 @@ function app(){return{
     this.telem.importSummary=TelemetryView.buildImportSummary(s);
     this.telem.mappingRows =TelemetryView.buildMappingRows(s);
     this.telem.preflight   =TelemetryView.buildPreflightSummary(s);
-    this.telem.capabilities=TelemetryView.buildCapabilityRows(s); },
+    this.telem.capabilities=TelemetryView.buildCapabilityRows(s);
+    this.telemYawRefresh(); },
   telemEdit(columnId, field, value){ const s=telemetryDataHolder.session; if(!s) return;
     const edit={}; edit[field]=(field==='sign'||field==='offset')?Number(value):(field==='confirmed'?!!value:(value===''?null:value));
     telemetryDataHolder.session=TelemetryView.applyMappingEdit(s, columnId, edit); this.telemRefresh(); },
@@ -2678,9 +2779,11 @@ function app(){return{
     if(s){ telemetryDataHolder.session=TelemetryView.setProfile(s, id); this.telemRefresh(); } },
   telemUnload(){ telemetryDataHolder.importToken++; telemetryDataHolder.session=null; // cancel in-flight read + release
     if(telemetryDataHolder.ro){ telemetryDataHolder.ro.disconnect(); telemetryDataHolder.ro=null; } telemetryDataHolder.lastW=null;
+    if(telemetryDataHolder.yawRo){ telemetryDataHolder.yawRo.disconnect(); telemetryDataHolder.yawRo=null; } telemetryDataHolder.yawLastW=null;
     Object.assign(telemetryDataHolder, { layout:null, timeValues:null, timeIndex:null, laneReaders:null, cursorTime:null, selection:null, dragging:false, dragStartPx:null, dragCurrPx:null, pointerInside:false });
     const cv=this.$refs.telemCanvas; if(cv){ const c=cv.getContext('2d'); if(c) c.clearRect(0,0,cv.width,cv.height); cv.width=0; cv.height=0; cv.style.width=''; cv.style.height=''; }
-    this.telem={ imported:false, error:null, profileId:'custom', importSummary:null, mappingRows:[], preflight:null, capabilities:[], plotChannels:[], plotUseCanonical:true, readout:null, summary:null, cursorPinned:false }; },
+    const yv=this.$refs.telemYawCanvas; if(yv){ const yc=yv.getContext('2d'); if(yc) yc.clearRect(0,0,yv.width,yv.height); yv.width=0; yv.height=0; yv.style.width=''; yv.style.height=''; }
+    this.telem={ imported:false, error:null, profileId:'custom', importSummary:null, mappingRows:[], preflight:null, capabilities:[], plotChannels:[], plotUseCanonical:true, readout:null, summary:null, cursorPinned:false, yawData:null, yawStrictness:'normal' }; },
   telemTogglePlot(id){ const a=this.telem.plotChannels; const i=a.indexOf(id); if(i>=0) a.splice(i,1); else a.push(id); },
   telemToggleCanonical(v){ this.telem.plotUseCanonical=!!v; },
   // Multi-channel canvas plot (V1 Step 3). Pure geometry in TelemetryPlot.plotLayout +
@@ -2767,7 +2870,7 @@ function app(){return{
     const ti=telemetryDataHolder.timeIndex;
     if(ti && !ti.usable){ this.telemScheduleRedraw(); return; } // unusable timebase (reset) → no range-select (fail closed)
     const sel=TelemetryInteract.selectionFromPixels(a, b, layout, ti);
-    telemetryDataHolder.selection=sel; this.telemBuildSummary(sel); this.telemScheduleRedraw(); },
+    telemetryDataHolder.selection=sel; this.telemBuildSummary(sel); this.telemScheduleRedraw(); this.telemYawRefresh(); },
   telemBuildSummary(sel){ const lr=telemetryDataHolder.laneReaders, L=telemetryDataHolder.layout;
     if(!sel || !lr){ this.telem.summary=null; return; }
     const sum=TelemetryInteract.summarizeSelection(sel.startIndex, sel.endIndex, lr);
@@ -2775,7 +2878,45 @@ function app(){return{
     this.telem.summary={ startTime:sel.startTime, endTime:sel.endTime, duration:dur, rowCount:sum.rowCount,
       xKind:(L&&L.x)?L.x.kind:'index', xUnit:(L&&L.x)?L.x.unit:'',
       lanes:sum.lanes.map(l=>({rawName:l.rawName, canonicalName:l.canonicalName, unit:l.unit, count:l.count, min:l.min, max:l.max, mean:l.mean })) }; },
-  telemClearSelection(){ telemetryDataHolder.selection=null; this.telem.summary=null; this.telemScheduleRedraw(); },
+  telemClearSelection(){ telemetryDataHolder.selection=null; this.telem.summary=null; this.telemScheduleRedraw(); this.telemYawRefresh(); },
+  // ── V2 Observed Yaw-Response wiring (scatter). Pure re-analysis of the already-parsed session at the
+  //    current strictness + selection scope; NEVER re-parses CSV or re-maps channels. Fail-closed via the
+  //    observedYawResponse capability (panel hidden unless the 4 required channels are present). ──
+  telemYawAvailable(){ const c=(this.telem.capabilities||[]).find(x=>x.key==='observedYawResponse'); return !!(c && c.available); },
+  telemYawPassRate(){ const c=this.telem.yawData && this.telem.yawData.sampleCounts; if(!c || !c.total) return '—'; return Math.round(100*c.steadyState/c.total)+'%'; },
+  telemYawCv(cv){ if(!cv) return '—'; return cv.value!=null ? this.telemFmt(cv.value) : this.t('ui.telem.yaw.cv.'+cv.reason); },
+  // flatten speed bins → per-direction display rows (combined / positive / negative / neutral)
+  telemYawBinRows(){ const bins=(this.telem.yawData && this.telem.yawData.speedBins)||[]; const rows=[]; const self=this; const f=v=>self.telemFmt(v);
+    for(let i=0;i<bins.length;i++){ const b=bins[i]; const sp=f(b.speedStart)+'–'+f(b.speedEnd);
+      rows.push({ key:i+':c', speed:sp, dir:self.t('ui.telem.yaw.dir.combined'), medYaw:'', medSteer:'', medRatio:f(b.combined.yawPerSteerStats.median), n:b.combined.count, cls:'text-slate-200' });
+      if(b.positive.available) rows.push({ key:i+':p', speed:'', dir:self.t('ui.telem.yaw.dir.positive'), medYaw:f(b.positive.medianYawRate), medSteer:f(b.positive.medianSteer), medRatio:f(b.positive.yawPerSteerStats.median), n:b.positive.count, cls:'text-slate-400' });
+      if(b.negative.available) rows.push({ key:i+':n', speed:'', dir:self.t('ui.telem.yaw.dir.negative'), medYaw:f(b.negative.medianYawRate), medSteer:f(b.negative.medianSteer), medRatio:f(b.negative.yawPerSteerStats.median), n:b.negative.count, cls:'text-slate-400' });
+      if(b.neutralCount>0) rows.push({ key:i+':x', speed:'', dir:self.t('ui.telem.yaw.dir.neutral'), medYaw:'', medSteer:'', medRatio:'', n:b.neutralCount, cls:'text-slate-600' });
+    }
+    return rows; },
+  telemYawRefresh(){ const s=telemetryDataHolder.session;
+    if(!s || typeof TelemetryView==='undefined'){ this.telem.yawData=null; return; }
+    const sel=telemetryDataHolder.selection;
+    const range=(sel && Number.isInteger(sel.startIndex) && Number.isInteger(sel.endIndex)) ? { startIndex:sel.startIndex, endIndex:sel.endIndex } : null;
+    this.telem.yawData=TelemetryView.buildYawResponseData(s, { strictness:this.telem.yawStrictness, range:range });
+    const self=this; this.$nextTick(()=>{ if(self.currentTab==='telemetry' && self.telem.imported && self.telemYawAvailable()) self.telemYawDraw(); }); },
+  telemSetStrictness(v){ if(!['loose','normal','strict'].includes(v)) return; this.telem.yawStrictness=v; this.telemYawRefresh(); },
+  telemYawDraw(){ const cv=this.$refs.telemYawCanvas; if(!cv || typeof TelemetryPlot==='undefined') return;
+    const host=cv.parentElement; const cssW=Math.max(240,(host && host.clientWidth)||cv.clientWidth||640); const cssH=300;
+    const dpr=window.devicePixelRatio || 1;
+    cv.style.width=cssW+'px'; cv.style.height=cssH+'px'; cv.style.maxWidth='none'; cv.style.maxHeight='none';
+    const layout=TelemetryPlot.scatterLayout({ cssW, cssH, dpr }, this.telem.yawData || { available:false, reason:'unavailable', scatter:[] });
+    cv.width=layout.backing.w; cv.height=layout.backing.h;
+    const ctx=cv.getContext('2d'); if(!ctx) return;
+    TelemetryPlot.drawScatter(ctx, layout);
+    if(!telemetryDataHolder.yawRo && typeof ResizeObserver!=='undefined' && host){
+      let raf=0; const self=this;
+      telemetryDataHolder.yawRo=new ResizeObserver(()=>{ if(raf) return;
+        raf=requestAnimationFrame(()=>{ raf=0; const w=Math.max(240,(host && host.clientWidth)||640);
+          if(w!==telemetryDataHolder.yawLastW && self.telem.imported && self.currentTab==='telemetry' && self.telemYawAvailable()) self.telemYawDraw(); }); });
+      telemetryDataHolder.yawRo.observe(host);
+    }
+    telemetryDataHolder.yawLastW=cssW; },
   telemFmt(v){ if(v==null) return '—'; const a=Math.abs(v); if(a!==0&&(a<0.01||a>=100000)) return v.toExponential(1); return (Math.round(v*1000)/1000).toString(); },
   telemGradeClass(g){ return g==='definition_confirmed'?'text-emerald-400':(g==='provisional'?'text-amber-400':(g==='blocked'?'text-red-400':'text-slate-500')); },
   telemGradeText(g){ return this.t('ui.telem.grade.'+(g||'unknown')); }, // grade/status machine value → localized label
