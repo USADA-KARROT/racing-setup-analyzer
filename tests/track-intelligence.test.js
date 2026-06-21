@@ -138,5 +138,21 @@ function sessionFrom(csv, confirmFn) {
   const ti = TI.deriveTrackIntelligence(sess, obs, {}, {});
   chk('blocked result carries framing limitation', ti.eligible===false && ti.limitations.indexOf('driver_behaviour_not_a_corner_or_setup_finding') !== -1 && ti.limitations.indexOf('raw_steering_input_not_road_wheel_angle') !== -1);
 })();
+// CP3 fix: MAX_CORNERS is a HARD universal cap — opts cannot raise it above 64
+(() => {
+  // build a canonical session with ~70 corners directly (corner=10 hi-lat samples + 6 lo-lat straight)
+  const me = ['time','speed','yaw_rate','steering','lateral_accel','track_position','lap'].map((c,i)=>({rawColumnId:i,canonicalChannel:c,userConfirmed:true,projection:{scale:1,offset:0,sign:1}}));
+  const time=[],speed=[],yaw=[],steer=[],latv=[],tp=[],lapv=[]; let t=0,dist=0;
+  for (let k=0;k<70;k++){
+    for (let i=0;i<6;i++){ time.push(t); speed.push(30); yaw.push(0.001); steer.push(0.002); latv.push(0.05); tp.push(dist); lapv.push(1); dist+=1.5; t+=0.05; }
+    const st=(k%2?-0.05:0.05);
+    for (let i=0;i<10;i++){ time.push(t); speed.push(30); yaw.push(0.27*st); steer.push(st); latv.push(8); tp.push(dist); lapv.push(1); dist+=1.5; t+=0.05; }
+  }
+  const sess={kind:'canonical_telemetry_session',mappingEntries:me,channels:{time:{values:time},speed:{values:speed},yaw_rate:{values:yaw},steering:{values:steer},lateral_accel:{values:latv},track_position:{values:tp},lap:{values:lapv}},time:time,dataProvenance:'synthetic'};
+  const tiRaise = TI.deriveTrackIntelligence(sess,{valid:true},{},{ MAX_CORNERS: 100 });
+  chk('opts.MAX_CORNERS=100 still capped at 64', tiRaise.eligible===true && tiRaise.corners.length === 64, tiRaise.corners.length);
+  const tiLower = TI.deriveTrackIntelligence(sess,{valid:true},{},{ MAX_CORNERS: 3 });
+  chk('opts.MAX_CORNERS=3 lowers the cap', tiLower.corners.length <= 3 && tiLower.corners.length >= 1, tiLower.corners.length);
+})();
 console.log(`track-intelligence: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
