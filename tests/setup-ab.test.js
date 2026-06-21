@@ -67,7 +67,8 @@ const withParam = (key, mul) => { const c = baseCase(); const p = c.modelSnapsho
   chk('A/B model versions match (same case)', r.modelVersions && r.modelVersions.match === true);
   const b = baseCase(); b.modelSnapshot.modelVersion = 'vX.test';
   const r2 = AB.compareSetups(baseCase(), b, { modelRunner: runner });
-  chk('A/B flags model-version mismatch', r2.modelVersions.match === false && r2.plausibilityWarnings.some(w => w.type === 'model_version_mismatch'), r2.plausibilityWarnings);
+  chk('A/B flags model-version mismatch (via modelVersions)', r2.modelVersions.match === false);
+  chk('plausibilityWarnings stays homogeneous (parameter-range only, no version entries)', r2.plausibilityWarnings.every(w => w.parameter !== undefined && w.range !== undefined && w.type === undefined));
 })();
 console.log(`setup-ab: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
