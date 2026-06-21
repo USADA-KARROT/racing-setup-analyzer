@@ -51,7 +51,7 @@
       if (!Array.isArray(value)) { errors.push('not_array:' + pathStr); return []; }
       var cap = schema.max != null ? schema.max : MAX_ARRAY;
       if (value.length > cap) { errors.push('array_too_long:' + pathStr); return []; }
-      return value.map(function (x, i) { return _val(x, schema.arr, pathStr + '[' + i + ']', errors, depth + 1); });
+      var aout = []; for (var ai = 0; ai < value.length; ai++) { aout.push(_val(value[ai], schema.arr, pathStr + '[' + ai + ']', errors, depth + 1)); } return aout; // dense (sparse holes → validated null)
     }
     if (schema && schema.boolMap) {
       if (value == null) return {};
@@ -76,7 +76,7 @@
 
   // ── section schemas ──
   var DETAIL = 'scalar'; // blocker detail kept scalar (string/null); structured details summarize to a string upstream
-  var BLOCKER = { obj: { code: 'scalar', scope: 'scalar', severity: 'scalar', detail: { arr: 'scalar' }, parameterKey: 'scalar', sourceRef: 'scalar', layer: 'scalar' } };
+  var BLOCKER = { obj: { code: 'scalar', scope: 'scalar', severity: 'scalar', detail: { arr: 'string' }, parameterKey: 'scalar', sourceRef: 'scalar', layer: 'scalar' } };
   var MAPPING_ENTRY = { obj: { rawColumnId: 'number', rawName: 'string', canonicalChannel: 'string', userConfirmed: 'boolean', projection: { obj: { scale: 'number', offset: 'number', sign: 'number' }, req: ['scale', 'offset', 'sign'] }, rawUnit: 'scalar', canonicalUnit: 'scalar' }, req: ['rawColumnId', 'rawName', 'canonicalChannel', 'projection'] };
   var CALIB_ENTRY = { obj: { calibrationType: 'string', value: 'scalar', unit: 'scalar', source: 'string', confidence: 'string', verified: 'boolean', applicableSessionIds: { arr: 'string' }, createdAt: 'string' }, req: ['calibrationType', 'source', 'confidence', 'verified', 'createdAt'] };
   var BUNDLE_SCHEMA = { obj: {
@@ -85,7 +85,7 @@
     case: { obj: { caseId: 'scalar', schemaVersion: 'scalar', modelId: 'scalar', modelVersion: 'scalar', calibrationVersion: 'scalar', canonicalContractVersion: 'scalar', vehicleProfileId: 'scalar', telemetrySessionId: 'scalar', modelInputEligible: 'boolean', title: 'scalar', createdAt: 'scalar' } },
     mapping: { obj: { entries: { arr: MAPPING_ENTRY } } },
     calibration: { obj: { entries: { arr: CALIB_ENTRY } } },
-    window: { obj: { startTime: 'scalar', endTime: 'scalar', valid: 'boolean', sampleCount: 'scalar', steadyStateCount: 'scalar', duration: 'scalar', speedRange: { arr: 'number', max: 4 }, lateralAccelRange: { arr: 'number', max: 4 }, steeringSign: 'scalar', quality: 'scalar', rejectionReasons: { arr: 'scalar' } } },
+    window: { obj: { startTime: 'scalar', endTime: 'scalar', valid: 'boolean', sampleCount: 'scalar', steadyStateCount: 'scalar', duration: 'scalar', speedRange: { arr: 'number', max: 4 }, lateralAccelRange: { arr: 'number', max: 4 }, steeringSign: 'scalar', quality: 'scalar', rejectionReasons: { arr: 'string' } } },
     observation: { obj: { valid: 'boolean', observedTendency: 'scalar', confidence: 'scalar', method: 'scalar', metric: 'scalar', limitations: { arr: 'string' }, confounders: { arr: 'string' }, credibility: 'scalar', blockedReasons: { arr: BLOCKER } } },
     comparison: { obj: { valid: 'boolean', predictedTendency: 'scalar', observedTendency: 'scalar', differenceClass: 'scalar', confidence: 'scalar', assumptions: { arr: 'string' }, modelTelemetryComparisonEligible: 'boolean', credibility: 'scalar', blockedReasons: { arr: BLOCKER } } },
     raceEngineer: { obj: { eligible: { obj: { inspection: 'boolean', directional: 'boolean', quantitative: 'boolean' } }, summary: 'scalar', likelySubsystems: { arr: 'string' }, inspectionPriorities: { arr: 'string' }, setupDirections: { arr: 'string' }, trialOrder: { arr: 'string' }, missingEvidence: { arr: 'string' }, confidence: 'scalar', credibility: 'scalar' } },
