@@ -122,7 +122,7 @@
       var sideEffects = OTHER_METRICS.filter(function (m) { return m !== target.metric; }).map(function (m) {
         var d = (_isFiniteNum(after.snapshot[m]) && _isFiniteNum(base.snapshot[m])) ? (after.snapshot[m] - base.snapshot[m]) : null;
         return { metric: m, delta: d };
-      }).filter(function (s) { return s.delta != null; }); // report ALL tracked metrics (incl unchanged = 0), drop only unavailable
+      }).filter(function (s) { return s.delta != null; }); // report ALL OTHER tracked metrics (incl unchanged = 0; the TARGET metric is the primary result via baselineMetric/predictedMetricAfter/residual), drop only unavailable
 
       var limitations = LIMITATIONS.slice();
       limitations.push('hypothetical_model_override_not_provenance_validated'); // the recommended value is a model what-if, not a provenance-validated canonical input
