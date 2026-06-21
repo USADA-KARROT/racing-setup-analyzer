@@ -46,5 +46,20 @@ chk('stores last case', /_lastCase:/.test(html));
   chk('no inline physics in handler', !/Math\.(sqrt|pow)\(|understeer_gradient\s*=/.test(region));
 })();
 
+// CP1 fix: Setup A/B UI present + service-driven
+chk('setup A/B section present', /F4 · Setup A\/B/.test(html));
+chk('A/B parameter select bound', /x-model="abParameter"/.test(html));
+chk('A/B change % bound', /x-model="abChangePct"/.test(html));
+chk('A/B compare button', /@click="runSetupAbCompare\(\)"/.test(html));
+chk('A/B reads directionalSummary', /abResult\.directionalSummary/.test(html));
+chk('A/B reads deltas', /abResult\.deltas\.understeer_gradient/.test(html));
+chk('A/B no lap-time note', /not a lap-time claim/.test(html));
+chk('A/B method calls compareSetups', /SetupAB\.compareSetups/.test(html));
+chk('A/B method present', /runSetupAbCompare\(\)\{/.test(html));
+chk('A/B state', /abResult:/.test(html));
+// CP1 fix: leverType surfaced (ballast vs suspension)
+chk('quantitative shows leverType', /quantitativeRecommendation\.leverType/.test(html));
+chk('ballast lever flagged materially different', /ballast\/weight move/.test(html));
+
 console.log(`r2.5-ui: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
