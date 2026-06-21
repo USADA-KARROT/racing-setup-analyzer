@@ -145,6 +145,22 @@
     };
   }
 
+  // R2.6 Track Intelligence / Corner Coaching section — per-corner driver-behaviour cards (Heuristic) or block reason.
+  function _phaseVm(p) { if (!p) return null; return p.sufficient ? { sufficient: true, qualitative: p.qualitative, reversalRatePerS: p.reversalRatePerS, abruptnessP95: p.abruptnessP95, confidence: p.confidence } : { sufficient: false, reason: p.reason || 'insufficient_samples', samples: p.samples }; }
+  function _trackIntelligence(ti) {
+    if (!ti) return { available: false, eligible: false, credibility: 'Unavailable', corners: [], blockedReasons: [] };
+    return {
+      available: ti.eligible === true,
+      eligible: ti.eligible === true,
+      trackPositionConfirmed: !!ti.trackPositionConfirmed, lapSegmentationConfirmed: !!ti.lapSegmentationConfirmed,
+      lapCount: ti.lapCount,
+      corners: (ti.corners || []).map(function (c) { return { cornerId: c.cornerId, lapId: c.lapId, samples: c.samples, summary: c.summary, confidence: c.confidence, trackPosRange: c.trackPosRange, timeRange: c.timeRange, entry: _phaseVm(c.entry), mid: _phaseVm(c.mid), exit: _phaseVm(c.exit) }; }),
+      segmentationBasis: ti.segmentationBasis, dataProvenance: ti.dataProvenance,
+      limitations: ti.limitations || [], cannotConclude: ti.cannotConclude || [], blockedReasons: ti.blockedReasons || [],
+      credibility: ti.credibility,
+    };
+  }
+
   function _raceEngineer(re) {
     if (!re) return { available: false };
     return {
@@ -215,6 +231,9 @@
         { key: 'driverCoachingEligible', available: !!cap.driverCoachingEligible },
         { key: 'quantitativeSetupRecommendationEligible', available: !!cap.quantitativeSetupRecommendationEligible },
         { key: 'setupAbEligible', available: !!cap.setupAbEligible },
+        { key: 'trackPositionConfirmed', available: !!cap.trackPositionConfirmed },
+        { key: 'lapSegmentationConfirmed', available: !!cap.lapSegmentationConfirmed },
+        { key: 'cornerCoachingEligible', available: !!cap.cornerCoachingEligible },
       ],
       setupInputs: _setupInputs(analysisCase, opts.suspensionNormalizationView),
       modelPrediction: _modelPrediction(workspaceResult.execution),
@@ -222,6 +241,7 @@
       modelVsActual: _modelVsActual(workspaceResult.comparison),
       measuredMetrics: _measuredMetrics(workspaceResult.comparison, workspaceResult.observation),
       quantitativeRecommendation: _quantitativeRecommendation(workspaceResult.quantitativeRecommendation),
+      trackIntelligence: _trackIntelligence(workspaceResult.trackIntelligence),
       raceEngineer: _raceEngineer(workspaceResult.raceEngineer),
       driverCoach: _driverCoach(workspaceResult.driverCoach),
       evidenceDrawer: _evidenceDrawer(workspaceResult, analysisCase),

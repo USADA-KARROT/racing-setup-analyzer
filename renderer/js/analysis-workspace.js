@@ -24,10 +24,11 @@
   var RE = _req('./race-engineer-insight.js', typeof RaceEngineerInsight !== 'undefined' ? RaceEngineerInsight : undefined);
   var DC = _req('./driver-coach-insight.js', typeof DriverCoachInsight !== 'undefined' ? DriverCoachInsight : undefined);
   var QR = _req('./quantitative-setup-recommendation.js', typeof QuantitativeSetupRecommendation !== 'undefined' ? QuantitativeSetupRecommendation : undefined);
+  var TI = _req('./track-intelligence.js', typeof TrackIntelligence !== 'undefined' ? TrackIntelligence : undefined);
   if (!AX || !OBS || !CMP || !RE || !DC) throw new Error('analysis-workspace.js requires execution + observation + comparison + engineer + coach modules');
 
   // pure aggregation: read the five results, derive the workspace capability matrix (no mutation, no recompute).
-  function deriveWorkspaceCapability(execution, observation, comparison, raceEngineer, driverCoach, quantitativeLeverAvailable) {
+  function deriveWorkspaceCapability(execution, observation, comparison, raceEngineer, driverCoach, quantitativeLeverAvailable, trackIntelligence) {
     var exCap = (execution && execution.capabilityState) || {};
     var telemetryInspectable = !!(observation && observation.channels && observation.channels.speed && observation.channels.speed.available && observation.channels.steering && observation.channels.steering.available);
     return {
@@ -44,6 +45,9 @@
       setupAbEligible: exCap.modelRan === true, // R2.5: a what-if A/B comparison can run on the model
       quantitativeSetupRecommendationEligible: quantitativeLeverAvailable === true, // R2.5: TRUE only when >=1 non-degenerate balance lever exists (probed via QR.hasQuantitativeLever in runAnalysisWorkspace); per-request still fail-closes; hardware clicks always gated
       driverCoachingEligible: !!(driverCoach && driverCoach.eligible === true),
+      trackPositionConfirmed: !!(trackIntelligence && trackIntelligence.trackPositionConfirmed === true), // R2.6 (re-derived, not the observation presence flag)
+      lapSegmentationConfirmed: !!(trackIntelligence && trackIntelligence.lapSegmentationConfirmed === true),
+      cornerCoachingEligible: !!(trackIntelligence && trackIntelligence.eligible === true),
     };
   }
 
@@ -74,7 +78,9 @@
     var quantitativeLeverAvailable = (QR && execution && execution.valid === true)
       ? (QR.hasQuantitativeLever(analysisCase, 'roll_stiffness_dist_front', opts.modelRunner, opts) || QR.hasQuantitativeLever(analysisCase, 'understeer_gradient', opts.modelRunner, opts) || QR.hasQuantitativeLever(analysisCase, 'total_roll_stiffness', opts.modelRunner, opts))
       : false;
-    var capability = deriveWorkspaceCapability(execution, observation, comparison, raceEngineer, driverCoach, quantitativeLeverAvailable);
+    // R2.6: track intelligence + per-corner driver coaching (re-derives confirmed-channel eligibility itself)
+    var trackIntelligence = TI ? TI.deriveTrackIntelligence(telemetrySession, observation, caseContext, opts.trackIntelligence || {}) : null;
+    var capability = deriveWorkspaceCapability(execution, observation, comparison, raceEngineer, driverCoach, quantitativeLeverAvailable, trackIntelligence);
     return {
       caseContext: caseContext,
       execution: execution,
@@ -83,6 +89,7 @@
       raceEngineer: raceEngineer,
       driverCoach: driverCoach,
       quantitativeRecommendation: quantitativeRecommendation,
+      trackIntelligence: trackIntelligence,
       capability: capability,
     };
   }

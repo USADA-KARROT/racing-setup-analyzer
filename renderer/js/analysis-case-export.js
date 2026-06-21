@@ -81,6 +81,9 @@
   var BLOCKER = { obj: { code: 'scalar', scope: 'scalar', severity: 'scalar', detail: { arr: 'string' }, parameterKey: 'scalar', sourceRef: 'scalar', layer: 'scalar' } };
   var MAPPING_ENTRY = { obj: { rawColumnId: 'number', rawName: 'string', canonicalChannel: 'string', userConfirmed: 'boolean', projection: { obj: { scale: 'number', offset: 'number', sign: 'number' }, req: ['scale', 'offset', 'sign'] }, rawUnit: 'scalar', canonicalUnit: 'scalar' }, req: ['rawColumnId', 'rawName', 'canonicalChannel', 'projection'] };
   var CALIB_ENTRY = { obj: { calibrationType: 'string', value: 'scalar', unit: 'scalar', source: 'string', confidence: 'string', verified: 'boolean', applicableSessionIds: { arr: 'string' }, createdAt: 'string' }, req: ['calibrationType', 'source', 'confidence', 'verified', 'createdAt'] };
+  var TI_PHASE = { obj: { sufficient: 'boolean', qualitative: 'scalar', reversalRatePerS: 'scalar', abruptnessP95: 'scalar', confidence: 'scalar', note: 'scalar', reason: 'scalar', samples: 'scalar' } };
+  var TI_CORNER = { obj: { cornerId: 'scalar', lapId: 'scalar', samples: 'scalar', summary: 'scalar', confidence: 'scalar', trackPosRange: { arr: 'number', max: 2 }, timeRange: { arr: 'number', max: 2 }, entry: TI_PHASE, mid: TI_PHASE, exit: TI_PHASE } };
+  var TRACK_INTEL = { obj: { available: 'boolean', valid: 'boolean', eligible: 'boolean', trackPositionConfirmed: 'boolean', lapSegmentationConfirmed: 'boolean', steeringConfirmed: 'boolean', lapCount: 'scalar', segmentationBasis: 'scalar', dataProvenance: 'scalar', credibility: 'scalar', corners: { arr: TI_CORNER, max: 64 }, limitations: { arr: 'string' }, cannotConclude: { arr: 'string' }, blockedReasons: { arr: BLOCKER } } };
   var BUNDLE_SCHEMA = { obj: {
     bundleSchemaVersion: 'string',
     meta: { obj: { bundleSchemaVersion: 'scalar', exportedAt: 'scalar', appModelVersion: 'scalar', note: 'scalar' } },
@@ -91,13 +94,14 @@
     observation: { obj: { valid: 'boolean', observedTendency: 'scalar', confidence: 'scalar', method: 'scalar', metric: 'scalar', limitations: { arr: 'string' }, confounders: { arr: 'string' }, credibility: 'scalar', blockedReasons: { arr: BLOCKER } } },
     comparison: { obj: { valid: 'boolean', predictedTendency: 'scalar', observedTendency: 'scalar', differenceClass: 'scalar', confidence: 'scalar', assumptions: { arr: 'string' }, modelTelemetryComparisonEligible: 'boolean', credibility: 'scalar', blockedReasons: { arr: BLOCKER } } },
     raceEngineer: { obj: { eligible: { obj: { inspection: 'boolean', directional: 'boolean', quantitative: 'boolean' } }, summary: 'scalar', likelySubsystems: { arr: 'string' }, inspectionPriorities: { arr: 'string' }, setupDirections: { arr: 'string' }, trialOrder: { arr: 'string' }, missingEvidence: { arr: 'string' }, confidence: 'scalar', credibility: 'scalar' } },
+    trackIntelligence: TRACK_INTEL,
     driverCoach: { obj: { eligible: 'boolean', observations: { arr: { obj: { type: 'scalar', code: 'scalar', qualitative: 'scalar', note: 'scalar', reversalCount: 'scalar', reversalRatePerS: 'scalar', abruptnessP95: 'scalar', unit: 'scalar', throttle: 'scalar', brake: 'scalar' } } }, practicePriorities: { arr: 'string' }, cannotConclude: { arr: 'string' }, confidence: 'scalar', credibility: 'scalar' } },
-    capability: { obj: { caseAssembled: 'boolean', modelRunnable: 'boolean', modelRan: 'boolean', telemetryInspectable: 'boolean', telemetryObservable: 'boolean', modelTelemetryComparisonEligible: 'boolean', calibratedMagnitudeEligible: 'boolean', measuredKUsEligible: 'boolean', raceEngineerInspectionEligible: 'boolean', raceEngineerDirectionalEligible: 'boolean', driverCoachingEligible: 'boolean', quantitativeSetupRecommendationEligible: 'boolean', setupAbEligible: 'boolean' } },
+    capability: { obj: { caseAssembled: 'boolean', modelRunnable: 'boolean', modelRan: 'boolean', telemetryInspectable: 'boolean', telemetryObservable: 'boolean', modelTelemetryComparisonEligible: 'boolean', calibratedMagnitudeEligible: 'boolean', measuredKUsEligible: 'boolean', raceEngineerInspectionEligible: 'boolean', raceEngineerDirectionalEligible: 'boolean', driverCoachingEligible: 'boolean', quantitativeSetupRecommendationEligible: 'boolean', setupAbEligible: 'boolean', trackPositionConfirmed: 'boolean', lapSegmentationConfirmed: 'boolean', cornerCoachingEligible: 'boolean' } },
     blockers: { arr: BLOCKER },
     warnings: { arr: 'string' },
   } };
 
-  var INPUT_ALLOWLIST = ['meta', 'case', 'mapping', 'calibration', 'window', 'observation', 'comparison', 'raceEngineer', 'driverCoach', 'capability', 'blockers', 'warnings'];
+  var INPUT_ALLOWLIST = ['meta', 'case', 'mapping', 'calibration', 'window', 'observation', 'comparison', 'raceEngineer', 'driverCoach', 'trackIntelligence', 'capability', 'blockers', 'warnings'];
 
   // extract a SCALAR-ONLY case summary from a full R2.1D case (unknown case keys never enter the bundle)
   function _caseSummary(c) {
@@ -129,6 +133,7 @@
       comparison: cmp,
       raceEngineer: input.raceEngineer !== undefined ? input.raceEngineer : {},
       driverCoach: input.driverCoach !== undefined ? input.driverCoach : {},
+      trackIntelligence: input.trackIntelligence !== undefined ? input.trackIntelligence : {},
       capability: input.capability !== undefined ? input.capability : {},
       blockers: _normBlockers(input.blockers),
       warnings: input.warnings !== undefined ? input.warnings : [],

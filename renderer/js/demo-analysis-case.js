@@ -139,7 +139,26 @@
     };
   }
 
-  var api = { buildDemoAnalysisCase: buildDemoAnalysisCase, buildCanonicalInputSnapshot: buildCanonicalInputSnapshot, buildDemoTelemetryCsv: buildDemoTelemetryCsv, buildTelemetrySession: buildTelemetrySession };
+  // R2.6: a SEPARATE corner demo (lap + track_position + |lateral_accel| corners) — does NOT change
+  // buildDemoTelemetryCsv, so existing suites stay byte-stable. Import + map + confirm → a canonical session
+  // with confirmed lap/track_position, demonstrating per-corner driver coaching.
+  function buildDemoCornerTelemetryCsv() {
+    var G = 9.80665, RAD2DEG = 180 / Math.PI, L = 2.8;
+    var gainFor = function (k, V) { var kRad = k / (G * RAD2DEG); return 1 / (L / V + kRad * V); };
+    var rows = []; var t = 0;
+    for (var lap = 1; lap <= 2; lap++) {
+      var dist = 0; var speeds = [24, 30, 36, 42];
+      for (var ci = 0; ci < speeds.length; ci++) {
+        var V = speeds[ci];
+        for (var sgn = 0; sgn < 24; sgn++) { rows.push([t.toFixed(3), V.toFixed(2), '0.001', '0.002', '0.05', dist.toFixed(1), lap]); dist += V * 0.05; t += 0.05; }
+        var st = (ci % 2 ? -0.05 : 0.05);
+        for (var i = 0; i < 18; i++) { var stj = st * (1 + 0.01 * Math.sin(i)); var yj = gainFor(2, V) * stj; rows.push([t.toFixed(3), V.toFixed(2), yj.toFixed(5), stj.toFixed(5), (yj * V).toFixed(5), dist.toFixed(1), lap]); dist += V * 0.05; t += 0.05; }
+      }
+    }
+    return 'time [s],speed [m/s],yaw_rate [rad/s],steering,lateral_accel [m/s2],track_position [m],lap\n' + rows.map(function (r) { return r.join(','); }).join('\n') + '\n';
+  }
+
+  var api = { buildDemoAnalysisCase: buildDemoAnalysisCase, buildCanonicalInputSnapshot: buildCanonicalInputSnapshot, buildDemoTelemetryCsv: buildDemoTelemetryCsv, buildDemoCornerTelemetryCsv: buildDemoCornerTelemetryCsv, buildTelemetrySession: buildTelemetrySession };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.DemoAnalysisCase = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
