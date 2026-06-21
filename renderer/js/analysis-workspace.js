@@ -23,6 +23,7 @@
   var CMP = _req('./model-telemetry-comparison.js', typeof ModelTelemetryComparison !== 'undefined' ? ModelTelemetryComparison : undefined);
   var RE = _req('./race-engineer-insight.js', typeof RaceEngineerInsight !== 'undefined' ? RaceEngineerInsight : undefined);
   var DC = _req('./driver-coach-insight.js', typeof DriverCoachInsight !== 'undefined' ? DriverCoachInsight : undefined);
+  var QR = _req('./quantitative-setup-recommendation.js', typeof QuantitativeSetupRecommendation !== 'undefined' ? QuantitativeSetupRecommendation : undefined);
   if (!AX || !OBS || !CMP || !RE || !DC) throw new Error('analysis-workspace.js requires execution + observation + comparison + engineer + coach modules');
 
   // pure aggregation: read the five results, derive the workspace capability matrix (no mutation, no recompute).
@@ -40,7 +41,8 @@
       measuredKUsEligible: !!(comparison && comparison.magnitudeComparisonEligible === true), // R2.4: a measured K_us was actually produced (passed every fail-closed gate)
       raceEngineerInspectionEligible: !!(raceEngineer && raceEngineer.eligible && raceEngineer.eligible.inspection === true),
       raceEngineerDirectionalEligible: !!(raceEngineer && raceEngineer.eligible && raceEngineer.eligible.directional === true),
-      quantitativeSetupRecommendationEligible: false, // first version — no validated click→rate mapping
+      setupAbEligible: exCap.modelRan === true, // R2.5: a what-if A/B comparison can run on the model
+      quantitativeSetupRecommendationEligible: !!(execution && execution.valid === true && execution.modelResultSnapshot && ((typeof execution.modelResultSnapshot.understeer_gradient === 'number' && isFinite(execution.modelResultSnapshot.understeer_gradient)) || (typeof execution.modelResultSnapshot.roll_stiffness_dist_front === 'number' && isFinite(execution.modelResultSnapshot.roll_stiffness_dist_front)))), // R2.5: model-grounded physical-unit recs available (per-lever degeneracy handled at request; hardware clicks still gated)
       driverCoachingEligible: !!(driverCoach && driverCoach.eligible === true),
     };
   }
@@ -63,6 +65,10 @@
     var comparison = CMP.compareModelToTelemetry(execution, observation, opts.comparison || {});
     var raceEngineer = RE.deriveRaceEngineerInsight(comparison, caseContext, opts.raceEngineer || {});
     var driverCoach = DC.deriveDriverCoachingInsight(observation, caseContext, opts.driverCoach || {});
+    // R2.5: optional model-grounded quantitative setup recommendation (when a target + parameter are supplied)
+    var quantitativeRecommendation = (opts.quantitative && opts.quantitative.target && opts.quantitative.parameterKey && QR)
+      ? QR.recommendSetupChange({ analysisCase: analysisCase, target: opts.quantitative.target, parameterKey: opts.quantitative.parameterKey, runner: opts.modelRunner })
+      : null;
     var capability = deriveWorkspaceCapability(execution, observation, comparison, raceEngineer, driverCoach);
     return {
       caseContext: caseContext,
@@ -71,6 +77,7 @@
       comparison: comparison,
       raceEngineer: raceEngineer,
       driverCoach: driverCoach,
+      quantitativeRecommendation: quantitativeRecommendation,
       capability: capability,
     };
   }

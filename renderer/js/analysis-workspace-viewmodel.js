@@ -130,6 +130,21 @@
     };
   }
 
+  // R2.5 Quantitative Recommendation section — model-grounded physical-unit setup change (clicks gated).
+  function _quantitativeRecommendation(qr) {
+    if (!qr) return { available: false, requested: false, credibility: 'Unavailable' };
+    return {
+      available: qr.available === true, requested: true,
+      parameterKey: qr.parameterKey, unit: qr.unit,
+      recommendedDeltaPhysical: qr.recommendedDeltaPhysical, recommendedValue: qr.recommendedValue,
+      targetMetric: qr.targetMetric, targetDelta: qr.targetDelta, metricUnit: qr.metricUnit,
+      baselineMetric: qr.baselineMetric, predictedMetricAfter: qr.predictedMetricAfter, residual: qr.residual,
+      sensitivity: qr.sensitivity, sideEffects: qr.sideEffects || [], validationStep: qr.validationStep,
+      limitations: qr.limitations || [], clicksEligible: qr.clicksEligible === true,
+      credibility: qr.available === true ? 'Model' : 'Unavailable', blockedReasons: qr.blockedReasons || [],
+    };
+  }
+
   function _raceEngineer(re) {
     if (!re) return { available: false };
     return {
@@ -199,12 +214,14 @@
         { key: 'raceEngineerDirectionalEligible', available: !!cap.raceEngineerDirectionalEligible },
         { key: 'driverCoachingEligible', available: !!cap.driverCoachingEligible },
         { key: 'quantitativeSetupRecommendationEligible', available: !!cap.quantitativeSetupRecommendationEligible },
+        { key: 'setupAbEligible', available: !!cap.setupAbEligible },
       ],
       setupInputs: _setupInputs(analysisCase, opts.suspensionNormalizationView),
       modelPrediction: _modelPrediction(workspaceResult.execution),
       telemetryObservation: _telemetryObservation(workspaceResult.observation),
       modelVsActual: _modelVsActual(workspaceResult.comparison),
       measuredMetrics: _measuredMetrics(workspaceResult.comparison, workspaceResult.observation),
+      quantitativeRecommendation: _quantitativeRecommendation(workspaceResult.quantitativeRecommendation),
       raceEngineer: _raceEngineer(workspaceResult.raceEngineer),
       driverCoach: _driverCoach(workspaceResult.driverCoach),
       evidenceDrawer: _evidenceDrawer(workspaceResult, analysisCase),

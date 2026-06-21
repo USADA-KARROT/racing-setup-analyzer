@@ -61,7 +61,7 @@ chk('null workspace → ok false', VM.buildAnalysisWorkspaceViewModel(null, demo
   chk('empty: model unavailable', v.modelPrediction.available === false);
   chk('empty: observation unavailable', v.telemetryObservation.available === false);
   chk('empty: comparison unavailable', v.modelVsActual.available === false);
-  chk('empty: capability summary still 12 rows', v.capabilitySummary.length === 12);
+  chk('empty: capability summary still 12 rows', v.capabilitySummary.length === 13);
 })();
 
 // ── pure: no-mutate ──
