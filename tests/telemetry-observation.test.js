@@ -66,6 +66,20 @@ function noForbidden(result) {
   chk('missing yaw: REQUIRED_CHANNEL_MISSING blocker', r.blockedReasons.some((b) => b.code === 'REQUIRED_CHANNEL_MISSING'));
 })();
 
+// ── fail-closed: required channels present but NOT user-confirmed (provisional identity) — §8 honesty ──
+(() => {
+  const unconfirmed = { channels: { speed: { confirmed: false }, yaw_rate: { confirmed: false }, steering: { confirmed: false }, lateral_accel: { confirmed: false } } };
+  const sess = FX.buildSession(FX.syntheticYawCsv('understeer'), 'syn', unconfirmed);
+  const r = OBS.observeTelemetry(sess, null, {});
+  chk('unconfirmed channels: not valid', r.valid === false);
+  chk('unconfirmed channels: unavailable', r.observedTendency === 'unavailable');
+  chk('unconfirmed channels: REQUIRED_CHANNEL_NOT_CONFIRMED blocker', r.blockedReasons.some((b) => b.code === 'REQUIRED_CHANNEL_NOT_CONFIRMED'));
+  // a SINGLE unconfirmed required channel still blocks observation
+  const partial = { channels: { speed: { confirmed: true }, yaw_rate: { confirmed: true }, steering: { confirmed: false }, lateral_accel: { confirmed: true } } };
+  const r2 = OBS.observeTelemetry(FX.buildSession(FX.syntheticYawCsv('understeer'), 'syn', partial), null, {});
+  chk('one unconfirmed channel blocks', r2.valid === false && r2.blockedReasons.some((b) => b.code === 'REQUIRED_CHANNEL_NOT_CONFIRMED'));
+})();
+
 // ── fail-closed: timebase reset ──
 (() => {
   const sess = FX.buildSession(FX.timebaseResetCsv());

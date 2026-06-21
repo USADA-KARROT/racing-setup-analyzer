@@ -202,9 +202,14 @@
     // hard gate: timebase must not be BLOCKED (a global timestamp reset breaks any dynamic comparison)
     if (tb.status === TC.GRADE.BLOCKED) blockedReasons.push(_blocker('TELEMETRY_TIMEBASE_BLOCKED', tb.reason));
     if (!tb.timeName) blockedReasons.push(_blocker('TELEMETRY_TIMEBASE_UNCONFIRMED', 'no time column — dynamic trend needs a timebase'));
-    // required channels present?
+    // required channels present AND user-confirmed?
     REQUIRED.forEach(function (canon) {
-      if (!channels[canon] || !channels[canon].available) blockedReasons.push(_blocker('REQUIRED_CHANNEL_MISSING', canon));
+      var ch = channels[canon];
+      if (!ch || !ch.available) { blockedReasons.push(_blocker('REQUIRED_CHANNEL_MISSING', canon)); return; }
+      // §8 honesty: an auto-mapped but UNCONFIRMED channel identity must NOT be treated as a confirmed
+      // physical quantity. Observation requires user-confirmed (definition_confirmed) required channels;
+      // a provisional/unknown identity fails closed (the session stays inspectable, comparison blocked).
+      if (ch.status !== TC.GRADE.DEFINITION_CONFIRMED) blockedReasons.push(_blocker('REQUIRED_CHANNEL_NOT_CONFIRMED', canon + ' (' + ch.status + ')'));
     });
     if (blockedReasons.length) return _unavailable('preflight_blocked', blockedReasons, channels, warnings);
 
