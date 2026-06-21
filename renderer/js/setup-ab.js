@@ -76,12 +76,10 @@
       var directionalSummary = (dK == null) ? 'unavailable' : (Math.abs(dK) < 0.05 ? 'no_meaningful_balance_change' : (dK > 0 ? 'b_more_understeer' : 'b_more_oversteer'));
       // verify (do not assume) the two setups declare the same model version
       var verA = _modelVersion(caseA), verB = _modelVersion(caseB);
-      var warnings = _plausibilityWarnings(caseA, caseB);
-      if (verA !== verB) warnings.push({ type: 'model_version_mismatch', a: verA, b: verB });
       return {
         valid: true, a: a, b: b, deltas: deltas, directionalSummary: directionalSummary,
-        modelVersions: { a: verA, b: verB, match: verA === verB },
-        plausibilityWarnings: warnings,
+        modelVersions: { a: verA, b: verB, match: verA === verB }, // version mismatch surfaced here (+ its own UI template), NOT mixed into plausibilityWarnings
+        plausibilityWarnings: _plausibilityWarnings(caseA, caseB),
         assumptions: ASSUMPTIONS, blockedReasons: [], credibility: 'Model',
       };
     } catch (e) {
