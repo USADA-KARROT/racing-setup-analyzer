@@ -135,7 +135,7 @@
     if (!qr) return { available: false, requested: false, credibility: 'Unavailable' };
     return {
       available: qr.available === true, requested: true,
-      parameterKey: qr.parameterKey, unit: qr.unit,
+      parameterKey: qr.parameterKey, leverType: qr.leverType || null, unit: qr.unit,
       recommendedDeltaPhysical: qr.recommendedDeltaPhysical, recommendedValue: qr.recommendedValue,
       targetMetric: qr.targetMetric, targetDelta: qr.targetDelta, metricUnit: qr.metricUnit,
       baselineMetric: qr.baselineMetric, predictedMetricAfter: qr.predictedMetricAfter, residual: qr.residual,

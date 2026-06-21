@@ -23,15 +23,17 @@
   var TARGET_METRICS = {
     understeer_gradient: { unit: 'deg/g', changeFloor: 0.005, band: [-8, 12] },
     roll_stiffness_dist_front: { unit: '%', changeFloor: 0.05, band: [0, 100] },
-    total_roll_stiffness: { unit: 'Nm/deg', changeFloor: 2, band: [0, Infinity] },
+    total_roll_stiffness: { unit: 'Nm/deg', changeFloor: 2, band: [0, 20000] },
   };
   // perturbable canonical-input parameters (snapshot keys), with physical unit + positivity constraint.
   var PARAMETERS = {
-    frontArbRollStiffnessNmDeg: { unit: 'Nm/deg', positive: true },
-    rearArbRollStiffnessNmDeg: { unit: 'Nm/deg', positive: true },
-    frontWheelRateNmm: { unit: 'N/mm', positive: true },
-    rearWheelRateNmm: { unit: 'N/mm', positive: true },
-    frontWeightPct: { unit: '%', range: [40, 70] },
+    // finite, defensible motorsport ranges — a recommended value outside its range is blocked (no arbitrarily large rec).
+    // leverType distinguishes a SUSPENSION change (spring/ARB) from a WEIGHT-DISTRIBUTION/ballast change — materially different.
+    frontArbRollStiffnessNmDeg: { unit: 'Nm/deg', range: [0, 3000], leverType: 'suspension_roll_stiffness' },
+    rearArbRollStiffnessNmDeg: { unit: 'Nm/deg', range: [0, 3000], leverType: 'suspension_roll_stiffness' },
+    frontWheelRateNmm: { unit: 'N/mm', range: [20, 600], leverType: 'suspension_spring_rate' },
+    rearWheelRateNmm: { unit: 'N/mm', range: [20, 600], leverType: 'suspension_spring_rate' },
+    frontWeightPct: { unit: '%', range: [40, 70], leverType: 'weight_distribution_ballast' },
   };
   var LIMITATIONS = ['local_linearization', 'single_parameter', 'model_grounded_not_measured'];
   var OTHER_METRICS = ['understeer_gradient', 'roll_stiffness_dist_front', 'total_roll_stiffness', 'front_wheel_rate', 'rear_wheel_rate'];
@@ -91,9 +93,8 @@
 
       var recommendedDelta = target.delta / sensitivity;
       var recommendedValue = baseValue + recommendedDelta;
-      // physical plausibility of the recommended value
-      if (pCfg.positive && recommendedValue <= 0) return _block([_blocker('IMPLAUSIBLE_RECOMMENDED_VALUE', parameterKey + '=' + recommendedValue.toFixed(2))]);
-      if (pCfg.range && (recommendedValue < pCfg.range[0] || recommendedValue > pCfg.range[1])) return _block([_blocker('IMPLAUSIBLE_RECOMMENDED_VALUE', parameterKey + '=' + recommendedValue.toFixed(2))]);
+      // physical plausibility of the recommended value (finite, defensible range — no arbitrarily large recommendation)
+      if (recommendedValue < pCfg.range[0] || recommendedValue > pCfg.range[1]) return _block([_blocker('IMPLAUSIBLE_RECOMMENDED_VALUE', parameterKey + '=' + recommendedValue.toFixed(2) + ' ' + pCfg.unit + ' outside [' + pCfg.range[0] + ',' + pCfg.range[1] + ']')]);
 
       // verify: re-run the model at the recommended value
       var after = _runAt(analysisCase, parameterKey, recommendedValue, runner);
@@ -115,6 +116,7 @@
       return {
         available: true,
         parameterKey: parameterKey,
+        leverType: pCfg.leverType, // suspension_roll_stiffness | suspension_spring_rate | weight_distribution_ballast
         unit: pCfg.unit,
         baselineValue: baseValue,
         recommendedDeltaPhysical: recommendedDelta,

@@ -75,5 +75,18 @@ const baseCase = () => DEMO.buildDemoAnalysisCase().analysisCase;
   chk('garbage case → no throw, blocked', threw === false);
 })();
 
+// CP1 fix: finite plausible bounds — an arbitrarily large target is blocked (no unbounded recommendation)
+(() => {
+  const r = QR.recommendSetupChange({ analysisCase: baseCase(), target: { metric: 'total_roll_stiffness', delta: 50000 }, parameterKey: 'frontArbRollStiffnessNmDeg', runner });
+  chk('huge target → IMPLAUSIBLE_RECOMMENDED_VALUE (bounded)', r.available === false && r.blockedReasons.some(b => b.code === 'IMPLAUSIBLE_RECOMMENDED_VALUE'), r.blockedReasons);
+})();
+// CP1 fix: leverType labels suspension vs weight-distribution (frontWeightPct is a distinct ballast lever)
+(() => {
+  const a = QR.recommendSetupChange({ analysisCase: baseCase(), target: { metric: 'roll_stiffness_dist_front', delta: 0.5 }, parameterKey: 'frontArbRollStiffnessNmDeg', runner });
+  chk('ARB lever labelled suspension', a.leverType === 'suspension_roll_stiffness');
+  const w = QR.recommendSetupChange({ analysisCase: baseCase(), target: { metric: 'understeer_gradient', delta: 0.1 }, parameterKey: 'frontWeightPct', runner });
+  chk('front weight lever labelled ballast', w.leverType === 'weight_distribution_ballast');
+})();
+
 console.log(`quantitative-setup-recommendation: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
