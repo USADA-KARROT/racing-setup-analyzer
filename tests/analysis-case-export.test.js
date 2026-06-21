@@ -46,5 +46,10 @@ const input = {
 (() => { const bad = JSON.parse(JSON.stringify(input)); bad.warnings = new Array(300).fill('x'); chk('over-long array rejected', EX.exportAnalysisCase(bad).ok === false && EX.exportAnalysisCase(bad).errors.some(e => e.indexOf('array_too_long') === 0)); })();
 // parse unknown top key rejected
 (() => { chk('parse unknown top key rejected', EX.parseAnalysisCaseExport(JSON.stringify({ bundleSchemaVersion: '1.0.0', junk: 1 })).ok === false); })();
+// CP2 re-review: capability is a CLOSED key set (arbitrary boolean key rejected)
+(() => { const bad = JSON.parse(JSON.stringify(input)); bad.capability.secret = true; chk('capability unknown key rejected', EX.exportAnalysisCase(bad).ok === false && EX.exportAnalysisCase(bad).errors.some(e => e.indexOf('unknown_key') === 0)); })();
+(() => { const bad = JSON.parse(JSON.stringify(input)); bad.raceEngineer.eligible.secret = true; chk('eligible unknown key rejected', EX.exportAnalysisCase(bad).ok === false); })();
+(() => { const bad = JSON.parse(JSON.stringify(input)); bad.blockers = [{ code: 'x', detail: [{ values: [1,2,3] }] }]; const r = EX.exportAnalysisCase(bad); chk('blocker detail raw object → no raw leak', r.ok === true && deepEq(r.bundle.blockers[0].detail, ['[non_scalar_detail]'])); })();
+(() => { const bad = JSON.parse(JSON.stringify(input)); bad.blockers = [{ code: 'x', detail: new Array(200).fill('x') }]; chk('blocker detail capped', EX.exportAnalysisCase(bad).bundle.blockers[0].detail.length === 16); })();
 console.log(`analysis-case-export: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
