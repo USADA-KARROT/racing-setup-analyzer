@@ -77,10 +77,16 @@
       var p0 = snap0 && snap0[parameterKey];
       var baseValue = p0 && _isFiniteNum(p0.value) ? p0.value : null;
       if (baseValue === null) return _block([_blocker('PARAMETER_VALUE_NOT_FINITE', parameterKey)]);
+      // the BASELINE itself must be inside the plausible range (never derive a sensitivity from an out-of-range setup)
+      if (baseValue < pCfg.range[0] || baseValue > pCfg.range[1]) return _block([_blocker('BASELINE_PARAMETER_OUT_OF_RANGE', parameterKey + '=' + baseValue)]);
 
-      // probe: relative +10% (min absolute floor), re-run
-      var probeDelta = Math.max(Math.abs(baseValue) * 0.1, 0.5);
-      var probeValue = baseValue + probeDelta;
+      // in-range probe: a relative step that stays INSIDE the parameter's plausible range (one-sided near a bound)
+      var step = Math.max(Math.abs(baseValue) * 0.1, 0.5);
+      var probeValue;
+      if (baseValue + step <= pCfg.range[1]) probeValue = baseValue + step;
+      else if (baseValue - step >= pCfg.range[0]) probeValue = baseValue - step;
+      else return _block([_blocker('PARAMETER_RANGE_TOO_NARROW_FOR_PROBE', parameterKey)]);
+      var probeStep = probeValue - baseValue; // signed (preserves sensitivity sign)
       var probe = _runAt(analysisCase, parameterKey, probeValue, runner);
       if (!probe.valid) return _block([_blocker('PERTURBED_RUN_NOT_MODEL_USABLE', probe.blockedReasons || probe.reason)]);
       var probeMetric = probe.snapshot[target.metric];
@@ -88,7 +94,7 @@
 
       // degenerate sensitivity: the parameter barely moves the metric over a meaningful probe → blocked
       if (Math.abs(probeMetric - baselineMetric) < mCfg.changeFloor) return _block([_blocker('DEGENERATE_SENSITIVITY', parameterKey + '→' + target.metric)]);
-      var sensitivity = (probeMetric - baselineMetric) / probeDelta; // Δmetric per unit of parameter
+      var sensitivity = (probeMetric - baselineMetric) / probeStep; // Δmetric per unit of parameter (signed in-range step)
       if (!_isFiniteNum(sensitivity) || sensitivity === 0) return _block([_blocker('DEGENERATE_SENSITIVITY', 'zero_or_non_finite')]);
 
       var recommendedDelta = target.delta / sensitivity;
@@ -149,9 +155,12 @@
     var snap = analysisCase.modelSnapshot && analysisCase.modelSnapshot.canonicalInputSnapshot;
     var keys = Object.keys(PARAMETERS);
     for (var i = 0; i < keys.length; i++) {
-      var p = snap && snap[keys[i]];
-      if (!p || !_isFiniteNum(p.value)) continue;
-      var probe = _runAt(analysisCase, keys[i], p.value + Math.max(Math.abs(p.value) * 0.1, 0.5), runner);
+      var p = snap && snap[keys[i]]; var pc = PARAMETERS[keys[i]];
+      if (!p || !_isFiniteNum(p.value) || !pc || p.value < pc.range[0] || p.value > pc.range[1]) continue;
+      var st = Math.max(Math.abs(p.value) * 0.1, 0.5);
+      var pv = (p.value + st <= pc.range[1]) ? p.value + st : ((p.value - st >= pc.range[0]) ? p.value - st : null);
+      if (pv === null) continue;
+      var probe = _runAt(analysisCase, keys[i], pv, runner);
       if (probe.valid && _isFiniteNum(probe.snapshot[metric]) && Math.abs(probe.snapshot[metric] - base.snapshot[metric]) >= mCfg.changeFloor) return true;
     }
     return false;

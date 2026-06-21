@@ -27,7 +27,7 @@
   if (!AX || !OBS || !CMP || !RE || !DC) throw new Error('analysis-workspace.js requires execution + observation + comparison + engineer + coach modules');
 
   // pure aggregation: read the five results, derive the workspace capability matrix (no mutation, no recompute).
-  function deriveWorkspaceCapability(execution, observation, comparison, raceEngineer, driverCoach) {
+  function deriveWorkspaceCapability(execution, observation, comparison, raceEngineer, driverCoach, quantitativeLeverAvailable) {
     var exCap = (execution && execution.capabilityState) || {};
     var telemetryInspectable = !!(observation && observation.channels && observation.channels.speed && observation.channels.speed.available && observation.channels.steering && observation.channels.steering.available);
     return {
@@ -42,7 +42,7 @@
       raceEngineerInspectionEligible: !!(raceEngineer && raceEngineer.eligible && raceEngineer.eligible.inspection === true),
       raceEngineerDirectionalEligible: !!(raceEngineer && raceEngineer.eligible && raceEngineer.eligible.directional === true),
       setupAbEligible: exCap.modelRan === true, // R2.5: a what-if A/B comparison can run on the model
-      quantitativeSetupRecommendationEligible: !!(execution && execution.valid === true && execution.modelResultSnapshot && ((typeof execution.modelResultSnapshot.understeer_gradient === 'number' && isFinite(execution.modelResultSnapshot.understeer_gradient)) || (typeof execution.modelResultSnapshot.roll_stiffness_dist_front === 'number' && isFinite(execution.modelResultSnapshot.roll_stiffness_dist_front)))), // R2.5: model-grounded physical-unit recs available (per-lever degeneracy handled at request; hardware clicks still gated)
+      quantitativeSetupRecommendationEligible: quantitativeLeverAvailable === true, // R2.5: TRUE only when >=1 non-degenerate balance lever exists (probed via QR.hasQuantitativeLever in runAnalysisWorkspace); per-request still fail-closes; hardware clicks always gated
       driverCoachingEligible: !!(driverCoach && driverCoach.eligible === true),
     };
   }
@@ -69,7 +69,12 @@
     var quantitativeRecommendation = (opts.quantitative && opts.quantitative.target && opts.quantitative.parameterKey && QR)
       ? QR.recommendSetupChange({ analysisCase: analysisCase, target: opts.quantitative.target, parameterKey: opts.quantitative.parameterKey, runner: opts.modelRunner })
       : null;
-    var capability = deriveWorkspaceCapability(execution, observation, comparison, raceEngineer, driverCoach);
+    // R2.5: a quantitative recommendation is only eligible when at least one permitted balance lever is
+    // non-degenerate for some target metric — probe the actual model (cheap; per-request still fail-closes).
+    var quantitativeLeverAvailable = (QR && execution && execution.valid === true)
+      ? (QR.hasQuantitativeLever(analysisCase, 'roll_stiffness_dist_front', opts.modelRunner) || QR.hasQuantitativeLever(analysisCase, 'understeer_gradient', opts.modelRunner) || QR.hasQuantitativeLever(analysisCase, 'total_roll_stiffness', opts.modelRunner))
+      : false;
+    var capability = deriveWorkspaceCapability(execution, observation, comparison, raceEngineer, driverCoach, quantitativeLeverAvailable);
     return {
       caseContext: caseContext,
       execution: execution,

@@ -88,5 +88,18 @@ const baseCase = () => DEMO.buildDemoAnalysisCase().analysisCase;
   chk('front weight lever labelled ballast', w.leverType === 'weight_distribution_ballast');
 })();
 
+// CP1 re-review fix: an out-of-range BASELINE is rejected (never derive sensitivity from an out-of-range setup)
+(() => {
+  const c = baseCase(); c.modelSnapshot.canonicalInputSnapshot.frontArbRollStiffnessNmDeg.value = 3500; // > 3000 cap
+  const r = QR.recommendSetupChange({ analysisCase: c, target: { metric: 'roll_stiffness_dist_front', delta: 0.5 }, parameterKey: 'frontArbRollStiffnessNmDeg', runner });
+  chk('out-of-range baseline → blocked', r.available === false && r.blockedReasons.some(b => b.code === 'BASELINE_PARAMETER_OUT_OF_RANGE'), r.blockedReasons);
+})();
+// CP1 re-review fix: near the upper bound, the probe steps INWARD (no out-of-range probe); result stays in range or blocks
+(() => {
+  const c = baseCase(); c.modelSnapshot.canonicalInputSnapshot.frontArbRollStiffnessNmDeg.value = 2995; // just under 3000
+  const r = QR.recommendSetupChange({ analysisCase: c, target: { metric: 'roll_stiffness_dist_front', delta: -0.5 }, parameterKey: 'frontArbRollStiffnessNmDeg', runner });
+  chk('near-upper baseline: in-range or blocked (never out-of-range)', (r.available === true && r.recommendedValue >= 0 && r.recommendedValue <= 3000) || r.available === false, r.recommendedValue);
+})();
+
 console.log(`quantitative-setup-recommendation: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

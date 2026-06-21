@@ -25,7 +25,9 @@ const chk = (n, c, d) => { if (c) { pass++; } else { fail++; console.log('  ✗ 
   chk('all-good: comparison eligible', cap.modelTelemetryComparisonEligible === true);
   chk('all-good: RE inspection + directional', cap.raceEngineerInspectionEligible === true && cap.raceEngineerDirectionalEligible === true);
   chk('all-good: driver coaching', cap.driverCoachingEligible === true);
-  chk('all-good: quantitative ALWAYS false', cap.quantitativeSetupRecommendationEligible === false);
+  chk('all-good: quantitative false without a lever probe (pure aggregation)', cap.quantitativeSetupRecommendationEligible === false);
+  chk('quantitative eligible follows lever flag true', WS.deriveWorkspaceCapability(exec, obs, cmp, re, dc, true).quantitativeSetupRecommendationEligible === true);
+  chk('quantitative eligible follows lever flag false', WS.deriveWorkspaceCapability(exec, obs, cmp, re, dc, false).quantitativeSetupRecommendationEligible === false);
 })();
 (() => {
   const cap = WS.deriveWorkspaceCapability({ capabilityState: { caseValid: true, modelInputResolved: false, modelRan: false } }, { valid: false, channels: {} }, { modelTelemetryComparisonEligible: false }, { eligible: { inspection: false, directional: false } }, { eligible: false });
