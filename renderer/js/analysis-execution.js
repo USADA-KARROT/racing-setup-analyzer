@@ -117,6 +117,10 @@
     // 4) freeze a snapshot (a deep clone so the frozen result never aliases the engine's internals)
     var snapshot = _deepFreeze(JSON.parse(JSON.stringify(rawResult)));
     var predictedTendency = TENDENCY_MAP[rawResult.tendency];
+    // surface the ALREADY-resolved wheelbase (mm->m) for downstream measured-metric fits — pure read of an
+    // authoritative resolved input; no physics change, model output untouched.
+    var _wbMm = (resolved.params && typeof resolved.params.wheelbase === 'number' && isFinite(resolved.params.wheelbase) && resolved.params.wheelbase > 0) ? resolved.params.wheelbase : null;
+    var measurementGeometry = { wheelbaseM: _wbMm != null ? _wbMm / 1000 : null, valid: _wbMm != null };
 
     return {
       valid: true,
@@ -127,6 +131,7 @@
       capabilityState: { caseValid: true, modelInputResolved: true, modelRan: true },
       blockedReasons: [],
       provenanceSummary: { modelInputs: resolved.provenance, usedParameters: resolved.usedParameters, modelVersion: modelVersion },
+      measurementGeometry: measurementGeometry,             // { wheelbaseM, valid } — for downstream measured K_us only
       warnings: warnings,
       credibility: 'Model',                                 // engineering model — directionally reliable, NOT measured
     };

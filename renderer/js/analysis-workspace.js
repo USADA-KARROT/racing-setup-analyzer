@@ -36,6 +36,8 @@
       telemetryInspectable: telemetryInspectable,
       telemetryObservable: !!(observation && observation.valid === true),
       modelTelemetryComparisonEligible: !!(comparison && comparison.modelTelemetryComparisonEligible === true),
+      calibratedMagnitudeEligible: !!(observation && observation.calibrationCapability && observation.calibrationCapability.calibratedMagnitudeEligible === true), // R2.4: road-wheel magnitude derivable
+      measuredKUsEligible: !!(comparison && comparison.magnitudeComparisonEligible === true), // R2.4: a measured K_us was actually produced (passed every fail-closed gate)
       raceEngineerInspectionEligible: !!(raceEngineer && raceEngineer.eligible && raceEngineer.eligible.inspection === true),
       raceEngineerDirectionalEligible: !!(raceEngineer && raceEngineer.eligible && raceEngineer.eligible.directional === true),
       quantitativeSetupRecommendationEligible: false, // first version — no validated click→rate mapping

@@ -108,6 +108,28 @@
     };
   }
 
+  // R2.4 Measured Metrics section — surfaces the calibrated magnitude + measured K_us (or the block reason).
+  function _measuredMetrics(comparison, observation) {
+    var calMag = observation && observation.calibratedMagnitude;
+    var mag = comparison && comparison.magnitudeComparison;
+    if (!mag) return { available: false, calibratedMagnitudeAvailable: !!calMag, eligible: false, blockedReasons: [], credibility: 'Unavailable' };
+    return {
+      available: mag.available === true,
+      eligible: mag.eligible === true,
+      calibratedMagnitudeAvailable: !!calMag,
+      measuredKUs: mag.available === true ? m(mag.measuredKUsDegG, mag.credibility || 'Measured (kinematic, confounded)', 'deg/g') : _na('Unavailable'),
+      predictedKUs: m(mag.predictedKUsDegG, 'Model', 'deg/g'),
+      residualDegG: (mag.residualDegG != null) ? mag.residualDegG : null,
+      agreementClass: mag.agreementClass || null,
+      fitQuality: mag.fitQuality || null,
+      dataProvenance: mag.dataProvenance || (calMag && calMag.dataProvenance) || 'unverified',
+      limitations: mag.limitations || [],
+      reason: mag.reason || null,
+      blockedReasons: mag.blockedReasons || [],
+      credibility: mag.available === true ? (mag.credibility || 'Measured (kinematic, confounded)') : 'Unavailable',
+    };
+  }
+
   function _raceEngineer(re) {
     if (!re) return { available: false };
     return {
@@ -171,6 +193,8 @@
         { key: 'telemetryInspectable', available: !!cap.telemetryInspectable },
         { key: 'telemetryObservable', available: !!cap.telemetryObservable },
         { key: 'modelTelemetryComparisonEligible', available: !!cap.modelTelemetryComparisonEligible },
+        { key: 'calibratedMagnitudeEligible', available: !!cap.calibratedMagnitudeEligible },
+        { key: 'measuredKUsEligible', available: !!cap.measuredKUsEligible },
         { key: 'raceEngineerInspectionEligible', available: !!cap.raceEngineerInspectionEligible },
         { key: 'raceEngineerDirectionalEligible', available: !!cap.raceEngineerDirectionalEligible },
         { key: 'driverCoachingEligible', available: !!cap.driverCoachingEligible },
@@ -180,6 +204,7 @@
       modelPrediction: _modelPrediction(workspaceResult.execution),
       telemetryObservation: _telemetryObservation(workspaceResult.observation),
       modelVsActual: _modelVsActual(workspaceResult.comparison),
+      measuredMetrics: _measuredMetrics(workspaceResult.comparison, workspaceResult.observation),
       raceEngineer: _raceEngineer(workspaceResult.raceEngineer),
       driverCoach: _driverCoach(workspaceResult.driverCoach),
       evidenceDrawer: _evidenceDrawer(workspaceResult, analysisCase),

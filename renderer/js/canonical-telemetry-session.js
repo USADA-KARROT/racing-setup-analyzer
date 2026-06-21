@@ -47,7 +47,7 @@
   }
 
   // assemble a session from immutable mappingEntries + raw columns (by id) + a resolved time array
-  function _assemble(mappingEntries, colsById, time, sampleRateHz, calibrationSet, windowRequest, timebaseStatus, sessionId, sourceMetadata) {
+  function _assemble(mappingEntries, colsById, time, sampleRateHz, calibrationSet, windowRequest, timebaseStatus, sessionId, sourceMetadata, dataProvenance) {
     var channels = {};
     var steerUnit = '(raw)';
     mappingEntries.forEach(function (e) {
@@ -63,7 +63,11 @@
       steerUnit: steerUnit, timebaseStatus: timebaseStatus,
     };
     var win = _normWindow(windowRequest);
-    var calibrationCapability = CR.deriveCalibrationCapability(CR.buildCalibrationSet(calibrationSet || []));
+    // bind calibrations to THIS steering mapping (single steering channel only) — projection change ⇒ stale
+    var steerEntries = mappingEntries.filter(function (e) { return e.canonicalChannel === 'steering'; });
+    var steeringBinding = (steerEntries.length === 1) ? { rawColumnId: steerEntries[0].rawColumnId, projectionSignature: CM.projectionSignature(steerEntries[0].projection) } : null;
+    // advisory capability is session-aware but DISPLAY-ONLY/NON-AUTHORITATIVE (observation re-derives the authority)
+    var calibrationCapability = CR.deriveCalibrationCapability(CR.buildCalibrationSet(calibrationSet || []), { sessionId: sessionId || null, steeringBinding: steeringBinding });
     var advisory = {
       validatedWindow: AW.validateAnalysisWindow(bundle, win, {}),
       calibrationCapability: calibrationCapability,
@@ -75,7 +79,7 @@
       channels: channels, time: time, sampleRateHz: _isFiniteNum(sampleRateHz) ? sampleRateHz : null, sampleCount: time.length,
       timebaseStatus: timebaseStatus || null,
       calibrationSet: (calibrationSet || []).slice(), windowRequest: win,
-      advisory: advisory, sourceMetadata: sourceMetadata || null, quality: advisory.validatedWindow.quality, blockedReasons: [], warnings: [],
+      advisory: advisory, sourceMetadata: sourceMetadata || null, steeringBinding: steeringBinding, dataProvenance: (dataProvenance === 'synthetic' || dataProvenance === 'real') ? dataProvenance : 'unverified', quality: advisory.validatedWindow.quality, blockedReasons: [], warnings: [],
     };
   }
 
@@ -114,7 +118,7 @@
     var time = _resolveTime(imported, mappingEntries, colsById);
     var timebaseStatus = (imported.timebase && imported.timebase.status) || null;
     var sessionId = opts.sessionId || (imported.sourceMetadata && imported.sourceMetadata.sessionId) || null;
-    return _assemble(mappingEntries, colsById, time, opts.sampleRateHz != null ? opts.sampleRateHz : (imported.timebase && imported.timebase.sampleRateHz), calibrationSet, windowRequest, timebaseStatus, sessionId, imported.sourceMetadata);
+    return _assemble(mappingEntries, colsById, time, opts.sampleRateHz != null ? opts.sampleRateHz : (imported.timebase && imported.timebase.sampleRateHz), calibrationSet, windowRequest, timebaseStatus, sessionId, imported.sourceMetadata, imported.dataProvenance);
   }
 
   // R2.2 back-compat: {parsed, definitions, sampleRateHz} + supplied legacy window → the same evidence session
@@ -138,7 +142,7 @@
     // time from the detected time column
     var time = [];
     if (tb.timeName) { var tn = tb.timeName; for (var id in colsById) { if (colsById[id].rawName && colsById[id].rawName.toLowerCase() === tn.toLowerCase()) { var u = tel.units[tn] || 's'; time = colsById[id].values.map(function (v) { return v == null ? null : (TC.convertToCanonical(v, u, 'time') != null ? TC.convertToCanonical(v, u, 'time') : v); }); break; } } }
-    return _assemble(mappingEntries, colsById, time, legacy.sampleRateHz != null ? legacy.sampleRateHz : tb.sampleRateHz, [], windowRequest, tb.status, legacy.sessionId || null, { format: 'legacy', channelCount: mappingEntries.length });
+    return _assemble(mappingEntries, colsById, time, legacy.sampleRateHz != null ? legacy.sampleRateHz : tb.sampleRateHz, [], windowRequest, tb.status, legacy.sessionId || null, { format: 'legacy', channelCount: mappingEntries.length }, 'unverified');
   }
 
   function isCanonicalSession(s) { return !!(s && s.kind === 'canonical_telemetry_session'); }
