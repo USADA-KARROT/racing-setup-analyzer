@@ -116,6 +116,7 @@
 
   function _inner(session, observation, opts) {
     var TH = {}; for (var key in DEFAULTS) TH[key] = (opts && _isFiniteNum(opts[key])) ? opts[key] : DEFAULTS[key];
+    TH.MAX_CORNERS = Math.min(TH.MAX_CORNERS, DEFAULTS.MAX_CORNERS); // HARD universal cap — opts may LOWER but never RAISE above 64
     // NOTE: corner coaching is steering BEHAVIOUR, independent of the directional yaw response — it does NOT
     // require observation.valid (a session can have confirmed channels yet an inconclusive yaw response).
     if (!session || typeof session !== 'object' || session.kind !== 'canonical_telemetry_session') return _result(false, false, false, false, 0, [], [_blocker('NOT_CANONICAL_SESSION', 'track intelligence requires a canonical telemetry session')], [], null, 'Unavailable');
