@@ -47,7 +47,8 @@
     }
     if (schema && schema.arr) {
       if (!Array.isArray(value)) { errors.push('not_array:' + pathStr); return []; }
-      if (value.length > MAX_ARRAY) { errors.push('array_too_long:' + pathStr); return []; }
+      var cap = schema.max != null ? schema.max : MAX_ARRAY;
+      if (value.length > cap) { errors.push('array_too_long:' + pathStr); return []; }
       return value.map(function (x, i) { return _val(x, schema.arr, pathStr + '[' + i + ']', errors); });
     }
     if (schema && schema.boolMap) {
@@ -82,7 +83,7 @@
     case: { obj: { caseId: 'scalar', schemaVersion: 'scalar', modelId: 'scalar', modelVersion: 'scalar', calibrationVersion: 'scalar', canonicalContractVersion: 'scalar', vehicleProfileId: 'scalar', telemetrySessionId: 'scalar', modelInputEligible: 'boolean', title: 'scalar', createdAt: 'scalar' } },
     mapping: { obj: { entries: { arr: MAPPING_ENTRY } } },
     calibration: { obj: { entries: { arr: CALIB_ENTRY } } },
-    window: { obj: { startTime: 'scalar', endTime: 'scalar', valid: 'boolean', sampleCount: 'scalar', steadyStateCount: 'scalar', duration: 'scalar', speedRange: { arr: 'number' }, lateralAccelRange: { arr: 'number' }, steeringSign: 'scalar', quality: 'scalar', rejectionReasons: { arr: 'scalar' } } },
+    window: { obj: { startTime: 'scalar', endTime: 'scalar', valid: 'boolean', sampleCount: 'scalar', steadyStateCount: 'scalar', duration: 'scalar', speedRange: { arr: 'number', max: 4 }, lateralAccelRange: { arr: 'number', max: 4 }, steeringSign: 'scalar', quality: 'scalar', rejectionReasons: { arr: 'scalar' } } },
     observation: { obj: { valid: 'boolean', observedTendency: 'scalar', confidence: 'scalar', method: 'scalar', metric: 'scalar', limitations: { arr: 'string' }, confounders: { arr: 'string' }, credibility: 'scalar', blockedReasons: { arr: BLOCKER } } },
     comparison: { obj: { valid: 'boolean', predictedTendency: 'scalar', observedTendency: 'scalar', differenceClass: 'scalar', confidence: 'scalar', assumptions: { arr: 'string' }, modelTelemetryComparisonEligible: 'boolean', credibility: 'scalar', blockedReasons: { arr: BLOCKER } } },
     raceEngineer: { obj: { eligible: { obj: { inspection: 'boolean', directional: 'boolean', quantitative: 'boolean' } }, summary: 'scalar', likelySubsystems: { arr: 'string' }, inspectionPriorities: { arr: 'string' }, setupDirections: { arr: 'string' }, trialOrder: { arr: 'string' }, missingEvidence: { arr: 'string' }, confidence: 'scalar', credibility: 'scalar' } },
@@ -92,7 +93,7 @@
     warnings: { arr: 'string' },
   } };
 
-  var INPUT_ALLOWLIST = ['meta', 'case', 'analysisCase', 'mapping', 'mappingEntries', 'calibration', 'calibrationSet', 'window', 'observation', 'comparison', 'raceEngineer', 'driverCoach', 'capability', 'blockers', 'warnings'];
+  var INPUT_ALLOWLIST = ['meta', 'case', 'mapping', 'calibration', 'window', 'observation', 'comparison', 'raceEngineer', 'driverCoach', 'capability', 'blockers', 'warnings'];
 
   // extract a SCALAR-ONLY case summary from a full R2.1D case (unknown case keys never enter the bundle)
   function _caseSummary(c) {
@@ -102,31 +103,29 @@
   }
   // normalize a blocker detail (string/array/object) to a bounded scalar array
   function _detailArr(d) { if (d == null) return []; var arr = Array.isArray(d) ? d : [d]; var out = []; for (var i = 0; i < arr.length && out.length < 16; i++) { var x = arr[i]; out.push((x == null || typeof x === 'object') ? '[non_scalar_detail]' : x); } return out; }
-  function _blocker(b) { b = b || {}; return { code: b.code != null ? b.code : null, scope: b.scope != null ? b.scope : null, severity: b.severity != null ? b.severity : null, detail: _detailArr(b.detail), parameterKey: b.parameterKey != null ? b.parameterKey : null, sourceRef: b.sourceRef != null ? b.sourceRef : null, layer: b.layer != null ? b.layer : null }; }
+  function _blocker(b) { b = (b && typeof b === 'object' && !Array.isArray(b)) ? b : {}; return Object.assign({}, b, { detail: _detailArr(b.detail) }); }
 
-  function _normBlockers(arr) { return (Array.isArray(arr) ? arr : []).map(_blocker); }
+  function _normBlockers(arr) { if (arr == null) return []; if (!Array.isArray(arr)) return arr; return arr.map(_blocker); }
   // shallow-copy each section (keep ALL keys so the closed schema can REJECT unknowns — never silently omit);
   // only the `case` is summarized to scalars, and blocker detail is normalized to a bounded scalar array.
   function _assemble(input) {
     input = input || {};
-    var mapEntries = (input.mapping && input.mapping.entries) || input.mappingEntries || [];
-    var calEntries = (input.calibration && input.calibration.entries) || input.calibrationSet || [];
     var obs = Object.assign({}, input.observation || {}); obs.blockedReasons = _normBlockers(obs.blockedReasons);
     var cmp = Object.assign({}, input.comparison || {}); cmp.blockedReasons = _normBlockers(cmp.blockedReasons);
     return {
       bundleSchemaVersion: BUNDLE_SCHEMA_VERSION,
       meta: Object.assign({ bundleSchemaVersion: BUNDLE_SCHEMA_VERSION }, input.meta || {}),
-      case: _caseSummary(input.case || input.analysisCase),
-      mapping: { entries: Array.isArray(mapEntries) ? mapEntries.slice() : [] },
-      calibration: { entries: Array.isArray(calEntries) ? calEntries.slice() : [] },
-      window: Object.assign({}, input.window || {}),
-      observation: obs,
+      case: _caseSummary(input.case),                                  // scalar summary (no deep case object)
+      mapping: input.mapping !== undefined ? input.mapping : { entries: [] },        // passed THROUGH → schema rejects unknowns
+      calibration: input.calibration !== undefined ? input.calibration : { entries: [] },
+      window: input.window !== undefined ? input.window : {},
+      observation: obs,                                                // shallow copy + normalized blocker detail
       comparison: cmp,
-      raceEngineer: Object.assign({}, input.raceEngineer || {}),
-      driverCoach: Object.assign({}, input.driverCoach || {}),
-      capability: Object.assign({}, input.capability || {}),
+      raceEngineer: input.raceEngineer !== undefined ? input.raceEngineer : {},
+      driverCoach: input.driverCoach !== undefined ? input.driverCoach : {},
+      capability: input.capability !== undefined ? input.capability : {},
       blockers: _normBlockers(input.blockers),
-      warnings: Array.isArray(input.warnings) ? input.warnings.filter(function (w) { return typeof w === 'string'; }) : [],
+      warnings: input.warnings !== undefined ? input.warnings : [],
     };
   }
 
