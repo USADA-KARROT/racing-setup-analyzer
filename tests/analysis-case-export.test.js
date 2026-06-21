@@ -6,7 +6,7 @@ const deepEq = (a, b) => { try { assert.deepStrictEqual(a, b); return true; } ca
 
 const input = {
   meta: { exportedAt: '2026-06-21T00:00:00Z', appModelVersion: 'v1.6.0', note: 'demo' },
-  case: { kind: 'analysis_case', schemaVersion: '1.0.0', caseId: 'c1', caseMetadata: { title: 't', createdAt: '2026-06-21T00:00:00Z' }, vehicleBinding: { profileId: 'veh' }, telemetryBinding: { sessionId: 'sess' }, modelSnapshot: { modelId: 'dynamics-model', modelVersion: 'v1.6.0', canonicalContractVersion: '1.0.0' }, capabilityState: { modelInputEligible: true }, valid: true },
+  case: EX.caseSummary({ kind: 'analysis_case', schemaVersion: '1.0.0', caseId: 'c1', caseMetadata: { title: 't', createdAt: '2026-06-21T00:00:00Z' }, vehicleBinding: { profileId: 'veh' }, telemetryBinding: { sessionId: 'sess' }, modelSnapshot: { modelId: 'dynamics-model', modelVersion: 'v1.6.0', canonicalContractVersion: '1.0.0' }, capabilityState: { modelInputEligible: true }, valid: true }),
   mapping: { entries: [{ rawColumnId: 1, rawName: 'speed', canonicalChannel: 'speed', userConfirmed: true, projection: { scale: 1, offset: 0, sign: 1 }, rawUnit: 'm/s', canonicalUnit: 'm/s' }] },
   calibration: { entries: [{ calibrationType: 'steering_sign', value: 1, unit: ':1', source: 'sheet', confidence: 'high', verified: true, applicableSessionIds: ['s1'], createdAt: '2026-06-21T00:00:00Z' }] },
   window: { startTime: 0, endTime: 10, valid: true, sampleCount: 200, steadyStateCount: 150, quality: 'good', speedRange: [15, 40], lateralAccelRange: [2, 9], steeringSign: 'positive', rejectionReasons: [] },
@@ -29,7 +29,7 @@ const input = {
 // CP2 finding: unknown TOP-LEVEL input key rejected
 (() => { const bad = Object.assign({ junk: 1 }, input); chk('unknown input top key rejected', EX.exportAnalysisCase(bad).ok === false && EX.exportAnalysisCase(bad).errors.some(e => e.indexOf('unknown_input_key') === 0)); })();
 // CP2 finding: unknown NESTED case key never leaks (case summarized) → export still ok, summary clean
-(() => { const c = JSON.parse(JSON.stringify(input)); c.case.secretNested = { raw: [1, 2, 3] }; const r = EX.exportAnalysisCase(c); chk('unknown nested case key does not leak (summarized)', r.ok === true && !('secretNested' in r.bundle.case)); })();
+(() => { const c = JSON.parse(JSON.stringify(input)); c.case = { kind: 'analysis_case', caseId: 'c1', caseMetadata: { title: 't' } }; chk('full (un-summarized) case object rejected', EX.exportAnalysisCase(c).ok === false); })();
 // CP2 finding: a raw values array in a mapping entry rejected (unknown key)
 (() => { const bad = JSON.parse(JSON.stringify(input)); bad.mapping.entries[0].values = [1, 2, 3, 4]; chk('mapping entry raw values rejected', EX.exportAnalysisCase(bad).ok === false && EX.exportAnalysisCase(bad).errors.some(e => e.indexOf('unknown_key') === 0)); })();
 // malformed entry (missing projection) fails closed
@@ -49,7 +49,7 @@ const input = {
 // CP2 re-review: capability is a CLOSED key set (arbitrary boolean key rejected)
 (() => { const bad = JSON.parse(JSON.stringify(input)); bad.capability.secret = true; chk('capability unknown key rejected', EX.exportAnalysisCase(bad).ok === false && EX.exportAnalysisCase(bad).errors.some(e => e.indexOf('unknown_key') === 0)); })();
 (() => { const bad = JSON.parse(JSON.stringify(input)); bad.raceEngineer.eligible.secret = true; chk('eligible unknown key rejected', EX.exportAnalysisCase(bad).ok === false); })();
-(() => { const bad = JSON.parse(JSON.stringify(input)); bad.blockers = [{ code: 'x', detail: [{ values: [1,2,3] }] }]; const r = EX.exportAnalysisCase(bad); chk('blocker detail raw object → no raw leak', r.ok === true && deepEq(r.bundle.blockers[0].detail, ['[non_scalar_detail]'])); })();
+(() => { const bad = JSON.parse(JSON.stringify(input)); bad.blockers = [{ code: 'x', detail: [{ values: [1,2,3] }] }]; const r = EX.exportAnalysisCase(bad); chk('blocker detail raw object → rejected (no leak)', r.ok === false && !JSON.stringify(r.bundle || {}).includes('values')); })();
 (() => { const bad = JSON.parse(JSON.stringify(input)); bad.blockers = [{ code: 'x', detail: new Array(200).fill('x') }]; chk('blocker detail capped', EX.exportAnalysisCase(bad).bundle.blockers[0].detail.length === 16); })();
 (() => { const bad = JSON.parse(JSON.stringify(input)); bad.mapping.secret = { values: [1,2,3] }; chk('section-level unknown key rejected', EX.exportAnalysisCase(bad).ok === false && EX.exportAnalysisCase(bad).errors.some(e => e === 'unknown_key:.mapping.secret')); })();
 (() => { const bad = JSON.parse(JSON.stringify(input)); bad.warnings = [{ values: [1,2,3] }]; chk('warnings non-string rejected (not silently omitted)', EX.exportAnalysisCase(bad).ok === false); })();
