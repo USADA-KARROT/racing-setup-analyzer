@@ -2611,6 +2611,14 @@ canvas{max-height:300px}
             <label class="flex items-center gap-1"><input type="checkbox" x-model="ch.confirmed"> <span>confirm</span></label>
           </div>
         </template>
+        <div class="mt-2 pt-2 border-t border-slate-700/60">
+          <div class="text-[11px] text-slate-400 mb-1">Steering calibration (optional) — enables <b>Measured</b> magnitude / K<sub>us</sub>. Value = road-wheel radians per projected steering unit (bound to this steering mapping).</div>
+          <div class="flex items-center gap-3 text-xs flex-wrap">
+            <label class="flex items-center gap-1">ratio <input type="number" step="any" x-model="importSteeringRatio" placeholder="rad/unit" class="w-24 bg-slate-900 border border-slate-700 rounded px-1 py-0.5"></label>
+            <label class="flex items-center gap-1"><input type="checkbox" x-model="importSteeringConfirmed"> <span>confirm sign + zero + ratio (road-wheel referenced)</span></label>
+          </div>
+          <div class="text-[10px] text-slate-500 mt-0.5">No calibration → directional tendency only (calibration-independent); magnitude stays blocked. Synthetic fixtures are labelled provenance-unverified.</div>
+        </div>
         <button id="runImportedAnalysis" class="mt-2 px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm font-semibold" @click="runImportedAnalysis()">Build Case &amp; Run Analysis</button>
         <div class="text-[11px] text-slate-500 mt-1">Required confirmed: speed, lateral_accel, yaw_rate, steering. Unconfirmed identity → observation blocked (the session stays inspectable; measured magnitude / road-wheel metrics stay blocked).</div>
       </div>
@@ -2710,6 +2718,21 @@ canvas{max-height:300px}
       </template>
     </div>
 
+    <!-- F2 · Measured Metrics (R2.4) -->
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+      <div class="text-xs text-slate-400 mb-2">F2 · Measured Metrics <span x-html="credBadge('Measured')"></span></div>
+      <template x-if="analysisView.measuredMetrics.available">
+        <div class="text-xs space-y-1">
+          <div>Measured K<sub>us</sub>: <b class="text-violet-300" x-text="fmt(analysisView.measuredMetrics.measuredKUs.value)"></b> deg/g <span x-html="credBadge('Measured')"></span> <span class="text-slate-500" x-text="'· vs predicted '+fmt(analysisView.measuredMetrics.predictedKUs.value)+' deg/g'"></span></div>
+          <div>Agreement: <b class="text-sky-300" x-text="analysisView.measuredMetrics.agreementClass"></b> <span class="text-slate-500" x-text="'· residual '+fmt(analysisView.measuredMetrics.residualDegG)+' deg/g'"></span></div>
+          <div class="text-[11px] text-amber-400/70" x-text="'Provenance: '+analysisView.measuredMetrics.dataProvenance+' · '+(analysisView.measuredMetrics.limitations||[]).join('; ')"></div>
+        </div>
+      </template>
+      <template x-if="!analysisView.measuredMetrics.available">
+        <div class="text-xs text-slate-400">Measured K<sub>us</sub> blocked — <span x-text="analysisView.measuredMetrics.reason || (analysisView.measuredMetrics.calibratedMagnitudeAvailable ? 'insufficient data quality' : 'no steering calibration')"></span><template x-for="b in (analysisView.measuredMetrics.blockedReasons||[])" :key="b"><span class="ml-2 text-slate-500" x-text="b"></span></template></div>
+      </template>
+    </div>
+
     <!-- G · Race Engineer -->
     <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700" x-show="analysisView.raceEngineer.available">
       <div class="text-xs text-slate-400 mb-2">G · Race Engineer <span x-html="credBadge('Heuristic')"></span></div>
@@ -2795,6 +2818,7 @@ canvas{max-height:300px}
 <script src="js/canonical-model-input.js"></script>
 <script src="js/analysis-execution.js"></script>
 <script src="js/telemetry-observation.js"></script>
+<script src="js/measured-metrics.js"></script>
 <script src="js/model-telemetry-comparison.js"></script>
 <script src="js/race-engineer-insight.js"></script>
 <script src="js/driver-coach-insight.js"></script>
@@ -2833,6 +2857,8 @@ function app(){return{
   // R2.3 import workflow — UI calls services only; no physics recompute, no UI-side capability derivation
   importCsvText: '',
   importError: null,
+  importSteeringRatio: '',
+  importSteeringConfirmed: false,
   importedChannels: [],
   _importedBundle: null,
   canonicalChannelOptions: (typeof ChannelMapping!=='undefined' && ChannelMapping.CANONICAL_CHANNELS) ? ChannelMapping.CANONICAL_CHANNELS : ['speed','lateral_accel','yaw_rate','steering','throttle','brake','track_position','lap','time'],
@@ -2855,7 +2881,18 @@ function app(){return{
       if (typeof CanonicalTelemetrySession==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof DemoAnalysisCase==='undefined'){ this.importError='analysis modules not loaded'; return; }
       var assignments = this.importedChannels.filter(function(c){ return c.assigned; }).map(function(c){ return { rawColumnId:c.rawColumnId, canonicalChannel:c.assigned, userConfirmed: c.confirmed===true }; });
       var mapping = ChannelMapping.buildChannelMapping(this._importedBundle.rawChannels, assignments);
-      var session = CanonicalTelemetrySession.buildCanonicalSession(this._importedBundle, mapping, [], null, { sessionId:'imported_session' });
+      var SESS='imported_session';
+      var cals=[];
+      var steerEntry=(mapping.mappingEntries||[]).filter(function(e){return e.canonicalChannel==='steering';});
+      var ratio=parseFloat(this.importSteeringRatio);
+      if (this.importSteeringConfirmed && steerEntry.length===1 && isFinite(ratio) && ratio>0 && typeof CalibrationRegistry!=='undefined') {
+        var bind={ rawColumnId:steerEntry[0].rawColumnId, projectionSignature:ChannelMapping.projectionSignature(steerEntry[0].projection) };
+        var now=new Date().toISOString();
+        var mk=function(ty,val){ return { calibrationType:ty, value:val, source:'user', confidence:'high', verified:true, createdAt:now, channelBinding:bind, applicableSessionIds:[SESS] }; };
+        var T=CalibrationRegistry.CALIBRATION_TYPE;
+        cals=[ mk(T.STEERING_SIGN), mk(T.STEERING_ZERO), mk(T.STEERING_RATIO, ratio) ];
+      }
+      var session = CanonicalTelemetrySession.buildCanonicalSession(this._importedBundle, mapping, cals, null, { sessionId:SESS });
       var demo = DemoAnalysisCase.buildDemoAnalysisCase(); // vehicle/setup binding; imported telemetry session
       var ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, session, null, {});
       this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, {});
