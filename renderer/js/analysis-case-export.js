@@ -85,9 +85,9 @@
     window: { obj: { startTime: 'scalar', endTime: 'scalar', valid: 'boolean', sampleCount: 'scalar', steadyStateCount: 'scalar', duration: 'scalar', speedRange: { arr: 'number' }, lateralAccelRange: { arr: 'number' }, steeringSign: 'scalar', quality: 'scalar', rejectionReasons: { arr: 'scalar' } } },
     observation: { obj: { valid: 'boolean', observedTendency: 'scalar', confidence: 'scalar', method: 'scalar', metric: 'scalar', limitations: { arr: 'string' }, confounders: { arr: 'string' }, credibility: 'scalar', blockedReasons: { arr: BLOCKER } } },
     comparison: { obj: { valid: 'boolean', predictedTendency: 'scalar', observedTendency: 'scalar', differenceClass: 'scalar', confidence: 'scalar', assumptions: { arr: 'string' }, modelTelemetryComparisonEligible: 'boolean', credibility: 'scalar', blockedReasons: { arr: BLOCKER } } },
-    raceEngineer: { obj: { eligible: { boolMap: true }, summary: 'scalar', likelySubsystems: { arr: 'string' }, inspectionPriorities: { arr: 'string' }, setupDirections: { arr: 'string' }, trialOrder: { arr: 'string' }, missingEvidence: { arr: 'string' }, confidence: 'scalar', credibility: 'scalar' } },
+    raceEngineer: { obj: { eligible: { obj: { inspection: 'boolean', directional: 'boolean', quantitative: 'boolean' } }, summary: 'scalar', likelySubsystems: { arr: 'string' }, inspectionPriorities: { arr: 'string' }, setupDirections: { arr: 'string' }, trialOrder: { arr: 'string' }, missingEvidence: { arr: 'string' }, confidence: 'scalar', credibility: 'scalar' } },
     driverCoach: { obj: { eligible: 'boolean', observations: { arr: { obj: { type: 'scalar', code: 'scalar', qualitative: 'scalar', note: 'scalar', reversalCount: 'scalar', reversalRatePerS: 'scalar', abruptnessP95: 'scalar', unit: 'scalar', throttle: 'scalar', brake: 'scalar' } } }, practicePriorities: { arr: 'string' }, cannotConclude: { arr: 'string' }, confidence: 'scalar', credibility: 'scalar' } },
-    capability: { boolMap: true },
+    capability: { obj: { caseAssembled: 'boolean', modelRunnable: 'boolean', modelRan: 'boolean', telemetryInspectable: 'boolean', telemetryObservable: 'boolean', modelTelemetryComparisonEligible: 'boolean', raceEngineerInspectionEligible: 'boolean', raceEngineerDirectionalEligible: 'boolean', driverCoachingEligible: 'boolean', quantitativeSetupRecommendationEligible: 'boolean' } },
     blockers: { arr: BLOCKER },
     warnings: { arr: 'string' },
   } };
@@ -101,7 +101,7 @@
     return { caseId: c.caseId || null, schemaVersion: c.schemaVersion || null, modelId: ms.modelId || null, modelVersion: ms.modelVersion || null, calibrationVersion: ms.calibrationVersion || null, canonicalContractVersion: ms.canonicalContractVersion || null, vehicleProfileId: vb.profileId || null, telemetrySessionId: tb.sessionId || null, modelInputEligible: cap.modelInputEligible === true, title: md.title || null, createdAt: md.createdAt || null };
   }
   // normalize a blocker detail (string/array/object) to a bounded scalar array
-  function _detailArr(d) { if (d == null) return []; if (Array.isArray(d)) return d.slice(0, MAX_ARRAY).map(function (x) { return (x == null || typeof x === 'object') ? JSON.stringify(x) : x; }); if (typeof d === 'object') return [JSON.stringify(d)]; return [d]; }
+  function _detailArr(d) { if (d == null) return []; var arr = Array.isArray(d) ? d : [d]; var out = []; for (var i = 0; i < arr.length && out.length < 16; i++) { var x = arr[i]; out.push((x == null || typeof x === 'object') ? '[non_scalar_detail]' : x); } return out; }
   function _blocker(b) { b = b || {}; return { code: b.code != null ? b.code : null, scope: b.scope != null ? b.scope : null, severity: b.severity != null ? b.severity : null, detail: _detailArr(b.detail), parameterKey: b.parameterKey != null ? b.parameterKey : null, sourceRef: b.sourceRef != null ? b.sourceRef : null, layer: b.layer != null ? b.layer : null }; }
 
   function _normBlockers(arr) { return (Array.isArray(arr) ? arr : []).map(_blocker); }
