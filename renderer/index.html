@@ -2572,6 +2572,142 @@ canvas{max-height:300px}
   </div>
 </div>
 
+<!-- ==================== TAB: Analysis Workspace (R2.2 end-to-end) ==================== -->
+<div x-show="currentTab==='analysis'" x-transition>
+  <div class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-bold" x-text="t('tab.analysis')"></h2>
+    <button id="loadDemoAnalysisCase" class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm font-semibold" @click="loadDemoAnalysisCase()">Load Demo Analysis Case</button>
+  </div>
+  <div class="text-xs text-slate-400 mb-3">First end-to-end analysis vertical slice: canonical setup → model prediction → telemetry observation → model-vs-actual → race-engineer & driver-coach guidance. Every value is labelled by how it was derived; blocked features state why.</div>
+  <div x-show="analysisError" class="text-red-400 text-sm mb-3" x-text="analysisError"></div>
+  <div x-show="!analysisView && !analysisError" class="text-slate-500 text-sm">Click <b>Load Demo Analysis Case</b> to run the full pipeline on synthetic data.</div>
+
+  <template x-if="analysisView">
+   <div class="space-y-4" id="analysisWorkspaceView">
+    <!-- A · Case Header -->
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+      <div class="text-xs text-slate-400 mb-2">A · Case Header</div>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
+        <div><span class="text-slate-500">Case </span><span x-text="analysisView.caseHeader.caseId"></span></div>
+        <div><span class="text-slate-500">Vehicle </span><span x-text="analysisView.caseHeader.vehicle"></span></div>
+        <div><span class="text-slate-500">Model </span><span x-text="analysisView.caseHeader.modelVersion"></span></div>
+        <div><span class="text-slate-500">Telemetry </span><span x-text="analysisView.caseHeader.telemetrySession"></span></div>
+        <div><span class="text-slate-500">Created </span><span x-text="analysisView.caseHeader.createdAt"></span></div>
+        <div><span class="text-slate-500">Status </span><span class="text-sky-300 font-semibold" x-text="analysisView.caseHeader.overallStatus"></span></div>
+      </div>
+    </div>
+
+    <!-- B · Capability Summary -->
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+      <div class="text-xs text-slate-400 mb-2">B · Capability Summary</div>
+      <div class="flex flex-wrap gap-2">
+        <template x-for="c in analysisView.capabilitySummary" :key="c.key">
+          <span class="text-xs px-2 py-1 rounded" :class="c.available ? 'bg-emerald-900/40 text-emerald-300' : 'bg-slate-700 text-slate-400'">
+            <span x-text="c.available ? '✓' : '○'"></span> <span x-text="c.key"></span>
+          </span>
+        </template>
+      </div>
+    </div>
+
+    <!-- C · Vehicle & Setup Inputs -->
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+      <div class="text-xs text-slate-400 mb-2">C · Vehicle &amp; Setup Inputs <span x-html="credBadge('Derived')"></span></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+        <div>Front wheel rate: <b x-text="fmt(analysisView.setupInputs.frontWheelRate.value)"></b> <span x-text="analysisView.setupInputs.frontWheelRate.unit"></span> <span class="text-slate-500" x-text="'· '+analysisView.setupInputs.frontWheelRate.basis"></span> <span x-html="credBadge(analysisView.setupInputs.frontWheelRate.credibility)"></span></div>
+        <div>Rear wheel rate: <b x-text="fmt(analysisView.setupInputs.rearWheelRate.value)"></b> <span x-text="analysisView.setupInputs.rearWheelRate.unit"></span> <span class="text-slate-500" x-text="'· '+analysisView.setupInputs.rearWheelRate.basis"></span> <span x-html="credBadge(analysisView.setupInputs.rearWheelRate.credibility)"></span></div>
+        <div>Front ARB: <b x-text="fmt(analysisView.setupInputs.frontArb.value)"></b> Nm/deg <span x-html="credBadge(analysisView.setupInputs.frontArb.credibility)"></span></div>
+        <div>Rear ARB: <b x-text="fmt(analysisView.setupInputs.rearArb.value)"></b> Nm/deg <span x-html="credBadge(analysisView.setupInputs.rearArb.credibility)"></span></div>
+        <div>Mass / Front%: <b x-text="fmt(analysisView.setupInputs.mass.value)"></b> kg / <b x-text="fmt(analysisView.setupInputs.frontWeightPct.value)"></b>%</div>
+        <div>CG height: <b x-text="fmt(analysisView.setupInputs.cgHeight.value)"></b> mm</div>
+      </div>
+      <div class="text-[11px] text-amber-400/80 mt-2" x-text="'Trust: '+analysisView.setupInputs.trustBadge"></div>
+    </div>
+
+    <!-- D · Model Prediction -->
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700" x-show="analysisView.modelPrediction.available">
+      <div class="text-xs text-slate-400 mb-2">D · Model Prediction <span x-html="credBadge('Model')"></span></div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+        <div>Front/Rear wheel rate: <b x-text="fmt(analysisView.modelPrediction.frontWheelRate.value)"></b> / <b x-text="fmt(analysisView.modelPrediction.rearWheelRate.value)"></b> N/mm <span x-html="credBadge('Physics')"></span></div>
+        <div>Effective wheel rate: <b x-text="fmt(analysisView.modelPrediction.frontWheelRateEffective.value)"></b> / <b x-text="fmt(analysisView.modelPrediction.rearWheelRateEffective.value)"></b> N/mm <span x-html="credBadge('Physics')"></span></div>
+        <div>Front/Rear roll stiffness: <b x-text="fmt(analysisView.modelPrediction.frontRollStiffness.value)"></b> / <b x-text="fmt(analysisView.modelPrediction.rearRollStiffness.value)"></b> Nm/deg <span x-html="credBadge('Physics')"></span></div>
+        <div>Roll stiffness dist (front): <b x-text="fmt(analysisView.modelPrediction.rollStiffnessDistFront.value)"></b>% <span x-html="credBadge('Physics')"></span></div>
+        <div>Roll gradient: <b x-text="fmt(analysisView.modelPrediction.rollGradient.value)"></b> deg/g <span x-html="credBadge('Physics')"></span></div>
+        <div>Ride frequency F/R: <b x-text="fmt(analysisView.modelPrediction.rideFrequencyFront.value)"></b> / <b x-text="fmt(analysisView.modelPrediction.rideFrequencyRear.value)"></b> Hz <span x-html="credBadge('Physics')"></span></div>
+        <div>LLTD front: <b x-text="fmt(analysisView.modelPrediction.lltdFront.value)"></b>% <span x-html="credBadge('Physics')"></span></div>
+        <div>Understeer gradient: <b x-text="fmt(analysisView.modelPrediction.understeerGradient.value)"></b> deg/g <span x-html="credBadge('Model')"></span></div>
+        <div class="md:col-span-2">Predicted tendency: <b class="text-sky-300" x-text="analysisView.modelPrediction.predictedTendency.value"></b> <span x-html="credBadge('Model')"></span></div>
+      </div>
+    </div>
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-amber-700/50" x-show="!analysisView.modelPrediction.available">
+      <div class="text-xs text-amber-400 mb-1">D · Model Prediction — blocked</div>
+      <template x-for="b in analysisView.modelPrediction.blockedReasons" :key="b.code"><div class="text-xs text-slate-400" x-text="b.code + (b.parameterKey?(' · '+b.parameterKey):'')"></div></template>
+    </div>
+
+    <!-- E · Telemetry Observation -->
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+      <div class="text-xs text-slate-400 mb-2">E · Telemetry Observation <span x-html="credBadge(analysisView.telemetryObservation.available ? 'Heuristic' : 'Unavailable')"></span></div>
+      <template x-if="analysisView.telemetryObservation.available">
+        <div class="text-sm space-y-1">
+          <div>Observed tendency: <b class="text-amber-300" x-text="analysisView.telemetryObservation.observedTendency.value"></b> · confidence <span x-text="analysisView.telemetryObservation.confidence"></span></div>
+          <div class="text-slate-400">Method: <span x-text="analysisView.telemetryObservation.method"></span> · metric <span x-text="analysisView.telemetryObservation.metric"></span></div>
+          <div class="text-[11px] text-slate-500">Limitations: <span x-text="(analysisView.telemetryObservation.limitations||[]).join(', ')"></span></div>
+          <div class="text-[11px] text-slate-500">Confounders: <span x-text="(analysisView.telemetryObservation.confounders||[]).join(', ')"></span></div>
+        </div>
+      </template>
+      <template x-if="!analysisView.telemetryObservation.available">
+        <div class="text-xs text-slate-400">Observation unavailable. <template x-for="b in (analysisView.telemetryObservation.blockedReasons||[])" :key="b.code"><span class="mr-2" x-text="b.code"></span></template></div>
+      </template>
+    </div>
+
+    <!-- F · Model vs Actual -->
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+      <div class="text-xs text-slate-400 mb-2">F · Model vs Actual <span x-html="credBadge('Heuristic')"></span></div>
+      <template x-if="analysisView.modelVsActual.available">
+        <div class="text-sm space-y-1">
+          <div>Predicted <b x-text="analysisView.modelVsActual.predicted.value"></b> · Observed <b x-text="analysisView.modelVsActual.observed.value"></b> → <b class="text-sky-300" x-text="analysisView.modelVsActual.difference.value"></b> <span x-html="credBadge('Heuristic')"></span></div>
+          <div class="text-[11px] text-slate-500">Assumptions: <span x-text="(analysisView.modelVsActual.assumptions||[]).join('; ')"></span></div>
+        </div>
+      </template>
+      <template x-if="!analysisView.modelVsActual.available">
+        <div class="text-xs text-slate-400">Comparison blocked. <template x-for="b in (analysisView.modelVsActual.blockedReasons||[])" :key="b.code"><span class="mr-2" x-text="b.code"></span></template></div>
+      </template>
+    </div>
+
+    <!-- G · Race Engineer -->
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700" x-show="analysisView.raceEngineer.available">
+      <div class="text-xs text-slate-400 mb-2">G · Race Engineer <span x-html="credBadge('Heuristic')"></span></div>
+      <div class="text-sm space-y-2">
+        <div>Summary: <span class="text-slate-300" x-text="analysisView.raceEngineer.summary"></span></div>
+        <div>Likely subsystems: <template x-for="s in analysisView.raceEngineer.likelySubsystems" :key="s"><span class="inline-block bg-slate-700 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="s"></span></template></div>
+        <div>Inspect first: <template x-for="s in analysisView.raceEngineer.inspectionPriorities" :key="s"><span class="inline-block bg-slate-700 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="s"></span></template></div>
+        <div x-show="analysisView.raceEngineer.eligible.directional">Directional trials: <template x-for="s in analysisView.raceEngineer.setupDirections" :key="s"><span class="inline-block bg-teal-900/40 text-teal-300 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="s"></span></template></div>
+        <div class="text-[11px] text-amber-400/80">Quantitative recommendation: <b>blocked</b> — <span x-text="(analysisView.raceEngineer.missingEvidence||[]).join(', ')"></span></div>
+      </div>
+    </div>
+
+    <!-- H · Driver Coach -->
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700" x-show="analysisView.driverCoach.available">
+      <div class="text-xs text-slate-400 mb-2">H · Driver Coach <span x-html="credBadge('Heuristic')"></span></div>
+      <div class="text-sm space-y-2">
+        <div>Observations: <template x-for="o in analysisView.driverCoach.observations" :key="o.code"><span class="inline-block bg-slate-700 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="o.code + (o.qualitative?(' · '+o.qualitative):'')"></span></template></div>
+        <div>Practice: <template x-for="p in analysisView.driverCoach.practicePriorities" :key="p"><span class="inline-block bg-sky-900/40 text-sky-300 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="p"></span></template></div>
+        <div class="text-[11px] text-amber-400/80">Cannot conclude: <span x-text="(analysisView.driverCoach.cannotConclude||[]).join(', ')"></span></div>
+      </div>
+    </div>
+
+    <!-- I · Evidence / Provenance Drawer -->
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+      <div class="text-xs text-slate-400 mb-2">I · Evidence &amp; Provenance</div>
+      <div class="text-xs text-slate-500 mb-2">Credibility: <template x-for="l in analysisView.evidenceDrawer.credibilityLegend" :key="l"><span class="mr-1" x-html="credBadge(l)"></span></template></div>
+      <div class="text-[11px] text-slate-400">Model: <span x-text="analysisView.evidenceDrawer.modelVersion"></span></div>
+      <div class="text-[11px] text-slate-400 mt-1">Blocked reasons (all layers):</div>
+      <template x-for="b in analysisView.evidenceDrawer.allBlockedReasons" :key="b.layer+b.code"><div class="text-[11px] text-slate-500" x-text="'· ['+b.layer+'] '+b.code"></div></template>
+      <div class="text-[11px] text-slate-400 mt-1" x-show="(analysisView.evidenceDrawer.allWarnings||[]).length">Warnings: <span x-text="(analysisView.evidenceDrawer.allWarnings||[]).join('; ')"></span></div>
+    </div>
+   </div>
+  </template>
+</div>
+
 </main>
 
 <script src="js/i18n.js"></script>
@@ -2613,6 +2749,21 @@ canvas{max-height:300px}
 <script src="js/bms-private-corpus-boundary.js"></script>
 <script src="js/bms-sanitized-evidence-adapter.js"></script>
 <script src="js/bms-channel-dictionary.js"></script>
+<!-- R2.1 canonical data layer + R2.2 end-to-end analysis workspace modules (dependency order) -->
+<script src="js/canonical-parameters.js"></script>
+<script src="js/parameter-conversions.js"></script>
+<script src="js/setup-snapshot.js"></script>
+<script src="js/analysis-case.js"></script>
+<script src="js/suspension-input-normalizer.js"></script>
+<script src="js/canonical-model-input.js"></script>
+<script src="js/analysis-execution.js"></script>
+<script src="js/telemetry-observation.js"></script>
+<script src="js/model-telemetry-comparison.js"></script>
+<script src="js/race-engineer-insight.js"></script>
+<script src="js/driver-coach-insight.js"></script>
+<script src="js/analysis-workspace.js"></script>
+<script src="js/analysis-workspace-viewmodel.js"></script>
+<script src="js/demo-analysis-case.js"></script>
 <script>
 const COLORS=['#38bdf8','#f472b6','#34d399','#facc15','#a78bfa','#fb923c','#22d3ee','#e879f9','#84cc16','#f87171'];
 
@@ -2623,6 +2774,25 @@ const telemetryDataHolder = { session: null, importToken: 0, ro: null, lastW: nu
   dragging: false, dragStartPx: null, dragCurrPx: null, pointerInside: false, raf: 0 };
 
 function app(){return{
+  // === R2.2 Analysis Workspace (consumes production service output via the pure view-model builder) ===
+  analysisView: null,
+  analysisError: null,
+  loadDemoAnalysisCase(){
+    try {
+      if (typeof DemoAnalysisCase==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof AnalysisWorkspaceViewModel==='undefined'){ this.analysisError='analysis modules not loaded'; this.analysisView=null; return; }
+      const demo = DemoAnalysisCase.buildDemoAnalysisCase();
+      const ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, demo.telemetrySession, demo.window, {}); // global Tier1BasicBalance as the model runner
+      this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, { suspensionNormalizationView: demo.suspensionNormalizationView });
+      this.analysisError = null;
+    } catch(e){ this.analysisError = String((e&&e.message)||e); this.analysisView=null; }
+  },
+  fmt(v){ return (v==null || (typeof v==='number' && !isFinite(v))) ? '—' : (typeof v==='number' ? (Math.round(v*100)/100) : v); },
+  credBadge(level){
+    const M={ Physics:['bg-emerald-900/40','text-emerald-300'], Model:['bg-sky-900/40','text-sky-300'], Measured:['bg-violet-900/40','text-violet-300'], Derived:['bg-teal-900/40','text-teal-300'], Heuristic:['bg-amber-900/40','text-amber-300'], Unavailable:['bg-slate-700','text-slate-400'] };
+    const c=M[level]||M.Unavailable;
+    return '<span class="text-[10px] px-1.5 py-0.5 rounded '+c[0]+' '+c[1]+'">'+level+'</span>';
+  },
+
   // === i18n (English primary / 繁中 / 日本語) ===
   lang: (typeof localStorage!=='undefined' && localStorage.getItem('lang')) || 'en',
   langs:[{id:'en',label:'EN'},{id:'zh',label:'繁'},{id:'ja',label:'日'}],
@@ -2933,6 +3103,7 @@ function app(){return{
     {id:'tire',key:'tab.tire'},
     {id:'lihpao',key:'tab.lihpao'},
     {id:'telemetry',key:'tab.telemetry'},
+    {id:'analysis',key:'tab.analysis'},
     {id:'guide',key:'tab.guide'},
   ],
   tier:1,
