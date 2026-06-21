@@ -1,114 +1,141 @@
 /**
- * analysis-case-export.js — R2.3 §4.7: portable, versioned, CLOSED-schema Analysis Case export (PURE).
+ * analysis-case-export.js — R2.3 §4.7: portable, versioned, FULLY-CLOSED Analysis Case export (PURE).
  *
- * exportAnalysisCase(bundleInput) → a versioned JSON-safe bundle; parseAnalysisCaseExport(json) → re-validate.
- * EVERY section has a FIXED key allowlist — an unknown key anywhere is a HARD error (rejected, NOT omitted);
- * each value is rebuilt from the whitelist (the caller object is never retained); a private path/sample leaf
- * (isPrivateRef) is rejected; no raw sample arrays may ride inside a section. The SAME closed validation runs
- * on export and parse (shared → no drift), so `parse(export(b))` deep-equals the sanitized bundle.
+ * exportAnalysisCase(input) → a versioned, JSON-safe bundle; parseAnalysisCaseExport(json) → re-validate.
+ * The bundle is a CURATED, recursively CLOSED summary: every object node has a fixed key allowlist (an
+ * unknown key ANYWHERE is rejected, not omitted), every leaf is a scalar / fixed-length / bounded array, no
+ * deep case object is embedded (the `case` section is a scalar summary), and NO raw sample arrays can ride
+ * in (no section schema has a values field; arrays are bounded). A private path/sample string leaf is
+ * rejected (value-level detection that still allows units like `N/mm` and ratios like `60/80`). The SAME
+ * schema validates export and parse (shared → no drift), so `parse(export(b))` deep-equals the bundle.
  *
- * Codex CP1 finding: do NOT rely on parseAnalysisCase for the unknown-key guarantee — this module rebuilds
- * the `case` section's top-level keys against its own allowlist too.
+ * Codex CP2 finding: closed "anywhere" — unknown top-level INPUT keys, unknown nested keys, and raw values
+ * arrays must all be rejected; the case is summarized (not embedded) so its unknown keys can never leak in.
  *
  * UMD: Node require / Electron renderer global (AnalysisCaseExport).
  */
 (function (root) {
   'use strict';
 
-  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
-  var SS = _req('./setup-snapshot.js', typeof SetupSnapshot !== 'undefined' ? SetupSnapshot : undefined);
-  if (!SS) throw new Error('analysis-case-export.js requires setup-snapshot.js (isPrivateRef)');
-  var isPrivateRef = SS.isPrivateRef;
-
   var BUNDLE_SCHEMA_VERSION = '1.0.0';
+  var MAX_ARRAY = 256; // bounded arrays (defensive raw-sample guard — no legitimate bundle field is longer)
 
-  // closed top-level key allowlists per section (and the case sub-allowlist) — unknown key = hard error
-  var CASE_KEYS = ['kind', 'schemaVersion', 'caseId', 'caseMetadata', 'vehicleBinding', 'setupSnapshot', 'telemetryBinding', 'modelSnapshot', 'context', 'capabilityState', 'blockedReasons', 'provenanceSummary', 'valid', 'errors', 'warnings'];
-  var SECTION = {
-    meta: ['bundleSchemaVersion', 'exportedAt', 'appModelVersion', 'note'],
-    case: CASE_KEYS,
-    mapping: ['entries'],
-    calibration: ['entries'],
-    window: ['startTime', 'endTime', 'valid', 'sampleCount', 'steadyStateCount', 'duration', 'speedRange', 'lateralAccelRange', 'steeringSign', 'quality', 'rejectionReasons'],
-    observation: ['valid', 'observedTendency', 'confidence', 'method', 'metric', 'limitations', 'confounders', 'credibility', 'blockedReasons'],
-    comparison: ['valid', 'predictedTendency', 'observedTendency', 'differenceClass', 'confidence', 'assumptions', 'modelTelemetryComparisonEligible', 'credibility', 'blockedReasons'],
-    raceEngineer: ['eligible', 'summary', 'likelySubsystems', 'inspectionPriorities', 'setupDirections', 'trialOrder', 'missingEvidence', 'confidence', 'credibility'],
-    driverCoach: ['eligible', 'observations', 'practicePriorities', 'cannotConclude', 'confidence', 'credibility'],
-    capability: null,   // any boolean-valued key (closed by type, not key list)
-    blockers: null,     // array
-    warnings: null,     // array of string
-  };
-  var TOP_KEYS = ['bundleSchemaVersion', 'meta', 'case', 'mapping', 'calibration', 'window', 'observation', 'comparison', 'raceEngineer', 'driverCoach', 'capability', 'blockers', 'warnings'];
-
-  function _isScalar(v) { return v == null || (typeof v === 'number' && isFinite(v)) || typeof v === 'string' || typeof v === 'boolean'; }
-  // VALUE-level path/private detection (looser than id-level isPrivateRef): flags real paths / filenames /
-  // private folders / fingerprints, but NOT a bare '/' (so units 'N/mm' and ratios '60/80' pass).
+  // ── value-level path/private detection (allows 'N/mm', '60/80'; rejects real paths/files/fingerprints) ──
   var _PATH_LIKE_RE = [
     /^[A-Za-z]:[\\/]/, /^\\\\/, /:\/\//, /^(file|data|smb|ftp|blob|javascript|vbscript|https?):/i,
     /(^|\s)\/(Users|home|tmp|private|var|Volumes|Applications)\//,
     /(^|[\/\\])(Users|Desktop|Documents|iCloud)([\/\\]|$)/, /個人資料/, /HFDP/i,
     /\.(csv|tsv|xlsx?|pdf|bmsbin|mat|mdf|ld|json|ssn|bin)($|[\/\\\s])/i, /^[0-9a-f]{32,}$/i,
   ];
-  function _looksLikePath(str) { for (var i = 0; i < _PATH_LIKE_RE.length; i++) { if (_PATH_LIKE_RE[i].test(str)) return true; } return false; }
-  // deep sanitize: reject non-JSON-safe + private string leaves; return a clean rebuilt copy.
-  function _deep(v, errors, path, depth) {
-    depth = depth || 0;
-    if (depth > 24) { errors.push('too_deep:' + path); return null; }
-    if (v == null) return null;
-    var t = typeof v;
-    if (t === 'number') { if (!isFinite(v)) { errors.push('non_finite:' + path); return null; } return v; }
-    if (t === 'boolean') return v;
-    if (t === 'string') { if (path.indexOf('createdAt') === -1 && _looksLikePath(v)) { errors.push('private_leaf:' + path); return null; } return v; }
-    if (t !== 'object') { errors.push('non_json:' + path); return null; }
-    if (Array.isArray(v)) { return v.map(function (x, i) { return _deep(x, errors, path + '[' + i + ']', depth + 1); }); }
-    var proto = Object.getPrototypeOf(v);
-    if (proto !== Object.prototype && proto !== null) { errors.push('exotic_object:' + path); return null; }
-    var out = {};
-    Object.keys(v).forEach(function (k) { out[k] = _deep(v[k], errors, path + '.' + k, depth + 1); });
-    return out;
+  function _looksLikePath(s) { for (var i = 0; i < _PATH_LIKE_RE.length; i++) { if (_PATH_LIKE_RE[i].test(s)) return true; } return false; }
+  function _isFiniteNum(v) { return typeof v === 'number' && isFinite(v); }
+
+  // ── recursive closed-schema validator ──
+  // schema: 'scalar' | 'string' | 'number' | 'boolean' | {obj:{k:schema}} | {arr:itemSchema} | {boolMap:true}
+  function _val(value, schema, pathStr, errors) {
+    if (schema === 'scalar' || schema === 'string' || schema === 'number' || schema === 'boolean') {
+      if (value == null) return (schema === 'scalar') ? null : (errors.push('null:' + pathStr), null);
+      var t = typeof value;
+      if (t === 'object') { errors.push('not_scalar:' + pathStr); return null; }
+      if (schema === 'number') { if (!_isFiniteNum(value)) { errors.push('not_finite_number:' + pathStr); return null; } return value; }
+      if (schema === 'boolean') { if (t !== 'boolean') { errors.push('not_boolean:' + pathStr); return null; } return value; }
+      if (schema === 'string') { if (t !== 'string') { errors.push('not_string:' + pathStr); return null; } }
+      if (t === 'number') { if (!_isFiniteNum(value)) { errors.push('not_finite:' + pathStr); return null; } return value; }
+      if (t === 'string') { if (pathStr.indexOf('createdAt') === -1 && _looksLikePath(value)) { errors.push('private_leaf:' + pathStr); return null; } return value; }
+      if (t === 'boolean') return value;
+      errors.push('bad_scalar:' + pathStr); return null;
+    }
+    if (schema && schema.arr) {
+      if (!Array.isArray(value)) { errors.push('not_array:' + pathStr); return []; }
+      if (value.length > MAX_ARRAY) { errors.push('array_too_long:' + pathStr); return []; }
+      return value.map(function (x, i) { return _val(x, schema.arr, pathStr + '[' + i + ']', errors); });
+    }
+    if (schema && schema.boolMap) {
+      if (value == null) return {};
+      if (typeof value !== 'object' || Array.isArray(value)) { errors.push('not_object:' + pathStr); return {}; }
+      var bm = {};
+      Object.keys(value).forEach(function (k) { if (typeof value[k] !== 'boolean') errors.push('not_boolean:' + pathStr + '.' + k); else bm[k] = value[k]; });
+      return bm;
+    }
+    if (schema && schema.obj) {
+      if (value == null) return null;
+      if (typeof value !== 'object' || Array.isArray(value)) { errors.push('not_object:' + pathStr); return {}; }
+      var out = {};
+      Object.keys(value).forEach(function (k) {
+        if (!Object.prototype.hasOwnProperty.call(schema.obj, k)) { errors.push('unknown_key:' + pathStr + '.' + k); return; } // CLOSED
+      });
+      if (schema.req) schema.req.forEach(function (rk) { if (!(rk in value)) errors.push('missing_required:' + pathStr + '.' + rk); });
+      Object.keys(schema.obj).forEach(function (k) { if (k in value) out[k] = _val(value[k], schema.obj[k], pathStr + '.' + k, errors); });
+      return out;
+    }
+    errors.push('bad_schema:' + pathStr); return null;
   }
 
-  // rebuild an object against a fixed key allowlist (unknown key → error); values deep-sanitized.
-  function _closed(obj, allowed, label, errors) {
-    var out = {};
-    if (obj == null) return out;
-    if (typeof obj !== 'object' || Array.isArray(obj)) { errors.push(label + '_not_object'); return out; }
-    Object.keys(obj).forEach(function (k) {
-      if (allowed.indexOf(k) === -1) { errors.push(label + '.' + k + '_unknown_key'); return; }
-      out[k] = _deep(obj[k], errors, label + '.' + k, 0);
-    });
-    return out;
-  }
-  function _closedCapability(obj, errors) {
-    var out = {};
-    if (obj == null) return out;
-    if (typeof obj !== 'object' || Array.isArray(obj)) { errors.push('capability_not_object'); return out; }
-    Object.keys(obj).forEach(function (k) { if (typeof obj[k] !== 'boolean') errors.push('capability.' + k + '_not_boolean'); else out[k] = obj[k]; });
-    return out;
-  }
+  // ── section schemas ──
+  var DETAIL = 'scalar'; // blocker detail kept scalar (string/null); structured details summarize to a string upstream
+  var BLOCKER = { obj: { code: 'scalar', scope: 'scalar', severity: 'scalar', detail: { arr: 'scalar' }, parameterKey: 'scalar', sourceRef: 'scalar', layer: 'scalar' } };
+  var MAPPING_ENTRY = { obj: { rawColumnId: 'number', rawName: 'string', canonicalChannel: 'string', userConfirmed: 'boolean', projection: { obj: { scale: 'number', offset: 'number', sign: 'number' }, req: ['scale', 'offset', 'sign'] }, rawUnit: 'scalar', canonicalUnit: 'scalar' }, req: ['rawColumnId', 'rawName', 'canonicalChannel', 'projection'] };
+  var CALIB_ENTRY = { obj: { calibrationType: 'string', value: 'scalar', unit: 'scalar', source: 'string', confidence: 'string', verified: 'boolean', applicableSessionIds: { arr: 'string' }, createdAt: 'string' }, req: ['calibrationType', 'source', 'confidence', 'verified', 'createdAt'] };
+  var BUNDLE_SCHEMA = { obj: {
+    bundleSchemaVersion: 'string',
+    meta: { obj: { bundleSchemaVersion: 'scalar', exportedAt: 'scalar', appModelVersion: 'scalar', note: 'scalar' } },
+    case: { obj: { caseId: 'scalar', schemaVersion: 'scalar', modelId: 'scalar', modelVersion: 'scalar', calibrationVersion: 'scalar', canonicalContractVersion: 'scalar', vehicleProfileId: 'scalar', telemetrySessionId: 'scalar', modelInputEligible: 'boolean', title: 'scalar', createdAt: 'scalar' } },
+    mapping: { obj: { entries: { arr: MAPPING_ENTRY } } },
+    calibration: { obj: { entries: { arr: CALIB_ENTRY } } },
+    window: { obj: { startTime: 'scalar', endTime: 'scalar', valid: 'boolean', sampleCount: 'scalar', steadyStateCount: 'scalar', duration: 'scalar', speedRange: { arr: 'number' }, lateralAccelRange: { arr: 'number' }, steeringSign: 'scalar', quality: 'scalar', rejectionReasons: { arr: 'scalar' } } },
+    observation: { obj: { valid: 'boolean', observedTendency: 'scalar', confidence: 'scalar', method: 'scalar', metric: 'scalar', limitations: { arr: 'string' }, confounders: { arr: 'string' }, credibility: 'scalar', blockedReasons: { arr: BLOCKER } } },
+    comparison: { obj: { valid: 'boolean', predictedTendency: 'scalar', observedTendency: 'scalar', differenceClass: 'scalar', confidence: 'scalar', assumptions: { arr: 'string' }, modelTelemetryComparisonEligible: 'boolean', credibility: 'scalar', blockedReasons: { arr: BLOCKER } } },
+    raceEngineer: { obj: { eligible: { boolMap: true }, summary: 'scalar', likelySubsystems: { arr: 'string' }, inspectionPriorities: { arr: 'string' }, setupDirections: { arr: 'string' }, trialOrder: { arr: 'string' }, missingEvidence: { arr: 'string' }, confidence: 'scalar', credibility: 'scalar' } },
+    driverCoach: { obj: { eligible: 'boolean', observations: { arr: { obj: { type: 'scalar', code: 'scalar', qualitative: 'scalar', note: 'scalar', reversalCount: 'scalar', reversalRatePerS: 'scalar', abruptnessP95: 'scalar', unit: 'scalar', throttle: 'scalar', brake: 'scalar' } } }, practicePriorities: { arr: 'string' }, cannotConclude: { arr: 'string' }, confidence: 'scalar', credibility: 'scalar' } },
+    capability: { boolMap: true },
+    blockers: { arr: BLOCKER },
+    warnings: { arr: 'string' },
+  } };
 
-  function _assemble(input, errors) {
+  var INPUT_ALLOWLIST = ['meta', 'case', 'analysisCase', 'mapping', 'mappingEntries', 'calibration', 'calibrationSet', 'window', 'observation', 'comparison', 'raceEngineer', 'driverCoach', 'capability', 'blockers', 'warnings'];
+
+  // extract a SCALAR-ONLY case summary from a full R2.1D case (unknown case keys never enter the bundle)
+  function _caseSummary(c) {
+    c = c || {};
+    var ms = c.modelSnapshot || {}, vb = c.vehicleBinding || {}, tb = c.telemetryBinding || {}, md = c.caseMetadata || {}, cap = c.capabilityState || {};
+    return { caseId: c.caseId || null, schemaVersion: c.schemaVersion || null, modelId: ms.modelId || null, modelVersion: ms.modelVersion || null, calibrationVersion: ms.calibrationVersion || null, canonicalContractVersion: ms.canonicalContractVersion || null, vehicleProfileId: vb.profileId || null, telemetrySessionId: tb.sessionId || null, modelInputEligible: cap.modelInputEligible === true, title: md.title || null, createdAt: md.createdAt || null };
+  }
+  // normalize a blocker detail (string/array/object) to a bounded scalar array
+  function _detailArr(d) { if (d == null) return []; if (Array.isArray(d)) return d.slice(0, MAX_ARRAY).map(function (x) { return (x == null || typeof x === 'object') ? JSON.stringify(x) : x; }); if (typeof d === 'object') return [JSON.stringify(d)]; return [d]; }
+  function _blocker(b) { b = b || {}; return { code: b.code != null ? b.code : null, scope: b.scope != null ? b.scope : null, severity: b.severity != null ? b.severity : null, detail: _detailArr(b.detail), parameterKey: b.parameterKey != null ? b.parameterKey : null, sourceRef: b.sourceRef != null ? b.sourceRef : null, layer: b.layer != null ? b.layer : null }; }
+
+  function _normBlockers(arr) { return (Array.isArray(arr) ? arr : []).map(_blocker); }
+  // shallow-copy each section (keep ALL keys so the closed schema can REJECT unknowns — never silently omit);
+  // only the `case` is summarized to scalars, and blocker detail is normalized to a bounded scalar array.
+  function _assemble(input) {
     input = input || {};
+    var mapEntries = (input.mapping && input.mapping.entries) || input.mappingEntries || [];
+    var calEntries = (input.calibration && input.calibration.entries) || input.calibrationSet || [];
+    var obs = Object.assign({}, input.observation || {}); obs.blockedReasons = _normBlockers(obs.blockedReasons);
+    var cmp = Object.assign({}, input.comparison || {}); cmp.blockedReasons = _normBlockers(cmp.blockedReasons);
     return {
       bundleSchemaVersion: BUNDLE_SCHEMA_VERSION,
-      meta: _closed(Object.assign({ bundleSchemaVersion: BUNDLE_SCHEMA_VERSION }, input.meta || {}), SECTION.meta, 'meta', errors),
-      case: _closed(input.case || input.analysisCase, SECTION.case, 'case', errors),
-      mapping: { entries: _deep((input.mapping && input.mapping.entries) || input.mappingEntries || [], errors, 'mapping.entries', 0) },
-      calibration: { entries: _deep((input.calibration && input.calibration.entries) || input.calibrationSet || [], errors, 'calibration.entries', 0) },
-      window: _closed(input.window, SECTION.window, 'window', errors),
-      observation: _closed(input.observation, SECTION.observation, 'observation', errors),
-      comparison: _closed(input.comparison, SECTION.comparison, 'comparison', errors),
-      raceEngineer: _closed(input.raceEngineer, SECTION.raceEngineer, 'raceEngineer', errors),
-      driverCoach: _closed(input.driverCoach, SECTION.driverCoach, 'driverCoach', errors),
-      capability: _closedCapability(input.capability, errors),
-      blockers: _deep(Array.isArray(input.blockers) ? input.blockers : [], errors, 'blockers', 0),
-      warnings: _deep(Array.isArray(input.warnings) ? input.warnings.filter(function (w) { return typeof w === 'string'; }) : [], errors, 'warnings', 0),
+      meta: Object.assign({ bundleSchemaVersion: BUNDLE_SCHEMA_VERSION }, input.meta || {}),
+      case: _caseSummary(input.case || input.analysisCase),
+      mapping: { entries: Array.isArray(mapEntries) ? mapEntries.slice() : [] },
+      calibration: { entries: Array.isArray(calEntries) ? calEntries.slice() : [] },
+      window: Object.assign({}, input.window || {}),
+      observation: obs,
+      comparison: cmp,
+      raceEngineer: Object.assign({}, input.raceEngineer || {}),
+      driverCoach: Object.assign({}, input.driverCoach || {}),
+      capability: Object.assign({}, input.capability || {}),
+      blockers: _normBlockers(input.blockers),
+      warnings: Array.isArray(input.warnings) ? input.warnings.filter(function (w) { return typeof w === 'string'; }) : [],
     };
   }
 
   function exportAnalysisCase(input) {
     var errors = [];
-    var bundle = _assemble(input, errors);
+    if (input != null && typeof input === 'object' && !Array.isArray(input)) {
+      Object.keys(input).forEach(function (k) { if (INPUT_ALLOWLIST.indexOf(k) === -1) errors.push('unknown_input_key:' + k); }); // CLOSED input
+    } else { errors.push('input_not_object'); }
+    var bundle = _val(_assemble(input), BUNDLE_SCHEMA, '', errors);
     return { ok: errors.length === 0, bundle: bundle, errors: errors };
   }
 
@@ -117,18 +144,12 @@
     try { obj = typeof json === 'string' ? JSON.parse(json) : json; } catch (e) { return { ok: false, errors: ['invalid_json'], bundle: null }; }
     if (obj == null || typeof obj !== 'object' || Array.isArray(obj)) return { ok: false, errors: ['bundle_not_object'], bundle: null };
     var errors = [];
-    Object.keys(obj).forEach(function (k) { if (TOP_KEYS.indexOf(k) === -1) errors.push('top.' + k + '_unknown_key'); });
     if (obj.bundleSchemaVersion !== BUNDLE_SCHEMA_VERSION) errors.push('incompatible_bundle_schema_version');
-    // re-run the SAME closed assembly (shared → no drift)
-    var rebuilt = _assemble({
-      meta: obj.meta, case: obj.case, mapping: obj.mapping, calibration: obj.calibration, window: obj.window,
-      observation: obj.observation, comparison: obj.comparison, raceEngineer: obj.raceEngineer, driverCoach: obj.driverCoach,
-      capability: obj.capability, blockers: obj.blockers, warnings: obj.warnings,
-    }, errors);
-    return { ok: errors.length === 0, errors: errors, bundle: rebuilt };
+    var bundle = _val(obj, BUNDLE_SCHEMA, '', errors); // SAME closed schema (no drift; unknown key anywhere rejected)
+    return { ok: errors.length === 0, errors: errors, bundle: bundle };
   }
 
-  var api = { exportAnalysisCase: exportAnalysisCase, parseAnalysisCaseExport: parseAnalysisCaseExport, BUNDLE_SCHEMA_VERSION: BUNDLE_SCHEMA_VERSION, TOP_KEYS: TOP_KEYS };
+  var api = { exportAnalysisCase: exportAnalysisCase, parseAnalysisCaseExport: parseAnalysisCaseExport, BUNDLE_SCHEMA_VERSION: BUNDLE_SCHEMA_VERSION, INPUT_ALLOWLIST: INPUT_ALLOWLIST };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.AnalysisCaseExport = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
