@@ -63,5 +63,9 @@ const input = {
 (() => { const g={}; Object.defineProperty(g,'detail',{enumerable:true,get(){throw new Error('boom');}}); let threw=false,r; try{ r=EX.exportAnalysisCase({blockers:[g]}); }catch(e){ threw=true; } chk('getter-throws blocker → no throw, ok false', threw===false && r.ok===false); })();
 (() => { let threw=false; try{ EX.exportAnalysisCase({blockers:[{code:'x',detail:(function(){var c={};c.s=c;return c;})()}]}); }catch(e){ threw=true; } chk('cyclic detail → no throw', threw===false); })();
 (() => { let threw=false,r; try{ r=EX.parseAnalysisCaseExport('not json'); }catch(e){ threw=true; } chk('parse invalid json → no throw, ok false', threw===false && r.ok===false); })();
+// CP2 re-review #6: blocker detail must be STRING codes (numeric sample-like array rejected)
+(() => { const bad = JSON.parse(JSON.stringify(input)); bad.blockers = [{ code: 'x', detail: [0,1,2,3,4,5,6,7,8,9,10] }]; chk('numeric detail array rejected', EX.exportAnalysisCase(bad).ok === false); })();
+// CP2 re-review #6: sparse array serializes deterministically and round-trips (no export-accept/parse-reject drift)
+(() => { const sp = new Array(5); sp[2]='a'; sp[4]='b'; const r = EX.exportAnalysisCase({ meta:{}, warnings: sp }); const p = EX.parseAnalysisCaseExport(JSON.stringify(r.bundle)); chk('sparse array round-trip stable', deepEq(p.bundle, r.bundle) && r.bundle.warnings.length === 5); })();
 console.log(`analysis-case-export: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
