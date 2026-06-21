@@ -106,5 +106,12 @@ const baseCase = () => DEMO.buildDemoAnalysisCase().analysisCase;
   const r = QR.recommendSetupChange({ analysisCase: baseCase(), target: { metric: 'roll_stiffness_dist_front', delta: 0.5 }, parameterKey: 'frontArbRollStiffnessNmDeg', runner });
   chk('sideEffects include an unchanged (zero) metric', r.available === true && r.sideEffects.some(s => s.delta === 0), r.sideEffects);
 })();
+// CP1 re-review fix: the recommendation is an EPHEMERAL hypothetical model override — scalars only, no case leakage
+(() => {
+  const r = QR.recommendSetupChange({ analysisCase: baseCase(), target: { metric: 'roll_stiffness_dist_front', delta: 0.5 }, parameterKey: 'frontArbRollStiffnessNmDeg', runner });
+  const blob = JSON.stringify(r);
+  chk('no AnalysisCase / snapshot leaked into output', blob.indexOf('canonicalInputSnapshot') === -1 && blob.indexOf('modelSnapshot') === -1 && r.analysisCase === undefined);
+  chk('labelled hypothetical model override (not provenance-validated)', r.limitations.indexOf('hypothetical_model_override_not_provenance_validated') !== -1);
+})();
 console.log(`quantitative-setup-recommendation: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

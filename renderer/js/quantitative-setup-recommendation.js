@@ -46,6 +46,11 @@
   // execution options resolver: prefer a full opts object (modelRunner | modelEngine | global) so the runner is
   // resolved EXACTLY as the workspace's execution did (never a divergent global fallback).
   function _execOpts(o) { if (o && o.execOpts) return o.execOpts; if (o && typeof o.runner === 'function') return { modelRunner: o.runner }; if (o && o.runner !== undefined && o.runner !== null) return { modelRunner: o.runner }; return {}; }
+  // EPHEMERAL hypothetical model override: the cloned case has ONE value changed for an in-memory model run; it
+  // is never returned, persisted, or exported. The recommendation output is scalars only (no AnalysisCase), and
+  // carries the 'hypothetical_model_override_not_provenance_validated' limitation — the perturbed value keeps the
+  // baseline parameter's provenance/conversion metadata (which describes the ORIGINAL value), so it must never be
+  // read as a newly provenance-validated case.
   function _runAt(analysisCase, parameterKey, value, execOpts) {
     var c = JSON.parse(JSON.stringify(analysisCase));
     if (value !== null) {
@@ -120,6 +125,7 @@
       }).filter(function (s) { return s.delta != null; }); // report ALL tracked metrics (incl unchanged = 0), drop only unavailable
 
       var limitations = LIMITATIONS.slice();
+      limitations.push('hypothetical_model_override_not_provenance_validated'); // the recommended value is a model what-if, not a provenance-validated canonical input
       if (Math.abs(recommendedDelta) > Math.abs(baseValue) * 0.5) limitations.push('large_extrapolation_beyond_local_linearity');
       if (Math.abs(residual) > Math.abs(target.delta) * 0.25) limitations.push('linearization_residual_significant_recheck');
 
