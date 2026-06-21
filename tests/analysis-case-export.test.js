@@ -51,5 +51,13 @@ const input = {
 (() => { const bad = JSON.parse(JSON.stringify(input)); bad.raceEngineer.eligible.secret = true; chk('eligible unknown key rejected', EX.exportAnalysisCase(bad).ok === false); })();
 (() => { const bad = JSON.parse(JSON.stringify(input)); bad.blockers = [{ code: 'x', detail: [{ values: [1,2,3] }] }]; const r = EX.exportAnalysisCase(bad); chk('blocker detail raw object → no raw leak', r.ok === true && deepEq(r.bundle.blockers[0].detail, ['[non_scalar_detail]'])); })();
 (() => { const bad = JSON.parse(JSON.stringify(input)); bad.blockers = [{ code: 'x', detail: new Array(200).fill('x') }]; chk('blocker detail capped', EX.exportAnalysisCase(bad).bundle.blockers[0].detail.length === 16); })();
+(() => { const bad = JSON.parse(JSON.stringify(input)); bad.mapping.secret = { values: [1,2,3] }; chk('section-level unknown key rejected', EX.exportAnalysisCase(bad).ok === false && EX.exportAnalysisCase(bad).errors.some(e => e === 'unknown_key:.mapping.secret')); })();
+(() => { const bad = JSON.parse(JSON.stringify(input)); bad.warnings = [{ values: [1,2,3] }]; chk('warnings non-string rejected (not silently omitted)', EX.exportAnalysisCase(bad).ok === false); })();
+(() => { const bad = JSON.parse(JSON.stringify(input)); bad.window.speedRange = new Array(256).fill(0); chk('speedRange over-cap rejected', EX.exportAnalysisCase(bad).ok === false); })();
+// CP2 re-review #3: alias shadow-discard paths removed (no silently-discarded raw values)
+(() => { const m={rawColumnId:1,rawName:'s',canonicalChannel:'speed',userConfirmed:true,projection:{scale:1,offset:0,sign:1}}; const r=EX.exportAnalysisCase({mapping:{entries:[m]},mappingEntries:[{values:[1,2,3]}]}); chk('mappingEntries alias rejected (no discard)', r.ok===false && r.errors.some(e=>e==='unknown_input_key:mappingEntries')); })();
+(() => { const r=EX.exportAnalysisCase({calibrationSet:[{values:[1,2,3]}]}); chk('calibrationSet alias rejected', r.ok===false); })();
+(() => { const r=EX.exportAnalysisCase({case:{},analysisCase:{deep:{values:[1,2,3]}}}); chk('analysisCase alias rejected', r.ok===false && !JSON.stringify(r.bundle||{}).includes('values')); })();
+(() => { const r=EX.exportAnalysisCase({mapping:''}); chk('malformed mapping section rejected', r.ok===false && r.errors.some(e=>e==='not_object:.mapping')); })();
 console.log(`analysis-case-export: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
