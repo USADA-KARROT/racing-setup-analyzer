@@ -2733,6 +2733,44 @@ canvas{max-height:300px}
       </template>
     </div>
 
+    <!-- F3 · Quantitative Recommendation (R2.5) -->
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+      <div class="text-xs text-slate-400 mb-2">F3 · Quantitative Recommendation <span x-html="credBadge('Model')"></span></div>
+      <div class="flex items-end gap-2 text-xs flex-wrap mb-2">
+        <label class="flex flex-col gap-0.5">metric
+          <select x-model="quantMetric" class="bg-slate-900 border border-slate-700 rounded px-1 py-0.5">
+            <option value="roll_stiffness_dist_front">roll stiffness dist front (%)</option>
+            <option value="understeer_gradient">understeer gradient (deg/g)</option>
+            <option value="total_roll_stiffness">total roll stiffness (Nm/deg)</option>
+          </select></label>
+        <label class="flex flex-col gap-0.5">target &Delta;<input type="number" step="any" x-model="quantDelta" class="w-20 bg-slate-900 border border-slate-700 rounded px-1 py-0.5"></label>
+        <label class="flex flex-col gap-0.5">via parameter
+          <select x-model="quantParameter" class="bg-slate-900 border border-slate-700 rounded px-1 py-0.5">
+            <option value="frontArbRollStiffnessNmDeg">front ARB (Nm/deg)</option>
+            <option value="rearArbRollStiffnessNmDeg">rear ARB (Nm/deg)</option>
+            <option value="frontWheelRateNmm">front wheel rate (N/mm)</option>
+            <option value="rearWheelRateNmm">rear wheel rate (N/mm)</option>
+            <option value="frontWeightPct">front weight (%)</option>
+          </select></label>
+        <button id="runQuantitative" class="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600 font-semibold" @click="runQuantitativeRecommendation()">Recommend</button>
+      </div>
+      <template x-if="analysisView.quantitativeRecommendation.available">
+        <div class="text-xs space-y-1">
+          <div>Change <b class="text-sky-300" x-text="quantParameter"></b> by <b class="text-emerald-300" x-text="(analysisView.quantitativeRecommendation.recommendedDeltaPhysical>=0?'+':'')+fmt(analysisView.quantitativeRecommendation.recommendedDeltaPhysical)"></b> <span x-text="analysisView.quantitativeRecommendation.unit"></span> <span x-html="credBadge('Model')"></span></div>
+          <div class="text-slate-400" x-text="'-> predicted '+analysisView.quantitativeRecommendation.targetMetric+' '+fmt(analysisView.quantitativeRecommendation.predictedMetricAfter)+' '+analysisView.quantitativeRecommendation.metricUnit+' (residual '+fmt(analysisView.quantitativeRecommendation.residual)+')'"></div>
+          <div class="text-[11px] text-slate-500">Side effects: <template x-for="se in analysisView.quantitativeRecommendation.sideEffects" :key="se.metric"><span class="mr-2" x-text="se.metric+' &Delta;'+fmt(se.delta)"></span></template></div>
+          <div class="text-[11px] text-amber-400/80" x-text="analysisView.quantitativeRecommendation.validationStep"></div>
+          <div class="text-[10px] text-slate-500">Physical units only &mdash; hardware clicks need a validated per-car click&rarr;rate mapping (unavailable). <span x-text="(analysisView.quantitativeRecommendation.limitations||[]).join('; ')"></span></div>
+        </div>
+      </template>
+      <template x-if="analysisView.quantitativeRecommendation.requested &amp;&amp; !analysisView.quantitativeRecommendation.available">
+        <div class="text-xs text-slate-400">Recommendation blocked &mdash; <template x-for="b in (analysisView.quantitativeRecommendation.blockedReasons||[])" :key="b.code"><span class="mr-2" x-text="b.code"></span></template></div>
+      </template>
+      <template x-if="!analysisView.quantitativeRecommendation.requested">
+        <div class="text-[11px] text-slate-500">Pick a target balance change + a parameter, then Recommend. Model-grounded physical units &mdash; never a click count or a lap-time promise.</div>
+      </template>
+    </div>
+
     <!-- G · Race Engineer -->
     <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700" x-show="analysisView.raceEngineer.available">
       <div class="text-xs text-slate-400 mb-2">G · Race Engineer <span x-html="credBadge('Heuristic')"></span></div>
@@ -2817,6 +2855,8 @@ canvas{max-height:300px}
 <script src="js/suspension-input-normalizer.js"></script>
 <script src="js/canonical-model-input.js"></script>
 <script src="js/analysis-execution.js"></script>
+<script src="js/setup-ab.js"></script>
+<script src="js/quantitative-setup-recommendation.js"></script>
 <script src="js/telemetry-observation.js"></script>
 <script src="js/measured-metrics.js"></script>
 <script src="js/model-telemetry-comparison.js"></script>
@@ -2850,6 +2890,7 @@ function app(){return{
       if (typeof DemoAnalysisCase==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof AnalysisWorkspaceViewModel==='undefined'){ this.analysisError='analysis modules not loaded'; this.analysisView=null; return; }
       const demo = DemoAnalysisCase.buildDemoAnalysisCase();
       const ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, demo.telemetrySession, demo.window, {}); // global Tier1BasicBalance as the model runner
+      this._lastCase = demo.analysisCase; this._lastSession = demo.telemetrySession; this._lastWindow = demo.window; this._lastVmOpts = { suspensionNormalizationView: demo.suspensionNormalizationView };
       this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, { suspensionNormalizationView: demo.suspensionNormalizationView });
       this.analysisError = null;
     } catch(e){ this.analysisError = String((e&&e.message)||e); this.analysisView=null; }
@@ -2859,6 +2900,17 @@ function app(){return{
   importError: null,
   importSteeringRatio: '',
   importSteeringConfirmed: false,
+  quantMetric: 'roll_stiffness_dist_front', quantDelta: '', quantParameter: 'frontArbRollStiffnessNmDeg',
+  _lastCase: null, _lastSession: null, _lastWindow: null, _lastVmOpts: null,
+  runQuantitativeRecommendation(){
+    try {
+      if (!this._lastCase || typeof AnalysisWorkspace==='undefined'){ this.analysisError='run an analysis first'; return; }
+      var d=parseFloat(this.quantDelta);
+      var opts={ quantitative: { target: { metric: this.quantMetric, delta: isFinite(d)?d:0 }, parameterKey: this.quantParameter } };
+      var ws=AnalysisWorkspace.runAnalysisWorkspace(this._lastCase, this._lastSession, this._lastWindow, opts);
+      this.analysisView=AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, this._lastCase, this._lastVmOpts||{});
+    } catch(e){ this.analysisError=String((e&&e.message)||e); }
+  },
   importedChannels: [],
   _importedBundle: null,
   canonicalChannelOptions: (typeof ChannelMapping!=='undefined' && ChannelMapping.CANONICAL_CHANNELS) ? ChannelMapping.CANONICAL_CHANNELS : ['speed','lateral_accel','yaw_rate','steering','throttle','brake','track_position','lap','time'],
@@ -2895,6 +2947,7 @@ function app(){return{
       var session = CanonicalTelemetrySession.buildCanonicalSession(this._importedBundle, mapping, cals, null, { sessionId:SESS });
       var demo = DemoAnalysisCase.buildDemoAnalysisCase(); // vehicle/setup binding; imported telemetry session
       var ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, session, null, {});
+      this._lastCase = demo.analysisCase; this._lastSession = session; this._lastWindow = null; this._lastVmOpts = {};
       this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, {});
     } catch(e){ this.importError=String((e&&e.message)||e); this.analysisView=null; }
   },
