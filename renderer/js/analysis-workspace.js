@@ -67,12 +67,12 @@
     var driverCoach = DC.deriveDriverCoachingInsight(observation, caseContext, opts.driverCoach || {});
     // R2.5: optional model-grounded quantitative setup recommendation (when a target + parameter are supplied)
     var quantitativeRecommendation = (opts.quantitative && opts.quantitative.target && opts.quantitative.parameterKey && QR)
-      ? QR.recommendSetupChange({ analysisCase: analysisCase, target: opts.quantitative.target, parameterKey: opts.quantitative.parameterKey, runner: opts.modelRunner })
+      ? QR.recommendSetupChange({ analysisCase: analysisCase, target: opts.quantitative.target, parameterKey: opts.quantitative.parameterKey, runner: opts.modelRunner, execOpts: opts })
       : null;
     // R2.5: a quantitative recommendation is only eligible when at least one permitted balance lever is
     // non-degenerate for some target metric — probe the actual model (cheap; per-request still fail-closes).
     var quantitativeLeverAvailable = (QR && execution && execution.valid === true)
-      ? (QR.hasQuantitativeLever(analysisCase, 'roll_stiffness_dist_front', opts.modelRunner) || QR.hasQuantitativeLever(analysisCase, 'understeer_gradient', opts.modelRunner) || QR.hasQuantitativeLever(analysisCase, 'total_roll_stiffness', opts.modelRunner))
+      ? (QR.hasQuantitativeLever(analysisCase, 'roll_stiffness_dist_front', opts.modelRunner, opts) || QR.hasQuantitativeLever(analysisCase, 'understeer_gradient', opts.modelRunner, opts) || QR.hasQuantitativeLever(analysisCase, 'total_roll_stiffness', opts.modelRunner, opts))
       : false;
     var capability = deriveWorkspaceCapability(execution, observation, comparison, raceEngineer, driverCoach, quantitativeLeverAvailable);
     return {
