@@ -2587,6 +2587,7 @@ canvas{max-height:300px}
     <textarea x-model="importCsvText" rows="3" placeholder="paste CSV: time [s],speed [m/s],yaw_rate [rad/s],steering [deg],accy [m/s2]" class="w-full text-xs bg-slate-900 border border-slate-700 rounded p-2 mb-2 font-mono"></textarea>
     <div class="flex gap-2 mb-2">
       <button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" @click="loadSampleImportCsv()">Load sample CSV</button>
+      <button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" @click="loadCornerSampleCsv()">Load corner sample</button>
       <button id="importTelemetryBtn" class="px-2 py-1 rounded bg-sky-700 hover:bg-sky-600 text-xs font-semibold" @click="importTelemetryCsv()">Import</button>
     </div>
     <div x-show="importError" class="text-red-400 text-xs mb-2" x-text="importError"></div>
@@ -2830,6 +2831,26 @@ canvas{max-height:300px}
       </div>
     </div>
 
+    <!-- J · Track Intelligence / Corner Coaching (R2.6) -->
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+      <div class="text-xs text-slate-400 mb-2">J · Corner Coaching <span x-html="credBadge('Heuristic')"></span></div>
+      <template x-if="analysisView.trackIntelligence.available">
+        <div class="text-xs space-y-2">
+          <div class="text-slate-400" x-text="analysisView.trackIntelligence.lapCount+' lap(s) &middot; '+analysisView.trackIntelligence.corners.length+' corner(s) &middot; provenance: '+analysisView.trackIntelligence.dataProvenance"></div>
+          <template x-for="c in analysisView.trackIntelligence.corners" :key="c.cornerId">
+            <div class="border-t border-slate-700/60 pt-1">
+              <div><b class="text-sky-300" x-text="c.cornerId"></b> <span class="text-slate-500" x-text="'lap '+c.lapId+' &middot; '+c.summary"></span> <span x-html="credBadge('Heuristic')"></span></div>
+              <div class="text-[11px] text-slate-500">entry: <span x-text="c.entry.sufficient ? c.entry.qualitative : c.entry.reason"></span> &middot; mid: <span x-text="c.mid.sufficient ? c.mid.qualitative : c.mid.reason"></span> &middot; exit: <span x-text="c.exit.sufficient ? c.exit.qualitative : c.exit.reason"></span></div>
+            </div>
+          </template>
+          <div class="text-[10px] text-amber-400/70" x-text="'Driver behaviour (raw steering) &mdash; not a corner characteristic or a setup finding. '+(analysisView.trackIntelligence.limitations||[]).join('; ')"></div>
+        </div>
+      </template>
+      <template x-if="!analysisView.trackIntelligence.available">
+        <div class="text-xs text-slate-400">Corner coaching blocked &mdash; <template x-for="b in (analysisView.trackIntelligence.blockedReasons||[])" :key="b.code"><span class="mr-2" x-text="b.code"></span></template><span class="text-slate-500" x-text="(analysisView.trackIntelligence.cannotConclude||[]).join('; ')"></span></div>
+      </template>
+    </div>
+
     <!-- I · Evidence / Provenance Drawer -->
     <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
       <div class="text-xs text-slate-400 mb-2">I · Evidence &amp; Provenance</div>
@@ -2899,6 +2920,7 @@ canvas{max-height:300px}
 <script src="js/model-telemetry-comparison.js"></script>
 <script src="js/race-engineer-insight.js"></script>
 <script src="js/driver-coach-insight.js"></script>
+<script src="js/track-intelligence.js"></script>
 <script src="js/analysis-workspace.js"></script>
 <script src="js/analysis-workspace-viewmodel.js"></script>
 <script src="js/demo-analysis-case.js"></script>
@@ -2964,6 +2986,7 @@ function app(){return{
   _importedBundle: null,
   canonicalChannelOptions: (typeof ChannelMapping!=='undefined' && ChannelMapping.CANONICAL_CHANNELS) ? ChannelMapping.CANONICAL_CHANNELS : ['speed','lateral_accel','yaw_rate','steering','throttle','brake','track_position','lap','time'],
   loadSampleImportCsv(){ try { this.importCsvText = (typeof DemoAnalysisCase!=='undefined') ? DemoAnalysisCase.buildDemoTelemetryCsv() : ''; this.importError=null; } catch(e){ this.importError=String((e&&e.message)||e); } },
+  loadCornerSampleCsv(){ try { this.importCsvText = (typeof DemoAnalysisCase!=='undefined') ? DemoAnalysisCase.buildDemoCornerTelemetryCsv() : ''; this.importError=null; } catch(e){ this.importError=String((e&&e.message)||e); } },
   importTelemetryCsv(){
     try {
       this.importError=null; this.importedChannels=[]; this._importedBundle=null;
