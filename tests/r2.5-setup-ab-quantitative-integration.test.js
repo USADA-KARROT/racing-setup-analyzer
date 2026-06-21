@@ -81,5 +81,11 @@ const baseCase = () => DEMO.buildDemoAnalysisCase().analysisCase;
   chk('export: still rejects an unknown capability key', EX.exportAnalysisCase({ meta: {}, capability: Object.assign({}, ws.capability, { secret: true }) }).ok === false);
 })();
 
+// CP1 re-review fix: runner consistency — a workspace run via opts.modelEngine threads the SAME engine to the
+// quantitative probe + recommendation (not a divergent global fallback)
+(() => {
+  const ws = WS.runAnalysisWorkspace(baseCase(), null, null, { modelEngine: ctx.__h.Tier1BasicBalance, quantitative: { target: { metric: 'roll_stiffness_dist_front', delta: 0.5 }, parameterKey: 'frontArbRollStiffnessNmDeg' } });
+  chk('modelEngine: exec + quant consistent', ws.execution.valid === true && ws.capability.quantitativeSetupRecommendationEligible === true && ws.quantitativeRecommendation.available === true, ws.quantitativeRecommendation && ws.quantitativeRecommendation.blockedReasons);
+})();
 console.log(`r2.5-setup-ab-quantitative-integration: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

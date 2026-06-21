@@ -43,7 +43,10 @@
   function _block(reasons) { return { available: false, parameterKey: null, recommendedDeltaPhysical: null, recommendedValue: null, predictedMetricAfter: null, residual: null, sensitivity: null, sideEffects: null, validationStep: null, limitations: [], clicksEligible: false, credibility: 'Unavailable', blockedReasons: reasons }; }
 
   // run the model at a snapshot value for parameterKey (or baseline when value===null); returns {valid, snapshot}
-  function _runAt(analysisCase, parameterKey, value, runner) {
+  // execution options resolver: prefer a full opts object (modelRunner | modelEngine | global) so the runner is
+  // resolved EXACTLY as the workspace's execution did (never a divergent global fallback).
+  function _execOpts(o) { if (o && o.execOpts) return o.execOpts; if (o && typeof o.runner === 'function') return { modelRunner: o.runner }; if (o && o.runner !== undefined && o.runner !== null) return { modelRunner: o.runner }; return {}; }
+  function _runAt(analysisCase, parameterKey, value, execOpts) {
     var c = JSON.parse(JSON.stringify(analysisCase));
     if (value !== null) {
       var snap = c.modelSnapshot && c.modelSnapshot.canonicalInputSnapshot;
@@ -51,7 +54,7 @@
       if (!p || typeof p !== 'object') return { valid: false, reason: 'parameter_not_in_snapshot' };
       p.value = value;
     }
-    var ex = AX.runAnalysisCase(c, { modelRunner: runner });
+    var ex = AX.runAnalysisCase(c, execOpts || {});
     if (!ex || ex.valid !== true) return { valid: false, reason: 'model_run_failed', blockedReasons: ex ? ex.blockedReasons : null };
     return { valid: true, snapshot: ex.modelResultSnapshot || {} };
   }
@@ -60,7 +63,8 @@
     input = input || {};
     try {
       if (!AX) return _block([_blocker('ANALYSIS_EXECUTION_UNAVAILABLE')]);
-      var analysisCase = input.analysisCase, runner = input.runner, target = input.target || {}, parameterKey = input.parameterKey;
+      var analysisCase = input.analysisCase, target = input.target || {}, parameterKey = input.parameterKey;
+      var execOpts = _execOpts(input); // SAME runner resolution as the workspace execution (modelRunner|modelEngine|global)
       var mCfg = TARGET_METRICS[target.metric];
       var pCfg = PARAMETERS[parameterKey];
       if (!analysisCase || typeof analysisCase !== 'object') return _block([_blocker('NO_ANALYSIS_CASE')]);
@@ -69,7 +73,7 @@
       if (!pCfg) return _block([_blocker('UNKNOWN_PARAMETER', String(parameterKey))]);
 
       // baseline
-      var base = _runAt(analysisCase, null, null, runner);
+      var base = _runAt(analysisCase, null, null, execOpts);
       if (!base.valid) return _block([_blocker('BASELINE_RUN_FAILED', base.blockedReasons || base.reason)]);
       var baselineMetric = base.snapshot[target.metric];
       if (!_isFiniteNum(baselineMetric)) return _block([_blocker('BASELINE_METRIC_NOT_FINITE', target.metric)]);
@@ -87,7 +91,7 @@
       else if (baseValue - step >= pCfg.range[0]) probeValue = baseValue - step;
       else return _block([_blocker('PARAMETER_RANGE_TOO_NARROW_FOR_PROBE', parameterKey)]);
       var probeStep = probeValue - baseValue; // signed (preserves sensitivity sign)
-      var probe = _runAt(analysisCase, parameterKey, probeValue, runner);
+      var probe = _runAt(analysisCase, parameterKey, probeValue, execOpts);
       if (!probe.valid) return _block([_blocker('PERTURBED_RUN_NOT_MODEL_USABLE', probe.blockedReasons || probe.reason)]);
       var probeMetric = probe.snapshot[target.metric];
       if (!_isFiniteNum(probeMetric)) return _block([_blocker('PROBE_METRIC_NOT_FINITE', target.metric)]);
@@ -103,7 +107,7 @@
       if (recommendedValue < pCfg.range[0] || recommendedValue > pCfg.range[1]) return _block([_blocker('IMPLAUSIBLE_RECOMMENDED_VALUE', parameterKey + '=' + recommendedValue.toFixed(2) + ' ' + pCfg.unit + ' outside [' + pCfg.range[0] + ',' + pCfg.range[1] + ']')]);
 
       // verify: re-run the model at the recommended value
-      var after = _runAt(analysisCase, parameterKey, recommendedValue, runner);
+      var after = _runAt(analysisCase, parameterKey, recommendedValue, execOpts);
       if (!after.valid) return _block([_blocker('RECOMMENDED_RUN_NOT_MODEL_USABLE', after.blockedReasons || after.reason)]);
       var predictedAfter = after.snapshot[target.metric];
       if (!_isFiniteNum(predictedAfter)) return _block([_blocker('RECOMMENDED_METRIC_NOT_FINITE', target.metric)]);
@@ -147,10 +151,11 @@
   }
 
   // does ANY known parameter have a non-degenerate sensitivity for the metric? (drives capability eligibility)
-  function hasQuantitativeLever(analysisCase, metric, runner) {
+  function hasQuantitativeLever(analysisCase, metric, runner, execOpts) {
     var mCfg = TARGET_METRICS[metric];
     if (!mCfg || !AX) return false;
-    var base = _runAt(analysisCase, null, null, runner);
+    var eo = execOpts || (typeof runner === 'function' ? { modelRunner: runner } : (runner != null ? { modelRunner: runner } : {}));
+    var base = _runAt(analysisCase, null, null, eo);
     if (!base.valid || !_isFiniteNum(base.snapshot[metric])) return false;
     var snap = analysisCase.modelSnapshot && analysisCase.modelSnapshot.canonicalInputSnapshot;
     var keys = Object.keys(PARAMETERS);
@@ -160,7 +165,7 @@
       var st = Math.max(Math.abs(p.value) * 0.1, 0.5);
       var pv = (p.value + st <= pc.range[1]) ? p.value + st : ((p.value - st >= pc.range[0]) ? p.value - st : null);
       if (pv === null) continue;
-      var probe = _runAt(analysisCase, keys[i], pv, runner);
+      var probe = _runAt(analysisCase, keys[i], pv, eo);
       if (probe.valid && _isFiniteNum(probe.snapshot[metric]) && Math.abs(probe.snapshot[metric] - base.snapshot[metric]) >= mCfg.changeFloor) return true;
     }
     return false;
