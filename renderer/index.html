@@ -2794,7 +2794,10 @@ canvas{max-height:300px}
           <template x-if="abResult.plausibilityWarnings &amp;&amp; abResult.plausibilityWarnings.length">
             <div class="text-[11px] text-amber-400/80">&#9888; implausible what-if: <template x-for="w in abResult.plausibilityWarnings" :key="w.parameter+w.setup"><span class="mr-2" x-text="w.parameter+'='+fmt(w.value)+' (range '+w.range[0]+'-'+w.range[1]+')'"></span></template></div>
           </template>
-          <div class="text-[10px] text-slate-500">Model what-if prediction &mdash; not measured, not a lap-time claim.</div>
+          <template x-if="abResult.modelVersions &amp;&amp; !abResult.modelVersions.match">
+            <div class="text-[11px] text-amber-400/80">&#9888; model version mismatch: A=<span x-text="abResult.modelVersions.a"></span> B=<span x-text="abResult.modelVersions.b"></span></div>
+          </template>
+          <div class="text-[10px] text-slate-500">Model what-if prediction &mdash; not measured, not a lap-time claim. The what-if is a hypothetical value-only override (not provenance-validated).</div>
         </div>
       </template>
       <template x-if="abResult &amp;&amp; !abResult.valid">

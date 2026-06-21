@@ -21,7 +21,8 @@
   var METRICS = ['understeer_gradient', 'roll_stiffness_dist_front', 'total_roll_stiffness', 'front_wheel_rate', 'rear_wheel_rate'];
   var ASSUMPTIONS = Object.freeze([
     'model_grounded_prediction_not_measured',
-    'same_model_version_both_setups',
+    'same_runner_used_for_both_setups',                                   // accurate: the SAME runner runs both; model versions are checked, not assumed
+    'what_if_may_be_hypothetical_model_override_not_provenance_validated', // a UI what-if mutates a value, keeping the baseline's provenance/conversion metadata
     'no_laptime_claim',
     'steady_state_single_point_model',
   ]);
@@ -46,6 +47,7 @@
     });
     return out;
   }
+  function _modelVersion(c) { return (c && c.modelSnapshot && c.modelSnapshot.modelVersion) || null; }
   function _side(exec) {
     var s = (exec && exec.modelResultSnapshot) || {};
     var out = { tendency: s.tendency != null ? s.tendency : null };
@@ -72,9 +74,14 @@
       // directional summary from the understeer-gradient delta (deg/g): more positive = more understeer
       var dK = deltas.understeer_gradient;
       var directionalSummary = (dK == null) ? 'unavailable' : (Math.abs(dK) < 0.05 ? 'no_meaningful_balance_change' : (dK > 0 ? 'b_more_understeer' : 'b_more_oversteer'));
+      // verify (do not assume) the two setups declare the same model version
+      var verA = _modelVersion(caseA), verB = _modelVersion(caseB);
+      var warnings = _plausibilityWarnings(caseA, caseB);
+      if (verA !== verB) warnings.push({ type: 'model_version_mismatch', a: verA, b: verB });
       return {
         valid: true, a: a, b: b, deltas: deltas, directionalSummary: directionalSummary,
-        plausibilityWarnings: _plausibilityWarnings(caseA, caseB),
+        modelVersions: { a: verA, b: verB, match: verA === verB },
+        plausibilityWarnings: warnings,
         assumptions: ASSUMPTIONS, blockedReasons: [], credibility: 'Model',
       };
     } catch (e) {

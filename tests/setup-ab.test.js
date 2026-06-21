@@ -59,5 +59,15 @@ const withParam = (key, mul) => { const c = baseCase(); const p = c.modelSnapsho
   const r2 = AB.compareSetups(baseCase(), withParam('frontArbRollStiffnessNmDeg', 25), { modelRunner: runner }); // ~9900 → out of range
   chk('out-of-range what-if: plausibility warning', r2.plausibilityWarnings.some(w => w.parameter === 'frontArbRollStiffnessNmDeg'), r2.plausibilityWarnings);
 })();
+// CP1 re-review fix: model version is CHECKED (not assumed) + hypothetical-override disclosure
+(() => {
+  const r = AB.compareSetups(baseCase(), baseCase(), { modelRunner: runner });
+  chk('A/B reports same runner (accurate assumption)', r.assumptions.indexOf('same_runner_used_for_both_setups') !== -1 && r.assumptions.indexOf('same_model_version_both_setups') === -1);
+  chk('A/B discloses hypothetical override', r.assumptions.indexOf('what_if_may_be_hypothetical_model_override_not_provenance_validated') !== -1);
+  chk('A/B model versions match (same case)', r.modelVersions && r.modelVersions.match === true);
+  const b = baseCase(); b.modelSnapshot.modelVersion = 'vX.test';
+  const r2 = AB.compareSetups(baseCase(), b, { modelRunner: runner });
+  chk('A/B flags model-version mismatch', r2.modelVersions.match === false && r2.plausibilityWarnings.some(w => w.type === 'model_version_mismatch'), r2.plausibilityWarnings);
+})();
 console.log(`setup-ab: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
