@@ -138,6 +138,50 @@
     };
   }
 
+  // ── driver-input summary (for the Driver Coach layer): steering smoothness/correction frequency +
+  // honest channel availability for pedals / track-position / lap segmentation. Raw steering only. ──
+  var PEDAL_THROTTLE_RE = [/throttle/i, /^tps$/i, /accel.*ped/i, /gas/i];
+  var PEDAL_BRAKE_RE = [/brake/i, /^bps$/i, /brk/i];
+  var TRACK_POS_RE = [/track.*pos/i, /lap.*dist/i, /^dist/i, /gps/i, /^s$/i, /curv/i];
+  var LAP_RE = [/^lap$/i, /lapno/i, /lap.*num/i, /lap.*idx/i, /lap.*ctr/i];
+  function _matchAny(reList, names) { return names.some(function (n) { return reList.some(function (re) { return re.test(n); }); }); }
+  function _driverInputs(tel, series) {
+    var names = tel.channels || [];
+    var steer = series.steer || [], time = series.time || [];
+    // robust steering scale (deadband so sensor jitter isn't counted as a correction)
+    var absSteer = [];
+    for (var i = 0; i < steer.length; i++) { if (steer[i] != null && isFinite(steer[i])) absSteer.push(Math.abs(steer[i])); }
+    absSteer.sort(function (a, b) { return a - b; });
+    var scale = absSteer.length ? absSteer[Math.floor(0.95 * (absSteer.length - 1))] : 0;
+    var deadband = (scale || 0) * 0.02;
+    var reversals = 0, lastSign = 0, absDeltas = [];
+    for (var j = 1; j < steer.length; j++) {
+      if (steer[j] == null || steer[j - 1] == null) { lastSign = 0; continue; }
+      var d = steer[j] - steer[j - 1];
+      if (Math.abs(d) <= deadband) continue;
+      absDeltas.push(Math.abs(d));
+      var sign = d > 0 ? 1 : -1;
+      if (lastSign !== 0 && sign !== lastSign) reversals++;
+      lastSign = sign;
+    }
+    absDeltas.sort(function (a, b) { return a - b; });
+    var abruptness = absDeltas.length ? absDeltas[Math.floor(0.95 * (absDeltas.length - 1))] : null;
+    var t0 = null, t1 = null;
+    for (var k = 0; k < time.length; k++) { if (time[k] != null) { if (t0 == null) t0 = time[k]; t1 = time[k]; } }
+    var durationS = (t0 != null && t1 != null && t1 > t0) ? (t1 - t0) : null;
+    return {
+      steeringChannelAvailable: true,
+      steeringReversalCount: reversals,
+      steeringReversalRatePerS: durationS ? reversals / durationS : null,
+      steeringAbruptnessP95: abruptness,
+      steerUnit: series.steerUnit || '(raw)',
+      pedalChannelsAvailable: { throttle: _matchAny(PEDAL_THROTTLE_RE, names), brake: _matchAny(PEDAL_BRAKE_RE, names) },
+      trackPositionAvailable: _matchAny(TRACK_POS_RE, names),
+      lapSegmentationAvailable: _matchAny(LAP_RE, names),
+      durationS: durationS,
+    };
+  }
+
   function observeTelemetry(session, window, opts) {
     try { return _observeInner(session, window, opts || {}); }
     catch (e) { return _unavailable('observation_exception', [_blocker('OBSERVATION_EXCEPTION', String(e && e.message || e))]); }
@@ -168,6 +212,7 @@
 
     var win = _applyWindow(series0, window);
     var series = win.series;
+    var driverInputs = _driverInputs(tel, series);
 
     // run the production observed yaw-response engine (raw steering only)
     var yawResp = TY.computeObservedYawResponse({ time: series.time, yawRate: series.yawRate, steer: series.steer, speed: series.speed, lateralAccel: series.lateralAccel, steerUnit: series.steerUnit }, { strictness: opts.strictness });
@@ -175,6 +220,7 @@
       return {
         valid: false, quality: quality, channels: channels, selectedWindow: win.selectedWindow,
         observedTendency: 'unavailable', observedMetrics: { yawResponseReason: yawResp.reason, sampleCounts: yawResp.sampleCounts },
+        driverInputs: driverInputs,
         evidence: { reason: 'yaw_response_unavailable', detail: yawResp.reason }, confidence: null,
         method: 'speed_dependent_yaw_per_steer_trend', limitations: LIMITATIONS, confounders: CONFOUNDERS,
         blockedReasons: [_blocker('OBSERVED_YAW_RESPONSE_UNAVAILABLE', yawResp.reason)], warnings: warnings, credibility: 'Unavailable',
@@ -200,6 +246,7 @@
         dispersion: yawResp.dispersion, speedBins: yawResp.speedBins, thresholds: yawResp.thresholds,
         sampleCounts: yawResp.sampleCounts, units: yawResp.units,
       },
+      driverInputs: driverInputs,
       evidence: derived.evidence,
       confidence: derived.confidence,
       method: 'speed_dependent_yaw_per_steer_trend',
