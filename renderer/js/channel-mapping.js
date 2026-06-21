@@ -36,6 +36,8 @@
   function _validProjection(p) {
     return p && _isFiniteNum(p.scale) && p.scale !== 0 && _isFiniteNum(p.offset) && (p.sign === 1 || p.sign === -1);
   }
+  // deterministic projection signature (binds a steering calibration to THIS mapping's projection); MUST match calibration-registry.projectionSignature
+  function projectionSignature(p) { p = p || {}; return 's:' + p.scale + '|o:' + p.offset + '|g:' + p.sign; }
 
   // auto-suggest a canonical channel for a raw name; returns {canonical, confidence} or null
   function _suggest(rawName) {
@@ -104,7 +106,7 @@
     return { ok: errors.length === 0, entries: entries, mappingEntries: mappingEntries, byCanonical: byCanonical, suggestions: suggestions, ambiguities: ambiguities, errors: errors };
   }
 
-  var api = { buildChannelMapping: buildChannelMapping, CANONICAL_CHANNELS: CANONICAL_CHANNELS, CANONICAL_UNITS: CANONICAL_UNITS, IDENTITY_STATUS: IDENTITY_STATUS };
+  var api = { buildChannelMapping: buildChannelMapping, projectionSignature: projectionSignature, CANONICAL_CHANNELS: CANONICAL_CHANNELS, CANONICAL_UNITS: CANONICAL_UNITS, IDENTITY_STATUS: IDENTITY_STATUS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.ChannelMapping = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

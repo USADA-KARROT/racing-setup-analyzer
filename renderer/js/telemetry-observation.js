@@ -235,6 +235,25 @@
     di.lapSegmentationAvailable = has('lap');
     return di;
   }
+  // R2.4: ADDITIVE calibrated-magnitude block (road-wheel-referenced per-bin yaw gain). Built ONLY when the
+  // session-scoped capability says calibratedMagnitudeEligible; directional fields are untouched.
+  function _calibratedMagnitude(yawResp, calCap, dataProvenance) {
+    if (!calCap.calibratedMagnitudeEligible || typeof calCap.steeringRatioValue !== 'number' || !isFinite(calCap.steeringRatioValue) || calCap.steeringRatioValue <= 0) return null;
+    var r = calCap.steeringRatioValue;
+    var fin = function (x) { return typeof x === 'number' && isFinite(x); };
+    var bins = ((yawResp && yawResp.speedBins) || []).map(function (b) {
+      var pm = b && b.positive && b.positive.yawPerSteerStats; var nm = b && b.negative && b.negative.yawPerSteerStats;
+      return {
+        speedMps: (b.speedStart + b.speedEnd) / 2,
+        positiveGain: (pm && fin(pm.median)) ? pm.median / r : null,
+        negativeGain: (nm && fin(nm.median)) ? nm.median / r : null,
+        nPos: (b.positive && typeof b.positive.count === 'number') ? b.positive.count : 0,
+        nNeg: (b.negative && typeof b.negative.count === 'number') ? b.negative.count : 0,
+      };
+    });
+    return { ratioValue: r, units: 'rad/s per road-wheel rad', bins: bins, dataProvenance: dataProvenance || 'unverified',
+      limitations: ['magnitude_from_user_supplied_steering_ratio', 'data_provenance_' + (dataProvenance || 'unverified')] };
+  }
   function _observeCanonical(s, opts) {
     var AW = _req('./analysis-window.js', typeof AnalysisWindow !== 'undefined' ? AnalysisWindow : undefined);
     var CR = _req('./calibration-registry.js', typeof CalibrationRegistry !== 'undefined' ? CalibrationRegistry : undefined);
@@ -246,19 +265,19 @@
     if (s.timebaseStatus === 'blocked') blockedReasons.push(_blocker('TELEMETRY_TIMEBASE_BLOCKED', 'global reset'));
     REQUIRED.forEach(function (canon) { if (!elig[canon] || !elig[canon].eligible) { var rs = elig[canon] ? elig[canon].reason : 'unmapped'; blockedReasons.push(_blocker(rs === 'unmapped' ? 'REQUIRED_CHANNEL_MISSING' : 'REQUIRED_CHANNEL_NOT_ELIGIBLE', canon + ' (' + rs + ')')); } });
     if (blockedReasons.length) return _unavailable('preflight_blocked', blockedReasons, channels, warnings);
-    var calCap = CR.deriveCalibrationCapability(CR.buildCalibrationSet(s.calibrationSet || []));
+    var calCap = CR.deriveCalibrationCapability(CR.buildCalibrationSet(s.calibrationSet || []), { sessionId: s.sessionId || null, steeringBinding: s.steeringBinding || null });
     var higher = { signedResponseEligible: calCap.signedResponseEligible, calibratedMagnitudeEligible: calCap.calibratedMagnitudeEligible, roadWheelMetricsEligible: calCap.roadWheelMetricsEligible };
     var win = AW.validateAnalysisWindow(_bundle(s), s.windowRequest, AW.normalizeYawOptions(opts));
     var selectedWindow = { startTime: win.startTime, endTime: win.endTime, sampleCount: win.sampleCount, applied: s.windowRequest != null };
     var quality = { grade: win.quality, sampleRateHz: s.sampleRateHz || null, sampleCount: (s.time || []).length, timebaseStatus: s.timebaseStatus };
     if (!win.valid) {
-      return { valid: false, quality: quality, channels: channels, selectedWindow: selectedWindow, observedTendency: 'unavailable', observedMetrics: null, driverInputs: _driverInputsFromSession(s, _sliceCanon(s, win)), evidence: { reason: 'window_invalid', detail: win.rejectionReasons }, confidence: null, method: 'speed_dependent_yaw_per_steer_trend', limitations: LIMITATIONS, confounders: CONFOUNDERS, calibrationCapability: higher, blockedReasons: win.rejectionReasons.map(function (r) { return _blocker(String(r).indexOf('timebase') === 0 ? 'TELEMETRY_TIMEBASE_BLOCKED' : 'ANALYSIS_WINDOW_INVALID', r); }), warnings: warnings, credibility: 'Unavailable' };
+      return { valid: false, quality: quality, channels: channels, selectedWindow: selectedWindow, observedTendency: 'unavailable', observedMetrics: null, driverInputs: _driverInputsFromSession(s, _sliceCanon(s, win)), evidence: { reason: 'window_invalid', detail: win.rejectionReasons }, confidence: null, method: 'speed_dependent_yaw_per_steer_trend', limitations: LIMITATIONS, confounders: CONFOUNDERS, calibratedMagnitude: null, calibrationCapability: higher, blockedReasons: win.rejectionReasons.map(function (r) { return _blocker(String(r).indexOf('timebase') === 0 ? 'TELEMETRY_TIMEBASE_BLOCKED' : 'ANALYSIS_WINDOW_INVALID', r); }), warnings: warnings, credibility: 'Unavailable' };
     }
     var series = _sliceCanon(s, win);
     var driverInputs = _driverInputsFromSession(s, series);
     var yawResp = TY.computeObservedYawResponse({ time: series.time, yawRate: series.yawRate, steer: series.steer, speed: series.speed, lateralAccel: series.lateralAccel, steerUnit: series.steerUnit }, AW.normalizeYawOptions(opts));
     if (!yawResp.available) {
-      return { valid: false, quality: quality, channels: channels, selectedWindow: selectedWindow, observedTendency: 'unavailable', observedMetrics: { yawResponseReason: yawResp.reason, sampleCounts: yawResp.sampleCounts }, driverInputs: driverInputs, evidence: { reason: 'yaw_response_unavailable', detail: yawResp.reason }, confidence: null, method: 'speed_dependent_yaw_per_steer_trend', limitations: LIMITATIONS, confounders: CONFOUNDERS, calibrationCapability: higher, blockedReasons: [_blocker('OBSERVED_YAW_RESPONSE_UNAVAILABLE', yawResp.reason)], warnings: warnings, credibility: 'Unavailable' };
+      return { valid: false, quality: quality, channels: channels, selectedWindow: selectedWindow, observedTendency: 'unavailable', observedMetrics: { yawResponseReason: yawResp.reason, sampleCounts: yawResp.sampleCounts }, driverInputs: driverInputs, evidence: { reason: 'yaw_response_unavailable', detail: yawResp.reason }, confidence: null, method: 'speed_dependent_yaw_per_steer_trend', limitations: LIMITATIONS, confounders: CONFOUNDERS, calibratedMagnitude: null, calibrationCapability: higher, blockedReasons: [_blocker('OBSERVED_YAW_RESPONSE_UNAVAILABLE', yawResp.reason)], warnings: warnings, credibility: 'Unavailable' };
     }
     var derived = _deriveTendency(yawResp, opts);
     var metricName = (yawResp.dispersion && yawResp.dispersion.metric) || '';
@@ -269,7 +288,7 @@
       observedMetrics: { metric: metricName, dispersion: yawResp.dispersion, speedBins: yawResp.speedBins, thresholds: yawResp.thresholds, sampleCounts: yawResp.sampleCounts, units: yawResp.units },
       driverInputs: driverInputs, evidence: derived.evidence, confidence: derived.confidence,
       method: 'speed_dependent_yaw_per_steer_trend', limitations: LIMITATIONS, confounders: CONFOUNDERS,
-      calibrationCapability: higher, blockedReasons: [], warnings: warnings, credibility: 'Heuristic',
+      calibratedMagnitude: _calibratedMagnitude(yawResp, calCap, s.dataProvenance), calibrationCapability: higher, blockedReasons: [], warnings: warnings, credibility: 'Heuristic',
     };
   }
 

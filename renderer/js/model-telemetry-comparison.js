@@ -22,6 +22,9 @@
 (function (root) {
   'use strict';
 
+  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+  var MM = _req('./measured-metrics.js', typeof MeasuredMetrics !== 'undefined' ? MeasuredMetrics : undefined);
+
   var RANK = { oversteer: -1, neutral: 0, understeer: 1 };
   var OBS_TO_DIR = {
     understeer_tendency: 'understeer', neutral_tendency: 'neutral', oversteer_tendency: 'oversteer',
@@ -38,12 +41,39 @@
 
   function _blocker(code, detail) { return { code: code, scope: 'comparison', severity: 'info', detail: detail || null }; }
 
-  function _unavailable(reason, predicted, observed, blockedReasons) {
+  var MAG_AGREE_DEGG = 0.5; // model-vs-measured K_us agreement band (deg/g)
+  function _agreementClass(residual) { if (residual == null) return 'no_model_prediction'; if (Math.abs(residual) <= MAG_AGREE_DEGG) return 'aligned'; return residual > 0 ? 'measured_more_understeer' : 'measured_more_oversteer'; }
+  // INDEPENDENT of the directional comparison: a measured K_us (deg/g) from calibrated bins + wheelbase vs the model's predicted K_us.
+  function _magnitudeComparison(modelResult, observation) {
+    var ms = modelResult && modelResult.modelResultSnapshot;
+    var predictedKUs = (ms && typeof ms.understeer_gradient === 'number' && isFinite(ms.understeer_gradient)) ? ms.understeer_gradient : null;
+    var calMag = observation && observation.calibratedMagnitude;
+    var geom = modelResult && modelResult.measurementGeometry;
+    if (!calMag || !Array.isArray(calMag.bins) || !geom || geom.valid !== true || !MM) {
+      return { eligible: false, available: false, reason: 'calibration_or_geometry_unavailable', predictedKUsDegG: predictedKUs, measuredKUsDegG: null };
+    }
+    var measured = MM.deriveMeasuredUndersteerGradient({ calibratedYawGainBins: calMag.bins, wheelbaseM: geom.wheelbaseM });
+    if (!measured.available) {
+      return { eligible: true, available: false, reason: 'measured_kus_blocked', blockedReasons: measured.blockedReasons, fitQuality: measured.fitQuality, predictedKUsDegG: predictedKUs, measuredKUsDegG: null };
+    }
+    var residual = (predictedKUs != null) ? (measured.kUsDegG - predictedKUs) : null;
+    return {
+      eligible: true, available: true,
+      predictedKUsDegG: predictedKUs, measuredKUsDegG: measured.kUsDegG, residualDegG: residual,
+      agreementClass: _agreementClass(residual), fitQuality: measured.fitQuality,
+      dataProvenance: calMag.dataProvenance || 'unverified', method: measured.method,
+      limitations: measured.limitations, credibility: measured.credibility,
+    };
+  }
+
+  function _unavailable(reason, predicted, observed, blockedReasons, magnitudeComparison) {
     return {
       valid: false, predictedTendency: predicted || 'unavailable', observedTendency: observed || 'unavailable',
       differenceClass: 'unavailable', confidence: null,
       evidence: { reason: reason }, assumptions: ASSUMPTIONS,
       blockedReasons: blockedReasons || [], warnings: [], modelTelemetryComparisonEligible: false,
+      magnitudeComparison: magnitudeComparison || { eligible: false, available: false, reason: reason },
+      magnitudeComparisonEligible: !!(magnitudeComparison && magnitudeComparison.available),
       credibility: 'Unavailable',
     };
   }
@@ -55,6 +85,9 @@
   function _compareInner(modelResult, observation, opts) {
     var thr = opts.speedDependentThreshold != null ? opts.speedDependentThreshold : DEFAULT_SPEED_DEP_THRESHOLD;
     var blockedReasons = [];
+    // magnitude comparison is INDEPENDENT of the directional control flow — computed up-front so valid
+    // calibrated bins yield a measured K_us even when the directional heuristic is inconclusive.
+    var magnitudeComparison = _magnitudeComparison(modelResult, observation);
 
     // 1) inputs must exist + the model run must be valid
     var modelOk = modelResult && modelResult.valid === true && RANK.hasOwnProperty(modelResult.predictedTendency);
@@ -62,7 +95,7 @@
     var obsOk = observation && observation.valid === true && OBS_TO_DIR.hasOwnProperty(observation.observedTendency);
     if (!obsOk) blockedReasons.push(_blocker('OBSERVATION_NOT_AVAILABLE', observation ? observation.observedTendency : 'absent'));
     if (!modelOk || !obsOk) {
-      return _unavailable('inputs_not_ready', modelOk ? modelResult.predictedTendency : 'unavailable', obsOk ? OBS_TO_DIR[observation.observedTendency] : 'unavailable', blockedReasons);
+      return _unavailable('inputs_not_ready', modelOk ? modelResult.predictedTendency : 'unavailable', obsOk ? OBS_TO_DIR[observation.observedTendency] : 'unavailable', blockedReasons, magnitudeComparison);
     }
 
     var predicted = modelResult.predictedTendency;                 // understeer|neutral|oversteer
@@ -75,7 +108,7 @@
         differenceClass: observedDir, confidence: null,
         evidence: { reason: 'observation_inconclusive', predictedTendency: predicted },
         assumptions: ASSUMPTIONS, blockedReasons: [_blocker('OBSERVATION_INCONCLUSIVE', observedDir)], warnings: [],
-        modelTelemetryComparisonEligible: false, credibility: 'Heuristic',
+        modelTelemetryComparisonEligible: false, magnitudeComparison: magnitudeComparison, magnitudeComparisonEligible: magnitudeComparison.available, credibility: 'Heuristic',
       };
     }
 
@@ -114,6 +147,8 @@
       blockedReasons: [],
       warnings: [],
       modelTelemetryComparisonEligible: true,       // condition-derived: model valid + observation valid + conclusive
+      magnitudeComparison: magnitudeComparison,     // INDEPENDENT measured K_us vs predicted K_us (or block reason)
+      magnitudeComparisonEligible: magnitudeComparison.available,
       credibility: 'Heuristic',                     // heuristic difference classifier — never measured truth
     };
   }

@@ -25,9 +25,10 @@
 
   function _err(code, detail) { return { code: code, detail: detail != null ? detail : null }; }
   function _fail(code, detail, partial) {
-    return Object.assign({ ok: false, sourceMetadata: null, rawChannels: [], timebase: null, sampleCount: 0, warnings: [], parseErrors: [_err(code, detail)] }, partial || {});
+    return Object.assign({ ok: false, sourceMetadata: null, rawChannels: [], timebase: null, sampleCount: 0, dataProvenance: 'unverified', warnings: [], parseErrors: [_err(code, detail)] }, partial || {});
   }
   function _isFiniteNum(v) { return typeof v === 'number' && isFinite(v); }
+  function _normProvenance(opts) { var p = opts && opts.dataProvenance; return (p === 'synthetic' || p === 'real') ? p : 'unverified'; } // machine-read, never assumed
 
   function importTelemetry(source, opts) {
     try { return _importInner(source, opts || {}); }
@@ -60,6 +61,7 @@
     return {
       ok: true,
       sourceMetadata: { format: 'csv', channelCount: rawChannels.length, rowCount: parsed.rowCount },
+      dataProvenance: _normProvenance(opts),
       rawChannels: rawChannels,
       timebase: { hasTime: tb.hasTime, timeName: tb.timeName || null, sampleRateHz: tb.sampleRateHz, monotonic: tb.monotonic, resets: tb.resets, dups: tb.dups, gaps: tb.gaps, status: tb.status },
       sampleCount: parsed.rowCount,
@@ -102,6 +104,7 @@
     return {
       ok: true,
       sourceMetadata: { format: 'canonical_json', channelCount: rawChannels.length, rowCount: time.length, schemaVersion: typeof obj.schemaVersion === 'string' ? obj.schemaVersion : null },
+      dataProvenance: _normProvenance(opts),
       rawChannels: rawChannels,
       timebase: { hasTime: true, timeName: 'time', sampleRateHz: sr, monotonic: monotonic, resets: resets, dups: 0, gaps: 0, status: monotonic ? TC.GRADE.DEFINITION_CONFIRMED : TC.GRADE.BLOCKED },
       sampleCount: time.length,
