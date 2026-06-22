@@ -20,9 +20,11 @@ chk('analysisView state', /analysisView:\s*null/.test(html));
 chk('credBadge method', /credBadge\(level\)\{/.test(html));
 chk('fmt helper', /fmt\(v\)\{/.test(html));
 
-// 9 section markers (A..I)
-['A · Case Header', 'B · Capability Summary', 'C · Vehicle', 'D · Model Prediction', 'E · Telemetry Observation', 'F · Model vs Actual', 'G · Race Engineer', 'H · Driver Coach', 'I · Evidence'].forEach((s) => {
-  chk('section present: ' + s, html.indexOf(s) !== -1);
+// 9 section markers (A..I) — workspace copy is now i18n'd via aw.label.* keys; assert the t() reference + all 3 locales carry the marker.
+const WS = require('../renderer/js/i18n-workspace.js').WS_I18N;
+const wstri = (k) => !!(WS.en[k] && WS.zh[k] && WS.ja[k]);
+[['a_case_header', 'A'], ['b_capability_summary', 'B'], ['c_vehicle_setup_inputs', 'C'], ['d_model_prediction', 'D'], ['e_telemetry_observation', 'E'], ['f_model_vs_actual', 'F'], ['g_race_engineer', 'G'], ['h_driver_coach', 'H'], ['i_evidence_provenance', 'I']].forEach(([slug, letter]) => {
+  chk('section present: ' + letter, new RegExp("t\\('aw\\.label\\." + slug + "'\\)").test(html) && WS.en['aw.label.' + slug].indexOf(letter + ' ·') !== -1 && wstri('aw.label.' + slug));
 });
 
 // blocked-reasons + capability + badge bindings
@@ -30,7 +32,7 @@ chk('capability summary binding', /x-for="c in analysisView\.capabilitySummary"/
 chk('blocked reasons binding (model)', /analysisView\.modelPrediction\.blockedReasons/.test(html));
 chk('blocked reasons binding (drawer)', /analysisView\.evidenceDrawer\.allBlockedReasons/.test(html));
 chk('credibility badges used', /credBadge\('Model'\)/.test(html) && /credBadge\('Physics'\)/.test(html) && /credBadge\('Heuristic'\)/.test(html));
-chk('quantitative blocked stated', /Quantitative recommendation:\s*<b>blocked<\/b>/.test(html));
+chk('quantitative blocked stated', /t\('aw\.label\.quant_rec_blocked_inline'\)/.test(html) && /blocked/i.test(WS.en['aw.label.quant_rec_blocked_inline']) && wstri('aw.label.quant_rec_blocked_inline'));
 
 // module script includes (dependency order)
 const mods = ['canonical-parameters', 'parameter-conversions', 'setup-snapshot', 'analysis-case', 'suspension-input-normalizer', 'canonical-model-input', 'analysis-execution', 'telemetry-observation', 'model-telemetry-comparison', 'race-engineer-insight', 'driver-coach-insight', 'analysis-workspace', 'analysis-workspace-viewmodel', 'demo-analysis-case'];

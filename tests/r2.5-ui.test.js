@@ -32,8 +32,10 @@ chk('blocked path shows reason', /analysisView\.quantitativeRecommendation\.bloc
 chk('Model credibility badge', /credBadge\('Model'\)/.test(html));
 
 // honesty: clicks gated + no lap-time promise
-chk('hardware clicks gated note', /hardware clicks need a validated/.test(html));
-chk('no click count / lap-time promise note', /never a click count or a lap-time promise/.test(html));
+const WS5 = require('../renderer/js/i18n-workspace.js').WS_I18N;
+const wstri5 = (k) => !!(WS5.en[k] && WS5.zh[k] && WS5.ja[k]);
+chk('hardware clicks gated note', /t\('aw\.hint\.physical_units_only_hint'\)/.test(html) && /hardware clicks need a validated/.test(WS5.en['aw.hint.physical_units_only_hint']) && wstri5('aw.hint.physical_units_only_hint'));
+chk('no click count / lap-time promise note', /t\('aw\.hint\.quant_pick_hint'\)/.test(html) && /never a click count or a lap-time promise/.test(WS5.en['aw.hint.quant_pick_hint']) && wstri5('aw.hint.quant_pick_hint'));
 
 // app() method + state
 chk('runQuantitativeRecommendation method', /runQuantitativeRecommendation\(\)\{/.test(html));
@@ -54,14 +56,14 @@ chk('A/B change % bound', /x-model="abChangePct"/.test(html));
 chk('A/B compare button', /@click="runSetupAbCompare\(\)"/.test(html));
 chk('A/B reads directionalSummary', /abResult\.directionalSummary/.test(html));
 chk('A/B reads deltas', /abResult\.deltas\.understeer_gradient/.test(html));
-chk('A/B no lap-time note', /not a lap-time claim/.test(html));
+chk('A/B no lap-time note', /t\('aw\.hint\.model_whatif_disclaimer'\)/.test(html) && /not a lap-time claim/.test(WS5.en['aw.hint.model_whatif_disclaimer']) && wstri5('aw.hint.model_whatif_disclaimer'));
 chk('A/B method calls compareSetups', /SetupAB\.compareSetups/.test(html));
 chk('A/B method present', /runSetupAbCompare\(\)\{/.test(html));
 chk('A/B state', /abResult:/.test(html));
 // CP1 fix: leverType surfaced (ballast vs suspension)
 chk('quantitative shows leverType', /quantitativeRecommendation\.leverType/.test(html));
-chk('ballast lever flagged materially different', /ballast\/weight move/.test(html));
-chk('A/B shows plausibility warnings', /abResult\.plausibilityWarnings/.test(html) && /implausible what-if/.test(html));
+chk('ballast lever flagged materially different', /t\('aw\.hint\.ballast_weight_move_note'\)/.test(html) && /ballast\/weight move/.test(WS5.en['aw.hint.ballast_weight_move_note']) && wstri5('aw.hint.ballast_weight_move_note'));
+chk('A/B shows plausibility warnings', /abResult\.plausibilityWarnings/.test(html) && /t\('aw\.label\.implausible_whatif_warn'\)/.test(html) && wstri5('aw.label.implausible_whatif_warn'));
 
 console.log(`r2.5-ui: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

@@ -60,25 +60,37 @@ const NEXT = ['create_case', 'run_model_or_import_telemetry', 'finish_import', '
 const missNext = NEXT.filter(s => !(has(en, 'ui.nextAction.' + s) && has(zh, 'ui.nextAction.' + s) && has(ja, 'ui.nextAction.' + s)));
 chk('every nextAction code has a 3-lang key', missNext.length === 0, missNext);
 
-// 5) hard-coded English scanner over the R3 shell region
+// 5) hard-coded English scanner over EVERY i18n'd region (R3 shell + analysis workspace + import/calibrate flow)
 const html = fs.readFileSync(path.join(__dirname, '../renderer/index.html'), 'utf8').split('\n');
-const startIdx = html.findIndex(l => l.includes('R3.0A: Analysis-Case app shell'));
-const endIdx = html.findIndex(l => l.includes('R3.0A: Setup Library sub-navigation'));
-chk('R3 shell region located in index.html', startIdx > 0 && endIdx > startIdx, { startIdx, endIdx });
-// excluded (not user-facing copy): brand, milestone id, unit tokens, symbol glyphs, code identifiers
-const ALLOW = /Racing Dynamics|R3\.0C|deg\/g|—|○|★|✓|CSV|Kus|K<sub>/;
+const REGIONS = [
+  ['R3.0A: Analysis-Case app shell', 'R3.0A: Setup Library sub-navigation'],   // R3 shell
+  ["showPane('analysis')", '</main>'],                                          // analysis workspace pane (import flow + sections A–J)
+];
+// allowlisted (NOT user-facing copy): brand/product, milestone & version ids, unit & symbol tokens, canonical
+// channel identifiers (option values), engineering abbreviations, and the K_us subscript markup.
+const ALLOW = /Racing Dynamics|R3\.0C|R2\.\d|deg\/g|N\/mm|Nm\/deg|°|km\/h|kgf|—|·|○|★|✓|→|↔|CSV|MDF|Kus|K<sub>|<sub>us|ARB|LLTD|<option value="(speed|lateral_accel|yaw_rate|steering|throttle|brake|track_position|lap|time)"/;
 const offenders = [];
-if (startIdx > 0 && endIdx > startIdx) {
-  for (let i = startIdx; i < endIdx; i++) {
-    const line = html[i];
-    // a literal text node ">Words<" that is not a binding and not allowlisted
-    (line.match(/>[A-Z][A-Za-z][A-Za-z /&]+</g) || []).forEach(tn => { if (!ALLOW.test(tn)) offenders.push((i + 1) + ': ' + tn); });
-    // a static placeholder=/title= with a letter (should be the :placeholder / :title bound form)
-    if (/\splaceholder="[A-Za-z]/.test(line)) offenders.push((i + 1) + ': static placeholder=');
-    if (/\stitle="[A-Za-z]/.test(line) && !/:title=/.test(line)) offenders.push((i + 1) + ': static title=');
+let located = 0;
+REGIONS.forEach(([sm, em]) => {
+  const s = html.findIndex(l => l.includes(sm));
+  const e = html.findIndex((l, idx) => idx > s && l.includes(em));
+  if (s >= 0 && e > s) {
+    located++;
+    for (let i = s; i < e; i++) {
+      const line = html[i];
+      if (ALLOW.test(line)) continue;
+      // a literal text node ">Words<" (capitalized, 3+ letters) — i18n'd copy renders via x-text so this is a leak
+      (line.match(/>[A-Z][a-z][A-Za-z ]{2,}</g) || []).forEach(tn => offenders.push((i + 1) + ' text: ' + tn));
+      // a static placeholder=/title= carrying letters (should be the :placeholder / :title bound form)
+      if (/\splaceholder="[A-Za-z]/.test(line)) offenders.push((i + 1) + ': static placeholder=');
+      if (/\stitle="[A-Za-z]/.test(line) && !/:title=/.test(line)) offenders.push((i + 1) + ': static title=');
+      // an English string literal inside an Alpine expression: x-text="'Capital words..."
+      (line.match(/x-text="'[A-Z][a-z][A-Za-z ]{2,}/g) || []).forEach(m => offenders.push((i + 1) + ' x-text-literal: ' + m));
+    }
   }
-}
-chk('no hard-coded English literals in the R3 shell region', offenders.length === 0, offenders.slice(0, 12));
+});
+chk('both i18n\'d scanner regions located', located === REGIONS.length, { located });
+chk('no hard-coded English literals in the i18n\'d regions', offenders.length === 0, offenders.slice(0, 15));
 
 // 6) t() fallback semantics
 function mkT(lang) { const D = { en, zh, ja }; return (k) => { if (has(D[lang], k)) return D[lang][k]; if (has(en, k)) return en[k]; return k; }; }
