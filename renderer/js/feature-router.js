@@ -16,8 +16,25 @@
 
   function _reg() { return REG || (root && root.FeatureRegistry) || null; }
 
-  // resolve a feature → route instructions (no UI mutation here)
-  function resolveFeatureRoute(featureId) { var r = _reg(); return r ? r.resolveFeatureRoute(featureId) : null; }
+  // resolve a feature → legacy route instructions. THIS is the single place featureId → shellSection/currentTab/
+  // caseSubview is constructed (the registry stays declarative data + derivations).
+  function resolveFeatureRoute(featureId) {
+    var r = _reg(); if (!r) return null;
+    var f = r.getFeature(featureId); if (!f) return null;
+    var node = r.getNode(f.navNodeId) || null;
+    var route;
+    if (node && node.kind === 'setuplib_area') {
+      // setup_library section + the feature's own pane — this is what makes 'predict' reachable in Setup Library
+      route = { shellSection: 'setup_library', currentTab: f.rendererAdapter ? f.rendererAdapter.paneId : null };
+    } else if (node && node.legacyRouting) {
+      route = Object.assign({}, node.legacyRouting);
+    } else {
+      route = {};
+    }
+    if (f.rendererAdapter && f.rendererAdapter.focusTarget) route.focusTarget = f.rendererAdapter.focusTarget;
+    route.featureId = featureId; route.deferred = f.availability === 'deferred' ? (f.deferredReason || true) : false;
+    return route;
+  }
   function getFeatureEntryPoints(featureId) { var r = _reg(); return r ? r.getFeatureEntryPoints(featureId) : null; }
   function isFeatureReachable(featureId) { var r = _reg(); return r ? r.isFeatureReachable(featureId) : false; }
   function getFeatureBreadcrumb(featureId) { var r = _reg(); return r ? r.getFeatureBreadcrumb(featureId) : []; }
