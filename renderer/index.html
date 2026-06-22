@@ -2752,15 +2752,15 @@ canvas{max-height:300px}
             <span class="w-40 truncate" x-text="ch.rawName + (ch.rawUnit?(' ['+ch.rawUnit+']'):'')"></span>
             <select x-model="ch.assigned" class="bg-slate-900 border border-slate-700 rounded px-1 py-0.5">
               <option value="" x-text="t('aw.opt.unmapped')"></option>
-              <option value="speed">speed</option>
-              <option value="lateral_accel">lateral_accel</option>
-              <option value="yaw_rate">yaw_rate</option>
-              <option value="steering">steering</option>
-              <option value="throttle">throttle</option>
-              <option value="brake">brake</option>
-              <option value="track_position">track_position</option>
-              <option value="lap">lap</option>
-              <option value="time">time</option>
+              <option value="speed" x-text="t('aw.channel.speed')"></option>
+              <option value="lateral_accel" x-text="t('aw.channel.lateral_accel')"></option>
+              <option value="yaw_rate" x-text="t('aw.channel.yaw_rate')"></option>
+              <option value="steering" x-text="t('aw.channel.steering')"></option>
+              <option value="throttle" x-text="t('aw.channel.throttle')"></option>
+              <option value="brake" x-text="t('aw.channel.brake')"></option>
+              <option value="track_position" x-text="t('aw.channel.track_position')"></option>
+              <option value="lap" x-text="t('aw.channel.lap')"></option>
+              <option value="time" x-text="t('aw.channel.time')"></option>
             </select>
             <label class="flex items-center gap-1"><input type="checkbox" x-model="ch.confirmed"> <span x-text="t('aw.label.confirm')"></span></label>
           </div>
@@ -2937,7 +2937,7 @@ canvas{max-height:300px}
       <template x-if="analysisView.quantitativeRecommendation.available">
         <div class="text-xs space-y-1">
           <div><span x-text="t('aw.label.Change')"></span> <b class="text-sky-300" x-text="tCode('aw.param', quantParameter)"></b> <span x-text="t('aw.label.by')"></span> <b class="text-emerald-300" x-text="(analysisView.quantitativeRecommendation.recommendedDeltaPhysical>=0?'+':'')+fmt(analysisView.quantitativeRecommendation.recommendedDeltaPhysical)"></b> <span x-text="analysisView.quantitativeRecommendation.unit"></span> <span x-html="credBadge('Model')"></span></div>
-          <div class="text-slate-400" x-text="t('aw.label.predicted_metric_after_prefix')+' '+tCode('aw.metricname', analysisView.quantitativeRecommendation.targetMetric)+' '+fmt(analysisView.quantitativeRecommendation.predictedMetricAfter)+' '+analysisView.quantitativeRecommendation.metricUnit+' (residual '+fmt(analysisView.quantitativeRecommendation.residual)+')'"></div>
+          <div class="text-slate-400" x-text="t('aw.label.predicted_metric_after_prefix')+' '+tCode('aw.metricname', analysisView.quantitativeRecommendation.targetMetric)+' '+fmt(analysisView.quantitativeRecommendation.predictedMetricAfter)+' '+analysisView.quantitativeRecommendation.metricUnit+' ('+t('aw.label.residual')+' '+fmt(analysisView.quantitativeRecommendation.residual)+')'"></div>
           <div class="text-[11px] text-slate-500"><span x-text="t('aw.label.side_effects')"></span> <template x-for="se in analysisView.quantitativeRecommendation.sideEffects" :key="se.metric"><span class="mr-2" x-text="tCode('aw.metricname', se.metric)+' &Delta;'+fmt(se.delta)"></span></template></div>
           <div class="text-[11px] text-amber-400/80" x-text="analysisView.quantitativeRecommendation.validationStep ? t('aw.qr.validationStep') : ''"></div>
           <div class="text-[11px] text-slate-500"><span x-text="t('aw.label.lever')"></span> <span x-text="tCode('aw.lever', analysisView.quantitativeRecommendation.leverType)"></span><template x-if="analysisView.quantitativeRecommendation.leverType==='weight_distribution_ballast'"><span class="text-amber-400/70" x-text="' '+t('aw.hint.ballast_weight_move_note')"></span></template></div>
@@ -2972,7 +2972,7 @@ canvas{max-height:300px}
           <div><span x-text="t('aw.label.predicted_balance_change_label')"></span> <b class="text-sky-300" x-text="tCode('aw.dir', abResult.directionalSummary)"></b> <span x-html="credBadge('Model')"></span></div>
           <div class="text-slate-400" x-text="'&Delta; '+tCode('aw.metricname','understeer_gradient')+' '+fmt(abResult.deltas.understeer_gradient)+' deg/g &middot; &Delta; '+tCode('aw.metricname','roll_stiffness_dist_front')+' '+fmt(abResult.deltas.roll_stiffness_dist_front)+' % &middot; &Delta; '+tCode('aw.metricname','total_roll_stiffness')+' '+fmt(abResult.deltas.total_roll_stiffness)+' Nm/deg'"></div>
           <template x-if="abResult.plausibilityWarnings &amp;&amp; abResult.plausibilityWarnings.length">
-            <div class="text-[11px] text-amber-400/80"><span x-text="t('aw.label.implausible_whatif_warn')"></span> <template x-for="w in abResult.plausibilityWarnings" :key="w.parameter+w.setup"><span class="mr-2" x-text="tCode('aw.param', w.parameter)+'='+fmt(w.value)+' (range '+w.range[0]+'-'+w.range[1]+')'"></span></template></div>
+            <div class="text-[11px] text-amber-400/80"><span x-text="t('aw.label.implausible_whatif_warn')"></span> <template x-for="w in abResult.plausibilityWarnings" :key="w.parameter+w.setup"><span class="mr-2" x-text="tCode('aw.param', w.parameter)+'='+fmt(w.value)+' ('+t('aw.label.range')+' '+w.range[0]+'-'+w.range[1]+')'"</span></template></div>
           </template>
           <template x-if="abResult.modelVersions &amp;&amp; !abResult.modelVersions.match">
             <div class="text-[11px] text-amber-400/80"><span x-text="t('aw.label.model_version_mismatch_warn')"></span> A=<span x-text="abResult.modelVersions.a"></span> B=<span x-text="abResult.modelVersions.b"></span></div>
@@ -3036,7 +3036,7 @@ canvas{max-height:300px}
       <div class="text-xs text-slate-500 mb-2"><span x-text="t('aw.label.credibility')"></span> <template x-for="l in analysisView.evidenceDrawer.credibilityLegend" :key="l"><span class="mr-1" x-html="credBadge(l)"></span></template></div>
       <div class="text-[11px] text-slate-400"><span x-text="t('aw.label.model')"></span> <span x-text="analysisView.evidenceDrawer.modelVersion"></span></div>
       <div class="text-[11px] text-slate-400 mt-1" x-text="t('aw.label.blocked_reasons_all_layers')"></div>
-      <template x-for="b in analysisView.evidenceDrawer.allBlockedReasons" :key="b.layer+b.code"><div class="text-[11px] text-slate-500" x-text="'· ['+b.layer+'] '+tCode('ui.blocker', b.code)"></div></template>
+      <template x-for="b in analysisView.evidenceDrawer.allBlockedReasons" :key="b.layer+b.code"><div class="text-[11px] text-slate-500" x-text="'· ['+tCode('aw.layer', b.layer)+'] '+tCode('ui.blocker', b.code)"></div></template>
       <div class="text-[11px] text-slate-400 mt-1" x-show="(analysisView.evidenceDrawer.allWarnings||[]).length"><span x-text="t('aw.label.warnings')"></span> <span x-text="(analysisView.evidenceDrawer.allWarnings||[]).map(x=>tCode('ui.limitation', typeof x==='string'?x:((x&&x.code)||x))).join('; ')"></span></div>
     </div>
    </div>

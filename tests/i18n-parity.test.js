@@ -25,6 +25,7 @@ require('../renderer/js/i18n-ui.js');
 require('../renderer/js/i18n-csv.js');
 require('../renderer/js/i18n-advisor.js');
 require('../renderer/js/i18n-shell.js');
+require('../renderer/js/i18n-workspace.js');
 const { en, zh, ja } = global.I18N;
 const ek = Object.keys(en), zk = Object.keys(zh), jk = Object.keys(ja);
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -66,31 +67,34 @@ const REGIONS = [
   ['R3.0A: Analysis-Case app shell', 'R3.0A: Setup Library sub-navigation'],   // R3 shell
   ["showPane('analysis')", '</main>'],                                          // analysis workspace pane (import flow + sections A–J)
 ];
-// allowlisted (NOT user-facing copy): brand/product, milestone & version ids, unit & symbol tokens, canonical
-// channel identifiers (option values), engineering abbreviations, and the K_us subscript markup.
-const ALLOW = /Racing Dynamics|R3\.0C|R2\.\d|deg\/g|N\/mm|Nm\/deg|°|km\/h|kgf|—|·|○|★|✓|→|↔|CSV|MDF|Kus|K<sub>|<sub>us|ARB|LLTD|<option value="(speed|lateral_accel|yaw_rate|steering|throttle|brake|track_position|lap|time)"/;
+// allowlisted TOKENS (removed PER-TOKEN, not whole-line, so a leak beside an allowed token is still caught):
+// brand/product, milestone & version ids, unit & symbol tokens, canonical channel option VALUES, engineering
+// abbreviations, K_us markup, and credBadge('<Level>') — its arg is a machine level mapped via aw.cred, not copy.
+const ALLOW = /Racing Dynamics|R3\.0C|R2\.\d|deg\/g|N\/mm|Nm\/deg|°C?|km\/h|kgf|Hz|—|·|○|★|✓|→|↔|⚠|CSV|MDF|K_us|Kus|K<sub>|<sub>us<\/sub>|\bARB\b|\bLLTD\b|\bMR\b|\bCG\b|credBadge\('[A-Za-z]+'\)|'(?:Physics|Model|Measured|Derived|Heuristic|Unavailable)'|value="(?:speed|lateral_accel|yaw_rate|steering|throttle|brake|track_position|lap|time)"/g;
 const offenders = [];
 let located = 0;
 REGIONS.forEach(([sm, em]) => {
   const s = html.findIndex(l => l.includes(sm));
   const e = html.findIndex((l, idx) => idx > s && l.includes(em));
-  if (s >= 0 && e > s) {
-    located++;
-    for (let i = s; i < e; i++) {
-      const line = html[i];
-      if (ALLOW.test(line)) continue;
-      // a literal text node ">Words<" (capitalized, 3+ letters) — i18n'd copy renders via x-text so this is a leak
-      (line.match(/>[A-Z][a-z][A-Za-z ]{2,}</g) || []).forEach(tn => offenders.push((i + 1) + ' text: ' + tn));
-      // a static placeholder=/title= carrying letters (should be the :placeholder / :title bound form)
-      if (/\splaceholder="[A-Za-z]/.test(line)) offenders.push((i + 1) + ': static placeholder=');
-      if (/\stitle="[A-Za-z]/.test(line) && !/:title=/.test(line)) offenders.push((i + 1) + ': static title=');
-      // an English string literal inside an Alpine expression: x-text="'Capital words..."
-      (line.match(/x-text="'[A-Z][a-z][A-Za-z ]{2,}/g) || []).forEach(m => offenders.push((i + 1) + ' x-text-literal: ' + m));
-    }
+  if (s < 0 || e <= s) return;
+  located++;
+  for (let i = s; i < e; i++) {
+    const stripped = html[i].replace(ALLOW, ' '); // per-token removal, then scan the remainder
+    // a literal text node ">Words<" (capitalized, 3+ letters) — i18n'd copy renders via x-text so this is a leak
+    (stripped.match(/>[A-Z][a-z][A-Za-z ]{2,}</g) || []).forEach(tn => offenders.push((i + 1) + ' text: ' + tn));
+    // a static placeholder=/title= carrying letters (should be the :placeholder / :title bound form)
+    if (/\splaceholder="[A-Za-z]/.test(stripped)) offenders.push((i + 1) + ': static placeholder=');
+    if (/\stitle="[A-Za-z]/.test(stripped) && !/:title=/.test(html[i])) offenders.push((i + 1) + ': static title=');
+    // a capitalized English string literal anywhere in an Alpine expression (catches inline concat like '(residual …)')
+    (stripped.match(/'[A-Z][a-z][A-Za-z]{2,}[A-Za-z ]*'/g) || []).forEach(m => offenders.push((i + 1) + ' literal: ' + m));
   }
 });
 chk('both i18n\'d scanner regions located', located === REGIONS.length, { located });
 chk('no hard-coded English literals in the i18n\'d regions', offenders.length === 0, offenders.slice(0, 15));
+// CP-I18N-2: evidence-drawer dynamic layer labels (b.layer) are localized in all three locales
+['execution', 'observation', 'comparison', 'measured', 'raceEngineer', 'driverCoach', 'trackIntelligence', 'model'].forEach(L => {
+  chk('layer localized 3-lang: ' + L, has(en, 'aw.layer.' + L) && has(zh, 'aw.layer.' + L) && has(ja, 'aw.layer.' + L));
+});
 
 // 6) t() fallback semantics
 function mkT(lang) { const D = { en, zh, ja }; return (k) => { if (has(D[lang], k)) return D[lang][k]; if (has(en, k)) return en[k]; return k; }; }

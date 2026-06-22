@@ -286,7 +286,7 @@ const SHELL_I18N = {
     'ui.confidence.low': '低', 'ui.confidence.medium': '中', 'ui.confidence.high': '高',
     'ui.mapping.confirmed_observable': '観測可能（確認済み）', 'ui.mapping.mapped_not_observable': 'マッピング済み・観測不可', 'ui.mapping.not_mapped': '未マッピング',
     'ui.calib.calibrated': 'キャリブレーション済み', 'ui.calib.uncalibrated': '未キャリブレーション',
-    'ui.prov.real': '実', 'ui.prov.synthetic': '合成データ', 'ui.prov.unverified': '未検証',
+    'ui.prov.real': '実データ', 'ui.prov.synthetic': '合成データ', 'ui.prov.unverified': '未検証',
     'ui.prov.user_confirmed': 'ユーザー確認済み', 'ui.prov.measured': '計測値', 'ui.prov.derived': '算出値', 'ui.prov.scalar': 'スカラー',
     'ui.nextAction.create_case': '解析ケースを作成', 'ui.nextAction.run_model_or_import_telemetry': 'モデルを実行またはテレメトリを取り込み',
     'ui.nextAction.finish_import': 'インポートを完了', 'ui.nextAction.map_channels_to_canonical': 'チャンネルを標準名にマッピング',
