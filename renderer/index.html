@@ -124,9 +124,59 @@ canvas{max-height:300px}
      <div>Status <b class="text-sky-300" x-text="caseShellState().status"></b></div>
    </div>
   </template>
-  <div class="mb-2 text-[11px] text-amber-400/70 flex items-center gap-1" x-show="shellSection==='cases'" x-cloak>
-    <span class="px-1.5 py-0.5 rounded bg-amber-900/30 border border-amber-700/40">Deferred to R3.0B</span>
-    <span>Saving, reopening, duplicating and a searchable multi-case library arrive in R3.0B — this session shows the current in-memory case only. No case is silently persisted.</span>
+  <!-- R3.0B: Case Library (local-first persistence) -->
+  <div class="mb-3 rounded-lg border border-slate-700 bg-slate-800/40 p-3" x-show="shellSection==='cases'" x-cloak x-init="$nextTick(()=>{ if(ensureStore()) refreshLibrary(); })">
+    <div class="flex items-center justify-between mb-2">
+      <div class="text-sm font-semibold text-slate-200">Case Library <span class="text-[11px] text-slate-500" x-text="library ? '· '+library.counts.shown+'/'+library.counts.total : ''"></span></div>
+      <div class="flex gap-1">
+        <button @click="saveCurrentCase()" :disabled="!analysisView || importedSummaryOpen" class="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-xs disabled:opacity-40" title="Save / update the current analysis (imported summaries cannot be overwritten — use Save as new)">Save</button>
+        <button @click="saveCurrentCaseAsNew()" :disabled="!analysisView || importedSummaryOpen" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs disabled:opacity-40" title="Save the current analysis as a new case (not available for imported summaries — re-run locally)">Save as new</button>
+        <button @click="exportCaseRow(currentCaseId)" :disabled="!currentCaseId" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs disabled:opacity-40">Export</button>
+        <label class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs cursor-pointer">Import<input type="file" accept="application/json" class="hidden" @change="importCaseFile($event)"></label>
+        <label class="flex items-center gap-1 text-[11px] text-slate-400 px-1" title="Autosave changes to the open case"><input type="checkbox" x-model="autosaveEnabled"> autosave</label>
+      </div>
+    </div>
+    <div class="text-[11px] text-rose-400 mb-1" x-show="storageError" x-cloak x-text="'Storage: '+storageError"></div>
+    <div class="text-[11px] text-amber-400/70 mb-1" x-show="importedSummaryOpen" x-cloak>Imported summary — full section detail not included; re-run locally for detail.</div>
+    <div class="flex flex-wrap gap-2 mb-2 text-xs">
+      <input x-model="libFilters.search" @input="refreshLibrary()" placeholder="search title / vehicle / track…" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 flex-1 min-w-[8rem]">
+      <input x-model="libFilters.vehicle" @input="refreshLibrary()" placeholder="vehicle" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-24">
+      <input x-model="libFilters.track" @input="refreshLibrary()" placeholder="track" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-24">
+      <select x-model="libFilters.status" @change="refreshLibrary()" class="bg-slate-900 border border-slate-700 rounded px-1 py-1">
+        <option value="">any status</option><option value="draft">draft</option><option value="ready">ready</option><option value="complete">complete</option><option value="archived">archived</option>
+      </select>
+      <input type="date" x-model="libFilters.fromDate" @change="refreshLibrary()" title="updated on/after" class="bg-slate-900 border border-slate-700 rounded px-1 py-1">
+      <label class="flex items-center gap-1 text-slate-400"><input type="checkbox" x-model="libFilters.includeArchived" @change="refreshLibrary()"> archived</label>
+    </div>
+    <div class="max-h-52 overflow-y-auto text-xs">
+      <template x-if="library && library.rows.length===0"><div class="text-slate-500 py-2">No saved cases — run an analysis and click Save.</div></template>
+      <template x-for="sec in libSections()" :key="sec.key">
+        <div class="mb-1">
+          <div class="text-[10px] uppercase tracking-wide text-slate-600 mt-1" x-text="sec.label+' ('+sec.rows.length+')'"></div>
+          <template x-for="row in sec.rows" :key="row.caseId">
+            <div class="flex items-center justify-between py-1 border-b border-white/5">
+              <div class="min-w-0 truncate">
+                <span class="text-amber-300 mr-0.5" x-show="row.pinned" x-cloak>★</span>
+                <span class="text-slate-200" x-text="row.title"></span>
+                <span class="text-slate-500" x-text="'· '+(row.vehicle||'—')+(row.track?(' · '+row.track):'')+' · '+row.status"></span>
+                <span class="ml-1 text-[10px] text-amber-400/70" x-show="row.recordType==='imported_summary'" x-cloak>imported</span>
+                <span class="ml-1 text-[10px]" :class="row.indicators.telemetry==='observable' ? 'text-emerald-300' : 'text-slate-600'" x-text="'tele:'+row.indicators.telemetry"></span>
+                <span class="ml-1 text-[10px]" :class="row.indicators.measured==='measured' ? 'text-violet-300' : 'text-slate-600'" x-text="'meas:'+row.indicators.measured"></span>
+                <span class="ml-1 text-[10px]" :class="row.indicators.corner==='eligible' ? 'text-sky-300' : 'text-slate-600'" x-text="'corner:'+row.indicators.corner"></span>
+                <span class="ml-1 text-[10px] text-sky-300" x-show="row.caseId===currentCaseId" x-cloak>open</span>
+              </div>
+              <div class="flex gap-1 shrink-0">
+                <button @click="pinCase(row.caseId, !row.pinned)" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600" :class="row.pinned?'text-amber-300':''" x-text="row.pinned ? 'Unpin' : 'Pin'"></button>
+                <button @click="openCase(row.caseId)" class="px-1.5 py-0.5 rounded bg-sky-700 hover:bg-sky-600">Open</button>
+                <button @click="duplicateCase(row.caseId)" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600" x-show="row.recordType!=='imported_summary'" x-cloak>Dup</button>
+                <button @click="archiveCase(row.caseId, !row.archived)" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600" x-text="row.archived ? 'Unarc' : 'Arc'"></button>
+                <button @click="deleteCase(row.caseId)" class="px-1.5 py-0.5 rounded bg-rose-800 hover:bg-rose-700">Del</button>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+    </div>
   </div>
   <div class="flex flex-wrap gap-1" x-show="analysisView">
     <template x-for="cn in caseNav" :key="cn.id">
@@ -2732,7 +2782,33 @@ canvas{max-height:300px}
 
   <div x-show="!analysisView && !analysisError" class="text-slate-500 text-sm">Click <b>Load Demo Analysis Case</b> for synthetic data, or import a CSV above — both run the same pipeline.</div>
 
-  <template x-if="analysisView">
+  <!-- R3.0B: an imported summary holds only curated fields (no full setupInputs/section objects) — render a safe,
+       explicitly-degraded view instead of the full workspace (which dereferences the full view model). -->
+  <template x-if="analysisView && importedSummaryOpen">
+   <div class="space-y-3" id="importedSummaryView">
+    <div class="rounded-lg border border-amber-700/40 bg-amber-900/10 p-4 text-sm">
+      <div class="text-amber-300 font-semibold mb-1">Imported summary</div>
+      <div class="text-slate-400 text-xs mb-2">Full section detail is not included in a portable bundle — re-run the analysis locally for the complete workspace.</div>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+        <div><span class="text-slate-500">Case </span><span x-text="(analysisView.caseHeader&&analysisView.caseHeader.caseId)||'—'"></span></div>
+        <div><span class="text-slate-500">Vehicle </span><span x-text="(analysisView.caseHeader&&analysisView.caseHeader.vehicle)||'—'"></span></div>
+        <div><span class="text-slate-500">Status </span><span class="text-sky-300" x-text="(analysisView.caseHeader&&analysisView.caseHeader.overallStatus)||'—'"></span></div>
+        <div><span class="text-slate-500">Understeer </span><b x-text="(analysisView.modelPrediction&&analysisView.modelPrediction.understeerGradient&&analysisView.modelPrediction.understeerGradient.value)??'—'"></b><span> deg/g</span></div>
+        <div><span class="text-slate-500">Tendency </span><b x-text="(analysisView.modelPrediction&&analysisView.modelPrediction.predictedTendency&&analysisView.modelPrediction.predictedTendency.value)||'—'"></b></div>
+        <div><span class="text-slate-500">Measured K<sub>us</sub> </span><b class="text-violet-300" x-text="(analysisView.measuredMetrics&&analysisView.measuredMetrics.measuredKUs&&analysisView.measuredMetrics.measuredKUs.value)??'—'"></b></div>
+      </div>
+    </div>
+    <div class="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+      <div class="text-xs text-slate-400 mb-2">Capability (as imported)</div>
+      <div class="flex flex-wrap gap-2">
+        <template x-for="c in (analysisView.capabilitySummary||[])" :key="c.key">
+          <span class="text-xs px-2 py-1 rounded" :class="c.available ? 'bg-emerald-900/40 text-emerald-300' : 'bg-slate-700 text-slate-400'"><span x-text="c.available ? '✓' : '○'"></span> <span x-text="c.key"></span></span>
+        </template>
+      </div>
+    </div>
+   </div>
+  </template>
+  <template x-if="analysisView && !importedSummaryOpen">
    <div class="space-y-4" id="analysisWorkspaceView">
     <!-- A · Case Header -->
     <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
@@ -3027,6 +3103,12 @@ canvas{max-height:300px}
 <script src="js/track-intelligence.js"></script>
 <script src="js/analysis-workspace.js"></script>
 <script src="js/analysis-workspace-viewmodel.js"></script>
+<script src="js/storage-backend.js"></script>
+<script src="js/schema-migration.js"></script>
+<script src="js/case-record-schema.js"></script>
+<script src="js/case-store.js"></script>
+<script src="js/session-store.js"></script>
+<script src="js/case-library-viewmodel.js"></script>
 <script src="js/case-shell.js"></script>
 <script src="js/demo-analysis-case.js"></script>
 <!-- R2.3 real-telemetry validation modules (dependency order) -->
@@ -3044,6 +3126,9 @@ const COLORS=['#38bdf8','#f472b6','#34d399','#facc15','#a78bfa','#fb923c','#22d3
 const telemetryDataHolder = { session: null, importToken: 0, ro: null, lastW: null,
   layout: null, timeValues: null, timeIndex: null, laneReaders: null, cursorTime: null, selection: null,
   dragging: false, dragStartPx: null, dragCurrPx: null, pointerInside: false, raf: 0 };
+// R3.0B: analysis working state incl. RAW telemetry (session/imported bundle) lives HERE, OUTSIDE Alpine's
+// reactive proxy — Alpine holds only ids + small summaries. (No raw sample arrays in the reactive tree.)
+const caseDataHolder = { lastCase: null, lastSession: null, lastSessionId: null, lastWindow: null, lastVmOpts: null, importedBundle: null, caseStore: null, sessionStore: null, sessionOpToken: 0, sessionPersistPromise: null, autosaveTimer: 0 };
 
 function app(){return{
   // === R2.2 Analysis Workspace (consumes production service output via the pure view-model builder) ===
@@ -3054,7 +3139,7 @@ function app(){return{
       if (typeof DemoAnalysisCase==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof AnalysisWorkspaceViewModel==='undefined'){ this.analysisError='analysis modules not loaded'; this.analysisView=null; this._shellEvidence=null; return; }
       const demo = DemoAnalysisCase.buildDemoAnalysisCase();
       const ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, demo.telemetrySession, demo.window, {}); // global Tier1BasicBalance as the model runner
-      this._lastCase = demo.analysisCase; this._lastSession = demo.telemetrySession; this._lastWindow = demo.window; this._lastVmOpts = { suspensionNormalizationView: demo.suspensionNormalizationView };
+      caseDataHolder.lastCase = demo.analysisCase; caseDataHolder.lastSession = demo.telemetrySession; caseDataHolder.lastWindow = demo.window; caseDataHolder.lastVmOpts = { suspensionNormalizationView: demo.suspensionNormalizationView }; this._persistSession(demo.telemetrySession);
       this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, { suspensionNormalizationView: demo.suspensionNormalizationView }); this._shellEvidence=this._mkShellEvidence(ws,'demo_case');
       this.analysisError = null;
     } catch(e){ this.analysisError = String((e&&e.message)||e); this.analysisView=null; this._shellEvidence=null; }
@@ -3066,39 +3151,37 @@ function app(){return{
   importSteeringConfirmed: false,
   quantMetric: 'roll_stiffness_dist_front', quantDelta: '', quantParameter: 'frontArbRollStiffnessNmDeg',
   abParameter: 'frontArbRollStiffnessNmDeg', abChangePct: '10', abResult: null,
-  _lastCase: null, _lastSession: null, _lastWindow: null, _lastVmOpts: null,
   runQuantitativeRecommendation(){
     try {
-      if (!this._lastCase || typeof AnalysisWorkspace==='undefined'){ this.analysisError='run an analysis first'; return; }
+      if (!caseDataHolder.lastCase || typeof AnalysisWorkspace==='undefined'){ this.analysisError='run an analysis first'; return; }
       var d=parseFloat(this.quantDelta);
       var opts={ quantitative: { target: { metric: this.quantMetric, delta: isFinite(d)?d:0 }, parameterKey: this.quantParameter } };
-      var ws=AnalysisWorkspace.runAnalysisWorkspace(this._lastCase, this._lastSession, this._lastWindow, opts);
-      this.analysisView=AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, this._lastCase, this._lastVmOpts||{}); this._shellEvidence=this._mkShellEvidence(ws,(this._shellEvidence&&this._shellEvidence.source)||'demo_case');
+      var ws=AnalysisWorkspace.runAnalysisWorkspace(caseDataHolder.lastCase, caseDataHolder.lastSession, caseDataHolder.lastWindow, opts);
+      this.analysisView=AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, caseDataHolder.lastCase, caseDataHolder.lastVmOpts||{}); this._shellEvidence=this._mkShellEvidence(ws,(this._shellEvidence&&this._shellEvidence.source)||'demo_case'); this.autosaveCurrentCase();
     } catch(e){ this.analysisError=String((e&&e.message)||e); }
   },
   runSetupAbCompare(){
     try {
-      if (!this._lastCase || typeof SetupAB==='undefined'){ this.analysisError='run an analysis first'; return; }
-      var whatif=JSON.parse(JSON.stringify(this._lastCase));
+      if (!caseDataHolder.lastCase || typeof SetupAB==='undefined'){ this.analysisError='run an analysis first'; return; }
+      var whatif=JSON.parse(JSON.stringify(caseDataHolder.lastCase));
       var snap=whatif.modelSnapshot && whatif.modelSnapshot.canonicalInputSnapshot; var p=snap && snap[this.abParameter];
       var pct=parseFloat(this.abChangePct);
       if (!p || !isFinite(pct)){ this.analysisError='pick a parameter and a % change'; return; }
       p.value = p.value * (1 + pct/100);
-      this.abResult = SetupAB.compareSetups(this._lastCase, whatif, {});
+      this.abResult = SetupAB.compareSetups(caseDataHolder.lastCase, whatif, {}); this.autosaveCurrentCase();
     } catch(e){ this.analysisError=String((e&&e.message)||e); this.abResult=null; }
   },
   importedChannels: [],
-  _importedBundle: null,
   canonicalChannelOptions: (typeof ChannelMapping!=='undefined' && ChannelMapping.CANONICAL_CHANNELS) ? ChannelMapping.CANONICAL_CHANNELS : ['speed','lateral_accel','yaw_rate','steering','throttle','brake','track_position','lap','time'],
   loadSampleImportCsv(){ try { this.importCsvText = (typeof DemoAnalysisCase!=='undefined') ? DemoAnalysisCase.buildDemoTelemetryCsv() : ''; this.importError=null; } catch(e){ this.importError=String((e&&e.message)||e); } },
   loadCornerSampleCsv(){ try { this.importCsvText = (typeof DemoAnalysisCase!=='undefined') ? DemoAnalysisCase.buildDemoCornerTelemetryCsv() : ''; this.importError=null; } catch(e){ this.importError=String((e&&e.message)||e); } },
   importTelemetryCsv(){
     try {
-      this.importError=null; this.importedChannels=[]; this._importedBundle=null;
+      this.importError=null; this.importedChannels=[]; caseDataHolder.importedBundle=null;
       if (typeof TelemetryImportAdapter==='undefined' || typeof ChannelMapping==='undefined'){ this.importError='import modules not loaded'; return; }
       var r = TelemetryImportAdapter.importTelemetry({ format:'csv', text:this.importCsvText });
       if (!r.ok){ this.importError = (r.parseErrors && r.parseErrors[0] && r.parseErrors[0].code) || 'import_failed'; return; }
-      this._importedBundle = r;
+      caseDataHolder.importedBundle = r;
       var sug = {}; (ChannelMapping.buildChannelMapping(r.rawChannels, []).suggestions || []).forEach(function(s){ if (s.canonicalChannel) sug[s.rawColumnId]=s.canonicalChannel; });
       // array-item properties (Alpine-reactive for the select/checkbox bindings)
       this.importedChannels = r.rawChannels.map(function(c){ return { rawColumnId:c.rawColumnId, rawName:c.rawName, rawUnit:c.rawUnit, assigned: sug[c.rawColumnId] || '', confirmed: false }; });
@@ -3109,7 +3192,7 @@ function app(){return{
       this.importError=null;
       if (typeof CanonicalTelemetrySession==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof DemoAnalysisCase==='undefined'){ this.importError='analysis modules not loaded'; return; }
       var assignments = this.importedChannels.filter(function(c){ return c.assigned; }).map(function(c){ return { rawColumnId:c.rawColumnId, canonicalChannel:c.assigned, userConfirmed: c.confirmed===true }; });
-      var mapping = ChannelMapping.buildChannelMapping(this._importedBundle.rawChannels, assignments);
+      var mapping = ChannelMapping.buildChannelMapping(caseDataHolder.importedBundle.rawChannels, assignments);
       var SESS='imported_session';
       var cals=[];
       var steerEntry=(mapping.mappingEntries||[]).filter(function(e){return e.canonicalChannel==='steering';});
@@ -3121,10 +3204,10 @@ function app(){return{
         var T=CalibrationRegistry.CALIBRATION_TYPE;
         cals=[ mk(T.STEERING_SIGN), mk(T.STEERING_ZERO), mk(T.STEERING_RATIO, ratio) ];
       }
-      var session = CanonicalTelemetrySession.buildCanonicalSession(this._importedBundle, mapping, cals, null, { sessionId:SESS });
+      var session = CanonicalTelemetrySession.buildCanonicalSession(caseDataHolder.importedBundle, mapping, cals, null, { sessionId:SESS });
       var demo = DemoAnalysisCase.buildDemoAnalysisCase(); // vehicle/setup binding; imported telemetry session
       var ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, session, null, {});
-      this._lastCase = demo.analysisCase; this._lastSession = session; this._lastWindow = null; this._lastVmOpts = {};
+      caseDataHolder.lastCase = demo.analysisCase; caseDataHolder.lastSession = session; caseDataHolder.lastWindow = null; caseDataHolder.lastVmOpts = {}; this._persistSession(session);
       this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, {}); this._shellEvidence=this._mkShellEvidence(ws,'imported_csv');
     } catch(e){ this.importError=String((e&&e.message)||e); this.analysisView=null; this._shellEvidence=null; }
   },
@@ -3455,6 +3538,7 @@ function app(){return{
   caseNav:[{id:'overview',label:'Overview'},{id:'setup_model',label:'Setup & Model'},{id:'telemetry',label:'Telemetry'},{id:'measured_metrics',label:'Measured Metrics'},{id:'model_vs_actual',label:'Model vs Actual'},{id:'recommendations',label:'Recommendations'},{id:'corner_coaching',label:'Corner Coaching'},{id:'evidence_trust',label:'Evidence & Trust'}],
   setupLibraryTabs:[{id:'spring',label:'Spring Calculator'},{id:'tire',label:'Tire Analysis'},{id:'advisor',label:'Setup Advisor'},{id:'lihpao',label:'Lihpao Lap'},{id:'telemetry',label:'Telemetry Viewer (raw CSV)'}],
   _shellEvidence:null,
+  library:null, libFilters:{search:'',vehicle:'',track:'',status:'',fromDate:'',includeArchived:false}, currentCaseId:null, importedSummaryOpen:false, storageError:null, autosaveEnabled:true,
   setShellSection(id){ this.shellSection=id;
     if(id==='dashboard') this.currentTab='dashboard';
     else if(id==='cases'){ this.caseSubview='overview'; this.currentTab='analysis'; }
@@ -3475,8 +3559,25 @@ function app(){return{
     return false; },
   svShow(name){ if(this.shellSection!=='cases') return true; return this.caseSubview==='overview' || this.caseSubview===name; },
   caseNavAvailable(id){ try{ var st=this.caseShellState(); if(!st) return false; var n=(st.navSections||[]).find(function(x){return x.key===id;}); return !!(n&&n.available); }catch(e){ return false; } },
+  _persistSession(session){ try{ var tok=++caseDataHolder.sessionOpToken; if(!session||!this.ensureStore()||!caseDataHolder.sessionStore) { if(tok===caseDataHolder.sessionOpToken){ caseDataHolder.lastSessionId=null; caseDataHolder.sessionPersistPromise=Promise.resolve(); } return; } var self=this; var ch=(session.channels&&typeof session.channels==='object')?Object.keys(session.channels).slice(0,64):[]; if(tok===caseDataHolder.sessionOpToken) caseDataHolder.lastSessionId=null; caseDataHolder.sessionPersistPromise = caseDataHolder.sessionStore.put({ summary:{ sourceSessionId: session.sessionId||null, channels: ch }, raw: session }).then(function(r){ if(tok!==caseDataHolder.sessionOpToken) return; caseDataHolder.lastSessionId=(r&&r.ok)?r.sessionId:null; if(r&&!r.ok&&r.code!=='SESSION_TOO_LARGE'&&r.code!=='SESSION_EXCEEDS_BUDGET') self.storageError='session: '+r.code; }).catch(function(){ if(tok===caseDataHolder.sessionOpToken) caseDataHolder.lastSessionId=null; }); }catch(e){ caseDataHolder.lastSessionId=null; } },
   _mkShellEvidence(ws, source){ try{ return { capability:(ws&&ws.capability)||null, observation:(ws&&ws.observation)?{ blockedReasons:((ws.observation.blockedReasons)||[]).map(function(b){return {code:(b&&b.code)||String(b)};}) }:null, source: source||null }; }catch(e){ return null; } },
   caseShellState(){ try{ var CS=(typeof CaseShell!=='undefined')?CaseShell:((typeof globalThis!=='undefined'&&globalThis.CaseShell)||null); if(!CS||!CS.deriveCaseShellState) return null; return CS.deriveCaseShellState({ workspaceResult:this._shellEvidence||null, analysisView:this.analysisView||null, importState:null, caseMeta:{ hasCase:!!this.analysisView, caseName:(this.analysisView&&this.analysisView.caseHeader&&this.analysisView.caseHeader.caseId)||null, vehicle:(this.analysisView&&this.analysisView.caseHeader&&this.analysisView.caseHeader.vehicle)||null, session:(this.analysisView&&this.analysisView.caseHeader&&this.analysisView.caseHeader.telemetrySession)||null, telemetrySource:(this._shellEvidence&&this._shellEvidence.source)||null } }); }catch(e){ return null; } },
+  ensureStore(){ if(caseDataHolder.caseStore) return true; try{ if(typeof StorageBackend==='undefined'||typeof CaseStore==='undefined'){ this.storageError='storage modules not loaded'; return false; } var be=StorageBackend.IndexedDBBackend({}); caseDataHolder.caseStore=CaseStore.createCaseStore(be); caseDataHolder.sessionStore=SessionStore.createSessionStore(be); this.storageError=null; return true; }catch(e){ this.storageError=(e&&e.code)||(e&&e.message)||String(e); return false; } },
+  refreshLibrary(){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.list().then(function(rows){ self.library=CaseLibraryViewModel.buildCaseLibraryView(rows, self.libFilters); }).catch(function(e){ self.storageError=String((e&&e.message)||e); }); },
+  libSections(){ if(!this.library) return []; var b=this.library.buckets||{}; var out=[]; if((b.pinned||[]).length) out.push({key:'pinned',label:'Pinned',rows:b.pinned}); out.push({key:'recent',label:'Recent',rows:b.recent||[]}); if(this.libFilters.includeArchived && (b.archived||[]).length) out.push({key:'archived',label:'Archived',rows:b.archived}); return out; },
+  pinCase(id, pinned){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.setPinned(id, pinned).then(function(){ self.refreshLibrary(); }); },
+  _setupSnapshotFromView(){ var si=(this.analysisView&&this.analysisView.setupInputs)||{}; var g=function(k){ return (si[k]&&typeof si[k].value==='number')?si[k].value:null; }; return { frontWheelRate:g('frontWheelRate'), rearWheelRate:g('rearWheelRate'), frontArb:g('frontArb'), rearArb:g('rearArb'), mass:g('mass'), frontWeightPct:g('frontWeightPct'), cgHeight:g('cgHeight') }; },
+  _saveInput(forceNew){ var ch=(this.analysisView&&this.analysisView.caseHeader)||{}; return { caseId: forceNew?undefined:(this.currentCaseId||undefined), metadata:{ title: ch.caseId||'Untitled case', vehicle: ch.vehicle||null, track:null, status:'complete' }, setupSnapshot:this._setupSnapshotFromView(), associations:{ telemetrySessionId: caseDataHolder.lastSessionId||null }, analysisResults: JSON.parse(JSON.stringify(this.analysisView)), shellEvidence: this._shellEvidence||{ capability:{}, observation:{blockedReasons:[]}, source:'demo_case' } }; },
+  saveCurrentCase(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='Imported summaries cannot be overwritten — use Save as new'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.save(self._saveInput(false)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.storageError=null; self.refreshLibrary(); } else { self.storageError=r.code+(r.violations?(' '+JSON.stringify(r.violations.slice(0,2))):''); } }); },
+  autosaveCurrentCase(){ var self=this; if(!this.autosaveEnabled || !this.currentCaseId || this.importedSummaryOpen || !this.analysisView || !caseDataHolder.caseStore) return; try{ if(caseDataHolder.autosaveTimer) clearTimeout(caseDataHolder.autosaveTimer); caseDataHolder.autosaveTimer=setTimeout(function(){ caseDataHolder.autosaveTimer=0; if(self.autosaveEnabled && self.currentCaseId && !self.importedSummaryOpen && self.analysisView) self.saveCurrentCase(); }, 1500); }catch(e){} },
+  saveCurrentCaseAsNew(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='Imported summaries cannot be promoted to a full case — re-run locally'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.create(self._saveInput(true)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.refreshLibrary(); } else self.storageError=r.code; }); },
+  openCase(id){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.open(id).then(function(o){ if(!o.ok){ self.storageError=o.code; return; } self.analysisView=o.analysisResults; self._shellEvidence={ capability:(o.shellEvidence&&o.shellEvidence.capability)||{}, observation:(o.shellEvidence&&o.shellEvidence.observation)||{blockedReasons:[]}, source:(o.shellEvidence&&o.shellEvidence.source)||null }; self.currentCaseId=id; self.importedSummaryOpen=!!o.degraded; ++caseDataHolder.sessionOpToken; caseDataHolder.lastSessionId=(o.associations&&o.associations.telemetrySessionId)||null; caseDataHolder.sessionPersistPromise=Promise.resolve(); self.caseSubview='overview'; self.shellSection='cases'; self.currentTab='analysis'; }); },
+  duplicateCase(id){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.duplicate(id).then(function(r){ if(r.ok) self.refreshLibrary(); else self.storageError=r.code; }); },
+  archiveCase(id,arch){ var self=this; if(!this.ensureStore()) return; (arch?caseDataHolder.caseStore.archive(id):caseDataHolder.caseStore.unarchive(id)).then(function(){ self.refreshLibrary(); }); },
+  deleteCase(id){ var self=this; if(!this.ensureStore()) return; if(typeof confirm==='function' && !confirm('Delete this case? This cannot be undone.')) return; caseDataHolder.caseStore.remove(id,{confirm:true}).then(function(r){ if(r.ok){ if(self.currentCaseId===id) self.currentCaseId=null; self.refreshLibrary(); } else self.storageError=r.code; }); },
+  exportCaseRow(id){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.exportCase(id).then(function(r){ if(!r.ok){ self.storageError=r.code; return; } self._downloadJson(r.bundle, 'case-'+id+'.json'); }); },
+  importCaseFile(ev){ var self=this; var f=ev&&ev.target&&ev.target.files&&ev.target.files[0]; if(!f||!this.ensureStore()){ if(ev&&ev.target) ev.target.value=''; return; } var rd=new FileReader(); rd.onload=function(){ try{ var b=JSON.parse(rd.result); caseDataHolder.caseStore.importBundle(b).then(function(r){ if(r.ok) self.refreshLibrary(); else self.storageError='import: '+r.code; }); }catch(e){ self.storageError='import parse: '+String((e&&e.message)||e); } }; rd.readAsText(f); ev.target.value=''; },
+  _downloadJson(obj,name){ try{ var blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); },1000); }catch(e){ this.storageError=String((e&&e.message)||e); } },
   tier:1,
   // Prediction inputs
   pred:{front_spring_rate:240,rear_spring_rate:925,front_arb:300,rear_arb:200,front_track:1440,rear_track:1380,front_motion_ratio:1.0,rear_motion_ratio:1.0,weight_front_pct:41.5,total_weight:570,cg_height:280,wheelbase:2730,tire_spring_rate:220,front_roll_center_height:50,rear_roll_center_height:50},

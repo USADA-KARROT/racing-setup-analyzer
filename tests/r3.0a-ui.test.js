@@ -72,7 +72,8 @@ chk('import setShellSection targets analysis', /id==='import'\)\{ this\.caseSubv
 chk('legacy raw CSV viewer is a labeled Setup Library tool', /Telemetry Viewer \(raw CSV\)/.test(html));
 chk('no cases->legacy-telemetry route', html.indexOf("caseSubview==='telemetry') return id==='telemetry'") === -1);
 // CP2 fix #3: full Cases Library deferral (R3.0B) is rendered as a visible, non-actionable panel
-chk('cases library deferred to R3.0B (visible)', /Deferred to R3\.0B/.test(html) && /No case is silently persisted/.test(html));
+// R3.0B SUPERSEDED the R3.0A "deferred to R3.0B" banner with the working Case Library (panel now present; banner gone).
+chk('cases library implemented (R3.0B superseded the deferral)', /Case Library/.test(html) && html.indexOf('Deferred to R3.0B') === -1);
 
 // CP2 fix #2: case-shell does NOT trust a caller-controlled capability field
 const shellSrc = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'js', 'case-shell.js'), 'utf8');
