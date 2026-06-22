@@ -18,6 +18,11 @@ Settings              ← User Guide + language + (future preferences)
 ```
 A. Vehicle & Setup
    - vehicle_presets        (Vehicle Presets — browse the preset database)
+       └── vehicle_preset_detail   (read-only CHILD route of vehicle_presets: a single preset's
+                                    summary/confidence/provenance/assumptions; breadcrumb
+                                    "Setup Library › Vehicle Presets › <preset name>"; Back returns
+                                    to the browser preserving its search/filter state. Not a top-level
+                                    menu entry — entryPoints.desktop=false, reached only from the browser.)
    - custom_setup           (Custom Setup — manual input)
    - handling_prediction    (Handling Prediction — Tier 1/2/3 balance)
 
