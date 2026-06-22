@@ -1,0 +1,65 @@
+# Racing Setup Analyzer
+
+> A case-centric vehicle-dynamics workspace that predicts handling balance, sizes spring / ARB / damper numbers, simulates a tyre stint, and — with real telemetry and a verified calibration — reports honestly-gated measured metrics. Every value is labelled by how it was derived; every blocked feature states why. Local-first, no cloud, no account, trilingual (English / 繁體中文 / 日本語) across the app shell and the analysis workspace.
+
+It is an Electron desktop app (also runs in a browser) built on textbook vehicle dynamics (Milliken, Gillespie, OptimumG). The physics runs locally in plain JavaScript. It is aimed at FSAE, track-day and sim engineers who know the formulas and want to see how they turn into decisions — and to do so without overclaiming.
+
+## What this is
+
+- A transparent, model-grounded setup analyzer and lap/tyre-stint simulator.
+- A case-centric workspace: build an Analysis Case (vehicle + setup + optional telemetry), run the model, optionally compare it against telemetry, and accumulate traceable evidence.
+- Honest about provenance: outputs are badged Physics / Model / Measured / Derived / Heuristic / Unavailable, and every conclusion carries credibility, confidence, provenance, limitations, blockers and a next validation step.
+
+## What this is NOT (never claimed)
+
+- Not a professional race-engineer replacement; never presented as professionally validated.
+- Not a full multi-body-dynamics (MBD) simulator — the model is a transparent linear/quasi-static balance model.
+- Not a complete tyre model — coefficients are estimated unless you import your own Pacejka `.tir` (pure-slip lateral only).
+- Not a GPS racing-line / lap-optimization tool — no racing line, no exact apex from position alone.
+- Not a telemetry decoder for arbitrary binary formats — the production import path is CSV / canonical-JSON.
+- Not a source of hardware "clicks" — no validated per-car click→rate mapping, so output stays in physical units (Nm/deg, N/mm, %).
+- Not a MoTeC / commercial-analysis replacement.
+
+## Credibility ladder
+
+- Physics — closed-form physical relation (exact for the inputs). ≠ Model.
+- Model — a prediction built from physics relations. ≠ Measured.
+- Measured — derived from real telemetry; still confounded; machine-read provenance (synthetic / real / unverified). ≠ fully validated.
+- Derived — a deterministic transform of inputs. ≠ direct measurement.
+- Heuristic — a rule-of-thumb observation. ≠ a vehicle fact.
+- Unavailable — not derivable from present evidence (shown blocked, with a reason).
+
+Fail-closed always: when a required input or quality gate is missing, the capability is blocked with a reason, never approximated. Driver behaviour ≠ vehicle characteristic ≠ setup finding; correlation ≠ causation; prediction ≠ guaranteed result.
+
+## Current capabilities (stable)
+
+- Handling-balance prediction (understeer gradient, LLTD, roll gradient, ride frequency) — Physics / Model.
+- Setup Advisor (rule-based targets) — Heuristic.
+- Spring / ARB calculator — Physics / Derived.
+- Tyre analysis + 21-tyre track-day database — Model / Derived.
+- Lihpao G2 lap-time + tyre-stint simulation — Model.
+- 501-car preset database (each parameter graded confirmed/documented/estimated/unknown).
+- Telemetry observation from confirmed CSV channels (directional) — Heuristic.
+- Measured understeer gradient K_us — requires confirmed telemetry AND a verified road-wheel steering calibration — Measured (kinematic, confounded).
+- Model-vs-actual comparison; Setup A/B (predicted balance deltas, never a lap-time claim); quantitative recommendation in physical units; corner coaching (driver raw-steering behaviour only).
+- Local-first Case Library (save / reopen / duplicate / archive / export-import); raw telemetry stays on device and never enters a portable export.
+
+## Roadmap (planned, NOT current features)
+
+- R3.0C — reference lap & corner-delta intelligence (cross-lap / cross-session comparison). In design; the in-app Comparisons panel is an explicit deferred placeholder.
+- R3.0D — deterministic, evidence-backed virtual race-engineer decision engine.
+- R3.0E — recommendation experiment & outcome loop.
+- R3.0F — hardening, schema migration, release.
+
+## Privacy
+
+Local-first. Cases/sessions live in the browser/Electron IndexedDB on your machine. No cloud, no accounts, no analytics, no third-party telemetry, no tracking. Imported `.tir` / CSV files are read locally and never uploaded.
+
+## Documentation
+
+- [README](README.md): overview, status, capabilities, credibility model, privacy, roadmap (English / 繁體中文 / 日本語).
+- [Product positioning](docs/product-positioning.md): what it is / is not, who it's for, the product loop.
+- [Credibility & trust model](docs/credibility-and-trust.md): the credibility ladder and honesty contract.
+- [Capability map](docs/r2-capability-map.md): the canonical Available / Conditionally-Available / Blocked / Deferred matrix.
+- [Analysis workspace architecture](docs/analysis-workspace-architecture.md): the end-to-end production pipeline.
+- [Physics notes](docs/physics-notes.md): formula derivations, units, references.

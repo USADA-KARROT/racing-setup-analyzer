@@ -38,7 +38,10 @@ chk('session-op token guards stale persistence', /sessionOpToken/.test(html) && 
 chk('save-as-new guarded for imported summary', /saveCurrentCaseAsNew\(\)[\s\S]{0,120}importedSummaryOpen/.test(html));
 
 // library panel + controls
-chk('Case Library panel', /Case Library/.test(html));
+// Case Library copy is now i18n'd → assert the t() key is referenced AND all three locales carry the text.
+const SHELL = require('../renderer/js/i18n-shell.js').SHELL_I18N;
+const tri = (k) => !!(SHELL.en[k] && SHELL.zh[k] && SHELL.ja[k]);
+chk('Case Library panel', /t\('ui\.case\.libraryTitle'\)/.test(html) && tri('ui.case.libraryTitle'));
 chk('save button → saveCurrentCase', /@click="saveCurrentCase\(\)"/.test(html));
 chk('save-as-new button', /@click="saveCurrentCaseAsNew\(\)"/.test(html));
 chk('open button', /@click="openCase\(row\.caseId\)"/.test(html));
@@ -52,15 +55,15 @@ chk('includeArchived filter', /x-model="libFilters\.includeArchived"/.test(html)
 chk('library rows iterate (bucketed)', /x-for="row in sec\.rows"/.test(html));
 chk('per-row indicators shown', /row\.indicators\.measured/.test(html));
 chk('imported badge', /row\.recordType==='imported_summary'/.test(html));
-chk('imported-summary degraded notice', /Imported summary — full section detail not included/.test(html));
-chk('empty-state honest', /No saved cases/.test(html));
+chk('imported-summary degraded notice', /t\('ui\.case\.importedBanner'\)/.test(html) && /Imported summary/.test(SHELL.en['ui.case.importedBanner']) && tri('ui.case.importedBanner'));
+chk('empty-state honest', /t\('ui\.case\.empty'\)/.test(html) && /No saved cases/.test(SHELL.en['ui.case.empty']) && tri('ui.case.empty'));
 
 // methods present + honest gates
 chk('delete uses confirm', /deleteCase\(id\)\{[\s\S]{0,200}confirm\(/.test(html));
 chk('remove passes confirm:true', /\.remove\(id, ?\{ ?confirm: ?true ?\}\)/.test(html));
 chk('open restores analysisView + shellEvidence', /openCase\(id\)\{[\s\S]{0,400}self\.analysisView=o\.analysisResults[\s\S]{0,200}self\._shellEvidence/.test(html));
 chk('save serializes the view model (display-safe)', /analysisResults: JSON\.parse\(JSON\.stringify\(this\.analysisView\)\)/.test(html));
-chk('storageError surfaced', /x-text="'Storage: '\+storageError"/.test(html));
+chk('storageError surfaced', /t\('ui\.case\.storageError'\)\+' '\+tErr\(storageError\)/.test(html) && tri('ui.case.storageError'));
 // CP3: autosave (§7.3) — debounced, gated to a saved local_full case (never auto-creates / never promotes imported)
 chk('autosave method gated to saved local_full', /autosaveCurrentCase\(\)\{[\s\S]{0,220}!this\.currentCaseId \|\| this\.importedSummaryOpen/.test(html));
 chk('autosave debounced (timer)', /caseDataHolder\.autosaveTimer=setTimeout/.test(html));

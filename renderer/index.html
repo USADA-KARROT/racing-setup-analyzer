@@ -48,7 +48,7 @@ canvas{max-height:300px}
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
 </style>
 </head>
-<body x-data="app()" x-init="init()">
+<body x-data="app()" x-init="init(); try{document.documentElement.lang=(lang==='zh'?'zh-TW':lang); document.title=t('ui.appTitle')}catch(e){}">
 
 <!-- Top Nav -->
 <header class="flex items-center justify-between px-6 py-3 border-b border-white/5" style="background:var(--bg2)">
@@ -58,7 +58,7 @@ canvas{max-height:300px}
   </div>
   <div class="flex items-center gap-2">
     <div class="text-xs text-slate-500" x-show="shellSection==='cases' && analysisView" x-cloak>
-      <span>Case status </span><span class="text-sky-300 font-semibold" x-text="(caseShellState()&&caseShellState().status)||''"></span>
+      <span x-text="t('ui.shell.caseStatusLabel')+' '"></span><span class="text-sky-300 font-semibold" x-text="tCode('ui.status',(caseShellState()&&caseShellState().status)||'')"></span>
     </div>
     <!-- Language switcher -->
     <div class="flex ml-2 rounded-lg overflow-hidden border border-white/10">
@@ -73,15 +73,15 @@ canvas{max-height:300px}
 
 <!-- R3.0A: Analysis-Case app shell — left main navigation -->
 <aside id="shellSidebar" class="fixed left-0 top-[53px] bottom-0 w-52 border-r border-white/5 overflow-y-auto py-3 px-2 z-20" style="background:var(--bg2)">
-  <div class="text-[10px] uppercase tracking-wide text-slate-600 px-3 mb-2">Workspace</div>
+  <div class="text-[10px] uppercase tracking-wide text-slate-600 px-3 mb-2" x-text="t('ui.shell.workspace')"></div>
   <template x-for="item in mainNav" :key="item.id">
     <button class="w-full text-left px-3 py-2 rounded-lg mb-1 text-sm transition-colors"
       :class="shellSection===item.id ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30' : 'text-slate-400 hover:bg-white/5 border border-transparent'"
-      @click="setShellSection(item.id)"><span x-text="item.label"></span><span class="float-right text-[10px] text-amber-400/70" x-show="item.deferred" x-cloak x-text="item.deferred"></span></button>
+      @click="setShellSection(item.id)"><span x-text="t('ui.nav.'+item.id)"></span><span class="float-right text-[10px] text-amber-400/70" x-show="item.deferred" x-cloak x-text="item.deferred"></span></button>
   </template>
   <div class="mt-3 pt-3 border-t border-white/5 text-[11px] text-slate-500 px-2">
-    <div>Status</div>
-    <div class="text-sky-300 font-semibold" x-text="(caseShellState()&&caseShellState().status)||'empty'"></div>
+    <div x-text="t('ui.shell.status')"></div>
+    <div class="text-sky-300 font-semibold" x-text="tCode('ui.status', (caseShellState()&&caseShellState().status)||'empty')"></div>
   </div>
 </aside>
 
@@ -89,23 +89,23 @@ canvas{max-height:300px}
 <aside id="shellTrustPanel" class="fixed right-0 top-[53px] bottom-0 w-72 border-l border-white/5 overflow-y-auto py-3 px-3 z-20 text-xs" style="background:var(--bg2)" x-show="shellSection==='cases' && analysisView" x-cloak>
   <template x-if="caseShellState()">
    <div class="space-y-2">
-    <div class="text-slate-300 font-semibold text-sm">Context &amp; Trust</div>
-    <div>Status: <span class="text-sky-300 font-semibold" x-text="caseShellState().status"></span></div>
-    <div>Credibility: <span x-text="caseShellState().trustPanel.credibility"></span></div>
-    <div>Confidence: <span x-text="caseShellState().trustPanel.confidence||'—'"></span></div>
-    <div>Mapping: <span x-text="caseShellState().trustPanel.mappingStatus"></span></div>
-    <div>Calibration: <span x-text="caseShellState().trustPanel.calibrationStatus"></span></div>
-    <div>Provenance: <span x-text="caseShellState().trustPanel.dataProvenance||'—'"></span></div>
-    <div class="pt-1">Next action: <span class="text-emerald-300" x-text="caseShellState().nextAction.key"></span>
-      <button class="ml-1 px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-[10px]" x-show="caseSubviewIds.includes(caseShellState().nextAction.target)" @click="setCaseSubview(caseShellState().nextAction.target)">go</button>
+    <div class="text-slate-300 font-semibold text-sm" x-text="t('ui.trust.title')"></div>
+    <div><span x-text="t('ui.shell.status')"></span>: <span class="text-sky-300 font-semibold" x-text="tCode('ui.status', caseShellState().status)"></span></div>
+    <div><span x-text="t('ui.trust.label.credibility')"></span>: <span x-text="credCode(caseShellState().trustPanel.credibility)"></span></div>
+    <div><span x-text="t('ui.trust.label.confidence')"></span>: <span x-text="caseShellState().trustPanel.confidence ? enumCode('ui.confidence', caseShellState().trustPanel.confidence) : '—'"></span></div>
+    <div><span x-text="t('ui.trust.label.mapping')"></span>: <span x-text="tCode('ui.mapping', caseShellState().trustPanel.mappingStatus)"></span></div>
+    <div><span x-text="t('ui.trust.label.calibration')"></span>: <span x-text="tCode('ui.calib', caseShellState().trustPanel.calibrationStatus)"></span></div>
+    <div><span x-text="t('ui.trust.label.provenance')"></span>: <span x-text="caseShellState().trustPanel.dataProvenance ? enumCode('ui.prov', caseShellState().trustPanel.dataProvenance) : '—'"></span></div>
+    <div class="pt-1"><span x-text="t('ui.trust.label.nextAction')"></span>: <span class="text-emerald-300" x-text="tCode('ui.nextAction', caseShellState().nextAction.key)"></span>
+      <button class="ml-1 px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-[10px]" x-show="caseSubviewIds.includes(caseShellState().nextAction.target)" @click="setCaseSubview(caseShellState().nextAction.target)" x-text="t('ui.shell.go')"></button>
     </div>
-    <div class="pt-1 text-slate-400" x-show="caseShellState().trustPanel.blockedReasons.length">Blocked reasons</div>
+    <div class="pt-1 text-slate-400" x-show="caseShellState().trustPanel.blockedReasons.length" x-text="t('ui.trust.label.blockedReasons')"></div>
     <template x-for="(b,bi) in caseShellState().trustPanel.blockedReasons" :key="bi">
-      <div class="text-[11px] text-amber-400/80" x-text="(b.layer?b.layer+': ':'')+(b.code||b)"></div>
+      <div class="text-[11px] text-amber-400/80" x-text="(b.layer?tCode('aw.layer',b.layer)+': ':'')+tCode('ui.blocker',(b.code||b))"></div>
     </template>
-    <div class="pt-1 text-slate-400" x-show="caseShellState().trustPanel.limitations.length">Limitations</div>
+    <div class="pt-1 text-slate-400" x-show="caseShellState().trustPanel.limitations.length" x-text="t('ui.trust.label.limitations')"></div>
     <template x-for="(lim,li) in caseShellState().trustPanel.limitations" :key="li">
-      <div class="text-[11px] text-slate-500" x-text="lim"></div>
+      <div class="text-[11px] text-slate-500" x-text="tCode('ui.limitation', lim)"></div>
     </template>
    </div>
   </template>
@@ -117,60 +117,60 @@ canvas{max-height:300px}
 <div x-show="shellSection==='cases'" x-cloak class="mb-4">
   <template x-if="caseShellState()">
    <div class="mb-3 rounded-lg border border-slate-700 bg-slate-800/40 px-4 py-2 text-xs flex flex-wrap gap-x-4 gap-y-1">
-     <div>Case <b class="text-slate-200" x-text="caseShellState().contextBar.caseName||'—'"></b></div>
-     <div>Vehicle <b x-text="caseShellState().contextBar.vehicle||'—'"></b></div>
-     <div>Session <b x-text="caseShellState().contextBar.session||'—'"></b></div>
-     <div>Telemetry <b x-text="caseShellState().contextBar.telemetrySource||'none'"></b></div>
-     <div>Status <b class="text-sky-300" x-text="caseShellState().status"></b></div>
+     <div><span x-text="t('ui.context.case')"></span> <b class="text-slate-200" x-text="caseShellState().contextBar.caseName||'—'"></b></div>
+     <div><span x-text="t('ui.context.vehicle')"></span> <b x-text="caseShellState().contextBar.vehicle||'—'"></b></div>
+     <div><span x-text="t('ui.context.session')"></span> <b x-text="caseShellState().contextBar.session||'—'"></b></div>
+     <div><span x-text="t('ui.context.telemetry')"></span> <b x-text="caseShellState().contextBar.telemetrySource||t('ui.context.telemetry.none')"></b></div>
+     <div><span x-text="t('ui.shell.status')"></span> <b class="text-sky-300" x-text="tCode('ui.status', caseShellState().status)"></b></div>
    </div>
   </template>
   <!-- R3.0B: Case Library (local-first persistence) -->
   <div class="mb-3 rounded-lg border border-slate-700 bg-slate-800/40 p-3" x-show="shellSection==='cases'" x-cloak x-init="$nextTick(()=>{ if(ensureStore()) refreshLibrary(); })">
     <div class="flex items-center justify-between mb-2">
-      <div class="text-sm font-semibold text-slate-200">Case Library <span class="text-[11px] text-slate-500" x-text="library ? '· '+library.counts.shown+'/'+library.counts.total : ''"></span></div>
+      <div class="text-sm font-semibold text-slate-200"><span x-text="t('ui.case.libraryTitle')"></span> <span class="text-[11px] text-slate-500" x-text="library ? '· '+library.counts.shown+'/'+library.counts.total : ''"></span></div>
       <div class="flex gap-1">
-        <button @click="saveCurrentCase()" :disabled="!analysisView || importedSummaryOpen" class="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-xs disabled:opacity-40" title="Save / update the current analysis (imported summaries cannot be overwritten — use Save as new)">Save</button>
-        <button @click="saveCurrentCaseAsNew()" :disabled="!analysisView || importedSummaryOpen" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs disabled:opacity-40" title="Save the current analysis as a new case (not available for imported summaries — re-run locally)">Save as new</button>
-        <button @click="exportCaseRow(currentCaseId)" :disabled="!currentCaseId" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs disabled:opacity-40">Export</button>
-        <label class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs cursor-pointer">Import<input type="file" accept="application/json" class="hidden" @change="importCaseFile($event)"></label>
-        <label class="flex items-center gap-1 text-[11px] text-slate-400 px-1" title="Autosave changes to the open case"><input type="checkbox" x-model="autosaveEnabled"> autosave</label>
+        <button @click="saveCurrentCase()" :disabled="!analysisView || importedSummaryOpen" class="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-xs disabled:opacity-40" :title="t('ui.case.save.tip')" x-text="t('ui.case.save')"></button>
+        <button @click="saveCurrentCaseAsNew()" :disabled="!analysisView || importedSummaryOpen" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs disabled:opacity-40" :title="t('ui.case.saveAsNew.tip')" x-text="t('ui.case.saveAsNew')"></button>
+        <button @click="exportCaseRow(currentCaseId)" :disabled="!currentCaseId" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs disabled:opacity-40" x-text="t('ui.case.export')"></button>
+        <label class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs cursor-pointer"><span x-text="t('ui.case.import')"></span><input type="file" accept="application/json" class="hidden" @change="importCaseFile($event)"></label>
+        <label class="flex items-center gap-1 text-[11px] text-slate-400 px-1" :title="t('ui.case.autosave.tip')"><input type="checkbox" x-model="autosaveEnabled"> <span x-text="t('ui.case.autosave')"></span></label>
       </div>
     </div>
-    <div class="text-[11px] text-rose-400 mb-1" x-show="storageError" x-cloak x-text="'Storage: '+storageError"></div>
-    <div class="text-[11px] text-amber-400/70 mb-1" x-show="importedSummaryOpen" x-cloak>Imported summary — full section detail not included; re-run locally for detail.</div>
+    <div class="text-[11px] text-rose-400 mb-1" x-show="storageError" x-cloak x-text="t('ui.case.storageError')+' '+tErr(storageError)"></div>
+    <div class="text-[11px] text-amber-400/70 mb-1" x-show="importedSummaryOpen" x-cloak x-text="t('ui.case.importedBanner')"></div>
     <div class="flex flex-wrap gap-2 mb-2 text-xs">
-      <input x-model="libFilters.search" @input="refreshLibrary()" placeholder="search title / vehicle / track…" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 flex-1 min-w-[8rem]">
-      <input x-model="libFilters.vehicle" @input="refreshLibrary()" placeholder="vehicle" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-24">
-      <input x-model="libFilters.track" @input="refreshLibrary()" placeholder="track" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-24">
+      <input x-model="libFilters.search" @input="refreshLibrary()" :placeholder="t('ui.case.filter.search')" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 flex-1 min-w-[8rem]">
+      <input x-model="libFilters.vehicle" @input="refreshLibrary()" :placeholder="t('ui.case.filter.vehicle')" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-24">
+      <input x-model="libFilters.track" @input="refreshLibrary()" :placeholder="t('ui.case.filter.track')" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-24">
       <select x-model="libFilters.status" @change="refreshLibrary()" class="bg-slate-900 border border-slate-700 rounded px-1 py-1">
-        <option value="">any status</option><option value="draft">draft</option><option value="ready">ready</option><option value="complete">complete</option><option value="archived">archived</option>
+        <option value="" x-text="t('ui.case.status.any')"></option><option value="draft" x-text="t('ui.case.status.draft')"></option><option value="ready" x-text="t('ui.case.status.ready')"></option><option value="complete" x-text="t('ui.case.status.complete')"></option><option value="archived" x-text="t('ui.case.status.archived')"></option>
       </select>
-      <input type="date" x-model="libFilters.fromDate" @change="refreshLibrary()" title="updated on/after" class="bg-slate-900 border border-slate-700 rounded px-1 py-1">
-      <label class="flex items-center gap-1 text-slate-400"><input type="checkbox" x-model="libFilters.includeArchived" @change="refreshLibrary()"> archived</label>
+      <input type="date" x-model="libFilters.fromDate" @change="refreshLibrary()" :title="t('ui.case.filter.fromDate.tip')" class="bg-slate-900 border border-slate-700 rounded px-1 py-1">
+      <label class="flex items-center gap-1 text-slate-400"><input type="checkbox" x-model="libFilters.includeArchived" @change="refreshLibrary()"> <span x-text="t('ui.case.filter.includeArchived')"></span></label>
     </div>
     <div class="max-h-52 overflow-y-auto text-xs">
-      <template x-if="library && library.rows.length===0"><div class="text-slate-500 py-2">No saved cases — run an analysis and click Save.</div></template>
+      <template x-if="library && library.rows.length===0"><div class="text-slate-500 py-2" x-text="t('ui.case.empty')"></div></template>
       <template x-for="sec in libSections()" :key="sec.key">
         <div class="mb-1">
-          <div class="text-[10px] uppercase tracking-wide text-slate-600 mt-1" x-text="sec.label+' ('+sec.rows.length+')'"></div>
+          <div class="text-[10px] uppercase tracking-wide text-slate-600 mt-1" x-text="tCode('ui.case.bucket', sec.key)+' ('+sec.rows.length+')'"></div>
           <template x-for="row in sec.rows" :key="row.caseId">
             <div class="flex items-center justify-between py-1 border-b border-white/5">
               <div class="min-w-0 truncate">
                 <span class="text-amber-300 mr-0.5" x-show="row.pinned" x-cloak>★</span>
                 <span class="text-slate-200" x-text="row.title"></span>
-                <span class="text-slate-500" x-text="'· '+(row.vehicle||'—')+(row.track?(' · '+row.track):'')+' · '+row.status"></span>
-                <span class="ml-1 text-[10px] text-amber-400/70" x-show="row.recordType==='imported_summary'" x-cloak>imported</span>
-                <span class="ml-1 text-[10px]" :class="row.indicators.telemetry==='observable' ? 'text-emerald-300' : 'text-slate-600'" x-text="'tele:'+row.indicators.telemetry"></span>
-                <span class="ml-1 text-[10px]" :class="row.indicators.measured==='measured' ? 'text-violet-300' : 'text-slate-600'" x-text="'meas:'+row.indicators.measured"></span>
-                <span class="ml-1 text-[10px]" :class="row.indicators.corner==='eligible' ? 'text-sky-300' : 'text-slate-600'" x-text="'corner:'+row.indicators.corner"></span>
-                <span class="ml-1 text-[10px] text-sky-300" x-show="row.caseId===currentCaseId" x-cloak>open</span>
+                <span class="text-slate-500" x-text="'· '+(row.vehicle||'—')+(row.track?(' · '+row.track):'')+' · '+tCode('ui.case.status', row.status)"></span>
+                <span class="ml-1 text-[10px] text-amber-400/70" x-show="row.recordType==='imported_summary'" x-cloak x-text="t('ui.case.row.imported')"></span>
+                <span class="ml-1 text-[10px]" :class="row.indicators.telemetry==='observable' ? 'text-emerald-300' : 'text-slate-600'" x-text="t('ui.case.ind.tele')+tCode('ui.case.ind.tele', row.indicators.telemetry)"></span>
+                <span class="ml-1 text-[10px]" :class="row.indicators.measured==='measured' ? 'text-violet-300' : 'text-slate-600'" x-text="t('ui.case.ind.meas')+tCode('ui.case.ind.meas', row.indicators.measured)"></span>
+                <span class="ml-1 text-[10px]" :class="row.indicators.corner==='eligible' ? 'text-sky-300' : 'text-slate-600'" x-text="t('ui.case.ind.corner')+tCode('ui.case.ind.corner', row.indicators.corner)"></span>
+                <span class="ml-1 text-[10px] text-sky-300" x-show="row.caseId===currentCaseId" x-cloak x-text="t('ui.case.row.open')"></span>
               </div>
               <div class="flex gap-1 shrink-0">
-                <button @click="pinCase(row.caseId, !row.pinned)" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600" :class="row.pinned?'text-amber-300':''" x-text="row.pinned ? 'Unpin' : 'Pin'"></button>
-                <button @click="openCase(row.caseId)" class="px-1.5 py-0.5 rounded bg-sky-700 hover:bg-sky-600">Open</button>
-                <button @click="duplicateCase(row.caseId)" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600" x-show="row.recordType!=='imported_summary'" x-cloak>Dup</button>
-                <button @click="archiveCase(row.caseId, !row.archived)" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600" x-text="row.archived ? 'Unarc' : 'Arc'"></button>
-                <button @click="deleteCase(row.caseId)" class="px-1.5 py-0.5 rounded bg-rose-800 hover:bg-rose-700">Del</button>
+                <button @click="pinCase(row.caseId, !row.pinned)" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600" :class="row.pinned?'text-amber-300':''" x-text="row.pinned ? t('ui.case.row.unpin') : t('ui.case.row.pin')"></button>
+                <button @click="openCase(row.caseId)" class="px-1.5 py-0.5 rounded bg-sky-700 hover:bg-sky-600" x-text="t('ui.case.row.openBtn')"></button>
+                <button @click="duplicateCase(row.caseId)" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600" x-show="row.recordType!=='imported_summary'" x-cloak x-text="t('ui.case.row.dup')"></button>
+                <button @click="archiveCase(row.caseId, !row.archived)" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600" x-text="row.archived ? t('ui.case.row.unarc') : t('ui.case.row.arc')"></button>
+                <button @click="deleteCase(row.caseId)" class="px-1.5 py-0.5 rounded bg-rose-800 hover:bg-rose-700" x-text="t('ui.case.row.del')"></button>
               </div>
             </div>
           </template>
@@ -182,29 +182,29 @@ canvas{max-height:300px}
     <template x-for="cn in caseNav" :key="cn.id">
       <button class="px-2.5 py-1 rounded text-xs transition-colors"
         :class="caseSubview===cn.id ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30' : 'text-slate-400 hover:bg-white/5 border border-transparent'"
-        @click="setCaseSubview(cn.id)"><span x-text="cn.label"></span><span class="ml-1 text-slate-600" x-show="!caseNavAvailable(cn.id)" x-cloak title="not yet available in this case">○</span></button>
+        @click="setCaseSubview(cn.id)"><span x-text="t('ui.caseNav.'+cn.id)"></span><span class="ml-1 text-slate-600" x-show="!caseNavAvailable(cn.id)" x-cloak :title="t('ui.caseNav.unavailable')">○</span></button>
     </template>
   </div>
 </div>
 
 <!-- R3.0A: Dashboard -->
 <div x-show="showPane('dashboard')" x-cloak x-transition>
-  <h2 class="text-xl font-bold mb-3">Dashboard</h2>
+  <h2 class="text-xl font-bold mb-3" x-text="t('ui.nav.dashboard')"></h2>
   <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700 max-w-2xl">
-    <div class="text-sm text-slate-300 mb-2">Current Analysis Case</div>
+    <div class="text-sm text-slate-300 mb-2" x-text="t('ui.dash.currentCase')"></div>
     <template x-if="analysisView">
       <div class="text-sm space-y-1">
-        <div>Case: <b x-text="(analysisView.caseHeader&&analysisView.caseHeader.caseId)||'—'"></b></div>
-        <div>Vehicle: <b x-text="(analysisView.caseHeader&&analysisView.caseHeader.vehicle)||'—'"></b></div>
-        <div>Status: <b class="text-sky-300" x-text="(caseShellState()&&caseShellState().status)||'—'"></b></div>
-        <div class="pt-2"><button class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm" @click="setShellSection('cases')">Open case</button></div>
+        <div><span x-text="t('ui.context.case')"></span>: <b x-text="(analysisView.caseHeader&&analysisView.caseHeader.caseId)||'—'"></b></div>
+        <div><span x-text="t('ui.context.vehicle')"></span>: <b x-text="(analysisView.caseHeader&&analysisView.caseHeader.vehicle)||'—'"></b></div>
+        <div><span x-text="t('ui.shell.status')"></span>: <b class="text-sky-300" x-text="(caseShellState()&&tCode('ui.status', caseShellState().status))||'—'"></b></div>
+        <div class="pt-2"><button class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm" @click="setShellSection('cases')" x-text="t('ui.dash.openCase')"></button></div>
       </div>
     </template>
     <template x-if="!analysisView">
-      <div class="text-sm text-slate-400">No analysis case yet.
+      <div class="text-sm text-slate-400"><span x-text="t('ui.dash.noCase')"></span>
         <div class="pt-2 flex gap-2">
-          <button class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm" @click="setShellSection('cases'); loadDemoAnalysisCase()">Load Demo Case</button>
-          <button class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-sm" @click="setShellSection('import')">Import Telemetry</button>
+          <button class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm" @click="setShellSection('cases'); loadDemoAnalysisCase()" x-text="t('ui.dash.loadDemo')"></button>
+          <button class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-sm" @click="setShellSection('import')" x-text="t('ui.nav.import')"></button>
         </div>
       </div>
     </template>
@@ -213,18 +213,17 @@ canvas{max-height:300px}
 
 <!-- R3.0A: Comparisons (explicitly deferred to R3.0C — non-actionable info panel, not a fake control) -->
 <div x-show="showPane('comparisons')" x-cloak x-transition>
-  <h2 class="text-xl font-bold mb-3">Comparisons</h2>
+  <h2 class="text-xl font-bold mb-3" x-text="t('ui.nav.comparisons')"></h2>
   <div class="bg-slate-800/40 rounded-lg p-4 border border-amber-700/40 max-w-2xl text-sm text-slate-300">
-    <div class="text-amber-300 font-semibold mb-1">Deferred to R3.0C</div>
-    Cross-lap / cross-session reference-lap and corner-delta comparison is not yet available. It arrives in
-    milestone R3.0C (Reference Lap &amp; Corner Delta Intelligence). No comparison is fabricated here.
+    <div class="text-amber-300 font-semibold mb-1" x-text="t('ui.comparisons.deferred')"></div>
+    <div x-text="t('ui.comparisons.deferredBody')"></div>
   </div>
 </div>
 
 <!-- R3.0A: Setup Library sub-navigation -->
 <div x-show="shellSection==='setup_library'" x-cloak class="mb-3 flex flex-wrap gap-1">
   <template x-for="lt in setupLibraryTabs" :key="lt.id">
-    <button class="px-2.5 py-1 rounded text-xs transition-colors" :class="currentTab===lt.id ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30' : 'text-slate-400 hover:bg-white/5 border border-transparent'" @click="currentTab=lt.id" x-text="lt.label"></button>
+    <button class="px-2.5 py-1 rounded text-xs transition-colors" :class="currentTab===lt.id ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30' : 'text-slate-400 hover:bg-white/5 border border-transparent'" @click="currentTab=lt.id" x-text="t('ui.setupTab.'+lt.id)"></button>
   </template>
 </div>
 
@@ -313,7 +312,7 @@ canvas{max-height:300px}
 
         <!-- Tier 1: Mechanical -->
         <div>
-          <div class="section-title"><span class="badge badge-b">Tier 1</span> <span x-text="t('sec.t1')"></span>
+          <div class="section-title"><span class="badge badge-b" x-text="t('ui.tier.t1')"></span> <span x-text="t('sec.t1')"></span>
             <span x-show="streetMode && streetCar" class="text-[10px] text-yellow-400 ml-2" x-text="t('sec.t1lock')"></span>
           </div>
           <!-- Street mode: locked summary -->
@@ -511,7 +510,7 @@ canvas{max-height:300px}
                           </div>
                         </template>
                         <template x-if="wheelUpgrade.front_result?.error">
-                          <div class="text-[10px] text-red-400 p-1" x-text="wheelUpgrade.front_result.message"></div>
+                          <div class="text-[10px] text-red-400 p-1" x-text="t('ui.err.wheelAspectRange')"></div>
                         </template>
                       </div>
                       <!-- Rear wheel -->
@@ -540,7 +539,7 @@ canvas{max-height:300px}
                           </div>
                         </template>
                         <template x-if="wheelUpgrade.rear_result?.error">
-                          <div class="text-[10px] text-red-400 p-1" x-text="wheelUpgrade.rear_result.message"></div>
+                          <div class="text-[10px] text-red-400 p-1" x-text="t('ui.err.wheelAspectRange')"></div>
                         </template>
                       </div>
                     </div>
@@ -618,7 +617,7 @@ canvas{max-height:300px}
 
         <!-- Tier 2+: Full tire controls -->
         <div x-show="tier >= 2" x-transition>
-          <div class="section-title"><span class="badge badge-p">Tier 2</span> <span x-text="t('sec.t2')"></span></div>
+          <div class="section-title"><span class="badge badge-p" x-text="t('ui.tier.t2')"></span> <span x-text="t('sec.t2')"></span></div>
           <div class="grid-4 text-sm mb-2">
             <div class="text-center text-xs text-slate-500">FL</div>
             <div class="text-center text-xs text-slate-500">FR</div>
@@ -672,7 +671,7 @@ canvas{max-height:300px}
                     </template>
                   </optgroup>
                   <optgroup :label="t('ui.og.legacy')">
-                    <option value="soft">Soft</option><option value="medium">Medium</option><option value="hard">Hard</option><option value="wet">Wet</option>
+                    <option value="soft" x-text="t('ui.tireCompound.soft')"></option><option value="medium" x-text="t('ui.tireCompound.medium')"></option><option value="hard" x-text="t('ui.tireCompound.hard')"></option><option value="wet" x-text="t('ui.tireCompound.wet')"></option>
                   </optgroup>
                 </select>
               </div>
@@ -695,7 +694,7 @@ canvas{max-height:300px}
                     </template>
                   </optgroup>
                   <optgroup :label="t('ui.og.legacy')">
-                    <option value="soft">Soft</option><option value="medium">Medium</option><option value="hard">Hard</option><option value="wet">Wet</option>
+                    <option value="soft" x-text="t('ui.tireCompound.soft')"></option><option value="medium" x-text="t('ui.tireCompound.medium')"></option><option value="hard" x-text="t('ui.tireCompound.hard')"></option><option value="wet" x-text="t('ui.tireCompound.wet')"></option>
                   </optgroup>
                 </select>
               </div>
@@ -836,7 +835,7 @@ canvas{max-height:300px}
 
         <!-- Tier 3: Advanced -->
         <div x-show="tier >= 3" x-transition>
-          <div class="section-title"><span class="badge badge-g">Tier 3</span> <span x-text="t('sec.t3')"></span></div>
+          <div class="section-title"><span class="badge badge-g" x-text="t('ui.tier.t3')"></span> <span x-text="t('sec.t3')"></span></div>
 
           <!-- Corner weights -->
           <div class="text-xs text-slate-400 mb-1" x-text="t('lbl.cornerWeight')"></div>
@@ -944,9 +943,9 @@ canvas{max-height:300px}
               <div class="gauge-bar"></div>
               <div class="gauge-needle" :style="'left:' + gaugePosition + '%'"></div>
               <template x-if="baseline"><div class="absolute top-0 w-1 h-full bg-yellow-400 opacity-60 rounded" :style="'left:' + baselineGaugePos + '%'" :title="t('ui.baselinePos')"></div></template>
-              <div class="gauge-label" style="left:5%">OS</div>
-              <div class="gauge-label" style="left:50%">Neutral</div>
-              <div class="gauge-label" style="left:95%">US</div>
+              <div class="gauge-label" style="left:5%" x-text="t('ui.gauge.os')"></div>
+              <div class="gauge-label" style="left:50%" x-text="t('ui.gauge.neutral')"></div>
+              <div class="gauge-label" style="left:95%" x-text="t('ui.gauge.us')"></div>
             </div>
             <!-- Tier 3: entry / steady / exit -->
             <div x-show="tier===3 && result?.prediction" class="grid grid-cols-3 gap-3 mt-4">
@@ -1042,7 +1041,7 @@ canvas{max-height:300px}
 
           <!-- Roll Stiffness -->
           <div class="card2 p-4 mb-4">
-            <div class="text-xs text-slate-400 mb-2"><span>Roll Stiffness Distribution</span> <span x-html="tierBadge('physics')"></span></div>
+            <div class="text-xs text-slate-400 mb-2"><span x-text="t('res.rollStiffDist')"></span> <span x-html="tierBadge('physics')"></span></div>
             <div class="flex items-center gap-2 mb-1">
               <span class="text-xs w-16 text-right text-sky-400" x-text="'F ' + (result?.roll_stiffness_dist_front || result?.mechanical?.roll_stiffness_dist_front || 50) + '%'"></span>
               <div class="flex-1 h-5 rounded overflow-hidden flex">
@@ -1143,7 +1142,7 @@ canvas{max-height:300px}
                 <div class="text-[10px] mt-1" :class="{'text-green-400': result?.damping?.rear_category==='street','text-yellow-400': result?.damping?.rear_category==='track','text-red-400': result?.damping?.rear_category==='race','text-slate-500': result?.damping?.rear_category==='underdamped'}" x-text="t('ui.cat.'+result?.damping?.rear_category)"></div>
               </div>
             </div>
-            <div class="text-xs text-slate-500">Roll Damping: <span class="font-mono text-slate-300" x-text="result?.damping?.roll_damping_ratio"></span></div>
+            <div class="text-xs text-slate-500"><span x-text="t('res.rollDamping')+': '"></span><span class="font-mono text-slate-300" x-text="result?.damping?.roll_damping_ratio"></span></div>
             <div class="text-[10px] text-slate-600 mt-1" x-text="t('ui.dampHint')"></div>
           </div>
 
@@ -1237,7 +1236,7 @@ canvas{max-height:300px}
           <!-- Tier 3: Corner weight / Aero -->
           <div x-show="tier === 3" class="grid-2 mb-4">
             <div class="card2 p-4" x-show="result?.corner_weight">
-              <div class="text-xs text-slate-400 mb-2"><span>Corner Weight</span> <span x-html="tierBadge('physics')"></span></div>
+              <div class="text-xs text-slate-400 mb-2"><span x-text="t('res.cornerWeight')"></span> <span x-html="tierBadge('physics')"></span></div>
               <div class="grid-4 mb-2">
                 <div class="corner-box"><div class="val text-sky-300" x-text="result?.corner_weight?.fl"></div><div class="lbl">FL</div></div>
                 <div class="corner-box"><div class="val text-sky-300" x-text="result?.corner_weight?.fr"></div><div class="lbl">FR</div></div>
@@ -1386,7 +1385,7 @@ canvas{max-height:300px}
           <input type="number" step="5" x-model.number="springCalc.corner_mass" class="w-full">
         </div>
         <div>
-          <label class="text-[10px] text-slate-400 block mb-1">Motion Ratio</label>
+          <label class="text-[10px] text-slate-400 block mb-1" x-text="t('lbl.motionRatio')"></label>
           <input type="number" step="0.05" x-model.number="springCalc.motion_ratio" class="w-full">
         </div>
         <div>
@@ -1407,7 +1406,7 @@ canvas{max-height:300px}
           <template x-if="springCalc.mode==='freq_to_spring'">
             <div class="space-y-2">
               <div class="flex justify-between"><span class="text-xs text-slate-400" x-text="t('ui.neededSpringRate')"></span><span class="text-lg font-bold text-sky-400" x-text="springCalcResult.spring_rate+' N/mm'"></span></div>
-              <div class="flex justify-between"><span class="text-xs text-slate-400">Wheel Rate</span><span class="text-sm font-mono" x-text="springCalcResult.wheel_rate+' N/mm'"></span></div>
+              <div class="flex justify-between"><span class="text-xs text-slate-400" x-text="t('ui.wheelRate')"></span><span class="text-sm font-mono" x-text="springCalcResult.wheel_rate+' N/mm'"></span></div>
               <div class="flex justify-between"><span class="text-xs text-slate-400" x-text="t('ui.effWheelRate')"></span><span class="text-sm font-mono" x-text="springCalcResult.effective_wheel_rate+' N/mm'"></span></div>
               <div class="flex justify-between"><span class="text-xs text-slate-400" x-text="t('ui.actualFreq')"></span><span class="text-sm font-mono" x-text="springCalcResult.frequency_hz+' Hz'"></span></div>
               <div class="flex justify-between"><span class="text-xs text-slate-400" x-text="t('th.category')"></span><span class="badge" :class="springCatBadge(springCalcResult.category)" x-text="springCatLabel(springCalcResult.category)"></span></div>
@@ -1415,8 +1414,8 @@ canvas{max-height:300px}
           </template>
           <template x-if="springCalc.mode==='spring_to_freq'">
             <div class="space-y-2">
-              <div class="flex justify-between"><span class="text-xs text-slate-400">Ride Frequency</span><span class="text-lg font-bold text-sky-400" x-text="springCalcResult.frequency_hz+' Hz'"></span></div>
-              <div class="flex justify-between"><span class="text-xs text-slate-400">Wheel Rate</span><span class="text-sm font-mono" x-text="springCalcResult.wheel_rate+' N/mm'"></span></div>
+              <div class="flex justify-between"><span class="text-xs text-slate-400" x-text="t('res.rideFreq')"></span><span class="text-lg font-bold text-sky-400" x-text="springCalcResult.frequency_hz+' Hz'"></span></div>
+              <div class="flex justify-between"><span class="text-xs text-slate-400" x-text="t('ui.wheelRate')"></span><span class="text-sm font-mono" x-text="springCalcResult.wheel_rate+' N/mm'"></span></div>
               <div class="flex justify-between"><span class="text-xs text-slate-400" x-text="t('ui.effWheelRate')"></span><span class="text-sm font-mono" x-text="springCalcResult.effective_wheel_rate+' N/mm'"></span></div>
               <div class="flex justify-between"><span class="text-xs text-slate-400" x-text="t('th.category')"></span><span class="badge" :class="springCatBadge(springCalcResult.category)" x-text="springCatLabel(springCalcResult.category)"></span></div>
             </div>
@@ -1487,7 +1486,7 @@ canvas{max-height:300px}
     <div class="text-xs text-slate-500 mb-3"><span x-text="t('ui.springTblCornerMass')"></span><span x-text="springCalc.corner_mass"></span><span x-text="t('ui.springTblMr')"></span><span x-text="springCalc.motion_ratio"></span><span x-text="t('ui.springTblTire')"></span><span x-text="springCalc.tire_spring_rate"></span> N/mm</div>
     <table>
       <thead><tr>
-        <th x-text="t('th.springRate')"></th><th>Wheel Rate (N/mm)</th><th x-text="t('th.effWheelRate')"></th><th>Ride Frequency (Hz)</th><th x-text="t('th.category')"></th>
+        <th x-text="t('th.springRate')"></th><th x-text="t('th.wheelRateNmm')"></th><th x-text="t('th.effWheelRate')"></th><th x-text="t('th.rideFreqHz')"></th><th x-text="t('th.category')"></th>
       </tr></thead>
       <tbody>
         <template x-for="row in springTable" :key="row.spring_rate">
@@ -2291,7 +2290,7 @@ canvas{max-height:300px}
         <div class="card2 p-3">
           <div class="flex items-center gap-2 mb-1">
             <span class="text-sm font-bold" x-text="t('gd.lltd.t')"></span>
-            <span class="badge badge-y">Lateral Load Transfer Distribution</span>
+            <span class="badge badge-y" x-text="t('ui.lltdFullName')"></span>
           </div>
           <div class="text-xs text-slate-300 leading-relaxed" x-html="t('gd.lltd.b')"></div>
         </div>
@@ -2506,7 +2505,7 @@ canvas{max-height:300px}
       <p x-html="t('gd.about.p1')"></p>
       <p x-html="t('gd.about.p2')"></p>
       <p x-text="t('gd.about.p3')"></p>
-      <p class="text-slate-600">v3.4 Desktop · USADA-KARROT</p>
+      <p class="text-slate-600">v3.4 <span x-text="t('ui.edition.desktop')"></span> · USADA-KARROT</p>
     </div>
   </div>
 
@@ -2525,7 +2524,7 @@ canvas{max-height:300px}
       <input type="file" accept=".csv,.txt" @change="importCSV($event)" class="text-xs">
       <button class="text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600" x-show="telem.imported" @click="telemUnload()" x-text="t('ui.telem.unload')"></button>
     </div>
-    <div x-show="telem.error" class="text-xs text-red-400" x-text="telem.error"></div>
+    <div x-show="telem.error" class="text-xs text-red-400" x-text="tErr(telem.error)"></div>
     <div x-show="telem.imported && telem.importSummary" class="text-xs text-slate-300 mt-2 space-y-1">
       <div><span class="text-slate-200" x-text="telem.importSummary.fileName"></span> · <span x-text="telem.importSummary.rowCount"></span> <span x-text="t('ui.telem.rows')"></span> · <span x-text="telem.importSummary.columnCount"></span> <span x-text="t('ui.telem.cols')"></span><template x-if="telem.importSummary.sampleRateHz"> · <span x-text="telem.importSummary.sampleRateHz+' Hz'"></span></template><template x-if="telem.importSummary.timeRange"> · <span x-text="telem.importSummary.timeRange.duration.toFixed(1)+' s'"></span></template></div>
       <template x-for="w in telem.importSummary.warnings"><div class="text-amber-400" x-text="'⚠ '+telemDiag(w)"></div></template>
@@ -2730,79 +2729,79 @@ canvas{max-height:300px}
 <div x-show="showPane('analysis')" x-transition>
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-xl font-bold" x-text="t('tab.analysis')"></h2>
-    <button id="loadDemoAnalysisCase" class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm font-semibold" @click="loadDemoAnalysisCase()">Load Demo Analysis Case</button>
+    <button id="loadDemoAnalysisCase" class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm font-semibold" @click="loadDemoAnalysisCase()" x-text="t('aw.label.load_demo_analysis_case')"></button>
   </div>
-  <div class="text-xs text-slate-400 mb-3">First end-to-end analysis vertical slice: canonical setup → model prediction → telemetry observation → model-vs-actual → race-engineer & driver-coach guidance. Every value is labelled by how it was derived; blocked features state why.</div>
-  <div x-show="analysisError" class="text-red-400 text-sm mb-3" x-text="analysisError"></div>
+  <div class="text-xs text-slate-400 mb-3" x-text="t('aw.hint.intro_paragraph')"></div>
+  <div x-show="analysisError" class="text-red-400 text-sm mb-3" x-text="tErr(analysisError)"></div>
 
   <!-- Import real/imported telemetry → map channels → run the SAME production pipeline (R2.3) -->
   <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700 mb-4" id="importTelemetryPanel">
-    <div class="text-xs text-slate-400 mb-2">Import Telemetry (CSV) → map channels → run the SAME analysis pipeline</div>
-    <textarea x-model="importCsvText" rows="3" placeholder="paste CSV: time [s],speed [m/s],yaw_rate [rad/s],steering [deg],accy [m/s2]" class="w-full text-xs bg-slate-900 border border-slate-700 rounded p-2 mb-2 font-mono"></textarea>
+    <div class="text-xs text-slate-400 mb-2" x-text="t('aw.hint.import_telemetry_panel_hint')"></div>
+    <textarea x-model="importCsvText" rows="3" :placeholder="t('aw.hint.csv_paste_placeholder')" class="w-full text-xs bg-slate-900 border border-slate-700 rounded p-2 mb-2 font-mono"></textarea>
     <div class="flex gap-2 mb-2">
-      <button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" @click="loadSampleImportCsv()">Load sample CSV</button>
-      <button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" @click="loadCornerSampleCsv()">Load corner sample</button>
-      <button id="importTelemetryBtn" class="px-2 py-1 rounded bg-sky-700 hover:bg-sky-600 text-xs font-semibold" @click="importTelemetryCsv()">Import</button>
+      <button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" @click="loadSampleImportCsv()" x-text="t('aw.label.load_sample_csv')"></button>
+      <button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" @click="loadCornerSampleCsv()" x-text="t('aw.label.load_corner_sample')"></button>
+      <button id="importTelemetryBtn" class="px-2 py-1 rounded bg-sky-700 hover:bg-sky-600 text-xs font-semibold" @click="importTelemetryCsv()" x-text="t('aw.label.Import')"></button>
     </div>
-    <div x-show="importError" class="text-red-400 text-xs mb-2" x-text="importError"></div>
+    <div x-show="importError" class="text-red-400 text-xs mb-2" x-text="tErr(importError)"></div>
     <template x-if="importedChannels.length">
       <div>
-        <div class="text-xs text-slate-400 mb-1">Map raw columns → canonical channels, then confirm identity:</div>
+        <div class="text-xs text-slate-400 mb-1" x-text="t('aw.hint.map_columns_hint')"></div>
         <template x-for="ch in importedChannels" :key="ch.rawColumnId">
           <div class="flex items-center gap-2 text-xs mb-1">
             <span class="w-40 truncate" x-text="ch.rawName + (ch.rawUnit?(' ['+ch.rawUnit+']'):'')"></span>
             <select x-model="ch.assigned" class="bg-slate-900 border border-slate-700 rounded px-1 py-0.5">
-              <option value="">(unmapped)</option>
-              <option value="speed">speed</option>
-              <option value="lateral_accel">lateral_accel</option>
-              <option value="yaw_rate">yaw_rate</option>
-              <option value="steering">steering</option>
-              <option value="throttle">throttle</option>
-              <option value="brake">brake</option>
-              <option value="track_position">track_position</option>
-              <option value="lap">lap</option>
-              <option value="time">time</option>
+              <option value="" x-text="t('aw.opt.unmapped')"></option>
+              <option value="speed" x-text="t('aw.channel.speed')"></option>
+              <option value="lateral_accel" x-text="t('aw.channel.lateral_accel')"></option>
+              <option value="yaw_rate" x-text="t('aw.channel.yaw_rate')"></option>
+              <option value="steering" x-text="t('aw.channel.steering')"></option>
+              <option value="throttle" x-text="t('aw.channel.throttle')"></option>
+              <option value="brake" x-text="t('aw.channel.brake')"></option>
+              <option value="track_position" x-text="t('aw.channel.track_position')"></option>
+              <option value="lap" x-text="t('aw.channel.lap')"></option>
+              <option value="time" x-text="t('aw.channel.time')"></option>
             </select>
-            <label class="flex items-center gap-1"><input type="checkbox" x-model="ch.confirmed"> <span>confirm</span></label>
+            <label class="flex items-center gap-1"><input type="checkbox" x-model="ch.confirmed"> <span x-text="t('aw.label.confirm')"></span></label>
           </div>
         </template>
         <div class="mt-2 pt-2 border-t border-slate-700/60">
-          <div class="text-[11px] text-slate-400 mb-1">Steering calibration (optional) — enables <b>Measured</b> magnitude / K<sub>us</sub>. Value = road-wheel radians per projected steering unit (bound to this steering mapping).</div>
+          <div class="text-[11px] text-slate-400 mb-1" x-text="t('aw.hint.steering_calibration_hint')"></div>
           <div class="flex items-center gap-3 text-xs flex-wrap">
-            <label class="flex items-center gap-1">ratio <input type="number" step="any" x-model="importSteeringRatio" placeholder="rad/unit" class="w-24 bg-slate-900 border border-slate-700 rounded px-1 py-0.5"></label>
-            <label class="flex items-center gap-1"><input type="checkbox" x-model="importSteeringConfirmed"> <span>confirm sign + zero + ratio (road-wheel referenced)</span></label>
+            <label class="flex items-center gap-1"><span x-text="t('aw.label.ratio')"></span> <input type="number" step="any" x-model="importSteeringRatio" :placeholder="t('aw.hint.rad_unit')" class="w-24 bg-slate-900 border border-slate-700 rounded px-1 py-0.5"></label>
+            <label class="flex items-center gap-1"><input type="checkbox" x-model="importSteeringConfirmed"> <span x-text="t('aw.label.confirm_sign_zero_ratio')"></span></label>
           </div>
-          <div class="text-[10px] text-slate-500 mt-0.5">No calibration → directional tendency only (calibration-independent); magnitude stays blocked. Synthetic fixtures are labelled provenance-unverified.</div>
+          <div class="text-[10px] text-slate-500 mt-0.5" x-text="t('aw.hint.no_calibration_hint')"></div>
         </div>
-        <button id="runImportedAnalysis" class="mt-2 px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm font-semibold" @click="runImportedAnalysis()">Build Case &amp; Run Analysis</button>
-        <div class="text-[11px] text-slate-500 mt-1">Required confirmed: speed, lateral_accel, yaw_rate, steering. Unconfirmed identity → observation blocked (the session stays inspectable; measured magnitude / road-wheel metrics stay blocked).</div>
+        <button id="runImportedAnalysis" class="mt-2 px-3 py-1.5 rounded bg-emerald-700 hover:bg-emerald-600 text-sm font-semibold" @click="runImportedAnalysis()" x-text="t('aw.label.build_case_run_analysis')"></button>
+        <div class="text-[11px] text-slate-500 mt-1" x-text="t('aw.hint.required_confirmed_hint')"></div>
       </div>
     </template>
   </div>
 
-  <div x-show="!analysisView && !analysisError" class="text-slate-500 text-sm">Click <b>Load Demo Analysis Case</b> for synthetic data, or import a CSV above — both run the same pipeline.</div>
+  <div x-show="!analysisView && !analysisError" class="text-slate-500 text-sm" x-text="t('aw.hint.load_demo_or_import_hint')"></div>
 
   <!-- R3.0B: an imported summary holds only curated fields (no full setupInputs/section objects) — render a safe,
        explicitly-degraded view instead of the full workspace (which dereferences the full view model). -->
   <template x-if="analysisView && importedSummaryOpen">
    <div class="space-y-3" id="importedSummaryView">
     <div class="rounded-lg border border-amber-700/40 bg-amber-900/10 p-4 text-sm">
-      <div class="text-amber-300 font-semibold mb-1">Imported summary</div>
-      <div class="text-slate-400 text-xs mb-2">Full section detail is not included in a portable bundle — re-run the analysis locally for the complete workspace.</div>
+      <div class="text-amber-300 font-semibold mb-1" x-text="t('ui.case.imported.title')"></div>
+      <div class="text-slate-400 text-xs mb-2" x-text="t('ui.case.imported.note')"></div>
       <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-        <div><span class="text-slate-500">Case </span><span x-text="(analysisView.caseHeader&&analysisView.caseHeader.caseId)||'—'"></span></div>
-        <div><span class="text-slate-500">Vehicle </span><span x-text="(analysisView.caseHeader&&analysisView.caseHeader.vehicle)||'—'"></span></div>
-        <div><span class="text-slate-500">Status </span><span class="text-sky-300" x-text="(analysisView.caseHeader&&analysisView.caseHeader.overallStatus)||'—'"></span></div>
-        <div><span class="text-slate-500">Understeer </span><b x-text="(analysisView.modelPrediction&&analysisView.modelPrediction.understeerGradient&&analysisView.modelPrediction.understeerGradient.value)??'—'"></b><span> deg/g</span></div>
-        <div><span class="text-slate-500">Tendency </span><b x-text="(analysisView.modelPrediction&&analysisView.modelPrediction.predictedTendency&&analysisView.modelPrediction.predictedTendency.value)||'—'"></b></div>
-        <div><span class="text-slate-500">Measured K<sub>us</sub> </span><b class="text-violet-300" x-text="(analysisView.measuredMetrics&&analysisView.measuredMetrics.measuredKUs&&analysisView.measuredMetrics.measuredKUs.value)??'—'"></b></div>
+        <div><span class="text-slate-500" x-text="t('ui.case.field.case')+' '"></span><span x-text="(analysisView.caseHeader&&analysisView.caseHeader.caseId)||'—'"></span></div>
+        <div><span class="text-slate-500" x-text="t('ui.case.field.vehicle')+' '"></span><span x-text="(analysisView.caseHeader&&analysisView.caseHeader.vehicle)||'—'"></span></div>
+        <div><span class="text-slate-500" x-text="t('ui.case.field.status')+' '"></span><span class="text-sky-300" x-text="(analysisView.caseHeader&&tCode('ui.status', analysisView.caseHeader.overallStatus))||'—'"></span></div>
+        <div><span class="text-slate-500" x-text="t('ui.case.field.understeer')+' '"></span><b x-text="(analysisView.modelPrediction&&analysisView.modelPrediction.understeerGradient&&analysisView.modelPrediction.understeerGradient.value)??'—'"></b><span> deg/g</span></div>
+        <div><span class="text-slate-500" x-text="t('ui.case.field.tendency')+' '"></span><b x-text="(analysisView.modelPrediction&&analysisView.modelPrediction.predictedTendency&&tnd(analysisView.modelPrediction.predictedTendency.value))||'—'"></b></div>
+        <div><span class="text-slate-500"><span x-text="t('ui.case.field.measuredKus')"></span><sub>us</sub> </span><b class="text-violet-300" x-text="(analysisView.measuredMetrics&&analysisView.measuredMetrics.measuredKUs&&analysisView.measuredMetrics.measuredKUs.value)??'—'"></b></div>
       </div>
     </div>
     <div class="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
-      <div class="text-xs text-slate-400 mb-2">Capability (as imported)</div>
+      <div class="text-xs text-slate-400 mb-2" x-text="t('ui.case.imported.capability')"></div>
       <div class="flex flex-wrap gap-2">
         <template x-for="c in (analysisView.capabilitySummary||[])" :key="c.key">
-          <span class="text-xs px-2 py-1 rounded" :class="c.available ? 'bg-emerald-900/40 text-emerald-300' : 'bg-slate-700 text-slate-400'"><span x-text="c.available ? '✓' : '○'"></span> <span x-text="c.key"></span></span>
+          <span class="text-xs px-2 py-1 rounded" :class="c.available ? 'bg-emerald-900/40 text-emerald-300' : 'bg-slate-700 text-slate-400'"><span x-text="c.available ? '✓' : '○'"></span> <span x-text="tCode('ui.cap', c.key)"></span></span>
         </template>
       </div>
     </div>
@@ -2812,24 +2811,24 @@ canvas{max-height:300px}
    <div class="space-y-4" id="analysisWorkspaceView">
     <!-- A · Case Header -->
     <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
-      <div class="text-xs text-slate-400 mb-2">A · Case Header</div>
+      <div class="text-xs text-slate-400 mb-2" x-text="t('aw.label.a_case_header')"></div>
       <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-        <div><span class="text-slate-500">Case </span><span x-text="analysisView.caseHeader.caseId"></span></div>
-        <div><span class="text-slate-500">Vehicle </span><span x-text="analysisView.caseHeader.vehicle"></span></div>
-        <div><span class="text-slate-500">Model </span><span x-text="analysisView.caseHeader.modelVersion"></span></div>
-        <div><span class="text-slate-500">Telemetry </span><span x-text="analysisView.caseHeader.telemetrySession"></span></div>
-        <div><span class="text-slate-500">Created </span><span x-text="analysisView.caseHeader.createdAt"></span></div>
-        <div><span class="text-slate-500">Status </span><span class="text-sky-300 font-semibold" x-text="analysisView.caseHeader.overallStatus"></span></div>
+        <div><span class="text-slate-500" x-text="t('aw.label.Case')+' '"></span><span x-text="analysisView.caseHeader.caseId"></span></div>
+        <div><span class="text-slate-500" x-text="t('aw.label.Vehicle')+' '"></span><span x-text="analysisView.caseHeader.vehicle"></span></div>
+        <div><span class="text-slate-500" x-text="t('aw.label.Model')+' '"></span><span x-text="analysisView.caseHeader.modelVersion"></span></div>
+        <div><span class="text-slate-500" x-text="t('aw.label.Telemetry')+' '"></span><span x-text="analysisView.caseHeader.telemetrySession"></span></div>
+        <div><span class="text-slate-500" x-text="t('aw.label.Created')+' '"></span><span x-text="analysisView.caseHeader.createdAt"></span></div>
+        <div><span class="text-slate-500" x-text="t('aw.label.Status')+' '"></span><span class="text-sky-300 font-semibold" x-text="tCode('aw.ostatus', analysisView.caseHeader.overallStatus)"></span></div>
       </div>
     </div>
 
     <!-- B · Capability Summary -->
     <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
-      <div class="text-xs text-slate-400 mb-2">B · Capability Summary</div>
+      <div class="text-xs text-slate-400 mb-2" x-text="t('aw.label.b_capability_summary')"></div>
       <div class="flex flex-wrap gap-2">
         <template x-for="c in analysisView.capabilitySummary" :key="c.key">
           <span class="text-xs px-2 py-1 rounded" :class="c.available ? 'bg-emerald-900/40 text-emerald-300' : 'bg-slate-700 text-slate-400'">
-            <span x-text="c.available ? '✓' : '○'"></span> <span x-text="c.key"></span>
+            <span x-text="c.available ? '✓' : '○'"></span> <span x-text="tCode('aw.cap', c.key)"></span>
           </span>
         </template>
       </div>
@@ -2837,208 +2836,208 @@ canvas{max-height:300px}
 
     <!-- C · Vehicle & Setup Inputs -->
     <div x-show="svShow('setup_model')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
-      <div class="text-xs text-slate-400 mb-2">C · Vehicle &amp; Setup Inputs <span x-html="credBadge('Derived')"></span></div>
+      <div class="text-xs text-slate-400 mb-2"><span x-text="t('aw.label.c_vehicle_setup_inputs')"></span> <span x-html="credBadge('Derived')"></span></div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-        <div>Front wheel rate: <b x-text="fmt(analysisView.setupInputs.frontWheelRate.value)"></b> <span x-text="analysisView.setupInputs.frontWheelRate.unit"></span> <span class="text-slate-500" x-text="'· '+analysisView.setupInputs.frontWheelRate.basis"></span> <span x-html="credBadge(analysisView.setupInputs.frontWheelRate.credibility)"></span></div>
-        <div>Rear wheel rate: <b x-text="fmt(analysisView.setupInputs.rearWheelRate.value)"></b> <span x-text="analysisView.setupInputs.rearWheelRate.unit"></span> <span class="text-slate-500" x-text="'· '+analysisView.setupInputs.rearWheelRate.basis"></span> <span x-html="credBadge(analysisView.setupInputs.rearWheelRate.credibility)"></span></div>
-        <div>Front ARB: <b x-text="fmt(analysisView.setupInputs.frontArb.value)"></b> Nm/deg <span x-html="credBadge(analysisView.setupInputs.frontArb.credibility)"></span></div>
-        <div>Rear ARB: <b x-text="fmt(analysisView.setupInputs.rearArb.value)"></b> Nm/deg <span x-html="credBadge(analysisView.setupInputs.rearArb.credibility)"></span></div>
-        <div>Mass / Front%: <b x-text="fmt(analysisView.setupInputs.mass.value)"></b> kg / <b x-text="fmt(analysisView.setupInputs.frontWeightPct.value)"></b>%</div>
-        <div>CG height: <b x-text="fmt(analysisView.setupInputs.cgHeight.value)"></b> mm</div>
+        <div><span x-text="t('aw.label.front_wheel_rate')"></span> <b x-text="fmt(analysisView.setupInputs.frontWheelRate.value)"></b> <span x-text="analysisView.setupInputs.frontWheelRate.unit"></span> <span class="text-slate-500" x-text="'· '+tCode('aw.basis', analysisView.setupInputs.frontWheelRate.basis)"></span> <span x-html="credBadge(analysisView.setupInputs.frontWheelRate.credibility)"></span></div>
+        <div><span x-text="t('aw.label.rear_wheel_rate')"></span> <b x-text="fmt(analysisView.setupInputs.rearWheelRate.value)"></b> <span x-text="analysisView.setupInputs.rearWheelRate.unit"></span> <span class="text-slate-500" x-text="'· '+tCode('aw.basis', analysisView.setupInputs.rearWheelRate.basis)"></span> <span x-html="credBadge(analysisView.setupInputs.rearWheelRate.credibility)"></span></div>
+        <div><span x-text="t('aw.label.front_arb')"></span> <b x-text="fmt(analysisView.setupInputs.frontArb.value)"></b> Nm/deg <span x-html="credBadge(analysisView.setupInputs.frontArb.credibility)"></span></div>
+        <div><span x-text="t('aw.label.rear_arb')"></span> <b x-text="fmt(analysisView.setupInputs.rearArb.value)"></b> Nm/deg <span x-html="credBadge(analysisView.setupInputs.rearArb.credibility)"></span></div>
+        <div><span x-text="t('aw.label.mass_front')"></span> <b x-text="fmt(analysisView.setupInputs.mass.value)"></b> kg / <b x-text="fmt(analysisView.setupInputs.frontWeightPct.value)"></b>%</div>
+        <div><span x-text="t('aw.label.cg_height')"></span> <b x-text="fmt(analysisView.setupInputs.cgHeight.value)"></b> mm</div>
       </div>
-      <div class="text-[11px] text-amber-400/80 mt-2" x-text="'Trust: '+analysisView.setupInputs.trustBadge"></div>
+      <div class="text-[11px] text-amber-400/80 mt-2"><span x-text="t('aw.label.trust')"></span> <span x-text="tCode('aw.trustbadge', analysisView.setupInputs.trustBadge)"></span></div>
     </div>
 
     <!-- D · Model Prediction -->
     <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700" x-show="svShow('setup_model') && analysisView.modelPrediction.available">
-      <div class="text-xs text-slate-400 mb-2">D · Model Prediction <span x-html="credBadge('Model')"></span></div>
+      <div class="text-xs text-slate-400 mb-2"><span x-text="t('aw.label.d_model_prediction')"></span> <span x-html="credBadge('Model')"></span></div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-        <div>Front/Rear wheel rate: <b x-text="fmt(analysisView.modelPrediction.frontWheelRate.value)"></b> / <b x-text="fmt(analysisView.modelPrediction.rearWheelRate.value)"></b> N/mm <span x-html="credBadge('Physics')"></span></div>
-        <div>Effective wheel rate: <b x-text="fmt(analysisView.modelPrediction.frontWheelRateEffective.value)"></b> / <b x-text="fmt(analysisView.modelPrediction.rearWheelRateEffective.value)"></b> N/mm <span x-html="credBadge('Physics')"></span></div>
-        <div>Front/Rear roll stiffness: <b x-text="fmt(analysisView.modelPrediction.frontRollStiffness.value)"></b> / <b x-text="fmt(analysisView.modelPrediction.rearRollStiffness.value)"></b> Nm/deg <span x-html="credBadge('Physics')"></span></div>
-        <div>Roll stiffness dist (front): <b x-text="fmt(analysisView.modelPrediction.rollStiffnessDistFront.value)"></b>% <span x-html="credBadge('Physics')"></span></div>
-        <div>Roll gradient: <b x-text="fmt(analysisView.modelPrediction.rollGradient.value)"></b> deg/g <span x-html="credBadge('Physics')"></span></div>
-        <div>Ride frequency F/R: <b x-text="fmt(analysisView.modelPrediction.rideFrequencyFront.value)"></b> / <b x-text="fmt(analysisView.modelPrediction.rideFrequencyRear.value)"></b> Hz <span x-html="credBadge('Physics')"></span></div>
-        <div>LLTD front: <b x-text="fmt(analysisView.modelPrediction.lltdFront.value)"></b>% <span x-html="credBadge('Physics')"></span></div>
-        <div>Understeer gradient: <b x-text="fmt(analysisView.modelPrediction.understeerGradient.value)"></b> deg/g <span x-html="credBadge('Model')"></span></div>
-        <div class="md:col-span-2">Predicted tendency: <b class="text-sky-300" x-text="analysisView.modelPrediction.predictedTendency.value"></b> <span x-html="credBadge('Model')"></span></div>
+        <div><span x-text="t('aw.label.front_rear_wheel_rate')"></span> <b x-text="fmt(analysisView.modelPrediction.frontWheelRate.value)"></b> / <b x-text="fmt(analysisView.modelPrediction.rearWheelRate.value)"></b> N/mm <span x-html="credBadge('Physics')"></span></div>
+        <div><span x-text="t('aw.label.effective_wheel_rate')"></span> <b x-text="fmt(analysisView.modelPrediction.frontWheelRateEffective.value)"></b> / <b x-text="fmt(analysisView.modelPrediction.rearWheelRateEffective.value)"></b> N/mm <span x-html="credBadge('Physics')"></span></div>
+        <div><span x-text="t('aw.label.front_rear_roll_stiffness')"></span> <b x-text="fmt(analysisView.modelPrediction.frontRollStiffness.value)"></b> / <b x-text="fmt(analysisView.modelPrediction.rearRollStiffness.value)"></b> Nm/deg <span x-html="credBadge('Physics')"></span></div>
+        <div><span x-text="t('aw.label.roll_stiffness_dist_front')"></span> <b x-text="fmt(analysisView.modelPrediction.rollStiffnessDistFront.value)"></b>% <span x-html="credBadge('Physics')"></span></div>
+        <div><span x-text="t('aw.label.roll_gradient')"></span> <b x-text="fmt(analysisView.modelPrediction.rollGradient.value)"></b> deg/g <span x-html="credBadge('Physics')"></span></div>
+        <div><span x-text="t('aw.label.ride_frequency_f_r')"></span> <b x-text="fmt(analysisView.modelPrediction.rideFrequencyFront.value)"></b> / <b x-text="fmt(analysisView.modelPrediction.rideFrequencyRear.value)"></b> Hz <span x-html="credBadge('Physics')"></span></div>
+        <div><span x-text="t('aw.label.lltd_front')"></span> <b x-text="fmt(analysisView.modelPrediction.lltdFront.value)"></b>% <span x-html="credBadge('Physics')"></span></div>
+        <div><span x-text="t('aw.label.understeer_gradient')"></span> <b x-text="fmt(analysisView.modelPrediction.understeerGradient.value)"></b> deg/g <span x-html="credBadge('Model')"></span></div>
+        <div class="md:col-span-2"><span x-text="t('aw.label.predicted_tendency')"></span> <b class="text-sky-300" x-text="tnd(analysisView.modelPrediction.predictedTendency.value)"></b> <span x-html="credBadge('Model')"></span></div>
       </div>
     </div>
     <div class="bg-slate-800/40 rounded-lg p-4 border border-amber-700/50" x-show="svShow('setup_model') && !analysisView.modelPrediction.available">
-      <div class="text-xs text-amber-400 mb-1">D · Model Prediction — blocked</div>
-      <template x-for="b in analysisView.modelPrediction.blockedReasons" :key="b.code"><div class="text-xs text-slate-400" x-text="b.code + (b.parameterKey?(' · '+b.parameterKey):'')"></div></template>
+      <div class="text-xs text-amber-400 mb-1" x-text="t('aw.label.d_model_prediction_blocked')"></div>
+      <template x-for="b in analysisView.modelPrediction.blockedReasons" :key="b.code"><div class="text-xs text-slate-400" x-text="tCode('ui.blocker', b.code) + (b.parameterKey?(' · '+b.parameterKey):'')"></div></template>
     </div>
 
     <!-- E · Telemetry Observation -->
     <div x-show="svShow('telemetry')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
-      <div class="text-xs text-slate-400 mb-2">E · Telemetry Observation <span x-html="credBadge(analysisView.telemetryObservation.available ? 'Heuristic' : 'Unavailable')"></span></div>
+      <div class="text-xs text-slate-400 mb-2"><span x-text="t('aw.label.e_telemetry_observation')"></span> <span x-html="credBadge(analysisView.telemetryObservation.available ? 'Heuristic' : 'Unavailable')"></span></div>
       <template x-if="analysisView.telemetryObservation.available">
         <div class="text-sm space-y-1">
-          <div>Observed tendency: <b class="text-amber-300" x-text="analysisView.telemetryObservation.observedTendency.value"></b> · confidence <span x-text="analysisView.telemetryObservation.confidence"></span></div>
-          <div class="text-slate-400">Method: <span x-text="analysisView.telemetryObservation.method"></span> · metric <span x-text="analysisView.telemetryObservation.metric"></span></div>
-          <div class="text-[11px] text-slate-500">Limitations: <span x-text="(analysisView.telemetryObservation.limitations||[]).join(', ')"></span></div>
-          <div class="text-[11px] text-slate-500">Confounders: <span x-text="(analysisView.telemetryObservation.confounders||[]).join(', ')"></span></div>
+          <div><span x-text="t('aw.label.observed_tendency')"></span> <b class="text-amber-300" x-text="tCode('aw.obs', analysisView.telemetryObservation.observedTendency.value)"></b> · <span x-text="t('aw.label.confidence')"></span> <span x-text="enumCode('ui.confidence', analysisView.telemetryObservation.confidence)"></span></div>
+          <div class="text-slate-400"><span x-text="t('aw.label.method')"></span> <span x-text="tCode('aw.method', analysisView.telemetryObservation.method)"></span> · <span x-text="t('aw.label.metric_select_label')"></span> <span x-text="tCode('aw.metric', analysisView.telemetryObservation.metric)"></span></div>
+          <div class="text-[11px] text-slate-500"><span x-text="t('aw.label.limitations')"></span> <span x-text="(analysisView.telemetryObservation.limitations||[]).map(x=>tCode('ui.limitation',x)).join(', ')"></span></div>
+          <div class="text-[11px] text-slate-500"><span x-text="t('aw.label.confounders')"></span> <span x-text="(analysisView.telemetryObservation.confounders||[]).map(x=>tCode('aw.confounder',x)).join(', ')"></span></div>
         </div>
       </template>
       <template x-if="!analysisView.telemetryObservation.available">
-        <div class="text-xs text-slate-400">Observation unavailable. <template x-for="b in (analysisView.telemetryObservation.blockedReasons||[])" :key="b.code"><span class="mr-2" x-text="b.code"></span></template></div>
+        <div class="text-xs text-slate-400"><span x-text="t('aw.label.observation_unavailable')"></span> <template x-for="b in (analysisView.telemetryObservation.blockedReasons||[])" :key="b.code"><span class="mr-2" x-text="tCode('ui.blocker', b.code)"></span></template></div>
       </template>
     </div>
 
     <!-- F · Model vs Actual -->
     <div x-show="svShow('model_vs_actual')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
-      <div class="text-xs text-slate-400 mb-2">F · Model vs Actual <span x-html="credBadge('Heuristic')"></span></div>
+      <div class="text-xs text-slate-400 mb-2"><span x-text="t('aw.label.f_model_vs_actual')"></span> <span x-html="credBadge('Heuristic')"></span></div>
       <template x-if="analysisView.modelVsActual.available">
         <div class="text-sm space-y-1">
-          <div>Predicted <b x-text="analysisView.modelVsActual.predicted.value"></b> · Observed <b x-text="analysisView.modelVsActual.observed.value"></b> → <b class="text-sky-300" x-text="analysisView.modelVsActual.difference.value"></b> <span x-html="credBadge('Heuristic')"></span></div>
-          <div class="text-[11px] text-slate-500">Assumptions: <span x-text="(analysisView.modelVsActual.assumptions||[]).join('; ')"></span></div>
+          <div><span x-text="t('aw.label.Predicted')"></span> <b x-text="tCode('aw.tendency', analysisView.modelVsActual.predicted.value)"></b> · <span x-text="t('aw.label.Observed')"></span> <b x-text="tCode('aw.tendency', analysisView.modelVsActual.observed.value)"></b> → <b class="text-sky-300" x-text="tCode('aw.diff', analysisView.modelVsActual.difference.value)"></b> <span x-html="credBadge('Heuristic')"></span></div>
+          <div class="text-[11px] text-slate-500"><span x-text="t('aw.label.assumptions')"></span> <span x-text="(analysisView.modelVsActual.assumptions||[]).map(x=>tCode('aw.basis',x)).join('; ')"></span></div>
         </div>
       </template>
       <template x-if="!analysisView.modelVsActual.available">
-        <div class="text-xs text-slate-400">Comparison blocked. <template x-for="b in (analysisView.modelVsActual.blockedReasons||[])" :key="b.code"><span class="mr-2" x-text="b.code"></span></template></div>
+        <div class="text-xs text-slate-400"><span x-text="t('aw.label.comparison_blocked')"></span> <template x-for="b in (analysisView.modelVsActual.blockedReasons||[])" :key="b.code"><span class="mr-2" x-text="tCode('ui.blocker', b.code)"></span></template></div>
       </template>
     </div>
 
     <!-- F2 · Measured Metrics (R2.4) -->
     <div x-show="svShow('measured_metrics')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
-      <div class="text-xs text-slate-400 mb-2">F2 · Measured Metrics <span x-html="credBadge('Measured')"></span></div>
+      <div class="text-xs text-slate-400 mb-2"><span x-text="t('aw.label.f2_measured_metrics')"></span> <span x-html="credBadge('Measured')"></span></div>
       <template x-if="analysisView.measuredMetrics.available">
         <div class="text-xs space-y-1">
-          <div>Measured K<sub>us</sub>: <b class="text-violet-300" x-text="fmt(analysisView.measuredMetrics.measuredKUs.value)"></b> deg/g <span x-html="credBadge('Measured')"></span> <span class="text-slate-500" x-text="'· vs predicted '+fmt(analysisView.measuredMetrics.predictedKUs.value)+' deg/g'"></span></div>
-          <div>Agreement: <b class="text-sky-300" x-text="analysisView.measuredMetrics.agreementClass"></b> <span class="text-slate-500" x-text="'· residual '+fmt(analysisView.measuredMetrics.residualDegG)+' deg/g'"></span></div>
-          <div class="text-[11px] text-amber-400/70" x-text="'Provenance: '+analysisView.measuredMetrics.dataProvenance+' · '+(analysisView.measuredMetrics.limitations||[]).join('; ')"></div>
+          <div><span x-text="t('aw.label.measured_kus')"></span> <b class="text-violet-300" x-text="fmt(analysisView.measuredMetrics.measuredKUs.value)"></b> deg/g <span x-html="credBadge('Measured')"></span> <span class="text-slate-500" x-text="'· '+t('aw.label.vs_predicted')+' '+fmt(analysisView.measuredMetrics.predictedKUs.value)+' deg/g'"></span></div>
+          <div><span x-text="t('aw.label.agreement')"></span> <b class="text-sky-300" x-text="tCode('aw.agree', analysisView.measuredMetrics.agreementClass)"></b> <span class="text-slate-500" x-text="'· '+t('aw.label.residual')+' '+fmt(analysisView.measuredMetrics.residualDegG)+' deg/g'"></span></div>
+          <div class="text-[11px] text-amber-400/70"><span x-text="t('aw.label.provenance')"></span> <span x-text="enumCode('ui.prov', analysisView.measuredMetrics.dataProvenance)+' · '+(analysisView.measuredMetrics.limitations||[]).map(x=>tCode('ui.confounder',x)).join('; ')"></span></div>
         </div>
       </template>
       <template x-if="!analysisView.measuredMetrics.available">
-        <div class="text-xs text-slate-400">Measured K<sub>us</sub> blocked — <span x-text="analysisView.measuredMetrics.reason || (analysisView.measuredMetrics.calibratedMagnitudeAvailable ? 'insufficient data quality' : 'no steering calibration')"></span><template x-for="b in (analysisView.measuredMetrics.blockedReasons||[])" :key="b"><span class="ml-2 text-slate-500" x-text="b"></span></template></div>
+        <div class="text-xs text-slate-400"><span x-text="t('aw.label.measured_kus_blocked_prefix')"></span> <span x-text="analysisView.measuredMetrics.reason ? tCode('aw.reason', analysisView.measuredMetrics.reason) : (analysisView.measuredMetrics.calibratedMagnitudeAvailable ? t('aw.reason.insufficient_data_quality') : t('aw.reason.no_steering_calibration'))"></span><template x-for="b in (analysisView.measuredMetrics.blockedReasons||[])" :key="b"><span class="ml-2 text-slate-500" x-text="tCode('ui.blocker', b)"></span></template></div>
       </template>
     </div>
 
     <!-- F3 · Quantitative Recommendation (R2.5) -->
     <div x-show="svShow('recommendations')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
-      <div class="text-xs text-slate-400 mb-2">F3 · Quantitative Recommendation <span x-html="credBadge('Model')"></span></div>
+      <div class="text-xs text-slate-400 mb-2"><span x-text="t('aw.label.f3_quantitative_recommendation')"></span> <span x-html="credBadge('Model')"></span></div>
       <div class="flex items-end gap-2 text-xs flex-wrap mb-2">
-        <label class="flex flex-col gap-0.5">metric
+        <label class="flex flex-col gap-0.5"><span x-text="t('aw.label.metric_select_label')"></span>
           <select x-model="quantMetric" class="bg-slate-900 border border-slate-700 rounded px-1 py-0.5">
-            <option value="roll_stiffness_dist_front">roll stiffness dist front (%)</option>
-            <option value="understeer_gradient">understeer gradient (deg/g)</option>
-            <option value="total_roll_stiffness">total roll stiffness (Nm/deg)</option>
+            <option value="roll_stiffness_dist_front" x-text="t('aw.opt.roll_stiffness_dist_front_opt')"></option>
+            <option value="understeer_gradient" x-text="t('aw.opt.understeer_gradient_opt')"></option>
+            <option value="total_roll_stiffness" x-text="t('aw.opt.total_roll_stiffness_opt')"></option>
           </select></label>
-        <label class="flex flex-col gap-0.5">target &Delta;<input type="number" step="any" x-model="quantDelta" class="w-20 bg-slate-900 border border-slate-700 rounded px-1 py-0.5"></label>
-        <label class="flex flex-col gap-0.5">via parameter
+        <label class="flex flex-col gap-0.5"><span x-text="t('aw.label.target')"></span><input type="number" step="any" x-model="quantDelta" class="w-20 bg-slate-900 border border-slate-700 rounded px-1 py-0.5"></label>
+        <label class="flex flex-col gap-0.5"><span x-text="t('aw.label.via_parameter')"></span>
           <select x-model="quantParameter" class="bg-slate-900 border border-slate-700 rounded px-1 py-0.5">
-            <option value="frontArbRollStiffnessNmDeg">front ARB (Nm/deg)</option>
-            <option value="rearArbRollStiffnessNmDeg">rear ARB (Nm/deg)</option>
-            <option value="frontWheelRateNmm">front wheel rate (N/mm)</option>
-            <option value="rearWheelRateNmm">rear wheel rate (N/mm)</option>
-            <option value="frontWeightPct">front weight (%)</option>
+            <option value="frontArbRollStiffnessNmDeg" x-text="t('aw.opt.front_arb_opt')"></option>
+            <option value="rearArbRollStiffnessNmDeg" x-text="t('aw.opt.rear_arb_opt')"></option>
+            <option value="frontWheelRateNmm" x-text="t('aw.opt.front_wheel_rate_opt')"></option>
+            <option value="rearWheelRateNmm" x-text="t('aw.opt.rear_wheel_rate_opt')"></option>
+            <option value="frontWeightPct" x-text="t('aw.opt.front_weight_opt')"></option>
           </select></label>
-        <button id="runQuantitative" class="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600 font-semibold" @click="runQuantitativeRecommendation()">Recommend</button>
+        <button id="runQuantitative" class="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600 font-semibold" @click="runQuantitativeRecommendation()" x-text="t('aw.label.Recommend')"></button>
       </div>
       <template x-if="analysisView.quantitativeRecommendation.available">
         <div class="text-xs space-y-1">
-          <div>Change <b class="text-sky-300" x-text="quantParameter"></b> by <b class="text-emerald-300" x-text="(analysisView.quantitativeRecommendation.recommendedDeltaPhysical>=0?'+':'')+fmt(analysisView.quantitativeRecommendation.recommendedDeltaPhysical)"></b> <span x-text="analysisView.quantitativeRecommendation.unit"></span> <span x-html="credBadge('Model')"></span></div>
-          <div class="text-slate-400" x-text="'-> predicted '+analysisView.quantitativeRecommendation.targetMetric+' '+fmt(analysisView.quantitativeRecommendation.predictedMetricAfter)+' '+analysisView.quantitativeRecommendation.metricUnit+' (residual '+fmt(analysisView.quantitativeRecommendation.residual)+')'"></div>
-          <div class="text-[11px] text-slate-500">Side effects: <template x-for="se in analysisView.quantitativeRecommendation.sideEffects" :key="se.metric"><span class="mr-2" x-text="se.metric+' &Delta;'+fmt(se.delta)"></span></template></div>
-          <div class="text-[11px] text-amber-400/80" x-text="analysisView.quantitativeRecommendation.validationStep"></div>
-          <div class="text-[11px] text-slate-500">Lever: <span x-text="analysisView.quantitativeRecommendation.leverType"></span><template x-if="analysisView.quantitativeRecommendation.leverType==='weight_distribution_ballast'"><span class="text-amber-400/70"> (ballast/weight move &mdash; materially different from a spring/ARB change)</span></template></div>
-          <div class="text-[10px] text-slate-500">Physical units only &mdash; hardware clicks need a validated per-car click&rarr;rate mapping (unavailable). <span x-text="(analysisView.quantitativeRecommendation.limitations||[]).join('; ')"></span></div>
+          <div><span x-text="t('aw.label.Change')"></span> <b class="text-sky-300" x-text="tCode('aw.param', quantParameter)"></b> <span x-text="t('aw.label.by')"></span> <b class="text-emerald-300" x-text="(analysisView.quantitativeRecommendation.recommendedDeltaPhysical>=0?'+':'')+fmt(analysisView.quantitativeRecommendation.recommendedDeltaPhysical)"></b> <span x-text="analysisView.quantitativeRecommendation.unit"></span> <span x-html="credBadge('Model')"></span></div>
+          <div class="text-slate-400" x-text="t('aw.label.predicted_metric_after_prefix')+' '+tCode('aw.metricname', analysisView.quantitativeRecommendation.targetMetric)+' '+fmt(analysisView.quantitativeRecommendation.predictedMetricAfter)+' '+analysisView.quantitativeRecommendation.metricUnit+' ('+t('aw.label.residual')+' '+fmt(analysisView.quantitativeRecommendation.residual)+')'"></div>
+          <div class="text-[11px] text-slate-500"><span x-text="t('aw.label.side_effects')"></span> <template x-for="se in analysisView.quantitativeRecommendation.sideEffects" :key="se.metric"><span class="mr-2" x-text="tCode('aw.metricname', se.metric)+' &Delta;'+fmt(se.delta)"></span></template></div>
+          <div class="text-[11px] text-amber-400/80" x-text="analysisView.quantitativeRecommendation.validationStep ? t('aw.qr.validationStep') : ''"></div>
+          <div class="text-[11px] text-slate-500"><span x-text="t('aw.label.lever')"></span> <span x-text="tCode('aw.lever', analysisView.quantitativeRecommendation.leverType)"></span><template x-if="analysisView.quantitativeRecommendation.leverType==='weight_distribution_ballast'"><span class="text-amber-400/70" x-text="' '+t('aw.hint.ballast_weight_move_note')"></span></template></div>
+          <div class="text-[10px] text-slate-500"><span x-text="t('aw.hint.physical_units_only_hint')"></span> <span x-text="(analysisView.quantitativeRecommendation.limitations||[]).map(x=>tCode('ui.limitation',x)).join('; ')"></span></div>
         </div>
       </template>
       <template x-if="analysisView.quantitativeRecommendation.requested &amp;&amp; !analysisView.quantitativeRecommendation.available">
-        <div class="text-xs text-slate-400">Recommendation blocked &mdash; <template x-for="b in (analysisView.quantitativeRecommendation.blockedReasons||[])" :key="b.code"><span class="mr-2" x-text="b.code"></span></template></div>
+        <div class="text-xs text-slate-400"><span x-text="t('aw.label.recommendation_blocked_prefix')"></span> <template x-for="b in (analysisView.quantitativeRecommendation.blockedReasons||[])" :key="b.code"><span class="mr-2" x-text="tCode('ui.blocker', b.code)"></span></template></div>
       </template>
       <template x-if="!analysisView.quantitativeRecommendation.requested">
-        <div class="text-[11px] text-slate-500">Pick a target balance change + a parameter, then Recommend. Model-grounded physical units &mdash; never a click count or a lap-time promise.</div>
+        <div class="text-[11px] text-slate-500" x-text="t('aw.hint.quant_pick_hint')"></div>
       </template>
     </div>
 
     <!-- F4 · Setup A/B (R2.5) -->
     <div x-show="svShow('recommendations')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
-      <div class="text-xs text-slate-400 mb-2">F4 · Setup A/B (model what-if) <span x-html="credBadge('Model')"></span></div>
+      <div class="text-xs text-slate-400 mb-2"><span x-text="t('aw.label.f4_setup_a_b_model_what_if')"></span> <span x-html="credBadge('Model')"></span></div>
       <div class="flex items-end gap-2 text-xs flex-wrap mb-2">
-        <label class="flex flex-col gap-0.5">parameter
+        <label class="flex flex-col gap-0.5"><span x-text="t('aw.label.parameter_select_label')"></span>
           <select x-model="abParameter" class="bg-slate-900 border border-slate-700 rounded px-1 py-0.5">
-            <option value="frontArbRollStiffnessNmDeg">front ARB (Nm/deg)</option>
-            <option value="rearArbRollStiffnessNmDeg">rear ARB (Nm/deg)</option>
-            <option value="frontWheelRateNmm">front wheel rate (N/mm)</option>
-            <option value="rearWheelRateNmm">rear wheel rate (N/mm)</option>
-            <option value="frontWeightPct">front weight (%)</option>
+            <option value="frontArbRollStiffnessNmDeg" x-text="t('aw.opt.front_arb_opt')"></option>
+            <option value="rearArbRollStiffnessNmDeg" x-text="t('aw.opt.rear_arb_opt')"></option>
+            <option value="frontWheelRateNmm" x-text="t('aw.opt.front_wheel_rate_opt')"></option>
+            <option value="rearWheelRateNmm" x-text="t('aw.opt.rear_wheel_rate_opt')"></option>
+            <option value="frontWeightPct" x-text="t('aw.opt.front_weight_opt')"></option>
           </select></label>
-        <label class="flex flex-col gap-0.5">change %<input type="number" step="any" x-model="abChangePct" class="w-20 bg-slate-900 border border-slate-700 rounded px-1 py-0.5"></label>
-        <button id="runSetupAb" class="px-2 py-1 rounded bg-sky-700 hover:bg-sky-600 font-semibold" @click="runSetupAbCompare()">Compare A/B</button>
+        <label class="flex flex-col gap-0.5"><span x-text="t('aw.label.change')"></span><input type="number" step="any" x-model="abChangePct" class="w-20 bg-slate-900 border border-slate-700 rounded px-1 py-0.5"></label>
+        <button id="runSetupAb" class="px-2 py-1 rounded bg-sky-700 hover:bg-sky-600 font-semibold" @click="runSetupAbCompare()" x-text="t('aw.label.compare_a_b')"></button>
       </div>
       <template x-if="abResult &amp;&amp; abResult.valid">
         <div class="text-xs space-y-1">
-          <div>Predicted balance change (B vs A): <b class="text-sky-300" x-text="abResult.directionalSummary"></b> <span x-html="credBadge('Model')"></span></div>
-          <div class="text-slate-400" x-text="'&Delta; understeer '+fmt(abResult.deltas.understeer_gradient)+' deg/g &middot; &Delta; roll-dist '+fmt(abResult.deltas.roll_stiffness_dist_front)+' % &middot; &Delta; total roll '+fmt(abResult.deltas.total_roll_stiffness)+' Nm/deg'"></div>
+          <div><span x-text="t('aw.label.predicted_balance_change_label')"></span> <b class="text-sky-300" x-text="tCode('aw.dir', abResult.directionalSummary)"></b> <span x-html="credBadge('Model')"></span></div>
+          <div class="text-slate-400" x-text="'&Delta; '+tCode('aw.metricname','understeer_gradient')+' '+fmt(abResult.deltas.understeer_gradient)+' deg/g &middot; &Delta; '+tCode('aw.metricname','roll_stiffness_dist_front')+' '+fmt(abResult.deltas.roll_stiffness_dist_front)+' % &middot; &Delta; '+tCode('aw.metricname','total_roll_stiffness')+' '+fmt(abResult.deltas.total_roll_stiffness)+' Nm/deg'"></div>
           <template x-if="abResult.plausibilityWarnings &amp;&amp; abResult.plausibilityWarnings.length">
-            <div class="text-[11px] text-amber-400/80">&#9888; implausible what-if: <template x-for="w in abResult.plausibilityWarnings" :key="w.parameter+w.setup"><span class="mr-2" x-text="w.parameter+'='+fmt(w.value)+' (range '+w.range[0]+'-'+w.range[1]+')'"></span></template></div>
+            <div class="text-[11px] text-amber-400/80"><span x-text="t('aw.label.implausible_whatif_warn')"></span> <template x-for="w in abResult.plausibilityWarnings" :key="w.parameter+w.setup"><span class="mr-2" x-text="tCode('aw.param', w.parameter)+'='+fmt(w.value)+' ('+t('aw.label.range')+' '+w.range[0]+'-'+w.range[1]+')'"</span></template></div>
           </template>
           <template x-if="abResult.modelVersions &amp;&amp; !abResult.modelVersions.match">
-            <div class="text-[11px] text-amber-400/80">&#9888; model version mismatch: A=<span x-text="abResult.modelVersions.a"></span> B=<span x-text="abResult.modelVersions.b"></span></div>
+            <div class="text-[11px] text-amber-400/80"><span x-text="t('aw.label.model_version_mismatch_warn')"></span> A=<span x-text="abResult.modelVersions.a"></span> B=<span x-text="abResult.modelVersions.b"></span></div>
           </template>
-          <div class="text-[10px] text-slate-500">Model what-if prediction &mdash; not measured, not a lap-time claim. The what-if is a hypothetical value-only override (not provenance-validated).</div>
+          <div class="text-[10px] text-slate-500" x-text="t('aw.hint.model_whatif_disclaimer')"></div>
         </div>
       </template>
       <template x-if="abResult &amp;&amp; !abResult.valid">
-        <div class="text-xs text-slate-400">A/B blocked. <template x-for="b in (abResult.blockedReasons||[])" :key="b.code"><span class="mr-2" x-text="b.code"></span></template></div>
+        <div class="text-xs text-slate-400"><span x-text="t('aw.label.ab_blocked_prefix')"></span> <template x-for="b in (abResult.blockedReasons||[])" :key="b.code"><span class="mr-2" x-text="tCode('ui.blocker', b.code)"></span></template></div>
       </template>
       <template x-if="!abResult">
-        <div class="text-[11px] text-slate-500">Pick a parameter + a % change to compare the current setup against a model what-if.</div>
+        <div class="text-[11px] text-slate-500" x-text="t('aw.hint.ab_pick_hint')"></div>
       </template>
     </div>
 
     <!-- G · Race Engineer -->
     <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700" x-show="svShow('recommendations') && analysisView.raceEngineer.available">
-      <div class="text-xs text-slate-400 mb-2">G · Race Engineer <span x-html="credBadge('Heuristic')"></span></div>
+      <div class="text-xs text-slate-400 mb-2"><span x-text="t('aw.label.g_race_engineer')"></span> <span x-html="credBadge('Heuristic')"></span></div>
       <div class="text-sm space-y-2">
-        <div>Summary: <span class="text-slate-300" x-text="analysisView.raceEngineer.summary"></span></div>
-        <div>Likely subsystems: <template x-for="s in analysisView.raceEngineer.likelySubsystems" :key="s"><span class="inline-block bg-slate-700 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="s"></span></template></div>
-        <div>Inspect first: <template x-for="s in analysisView.raceEngineer.inspectionPriorities" :key="s"><span class="inline-block bg-slate-700 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="s"></span></template></div>
-        <div x-show="analysisView.raceEngineer.eligible.directional">Directional trials: <template x-for="s in analysisView.raceEngineer.setupDirections" :key="s"><span class="inline-block bg-teal-900/40 text-teal-300 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="s"></span></template></div>
-        <div class="text-[11px] text-amber-400/80">Quantitative recommendation: <b>blocked</b> — <span x-text="(analysisView.raceEngineer.missingEvidence||[]).join(', ')"></span></div>
+        <div><span x-text="t('aw.label.summary')"></span> <span class="text-slate-300" x-text="awSummary(analysisView.raceEngineer.summary)"></span></div>
+        <div><span x-text="t('aw.label.likely_subsystems')"></span> <template x-for="s in analysisView.raceEngineer.likelySubsystems" :key="s"><span class="inline-block bg-slate-700 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="tCode('aw.subsys', s)"></span></template></div>
+        <div><span x-text="t('aw.label.inspect_first')"></span> <template x-for="s in analysisView.raceEngineer.inspectionPriorities" :key="s"><span class="inline-block bg-slate-700 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="tCode('aw.inspect', s)"></span></template></div>
+        <div x-show="analysisView.raceEngineer.eligible.directional"><span x-text="t('aw.label.directional_trials')"></span> <template x-for="s in analysisView.raceEngineer.setupDirections" :key="s"><span class="inline-block bg-teal-900/40 text-teal-300 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="tCode('aw.direction', s)"></span></template></div>
+        <div class="text-[11px] text-amber-400/80"><span x-text="t('aw.label.quant_rec_blocked_inline')"></span> <span x-text="(analysisView.raceEngineer.missingEvidence||[]).map(x=>tCode('aw.missing',x)).join(', ')"></span></div>
       </div>
     </div>
 
     <!-- H · Driver Coach -->
     <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700" x-show="svShow('recommendations') && analysisView.driverCoach.available">
-      <div class="text-xs text-slate-400 mb-2">H · Driver Coach <span x-html="credBadge('Heuristic')"></span></div>
+      <div class="text-xs text-slate-400 mb-2"><span x-text="t('aw.label.h_driver_coach')"></span> <span x-html="credBadge('Heuristic')"></span></div>
       <div class="text-sm space-y-2">
-        <div>Observations: <template x-for="o in analysisView.driverCoach.observations" :key="o.code"><span class="inline-block bg-slate-700 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="o.code + (o.qualitative?(' · '+o.qualitative):'')"></span></template></div>
-        <div>Practice: <template x-for="p in analysisView.driverCoach.practicePriorities" :key="p"><span class="inline-block bg-sky-900/40 text-sky-300 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="p"></span></template></div>
-        <div class="text-[11px] text-amber-400/80">Cannot conclude: <span x-text="(analysisView.driverCoach.cannotConclude||[]).join(', ')"></span></div>
+        <div><span x-text="t('aw.label.observations')"></span> <template x-for="o in analysisView.driverCoach.observations" :key="o.code"><span class="inline-block bg-slate-700 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="tCode('aw.obs', o.code) + (o.qualitative?(' · '+tCode('aw.qual', o.qualitative)):'')"></span></template></div>
+        <div><span x-text="t('aw.label.practice')"></span> <template x-for="p in analysisView.driverCoach.practicePriorities" :key="p"><span class="inline-block bg-sky-900/40 text-sky-300 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="tCode('aw.practice', p)"></span></template></div>
+        <div class="text-[11px] text-amber-400/80"><span x-text="t('aw.label.cannot_conclude')"></span> <span x-text="(analysisView.driverCoach.cannotConclude||[]).map(x=>tCode('ui.cannot',x)).join(', ')"></span></div>
       </div>
     </div>
 
     <!-- J · Track Intelligence / Corner Coaching (R2.6) -->
     <div x-show="svShow('corner_coaching')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
-      <div class="text-xs text-slate-400 mb-2">J · Corner Coaching <span x-html="credBadge('Heuristic')"></span></div>
+      <div class="text-xs text-slate-400 mb-2"><span x-text="t('aw.label.j_corner_coaching')"></span> <span x-html="credBadge('Heuristic')"></span></div>
       <template x-if="analysisView.trackIntelligence.available">
         <div class="text-xs space-y-2">
-          <div class="text-slate-400" x-text="analysisView.trackIntelligence.lapCount+' lap(s) &middot; '+analysisView.trackIntelligence.corners.length+' corner(s) &middot; provenance: '+analysisView.trackIntelligence.dataProvenance"></div>
+          <div class="text-slate-400" x-text="analysisView.trackIntelligence.lapCount+' '+t('aw.unit.laps')+' &middot; '+analysisView.trackIntelligence.corners.length+' '+t('aw.unit.corners')+' &middot; '+t('aw.label.provenance')+' '+enumCode('ui.prov', analysisView.trackIntelligence.dataProvenance)"></div>
           <template x-for="c in analysisView.trackIntelligence.corners" :key="c.cornerId">
             <div class="border-t border-slate-700/60 pt-1">
-              <div><b class="text-sky-300" x-text="c.cornerId"></b> <span class="text-slate-500" x-text="'lap '+c.lapId+' &middot; '+c.summary"></span> <span x-html="credBadge('Heuristic')"></span></div>
-              <div class="text-[11px] text-slate-500">entry: <span x-text="c.entry.sufficient ? c.entry.qualitative : c.entry.reason"></span> &middot; mid: <span x-text="c.mid.sufficient ? c.mid.qualitative : c.mid.reason"></span> &middot; exit: <span x-text="c.exit.sufficient ? c.exit.qualitative : c.exit.reason"></span></div>
+              <div><b class="text-sky-300" x-text="t('aw.label.corner')+' '+(c.cornerId||'').replace(/^corner_/,'')"></b> <span class="text-slate-500" x-text="t('aw.unit.laps')+' '+c.lapId+' &middot; '+awSummary(c.summary)"></span> <span x-html="credBadge('Heuristic')"></span></div>
+              <div class="text-[11px] text-slate-500"><span x-text="t('aw.phase.entry')"></span>: <span x-text="c.entry.sufficient ? tCode('aw.qual', c.entry.qualitative) : tCode('aw.reason', c.entry.reason)"></span> &middot; <span x-text="t('aw.phase.mid')"></span>: <span x-text="c.mid.sufficient ? tCode('aw.qual', c.mid.qualitative) : tCode('aw.reason', c.mid.reason)"></span> &middot; <span x-text="t('aw.phase.exit')"></span>: <span x-text="c.exit.sufficient ? tCode('aw.qual', c.exit.qualitative) : tCode('aw.reason', c.exit.reason)"></span></div>
             </div>
           </template>
-          <div class="text-[10px] text-amber-400/70" x-text="'Driver behaviour (raw steering) &mdash; not a corner characteristic or a setup finding. '+(analysisView.trackIntelligence.limitations||[]).join('; ')"></div>
+          <div class="text-[10px] text-amber-400/70" x-text="t('aw.hint.driver_behaviour_raw_steering_note')+' '+(analysisView.trackIntelligence.limitations||[]).map(x=>tCode('ui.limitation',x)).join('; ')"></div>
         </div>
       </template>
       <template x-if="!analysisView.trackIntelligence.available">
-        <div class="text-xs text-slate-400">Corner coaching blocked &mdash; <template x-for="b in (analysisView.trackIntelligence.blockedReasons||[])" :key="b.code"><span class="mr-2" x-text="b.code"></span></template><span class="text-slate-500" x-text="(analysisView.trackIntelligence.cannotConclude||[]).join('; ')"></span></div>
+        <div class="text-xs text-slate-400"><span x-text="t('aw.label.corner_coaching_blocked_prefix')"></span> <template x-for="b in (analysisView.trackIntelligence.blockedReasons||[])" :key="b.code"><span class="mr-2" x-text="tCode('ui.blocker', b.code)"></span></template><span class="text-slate-500" x-text="(analysisView.trackIntelligence.cannotConclude||[]).map(x=>tCode('ui.cannot',x)).join('; ')"></span></div>
       </template>
     </div>
 
     <!-- I · Evidence / Provenance Drawer -->
     <div x-show="svShow('evidence_trust')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
-      <div class="text-xs text-slate-400 mb-2">I · Evidence &amp; Provenance</div>
-      <div class="text-xs text-slate-500 mb-2">Credibility: <template x-for="l in analysisView.evidenceDrawer.credibilityLegend" :key="l"><span class="mr-1" x-html="credBadge(l)"></span></template></div>
-      <div class="text-[11px] text-slate-400">Model: <span x-text="analysisView.evidenceDrawer.modelVersion"></span></div>
-      <div class="text-[11px] text-slate-400 mt-1">Blocked reasons (all layers):</div>
-      <template x-for="b in analysisView.evidenceDrawer.allBlockedReasons" :key="b.layer+b.code"><div class="text-[11px] text-slate-500" x-text="'· ['+b.layer+'] '+b.code"></div></template>
-      <div class="text-[11px] text-slate-400 mt-1" x-show="(analysisView.evidenceDrawer.allWarnings||[]).length">Warnings: <span x-text="(analysisView.evidenceDrawer.allWarnings||[]).join('; ')"></span></div>
+      <div class="text-xs text-slate-400 mb-2" x-text="t('aw.label.i_evidence_provenance')"></div>
+      <div class="text-xs text-slate-500 mb-2"><span x-text="t('aw.label.credibility')"></span> <template x-for="l in analysisView.evidenceDrawer.credibilityLegend" :key="l"><span class="mr-1" x-html="credBadge(l)"></span></template></div>
+      <div class="text-[11px] text-slate-400"><span x-text="t('aw.label.model')"></span> <span x-text="analysisView.evidenceDrawer.modelVersion"></span></div>
+      <div class="text-[11px] text-slate-400 mt-1" x-text="t('aw.label.blocked_reasons_all_layers')"></div>
+      <template x-for="b in analysisView.evidenceDrawer.allBlockedReasons" :key="b.layer+b.code"><div class="text-[11px] text-slate-500" x-text="'· ['+tCode('aw.layer', b.layer)+'] '+tCode('ui.blocker', b.code)"></div></template>
+      <div class="text-[11px] text-slate-400 mt-1" x-show="(analysisView.evidenceDrawer.allWarnings||[]).length"><span x-text="t('aw.label.warnings')"></span> <span x-text="(analysisView.evidenceDrawer.allWarnings||[]).map(x=>tCode('ui.limitation', typeof x==='string'?x:((x&&x.code)||x))).join('; ')"></span></div>
     </div>
    </div>
   </template>
@@ -3051,6 +3050,8 @@ canvas{max-height:300px}
 <script src="js/i18n-ui.js"></script>
 <script src="js/i18n-advisor.js"></script>
 <script src="js/i18n-csv.js"></script>
+<script src="js/i18n-shell.js"></script>
+<script src="js/i18n-workspace.js"></script>
 <script src="js/calibration.js"></script>
 <script src="js/tire-data.js"></script>
 <script src="js/dynamics-model.js"></script>
@@ -3136,7 +3137,7 @@ function app(){return{
   analysisError: null,
   loadDemoAnalysisCase(){
     try {
-      if (typeof DemoAnalysisCase==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof AnalysisWorkspaceViewModel==='undefined'){ this.analysisError='analysis modules not loaded'; this.analysisView=null; this._shellEvidence=null; return; }
+      if (typeof DemoAnalysisCase==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof AnalysisWorkspaceViewModel==='undefined'){ this.analysisError='modules_not_loaded'; this.analysisView=null; this._shellEvidence=null; return; }
       const demo = DemoAnalysisCase.buildDemoAnalysisCase();
       const ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, demo.telemetrySession, demo.window, {}); // global Tier1BasicBalance as the model runner
       caseDataHolder.lastCase = demo.analysisCase; caseDataHolder.lastSession = demo.telemetrySession; caseDataHolder.lastWindow = demo.window; caseDataHolder.lastVmOpts = { suspensionNormalizationView: demo.suspensionNormalizationView }; this._persistSession(demo.telemetrySession);
@@ -3153,7 +3154,7 @@ function app(){return{
   abParameter: 'frontArbRollStiffnessNmDeg', abChangePct: '10', abResult: null,
   runQuantitativeRecommendation(){
     try {
-      if (!caseDataHolder.lastCase || typeof AnalysisWorkspace==='undefined'){ this.analysisError='run an analysis first'; return; }
+      if (!caseDataHolder.lastCase || typeof AnalysisWorkspace==='undefined'){ this.analysisError='run_analysis_first'; return; }
       var d=parseFloat(this.quantDelta);
       var opts={ quantitative: { target: { metric: this.quantMetric, delta: isFinite(d)?d:0 }, parameterKey: this.quantParameter } };
       var ws=AnalysisWorkspace.runAnalysisWorkspace(caseDataHolder.lastCase, caseDataHolder.lastSession, caseDataHolder.lastWindow, opts);
@@ -3162,11 +3163,11 @@ function app(){return{
   },
   runSetupAbCompare(){
     try {
-      if (!caseDataHolder.lastCase || typeof SetupAB==='undefined'){ this.analysisError='run an analysis first'; return; }
+      if (!caseDataHolder.lastCase || typeof SetupAB==='undefined'){ this.analysisError='run_analysis_first'; return; }
       var whatif=JSON.parse(JSON.stringify(caseDataHolder.lastCase));
       var snap=whatif.modelSnapshot && whatif.modelSnapshot.canonicalInputSnapshot; var p=snap && snap[this.abParameter];
       var pct=parseFloat(this.abChangePct);
-      if (!p || !isFinite(pct)){ this.analysisError='pick a parameter and a % change'; return; }
+      if (!p || !isFinite(pct)){ this.analysisError='pick_param_pct'; return; }
       p.value = p.value * (1 + pct/100);
       this.abResult = SetupAB.compareSetups(caseDataHolder.lastCase, whatif, {}); this.autosaveCurrentCase();
     } catch(e){ this.analysisError=String((e&&e.message)||e); this.abResult=null; }
@@ -3178,7 +3179,7 @@ function app(){return{
   importTelemetryCsv(){
     try {
       this.importError=null; this.importedChannels=[]; caseDataHolder.importedBundle=null;
-      if (typeof TelemetryImportAdapter==='undefined' || typeof ChannelMapping==='undefined'){ this.importError='import modules not loaded'; return; }
+      if (typeof TelemetryImportAdapter==='undefined' || typeof ChannelMapping==='undefined'){ this.importError='modules_not_loaded'; return; }
       var r = TelemetryImportAdapter.importTelemetry({ format:'csv', text:this.importCsvText });
       if (!r.ok){ this.importError = (r.parseErrors && r.parseErrors[0] && r.parseErrors[0].code) || 'import_failed'; return; }
       caseDataHolder.importedBundle = r;
@@ -3190,7 +3191,7 @@ function app(){return{
   runImportedAnalysis(){
     try {
       this.importError=null;
-      if (typeof CanonicalTelemetrySession==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof DemoAnalysisCase==='undefined'){ this.importError='analysis modules not loaded'; return; }
+      if (typeof CanonicalTelemetrySession==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof DemoAnalysisCase==='undefined'){ this.importError='modules_not_loaded'; return; }
       var assignments = this.importedChannels.filter(function(c){ return c.assigned; }).map(function(c){ return { rawColumnId:c.rawColumnId, canonicalChannel:c.assigned, userConfirmed: c.confirmed===true }; });
       var mapping = ChannelMapping.buildChannelMapping(caseDataHolder.importedBundle.rawChannels, assignments);
       var SESS='imported_session';
@@ -3215,13 +3216,13 @@ function app(){return{
   credBadge(level){
     const M={ Physics:['bg-emerald-900/40','text-emerald-300'], Model:['bg-sky-900/40','text-sky-300'], Measured:['bg-violet-900/40','text-violet-300'], Derived:['bg-teal-900/40','text-teal-300'], Heuristic:['bg-amber-900/40','text-amber-300'], Unavailable:['bg-slate-700','text-slate-400'] };
     const c=M[level]||M.Unavailable;
-    return '<span class="text-[10px] px-1.5 py-0.5 rounded '+c[0]+' '+c[1]+'">'+level+'</span>';
+    return '<span class="text-[10px] px-1.5 py-0.5 rounded '+c[0]+' '+c[1]+'">'+this.tCode('aw.cred', level)+'</span>';
   },
 
   // === i18n (English primary / 繁中 / 日本語) ===
   lang: (typeof localStorage!=='undefined' && localStorage.getItem('lang')) || 'en',
   langs:[{id:'en',label:'EN'},{id:'zh',label:'繁'},{id:'ja',label:'日'}],
-  setLang(l){ this.lang=l; try{localStorage.setItem('lang',l)}catch(e){} if(this.carPresets.length) this.loadPresets(); if(this.advisorResult && this.result) this.runAdvisor(); },
+  setLang(l){ this.lang=l; try{localStorage.setItem('lang',l)}catch(e){} try{document.documentElement.lang=(l==='zh'?'zh-TW':l); document.title=this.t('ui.appTitle')}catch(e){} if(this.carPresets.length) this.loadPresets(); if(this.advisorResult && this.result) this.runAdvisor(); },
   t(k){ const D=(typeof I18N!=='undefined')?I18N:null; if(!D) return k;
         const has=(o)=>o && Object.prototype.hasOwnProperty.call(o,k); // 用 hasOwnProperty 避免命中原型鏈(toString…)
         if(has(D[this.lang])) return D[this.lang][k]; // 尊重「刻意空字串」翻譯(如 EN ui.lapPost='')，不誤當缺漏
@@ -3229,10 +3230,38 @@ function app(){return{
         return k; },
   // 把模型回傳的英文傾向(Understeer/Oversteer/Neutral)轉成目前語言
   tnd(tendencyEn){ return this.t('us.'+(tendencyEn||'Neutral')); },
+  // R3 shell — render a FROZEN-service code via t('<prefix>.'+code); unknown codes humanize (never a raw SCREAMING_SNAKE token).
+  tCode(prefix, code){ if(code==null||code==='') return ''; const k=prefix+'.'+String(code); const v=this.t(k);
+        if(v!==k) return v;
+        // unknown code: record it (so a missing translation is never invisible) + warn on localhost; humanize is a LAST-RESORT safety net only.
+        try{ var M=(globalThis.__i18nMissingCodes||(globalThis.__i18nMissingCodes={})); if(!M[k]){ M[k]=1; if(typeof location!=='undefined' && /^(localhost|127\.0\.0\.1|)$/.test(location.hostname)) console.warn('[i18n] missing dynamic-code key, humanized fallback used: '+k); } }catch(e){}
+        return String(code).replace(/[_-]+/g,' ').replace(/([a-z0-9])([A-Z])/g,'$1 $2').toLowerCase().replace(/\b\w/g,function(c){return c.toUpperCase();}); },
+  // credibility values from the frozen service are English literals → normalize to a code, then translate.
+  credCode(v){ if(v==null||v==='') return ''; var s=String(v).toLowerCase();
+        if(s.indexOf('measured')!==-1) return this.t('ui.cred.measured_kinematic_confounded');
+        if(s.indexOf('model')!==-1) return this.t('ui.cred.model');
+        if(s.indexOf('unavailable')!==-1||s.indexOf('—')!==-1) return this.t('ui.cred.unavailable');
+        return this.tCode('ui.cred', s.replace(/[^a-z0-9]+/g,'_')); },
+  // generic enum value (provenance/confidence/…) → normalize hyphens/spaces/case to a snake_case code, then translate.
+  enumCode(prefix, v){ if(v==null||v==='') return ''; return this.tCode(prefix, String(v).toLowerCase().replace(/[^a-z0-9]+/g,'_')); },
+  // error/failure-path messages: known UI/service codes → ui.err.*; a 'prefix: CODE' compound is split; an unknown
+  // code → generic + the code in parens; free-text (a caught Error.message) → generic only (never raw English).
+  tErr(v){ if(v==null||v==='') return ''; var s=String(v);
+        if(/^[a-z][a-z_]*: /.test(s)){ var i=s.indexOf(': '); return this.tErr(s.slice(0,i))+'：'+this.tErr(s.slice(i+2)); }
+        var k='ui.err.'+s; var tv=this.t(k); if(tv!==k) return tv;
+        try{ (globalThis.__i18nMissingCodes||(globalThis.__i18nMissingCodes={}))[k]=1; }catch(e){}
+        if(/^[A-Za-z][A-Za-z0-9_]*$/.test(s)) return this.t('ui.err.generic')+' ('+s+')';
+        return this.t('ui.err.generic'); },
+  // composite raceEngineer / corner summary codes: parse the prefix, then translate each sub-part.
+  awSummary(s){ if(s==null||s==='') return ''; var p=String(s); var self=this;
+        if(p.indexOf('directional_insight:')===0) return this.t('aw.summary.directional_insight')+' '+this.tCode('aw.diff', p.slice(20));
+        if(p.indexOf('inspection_only:model_predicts_')===0) return this.t('aw.summary.inspection_only')+' '+this.tCode('aw.tendency', p.slice(31));
+        if(p.indexOf('corrections_elevated_in_')===0) return this.t('aw.summary.corrections_elevated')+' '+p.slice(24).split('_').map(function(x){return self.tCode('aw.phase',x);}).join('/');
+        return this.tCode('aw.summary', p); },
   // 資料驅動名稱(車款/輪胎)：英文/日文模式用英文 name，繁中用 name_zh
   nm(o){ if(!o) return ''; return (this.lang==='zh' && o.name_zh) ? o.name_zh : (o.name || o.name_zh || ''); },
   // 資料驅動備註(車款/輪胎)：繁中用 notes，英文/日文用 notes_en（日文回退英文）
-  noteOf(o){ if(!o) return ''; return (this.lang==='zh') ? (o.notes||'') : (o.notes_en||o.notes||''); },
+  noteOf(o){ if(!o) return ''; if(this.lang==='zh') return o.notes||''; if(this.lang==='ja') return o.notes_ja||''; return o.notes_en||o.notes||''; },
   // 可信度等級 badge：Physics(◆ 教科書硬公式) / Model(◈ 工程估算) / Heuristic(◇ 手調調味)。
   // 重用既有 conf badge 的視覺語彙；以 x-html 嵌入，語言切換時隨 t() 自動重繪。
   tierBadge(level){
@@ -3343,21 +3372,21 @@ function app(){return{
   telemCanonOptions(){ return (typeof TelemetryCore!=='undefined') ? [''].concat(Object.keys(TelemetryCore.CHANNEL_PATTERNS)) : []; },
   importCSV(e){
     const f=e.target.files && e.target.files[0]; if(!f) return;
-    if(typeof TelemetryCore==='undefined' || typeof TelemetryView==='undefined'){ this.telem.error='telemetry-core not loaded'; e.target.value=''; return; }
+    if(typeof TelemetryCore==='undefined' || typeof TelemetryView==='undefined'){ this.telem.error='modules_not_loaded'; e.target.value=''; return; }
     const token=++telemetryDataHolder.importToken; this.telem.error=null;
     const reader=new FileReader();
     reader.onload=()=>{ if(token!==telemetryDataHolder.importToken) return; // stale import cancelled
       try{ const parsed=TelemetryCore.parseCsv(reader.result);
         if(parsed.errors && parsed.errors.length){ // fatal parse errors (e.g. CSV_UNCLOSED_QUOTE / EMPTY / NO_ROWS) → not a usable dataset
-          const msg=parsed.errors.map(e=>(e&&(e.message||e.code))||String(e)).join('; ');
+          const msg=(parsed.errors[0]&&parsed.errors[0].code)||'PARSE_ERROR';
           this.telemUnload();        // clear any prior session FIRST (telemUnload resets this.telem)
           this.telem.error=msg;      // …THEN surface this import's fatal error (order matters)
           return;                    // do NOT build a session or run preflight
         }
         telemetryDataHolder.session=TelemetryView.newSession(f.name||null, parsed, this.telem.profileId);
         this.telem.imported=true; this.telemRefresh();
-      }catch(err){ this.telem.error=String((err&&err.message)||err); this.telemUnload(); } };
-    reader.onerror=()=>{ if(token===telemetryDataHolder.importToken) this.telem.error='file read error'; };
+      }catch(err){ this.telem.error='unexpected_error'; this.telemUnload(); } };
+    reader.onerror=()=>{ if(token===telemetryDataHolder.importToken) this.telem.error='file_read_error'; };
     reader.readAsText(f);
     e.target.value=''; // clean-room: do not retain the file path/handle
   },
@@ -3562,19 +3591,19 @@ function app(){return{
   _persistSession(session){ try{ var tok=++caseDataHolder.sessionOpToken; if(!session||!this.ensureStore()||!caseDataHolder.sessionStore) { if(tok===caseDataHolder.sessionOpToken){ caseDataHolder.lastSessionId=null; caseDataHolder.sessionPersistPromise=Promise.resolve(); } return; } var self=this; var ch=(session.channels&&typeof session.channels==='object')?Object.keys(session.channels).slice(0,64):[]; if(tok===caseDataHolder.sessionOpToken) caseDataHolder.lastSessionId=null; caseDataHolder.sessionPersistPromise = caseDataHolder.sessionStore.put({ summary:{ sourceSessionId: session.sessionId||null, channels: ch }, raw: session }).then(function(r){ if(tok!==caseDataHolder.sessionOpToken) return; caseDataHolder.lastSessionId=(r&&r.ok)?r.sessionId:null; if(r&&!r.ok&&r.code!=='SESSION_TOO_LARGE'&&r.code!=='SESSION_EXCEEDS_BUDGET') self.storageError='session: '+r.code; }).catch(function(){ if(tok===caseDataHolder.sessionOpToken) caseDataHolder.lastSessionId=null; }); }catch(e){ caseDataHolder.lastSessionId=null; } },
   _mkShellEvidence(ws, source){ try{ return { capability:(ws&&ws.capability)||null, observation:(ws&&ws.observation)?{ blockedReasons:((ws.observation.blockedReasons)||[]).map(function(b){return {code:(b&&b.code)||String(b)};}) }:null, source: source||null }; }catch(e){ return null; } },
   caseShellState(){ try{ var CS=(typeof CaseShell!=='undefined')?CaseShell:((typeof globalThis!=='undefined'&&globalThis.CaseShell)||null); if(!CS||!CS.deriveCaseShellState) return null; return CS.deriveCaseShellState({ workspaceResult:this._shellEvidence||null, analysisView:this.analysisView||null, importState:null, caseMeta:{ hasCase:!!this.analysisView, caseName:(this.analysisView&&this.analysisView.caseHeader&&this.analysisView.caseHeader.caseId)||null, vehicle:(this.analysisView&&this.analysisView.caseHeader&&this.analysisView.caseHeader.vehicle)||null, session:(this.analysisView&&this.analysisView.caseHeader&&this.analysisView.caseHeader.telemetrySession)||null, telemetrySource:(this._shellEvidence&&this._shellEvidence.source)||null } }); }catch(e){ return null; } },
-  ensureStore(){ if(caseDataHolder.caseStore) return true; try{ if(typeof StorageBackend==='undefined'||typeof CaseStore==='undefined'){ this.storageError='storage modules not loaded'; return false; } var be=StorageBackend.IndexedDBBackend({}); caseDataHolder.caseStore=CaseStore.createCaseStore(be); caseDataHolder.sessionStore=SessionStore.createSessionStore(be); this.storageError=null; return true; }catch(e){ this.storageError=(e&&e.code)||(e&&e.message)||String(e); return false; } },
+  ensureStore(){ if(caseDataHolder.caseStore) return true; try{ if(typeof StorageBackend==='undefined'||typeof CaseStore==='undefined'){ this.storageError='modules_not_loaded'; return false; } var be=StorageBackend.IndexedDBBackend({}); caseDataHolder.caseStore=CaseStore.createCaseStore(be); caseDataHolder.sessionStore=SessionStore.createSessionStore(be); this.storageError=null; return true; }catch(e){ this.storageError=(e&&e.code)||(e&&e.message)||String(e); return false; } },
   refreshLibrary(){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.list().then(function(rows){ self.library=CaseLibraryViewModel.buildCaseLibraryView(rows, self.libFilters); }).catch(function(e){ self.storageError=String((e&&e.message)||e); }); },
   libSections(){ if(!this.library) return []; var b=this.library.buckets||{}; var out=[]; if((b.pinned||[]).length) out.push({key:'pinned',label:'Pinned',rows:b.pinned}); out.push({key:'recent',label:'Recent',rows:b.recent||[]}); if(this.libFilters.includeArchived && (b.archived||[]).length) out.push({key:'archived',label:'Archived',rows:b.archived}); return out; },
   pinCase(id, pinned){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.setPinned(id, pinned).then(function(){ self.refreshLibrary(); }); },
   _setupSnapshotFromView(){ var si=(this.analysisView&&this.analysisView.setupInputs)||{}; var g=function(k){ return (si[k]&&typeof si[k].value==='number')?si[k].value:null; }; return { frontWheelRate:g('frontWheelRate'), rearWheelRate:g('rearWheelRate'), frontArb:g('frontArb'), rearArb:g('rearArb'), mass:g('mass'), frontWeightPct:g('frontWeightPct'), cgHeight:g('cgHeight') }; },
   _saveInput(forceNew){ var ch=(this.analysisView&&this.analysisView.caseHeader)||{}; return { caseId: forceNew?undefined:(this.currentCaseId||undefined), metadata:{ title: ch.caseId||'Untitled case', vehicle: ch.vehicle||null, track:null, status:'complete' }, setupSnapshot:this._setupSnapshotFromView(), associations:{ telemetrySessionId: caseDataHolder.lastSessionId||null }, analysisResults: JSON.parse(JSON.stringify(this.analysisView)), shellEvidence: this._shellEvidence||{ capability:{}, observation:{blockedReasons:[]}, source:'demo_case' } }; },
-  saveCurrentCase(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='Imported summaries cannot be overwritten — use Save as new'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.save(self._saveInput(false)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.storageError=null; self.refreshLibrary(); } else { self.storageError=r.code+(r.violations?(' '+JSON.stringify(r.violations.slice(0,2))):''); } }); },
+  saveCurrentCase(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='cannot_overwrite_imported'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.save(self._saveInput(false)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.storageError=null; self.refreshLibrary(); } else { self.storageError=r.code; } }); },
   autosaveCurrentCase(){ var self=this; if(!this.autosaveEnabled || !this.currentCaseId || this.importedSummaryOpen || !this.analysisView || !caseDataHolder.caseStore) return; try{ if(caseDataHolder.autosaveTimer) clearTimeout(caseDataHolder.autosaveTimer); caseDataHolder.autosaveTimer=setTimeout(function(){ caseDataHolder.autosaveTimer=0; if(self.autosaveEnabled && self.currentCaseId && !self.importedSummaryOpen && self.analysisView) self.saveCurrentCase(); }, 1500); }catch(e){} },
-  saveCurrentCaseAsNew(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='Imported summaries cannot be promoted to a full case — re-run locally'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.create(self._saveInput(true)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.refreshLibrary(); } else self.storageError=r.code; }); },
+  saveCurrentCaseAsNew(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='cannot_promote_imported'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.create(self._saveInput(true)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.refreshLibrary(); } else self.storageError=r.code; }); },
   openCase(id){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.open(id).then(function(o){ if(!o.ok){ self.storageError=o.code; return; } self.analysisView=o.analysisResults; self._shellEvidence={ capability:(o.shellEvidence&&o.shellEvidence.capability)||{}, observation:(o.shellEvidence&&o.shellEvidence.observation)||{blockedReasons:[]}, source:(o.shellEvidence&&o.shellEvidence.source)||null }; self.currentCaseId=id; self.importedSummaryOpen=!!o.degraded; ++caseDataHolder.sessionOpToken; caseDataHolder.lastSessionId=(o.associations&&o.associations.telemetrySessionId)||null; caseDataHolder.sessionPersistPromise=Promise.resolve(); self.caseSubview='overview'; self.shellSection='cases'; self.currentTab='analysis'; }); },
   duplicateCase(id){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.duplicate(id).then(function(r){ if(r.ok) self.refreshLibrary(); else self.storageError=r.code; }); },
   archiveCase(id,arch){ var self=this; if(!this.ensureStore()) return; (arch?caseDataHolder.caseStore.archive(id):caseDataHolder.caseStore.unarchive(id)).then(function(){ self.refreshLibrary(); }); },
-  deleteCase(id){ var self=this; if(!this.ensureStore()) return; if(typeof confirm==='function' && !confirm('Delete this case? This cannot be undone.')) return; caseDataHolder.caseStore.remove(id,{confirm:true}).then(function(r){ if(r.ok){ if(self.currentCaseId===id) self.currentCaseId=null; self.refreshLibrary(); } else self.storageError=r.code; }); },
+  deleteCase(id){ var self=this; if(!this.ensureStore()) return; if(typeof confirm==='function' && !confirm(this.t('ui.case.deleteConfirm'))) return; caseDataHolder.caseStore.remove(id,{confirm:true}).then(function(r){ if(r.ok){ if(self.currentCaseId===id) self.currentCaseId=null; self.refreshLibrary(); } else self.storageError=r.code; }); },
   exportCaseRow(id){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.exportCase(id).then(function(r){ if(!r.ok){ self.storageError=r.code; return; } self._downloadJson(r.bundle, 'case-'+id+'.json'); }); },
   importCaseFile(ev){ var self=this; var f=ev&&ev.target&&ev.target.files&&ev.target.files[0]; if(!f||!this.ensureStore()){ if(ev&&ev.target) ev.target.value=''; return; } var rd=new FileReader(); rd.onload=function(){ try{ var b=JSON.parse(rd.result); caseDataHolder.caseStore.importBundle(b).then(function(r){ if(r.ok) self.refreshLibrary(); else self.storageError='import: '+r.code; }); }catch(e){ self.storageError='import parse: '+String((e&&e.message)||e); } }; rd.readAsText(f); ev.target.value=''; },
   _downloadJson(obj,name){ try{ var blob=new Blob([JSON.stringify(obj,null,2)],{type:'application/json'}); var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); },1000); }catch(e){ this.storageError=String((e&&e.message)||e); } },
@@ -3879,7 +3908,7 @@ function app(){return{
     }
     // Catch any unmatched
     const others = this.carPresets.filter(c => !used.has(c.id));
-    if (others.length) groups.push({ label: this.lang==='zh' ? '其他 Other' : this.lang==='ja' ? 'その他 Other' : 'Other', cars: others });
+    if (others.length) groups.push({ label: this.t('ui.group.other'), cars: others });
     this.carPresetGroups = groups;
   },
 

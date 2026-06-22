@@ -1,112 +1,148 @@
 # Racing Setup Analyzer
 
-**A vehicle-dynamics setup & lap-time tool that turns professional-grade chassis engineering into something you can actually play with.**
-
-Predict understeer/oversteer balance, find your spring/ARB/damper numbers, and simulate a full tyre stint at Lihpao International Circuit — grounded in textbook vehicle dynamics (Milliken, Gillespie, OptimumG) and cross-checked against real-world engineering practice.
+**A case-centric vehicle-dynamics workspace that predicts handling balance, sizes your spring / ARB / damper numbers, simulates a tyre stint, and — when you bring real telemetry and a verified calibration — reports honestly-gated measured metrics. Every number is labelled by how it was derived; every blocked feature says why.**
 
 `🌐 Language:` **English** ｜ [繁體中文](#繁體中文) ｜ [日本語](#日本語)
 
----
+Grounded in textbook vehicle dynamics (Milliken, Gillespie, OptimumG) and cross-checked against real-world engineering practice. Runs as an Electron desktop app or straight in a browser — no build step, no server, no account; the physics runs locally in plain JavaScript.
 
-## What it is
+## Core value
 
-Most people learn the *formulas* of vehicle dynamics but never see how a professional team turns those formulas into decisions on track. This tool sits in that gap. You set up a car — springs, anti-roll bars, dampers, geometry, tyres, aero — and it tells you **which way the car will handle and why**, then predicts a **lap time** and how the tyres evolve over a stint.
+- **Transparent balance prediction** — an understeer-gradient model that combines weight distribution, roll-stiffness distribution (LLTD) and tyre load sensitivity, with every output badged **Physics / Model / Heuristic**.
+- **Honest, fail-closed telemetry analysis** — import a CSV, map channels, confirm identity; a *measured* understeer gradient (K_us) is produced **only** when a verified steering calibration *and* the data quality pass every gate — otherwise it stays blocked with a reason.
+- **Local-first case workspace** — build an Analysis Case (vehicle + setup + optional telemetry), save / reopen / duplicate / archive / export — all in a local Case Library. No cloud, no accounts; raw telemetry never leaves your device.
+- **Trilingual UI** — English / 繁體中文（台灣）/ 日本語, switchable at runtime across the app shell and the full analysis workspace.
+- **Source as teaching material** — embedded "knowledge essays" (`docs/fsae/`) walk intuition → physics → formula → code for FSAE / track-day engineers.
 
-It runs as an Electron desktop app or straight in a browser. No build step, no server — the physics runs locally in plain JavaScript.
+## Current status
 
-## Features
+| Milestone | Scope | State |
+|---|---|---|
+| R1 / R2.0–R2.2 | Handling prediction, advisor, spring/ARB, tyre analysis, Lihpao lap+stint, 501-car presets, Analysis Workspace slice | ✅ complete |
+| R2.3 | Real/imported CSV → canonical telemetry session, channel mapping + confirmation, closed-schema case export | ✅ complete |
+| R2.4 | Honestly-gated **measured** understeer gradient K_us (needs a verified steering calibration) + model-vs-actual | ✅ complete |
+| R2.5 | Setup A/B (predicted balance deltas) + quantitative recommendation in physical units | ✅ complete |
+| R2.6 | Track intelligence + per-corner driver steering-behaviour coaching (Heuristic, low-confidence) | ✅ complete |
+| R3.0A | Case-centric app shell (nav / Case Context / Trust panel) + documentation consolidation | ✅ complete |
+| R3.0B | Local-first Case Library & persistence (save / reopen / duplicate / archive / export-import) | ✅ complete |
+| R3.0C | Reference lap & corner-delta intelligence (cross-lap / cross-session comparison) | 🚧 planned / in design — **not yet available** |
+| R3.0D–F | Race-engineer decision engine · experiment-outcome loop · hardening & release | ⏳ planned |
 
-- **3-tier handling balance prediction** — understeer gradient (deg/g) from a unified Milliken model that combines weight distribution, roll-stiffness distribution (LLTD) and tyre load sensitivity in one consistent calculation.
-  - *Tier 1* — mechanical balance (springs, ARB, geometry, weight)
-  - *Tier 2* — adds the tyre model (temperature / pressure / compound / width)
-  - *Tier 3* — adds corner weights, aero, dampers, camber/toe, bump rubbers, plus a linear bicycle model (characteristic/critical speed, yaw gain)
-- **Setup Advisor** — rule-based suggestions (ride frequency, LLTD vs weight, roll gradient, damping ratio, grip imbalance, cross weight, camber…) with concrete target values.
-- **Spring & ARB Calculator** — ride-frequency ↔ spring-rate conversion (tyre-compliance aware), spring-rate tables, ARB sizing for a target roll gradient.
-- **Tyre Analysis** — temperature/pressure grip curves and a **21-tyre track-day database** (Michelin, Yokohama, Bridgestone, Pirelli, Hankook, Federal, Nankang, Toyo… plus slicks) with optimal temps/pressures and peak-grip values.
-- **Lihpao G2 Lap-Time Simulator** — a GG-diagram point-mass lap sim over the 3.500 km / 23-turn circuit, plus a **tyre stint model**: it predicts the **fastest lap, which lap the tyre-pressure sweet spot appears**, the peak-grip lap, recommended cold pressure, and a lap-by-lap evolution chart (temperature → pressure build-up → sweet spot → overheating/wear degradation).
-- **501-car preset database** — load a car and its chassis baseline is filled in; tweak only what's adjustable.
-- **Analysis Workspace (first end-to-end vertical slice)** — a case-centric view that runs the whole production chain on a synthetic Demo Analysis Case: canonical setup normalization → model prediction → telemetry observation → model-vs-actual comparison → Race Engineer (inspection + directional trials) → Driver Coach (driving observations). Every value is labelled by how it was derived (Physics / Model / Measured / Derived / Heuristic / Unavailable); blocked features state why. **This is a working slice, not a finished product:** it is *not* a professional race-engineer replacement. As of **R2.4** it *does* produce a **measured** understeer gradient K_us — but ONLY when a verified road-wheel steering calibration *and* data quality pass every fail-closed gate; otherwise measured numbers stay blocked with a reason (see R2.4 below). It does *not* support all telemetry formats, and does *not* output reliable precise setup clicks (no validated click→rate mapping) — those stay runtime-blocked. See `docs/analysis-workspace-architecture.md`. **R3.0A** re-shells the app around the Analysis Case: a left workspace nav (Dashboard / Analysis Cases / Import Telemetry / Setup Library / Comparisons / Settings), a per-case nav (Overview / Setup & Model / Telemetry / Measured Metrics / Model vs Actual / Recommendations / Corner Coaching / Evidence & Trust), a Case Context bar, and a fixed Context/Trust panel — all driven by a pure `case-shell.js` state deriver that re-reads the services' capability/observation (it never re-decides eligibility or recomputes physics). Not-yet-built nav (Comparisons → R3.0C) is shown as an explicit, non-actionable deferred panel, never a fake control. See `docs/product-positioning.md`, `docs/r2-capability-map.md`, and `docs/credibility-and-trust.md`. **R3.0B** makes a case persistable: a local-first **Case Library** (browser/Electron IndexedDB; no cloud/accounts) with save / reopen-identical / duplicate / archive / delete / export / import. Raw telemetry stays local-only and never enters a portable export (curated, value-constrained closed bundle); imported cases open as an explicitly degraded summary; migration is fail-closed (future versions rejected). See `docs/r3.0b-case-library-persistence.md`. **R2.3** adds real/imported telemetry: import a CSV (or canonical-JSON) → map raw columns to canonical channels → confirm identity → run the *same* pipeline, with a Canonical Telemetry Session whose gates are re-derived from evidence (unconfirmed channels stay blocked; measured magnitude / road-wheel metrics are deferred to R2.4), plus a portable closed-schema case export. See `docs/r2.3-real-telemetry-validation.md`. **R2.4** turns that deferred calibration capability into honestly-gated *measured* metrics: supply a verified steering-ratio calibration (road-wheel-referenced, bound to the steering mapping and session) and the same pipeline derives a **measured understeer gradient K_us** from a yaw-gain-vs-speed fit and compares it to the model's predicted K_us — but only when calibration *and* data quality pass every fail-closed gate (positive gain, enough bins/speed-span, across-bin consistency, left/right agreement, plausible band); otherwise it stays blocked with a reason. The directional tendency stays calibration-independent; measured numbers carry confounder limitations and a machine-read provenance (synthetic/real/unverified), and no measured K_us is ever claimed without a steering calibration. See `docs/r2.4-model-calibration-measured-metrics.md`. **R2.5** adds a model-grounded quantitative layer: a **Setup A/B** that runs the model on two setups and reports the predicted balance deltas (credibility Model, never a lap-time claim), and a **quantitative recommendation** that perturbs one setup parameter, measures the model's local sensitivity, and recommends a change in *physical units* (Nm/deg, N/mm, %) to hit a target balance — with a re-run check, the side-effects, and a validation step. Hardware *clicks* stay gated (no validated per-car click→rate mapping), degenerate levers fail closed, and nothing is presented as measured or guaranteed. See `docs/r2.5-setup-ab-quantitative-recommendation.md`. **R2.6** adds track intelligence + per-corner driver coaching: with a confirmed `track_position` + `lap` channel the same pipeline segments the session into laps → corners → entry/mid/exit phases and reports the *driver*'s raw-steering behaviour per phase (correction frequency + abruptness) as honest, low-confidence Heuristic observations — never a corner characteristic, a measured magnitude, or a setup finding. Channel eligibility is re-derived (a mapped-but-unconfirmed channel is blocked, not trusted); without confirmed track position/lap, corner coaching is fail-closed and inspectable. See `docs/r2.6-track-intelligence-corner-coaching.md`.
-- **Code as teaching material** — the source carries embedded "knowledge essays" (see `docs/fsae/`) written for FSAE / track-day engineers: intuition → physics → formula → which line of code → FSAE caveats.
+Version 1.4.0. The Comparisons section in the app is shown as an explicit, non-actionable **deferred** panel — never a fake control.
 
-## Physics basis & validation
+## What it can do
 
-The model is built on standard references — Milliken & Milliken *Race Car Vehicle Dynamics*, Gillespie *Fundamentals of Vehicle Dynamics*, OptimumG tech tips, Suspension Secrets — and cross-checked against real-world engineering practice: roll-stiffness and damping-ratio calculations, ride-height-based aero maps, and telemetry-derived workflows. Where the tool's formulas matched established engineering practice (e.g. critical damping `Cc = 2√(k·m)`, axle roll stiffness `k·t²/2`), that's noted; where they didn't, they were fixed. See [`docs/physics-notes.md`](docs/physics-notes.md).
+**Works on model inputs alone**
+- Handling-balance prediction (understeer gradient, LLTD, roll gradient, ride frequency) — *Physics / Model*
+- Setup Advisor with concrete target values — *Heuristic*
+- Spring / ARB calculator (ride-freq ↔ rate, ARB sizing) — *Physics / Derived*
+- Tyre analysis + 21-tyre track-day database — *Model / Derived*
+- Lihpao G2 lap-time + tyre-stint simulation — *Model*
+- 501-car preset database (each parameter graded `confirmed` / `documented` / `estimated` / `unknown`)
+- Analysis Case model prediction + directional tendency — *Model / Heuristic*
 
-> ⚠️ **Accuracy note.** Absolute lap times depend entirely on the inputs you give it (power, grip, aero, mass). Published circuit records are usually set by heavily-modified cars, so a stock-spec prediction being slower is correct, not a bug. The tool's strength is **relative** comparison (how a setup change moves the car) and the **tyre-stint sweet-spot** analysis. Methodology transfers across cars; absolute numbers do not — especially for FSAE, where you must fit your own tyre data.
+**Conditionally available (need real telemetry and/or calibration; gated)**
+- Telemetry observation (directional tendency from data) — needs **confirmed** channels
+- **Measured understeer gradient K_us** — needs confirmed telemetry **+ a verified road-wheel steering calibration**
+- Model-vs-actual comparison — directional always; magnitude only when measured K_us passes its gates
+- Setup A/B (predicted balance deltas — never a lap-time claim)
+- Quantitative setup recommendation in physical units (Nm/deg, N/mm, %)
+- Corner coaching (the **driver's** raw-steering behaviour per entry/mid/exit — never a vehicle or setup finding)
 
-## Model boundaries & credibility tiers
+See [`docs/r2-capability-map.md`](docs/r2-capability-map.md) for the full Available / Conditionally-Available / Blocked / Deferred matrix with each capability's required input, credibility, fail-closed conditions and limitations.
 
-Not every number the tool prints is equally trustworthy — and now it says so. Each result carries a badge:
+## What it does not claim
 
-- **◆ Physics** — textbook formulas from first principles (wheel rate, ride frequency, roll stiffness/gradient, damping ratio, geometric/elastic LLTD split, suspension kinematics). Exact for the inputs given.
-- **◈ Model** — physically-grounded engineering estimates (understeer gradient, cornering stiffness, characteristic/critical speed, yaw gain, transient response, lap time). Directionally reliable; approximate in absolute terms.
-- **◇ Heuristic** — gains/multipliers hand-tuned against real data (tyre grip → balance shift, tyre width/pressure/temperature grip factors, lap-balance penalty, drivetrain traction fraction). These all live in [`renderer/js/calibration.js`](renderer/js/calibration.js) with full metadata (value, unit, valid range, tier, what data could calibrate them) — tuning knobs, not laws of physics. Treat as indicative.
+This tool is deliberately honest about its limits. It is **not**:
 
-**Known boundaries.** No suspension hardpoint kinematics beyond the 2D front-view double-wishbone calculator; no transient model beyond a linear 2-DOF step-steer; one representative track for lap simulation; tyre coefficients are estimated unless you import your own `.tir` model. Preset chassis data is labelled per parameter (`confirmed` / `documented` / `estimated` / `unknown`) with an overall letter grade, so you can see how much of a given car is measured vs. inferred. The **Sensitivity** panel re-runs the balance while varying each uncertain input one at a time — it tells you how stable the answer is and which input matters most. Imported `.bmsbin` telemetry decodes the channel catalog, runs a clean-room binary probe, and can report raw series candidates plus channel-linking / scaling **hypotheses**. It now also **evaluates confirmation criteria** — the explicit rules that decide what may be upgraded from *hypothesis* to *confirmed*: the channel catalog is confirmable, but sample structure, channel identity, timebase, and physical scaling remain **not confirmed** (no physical telemetry values yet). A clean-room **sample-structure discovery** pass then reports, as hypotheses, how the channels might be laid out in the binary (per-channel blocks, an offset/index table, or an interleaved layout) and why so few raw series appear versus the catalog count — still decoding and confirming nothing. A **raw-stream confirmation** step then applies strict criteria (stable boundaries, consistent block length, a cross-file corpus) to decide whether a raw stream's *structure* is confirmed — but channel identity, timebase, and physical values remain unavailable. A **channel-identity confirmation criteria** layer grades identity evidence on a conservative ladder (shape alone is insufficient; independent, corpus-stable evidence is required) — real imported data is always *not confirmed*, no channel is named from waveform shape, and no canonical telemetry is produced. A **timebase confirmation criteria** layer then evaluates purely *structural* timebase evidence (sample ordering / count / interval stability / per-channel sync) — a manual sample rate is only a fallback hint, real single-file imports are never confirmed, and no seconds/Hz, units, or physical-time chart is produced. A **physical-scaling confirmation criteria** layer decides when a raw value may be called a physical value: it requires *independent* scale and unit evidence over a confirmed raw stream / identity / timebase — a plausible value range and a manual scale are never enough, real single-file imports never get physical values or confirmed units, and no canonical telemetry, overlay, Kus, or setup recommendation is enabled. Finally, a **telemetry-readiness gate** asks whether the data is confirmed and complete enough to *enter* a later handling-analysis phase (required channels, sample-rate/sync/dropout quality, all prerequisites) — readiness is a gate, not an analysis result; real single-file imports are never ready, and no handling analysis, overlay, Kus, model-vs-actual, or setup recommendation is enabled. An **extraction-eligibility gate** then defines the *input contract* for a later measured handling-response extraction (a canonical measured series, required channels, corner-segmentation and entry/mid/exit-window prerequisites, corpus-backed) and decides whether the data is eligible to enter it — eligibility is an input contract, not extraction; real/imported data is never eligible, and no measured handling response, tendency, understeer/oversteer proxy, Kus, overlay, or model-vs-actual is produced. A **synthetic measured-extraction harness** then proves the SHAPE of a future extraction (corner segmentation → entry/mid/exit windows → steady-state filter → a measured-tendency proxy) by running ONLY on a synthetic canonical series — real/imported data is always blocked, `realDataUsed` is always false, and the tendency is a synthetic proxy, explicitly not a Kus, model-vs-actual, or setup recommendation; no overlay or handling analysis is enabled. Further boundary layers have since been added — a canonical-adapter eligibility gate, a local-only private-corpus evidence-ingestion boundary, and a sanitized-evidence adapter dry-run shape — each of which confirms nothing, produces no canonical series, and keeps the real single-file path fail-closed. See [docs/phase-3-trust-chain.md](docs/phase-3-trust-chain.md) for the full trust-chain map (modules, gates, red-line invariants).
+- a professional race-engineer replacement, and it is never presented as professionally validated;
+- a full multi-body-dynamics (MBD) simulator — the model is a transparent linear/quasi-static balance model;
+- a complete tyre model — coefficients are estimated unless you import your own `.tir` (pure-slip lateral only);
+- a GPS racing-line / lap-optimization tool — no racing line, no exact apex from position alone;
+- a telemetry decoder for arbitrary binary formats — the production path is CSV / canonical-JSON;
+- a source of hardware "clicks" — there is no validated per-car click→rate mapping, so output stays in physical units;
+- a MoTeC / commercial-analysis replacement.
 
-> **⚠️ Legacy / historical research path.** The entire `.bmsbin` clean-room binary investigation above (and `docs/phase-3-trust-chain.md` + the `bmsbin-*` notes) is a **historical research path** that decodes nothing beyond a channel catalog and produces no canonical telemetry. The **production telemetry path is CSV / canonical-JSON import** (R2.3+) — that is the only route that yields a Canonical Telemetry Session, directional analysis, and (with a verified calibration) a measured K_us. The two are intentionally separate: model-vs-actual correlation is delivered through the CSV/canonical pipeline, not the binary research path.
+Measured numbers are never claimed without the data **and** calibration to back them, and nothing is fabricated to fill a gap.
 
-## Tyre model workflow (imported .tir)
+## Credibility model
 
-You can import a real **Pacejka Magic Formula `.tir`** file at runtime (nothing is bundled or uploaded). The importer implements the **pure-slip lateral** set only, so an import is *not* a complete tyre model — and the UI is honest about exactly what it covers.
+Every value carries a badge for **how it was derived**, and every conclusion carries trust metadata (credibility · confidence · provenance · limitations · blockers · evidence references · next validation step). This is enforced in the services, not the UI.
 
-**What an imported .tir drives** (badged ◈ Model, source = imported .tir):
-- Cornering stiffness Cα → the understeer-gradient prediction
-- Peak μ → the lap-sim base grip
-- Lateral-force vs slip-angle curve, and peak-μ vs vertical-load curve (Tyre Analysis tab)
-- Vertical stiffness → can be applied as the tyre spring rate
+- **◆ Physics** — closed-form physical relation (exact for the inputs given). *≠ Model.*
+- **◈ Model** — a model prediction built from physics relations. *≠ Measured.*
+- **Measured** — derived from real telemetry; still confounded (tyre/track/driver/sensor), with machine-read provenance (synthetic / real / unverified). *≠ fully validated.*
+- **Derived** — a deterministic transform of inputs. *≠ direct measurement.*
+- **◇ Heuristic** — a rule-of-thumb observation. *≠ a vehicle fact.*
+- **Unavailable** — not derivable from the present evidence (shown blocked, with a reason).
 
-**What stays a generic heuristic even with a .tir loaded** (badged ◇ Heuristic):
-- Temperature, pressure and tyre-width grip corrections
-- The grip-imbalance → understeer shift
+**Fail-closed, always:** when a required input or quality gate is missing, the capability is blocked with a reason, never approximated. Driver behaviour ≠ vehicle characteristic ≠ setup finding; correlation ≠ causation; prediction ≠ guaranteed result. See [`docs/credibility-and-trust.md`](docs/credibility-and-trust.md).
 
-These are *not* upgraded by an import. The **Tyre Model Status** panel says so per output, so you always know which numbers are a measured model and which are still seasoning.
+## Main workflow
 
-**Not modelled at all:** combined slip, aligning moment (Mz), longitudinal force (Fx).
+1. **Create an Analysis Case** — pick a vehicle + setup (or load the synthetic Demo Case).
+2. **(Optional) Import telemetry** — CSV / canonical-JSON → map raw columns to canonical channels → confirm identity.
+3. **Run the analysis** — model prediction + (if telemetry is confirmed) a directional observation.
+4. **(Optional) Add a steering calibration** — unlocks the honestly-gated measured K_us and magnitude comparison.
+5. **Review** — model-vs-actual, measured metrics, Setup A/B, quantitative recommendation, corner coaching — each with its credibility and blockers.
+6. **Save to the Case Library** — reopen-identical, duplicate, archive, or export a portable (curated, raw-free) bundle.
 
-**Import diagnostics** are graded, and describe *what the file supports* rather than judging the tyre:
-- **error** — the file can't produce effective lateral force (no `PCY1`, no peak, or the pure-slip evaluator yields ~zero force); the import is rejected.
-- **warning** — usable but narrow, or not wired into the app (lateral-only; pressure/temperature still heuristic; no camber coefficients).
-- **info** — an available capability (vertical stiffness, load-sensitivity curve) or a wiring note (a pressure model exists in the file but isn't used for the grip correction).
+## UI overview
 
-**Reading the curves:** the two ◈ Model curves come straight from your `.tir`'s lateral fit; the temperature/pressure grip curves below them are the ◇ Heuristic app-level correction and are explicitly labelled "not from .tir" — don't read them as measured tyre data.
+A case-centric shell: a left **Workspace** nav (Dashboard / Analysis Cases / Import Telemetry / Setup Library / Comparisons / Settings), a per-case nav (Overview / Setup & Model / Telemetry / Measured Metrics / Model vs Actual / Recommendations / Corner Coaching / Evidence & Trust), a **Case Context** bar, and a fixed **Context/Trust** panel that re-reads the services' capability and surfaces status, credibility, blockers and the next action. The Setup Library hosts the original calculators (Spring / Tyre / Advisor / Lihpao Lap / raw-CSV Telemetry Viewer).
 
-## Quick start
+## Installation / run
 
 ```bash
 # Desktop (Electron)
 npm install
 npm start
 
-# Or just open it in a browser
+# Or open it in a browser (no server needed — pure client-side JS)
 open renderer/index.html        # macOS
-# (no server needed — pure client-side JS)
 
-# Run the physics regression tests (143 assertions)
+# Run the full test suite (physics regression + telemetry + persistence + UI contract + i18n parity)
 npm test
 ```
 
-## Project structure
+## Data and privacy
 
-```
-renderer/
-  index.html              UI (Alpine.js + Tailwind + Chart.js)
-  js/
-    dynamics-model.js      core vehicle-dynamics physics (3 tiers, advisor, calculators)
-    tire-data.js           track-day tyre database
-    car-presets.js         501-car preset database
-    lihpao-laptime.js      Lihpao G2 lap-time + tyre-stint simulator
-    api.js                 thin bridge layer
-docs/
-  physics-notes.md        formula derivations, units, references
-  fsae/                   embedded teaching essays (knowledge index)
-tests/
-  verify-dynamics.js      physics regression tests
-```
+- **Local-first.** Cases and sessions are stored in the browser/Electron IndexedDB on your machine. No cloud, no accounts, no sign-in.
+- **No tracking.** No analytics, no third-party telemetry, no tracking pixels, no cookies.
+- **Raw telemetry stays on device.** It lives in a capacity-bounded local session store and is **never** included in a portable export. A portable case bundle is a curated, value-constrained, raw-free summary; an imported bundle opens as an explicitly degraded "imported summary".
+- **Imported `.tir` / CSV files are read locally** and never uploaded or bundled.
 
-## Status
+## Documentation map
 
-v1.4.0 · MIT-spirit personal/educational project · contributions and corrections welcome. Built in Taiwan, aimed at making serious chassis-engineering knowledge accessible to the next generation of FSAE students and track-day engineers.
+- [`docs/product-positioning.md`](docs/product-positioning.md) — what this is / is not, who it's for, the product loop.
+- [`docs/credibility-and-trust.md`](docs/credibility-and-trust.md) — the credibility ladder and honesty contract.
+- [`docs/r2-capability-map.md`](docs/r2-capability-map.md) — the canonical capability matrix.
+- [`docs/analysis-workspace-architecture.md`](docs/analysis-workspace-architecture.md) — the end-to-end production pipeline.
+- [`docs/r3.0b-case-library-persistence.md`](docs/r3.0b-case-library-persistence.md) — local-first persistence design.
+- [`docs/physics-notes.md`](docs/physics-notes.md) — formula derivations, units, references.
+- [`docs/fsae/`](docs/fsae/) — embedded teaching essays.
+- [`docs/phase-3-trust-chain.md`](docs/phase-3-trust-chain.md) — the legacy `.bmsbin` research path (see below).
+
+## Roadmap
+
+- **R3.0C** — reference lap & corner-delta intelligence: a normalized track-position axis, per-corner + entry/mid/exit deltas, with a hard comparability gate. *In design; the Comparisons panel is a deferred placeholder until it ships.*
+- **R3.0D** — a deterministic, evidence-backed virtual race-engineer decision engine (primary issue + alternatives + a verifiable next experiment; never a free-text LLM conclusion).
+- **R3.0E** — a recommendation experiment & outcome loop (expected vs observed; local evidence history only).
+- **R3.0F** — product hardening, schema migration and release.
+
+Roadmap items are **planned, not current features**. They are never presented in the app as if they already work.
+
+## Validation and limitations
+
+- The model is validated against textbook formulas and real-world engineering practice (e.g. critical damping `Cc = 2√(k·m)`, axle roll stiffness `k·t²/2`); see [`docs/physics-notes.md`](docs/physics-notes.md). The automated tests are **synthetic** regression/contract tests — they are not real-world track validation.
+- **Absolute lap times depend entirely on your inputs.** Published circuit records are usually set by heavily-modified cars, so a stock-spec prediction being slower is correct, not a bug. The tool's strength is **relative** comparison and tyre-stint sweet-spot analysis; methodology transfers across cars, absolute numbers do not — especially for FSAE, where you must fit your own tyre data.
+- **Known boundaries:** no suspension hardpoint kinematics beyond the 2D front-view double-wishbone calculator; no transient model beyond a linear 2-DOF step-steer; one representative track for lap simulation; tyre coefficients estimated unless a `.tir` is imported.
+
+> **⚠️ Legacy / historical research path.** The `.bmsbin` clean-room binary investigation (`docs/phase-3-trust-chain.md` + the `bmsbin-*` notes) is a **historical research path** that decodes nothing beyond a channel catalog and produces no canonical telemetry. The **production telemetry path is CSV / canonical-JSON import** (R2.3+) — the only route that yields a Canonical Telemetry Session, directional analysis and (with a verified calibration) a measured K_us. The two are intentionally separate.
+
+## License / contributing
+
+MIT-spirit personal/educational project — contributions and corrections welcome. Built in Taiwan, aimed at making serious chassis-engineering knowledge accessible to the next generation of FSAE students and track-day engineers.
 
 ---
 ---
@@ -115,150 +151,297 @@ v1.4.0 · MIT-spirit personal/educational project · contributions and correctio
 
 # Racing Setup Analyzer — 賽車調校與單圈分析工具
 
-**把職業級的底盤工程,變成你真的可以動手玩的東西。**
-
-預測轉向不足/過度的平衡、算出你的彈簧/防傾桿/阻尼數值、模擬麗寶賽道一整段 stint 的輪胎演化——全部建立在標準車輛動力學教科書(Milliken、Gillespie、OptimumG)之上,並用真實世界的工程實務交叉驗證過。
+**以「分析案例」為核心的車輛動力學工作台：預測操控平衡、算出彈簧／防傾桿／阻尼數值、模擬輪胎 stint；當你帶入真實遙測與一份經驗證的校正時，輸出誠實受閘門控管的量測指標。每個數字都標示它是怎麼推導出來的，每個被擋下的功能都說明原因。**
 
 `🌐 語言:` [English](#racing-setup-analyzer) ｜ **繁體中文** ｜ [日本語](#日本語)
 
-### 這是什麼
+建立在標準車輛動力學教科書（Milliken、Gillespie、OptimumG）之上，並用真實世界的工程實務交叉驗證。可作為 Electron 桌面 app，或直接用瀏覽器開——免編譯、免伺服器、免帳號，物理全在本地 JavaScript 執行。
 
-多數人學了車輛動力學的「公式」,卻沒看過職業車隊怎麼把公式變成賽道上的決策。這個工具補的就是那個斷層。你設定一台車(彈簧、防傾桿、阻尼、幾何、輪胎、空力),它告訴你**車會往哪個方向操控、為什麼**,再預測**單圈時間**和輪胎在一段 stint 裡怎麼變化。可當 Electron 桌面 app,或直接用瀏覽器開——不需編譯、不需伺服器,物理全在本地 JavaScript 跑。
+### 核心價值
 
-### 功能
+- **透明的平衡預測** — 轉向不足梯度模型整合配重、側傾剛度分配（LLTD）與輪胎負載敏感度，每個輸出都標 **物理計算（Physics）／模型結果（Model）／啟發式判定（Heuristic）**。
+- **誠實、fail-closed 的遙測分析** — 匯入 CSV、對應通道、確認身分；**唯有**當一份經驗證的轉向校正*與*資料品質全數通過閘門，才會輸出*量測所得*的轉向不足梯度（K_us）——否則維持「無法執行」並附原因。
+- **本機優先的案例工作台** — 建立分析案例（車輛＋設定＋可選遙測），可儲存／重新開啟／建立副本／封存／匯出，全在本機案例庫。無雲端、無帳號；原始遙測資料絕不離開你的裝置。
+- **三語介面** — English／繁體中文（台灣）／日本語，可即時切換，涵蓋 app 外殼與完整分析工作台。
+- **原始碼即教材** — 內嵌寫給 FSAE／賽道工程師的「知識文」（`docs/fsae/`）：直覺 → 物理 → 公式 → 程式碼。
 
-- **三層轉向平衡預測** — 用統一的 Milliken 模型把配重、側傾剛性分配(LLTD)、輪胎負載敏感度合在一條公式裡,輸出 understeer gradient(deg/g)。Tier 1 機械平衡 / Tier 2 加輪胎模型 / Tier 3 加四角重量、空力、阻尼、Camber/Toe、bump rubber 與線性自行車模型(特徵/臨界速度、yaw gain)。
-- **調校建議** — 規則式建議(ride frequency、LLTD vs 配重、roll gradient、阻尼比、抓地失衡、cross weight、camber…),附具體目標值。
-- **彈簧 & ARB 計算器** — 頻率↔彈簧率互算(含輪胎柔度)、彈簧率對照表、目標 roll gradient 的 ARB sizing。
-- **輪胎分析** — 溫度/壓力抓地曲線 + **21 款賽道胎資料庫**(含光頭胎),附最佳胎溫胎壓與峰值抓地。
-- **麗寶 G2 單圈模擬器** — GG-diagram 點質量單圈模擬(3.500 km / 23 彎)+ **輪胎 stint 模型**:預測**最快單圈、胎壓甜蜜點在第幾圈**、峰值抓地圈、建議冷胎壓,以及逐圈演化圖(冷胎→升溫建壓→甜蜜點→過熱/磨耗退化)。
-- **501 台車預設資料庫** — 選車自動帶入底盤基準,只調可調項目。
-- **code 即教材** — 原始碼裡埋了寫給 FSAE/賽道工程師的「知識文」(見 `docs/fsae/`):直覺→物理→公式→對應哪段 code→FSAE 注意。
+### 目前狀態
 
-### 物理依據與驗證
+| 里程碑 | 範圍 | 狀態 |
+|---|---|---|
+| R1 / R2.0–R2.2 | 操控預測、調校建議、彈簧／ARB、輪胎分析、麗寶單圈+stint、501 車預設、分析工作台切片 | ✅ 完成 |
+| R2.3 | 真實／匯入 CSV → 標準化遙測 session、通道對應+確認、封閉 schema 案例匯出 | ✅ 完成 |
+| R2.4 | 誠實受閘門控管的*量測*轉向不足梯度 K_us（需經驗證的轉向校正）+ model-vs-actual | ✅ 完成 |
+| R2.5 | Setup A/B（預測平衡差）+ 物理單位的量化建議 | ✅ 完成 |
+| R2.6 | 賽道情報 + 逐彎駕駛轉向行為教練（啟發式、低信心） | ✅ 完成 |
+| R3.0A | 案例為核心的 app 外殼（導覽／Case Context／可信度面板）+ 文件整併 | ✅ 完成 |
+| R3.0B | 本機優先案例庫與持久化（儲存／重開／副本／封存／匯出匯入） | ✅ 完成 |
+| R3.0C | 參考圈與逐彎差異情報（跨圈／跨 session 比較） | 🚧 規劃／設計中 — **尚未提供** |
+| R3.0D–F | 賽車工程師決策引擎 · 實驗-結果迴圈 · 硬化與發佈 | ⏳ 規劃中 |
 
-建立在標準參考(Milliken《Race Car Vehicle Dynamics》、Gillespie《Fundamentals of Vehicle Dynamics》、OptimumG、Suspension Secrets)之上,並**用真實世界的工程實務交叉驗證**:側傾剛性與阻尼比計算、車高空力地圖、遙測車高工作流。公式與既有工程實務一致處(如臨界阻尼 `Cc = 2√(k·m)`、軸側傾剛性 `k·t²/2`)會註明,不一致處則修正。詳見 [`docs/physics-notes.md`](docs/physics-notes.md)。
+版本 1.4.0。app 內的「Comparisons」以明確、不可操作的**延後（deferred）**面板呈現——絕不是假的控制項。
 
-> ⚠️ **準確度說明:** 絕對圈速完全取決於你輸入的規格(動力/抓地/空力/質量)。賽道紀錄多為大改車,所以原廠規格預測較慢是正確的、不是 bug。本工具的強項在**相對比較**(setup 改了車往哪邊動)與**胎壓甜蜜點**分析。方法論可跨車移植,絕對數值不行——FSAE 尤其必須換上你自己的輪胎數據。
+### 它能做什麼
 
-### 模型邊界與可信度分層
+**只靠模型輸入即可運作**
+- 操控平衡預測（轉向不足梯度、LLTD、roll gradient、ride frequency）— *物理／模型*
+- 附具體目標值的調校建議 — *啟發式*
+- 彈簧／ARB 計算器（頻率 ↔ 彈簧率、ARB sizing）— *物理／推導值*
+- 輪胎分析 + 21 款賽道胎資料庫 — *模型／推導值*
+- 麗寶 G2 單圈時間 + 輪胎 stint 模擬 — *模型*
+- 501 車預設資料庫（每個參數標示 `confirmed`／`documented`／`estimated`／`unknown`）
+- 分析案例模型預測 + 方向性傾向 — *模型／啟發式*
 
-不是每個數字都同等可信——現在工具會誠實標示。每個結果都帶 badge：
+**有條件提供（需真實遙測且／或校正；受閘門控管）**
+- 遙測觀測（從資料得到方向性傾向）— 需**已確認**的通道
+- **量測所得的轉向不足梯度 K_us** — 需已確認遙測 **+ 一份經驗證的車輪轉角轉向校正**
+- Model-vs-actual 比較 — 方向性恆有；幅值僅在量測 K_us 通過閘門時提供
+- Setup A/B（預測平衡差——絕不宣稱圈速）
+- 物理單位（Nm/deg、N/mm、%）的量化調校建議
+- 逐彎教練（**駕駛**在入彎／彎中／出彎的原始轉向行為——絕非車輛或調校結論）
 
-- **◆ Physics（物理）** — 由基本原理推導的教科書公式（wheel rate、ride frequency、側傾剛性/梯度、阻尼比、幾何/彈性 LLTD 分解、懸吊運動學）。對給定輸入精確。
-- **◈ Model（模型）** — 有物理依據的工程估算（understeer gradient、cornering stiffness、特徵/臨界速度、yaw gain、瞬態反應、單圈時間）。方向可靠、絕對值近似。
-- **◇ Heuristic（啟發式）** — 對標真實數據手調的增益/倍率（抓地失衡→平衡偏移、胎寬/胎壓/溫度抓地因子、平衡懲罰、驅動軸牽引比）。全部集中在 [`renderer/js/calibration.js`](renderer/js/calibration.js) 並附 metadata（值/單位/合理範圍/等級/可被什麼資料校正）——是可調旋鈕，不是物理定律，僅供參考。
+完整的「可用／有條件可用／已阻擋／延後」矩陣（含各能力的必要輸入、可信度、fail-closed 條件與限制）見 [`docs/r2-capability-map.md`](docs/r2-capability-map.md)。
 
-**已知邊界：** 除 2D 前視雙 A 臂運動學外無懸吊硬點運動學；除線性 2-DOF step-steer 外無瞬態模型；單圈模擬只有一條代表性賽道；未匯入 `.tir` 時胎係數為估算。車庫底盤資料逐參數標示（`confirmed`/`documented`/`estimated`/`unknown`）+ 整體字母評級，一眼看出某台車多少是實測、多少是推估。**敏感度**面板把每個不確定輸入單獨變動重算平衡——告訴你答案有多穩、哪個輸入最關鍵。匯入的 `.bmsbin` 遙測會解析通道目錄、執行 clean-room 二進位勘查，並能回報原始序列候選與通道連結／縮放**假設**。現在更會**評估確認判準**——也就是決定哪些可從*假設*升級為*確認*的明確規則:通道目錄可確認,但樣本結構、通道身分、時間基準與物理縮放仍**尚未確認**(亦尚無物理遙測數值)。接著會執行 clean-room 的**樣本結構探索**,以假設形式回報這些通道可能如何排列在 binary 中(逐通道區塊、offset／索引表、或 interleaved 佈局),並說明為何原始序列數遠少於通道數——仍不解碼、不確認任何內容。再以**原始資料流確認**步驟套用嚴格判準(邊界穩定、區塊長度一致、跨檔語料)判斷原始資料流的*結構*是否可確認——但通道身分、時間基準與物理數值仍不可用。另有**通道身分確認判準**層,將身分證據分級於保守階梯(僅憑波形形狀不足;需獨立且跨檔穩定的證據)——真實匯入資料一律*尚未確認*,不會只憑波形形狀為任何通道命名,也不產生標準化 telemetry。再有**時間基準確認判準**層,只評估*結構性*的時間基準證據(樣本排序／數量／間隔穩定／逐通道同步)——手動 sample rate 僅為 fallback 提示,真實單檔匯入永不確認,且不產生任何秒／Hz、單位或物理時間圖表。有**物理縮放確認判準**層,決定 raw value 何時可稱為物理值:需要在已確認的 raw stream／身分／時間基準之上,具備*獨立的* scale 與單位證據——合理範圍與手動 scale 都不足,真實單檔匯入永不取得物理值或確認單位,亦不啟用標準化 telemetry、疊圖、Kus 或 setup 建議。最後有**telemetry 準備度閘門**,判斷資料是否已確認且完整到足以*進入*後續操控分析階段(必要通道、sample-rate／同步／掉點品質、所有前置條件)——準備度只是閘門,不是分析結果;真實單檔匯入永不 ready,亦不啟用任何操控分析、疊圖、Kus、model-vs-actual 或 setup 建議。再有**萃取資格閘門**,定義後續「操控反應萃取」的*輸入契約*(canonical 量測序列、必要通道、彎道分段與 entry／mid／exit 視窗前置條件、需跨檔語料),並判斷資料是否有資格進入——資格是輸入契約,不是萃取;real／匯入資料一律不符合資格,且不產生任何操控反應、tendency、轉向不足／過度 proxy、Kus、疊圖或 model-vs-actual。接著一個 **synthetic 實測萃取 harness** 證明未來萃取的「形狀」(彎道分段 → entry／mid／exit 視窗 → steady-state 濾波 → measured-tendency proxy),但**只在 synthetic canonical series 上執行**——real／匯入資料一律阻擋,`realDataUsed` 恆為 false,tendency 只是 synthetic proxy,明確不是 Kus、model-vs-actual 或 setup 建議;不啟用任何疊圖或操控分析。其後再加入數個邊界層——canonical-adapter 資格閘門、僅限本機的 private-corpus 證據進場邊界,以及 sanitized-evidence adapter 的 dry-run shape——每一層都不確認任何內容、不產生 canonical series,並讓真實單檔路徑維持 fail-closed。完整的 trust-chain 地圖(模組、閘門、紅線 invariants)見 [docs/phase-3-trust-chain.md](docs/phase-3-trust-chain.md)。
+### 它不宣稱什麼
 
-> **⚠️ 舊／歷史研究路徑。** 上述整個 `.bmsbin` clean-room 二進位研究(及 `docs/phase-3-trust-chain.md`、`bmsbin-*` 筆記)是**歷史研究路徑**,除通道目錄外不解碼任何東西、不產生 canonical telemetry。**正式遙測路徑是 CSV／canonical-JSON 匯入**(R2.3+)——那才是產生 Canonical Telemetry Session、方向性分析、以及(具備驗證校正時)measured K_us 的唯一途徑。model-vs-actual 對標經由 CSV／canonical pipeline 交付,不走這條二進位研究路徑;兩者刻意分離。
+本工具刻意對自己的邊界誠實。它**不是**：
 
-### 輪胎模型工作流程（匯入 .tir）
+- 職業賽車工程師的替代品，也從不以「經專業驗證」自居；
+- 完整的多體動力學（MBD）模擬器——模型是透明的線性／準靜態平衡模型；
+- 完整的輪胎模型——未匯入你自己的 `.tir`（僅純側向）時，係數為估算；
+- GPS 賽車線／單圈最佳化工具——無賽車線，無法僅憑位置得出精確 apex；
+- 任意二進位格式的遙測解碼器——正式路徑是 CSV／canonical-JSON；
+- 硬體「咔數（clicks）」的來源——無經驗證的逐車 click→rate 對應，故輸出維持物理單位；
+- MoTeC／商用分析軟體的替代品。
 
-可在執行時匯入真實的 **Pacejka Magic Formula `.tir`** 檔（不打包、不上傳）。匯入器只實作 **純側向（pure-slip lateral）**，所以匯入**不等於**完整真實胎——介面對自己涵蓋什麼很誠實。
+沒有資料**且**校正佐證，絕不宣稱任何量測數字；也絕不為了補洞而捏造。
 
-**匯入 .tir 會驅動**（標 ◈ Model，來源＝匯入 .tir）：
-- 轉向剛度 Cα → understeer gradient 預測
-- 峰值 μ → 單圈模擬基礎抓地
-- 側向力 vs 滑移角曲線、峰值 μ vs 垂直負載曲線（Tyre Analysis 分頁）
-- 垂直剛性 → 可套用為輪胎彈簧率
+### 可信度模型
 
-**即使匯入 .tir 仍是通用啟發式**（標 ◇ Heuristic）：
-- 胎溫、胎壓、胎寬抓地修正
-- 抓地失衡 → 轉向偏移
+每個值都帶有「如何推導」的標籤，每個結論都附信任 metadata（可信度 · 信心水準 · 資料來源 · 限制 · 阻擋原因 · 證據參照 · 下一步驗證）。這是在服務層強制執行，而非 UI。
 
-這些**不會**因匯入而升級。「輪胎模型狀態」面板會逐輸出標示，讓你隨時分得清哪些是實測模型、哪些只是調味。
+- **◆ 物理計算（Physics）** — 封閉形式的物理關係（對給定輸入精確）。*≠ 模型。*
+- **◈ 模型結果（Model）** — 由物理關係建立的模型預測。*≠ 量測。*
+- **量測所得（Measured）** — 由真實遙測推導；仍受干擾（胎/路/駕駛/感測器），附機器可讀的資料來源（合成／真實／未驗證）。*≠ 完全驗證。*
+- **推導值（Derived）** — 對輸入的確定性轉換。*≠ 直接量測。*
+- **◇ 啟發式判定（Heuristic）** — 經驗法則式的觀察。*≠ 車輛事實。*
+- **無法提供（Unavailable）** — 以現有證據無法推導（顯示為已阻擋並附原因）。
 
-**完全未建模：** combined slip、回正力矩（Mz）、縱向力（Fx）。
+**永遠 fail-closed：** 缺少必要輸入或品質閘門時，該能力會被「無法執行」並附原因，絕不近似帶過。駕駛行為 ≠ 車輛特性 ≠ 調校結論；相關 ≠ 因果；預測 ≠ 保證結果。詳見 [`docs/credibility-and-trust.md`](docs/credibility-and-trust.md)。
 
-**匯入診斷**分級，且只描述「檔案支援什麼」而非評斷胎好壞：
-- **error**——無法產生有效側向力（缺 `PCY1`、無峰值、或純側向 evaluator 算出 ~0 力）；匯入被拒。
-- **warning**——可用但範圍窄或未接線（僅側向；胎壓/胎溫仍 heuristic；無外傾係數）。
-- **info**——可用能力（垂直剛性、負載敏感度曲線）或接線註記（檔案含胎壓模型但抓地修正未使用）。
+### 主要工作流程
 
-**如何看曲線：** 兩張 ◈ Model 曲線直接來自你 .tir 的側向擬合；其下的胎溫/胎壓抓地曲線是 ◇ Heuristic 的 app 層修正，已明確標「非來自 .tir」——別把它們當實測胎資料讀。
+1. **建立分析案例** — 選車輛＋設定（或載入合成 Demo 案例）。
+2. **（可選）匯入遙測** — CSV／canonical-JSON → 將原始欄位對應到標準通道 → 確認身分。
+3. **執行分析** — 模型預測 +（若遙測已確認）方向性觀測。
+4. **（可選）加入轉向校正** — 解鎖誠實受閘門控管的量測 K_us 與幅值比較。
+5. **檢視** — model-vs-actual、量測指標、Setup A/B、量化建議、逐彎教練——各自附可信度與阻擋原因。
+6. **存入案例庫** — 可重開還原、建立副本、封存，或匯出可攜（精選、不含原始資料）的 bundle。
 
-### 快速開始
+### 介面總覽
+
+以案例為核心的外殼：左側 **Workspace** 導覽（Dashboard／Analysis Cases／Import Telemetry／Setup Library／Comparisons／Settings）、per-case 導覽（Overview／Setup & Model／Telemetry／Measured Metrics／Model vs Actual／Recommendations／Corner Coaching／Evidence & Trust）、**Case Context** 列，以及固定的**可信度面板**（重新讀取服務的能力，呈現狀態、可信度、阻擋原因與下一步）。Setup Library 收納原本的計算器（彈簧／輪胎／調校建議／麗寶單圈／原始 CSV 遙測檢視器）。
+
+### 安裝／執行
 
 ```bash
-npm install && npm start      # 桌面 (Electron)
-open renderer/index.html      # 或直接瀏覽器開,免伺服器
-npm test                      # 物理迴歸測試 (143 項)
+# 桌面 (Electron)
+npm install
+npm start
+
+# 或直接用瀏覽器開（免伺服器——純前端 JS）
+open renderer/index.html        # macOS
+
+# 執行完整測試套件（物理迴歸 + 遙測 + 持久化 + UI 契約 + i18n parity）
+npm test
 ```
 
+### 資料與隱私
+
+- **本機優先。** 案例與 session 儲存在你機器上的瀏覽器／Electron IndexedDB。無雲端、無帳號、無登入。
+- **不追蹤。** 無分析工具、無第三方遙測、無追蹤像素、無 cookie。
+- **原始遙測資料留在裝置上。** 它存在容量受限的本機 session store，**絕不**進入可攜匯出。可攜案例 bundle 是精選、值受限、不含原始資料的摘要；匯入的 bundle 會以明確的「匯入摘要」降級狀態開啟。
+- **匯入的 `.tir`／CSV 檔皆在本機讀取**，不上傳、不打包。
+
+### 文件地圖
+
+- [`docs/product-positioning.md`](docs/product-positioning.md) — 它是什麼／不是什麼、為誰而做、產品迴圈。
+- [`docs/credibility-and-trust.md`](docs/credibility-and-trust.md) — 可信度階梯與誠實契約。
+- [`docs/r2-capability-map.md`](docs/r2-capability-map.md) — 權威能力矩陣。
+- [`docs/analysis-workspace-architecture.md`](docs/analysis-workspace-architecture.md) — 端到端正式管線。
+- [`docs/r3.0b-case-library-persistence.md`](docs/r3.0b-case-library-persistence.md) — 本機優先持久化設計。
+- [`docs/physics-notes.md`](docs/physics-notes.md) — 公式推導、單位、參考文獻。
+- [`docs/fsae/`](docs/fsae/) — 內嵌教學文。
+- [`docs/phase-3-trust-chain.md`](docs/phase-3-trust-chain.md) — 舊的 `.bmsbin` 研究路徑（見下）。
+
+### 開發路線圖
+
+- **R3.0C** — 參考圈與逐彎差異情報：正規化賽道位置軸、逐彎＋入彎／彎中／出彎差異，含嚴格的可比較性閘門。*設計中；Comparisons 面板在它上線前是延後的佔位面板。*
+- **R3.0D** — 確定性、以證據為本的虛擬賽車工程師決策引擎（主要問題＋替代解釋＋可驗證的下一步實驗；絕非自由文字 LLM 結論）。
+- **R3.0E** — 建議實驗與結果迴圈（預期 vs 觀測；僅累積本機證據歷史）。
+- **R3.0F** — 產品硬化、schema 遷移與發佈。
+
+路線圖項目是**規劃中、非現有功能**，在 app 內絕不會被當成已可運作來呈現。
+
+### 驗證與限制
+
+- 模型對標教科書公式與真實工程實務（如臨界阻尼 `Cc = 2√(k·m)`、軸側傾剛性 `k·t²/2`），見 [`docs/physics-notes.md`](docs/physics-notes.md)。自動化測試是**合成的**迴歸／契約測試——並非真實賽道驗證。
+- **絕對圈速完全取決於你的輸入。** 賽道紀錄多由大改車創下，原廠規格預測較慢是正確的、不是 bug。本工具強項在**相對**比較與輪胎 stint 甜蜜點分析；方法論可跨車移植，絕對數值不行——FSAE 尤其必須換上你自己的輪胎數據。
+- **已知邊界：** 除 2D 前視雙 A 臂計算器外無懸吊硬點運動學；除線性 2-DOF step-steer 外無瞬態模型；單圈模擬僅一條代表性賽道；未匯入 `.tir` 時胎係數為估算。
+
+> **⚠️ 舊／歷史研究路徑。** `.bmsbin` clean-room 二進位研究（`docs/phase-3-trust-chain.md` 與 `bmsbin-*` 筆記）是**歷史研究路徑**，除通道目錄外不解碼任何東西，也不產生 canonical telemetry。**正式遙測路徑是 CSV／canonical-JSON 匯入**（R2.3+）——那才是產生 Canonical Telemetry Session、方向性分析、以及（具備驗證校正時）量測 K_us 的唯一途徑。兩者刻意分離。
+
+### 授權／貢獻
+
+MIT 精神的個人／教育專案——歡迎貢獻與指正。在台灣打造，志在讓嚴肅的底盤工程知識，能被下一代 FSAE 學生與賽道工程師接觸到。
+
+---
 ---
 
 ## 日本語
 
 # Racing Setup Analyzer — 車両運動・ラップタイム解析ツール
 
-**ファクトリーレベルのシャシーエンジニアリングを、実際に手で触れて遊べるものに。**
-
-アンダー/オーバーステアのバランス予測、スプリング/アンチロールバー/ダンパーの数値算出、麗寶サーキットでのスティント全体のタイヤ挙動シミュレーション——すべて標準的な車両運動力学(Milliken、Gillespie、OptimumG)に基づき、実世界のエンジニアリング実務と照合済み。
+**「解析ケース」を中核とした車両運動ワークスペース。ハンドリングバランスを予測し、スプリング／アンチロールバー／ダンパーの数値を算出し、タイヤスティントをシミュレートする。実テレメトリと検証済みキャリブレーションを与えれば、誠実にゲート管理された計測指標も出力する。すべての数値は「どう導かれたか」がラベル付けされ、ブロックされた機能はその理由を示す。**
 
 `🌐 言語:` [English](#racing-setup-analyzer) ｜ [繁體中文](#繁體中文) ｜ **日本語**
 
-### 概要
+標準的な車両運動力学（Milliken、Gillespie、OptimumG）に基づき、実世界のエンジニアリング実務と照合済み。Electron デスクトップアプリ、またはブラウザで直接動作——ビルド不要・サーバー不要・アカウント不要、物理計算はすべてローカルの JavaScript で実行。
 
-多くの人は車両運動力学の「数式」を学んでも、プロのチームがそれをどうコース上の判断に変えるかは見たことがない。このツールはそのギャップを埋める。車両をセットアップ(スプリング、アンチロールバー、ダンパー、ジオメトリー、タイヤ、エアロ)すると、**車がどちらに曲がる特性になるか・なぜそうなるか**を示し、さらに**ラップタイム**とスティント中のタイヤ変化を予測する。Electron デスクトップアプリ、またはブラウザで直接動作——ビルド不要・サーバー不要、物理計算はすべてローカルの JavaScript で実行。
+### コアバリュー
 
-### 主な機能
+- **透明なバランス予測** — 重量配分・ロール剛性配分（LLTD）・タイヤ荷重感度を統合したアンダーステア勾配モデル。各出力に **物理計算（Physics）／モデル推定（Model）／ヒューリスティック（Heuristic）** のバッジ。
+- **誠実な fail-closed テレメトリ解析** — CSV を読み込み、チャンネルを対応付け、識別を確認する。検証済みステアリングキャリブレーション*と*データ品質がすべてのゲートを通過した場合**のみ**、*計測値*のアンダーステア勾配（K_us）を出力する——そうでなければ理由付きで実行不可のまま。
+- **ローカルファーストのケースワークスペース** — 解析ケース（車両＋セットアップ＋任意のテレメトリ）を作成し、保存／再オープン／複製／アーカイブ／エクスポートできる。クラウドなし・アカウントなし；生テレメトリはデバイスから出ない。
+- **3 言語 UI** — English／繁體中文（台湾）／日本語、実行時に切替可能（アプリシェルと解析ワークスペース全体に対応）。
+- **コードが教材** — FSAE／サーキット走行エンジニア向けの「知識ノート」（`docs/fsae/`）を同梱：直感 → 物理 → 数式 → コード。
 
-- **3 段階のハンドリングバランス予測** — 統一 Milliken モデルで重量配分・ロール剛性配分(LLTD)・タイヤ荷重感度を一つの式に統合し、アンダーステアグラジエント(deg/g)を出力。Tier 1 機械バランス / Tier 2 タイヤモデル追加 / Tier 3 コーナーウェイト・エアロ・ダンパー・キャンバー/トー・バンプラバー + 線形バイシクルモデル(特性/臨界速度、ヨーゲイン)。
-- **セットアップアドバイザー** — ルールベースの提案(ライドフリクエンシー、LLTD 対 重量、ロールグラジエント、減衰比、グリップ不均衡、クロスウェイト、キャンバー…)、具体的な目標値付き。
-- **スプリング & ARB 計算機** — 周波数↔スプリングレート換算(タイヤコンプライアンス考慮)、レート対照表、目標ロールグラジエントの ARB サイジング。
-- **タイヤ解析** — 温度/空気圧グリップ曲線 + **21 銘柄のトラックデイタイヤDB**(スリック含む)、最適温度・空気圧・ピークグリップ付き。
-- **麗寶 G2 ラップシミュレーター** — GG ダイアグラム質点ラップシム(3.500 km / 23 コーナー)+ **タイヤスティントモデル**:**ベストラップ・タイヤ空気圧のスイートスポットが何周目に来るか**・ピークグリップ周回・推奨冷間空気圧、周回ごとの推移グラフ(冷間→昇温・内圧上昇→スイートスポット→オーバーヒート/摩耗による低下)を予測。
-- **501 台のプリセット車両DB** — 車を選べばシャシーの基準値が自動入力。
-- **コードが教材** — ソース内に FSAE/サーキット走行エンジニア向けの「知識ノート」を埋め込み(`docs/fsae/` 参照)。
+### 現在のステータス
 
-### 物理的根拠と検証
+| マイルストーン | 範囲 | 状態 |
+|---|---|---|
+| R1 / R2.0–R2.2 | ハンドリング予測、アドバイザー、スプリング／ARB、タイヤ解析、麗寶ラップ+スティント、501 台プリセット、解析ワークスペース切片 | ✅ 完了 |
+| R2.3 | 実／インポート CSV → 正規化テレメトリ session、チャンネルマッピング+確認、クローズドスキーマのケース書き出し | ✅ 完了 |
+| R2.4 | 誠実にゲート管理された*計測*アンダーステア勾配 K_us（検証済みステアリングキャリブレーションが必要）+ model-vs-actual | ✅ 完了 |
+| R2.5 | Setup A/B（予測バランス差）+ 物理単位の定量推奨 | ✅ 完了 |
+| R2.6 | トラックインテリジェンス + コーナーごとのドライバー操舵挙動コーチング（ヒューリスティック、低確信度） | ✅ 完了 |
+| R3.0A | ケース中核のアプリシェル（ナビ／Case Context／信頼性パネル）+ ドキュメント統合 | ✅ 完了 |
+| R3.0B | ローカルファーストのケースライブラリと永続化（保存／再オープン／複製／アーカイブ／入出力） | ✅ 完了 |
+| R3.0C | リファレンスラップとコーナーデルタ解析（ラップ間／session 間比較） | 🚧 計画／設計中 — **未提供** |
+| R3.0D–F | レースエンジニア意思決定エンジン · 実験-結果ループ · ハードニングとリリース | ⏳ 計画中 |
 
-標準的な文献(Milliken『Race Car Vehicle Dynamics』、Gillespie『Fundamentals of Vehicle Dynamics』、OptimumG、Suspension Secrets)に基づき、**実世界のエンジニアリング実務と照合**:ロール剛性・減衰比の計算、車高ベースのエアロマップ、テレメトリーから導いた車高ワークフロー。式が既存の実務と一致する箇所(例:臨界減衰 `Cc = 2√(k·m)`、車軸ロール剛性 `k·t²/2`)は明記し、一致しない箇所は修正した。詳細は [`docs/physics-notes.md`](docs/physics-notes.md)。
+バージョン 1.4.0。アプリ内の「Comparisons」は、明示的で操作不可の**保留（deferred）**パネルとして表示される——偽のコントロールではない。
 
-> ⚠️ **精度に関する注意:** 絶対的なラップタイムは入力仕様(パワー/グリップ/エアロ/重量)に完全に依存する。サーキット記録は大幅改造車によるものが多いため、ノーマル仕様の予測が遅くなるのは正しく、バグではない。本ツールの強みは**相対比較**(セットアップ変更で車がどちらに動くか)と**タイヤスイートスポット**解析にある。方法論は車種を超えて移植できるが、絶対値はできない——特に FSAE では自分のタイヤデータが必須。
+### できること
 
-### モデルの境界と信頼度の階層
+**モデル入力だけで動作**
+- ハンドリングバランス予測（アンダーステア勾配、LLTD、ロール勾配、ライドフリクエンシー）— *物理／モデル*
+- 具体的な目標値付きセットアップアドバイザー — *ヒューリスティック*
+- スプリング／ARB 計算機（周波数 ↔ レート、ARB サイジング）— *物理／算出値*
+- タイヤ解析 + 21 銘柄のトラックデイタイヤ DB — *モデル／算出値*
+- 麗寶 G2 ラップタイム + タイヤスティントシミュレーション — *モデル*
+- 501 台プリセット DB（各パラメータに `confirmed`／`documented`／`estimated`／`unknown`）
+- 解析ケースのモデル予測 + 方向性傾向 — *モデル／ヒューリスティック*
 
-すべての数値が同等に信頼できるわけではない——今はそれを明示する。各結果にバッジが付く：
+**条件付きで利用可能（実テレメトリおよび／またはキャリブレーションが必要；ゲート管理）**
+- テレメトリ観測（データからの方向性傾向）— **確認済み**チャンネルが必要
+- **計測アンダーステア勾配 K_us** — 確認済みテレメトリ **+ 検証済みの実舵角ステアリングキャリブレーション**が必要
+- Model-vs-actual 比較 — 方向性は常に；大きさは計測 K_us がゲートを通過したときのみ
+- Setup A/B（予測バランス差——ラップタイムの主張は決してしない）
+- 物理単位（Nm/deg、N/mm、%）の定量セットアップ推奨
+- コーナーコーチング（進入／旋回中／立ち上がりにおける**ドライバー**の生操舵挙動——車両やセットアップの結論ではない）
 
-- **◆ Physics（物理）** — 基本原理から導く教科書的な式（wheel rate、ride frequency、ロール剛性/勾配、減衰比、幾何/弾性 LLTD 分解、サスペンション運動学）。与えた入力に対しては正確。
-- **◈ Model（モデル）** — 物理的根拠のある工学的推定（アンダーステア勾配、コーナリング剛性、特性/臨界速度、ヨーゲイン、過渡応答、ラップタイム）。方向性は信頼でき、絶対値は近似。
-- **◇ Heuristic（経験則）** — 実データに合わせて手調整したゲイン/倍率（グリップ不均衡→バランス変化、タイヤ幅/空気圧/温度のグリップ係数、バランスペナルティ、駆動輪トラクション比）。すべて [`renderer/js/calibration.js`](renderer/js/calibration.js) にメタデータ付きで集約（値/単位/有効範囲/階層/校正に必要なデータ）——物理法則ではなく調整ノブ。参考値として扱う。
+「利用可能／条件付き利用可能／ブロック／保留」の全マトリクス（各能力の必要入力・信頼性・fail-closed 条件・制約）は [`docs/r2-capability-map.md`](docs/r2-capability-map.md) を参照。
 
-**既知の境界：** 2D 前面ダブルウィッシュボーン計算機以外のサスペンション・ハードポイント運動学なし；線形 2-DOF ステアステップ以外の過渡モデルなし；ラップシミュレーションは代表的な 1 コースのみ；`.tir` 未読込時はタイヤ係数は推定値。プリセットのシャシーデータはパラメータごとに表示（`confirmed`/`documented`/`estimated`/`unknown`）＋総合レター評価。**感度**パネルは各不確実入力を単独で変動させバランスを再計算し、答えの安定性と最重要入力を示す。読み込んだ `.bmsbin` テレメトリはチャンネル目録を解析し、clean-room バイナリ探査を実行し、生系列候補とチャンネルリンク／スケーリングの**仮説**を報告できます。さらに**確認基準を評価**します——*仮説*から*確認*へ昇格できる対象を決める明示的なルールです:チャンネル目録は確認可能ですが、サンプル構造・チャンネル対応・タイムベース・物理スケーリングは依然**未確認**です(物理テレメトリ値もまだありません)。続いて clean-room の**サンプル構造探索**を実行し、チャンネルがバイナリ内にどう配置されているか(チャンネル別ブロック・オフセット／インデックステーブル・インターリーブ配置)を仮説として報告し、生系列数がチャンネル数より大幅に少ない理由を示します——デコードも確認も一切行いません。続いて**生データストリーム確認**ステップが厳格な基準(境界の安定性・ブロック長の一貫性・複数ファイルのコーパス)を適用し、生データストリームの*構造*が確認できるかを判定します——ただしチャンネル対応・時間基準・物理値は依然利用できません。さらに**チャンネル識別の確認基準**層が識別の証拠を保守的な段階(波形だけでは不十分;独立しコーパスで安定した証拠が必要)で評価します——実際の読み込みデータは常に*未確認*で、波形だけでチャンネル名を付与せず、標準化 telemetry も生成しません。続いて**タイムベース確認基準**層が*構造的*なタイムベース証拠(サンプル順序／数／間隔の安定性／チャンネル間同期)のみを評価します——手動 sample rate は fallback の手がかりに過ぎず、実際の単一ファイル読み込みは確認されず、秒／Hz・単位・物理時間チャートも生成しません。**物理スケーリング確認基準**層が、raw value をいつ物理値と呼べるかを判定します:確認済みの raw stream／識別／タイムベースの上で、*独立した* scale と単位の証拠が必要です——妥当そうな範囲や手動 scale だけでは不十分で、実際の単一ファイル読み込みは物理値も確認済み単位も得られず、標準化 telemetry・オーバーレイ・Kus・セットアップ推奨も有効化しません。最後に**telemetry readiness ゲート**が、データが後続のハンドリング分析段階に*入れる*ほど確認・完備されているか(必須チャンネル・sample-rate／同期／dropout 品質・全前提条件)を判定します——readiness はゲートであり分析結果ではなく、実際の単一ファイル読み込みは ready にならず、ハンドリング分析・オーバーレイ・Kus・model-vs-actual・セットアップ推奨も有効化しません。さらに**抽出適格性ゲート**が、後続の「操作応答抽出」の*入力契約*(canonical な計測系列・必須チャンネル・コーナー分割と entry／mid／exit ウィンドウの前提条件・コーパス必須)を定義し、データがそれに入る適格性があるかを判定します——適格性は入力契約であり抽出ではなく、real／インポートデータは決して適格にならず、操作応答・tendency・アンダー／オーバーステア proxy・Kus・オーバーレイ・model-vs-actual は一切生成しません。続いて **synthetic 実測抽出ハーネス**が、将来の抽出の「形」(コーナー分割 → entry／mid／exit ウィンドウ → steady-state フィルタ → measured-tendency proxy)を **synthetic canonical series 上でのみ**実行して検証します——real／インポートデータは常にブロックされ、`realDataUsed` は常に false で、tendency は synthetic proxy に過ぎず、Kus・model-vs-actual・セットアップ推奨ではありません;オーバーレイやハンドリング分析は有効化しません。その後さらに境界層を追加——canonical-adapter 適格性ゲート、ローカル限定の private-corpus 証拠取り込み境界、そして sanitized-evidence adapter の dry-run shape——いずれも何も確認せず、canonical series も生成せず、実データ単一ファイルのパスを fail-closed に保ちます。トラストチェーンの全体図(モジュール・ゲート・レッドライン invariants)は [docs/phase-3-trust-chain.md](docs/phase-3-trust-chain.md) を参照。
+### 主張しないこと
 
-> **⚠️ レガシー／歴史的リサーチ経路。** 上記の `.bmsbin` クリーンルーム・バイナリ調査全体(および `docs/phase-3-trust-chain.md`・`bmsbin-*` ノート)は**歴史的リサーチ経路**であり、チャンネル目録以外は何もデコードせず、canonical telemetry も生成しません。**本番のテレメトリ経路は CSV／canonical-JSON インポート**(R2.3+)です——Canonical Telemetry Session・方向性分析・(検証済みキャリブレーションがある場合の)measured K_us を生むのはこの経路のみです。model-vs-actual 相関は CSV／canonical パイプラインで提供され、このバイナリ研究経路は通りません;両者は意図的に分離されています。
+本ツールは自らの限界について意図的に正直である。以下では**ない**：
 
-### タイヤモデルのワークフロー（.tir 読込）
+- プロのレースエンジニアの代替ではなく、「専門的に検証済み」を称することもない；
+- 完全なマルチボディダイナミクス（MBD）シミュレータではない——モデルは透明な線形／準静的バランスモデル；
+- 完全なタイヤモデルではない——自分の `.tir`（純スリップ横方向のみ）を読み込まない限り係数は推定値；
+- GPS レーシングライン／ラップ最適化ツールではない——レーシングラインなし、位置だけから正確なエイペックスは出さない；
+- 任意のバイナリ形式のテレメトリデコーダではない——本番経路は CSV／canonical-JSON；
+- ハードウェアの「クリック」の供給源ではない——検証済みの車種別 click→rate 対応がないため、出力は物理単位のまま；
+- MoTeC／商用解析ソフトの代替ではない。
 
-実行時に実際の **Pacejka Magic Formula `.tir`** を読み込めます（同梱・アップロードなし）。インポータは **純スリップ横方向（pure-slip lateral）** のみを実装するため、読込＝完全なタイヤモデルでは**ありません**——UI はカバー範囲を正直に示します。
+データ**と**キャリブレーションの裏付けなしに計測値を主張することはなく、ギャップを埋めるための捏造もしない。
 
-**読込 .tir が駆動するもの**（◈ Model、ソース＝読込 .tir）：
-- コーナリング剛性 Cα → アンダーステア勾配の予測
-- ピーク μ → ラップシムの基礎グリップ
-- 横力 vs スリップ角、ピーク μ vs 垂直荷重の曲線（Tyre Analysis タブ）
-- 縦剛性 → タイヤばねレートに適用可能
+### 信頼性モデル
 
-**.tir を読み込んでも汎用ヒューリスティックのまま**（◇ Heuristic）：
-- 温度・空気圧・タイヤ幅のグリップ補正
-- グリップ不均衡 → ステア偏移
+すべての値に「どう導かれたか」のバッジが付き、すべての結論に信頼メタデータ（信頼性 · 確信度 · データ由来 · 制約事項 · ブロッカー · 証拠参照 · 次の検証手順）が付く。これは UI ではなくサービス層で強制される。
 
-これらは読込でも更新されません。「タイヤモデルの状態」パネルが出力ごとに表示します。
+- **◆ 物理計算（Physics）** — 閉形式の物理関係（与えた入力に対して正確）。*≠ モデル。*
+- **◈ モデル推定（Model）** — 物理関係から構築したモデル予測。*≠ 計測。*
+- **計測値（Measured）** — 実テレメトリから導出；依然として交絡あり（タイヤ/路面/ドライバー/センサー）、機械可読のデータ由来（合成／実／未検証）付き。*≠ 完全検証。*
+- **算出値（Derived）** — 入力の決定的な変換。*≠ 直接計測。*
+- **◇ ヒューリスティック（Heuristic）** — 経験則的な観測。*≠ 車両の事実。*
+- **提供不可（Unavailable）** — 現在の証拠からは導けない（理由付きでブロック表示）。
 
-**未モデル化：** 複合スリップ、セルフアライニングトルク（Mz）、前後力（Fx）。
+**常に fail-closed：** 必要な入力や品質ゲートが欠けると、その能力は理由付きでブロックされ、決して近似しない。ドライバー挙動 ≠ 車両特性 ≠ セットアップの結論；相関 ≠ 因果；予測 ≠ 保証された結果。詳細は [`docs/credibility-and-trust.md`](docs/credibility-and-trust.md)。
 
-**インポート診断**は段階分けされ、タイヤの良し悪しではなく「ファイルが何を支援するか」を示します：
-- **error**——有効な横力を生成できない（`PCY1` なし、ピークなし、または純スリップ評価器が ~0 の力）；読込は拒否。
-- **warning**——使用可能だが範囲が狭い／アプリに未接続（横方向のみ；空気圧・温度は依然ヒューリスティック；キャンバー係数なし）。
-- **info**——利用可能な機能（縦剛性、荷重感度曲線）または接続メモ。
+### 主なワークフロー
 
-**曲線の読み方：** 2 つの ◈ Model 曲線は .tir の横方向フィット由来；その下の温度/空気圧グリップ曲線は ◇ Heuristic のアプリ層補正で「.tir 由来ではない」と明示——実測タイヤデータとして読まないこと。
+1. **解析ケースを作成** — 車両＋セットアップを選ぶ（または合成 Demo ケースを読み込む）。
+2. **（任意）テレメトリをインポート** — CSV／canonical-JSON → 生カラムを正規チャンネルに対応付け → 識別を確認。
+3. **解析を実行** — モデル予測 +（テレメトリが確認済みなら）方向性観測。
+4. **（任意）ステアリングキャリブレーションを追加** — 誠実にゲート管理された計測 K_us と大きさ比較を解放。
+5. **レビュー** — model-vs-actual、計測指標、Setup A/B、定量推奨、コーナーコーチング——それぞれ信頼性とブロッカー付き。
+6. **ケースライブラリに保存** — 同一再オープン、複製、アーカイブ、または可搬（精選・生データなし）バンドルのエクスポート。
 
-### クイックスタート
+### UI 概要
+
+ケース中核のシェル：左の **Workspace** ナビ（Dashboard／Analysis Cases／Import Telemetry／Setup Library／Comparisons／Settings）、ケースごとのナビ（Overview／Setup & Model／Telemetry／Measured Metrics／Model vs Actual／Recommendations／Corner Coaching／Evidence & Trust）、**Case Context** バー、そしてサービスの能力を読み直して状態・信頼性・ブロッカー・次のアクションを示す固定の**信頼性パネル**。Setup Library には元の計算機（スプリング／タイヤ／アドバイザー／麗寶ラップ／生 CSV テレメトリビューア）が入る。
+
+### インストール／実行
 
 ```bash
-npm install && npm start      # デスクトップ (Electron)
-open renderer/index.html      # またはブラウザで直接(サーバー不要)
-npm test                      # 物理回帰テスト (143 項目)
+# デスクトップ (Electron)
+npm install
+npm start
+
+# またはブラウザで直接（サーバー不要——純粋なクライアント側 JS）
+open renderer/index.html        # macOS
+
+# 全テストスイートを実行（物理回帰 + テレメトリ + 永続化 + UI 契約 + i18n parity）
+npm test
 ```
+
+### データとプライバシー
+
+- **ローカルファースト。** ケースと session はあなたのマシンのブラウザ／Electron IndexedDB に保存される。クラウドなし、アカウントなし、サインインなし。
+- **トラッキングなし。** アナリティクスなし、第三者テレメトリなし、トラッキングピクセルなし、Cookie なし。
+- **生テレメトリはデバイス内に留まる。** 容量制限付きのローカル session ストアに存在し、可搬エクスポートには**決して**含まれない。可搬ケースバンドルは精選・値制約付き・生データなしの要約；インポートしたバンドルは明示的に降格した「インポート要約」として開く。
+- **読み込んだ `.tir`／CSV はローカルで読まれ**、アップロードも同梱もされない。
+
+### ドキュメントマップ
+
+- [`docs/product-positioning.md`](docs/product-positioning.md) — 何であり何でないか、対象者、プロダクトループ。
+- [`docs/credibility-and-trust.md`](docs/credibility-and-trust.md) — 信頼性ラダーと誠実契約。
+- [`docs/r2-capability-map.md`](docs/r2-capability-map.md) — 正準の能力マトリクス。
+- [`docs/analysis-workspace-architecture.md`](docs/analysis-workspace-architecture.md) — エンドツーエンドの本番パイプライン。
+- [`docs/r3.0b-case-library-persistence.md`](docs/r3.0b-case-library-persistence.md) — ローカルファースト永続化設計。
+- [`docs/physics-notes.md`](docs/physics-notes.md) — 数式導出、単位、参考文献。
+- [`docs/fsae/`](docs/fsae/) — 同梱の教材エッセイ。
+- [`docs/phase-3-trust-chain.md`](docs/phase-3-trust-chain.md) — レガシー `.bmsbin` 研究経路（下記参照）。
+
+### ロードマップ
+
+- **R3.0C** — リファレンスラップとコーナーデルタ解析：正規化コース位置軸、コーナーごと＋進入／旋回中／立ち上がりのデルタ、厳格な比較可能性ゲート付き。*設計中；Comparisons パネルはリリースまで保留のプレースホルダ。*
+- **R3.0D** — 決定的で証拠に基づく仮想レースエンジニア意思決定エンジン（主要課題＋代替説明＋検証可能な次の実験；自由文の LLM 結論ではない）。
+- **R3.0E** — 推奨の実験・結果ループ（期待 vs 観測；ローカル証拠履歴のみ）。
+- **R3.0F** — プロダクトのハードニング、スキーマ移行、リリース。
+
+ロードマップ項目は**計画であり現行機能ではない**。アプリ内ですでに動作するかのように提示されることはない。
+
+### 検証と制約
+
+- モデルは教科書の数式と実世界のエンジニアリング実務（例：臨界減衰 `Cc = 2√(k·m)`、車軸ロール剛性 `k·t²/2`）に対して検証されている。[`docs/physics-notes.md`](docs/physics-notes.md) を参照。自動テストは**合成の**回帰／契約テストであり、実走行による検証ではない。
+- **絶対的なラップタイムは入力に完全に依存する。** サーキット記録は大幅改造車によるものが多いため、ノーマル仕様の予測が遅くなるのは正しく、バグではない。本ツールの強みは**相対**比較とタイヤスティントのスイートスポット解析にある；方法論は車種を超えて移植できるが絶対値はできない——特に FSAE では自分のタイヤデータが必須。
+- **既知の境界：** 2D 前面ダブルウィッシュボーン計算機を超えるサスペンション・ハードポイント運動学なし；線形 2-DOF ステアステップを超える過渡モデルなし；ラップシミュレーションは代表的な 1 コースのみ；`.tir` 未読込時はタイヤ係数は推定値。
+
+> **⚠️ レガシー／歴史的リサーチ経路。** `.bmsbin` クリーンルーム・バイナリ調査（`docs/phase-3-trust-chain.md` と `bmsbin-*` ノート）は**歴史的リサーチ経路**であり、チャンネル目録以外は何もデコードせず、canonical telemetry も生成しない。**本番のテレメトリ経路は CSV／canonical-JSON インポート**（R2.3+）——Canonical Telemetry Session・方向性解析・（検証済みキャリブレーションがある場合の）計測 K_us を生むのはこの経路のみ。両者は意図的に分離されている。
+
+### ライセンス／コントリビュート
+
+MIT スピリットの個人／教育プロジェクト——コントリビュートと修正を歓迎。台湾発、真剣なシャシーエンジニアリングの知識を次世代の FSAE 学生とサーキット走行エンジニアに届けることを目指す。
