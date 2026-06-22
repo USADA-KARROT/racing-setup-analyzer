@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Racing Setup Analyzer"
+abstract: >-
+  A case-centric vehicle-dynamics workspace that predicts handling balance, sizes
+  spring / ARB / damper numbers, simulates a tyre stint, and — with real telemetry
+  and a verified calibration — reports honestly-gated measured metrics. Every value
+  is labelled by how it was derived (Physics / Model / Measured / Derived / Heuristic
+  / Unavailable) and every blocked feature states why. Local-first, trilingual
+  (English / 繁體中文 / 日本語). Not a professional race-engineer replacement,
+  a full MBD simulator, a complete tyre model, or a GPS racing-line tool.
+type: software
+authors:
+  - alias: SKYLINE
+license: MIT
+version: "1.4.0"
+repository-code: "https://github.com/USADA-KARROT/racing-setup-analyzer"
+url: "https://github.com/USADA-KARROT/racing-setup-analyzer"
+keywords:
+  - vehicle-dynamics
+  - racing-setup
+  - understeer-gradient
+  - lap-time-simulation
+  - tyre-model
+  - telemetry-analysis
+  - FSAE
+  - motorsport-engineering
