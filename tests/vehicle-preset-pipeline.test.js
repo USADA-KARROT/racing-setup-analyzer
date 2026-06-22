@@ -37,6 +37,9 @@ chk('manufacturers list', uc.manufacturers().join(',') === 'honda,porsche');
 // draft is NON-PERSISTENT + carries provenance/confidence
 (() => { const dr = uc.buildSetupDraftFromPreset('honda_civic_ek'); chk('draft persisted:false', dr.persisted === false && dr.source === 'preset_draft'); chk('draft has setupInputs + provenance + confidence', !!dr.setupInputs && dr.provenance.isCompleteVehicleModel === false && !!dr.confidence); chk('draft has no UI label keys', JSON.stringify(dr).indexOf('labelKey') === -1); })();
 
+// getPresetSnapshot: deep-copy full preset for the LEGACY editor adapter (never the live object)
+(() => { const before = JSON.stringify(FIX.porsche_996_gt3); const snap = uc.getPresetSnapshot('porsche_996_gt3'); chk('snapshot has full preset shape', !!snap && !!snap.params && snap.params.front_spring_rate === 80 && !!snap.tire_defaults); snap.params.front_spring_rate = -1; snap.name = 'HACKED'; const rows0 = uc.listVehiclePresets({}); chk('mutating snapshot does NOT mutate the source preset', JSON.stringify(FIX.porsche_996_gt3) === before && rows0.length === 2); })();
+
 // apply is fail-closed / unavailable until wired
 chk('apply unavailable', uc.applyAvailability() === 'unavailable' && uc.previewApplyPresetToCase().code === 'UNAVAILABLE' && uc.confirmApplyPresetToCase().code === 'UNAVAILABLE');
 
@@ -61,6 +64,9 @@ chk('apply unavailable', uc.applyAvailability() === 'unavailable' && uc.previewA
   chk('preset IDs unchanged before/after', Object.keys(CAR_PRESETS).slice().sort().join(',') === idsBefore);
   chk('preset CONTENT unchanged (deep) after read pipeline', JSON.stringify(CAR_PRESETS) === snapshot);
   chk('real detail is a deep copy (not the live preset)', d.setupInputs.front_spring_rate === -1 && CAR_PRESETS[firstId].params.front_spring_rate !== -1);
+  const snap = realUc.getPresetSnapshot(firstId); const wasFront = CAR_PRESETS[firstId].params.front_spring_rate; snap.params.front_spring_rate = -7777; snap.name = 'HACKED';
+  chk('real snapshot is a deep copy (legacy adapter cannot mutate CAR_PRESETS)', snap.params.front_spring_rate === -7777 && CAR_PRESETS[firstId].params.front_spring_rate === wasFront);
+  chk('real preset CONTENT still unchanged after snapshot mutation', JSON.stringify(CAR_PRESETS) === snapshot);
 })();
 
 console.log(`vehicle-preset-pipeline: ${pass} passed, ${fail} failed`);

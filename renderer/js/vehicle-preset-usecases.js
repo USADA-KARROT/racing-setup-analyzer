@@ -83,12 +83,16 @@
       });
     }
 
+    // Deep-copy snapshot of a full preset (same shape as api.getPreset) for the LEGACY editor adapter, so the
+    // street/pro selector never holds a live CAR_PRESETS reference. Read-only: mutating the result cannot touch source.
+    function getPresetSnapshot(presetId) { var p = src.getPreset(presetId); return p ? _clone(p) : null; }
+
     // Apply-to-case (preview + opaque token + confirm) — surfaced 'unavailable' until safely wired through R3.0B case-store.
     function previewApplyPresetToCase() { return { ok: false, code: 'UNAVAILABLE', reason: 'apply_to_case_not_yet_wired' }; }
     function confirmApplyPresetToCase() { return { ok: false, code: 'UNAVAILABLE', reason: 'apply_to_case_not_yet_wired' }; }
     function applyAvailability() { return 'unavailable'; }
 
-    return { listVehiclePresets: listVehiclePresets, manufacturers: manufacturers, layouts: layouts, getVehiclePresetDetail: getVehiclePresetDetail, buildVehiclePresetSummary: buildVehiclePresetSummary, buildSetupDraftFromPreset: buildSetupDraftFromPreset, previewApplyPresetToCase: previewApplyPresetToCase, confirmApplyPresetToCase: confirmApplyPresetToCase, applyAvailability: applyAvailability };
+    return { listVehiclePresets: listVehiclePresets, manufacturers: manufacturers, layouts: layouts, getVehiclePresetDetail: getVehiclePresetDetail, buildVehiclePresetSummary: buildVehiclePresetSummary, buildSetupDraftFromPreset: buildSetupDraftFromPreset, getPresetSnapshot: getPresetSnapshot, previewApplyPresetToCase: previewApplyPresetToCase, confirmApplyPresetToCase: confirmApplyPresetToCase, applyAvailability: applyAvailability };
   }
 
   var api = { createVehiclePresetUseCases: createVehiclePresetUseCases };

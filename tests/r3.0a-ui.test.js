@@ -32,6 +32,10 @@ chk('sidebar highlights active section', /shellSection===item\.id/.test(html));
 });
 chk('case nav drives setCaseSubview', /@click="setCaseSubview\(cn\.id\)"/.test(html));
 chk('case nav shows unavailable indicator', /caseNavAvailable\(cn\.id\)/.test(html));
+// R3-UX0: navigation surfaces are DERIVED from the feature registry (single source of truth; no inline whitelist).
+chk('mainNav derived from registry', /FeatureRegistry\.deriveMainNav\(\)/.test(html) && html.indexOf("mainNav:[{id:'dashboard'") === -1);
+chk('caseNav derived from registry', /FeatureRegistry\.deriveCaseNav\(\)/.test(html) && html.indexOf("caseNav:[{id:'overview'") === -1);
+chk('caseSubviewIds derived from registry', /FeatureRegistry\.deriveCaseSubviewIds\(\)/.test(html) && html.indexOf("caseSubviewIds:['overview'") === -1);
 
 // top Case Context bar (read from contextBar)
 chk('context bar caseName', /caseShellState\(\)\.contextBar\.caseName/.test(html));

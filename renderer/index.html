@@ -3631,9 +3631,9 @@ function app(){return{
   ],
   shellSection:'cases',
   caseSubview:'overview',
-  caseSubviewIds:['overview','setup_model','telemetry','measured_metrics','model_vs_actual','recommendations','corner_coaching','evidence_trust'],
-  mainNav:[{id:'dashboard',label:'Dashboard'},{id:'cases',label:'Analysis Cases'},{id:'import',label:'Import Telemetry'},{id:'setup_library',label:'Setup Library'},{id:'comparisons',label:'Comparisons',deferred:'R3.0C'},{id:'settings',label:'Settings'}],
-  caseNav:[{id:'overview',label:'Overview'},{id:'setup_model',label:'Setup & Model'},{id:'telemetry',label:'Telemetry'},{id:'measured_metrics',label:'Measured Metrics'},{id:'model_vs_actual',label:'Model vs Actual'},{id:'recommendations',label:'Recommendations'},{id:'corner_coaching',label:'Corner Coaching'},{id:'evidence_trust',label:'Evidence & Trust'}],
+  caseSubviewIds:(function(){try{return FeatureRegistry.deriveCaseSubviewIds();}catch(e){return [];}})(), // R3-UX0: derived from the registry (no second nav whitelist)
+  mainNav:(function(){try{return FeatureRegistry.deriveMainNav().map(function(n){return {id:n.id,deferred:n.deferred};});}catch(e){return [];}})(), // R3-UX0: derived from the registry (labels via t('ui.nav.'+id))
+  caseNav:(function(){try{return FeatureRegistry.deriveCaseNav().map(function(n){return {id:n.id};});}catch(e){return [];}})(), // R3-UX0: derived from the registry (labels via t('ui.caseNav.'+id))
   setupLibraryTabs:(function(){try{return FeatureRegistry.deriveSetupLibraryPaneIds().filter(function(p){return p!=='predict';}).map(function(p){return {id:p};});}catch(e){return [];}})(), // R3-UX0: derived from the registry (no second pane whitelist; predict reached via landing cards)
   _shellEvidence:null,
   library:null, libFilters:{search:'',vehicle:'',track:'',status:'',fromDate:'',includeArchived:false}, currentCaseId:null, importedSummaryOpen:false, storageError:null, autosaveEnabled:true,
@@ -3994,7 +3994,10 @@ function app(){return{
 
   applyPreset(){
     if(!this.streetCar){ this.streetCarDetail=null; return; }
-    const d = api.getPreset(this.streetCar);
+    // R3-UX0: load a DEEP-COPY snapshot through the read-only use-case — never the live CAR_PRESETS object.
+    const _uc=this._vpUseCases();
+    const d = _uc && _uc.getPresetSnapshot ? _uc.getPresetSnapshot(this.streetCar) : JSON.parse(JSON.stringify(api.getPreset(this.streetCar)||null));
+    if(!d){ this.streetCarDetail=null; return; }
     this.streetCarDetail = d;
     // Apply locked params
     const p = d.params;
