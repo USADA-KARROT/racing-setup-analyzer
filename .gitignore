@@ -34,3 +34,6 @@ build/
 # This project has never tracked an npm lockfile; exclude to avoid an accidental commit
 # (revisit if a lockfile policy is later adopted).
 package-lock.json
+
+# R3-GATE0 verification evidence is produced by CI and uploaded as an artifact; never commit it.
+artifacts/
