@@ -23,7 +23,10 @@ jobs:
   verify:
     name: trusted-verification
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Job ceiling exceeds the SUM of all step timeouts below (≈33m), so even if every verifier ran to its
+    # own limit the job would not be killed before evidence collection + upload. A single hung verifier is
+    # killed at the step (a failure, NOT a cancel), and the collect + upload steps still run.
+    timeout-minutes: 40
     env:
       ARTIFACT_DIR: ${{ github.workspace }}/artifacts
       TEST_TIMEOUT_MS: '180000'
@@ -42,6 +45,7 @@ jobs:
           node-version: '22'
 
       - name: Resolve base/head identity (pass GitHub context via env, never inline)
+        timeout-minutes: 2
         env:
           EVENT_NAME: ${{ github.event_name }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
@@ -65,12 +69,14 @@ jobs:
           echo "resolved event=$EVENT_NAME BASE_SHA=$BASE HEAD_SHA=$HEAD"
 
       - name: Verify checked-out SHA matches the event-reported SHA
+        timeout-minutes: 1
         env:
           EVENT_NAME: ${{ github.event_name }}
+          GH_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           ACTUAL="$(git rev-parse HEAD)"
-          echo "checked-out=$ACTUAL  expected HEAD_SHA=$HEAD_SHA  github.sha=${{ github.sha }}"
+          echo "checked-out=$ACTUAL  expected HEAD_SHA=$HEAD_SHA  github.sha=$GH_SHA"
           if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "push" ]; then
             if [ "$ACTUAL" != "$HEAD_SHA" ]; then
               echo "::error::checked-out SHA ($ACTUAL) != expected HEAD_SHA ($HEAD_SHA)"; exit 1
@@ -82,50 +88,63 @@ jobs:
       # installs nothing; the dependency audit below proves that contract. (Electron packaging is a
       # separate future milestone, not this gate.)
       - name: Confirm dependency-free lane (this job installs nothing)
+        timeout-minutes: 1
         run: |
           set -euo pipefail
           echo "Dependency-free verification lane: only node scripts run here."
           echo "node version: $(node -v)"
           echo "npm version: $(npm -v)"
 
-      - name: A0 — Dependency audit (no third-party packages reachable)
+      - name: A0 — Dependency audit (self-test, then prove no third-party packages reachable)
         if: ${{ !cancelled() }}
-        run: node scripts/check-verification-dependencies.js
+        timeout-minutes: 2
+        run: |
+          node scripts/check-verification-dependencies.js --selftest
+          node scripts/check-verification-dependencies.js
 
       - name: A — Full per-file test manifest
         if: ${{ !cancelled() }}
+        timeout-minutes: 10
         run: node scripts/run-tests-manifest.js
 
       - name: B — i18n three-language parity
         if: ${{ !cancelled() }}
+        timeout-minutes: 2
         run: node scripts/check-i18n.js
 
       - name: C — Feature registry / reachability
         if: ${{ !cancelled() }}
+        timeout-minutes: 2
         run: node scripts/check-feature-registry.js
 
       - name: D — Vehicle preset integrity
         if: ${{ !cancelled() }}
+        timeout-minutes: 2
         run: node scripts/check-preset-integrity.js
 
       - name: E — Frozen-boundary guard
         if: ${{ !cancelled() }}
+        timeout-minutes: 2
         run: node scripts/check-frozen-boundary.js
 
       - name: F — Package version policy
         if: ${{ !cancelled() }}
+        timeout-minutes: 2
         run: node scripts/check-version-policy.js
 
       - name: G — R3.0C scope guard
         if: ${{ !cancelled() }}
+        timeout-minutes: 2
         run: node scripts/check-r3-0c-guard.js
 
       - name: Collect evidence + summary (final gate)
         if: ${{ !cancelled() }}
+        timeout-minutes: 2
         run: node scripts/collect-evidence.js
 
       - name: Upload trusted-verification-evidence
         if: ${{ !cancelled() }}
+        timeout-minutes: 3
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: trusted-verification-evidence

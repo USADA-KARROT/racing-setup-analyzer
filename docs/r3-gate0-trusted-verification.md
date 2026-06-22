@@ -59,7 +59,11 @@ complete; any failure fails the job):
   must be a Node builtin or a repo-relative path; a bare third-party specifier or an unresolvable
   dynamic load fails the gate (fail-closed). Two safe dynamic forms — `path.join(__dirname, …literals)`
   and the UMD `_req(p)` helper that forwards only literal relative specifiers — are adjudicated
-  statically and recorded (`dynamicResolvedStatically`); nothing is optimistically skipped.
+  statically and recorded (`dynamicResolvedStatically`); nothing is optimistically skipped. The
+  tokenizer is comment-, string-, regex-, AND template-aware (a hidden `` `${require('x')}` `` is still
+  seen); `path.join` is trusted only when the file binds `path` to `require('path')` (a shadowed `path`
+  is not); forwarded-arg call sites are matched on the token stream, not raw text; and `--selftest`
+  carries adversarial cases proving these.
 - **A — Full per-file test manifest** (`scripts/run-tests-manifest.js`): deterministic discovery from
   `package.json scripts.test`, cross-checked against `tests/*.js` on disk. Each file runs in its own
   child process; **per-file PASS authority is the exit code** (never a grep of "PASS", never the test
@@ -81,15 +85,18 @@ complete; any failure fails the job):
 - **F — Version policy** (`scripts/check-version-policy.js`): `package.json` version must remain `1.4.0`
   unless `VERSION_BUMP_ALLOW` is set. CI never publishes/tags/releases.
 - **G — R3.0C scope guard** (`scripts/check-r3-0c-guard.js`): the three deferred IDs stay deferred with
-  no renderer adapter, and the PR introduces no `renderer/js` production module implementing
-  Reference Lap / Corner Delta / Case Comparison.
+  no renderer adapter; the PR introduces no `renderer/js` module whose name implies those features; and
+  any newly ADDED `renderer/js` module is content-scanned for R3.0C symbols (so a deferred-behaviour
+  module with a neutral filename, e.g. `lap-analysis.js`, still fails).
 
 `scripts/collect-evidence.js` aggregates everything and is the **final gate**: `overall = PASS` only if
 every check passed AND the checked-out SHA matches the event-reported SHA.
 
 ## 5. Artifact: `trusted-verification-evidence`
 
-Uploaded on every run (even on failure). Contents:
+Uploaded on every run (even on failure): every verifier has a step-level `timeout-minutes` below the
+job timeout, so a single hung verifier is killed at the step (a failure, not a cancel) and the
+collect + upload steps (`if: !cancelled()`) still run. Contents:
 
 | File | Purpose |
 | --- | --- |
