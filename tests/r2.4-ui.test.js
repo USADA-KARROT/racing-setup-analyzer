@@ -21,7 +21,7 @@ const WS24 = require('../renderer/js/i18n-workspace.js').WS_I18N;
 chk('calibration value is road-wheel-referenced (documented)', /t\('aw\.hint\.steering_calibration_hint'\)/.test(html) && /road-wheel radians per projected/.test(WS24.en['aw.hint.steering_calibration_hint']) && /車輪實際轉角/.test(WS24.zh['aw.hint.steering_calibration_hint']) && /実舵角/.test(WS24.ja['aw.hint.steering_calibration_hint']));
 
 // Measured Metrics display section
-chk('measured metrics section present', /F2 · Measured Metrics/.test(html));
+chk('measured metrics section present', /t\('aw\.label\.f2_measured_metrics'\)/.test(html) && !!(WS24.en['aw.label.f2_measured_metrics'] && WS24.zh['aw.label.f2_measured_metrics'] && WS24.ja['aw.label.f2_measured_metrics']));
 chk('reads measuredMetrics.available', /analysisView\.measuredMetrics\.available/.test(html));
 chk('renders measured K_us value', /analysisView\.measuredMetrics\.measuredKUs\.value/.test(html));
 chk('renders predicted K_us', /analysisView\.measuredMetrics\.predictedKUs\.value/.test(html));

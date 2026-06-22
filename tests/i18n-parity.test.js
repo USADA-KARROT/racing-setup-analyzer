@@ -66,6 +66,15 @@ const html = fs.readFileSync(path.join(__dirname, '../renderer/index.html'), 'ut
 const REGIONS = [
   ['R3.0A: Analysis-Case app shell', 'R3.0A: Setup Library sub-navigation'],   // R3 shell
   ["showPane('analysis')", '</main>'],                                          // analysis workspace pane (import flow + sections A–J)
+  ["showPane('predict')", "showPane('advisor')"],                                  // Setup-Library tier result panes
+  ["showPane('spring')", "showPane('tire')"],                                       // spring + ARB calculators + reference table
+  ["showPane('guide')", "showPane('telemetry')"],                                   // engineering guide
+  ["showPane('dashboard')", "showPane('comparisons')"],                            // case dashboard
+  ["showPane('comparisons')", "showPane('predict')"],                               // comparisons
+  ["showPane('advisor')", "showPane('spring')"],                                    // setup advisor
+  ["showPane('tire')", "showPane('lihpao')"],                                        // tire model
+  ["showPane('lihpao')", "showPane('guide')"],                                       // Lihpao track
+  ["showPane('telemetry')", "showPane('analysis')"],                                 // legacy .bmsbin telemetry viewer
 ];
 // allowlisted TOKENS (removed PER-TOKEN, not whole-line, so a leak beside an allowed token is still caught):
 // brand/product, milestone & version ids, unit & symbol tokens, canonical channel option VALUES, engineering

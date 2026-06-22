@@ -50,7 +50,7 @@ chk('stores last case', /caseDataHolder\.lastCase/.test(html));
 })();
 
 // CP1 fix: Setup A/B UI present + service-driven
-chk('setup A/B section present', /F4 · Setup A\/B/.test(html));
+chk('setup A/B section present', /t\('aw\.label\.f4_setup_a_b_model_what_if'\)/.test(html) && wstri5('aw.label.f4_setup_a_b_model_what_if'));
 chk('A/B parameter select bound', /x-model="abParameter"/.test(html));
 chk('A/B change % bound', /x-model="abChangePct"/.test(html));
 chk('A/B compare button', /@click="runSetupAbCompare\(\)"/.test(html));
