@@ -206,3 +206,29 @@ must not be smuggled into R3-GATE0.
 package, the A0 audit fails loudly (a bare specifier is reported with its file/line) rather than
 degrading into a vague runtime "module not found" — forcing an explicit dependency-governance decision
 before the lane changes.
+
+## 11. Accepted limitations (CP-GATE0: PASS with accepted governance limitations)
+
+The Codex CP-GATE0 architecture review ran three adversarial rounds. The findings that were genuine
+code defects were fixed and confirmed. Two residual concerns are **accepted, documented limitations**
+rather than gate failures — closing them fully would require either a full ECMAScript parser (which
+needs a third-party dependency and would break the dependency-free lane) or repository-admin governance
+(branch protection), both deliberately out of scope for this PR. **CI evidence is operationally valid;
+tamper resistance becomes enforced after repository rules are enabled.**
+
+### Dependency-audit limits
+The audit reliably handles: Node builtin imports; literal bare imports; relative imports; literal
+`path.join(__dirname, …)`; the UMD forwarding pattern this repo uses; and template expressions with the
+shadow/reassignment patterns covered by `--selftest`. It is **defence-in-depth, not a full ECMAScript
+parser**, and therefore does not claim to prove that *arbitrary, deliberately-obfuscated* JavaScript is
+free of an external dependency. The formal guarantee comes from the **combination** of: actual
+child-process execution (a missing module fails the test), module-resolution failure, remote CI, a fixed
+commit SHA, artifact binding, code review, the frozen/scope checks, and branch protection.
+
+### Self-referential CI limit
+The workflow, guard scripts, and `.github/CODEOWNERS` all live in the repo and are therefore editable by
+a PR. The gate cannot, by itself, prove a PR has not rewritten the gate to pass. Real enforcement
+depends on post-merge repository rules on `main`: require a pull request; required status check
+(`trusted-verification`); require review from Code Owners; block force pushes; block branch deletion
+(see §8). Until those are configured, the CI evidence is trustworthy operationally but is **not yet an
+un-bypassable repository policy**. This is an explicit POST-MERGE admin action, not a CI failure.
