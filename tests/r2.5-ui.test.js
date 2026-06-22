@@ -38,7 +38,8 @@ chk('no click count / lap-time promise note', /never a click count or a lap-time
 // app() method + state
 chk('runQuantitativeRecommendation method', /runQuantitativeRecommendation\(\)\{/.test(html));
 chk('quantMetric state', /quantMetric:/.test(html));
-chk('stores last case', /_lastCase:/.test(html));
+// R3.0B moved analysis working state to the non-reactive caseDataHolder (raw out of the Alpine reactive tree).
+chk('stores last case', /caseDataHolder\.lastCase/.test(html));
 (() => {
   const start = html.indexOf('runQuantitativeRecommendation(){');
   const region = html.slice(start, start + 800);

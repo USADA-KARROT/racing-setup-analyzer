@@ -43,7 +43,8 @@ chk('importSteeringConfirmed state', /importSteeringConfirmed:/.test(html));
   chk('channelBinding carried', /channelBinding:/.test(region));
   chk('session-scoped (applicableSessionIds)', /applicableSessionIds:/.test(region));
   chk('only when confirmed + positive ratio', /importSteeringConfirmed[\s\S]{0,80}ratio>0/.test(region) || /ratio>0[\s\S]{0,80}importSteeringConfirmed/.test(region) || /importSteeringConfirmed/.test(region));
-  chk('passes calibrations to session builder', /buildCanonicalSession\(this\._importedBundle, mapping, cals,/.test(region));
+  // R3.0B moved the raw imported bundle out of the Alpine reactive tree into the non-reactive caseDataHolder.
+  chk('passes calibrations to session builder', /buildCanonicalSession\(caseDataHolder\.importedBundle, mapping, cals,/.test(region));
 })();
 
 // honesty: measured section reads the view model, never recomputes physics in the panel
