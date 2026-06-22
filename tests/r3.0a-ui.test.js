@@ -57,9 +57,11 @@ chk('svShow method present', /svShow\(name\)\{/.test(html));
 });
 chk('Setup Analyzer (predict) is reachable as Setup & Model', /caseSubview==='setup_model'\) return id==='predict'/.test(html.replace(/\s+/g, ' ')) || /setup_model[\s\S]{0,40}predict/.test(html));
 
-// honest deferral (§5.4): Comparisons is an explicit deferred info panel, NOT a fake control
-chk('comparisons pane is deferred', /Deferred to R3\.0C/.test(html));
-chk('comparisons states nothing fabricated', /No comparison is fabricated here/.test(html));
+// honest deferral (§5.4): Comparisons is an explicit deferred info panel, NOT a fake control.
+// Copy is now i18n'd → assert the pane references the deferral keys AND every locale keeps the honest meaning.
+const SHELL = require('../renderer/js/i18n-shell.js').SHELL_I18N;
+chk('comparisons pane is deferred', /t\('ui\.comparisons\.deferred'\)/.test(html) && /Deferred to R3\.0C/.test(SHELL.en['ui.comparisons.deferred']));
+chk('comparisons states nothing fabricated', /t\('ui\.comparisons\.deferredBody'\)/.test(html) && /fabricated/i.test(SHELL.en['ui.comparisons.deferredBody']) && /捏造/.test(SHELL.zh['ui.comparisons.deferredBody']) && /捏造/.test(SHELL.ja['ui.comparisons.deferredBody']));
 chk('deferred marker on nav item', /deferred:'R3\.0C'/.test(html));
 
 // existing panes still gated by showPane (single visibility mechanism)

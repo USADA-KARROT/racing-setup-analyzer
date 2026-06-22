@@ -58,7 +58,7 @@ canvas{max-height:300px}
   </div>
   <div class="flex items-center gap-2">
     <div class="text-xs text-slate-500" x-show="shellSection==='cases' && analysisView" x-cloak>
-      <span>Case status </span><span class="text-sky-300 font-semibold" x-text="(caseShellState()&&caseShellState().status)||''"></span>
+      <span x-text="t('ui.shell.caseStatusLabel')+' '"></span><span class="text-sky-300 font-semibold" x-text="tCode('ui.status',(caseShellState()&&caseShellState().status)||'')"></span>
     </div>
     <!-- Language switcher -->
     <div class="flex ml-2 rounded-lg overflow-hidden border border-white/10">
@@ -73,15 +73,15 @@ canvas{max-height:300px}
 
 <!-- R3.0A: Analysis-Case app shell — left main navigation -->
 <aside id="shellSidebar" class="fixed left-0 top-[53px] bottom-0 w-52 border-r border-white/5 overflow-y-auto py-3 px-2 z-20" style="background:var(--bg2)">
-  <div class="text-[10px] uppercase tracking-wide text-slate-600 px-3 mb-2">Workspace</div>
+  <div class="text-[10px] uppercase tracking-wide text-slate-600 px-3 mb-2" x-text="t('ui.shell.workspace')"></div>
   <template x-for="item in mainNav" :key="item.id">
     <button class="w-full text-left px-3 py-2 rounded-lg mb-1 text-sm transition-colors"
       :class="shellSection===item.id ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30' : 'text-slate-400 hover:bg-white/5 border border-transparent'"
-      @click="setShellSection(item.id)"><span x-text="item.label"></span><span class="float-right text-[10px] text-amber-400/70" x-show="item.deferred" x-cloak x-text="item.deferred"></span></button>
+      @click="setShellSection(item.id)"><span x-text="t('ui.nav.'+item.id)"></span><span class="float-right text-[10px] text-amber-400/70" x-show="item.deferred" x-cloak x-text="item.deferred"></span></button>
   </template>
   <div class="mt-3 pt-3 border-t border-white/5 text-[11px] text-slate-500 px-2">
-    <div>Status</div>
-    <div class="text-sky-300 font-semibold" x-text="(caseShellState()&&caseShellState().status)||'empty'"></div>
+    <div x-text="t('ui.shell.status')"></div>
+    <div class="text-sky-300 font-semibold" x-text="tCode('ui.status', (caseShellState()&&caseShellState().status)||'empty')"></div>
   </div>
 </aside>
 
@@ -89,23 +89,23 @@ canvas{max-height:300px}
 <aside id="shellTrustPanel" class="fixed right-0 top-[53px] bottom-0 w-72 border-l border-white/5 overflow-y-auto py-3 px-3 z-20 text-xs" style="background:var(--bg2)" x-show="shellSection==='cases' && analysisView" x-cloak>
   <template x-if="caseShellState()">
    <div class="space-y-2">
-    <div class="text-slate-300 font-semibold text-sm">Context &amp; Trust</div>
-    <div>Status: <span class="text-sky-300 font-semibold" x-text="caseShellState().status"></span></div>
-    <div>Credibility: <span x-text="caseShellState().trustPanel.credibility"></span></div>
-    <div>Confidence: <span x-text="caseShellState().trustPanel.confidence||'—'"></span></div>
-    <div>Mapping: <span x-text="caseShellState().trustPanel.mappingStatus"></span></div>
-    <div>Calibration: <span x-text="caseShellState().trustPanel.calibrationStatus"></span></div>
-    <div>Provenance: <span x-text="caseShellState().trustPanel.dataProvenance||'—'"></span></div>
-    <div class="pt-1">Next action: <span class="text-emerald-300" x-text="caseShellState().nextAction.key"></span>
-      <button class="ml-1 px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-[10px]" x-show="caseSubviewIds.includes(caseShellState().nextAction.target)" @click="setCaseSubview(caseShellState().nextAction.target)">go</button>
+    <div class="text-slate-300 font-semibold text-sm" x-text="t('ui.trust.title')"></div>
+    <div><span x-text="t('ui.shell.status')"></span>: <span class="text-sky-300 font-semibold" x-text="tCode('ui.status', caseShellState().status)"></span></div>
+    <div><span x-text="t('ui.trust.label.credibility')"></span>: <span x-text="credCode(caseShellState().trustPanel.credibility)"></span></div>
+    <div><span x-text="t('ui.trust.label.confidence')"></span>: <span x-text="caseShellState().trustPanel.confidence ? enumCode('ui.confidence', caseShellState().trustPanel.confidence) : '—'"></span></div>
+    <div><span x-text="t('ui.trust.label.mapping')"></span>: <span x-text="tCode('ui.mapping', caseShellState().trustPanel.mappingStatus)"></span></div>
+    <div><span x-text="t('ui.trust.label.calibration')"></span>: <span x-text="tCode('ui.calib', caseShellState().trustPanel.calibrationStatus)"></span></div>
+    <div><span x-text="t('ui.trust.label.provenance')"></span>: <span x-text="caseShellState().trustPanel.dataProvenance ? enumCode('ui.prov', caseShellState().trustPanel.dataProvenance) : '—'"></span></div>
+    <div class="pt-1"><span x-text="t('ui.trust.label.nextAction')"></span>: <span class="text-emerald-300" x-text="tCode('ui.nextAction', caseShellState().nextAction.key)"></span>
+      <button class="ml-1 px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-[10px]" x-show="caseSubviewIds.includes(caseShellState().nextAction.target)" @click="setCaseSubview(caseShellState().nextAction.target)" x-text="t('ui.shell.go')"></button>
     </div>
-    <div class="pt-1 text-slate-400" x-show="caseShellState().trustPanel.blockedReasons.length">Blocked reasons</div>
+    <div class="pt-1 text-slate-400" x-show="caseShellState().trustPanel.blockedReasons.length" x-text="t('ui.trust.label.blockedReasons')"></div>
     <template x-for="(b,bi) in caseShellState().trustPanel.blockedReasons" :key="bi">
-      <div class="text-[11px] text-amber-400/80" x-text="(b.layer?b.layer+': ':'')+(b.code||b)"></div>
+      <div class="text-[11px] text-amber-400/80" x-text="(b.layer?b.layer+': ':'')+tCode('ui.blocker',(b.code||b))"></div>
     </template>
-    <div class="pt-1 text-slate-400" x-show="caseShellState().trustPanel.limitations.length">Limitations</div>
+    <div class="pt-1 text-slate-400" x-show="caseShellState().trustPanel.limitations.length" x-text="t('ui.trust.label.limitations')"></div>
     <template x-for="(lim,li) in caseShellState().trustPanel.limitations" :key="li">
-      <div class="text-[11px] text-slate-500" x-text="lim"></div>
+      <div class="text-[11px] text-slate-500" x-text="tCode('ui.limitation', lim)"></div>
     </template>
    </div>
   </template>
@@ -117,60 +117,60 @@ canvas{max-height:300px}
 <div x-show="shellSection==='cases'" x-cloak class="mb-4">
   <template x-if="caseShellState()">
    <div class="mb-3 rounded-lg border border-slate-700 bg-slate-800/40 px-4 py-2 text-xs flex flex-wrap gap-x-4 gap-y-1">
-     <div>Case <b class="text-slate-200" x-text="caseShellState().contextBar.caseName||'—'"></b></div>
-     <div>Vehicle <b x-text="caseShellState().contextBar.vehicle||'—'"></b></div>
-     <div>Session <b x-text="caseShellState().contextBar.session||'—'"></b></div>
-     <div>Telemetry <b x-text="caseShellState().contextBar.telemetrySource||'none'"></b></div>
-     <div>Status <b class="text-sky-300" x-text="caseShellState().status"></b></div>
+     <div><span x-text="t('ui.context.case')"></span> <b class="text-slate-200" x-text="caseShellState().contextBar.caseName||'—'"></b></div>
+     <div><span x-text="t('ui.context.vehicle')"></span> <b x-text="caseShellState().contextBar.vehicle||'—'"></b></div>
+     <div><span x-text="t('ui.context.session')"></span> <b x-text="caseShellState().contextBar.session||'—'"></b></div>
+     <div><span x-text="t('ui.context.telemetry')"></span> <b x-text="caseShellState().contextBar.telemetrySource||t('ui.context.telemetry.none')"></b></div>
+     <div><span x-text="t('ui.shell.status')"></span> <b class="text-sky-300" x-text="tCode('ui.status', caseShellState().status)"></b></div>
    </div>
   </template>
   <!-- R3.0B: Case Library (local-first persistence) -->
   <div class="mb-3 rounded-lg border border-slate-700 bg-slate-800/40 p-3" x-show="shellSection==='cases'" x-cloak x-init="$nextTick(()=>{ if(ensureStore()) refreshLibrary(); })">
     <div class="flex items-center justify-between mb-2">
-      <div class="text-sm font-semibold text-slate-200">Case Library <span class="text-[11px] text-slate-500" x-text="library ? '· '+library.counts.shown+'/'+library.counts.total : ''"></span></div>
+      <div class="text-sm font-semibold text-slate-200"><span x-text="t('ui.case.libraryTitle')"></span> <span class="text-[11px] text-slate-500" x-text="library ? '· '+library.counts.shown+'/'+library.counts.total : ''"></span></div>
       <div class="flex gap-1">
-        <button @click="saveCurrentCase()" :disabled="!analysisView || importedSummaryOpen" class="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-xs disabled:opacity-40" title="Save / update the current analysis (imported summaries cannot be overwritten — use Save as new)">Save</button>
-        <button @click="saveCurrentCaseAsNew()" :disabled="!analysisView || importedSummaryOpen" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs disabled:opacity-40" title="Save the current analysis as a new case (not available for imported summaries — re-run locally)">Save as new</button>
-        <button @click="exportCaseRow(currentCaseId)" :disabled="!currentCaseId" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs disabled:opacity-40">Export</button>
-        <label class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs cursor-pointer">Import<input type="file" accept="application/json" class="hidden" @change="importCaseFile($event)"></label>
-        <label class="flex items-center gap-1 text-[11px] text-slate-400 px-1" title="Autosave changes to the open case"><input type="checkbox" x-model="autosaveEnabled"> autosave</label>
+        <button @click="saveCurrentCase()" :disabled="!analysisView || importedSummaryOpen" class="px-2 py-1 rounded bg-emerald-700 hover:bg-emerald-600 text-xs disabled:opacity-40" :title="t('ui.case.save.tip')" x-text="t('ui.case.save')"></button>
+        <button @click="saveCurrentCaseAsNew()" :disabled="!analysisView || importedSummaryOpen" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs disabled:opacity-40" :title="t('ui.case.saveAsNew.tip')" x-text="t('ui.case.saveAsNew')"></button>
+        <button @click="exportCaseRow(currentCaseId)" :disabled="!currentCaseId" class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs disabled:opacity-40" x-text="t('ui.case.export')"></button>
+        <label class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs cursor-pointer"><span x-text="t('ui.case.import')"></span><input type="file" accept="application/json" class="hidden" @change="importCaseFile($event)"></label>
+        <label class="flex items-center gap-1 text-[11px] text-slate-400 px-1" :title="t('ui.case.autosave.tip')"><input type="checkbox" x-model="autosaveEnabled"> <span x-text="t('ui.case.autosave')"></span></label>
       </div>
     </div>
-    <div class="text-[11px] text-rose-400 mb-1" x-show="storageError" x-cloak x-text="'Storage: '+storageError"></div>
-    <div class="text-[11px] text-amber-400/70 mb-1" x-show="importedSummaryOpen" x-cloak>Imported summary — full section detail not included; re-run locally for detail.</div>
+    <div class="text-[11px] text-rose-400 mb-1" x-show="storageError" x-cloak x-text="t('ui.case.storageError')+' '+storageError"></div>
+    <div class="text-[11px] text-amber-400/70 mb-1" x-show="importedSummaryOpen" x-cloak x-text="t('ui.case.importedBanner')"></div>
     <div class="flex flex-wrap gap-2 mb-2 text-xs">
-      <input x-model="libFilters.search" @input="refreshLibrary()" placeholder="search title / vehicle / track…" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 flex-1 min-w-[8rem]">
-      <input x-model="libFilters.vehicle" @input="refreshLibrary()" placeholder="vehicle" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-24">
-      <input x-model="libFilters.track" @input="refreshLibrary()" placeholder="track" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-24">
+      <input x-model="libFilters.search" @input="refreshLibrary()" :placeholder="t('ui.case.filter.search')" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 flex-1 min-w-[8rem]">
+      <input x-model="libFilters.vehicle" @input="refreshLibrary()" :placeholder="t('ui.case.filter.vehicle')" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-24">
+      <input x-model="libFilters.track" @input="refreshLibrary()" :placeholder="t('ui.case.filter.track')" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 w-24">
       <select x-model="libFilters.status" @change="refreshLibrary()" class="bg-slate-900 border border-slate-700 rounded px-1 py-1">
-        <option value="">any status</option><option value="draft">draft</option><option value="ready">ready</option><option value="complete">complete</option><option value="archived">archived</option>
+        <option value="" x-text="t('ui.case.status.any')"></option><option value="draft" x-text="t('ui.case.status.draft')"></option><option value="ready" x-text="t('ui.case.status.ready')"></option><option value="complete" x-text="t('ui.case.status.complete')"></option><option value="archived" x-text="t('ui.case.status.archived')"></option>
       </select>
-      <input type="date" x-model="libFilters.fromDate" @change="refreshLibrary()" title="updated on/after" class="bg-slate-900 border border-slate-700 rounded px-1 py-1">
-      <label class="flex items-center gap-1 text-slate-400"><input type="checkbox" x-model="libFilters.includeArchived" @change="refreshLibrary()"> archived</label>
+      <input type="date" x-model="libFilters.fromDate" @change="refreshLibrary()" :title="t('ui.case.filter.fromDate.tip')" class="bg-slate-900 border border-slate-700 rounded px-1 py-1">
+      <label class="flex items-center gap-1 text-slate-400"><input type="checkbox" x-model="libFilters.includeArchived" @change="refreshLibrary()"> <span x-text="t('ui.case.filter.includeArchived')"></span></label>
     </div>
     <div class="max-h-52 overflow-y-auto text-xs">
-      <template x-if="library && library.rows.length===0"><div class="text-slate-500 py-2">No saved cases — run an analysis and click Save.</div></template>
+      <template x-if="library && library.rows.length===0"><div class="text-slate-500 py-2" x-text="t('ui.case.empty')"></div></template>
       <template x-for="sec in libSections()" :key="sec.key">
         <div class="mb-1">
-          <div class="text-[10px] uppercase tracking-wide text-slate-600 mt-1" x-text="sec.label+' ('+sec.rows.length+')'"></div>
+          <div class="text-[10px] uppercase tracking-wide text-slate-600 mt-1" x-text="tCode('ui.case.bucket', sec.key)+' ('+sec.rows.length+')'"></div>
           <template x-for="row in sec.rows" :key="row.caseId">
             <div class="flex items-center justify-between py-1 border-b border-white/5">
               <div class="min-w-0 truncate">
                 <span class="text-amber-300 mr-0.5" x-show="row.pinned" x-cloak>★</span>
                 <span class="text-slate-200" x-text="row.title"></span>
-                <span class="text-slate-500" x-text="'· '+(row.vehicle||'—')+(row.track?(' · '+row.track):'')+' · '+row.status"></span>
-                <span class="ml-1 text-[10px] text-amber-400/70" x-show="row.recordType==='imported_summary'" x-cloak>imported</span>
-                <span class="ml-1 text-[10px]" :class="row.indicators.telemetry==='observable' ? 'text-emerald-300' : 'text-slate-600'" x-text="'tele:'+row.indicators.telemetry"></span>
-                <span class="ml-1 text-[10px]" :class="row.indicators.measured==='measured' ? 'text-violet-300' : 'text-slate-600'" x-text="'meas:'+row.indicators.measured"></span>
-                <span class="ml-1 text-[10px]" :class="row.indicators.corner==='eligible' ? 'text-sky-300' : 'text-slate-600'" x-text="'corner:'+row.indicators.corner"></span>
-                <span class="ml-1 text-[10px] text-sky-300" x-show="row.caseId===currentCaseId" x-cloak>open</span>
+                <span class="text-slate-500" x-text="'· '+(row.vehicle||'—')+(row.track?(' · '+row.track):'')+' · '+tCode('ui.case.status', row.status)"></span>
+                <span class="ml-1 text-[10px] text-amber-400/70" x-show="row.recordType==='imported_summary'" x-cloak x-text="t('ui.case.row.imported')"></span>
+                <span class="ml-1 text-[10px]" :class="row.indicators.telemetry==='observable' ? 'text-emerald-300' : 'text-slate-600'" x-text="t('ui.case.ind.tele')+tCode('ui.case.ind.tele', row.indicators.telemetry)"></span>
+                <span class="ml-1 text-[10px]" :class="row.indicators.measured==='measured' ? 'text-violet-300' : 'text-slate-600'" x-text="t('ui.case.ind.meas')+tCode('ui.case.ind.meas', row.indicators.measured)"></span>
+                <span class="ml-1 text-[10px]" :class="row.indicators.corner==='eligible' ? 'text-sky-300' : 'text-slate-600'" x-text="t('ui.case.ind.corner')+tCode('ui.case.ind.corner', row.indicators.corner)"></span>
+                <span class="ml-1 text-[10px] text-sky-300" x-show="row.caseId===currentCaseId" x-cloak x-text="t('ui.case.row.open')"></span>
               </div>
               <div class="flex gap-1 shrink-0">
-                <button @click="pinCase(row.caseId, !row.pinned)" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600" :class="row.pinned?'text-amber-300':''" x-text="row.pinned ? 'Unpin' : 'Pin'"></button>
-                <button @click="openCase(row.caseId)" class="px-1.5 py-0.5 rounded bg-sky-700 hover:bg-sky-600">Open</button>
-                <button @click="duplicateCase(row.caseId)" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600" x-show="row.recordType!=='imported_summary'" x-cloak>Dup</button>
-                <button @click="archiveCase(row.caseId, !row.archived)" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600" x-text="row.archived ? 'Unarc' : 'Arc'"></button>
-                <button @click="deleteCase(row.caseId)" class="px-1.5 py-0.5 rounded bg-rose-800 hover:bg-rose-700">Del</button>
+                <button @click="pinCase(row.caseId, !row.pinned)" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600" :class="row.pinned?'text-amber-300':''" x-text="row.pinned ? t('ui.case.row.unpin') : t('ui.case.row.pin')"></button>
+                <button @click="openCase(row.caseId)" class="px-1.5 py-0.5 rounded bg-sky-700 hover:bg-sky-600" x-text="t('ui.case.row.openBtn')"></button>
+                <button @click="duplicateCase(row.caseId)" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600" x-show="row.recordType!=='imported_summary'" x-cloak x-text="t('ui.case.row.dup')"></button>
+                <button @click="archiveCase(row.caseId, !row.archived)" class="px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600" x-text="row.archived ? t('ui.case.row.unarc') : t('ui.case.row.arc')"></button>
+                <button @click="deleteCase(row.caseId)" class="px-1.5 py-0.5 rounded bg-rose-800 hover:bg-rose-700" x-text="t('ui.case.row.del')"></button>
               </div>
             </div>
           </template>
@@ -182,29 +182,29 @@ canvas{max-height:300px}
     <template x-for="cn in caseNav" :key="cn.id">
       <button class="px-2.5 py-1 rounded text-xs transition-colors"
         :class="caseSubview===cn.id ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30' : 'text-slate-400 hover:bg-white/5 border border-transparent'"
-        @click="setCaseSubview(cn.id)"><span x-text="cn.label"></span><span class="ml-1 text-slate-600" x-show="!caseNavAvailable(cn.id)" x-cloak title="not yet available in this case">○</span></button>
+        @click="setCaseSubview(cn.id)"><span x-text="t('ui.caseNav.'+cn.id)"></span><span class="ml-1 text-slate-600" x-show="!caseNavAvailable(cn.id)" x-cloak :title="t('ui.caseNav.unavailable')">○</span></button>
     </template>
   </div>
 </div>
 
 <!-- R3.0A: Dashboard -->
 <div x-show="showPane('dashboard')" x-cloak x-transition>
-  <h2 class="text-xl font-bold mb-3">Dashboard</h2>
+  <h2 class="text-xl font-bold mb-3" x-text="t('ui.nav.dashboard')"></h2>
   <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700 max-w-2xl">
-    <div class="text-sm text-slate-300 mb-2">Current Analysis Case</div>
+    <div class="text-sm text-slate-300 mb-2" x-text="t('ui.dash.currentCase')"></div>
     <template x-if="analysisView">
       <div class="text-sm space-y-1">
-        <div>Case: <b x-text="(analysisView.caseHeader&&analysisView.caseHeader.caseId)||'—'"></b></div>
-        <div>Vehicle: <b x-text="(analysisView.caseHeader&&analysisView.caseHeader.vehicle)||'—'"></b></div>
-        <div>Status: <b class="text-sky-300" x-text="(caseShellState()&&caseShellState().status)||'—'"></b></div>
-        <div class="pt-2"><button class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm" @click="setShellSection('cases')">Open case</button></div>
+        <div><span x-text="t('ui.context.case')"></span>: <b x-text="(analysisView.caseHeader&&analysisView.caseHeader.caseId)||'—'"></b></div>
+        <div><span x-text="t('ui.context.vehicle')"></span>: <b x-text="(analysisView.caseHeader&&analysisView.caseHeader.vehicle)||'—'"></b></div>
+        <div><span x-text="t('ui.shell.status')"></span>: <b class="text-sky-300" x-text="(caseShellState()&&tCode('ui.status', caseShellState().status))||'—'"></b></div>
+        <div class="pt-2"><button class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm" @click="setShellSection('cases')" x-text="t('ui.dash.openCase')"></button></div>
       </div>
     </template>
     <template x-if="!analysisView">
-      <div class="text-sm text-slate-400">No analysis case yet.
+      <div class="text-sm text-slate-400"><span x-text="t('ui.dash.noCase')"></span>
         <div class="pt-2 flex gap-2">
-          <button class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm" @click="setShellSection('cases'); loadDemoAnalysisCase()">Load Demo Case</button>
-          <button class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-sm" @click="setShellSection('import')">Import Telemetry</button>
+          <button class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm" @click="setShellSection('cases'); loadDemoAnalysisCase()" x-text="t('ui.dash.loadDemo')"></button>
+          <button class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-sm" @click="setShellSection('import')" x-text="t('ui.nav.import')"></button>
         </div>
       </div>
     </template>
@@ -213,18 +213,17 @@ canvas{max-height:300px}
 
 <!-- R3.0A: Comparisons (explicitly deferred to R3.0C — non-actionable info panel, not a fake control) -->
 <div x-show="showPane('comparisons')" x-cloak x-transition>
-  <h2 class="text-xl font-bold mb-3">Comparisons</h2>
+  <h2 class="text-xl font-bold mb-3" x-text="t('ui.nav.comparisons')"></h2>
   <div class="bg-slate-800/40 rounded-lg p-4 border border-amber-700/40 max-w-2xl text-sm text-slate-300">
-    <div class="text-amber-300 font-semibold mb-1">Deferred to R3.0C</div>
-    Cross-lap / cross-session reference-lap and corner-delta comparison is not yet available. It arrives in
-    milestone R3.0C (Reference Lap &amp; Corner Delta Intelligence). No comparison is fabricated here.
+    <div class="text-amber-300 font-semibold mb-1" x-text="t('ui.comparisons.deferred')"></div>
+    <div x-text="t('ui.comparisons.deferredBody')"></div>
   </div>
 </div>
 
 <!-- R3.0A: Setup Library sub-navigation -->
 <div x-show="shellSection==='setup_library'" x-cloak class="mb-3 flex flex-wrap gap-1">
   <template x-for="lt in setupLibraryTabs" :key="lt.id">
-    <button class="px-2.5 py-1 rounded text-xs transition-colors" :class="currentTab===lt.id ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30' : 'text-slate-400 hover:bg-white/5 border border-transparent'" @click="currentTab=lt.id" x-text="lt.label"></button>
+    <button class="px-2.5 py-1 rounded text-xs transition-colors" :class="currentTab===lt.id ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30' : 'text-slate-400 hover:bg-white/5 border border-transparent'" @click="currentTab=lt.id" x-text="t('ui.setupTab.'+lt.id)"></button>
   </template>
 </div>
 
@@ -2787,22 +2786,22 @@ canvas{max-height:300px}
   <template x-if="analysisView && importedSummaryOpen">
    <div class="space-y-3" id="importedSummaryView">
     <div class="rounded-lg border border-amber-700/40 bg-amber-900/10 p-4 text-sm">
-      <div class="text-amber-300 font-semibold mb-1">Imported summary</div>
-      <div class="text-slate-400 text-xs mb-2">Full section detail is not included in a portable bundle — re-run the analysis locally for the complete workspace.</div>
+      <div class="text-amber-300 font-semibold mb-1" x-text="t('ui.case.imported.title')"></div>
+      <div class="text-slate-400 text-xs mb-2" x-text="t('ui.case.imported.note')"></div>
       <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-        <div><span class="text-slate-500">Case </span><span x-text="(analysisView.caseHeader&&analysisView.caseHeader.caseId)||'—'"></span></div>
-        <div><span class="text-slate-500">Vehicle </span><span x-text="(analysisView.caseHeader&&analysisView.caseHeader.vehicle)||'—'"></span></div>
-        <div><span class="text-slate-500">Status </span><span class="text-sky-300" x-text="(analysisView.caseHeader&&analysisView.caseHeader.overallStatus)||'—'"></span></div>
-        <div><span class="text-slate-500">Understeer </span><b x-text="(analysisView.modelPrediction&&analysisView.modelPrediction.understeerGradient&&analysisView.modelPrediction.understeerGradient.value)??'—'"></b><span> deg/g</span></div>
-        <div><span class="text-slate-500">Tendency </span><b x-text="(analysisView.modelPrediction&&analysisView.modelPrediction.predictedTendency&&analysisView.modelPrediction.predictedTendency.value)||'—'"></b></div>
-        <div><span class="text-slate-500">Measured K<sub>us</sub> </span><b class="text-violet-300" x-text="(analysisView.measuredMetrics&&analysisView.measuredMetrics.measuredKUs&&analysisView.measuredMetrics.measuredKUs.value)??'—'"></b></div>
+        <div><span class="text-slate-500" x-text="t('ui.case.field.case')+' '"></span><span x-text="(analysisView.caseHeader&&analysisView.caseHeader.caseId)||'—'"></span></div>
+        <div><span class="text-slate-500" x-text="t('ui.case.field.vehicle')+' '"></span><span x-text="(analysisView.caseHeader&&analysisView.caseHeader.vehicle)||'—'"></span></div>
+        <div><span class="text-slate-500" x-text="t('ui.case.field.status')+' '"></span><span class="text-sky-300" x-text="(analysisView.caseHeader&&tCode('ui.status', analysisView.caseHeader.overallStatus))||'—'"></span></div>
+        <div><span class="text-slate-500" x-text="t('ui.case.field.understeer')+' '"></span><b x-text="(analysisView.modelPrediction&&analysisView.modelPrediction.understeerGradient&&analysisView.modelPrediction.understeerGradient.value)??'—'"></b><span> deg/g</span></div>
+        <div><span class="text-slate-500" x-text="t('ui.case.field.tendency')+' '"></span><b x-text="(analysisView.modelPrediction&&analysisView.modelPrediction.predictedTendency&&tnd(analysisView.modelPrediction.predictedTendency.value))||'—'"></b></div>
+        <div><span class="text-slate-500"><span x-text="t('ui.case.field.measuredKus')"></span><sub>us</sub> </span><b class="text-violet-300" x-text="(analysisView.measuredMetrics&&analysisView.measuredMetrics.measuredKUs&&analysisView.measuredMetrics.measuredKUs.value)??'—'"></b></div>
       </div>
     </div>
     <div class="rounded-lg border border-slate-700 bg-slate-800/40 p-4">
-      <div class="text-xs text-slate-400 mb-2">Capability (as imported)</div>
+      <div class="text-xs text-slate-400 mb-2" x-text="t('ui.case.imported.capability')"></div>
       <div class="flex flex-wrap gap-2">
         <template x-for="c in (analysisView.capabilitySummary||[])" :key="c.key">
-          <span class="text-xs px-2 py-1 rounded" :class="c.available ? 'bg-emerald-900/40 text-emerald-300' : 'bg-slate-700 text-slate-400'"><span x-text="c.available ? '✓' : '○'"></span> <span x-text="c.key"></span></span>
+          <span class="text-xs px-2 py-1 rounded" :class="c.available ? 'bg-emerald-900/40 text-emerald-300' : 'bg-slate-700 text-slate-400'"><span x-text="c.available ? '✓' : '○'"></span> <span x-text="tCode('ui.cap', c.key)"></span></span>
         </template>
       </div>
     </div>
@@ -3051,6 +3050,7 @@ canvas{max-height:300px}
 <script src="js/i18n-ui.js"></script>
 <script src="js/i18n-advisor.js"></script>
 <script src="js/i18n-csv.js"></script>
+<script src="js/i18n-shell.js"></script>
 <script src="js/calibration.js"></script>
 <script src="js/tire-data.js"></script>
 <script src="js/dynamics-model.js"></script>
@@ -3229,6 +3229,17 @@ function app(){return{
         return k; },
   // 把模型回傳的英文傾向(Understeer/Oversteer/Neutral)轉成目前語言
   tnd(tendencyEn){ return this.t('us.'+(tendencyEn||'Neutral')); },
+  // R3 shell — render a FROZEN-service code via t('<prefix>.'+code); unknown codes humanize (never a raw SCREAMING_SNAKE token).
+  tCode(prefix, code){ if(code==null||code==='') return ''; const k=prefix+'.'+String(code); const v=this.t(k);
+        if(v!==k) return v; return String(code).replace(/[_-]+/g,' ').replace(/([a-z0-9])([A-Z])/g,'$1 $2').replace(/\b\w/g,function(c){return c.toUpperCase();}); },
+  // credibility values from the frozen service are English literals → normalize to a code, then translate.
+  credCode(v){ if(v==null||v==='') return ''; var s=String(v).toLowerCase();
+        if(s.indexOf('measured')!==-1) return this.t('ui.cred.measured_kinematic_confounded');
+        if(s.indexOf('model')!==-1) return this.t('ui.cred.model');
+        if(s.indexOf('unavailable')!==-1||s.indexOf('—')!==-1) return this.t('ui.cred.unavailable');
+        return this.tCode('ui.cred', s.replace(/[^a-z0-9]+/g,'_')); },
+  // generic enum value (provenance/confidence/…) → normalize hyphens/spaces/case to a snake_case code, then translate.
+  enumCode(prefix, v){ if(v==null||v==='') return ''; return this.tCode(prefix, String(v).toLowerCase().replace(/[^a-z0-9]+/g,'_')); },
   // 資料驅動名稱(車款/輪胎)：英文/日文模式用英文 name，繁中用 name_zh
   nm(o){ if(!o) return ''; return (this.lang==='zh' && o.name_zh) ? o.name_zh : (o.name || o.name_zh || ''); },
   // 資料驅動備註(車款/輪胎)：繁中用 notes，英文/日文用 notes_en（日文回退英文）
