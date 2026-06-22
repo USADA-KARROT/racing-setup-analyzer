@@ -134,6 +134,9 @@ chk('tCode humanizes unknown codes as a last resort', /tCode\(prefix, code\)\{[\
 chk('tErr maps error codes with a localized generic fallback', /tErr\(v\)\{[\s\S]{0,500}ui\.err\.generic/.test(idxHtml) && tri.length && has(en, 'ui.err.generic') && has(zh, 'ui.err.generic') && has(ja, 'ui.err.generic'));
 chk('error displays route through tErr (no raw importError/analysisError/storageError)', /x-text="tErr\(importError\)"/.test(idxHtml) && /x-text="tErr\(analysisError\)"/.test(idxHtml) && /tErr\(storageError\)/.test(idxHtml));
 chk('document lang bound to the active locale (a11y)', /documentElement\.lang=\(l==='zh'\?'zh-TW':l\)/.test(idxHtml));
+// CP-I18N-3 round3: trust-panel evidence layer + deleteCase confirm must not leak English
+chk('trust-panel evidence layer localized (not raw b.layer)', /\(b\.layer\?tCode\('aw\.layer',b\.layer\)/.test(idxHtml));
+chk('deleteCase confirm localized (no raw English prompt)', /confirm\(this\.t\('ui\.case\.deleteConfirm'\)\)/.test(idxHtml) && !/Delete this case\? This cannot be undone\./.test(idxHtml) && tri('ui.case', 'deleteConfirm'));
 // CP-I18N-3 #1: legacy .bmsbin viewer adapter titles are no longer English in zh/ja
 ['ui.telem.cadapter.title', 'ui.telem.sadapter.title'].forEach(k => {
   chk('legacy adapter title localized: ' + k, has(en, k) && zh[k] !== en[k] && ja[k] !== en[k]);

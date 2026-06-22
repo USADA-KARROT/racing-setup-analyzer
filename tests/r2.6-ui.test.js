@@ -32,9 +32,10 @@ chk('Heuristic credibility badge', /credBadge\('Heuristic'\)/.test(html));
 
 // honesty: the corner section reads the view model, no inline physics/segmentation in the panel
 (() => {
-  const idx = html.indexOf('J · Corner Coaching');
+  const idx = html.indexOf('aw.label.j_corner_coaching');
+  chk('J Corner Coaching section anchor present', idx >= 0);
   const region = html.slice(idx, idx + 1400);
-  chk('no inline segmentation math in the panel', !/Math\.(sqrt|pow|abs)\(|lateral_accel\s*>=|cornerThresh/.test(region));
+  chk('no inline segmentation math in the panel', idx >= 0 && !/Math\.(sqrt|pow|abs)\(|lateral_accel\s*>=|cornerThresh/.test(region));
 })();
 
 console.log(`r2.6-ui: ${pass} passed, ${fail} failed`);
