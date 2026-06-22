@@ -59,8 +59,10 @@ NAV_NODES[nodeId] = {
 - `showPane(id)` / `setShellSection(id)` / `setCaseSubview(id)` routing = read `legacyRouting` / `rendererAdapter`
   from the registry; the inline `['spring','tire','advisor','lihpao','telemetry']` arrays are ELIMINATED (the
   membership comes from `FEATURES` filtered by area + adapter pane).
-- A `feature-router.js` resolves `navigateToFeature(featureId)` → its `navNodeId.legacyRouting` + `rendererAdapter`,
-  and is the ONLY code that sets `shellSection`/`currentTab`/`caseSubview`. Scattered inline `@click` navigation is
+- A `feature-router.js` resolves `navigateToFeature(featureId)` → constructs the legacy route from the registry's
+  declarative data (`getFeature`/`getNode`: `navNodeId.legacyRouting` + `rendererAdapter`). The router is the ONLY
+  place featureId→`shellSection`/`currentTab`/`caseSubview` is constructed; the registry stays declarative data +
+  navigation derivations (it does NOT build routes). Scattered inline `@click` navigation is
   routed through it (or, where it must stay inline for now, it calls `navigateToFeature` with a Feature/Nav ID, never
   a raw pane literal).
 

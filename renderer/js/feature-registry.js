@@ -101,23 +101,8 @@
   function getFeature(id) { return FEATURES[id] || null; }
   function getNode(id) { return NAV_NODES[id] || null; }
 
-  // resolve the legacy routing instructions for a feature (the ONLY place feature→pane state is computed)
-  function resolveFeatureRoute(featureId) {
-    var f = FEATURES[featureId]; if (!f) return null;
-    var node = NAV_NODES[f.navNodeId] || null;
-    var route;
-    if (node && node.kind === 'setuplib_area') {
-      // setup_library section + the feature's own pane (this is what fixes 'predict' being orphaned)
-      route = { shellSection: 'setup_library', currentTab: f.rendererAdapter ? f.rendererAdapter.paneId : null };
-    } else if (node && node.legacyRouting) {
-      route = Object.assign({}, node.legacyRouting);
-    } else {
-      route = {};
-    }
-    if (f.rendererAdapter && f.rendererAdapter.focusTarget) route.focusTarget = f.rendererAdapter.focusTarget;
-    route.featureId = featureId; route.deferred = f.availability === 'deferred' ? (f.deferredReason || true) : false;
-    return route;
-  }
+  // NOTE: featureId → legacy UI-state (shellSection/currentTab/caseSubview) is constructed ONLY in feature-router.js
+  // (the single translator). The registry stays declarative data (FEATURES/NAV_NODES) + navigation derivations.
 
   function getFeatureBreadcrumb(featureId) {
     var f = FEATURES[featureId]; if (!f) return [];
@@ -158,7 +143,7 @@
     getFeature: getFeature, getNode: getNode,
     deriveMainNav: deriveMainNav, deriveCaseNav: deriveCaseNav, deriveCaseSubviewIds: deriveCaseSubviewIds,
     deriveSetupLibraryAreas: deriveSetupLibraryAreas, deriveSetupLibraryPaneIds: deriveSetupLibraryPaneIds,
-    resolveFeatureRoute: resolveFeatureRoute, getFeatureBreadcrumb: getFeatureBreadcrumb,
+    getFeatureBreadcrumb: getFeatureBreadcrumb,
     isFeatureReachable: isFeatureReachable, getFeatureEntryPoints: getFeatureEntryPoints,
     validateRegistry: validateRegistry,
   };
