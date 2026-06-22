@@ -9,11 +9,16 @@ These live in a pure module (proposed `renderer/js/vehicle-preset-usecases.js`) 
 `renderer/js/vehicle-preset-viewmodel.js`). They **read** the frozen `car-presets.js` (via `api.js` where it already
 wraps it) and MUST NOT mutate preset data or change `PRESET_BASELINE_COUNT` (501) / preset IDs.
 
-## Read pipeline (READ-ONLY)
+## Read pipeline (READ-ONLY + immutable returns)
 - `listVehiclePresets(filters)` → `[summary]` — search (name/manufacturer/layout), manufacturer filter, layout
   filter. Pure; sourced from the existing preset summary API; never mutates a preset; never touches a case.
 - `getVehiclePresetDetail(presetId)` → `{ identity, setupInputs, tireDefaults, geometryDefaults, provenance,
-  confidence, assumptions, warnings }` — a read-only detail projection.
+  confidence, assumptions, warnings }` — a read-only detail **projection/deep-copy**. The read pipeline MUST return a
+  projection or deep copy, NEVER the live `CAR_PRESETS` object (today `api.getPreset()` returns the live reference),
+  so a UI consumer cannot mutate preset data by reference. Contract test verifies preset **content** (deep-equal),
+  not only count/IDs, is unchanged before/after the read pipeline runs.
+- Browsing/selecting is the read path only — it never calls the mutating legacy `applyPreset()` (see
+  `docs/r3-ux0-ui-domain-boundary.md` "Legacy predict adapter rule").
 - `buildVehiclePresetSummary(preset)` → a small card/list view model `{ presetId, name, manufacturer, layout,
   confidenceGrade, provenanceBadge }`. Pure transform; no I/O.
 - The view model exposes a `confidenceView` + `provenanceView` (per the existing per-parameter
@@ -31,10 +36,13 @@ wraps it) and MUST NOT mutate preset data or change `PRESET_BASELINE_COUNT` (501
 ## Case actions (FAIL-CLOSED; preview + confirm)
 - `createCaseFromSetupDraft(draft, metadata)` → creates a NEW Analysis Case from a draft (explicit user action).
   Until this is wired safely through the existing R3.0B case-store, it is surfaced as `unavailable` (no fake button).
-- `previewApplyPresetToCase(caseId, presetId)` → a NON-mutating preview of what applying would change (a diff), with
-  provenance/confidence; writes nothing.
-- `confirmApplyPresetToCase(preview)` → applies ONLY a preview the user explicitly confirmed; never a silent
-  overwrite. Until safely wired, `unavailable`.
+- `previewApplyPresetToCase(caseId, presetId)` → a NON-mutating preview `{ previewToken, diff, provenance,
+  confidence }`; writes nothing. The `previewToken` is an OPAQUE ephemeral token bound to `caseId` + the case's
+  current `baseRevision` + a hash of the `(draft/preset)` content + an `expiry`.
+- `confirmApplyPresetToCase(preview)` → applies ONLY a preview whose `previewToken` still matches the case's current
+  revision and content hash and has not expired; a stale, expired, fabricated, or wrong-case token is REJECTED
+  fail-closed (no apply). Never a silent overwrite. Until this is safely wired through the (frozen) R3.0B case-store,
+  the apply actions surface as `unavailable` (a real disabled+explained state), not a fake button.
 
 ## Invariants (Phase-2 contract tests)
 - `CAR_PRESETS` count + preset IDs are identical before and after (read-only pipeline; no mutation).

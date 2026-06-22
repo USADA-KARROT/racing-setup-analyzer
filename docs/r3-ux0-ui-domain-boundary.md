@@ -48,3 +48,17 @@ the case record, or any export.
   `setShellSection` inline arrays) that can drift → replaced by the registry as the single source of truth.
 - A feature reachable only as a side effect of another section's default (e.g. `predict` reachable only via
   `cases→setup_model`, orphaned in Setup Library) → every production feature has a registry entry point.
+
+## Legacy `predict` adapter rule (browse ≠ mutate)
+Today, selecting a preset directly calls the mutating `applyPreset()` (it writes the editor/model input state and
+clears results). Under R3-UX0:
+- **Browsing/selecting** a vehicle preset (in the Vehicle Presets browser) updates ONLY read-only browse/detail view
+  state (the highlighted preset + its `getVehiclePresetDetail` projection). It MUST NOT call `applyPreset()`, MUST
+  NOT mutate the editor `pred.*` inputs, MUST NOT clear results, MUST NOT create/overwrite a case, run the model, or
+  persist anything.
+- The ONLY path that mutates the editor is an explicit user action: **build a setup draft → load it into the
+  editor** (`buildSetupDraftFromPreset` → `loadSetupDraftIntoEditor`). The legacy `applyPreset()` mutation is reached
+  only through that explicit "load draft into editor" action, never as a side effect of browsing.
+- Contract test: firing a preset selection / detail-view event (browse) leaves the current Analysis Case, the editor
+  `pred.*` inputs, persistence, and the model result **byte-identical** (no mutation); only the explicit build/load
+  action changes editor state.
