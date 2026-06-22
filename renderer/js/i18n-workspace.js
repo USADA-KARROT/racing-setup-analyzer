@@ -411,7 +411,13 @@ const WS_I18N = {
     "ui.err.CANNOT_DUPLICATE_IMPORTED_SUMMARY": "Cannot duplicate an imported summary",
     "ui.err.CANNOT_OVERWRITE_IMPORTED": "Cannot overwrite an imported summary",
     "ui.err.CANNOT_OVERWRITE_FUTURE": "Cannot overwrite a newer-version record",
-    "ui.err.STORAGE_UNAVAILABLE": "Local storage unavailable"
+    "ui.err.STORAGE_UNAVAILABLE": "Local storage unavailable",
+    "ui.limitation.local_linearization": "Local linearization",
+    "ui.limitation.single_parameter": "Single parameter varied",
+    "ui.limitation.model_grounded_not_measured": "Model-grounded, not measured",
+    "ui.limitation.hypothetical_model_override_not_provenance_validated": "Hypothetical model what-if, not provenance-validated",
+    "ui.limitation.large_extrapolation_beyond_local_linearity": "Large extrapolation beyond local linearity",
+    "ui.limitation.linearization_residual_significant_recheck": "Linearization residual significant — re-check"
   },
   zh: {
     "aw.subsys.front_tyre_state": "前輪胎狀態",
@@ -819,7 +825,13 @@ const WS_I18N = {
     "ui.err.CANNOT_DUPLICATE_IMPORTED_SUMMARY": "無法複製匯入摘要",
     "ui.err.CANNOT_OVERWRITE_IMPORTED": "無法覆寫匯入摘要",
     "ui.err.CANNOT_OVERWRITE_FUTURE": "無法覆寫較新版本的記錄",
-    "ui.err.STORAGE_UNAVAILABLE": "本機儲存無法使用"
+    "ui.err.STORAGE_UNAVAILABLE": "本機儲存無法使用",
+    "ui.limitation.local_linearization": "局部線性化",
+    "ui.limitation.single_parameter": "僅變動單一參數",
+    "ui.limitation.model_grounded_not_measured": "模型推導——非實測",
+    "ui.limitation.hypothetical_model_override_not_provenance_validated": "假設性模型試算——未經來源驗證",
+    "ui.limitation.large_extrapolation_beyond_local_linearity": "大幅外推、超出局部線性範圍",
+    "ui.limitation.linearization_residual_significant_recheck": "線性化殘差顯著——請複查"
   },
   ja: {
     "aw.subsys.front_tyre_state": "フロントタイヤの状態",
@@ -1227,7 +1239,13 @@ const WS_I18N = {
     "ui.err.CANNOT_DUPLICATE_IMPORTED_SUMMARY": "インポート要約は複製できません",
     "ui.err.CANNOT_OVERWRITE_IMPORTED": "インポート要約は上書きできません",
     "ui.err.CANNOT_OVERWRITE_FUTURE": "新しいバージョンの記録は上書きできません",
-    "ui.err.STORAGE_UNAVAILABLE": "ローカルストレージが利用できません"
+    "ui.err.STORAGE_UNAVAILABLE": "ローカルストレージが利用できません",
+    "ui.limitation.local_linearization": "局所線形化",
+    "ui.limitation.single_parameter": "単一パラメータのみ変更",
+    "ui.limitation.model_grounded_not_measured": "モデル由来——実測ではない",
+    "ui.limitation.hypothetical_model_override_not_provenance_validated": "仮説的なモデル試算——由来未検証",
+    "ui.limitation.large_extrapolation_beyond_local_linearity": "局所線形性を超える大きな外挿",
+    "ui.limitation.linearization_residual_significant_recheck": "線形化残差が大きい——再確認"
   },
 };
 if (typeof I18N !== 'undefined') { Object.assign(I18N.en, WS_I18N.en); Object.assign(I18N.zh, WS_I18N.zh); Object.assign(I18N.ja, WS_I18N.ja); }

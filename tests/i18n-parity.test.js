@@ -117,6 +117,15 @@ const missBlocker = blockerCodes.filter(c => !INTERNAL.test(c) && !tri('ui.block
 const missCannot = cannotCodes.filter(c => !tri('ui.cannot', c));
 chk('every production blocker code has a 3-lang key (internal/exception allowlisted)', missBlocker.length === 0, missBlocker);
 chk('every cannotConclude code has a 3-lang key', missCannot.length === 0, missCannot);
+// limitation + confounder closure (CP-I18N-3 round2): measured-metric confounders render via ui.confounder,
+// quantitative-recommendation limitations via ui.limitation -- both namespaces must carry every emitted code.
+const collectArr = re => uniq([].concat(...[...svcSrc.matchAll(re)].map(m => (m[1].match(/'[a-z0-9_]+'/g) || []).map(s => s.slice(1, -1)))));
+const limCodes = uniq([...collectArr(/\bLIMITATIONS\s*=\s*\[([^\]]*)\]/g), ...[...svcSrc.matchAll(/limitations\.push\(['"]([a-z0-9_]+)['"]/g)].map(m => m[1])]);
+const confCodes = collectArr(/\bCONFOUNDERS\s*=\s*\[([^\]]*)\]/g);
+const missLim = limCodes.filter(c => !tri('ui.limitation', c));
+const missConf = confCodes.filter(c => !tri('ui.confounder', c));
+chk('every limitation code has a 3-lang ui.limitation key', missLim.length === 0, missLim);
+chk('every confounder code has a 3-lang ui.confounder key', missConf.length === 0, missConf);
 
 // 8) CP-I18N-3: UI-layer helpers (tCode recorder + tErr) + a11y lang are wired in index.html
 const idxHtml = fs.readFileSync(path.join(__dirname, '../renderer/index.html'), 'utf8');

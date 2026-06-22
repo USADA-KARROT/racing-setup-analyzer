@@ -2905,7 +2905,7 @@ canvas{max-height:300px}
         <div class="text-xs space-y-1">
           <div><span x-text="t('aw.label.measured_kus')"></span> <b class="text-violet-300" x-text="fmt(analysisView.measuredMetrics.measuredKUs.value)"></b> deg/g <span x-html="credBadge('Measured')"></span> <span class="text-slate-500" x-text="'· '+t('aw.label.vs_predicted')+' '+fmt(analysisView.measuredMetrics.predictedKUs.value)+' deg/g'"></span></div>
           <div><span x-text="t('aw.label.agreement')"></span> <b class="text-sky-300" x-text="tCode('aw.agree', analysisView.measuredMetrics.agreementClass)"></b> <span class="text-slate-500" x-text="'· '+t('aw.label.residual')+' '+fmt(analysisView.measuredMetrics.residualDegG)+' deg/g'"></span></div>
-          <div class="text-[11px] text-amber-400/70"><span x-text="t('aw.label.provenance')"></span> <span x-text="enumCode('ui.prov', analysisView.measuredMetrics.dataProvenance)+' · '+(analysisView.measuredMetrics.limitations||[]).map(x=>tCode('ui.limitation',x)).join('; ')"></span></div>
+          <div class="text-[11px] text-amber-400/70"><span x-text="t('aw.label.provenance')"></span> <span x-text="enumCode('ui.prov', analysisView.measuredMetrics.dataProvenance)+' · '+(analysisView.measuredMetrics.limitations||[]).map(x=>tCode('ui.confounder',x)).join('; ')"></span></div>
         </div>
       </template>
       <template x-if="!analysisView.measuredMetrics.available">
