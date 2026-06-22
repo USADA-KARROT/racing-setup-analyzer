@@ -221,21 +221,85 @@ canvas{max-height:300px}
 </div>
 
 <!-- R3.0A: Setup Library sub-navigation -->
-<div x-show="shellSection==='setup_library'" x-cloak class="mb-3 flex flex-wrap gap-1">
+<!-- R3-UX0: Setup Library landing (three areas; never auto-drops into a tool) -->
+<div x-show="shellSection==='setup_library' && setupLibSubview==='landing'" x-cloak class="mb-4">
+  <h2 class="text-xl font-bold mb-1" x-text="t('ux0.landing.title')"></h2>
+  <div class="text-xs text-slate-500 mb-3" x-text="t('ux0.landing.subtitle')"></div>
+  <template x-for="area in setupLibraryAreas()" :key="area.areaId">
+    <div class="mb-4">
+      <div class="text-[11px] uppercase tracking-wide text-slate-600 mb-2" x-text="t(area.labelKey)"></div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <template x-for="f in area.features" :key="f.id">
+          <button class="text-left rounded-lg border border-slate-700 bg-slate-800/40 hover:bg-slate-800/70 p-3 transition-colors" @click="navigateToFeature(f.id)">
+            <div class="text-sm font-semibold text-slate-200" x-text="t('feat.'+f.id)"></div>
+            <div class="text-[11px] text-slate-500 mt-0.5" x-text="t('feat.'+f.id+'.desc')"></div>
+          </button>
+        </template>
+      </div>
+    </div>
+  </template>
+  <div class="text-[11px] text-amber-400/70 mt-2 border-t border-white/5 pt-2" x-text="t('ux0.preset_disclaimer')"></div>
+</div>
+<!-- R3-UX0: Setup Library tool tab strip (shown once a tool is open; back returns to the landing) -->
+<div x-show="shellSection==='setup_library' && setupLibSubview!=='landing'" x-cloak class="mb-3 flex flex-wrap items-center gap-1">
+  <button class="px-2 py-1 rounded text-xs bg-slate-700 hover:bg-slate-600 mr-1" @click="backToSetupLibrary()" x-text="t('ux0.browser.back')"></button>
   <template x-for="lt in setupLibraryTabs" :key="lt.id">
-    <button class="px-2.5 py-1 rounded text-xs transition-colors" :class="currentTab===lt.id ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30' : 'text-slate-400 hover:bg-white/5 border border-transparent'" @click="currentTab=lt.id" x-text="t('ui.setupTab.'+lt.id)"></button>
+    <button class="px-2.5 py-1 rounded text-xs transition-colors" :class="currentTab===lt.id ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30' : 'text-slate-400 hover:bg-white/5 border border-transparent'" @click="currentTab=lt.id; setupLibSubview='tool'" x-text="t('ui.setupTab.'+lt.id)"></button>
   </template>
 </div>
 
 <!-- ==================== TAB: Handling Prediction ==================== -->
-<div x-show="showPane('predict')" x-transition>
+<div x-show="showPane('predict')">
+<!-- R3-UX0: Vehicle Preset Browser (first-class entry; replaces the long <select> as the production path) -->
+<div id="vp-browser" x-show="shellSection==='setup_library'" x-cloak class="mb-4 rounded-lg border border-slate-700 bg-slate-800/40 p-3" x-init="$nextTick(()=>{ if(shellSection==='setup_library' && !vpView) ensureVehiclePresets(); })">
+  <div class="flex items-center justify-between mb-1">
+    <h3 class="text-sm font-semibold text-slate-200" x-text="t('ux0.vehicle_preset')"></h3>
+    <span class="text-[11px] text-slate-500" x-text="(vpView?vpView.count:0)+' '+t('ux0.browser.count')"></span>
+  </div>
+  <div class="text-[11px] text-amber-400/70 mb-2" x-text="t('ux0.preset_disclaimer')"></div>
+  <div class="flex flex-wrap gap-2 mb-2 text-xs">
+    <input x-model="vpFilters.search" @input="refreshVehiclePresets()" :placeholder="t('ux0.browser.search')" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 flex-1 min-w-[8rem]">
+    <select x-model="vpFilters.manufacturer" @change="refreshVehiclePresets()" class="bg-slate-900 border border-slate-700 rounded px-1 py-1">
+      <option value="" x-text="t('ux0.browser.manufacturer')+' · '+t('ux0.browser.all')"></option>
+      <template x-for="m in (vpView?vpView.manufacturers:[])" :key="m"><option :value="m" x-text="m"></option></template>
+    </select>
+    <select x-model="vpFilters.layout" @change="refreshVehiclePresets()" class="bg-slate-900 border border-slate-700 rounded px-1 py-1">
+      <option value="" x-text="t('ux0.browser.layout')+' · '+t('ux0.browser.all')"></option>
+      <template x-for="l in (vpView?vpView.layouts:[])" :key="l"><option :value="l" x-text="l"></option></template>
+    </select>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+    <div class="max-h-44 overflow-y-auto text-xs border border-white/5 rounded">
+      <template x-if="vpView && vpView.rows.length===0"><div class="text-slate-500 p-2" x-text="t('ux0.browser.no_results')"></div></template>
+      <template x-for="row in (vpView?vpView.rows:[])" :key="row.presetId">
+        <button class="w-full text-left px-2 py-1 border-b border-white/5 hover:bg-white/5" :class="vpSelected===row.presetId?'bg-sky-500/10 text-sky-300':''" @click="selectVehiclePreset(row.presetId)">
+          <span x-text="lang==='zh'?(row.name_zh||row.name):row.name"></span><span class="text-slate-500" x-text="' · '+(row.manufacturer||'')+' · '+(row.layout||'')"></span>
+        </button>
+      </template>
+    </div>
+    <div class="text-xs">
+      <template x-if="!vpDetail"><div class="text-slate-500 p-2" x-text="t('ux0.browser.select_hint')"></div></template>
+      <template x-if="vpDetail">
+        <div class="space-y-1">
+          <div class="font-semibold text-slate-200" x-text="lang==='zh'?(vpDetail.identity.name_zh||vpDetail.identity.name):vpDetail.identity.name"></div>
+          <div class="text-slate-500" x-text="(vpDetail.identity.manufacturer||'')+' · '+(vpDetail.identity.layout||'')+' · '+(vpDetail.identity.category||'')"></div>
+          <div><span class="text-slate-500" x-text="t('ux0.browser.confidence')+': '"></span><b x-text="vpDetail.confidence.grade"></b></div>
+          <div><span class="text-slate-500" x-text="t('ux0.browser.provenance')+': '"></span><span x-text="vpDetail.provenance.badge"></span> <span x-html="credBadge('Derived')"></span></div>
+          <div class="text-[11px] text-amber-400/70" x-text="(vpDetail.assumptions||[]).join(', ')"></div>
+          <button class="mt-1 px-2 py-1 rounded bg-sky-700 hover:bg-sky-600 text-xs" @click="loadPresetAsDraft()" x-text="t('ux0.browser.load_draft')"></button>
+          <span class="ml-2 text-[11px] text-emerald-300" x-show="presetDraftLoaded" x-cloak x-text="t('ux0.draft_loaded')"></span>
+        </div>
+      </template>
+    </div>
+  </div>
+</div>
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-xl font-bold" x-text="t('h2.predict')"></h2>
     <!-- Mode toggle -->
     <div class="flex items-center gap-3">
       <div class="flex rounded-lg overflow-hidden border border-white/10">
-        <button class="px-4 py-2 text-xs font-semibold transition-colors" :class="streetMode ? 'bg-transparent text-slate-400' : 'bg-sky-500 text-white'" @click="streetMode=false; streetCar=''" x-text="t('mode.pro')"></button>
-        <button class="px-4 py-2 text-xs font-semibold transition-colors" :class="streetMode ? 'bg-green-500 text-white' : 'bg-transparent text-slate-400'" @click="streetMode=true; proOem.enabled=false; if(!carPresets.length) loadPresets()" x-text="t('mode.street')"></button>
+        <button class="px-4 py-2 text-xs font-semibold transition-colors" :class="streetMode ? 'bg-transparent text-slate-400' : 'bg-sky-500 text-white'" @click="streetMode=false; streetCar=''" x-text="t('ux0.custom_setup')"></button>
+        <button class="px-4 py-2 text-xs font-semibold transition-colors" :class="streetMode ? 'bg-green-500 text-white' : 'bg-transparent text-slate-400'" @click="streetMode=true; proOem.enabled=false; if(!carPresets.length) loadPresets()" x-text="t('ux0.vehicle_preset')"></button>
       </div>
     </div>
   </div>
@@ -1287,7 +1351,7 @@ canvas{max-height:300px}
 </div>
 
 <!-- ==================== TAB: Setup Advisor ==================== -->
-<div x-show="showPane('advisor')" x-transition>
+<div x-show="showPane('advisor')">
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-xl font-bold" x-text="t('h2.advisor')"></h2>
     <button class="btn btn-primary" @click="runAdvisor()" :disabled="!result">
@@ -1356,7 +1420,7 @@ canvas{max-height:300px}
 </div>
 
 <!-- ==================== TAB: Spring Calculator ==================== -->
-<div x-show="showPane('spring')" x-transition>
+<div x-show="showPane('spring')">
   <h2 class="text-xl font-bold mb-4" x-text="t('h2.spring')"></h2>
 
   <div class="grid-2">
@@ -1571,7 +1635,7 @@ canvas{max-height:300px}
 </div>
 
 <!-- ==================== TAB: Tire Analysis ==================== -->
-<div x-show="showPane('tire')" x-transition>
+<div x-show="showPane('tire')">
   <h2 class="text-xl font-bold mb-4" x-text="t('h2.tire')"></h2>
   <!-- Import real tire model (.tir) — user loads their own file at runtime; nothing bundled/uploaded -->
   <div class="card p-5 mb-4">
@@ -2037,7 +2101,7 @@ canvas{max-height:300px}
 </div>
 
 <!-- ==================== TAB: Lihpao Lap ==================== -->
-<div x-show="showPane('lihpao')" x-transition>
+<div x-show="showPane('lihpao')">
   <h2 class="text-xl font-bold mb-1" x-text="t('h2.lihpao')"></h2>
   <p class="text-xs text-slate-500 mb-4" x-text="t('lihpao.sub')"></p>
   <div class="grid-2">
@@ -2111,7 +2175,7 @@ canvas{max-height:300px}
 </div>
 
 <!-- ==================== TAB: User Guide ==================== -->
-<div x-show="showPane('guide')" x-transition>
+<div x-show="showPane('guide')">
   <h2 class="text-xl font-bold mb-4" x-text="t('h2.guide')"></h2>
 
   <!-- Quick Start -->
@@ -2512,7 +2576,7 @@ canvas{max-height:300px}
 </div>
 
 <!-- ===== Telemetry CSV Evidence viewer (V1 Step 2B): import + mapping + fail-closed preflight. No curves / no yaw metrics / no model overlay. ===== -->
-<div x-show="showPane('telemetry')" x-transition>
+<div x-show="showPane('telemetry')">
   <div class="card p-5 mb-4">
     <div class="section-title">📈 <span x-text="t('ui.telem.title')"></span></div>
     <div class="text-xs text-slate-500 mb-3" x-text="t('ui.telem.hint')"></div>
@@ -2726,7 +2790,7 @@ canvas{max-height:300px}
 </div>
 
 <!-- ==================== TAB: Analysis Workspace (R2.2 end-to-end) ==================== -->
-<div x-show="showPane('analysis')" x-transition>
+<div x-show="showPane('analysis')">
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-xl font-bold" x-text="t('tab.analysis')"></h2>
     <button id="loadDemoAnalysisCase" class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm font-semibold" @click="loadDemoAnalysisCase()" x-text="t('aw.label.load_demo_analysis_case')"></button>
@@ -3052,6 +3116,7 @@ canvas{max-height:300px}
 <script src="js/i18n-csv.js"></script>
 <script src="js/i18n-shell.js"></script>
 <script src="js/i18n-workspace.js"></script>
+<script src="js/i18n-ux0.js"></script>
 <script src="js/calibration.js"></script>
 <script src="js/tire-data.js"></script>
 <script src="js/dynamics-model.js"></script>
@@ -3110,6 +3175,10 @@ canvas{max-height:300px}
 <script src="js/case-store.js"></script>
 <script src="js/session-store.js"></script>
 <script src="js/case-library-viewmodel.js"></script>
+<script src="js/feature-registry.js"></script>
+<script src="js/feature-router.js"></script>
+<script src="js/vehicle-preset-usecases.js"></script>
+<script src="js/vehicle-preset-viewmodel.js"></script>
 <script src="js/case-shell.js"></script>
 <script src="js/demo-analysis-case.js"></script>
 <!-- R2.3 real-telemetry validation modules (dependency order) -->
@@ -3565,28 +3634,39 @@ function app(){return{
   caseSubviewIds:['overview','setup_model','telemetry','measured_metrics','model_vs_actual','recommendations','corner_coaching','evidence_trust'],
   mainNav:[{id:'dashboard',label:'Dashboard'},{id:'cases',label:'Analysis Cases'},{id:'import',label:'Import Telemetry'},{id:'setup_library',label:'Setup Library'},{id:'comparisons',label:'Comparisons',deferred:'R3.0C'},{id:'settings',label:'Settings'}],
   caseNav:[{id:'overview',label:'Overview'},{id:'setup_model',label:'Setup & Model'},{id:'telemetry',label:'Telemetry'},{id:'measured_metrics',label:'Measured Metrics'},{id:'model_vs_actual',label:'Model vs Actual'},{id:'recommendations',label:'Recommendations'},{id:'corner_coaching',label:'Corner Coaching'},{id:'evidence_trust',label:'Evidence & Trust'}],
-  setupLibraryTabs:[{id:'spring',label:'Spring Calculator'},{id:'tire',label:'Tire Analysis'},{id:'advisor',label:'Setup Advisor'},{id:'lihpao',label:'Lihpao Lap'},{id:'telemetry',label:'Telemetry Viewer (raw CSV)'}],
+  setupLibraryTabs:(function(){try{return FeatureRegistry.deriveSetupLibraryPaneIds().filter(function(p){return p!=='predict';}).map(function(p){return {id:p};});}catch(e){return [];}})(), // R3-UX0: derived from the registry (no second pane whitelist; predict reached via landing cards)
   _shellEvidence:null,
   library:null, libFilters:{search:'',vehicle:'',track:'',status:'',fromDate:'',includeArchived:false}, currentCaseId:null, importedSummaryOpen:false, storageError:null, autosaveEnabled:true,
+  setupLibSubview:'landing', vpFilters:{search:'',manufacturer:'',layout:''}, vpView:null, vpSelected:null, vpDetail:null, presetDraftLoaded:null, _vpUC:null,
   setShellSection(id){ this.shellSection=id;
     if(id==='dashboard') this.currentTab='dashboard';
     else if(id==='cases'){ this.caseSubview='overview'; this.currentTab='analysis'; }
     else if(id==='import'){ this.caseSubview='overview'; this.currentTab='analysis'; }
-    else if(id==='setup_library'){ if(['spring','tire','advisor','lihpao','telemetry'].indexOf(this.currentTab)<0) this.currentTab='spring'; }
+    else if(id==='setup_library'){ this.setupLibSubview='landing'; this.currentTab=''; }
     else if(id==='comparisons') this.currentTab='comparisons';
     else if(id==='settings') this.currentTab='guide'; },
   setCaseSubview(id){ this.shellSection='cases'; this.caseSubview=id;
     if(id==='setup_model') this.currentTab='predict';
     else this.currentTab='analysis'; },
-  showPane(id){ var s=this.shellSection;
+  showPane(id){ var s=this.shellSection, tab=this.currentTab, cs=this.caseSubview; /* R3-UX0: setup_library panes are driven PURELY by currentTab (the既有 reliable mode); the landing uses currentTab='' so every tool pane is hidden. setupLibSubview only toggles the landing/tool chrome, never pane visibility. */
     if(s==='dashboard') return id==='dashboard';
     if(s==='comparisons') return id==='comparisons';
     if(s==='import') return id==='analysis'; /* canonical R2.3 import panel lives at the top of the analysis/cases pane */
     if(s==='settings') return id==='guide';
-    if(s==='setup_library') return ['spring','tire','advisor','lihpao','telemetry'].indexOf(id)>=0 && this.currentTab===id;
-    if(s==='cases'){ if(this.caseSubview==='setup_model') return id==='predict'; return id==='analysis'; }
+    if(s==='setup_library'){ if(typeof FeatureRegistry==='undefined') return false; return FeatureRegistry.deriveSetupLibraryPaneIds().indexOf(id)>=0 && tab===id; }
+    if(s==='cases'){ if(cs==='setup_model') return id==='predict'; return id==='analysis'; }
     return false; },
   svShow(name){ if(this.shellSection!=='cases') return true; return this.caseSubview==='overview' || this.caseSubview===name; },
+  navigateToFeature(featureId){ try{ if(typeof FeatureRouter==='undefined') return; var route=FeatureRouter.navigateToFeature(featureId); if(!route) return; if(route.deferred){ this.shellSection='comparisons'; this.currentTab='comparisons'; return; } if(route.shellSection!==undefined) this.shellSection=route.shellSection; if(route.caseSubview!==undefined) this.caseSubview=route.caseSubview; if(route.currentTab!==undefined && route.currentTab!==null) this.currentTab=route.currentTab; this.setupLibSubview = (route.shellSection==='setup_library') ? 'tool' : 'landing'; if(featureId==='vehicle_presets'){ this.ensureVehiclePresets(); } if(route.focusTarget){ var ft=route.focusTarget; var self=this; this.$nextTick(function(){ try{ var el=document.getElementById(ft); if(el&&el.scrollIntoView) el.scrollIntoView({behavior:'smooth',block:'start'}); }catch(e){} }); } }catch(e){} },
+  backToSetupLibrary(){ this.shellSection='setup_library'; this.setupLibSubview='landing'; this.currentTab=''; },
+  setupLibraryAreas(){ try{ return (typeof FeatureRegistry!=='undefined')?FeatureRegistry.deriveSetupLibraryAreas():[]; }catch(e){ return []; } },
+  featureLabel(id){ return this.t('feat.'+id); },
+  _vpUseCases(){ if(!this._vpUC){ try{ this._vpUC = (typeof VehiclePresetUseCases!=='undefined') ? VehiclePresetUseCases.createVehiclePresetUseCases() : null; }catch(e){ this._vpUC=null; } } return this._vpUC; },
+  ensureVehiclePresets(){ try{ var uc=this._vpUseCases(); if(!uc||typeof VehiclePresetViewModel==='undefined') return; this.vpView=VehiclePresetViewModel.buildPresetListView(uc, this.vpFilters); }catch(e){} },
+  refreshVehiclePresets(){ this.ensureVehiclePresets(); },
+  selectVehiclePreset(id){ try{ var uc=this._vpUseCases(); if(!uc) return; this.vpSelected=id; this.vpDetail=VehiclePresetViewModel.buildPresetDetailView(uc, id); }catch(e){} },
+  loadPresetAsDraft(){ try{ var uc=this._vpUseCases(); if(!uc||!this.vpSelected) return; var draft=uc.buildSetupDraftFromPreset(this.vpSelected); if(!draft) return; this._loadDraftIntoEditor(draft); }catch(e){} },
+  _loadDraftIntoEditor(draft){ try{ var si=draft.setupInputs||{}; var self=this; ['front_spring_rate','rear_spring_rate','front_arb','rear_arb','front_track','rear_track','front_motion_ratio','rear_motion_ratio','weight_front_pct','total_weight','cg_height','wheelbase'].forEach(function(k){ if(typeof si[k]==='number') self.pred[k]=si[k]; }); this.presetDraftLoaded={ presetId:draft.presetId, name:(draft.vehicleIdentity&&draft.vehicleIdentity.name)||null }; }catch(e){} },
   caseNavAvailable(id){ try{ var st=this.caseShellState(); if(!st) return false; var n=(st.navSections||[]).find(function(x){return x.key===id;}); return !!(n&&n.available); }catch(e){ return false; } },
   _persistSession(session){ try{ var tok=++caseDataHolder.sessionOpToken; if(!session||!this.ensureStore()||!caseDataHolder.sessionStore) { if(tok===caseDataHolder.sessionOpToken){ caseDataHolder.lastSessionId=null; caseDataHolder.sessionPersistPromise=Promise.resolve(); } return; } var self=this; var ch=(session.channels&&typeof session.channels==='object')?Object.keys(session.channels).slice(0,64):[]; if(tok===caseDataHolder.sessionOpToken) caseDataHolder.lastSessionId=null; caseDataHolder.sessionPersistPromise = caseDataHolder.sessionStore.put({ summary:{ sourceSessionId: session.sessionId||null, channels: ch }, raw: session }).then(function(r){ if(tok!==caseDataHolder.sessionOpToken) return; caseDataHolder.lastSessionId=(r&&r.ok)?r.sessionId:null; if(r&&!r.ok&&r.code!=='SESSION_TOO_LARGE'&&r.code!=='SESSION_EXCEEDS_BUDGET') self.storageError='session: '+r.code; }).catch(function(){ if(tok===caseDataHolder.sessionOpToken) caseDataHolder.lastSessionId=null; }); }catch(e){ caseDataHolder.lastSessionId=null; } },
   _mkShellEvidence(ws, source){ try{ return { capability:(ws&&ws.capability)||null, observation:(ws&&ws.observation)?{ blockedReasons:((ws.observation.blockedReasons)||[]).map(function(b){return {code:(b&&b.code)||String(b)};}) }:null, source: source||null }; }catch(e){ return null; } },

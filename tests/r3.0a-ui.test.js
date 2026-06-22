@@ -71,7 +71,11 @@ chk('no leftover flat tab strip', html.indexOf('@click="switchTab(tab.id)"') ===
 // CP2 fix #1: Import Telemetry routes to the canonical R2.3 import (analysis pane), NOT the legacy V1 viewer
 chk('import nav -> canonical analysis pane', /s==='import'\) return id==='analysis'/.test(html));
 chk('import setShellSection targets analysis', /id==='import'\)\{ this\.caseSubview='overview'; this\.currentTab='analysis'; \}/.test(html));
-chk('legacy raw CSV viewer is a labeled Setup Library tool', /Telemetry Viewer \(raw CSV\)/.test(html));
+// R3-UX0: the Setup Library tab label is now sourced from i18n (i18n-shell.js) and the strip renders it via
+// t('ui.setupTab.'+lt.id); setupLibraryTabs is derived from the feature registry. The "raw CSV" labelling intent
+// is unchanged — it still exists (now in the i18n dictionary) and the telemetry tab is still a reachable tool.
+const _i18nShell = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'js', 'i18n-shell.js'), 'utf8');
+chk('legacy raw CSV viewer is a labeled Setup Library tool', /Telemetry Viewer \(raw CSV\)/.test(_i18nShell) && /t\('ui\.setupTab\.'\+lt\.id\)/.test(html) && /setupLibraryTabs/.test(html));
 chk('no cases->legacy-telemetry route', html.indexOf("caseSubview==='telemetry') return id==='telemetry'") === -1);
 // CP2 fix #3: full Cases Library deferral (R3.0B) is rendered as a visible, non-actionable panel
 // R3.0B SUPERSEDED the R3.0A "deferred to R3.0B" banner with the working Case Library (panel now present; banner gone).

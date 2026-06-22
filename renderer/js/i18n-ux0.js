@@ -1,0 +1,78 @@
+/**
+ * i18n-ux0.js — R3-UX0 three-language dictionary for the Setup Library landing, the Vehicle Preset browser,
+ * the Vehicle-Preset / Custom-Setup terminology, and the preset disclaimer. Same pattern as i18n-shell.js
+ * (Object.assign into the global I18N at load). Load AFTER i18n.js; BEFORE the app script.
+ *
+ * Scope (UI layer only): feat.* (registry feature labels/desc) · setuplib.area.* · ux0.* (landing/browser/
+ * terminology/disclaimer). Feature IDs are locale-invariant; only the labels are translated here.
+ */
+const UX0_I18N = {
+  en: {
+    'feat.vehicle_presets': 'Vehicle Presets', 'feat.vehicle_presets.desc': 'Browse the 501-car preset database',
+    'feat.custom_setup': 'Custom Setup', 'feat.custom_setup.desc': 'Enter a setup manually',
+    'feat.handling_prediction': 'Handling Prediction', 'feat.handling_prediction.desc': 'Tier 1/2/3 understeer/oversteer balance',
+    'feat.spring_calculator': 'Spring / Ride Frequency', 'feat.spring_calculator.desc': 'Ride frequency ↔ spring/wheel rate',
+    'feat.arb_calculator': 'ARB Sizing', 'feat.arb_calculator.desc': 'Anti-roll-bar for a target roll gradient',
+    'feat.suspension_kinematics': 'Suspension Kinematics', 'feat.suspension_kinematics.desc': '2D double-wishbone geometry',
+    'feat.corner_weight': 'Corner Weight / LLTD', 'feat.corner_weight.desc': 'Corner weights and load transfer',
+    'feat.tire_analysis': 'Tyre Analysis', 'feat.tire_analysis.desc': 'Grip curves + tyre database',
+    'feat.wheel_upgrade': 'Wheel Upgrade', 'feat.wheel_upgrade.desc': 'Wheel/tyre upgrade comparison',
+    'feat.setup_advisor': 'Setup Advisor', 'feat.setup_advisor.desc': 'Rule-based setup suggestions',
+    'feat.lihpao_simulator': 'Lihpao Simulator', 'feat.lihpao_simulator.desc': 'Lap-time + tyre stint simulation',
+    'feat.telemetry_viewer': 'Telemetry Viewer', 'feat.telemetry_viewer.desc': 'Raw CSV telemetry evidence viewer',
+    'setuplib.area.vehicle_setup': 'Vehicle & Setup', 'setuplib.area.engineering_tools': 'Engineering Tools', 'setuplib.area.analysis_support': 'Analysis & Support',
+    'ux0.landing.title': 'Setup Library', 'ux0.landing.subtitle': 'Pick a tool — nothing here changes a saved case.',
+    'ux0.vehicle_preset': 'Vehicle Preset', 'ux0.custom_setup': 'Custom Setup',
+    'ux0.browser.search': 'search name / manufacturer', 'ux0.browser.manufacturer': 'manufacturer', 'ux0.browser.layout': 'layout', 'ux0.browser.all': 'all',
+    'ux0.browser.count': 'presets', 'ux0.browser.load_draft': 'Load as setup draft', 'ux0.browser.back': '← Setup Library',
+    'ux0.browser.confidence': 'Data confidence', 'ux0.browser.provenance': 'Source', 'ux0.browser.select_hint': 'Select a vehicle preset to see its details.',
+    'ux0.browser.no_results': 'No presets match.', 'ux0.draft_loaded': 'Loaded as a setup draft (not saved).',
+    'ux0.preset_disclaimer': 'Vehicle presets provide an analysis baseline. They contain documented, confirmed, engineering-estimated and unknown values, and do NOT represent a complete OEM or measured vehicle model.',
+  },
+  zh: {
+    'feat.vehicle_presets': '車款預設', 'feat.vehicle_presets.desc': '瀏覽 501 台車款預設資料庫',
+    'feat.custom_setup': '自訂設定', 'feat.custom_setup.desc': '手動輸入設定',
+    'feat.handling_prediction': '操控預測', 'feat.handling_prediction.desc': 'Tier 1/2/3 轉向不足／過度平衡',
+    'feat.spring_calculator': '彈簧 / 乘載頻率', 'feat.spring_calculator.desc': '乘載頻率 ↔ 彈簧／輪端剛性',
+    'feat.arb_calculator': '防傾桿計算', 'feat.arb_calculator.desc': '達成目標側傾梯度的防傾桿',
+    'feat.suspension_kinematics': '懸吊運動學', 'feat.suspension_kinematics.desc': '2D 雙 A 臂幾何',
+    'feat.corner_weight': '輪重 / LLTD', 'feat.corner_weight.desc': '輪重與負載轉移',
+    'feat.tire_analysis': '輪胎分析', 'feat.tire_analysis.desc': '抓地曲線 + 輪胎資料庫',
+    'feat.wheel_upgrade': '輪圈升級', 'feat.wheel_upgrade.desc': '輪圈／輪胎升級比較',
+    'feat.setup_advisor': '設定建議', 'feat.setup_advisor.desc': '規則式設定建議',
+    'feat.lihpao_simulator': '麗寶模擬', 'feat.lihpao_simulator.desc': '單圈時間 + 輪胎 stint 模擬',
+    'feat.telemetry_viewer': '遙測檢視器', 'feat.telemetry_viewer.desc': '原始 CSV 遙測證據檢視',
+    'setuplib.area.vehicle_setup': '車輛與設定', 'setuplib.area.engineering_tools': '工程工具', 'setuplib.area.analysis_support': '分析與支援',
+    'ux0.landing.title': '設定庫', 'ux0.landing.subtitle': '選擇工具——這裡的操作不會更動已儲存的 case。',
+    'ux0.vehicle_preset': '車款預設', 'ux0.custom_setup': '自訂設定',
+    'ux0.browser.search': '搜尋名稱／廠牌', 'ux0.browser.manufacturer': '廠牌', 'ux0.browser.layout': '驅動', 'ux0.browser.all': '全部',
+    'ux0.browser.count': '個預設', 'ux0.browser.load_draft': '載入為設定草稿', 'ux0.browser.back': '← 設定庫',
+    'ux0.browser.confidence': '資料可信度', 'ux0.browser.provenance': '來源', 'ux0.browser.select_hint': '選擇一個車款預設以查看細節。',
+    'ux0.browser.no_results': '沒有符合的預設。', 'ux0.draft_loaded': '已載入為設定草稿（未儲存）。',
+    'ux0.preset_disclaimer': '車款預設用於建立分析基準，其中包含文件值、確認值、工程估算與未知項目，不代表完整原廠或實測車輛模型。',
+  },
+  ja: {
+    'feat.vehicle_presets': '車種プリセット', 'feat.vehicle_presets.desc': '501台のプリセットDBを閲覧',
+    'feat.custom_setup': 'カスタム設定', 'feat.custom_setup.desc': '手動でセットアップを入力',
+    'feat.handling_prediction': 'ハンドリング予測', 'feat.handling_prediction.desc': 'Tier 1/2/3 アンダー/オーバー バランス',
+    'feat.spring_calculator': 'スプリング / 乗車周波数', 'feat.spring_calculator.desc': '乗車周波数 ↔ スプリング/ホイールレート',
+    'feat.arb_calculator': 'ARB サイジング', 'feat.arb_calculator.desc': '目標ロール勾配のアンチロールバー',
+    'feat.suspension_kinematics': 'サスペンション運動学', 'feat.suspension_kinematics.desc': '2D ダブルウィッシュボーン幾何',
+    'feat.corner_weight': 'コーナーウェイト / LLTD', 'feat.corner_weight.desc': 'コーナーウェイトと荷重移動',
+    'feat.tire_analysis': 'タイヤ分析', 'feat.tire_analysis.desc': 'グリップ曲線 + タイヤDB',
+    'feat.wheel_upgrade': 'ホイールアップグレード', 'feat.wheel_upgrade.desc': 'ホイール/タイヤ アップグレード比較',
+    'feat.setup_advisor': 'セットアップアドバイザー', 'feat.setup_advisor.desc': 'ルールベースのセットアップ提案',
+    'feat.lihpao_simulator': 'Lihpao シミュレータ', 'feat.lihpao_simulator.desc': 'ラップタイム + タイヤスティント模擬',
+    'feat.telemetry_viewer': 'テレメトリビューア', 'feat.telemetry_viewer.desc': '生CSVテレメトリ証拠ビューア',
+    'setuplib.area.vehicle_setup': '車両とセットアップ', 'setuplib.area.engineering_tools': 'エンジニアリングツール', 'setuplib.area.analysis_support': '分析とサポート',
+    'ux0.landing.title': 'セットアップライブラリ', 'ux0.landing.subtitle': 'ツールを選択 — ここでは保存済みケースは変更されません。',
+    'ux0.vehicle_preset': '車種プリセット', 'ux0.custom_setup': 'カスタム設定',
+    'ux0.browser.search': '名前 / メーカーで検索', 'ux0.browser.manufacturer': 'メーカー', 'ux0.browser.layout': '駆動', 'ux0.browser.all': 'すべて',
+    'ux0.browser.count': '件のプリセット', 'ux0.browser.load_draft': 'セットアップ下書きとして読込', 'ux0.browser.back': '← セットアップライブラリ',
+    'ux0.browser.confidence': 'データ信頼度', 'ux0.browser.provenance': 'ソース', 'ux0.browser.select_hint': '車種プリセットを選択して詳細を表示。',
+    'ux0.browser.no_results': '該当するプリセットがありません。', 'ux0.draft_loaded': 'セットアップ下書きとして読込（未保存）。',
+    'ux0.preset_disclaimer': '車種プリセットは分析の基準として使用します。文書値・確認値・工学的推定値・不明項目を含み、完全なOEMまたは実測の車両モデルを表すものではありません。',
+  },
+};
+if (typeof I18N !== 'undefined') { Object.assign(I18N.en, UX0_I18N.en); Object.assign(I18N.zh, UX0_I18N.zh); Object.assign(I18N.ja, UX0_I18N.ja); }
+if (typeof module !== 'undefined' && module.exports) module.exports = { UX0_I18N };
