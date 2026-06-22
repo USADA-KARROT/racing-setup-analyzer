@@ -90,7 +90,7 @@ REGIONS.forEach(([sm, em]) => {
   for (let i = s; i < e; i++) {
     const stripped = html[i].replace(ALLOW, ' '); // per-token removal, then scan the remainder
     // a literal text node ">Words<" (capitalized, 3+ letters) — i18n'd copy renders via x-text so this is a leak
-    (stripped.match(/>[A-Z][a-z][A-Za-z ]{2,}</g) || []).forEach(tn => offenders.push((i + 1) + ' text: ' + tn));
+    (stripped.match(/>[A-Z][a-z][A-Za-z0-9 ]{2,}</g) || []).forEach(tn => offenders.push((i + 1) + ' text: ' + tn));
     // a static placeholder=/title= carrying letters (should be the :placeholder / :title bound form)
     if (/\splaceholder="[A-Za-z]/.test(stripped)) offenders.push((i + 1) + ': static placeholder=');
     if (/\stitle="[A-Za-z]/.test(stripped) && !/:title=/.test(html[i])) offenders.push((i + 1) + ': static title=');
@@ -143,6 +143,8 @@ chk('tCode humanizes unknown codes as a last resort', /tCode\(prefix, code\)\{[\
 chk('tErr maps error codes with a localized generic fallback', /tErr\(v\)\{[\s\S]{0,500}ui\.err\.generic/.test(idxHtml) && tri.length && has(en, 'ui.err.generic') && has(zh, 'ui.err.generic') && has(ja, 'ui.err.generic'));
 chk('error displays route through tErr (no raw importError/analysisError/storageError)', /x-text="tErr\(importError\)"/.test(idxHtml) && /x-text="tErr\(analysisError\)"/.test(idxHtml) && /tErr\(storageError\)/.test(idxHtml));
 chk('document lang bound to the active locale (a11y)', /documentElement\.lang=\(l==='zh'\?'zh-TW':l\)/.test(idxHtml));
+chk('document.title localized on locale switch', /document\.title=this\.t\('ui\.appTitle'\)/.test(idxHtml) && tri('ui', 'appTitle'));
+chk('wheel-upgrade error re-localized (no raw frozen-service message)', /t\('ui\.err\.wheelAspectRange'\)/.test(idxHtml) && !/wheelUpgrade\.(front|rear)_result\.message/.test(idxHtml) && tri('ui.err','wheelAspectRange'));
 // CP-I18N-3 round3: trust-panel evidence layer + deleteCase confirm must not leak English
 chk('trust-panel evidence layer localized (not raw b.layer)', /\(b\.layer\?tCode\('aw\.layer',b\.layer\)/.test(idxHtml));
 chk('deleteCase confirm localized (no raw English prompt)', /confirm\(this\.t\('ui\.case\.deleteConfirm'\)\)/.test(idxHtml) && !/Delete this case\? This cannot be undone\./.test(idxHtml) && tri('ui.case', 'deleteConfirm'));

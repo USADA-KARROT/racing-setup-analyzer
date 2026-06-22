@@ -432,7 +432,15 @@ const WS_I18N = {
     "ui.tireCompound.wet": "Wet",
     "ui.gauge.os": "OS",
     "ui.gauge.neutral": "Neutral",
-    "ui.gauge.us": "US"
+    "ui.gauge.us": "US",
+    "ui.tier.t1": "Tier 1",
+    "ui.tier.t2": "Tier 2",
+    "ui.tier.t3": "Tier 3",
+    "ui.edition.desktop": "Desktop",
+    "ui.err.file_read_error": "File read error",
+    "ui.appTitle": "Racing Dynamics — Vehicle Dynamics Analyzer",
+    "ui.group.other": "Other",
+    "ui.err.wheelAspectRange": "Computed aspect ratio is outside the valid range (20-70); this rim size does not fit."
   },
   zh: {
     "aw.subsys.front_tyre_state": "前輪胎狀態",
@@ -861,7 +869,15 @@ const WS_I18N = {
     "ui.tireCompound.wet": "濕地 Wet",
     "ui.gauge.os": "過度 OS",
     "ui.gauge.neutral": "中性",
-    "ui.gauge.us": "不足 US"
+    "ui.gauge.us": "不足 US",
+    "ui.tier.t1": "第 1 階",
+    "ui.tier.t2": "第 2 階",
+    "ui.tier.t3": "第 3 階",
+    "ui.edition.desktop": "桌面版",
+    "ui.err.file_read_error": "檔案讀取錯誤",
+    "ui.appTitle": "Racing Dynamics — 車輛動力學分析器",
+    "ui.group.other": "其他",
+    "ui.err.wheelAspectRange": "計算出的扁平比不在合理範圍（20–70），此輪圈尺寸不適用。"
   },
   ja: {
     "aw.subsys.front_tyre_state": "フロントタイヤの状態",
@@ -1290,7 +1306,15 @@ const WS_I18N = {
     "ui.tireCompound.wet": "ウェット",
     "ui.gauge.os": "オーバー",
     "ui.gauge.neutral": "ニュートラル",
-    "ui.gauge.us": "アンダー"
+    "ui.gauge.us": "アンダー",
+    "ui.tier.t1": "ティア1",
+    "ui.tier.t2": "ティア2",
+    "ui.tier.t3": "ティア3",
+    "ui.edition.desktop": "デスクトップ版",
+    "ui.err.file_read_error": "ファイル読み込みエラー",
+    "ui.appTitle": "Racing Dynamics — 車両ダイナミクス解析",
+    "ui.group.other": "その他",
+    "ui.err.wheelAspectRange": "計算されたアスペクト比が有効範囲（20〜70）外です。このリムサイズは適合しません。"
   },
 };
 if (typeof I18N !== 'undefined') { Object.assign(I18N.en, WS_I18N.en); Object.assign(I18N.zh, WS_I18N.zh); Object.assign(I18N.ja, WS_I18N.ja); }

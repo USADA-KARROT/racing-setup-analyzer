@@ -48,7 +48,7 @@ canvas{max-height:300px}
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
 </style>
 </head>
-<body x-data="app()" x-init="init(); try{document.documentElement.lang=(lang==='zh'?'zh-TW':lang)}catch(e){}">
+<body x-data="app()" x-init="init(); try{document.documentElement.lang=(lang==='zh'?'zh-TW':lang); document.title=t('ui.appTitle')}catch(e){}">
 
 <!-- Top Nav -->
 <header class="flex items-center justify-between px-6 py-3 border-b border-white/5" style="background:var(--bg2)">
@@ -312,7 +312,7 @@ canvas{max-height:300px}
 
         <!-- Tier 1: Mechanical -->
         <div>
-          <div class="section-title"><span class="badge badge-b">Tier 1</span> <span x-text="t('sec.t1')"></span>
+          <div class="section-title"><span class="badge badge-b" x-text="t('ui.tier.t1')"></span> <span x-text="t('sec.t1')"></span>
             <span x-show="streetMode && streetCar" class="text-[10px] text-yellow-400 ml-2" x-text="t('sec.t1lock')"></span>
           </div>
           <!-- Street mode: locked summary -->
@@ -510,7 +510,7 @@ canvas{max-height:300px}
                           </div>
                         </template>
                         <template x-if="wheelUpgrade.front_result?.error">
-                          <div class="text-[10px] text-red-400 p-1" x-text="wheelUpgrade.front_result.message"></div>
+                          <div class="text-[10px] text-red-400 p-1" x-text="t('ui.err.wheelAspectRange')"></div>
                         </template>
                       </div>
                       <!-- Rear wheel -->
@@ -539,7 +539,7 @@ canvas{max-height:300px}
                           </div>
                         </template>
                         <template x-if="wheelUpgrade.rear_result?.error">
-                          <div class="text-[10px] text-red-400 p-1" x-text="wheelUpgrade.rear_result.message"></div>
+                          <div class="text-[10px] text-red-400 p-1" x-text="t('ui.err.wheelAspectRange')"></div>
                         </template>
                       </div>
                     </div>
@@ -617,7 +617,7 @@ canvas{max-height:300px}
 
         <!-- Tier 2+: Full tire controls -->
         <div x-show="tier >= 2" x-transition>
-          <div class="section-title"><span class="badge badge-p">Tier 2</span> <span x-text="t('sec.t2')"></span></div>
+          <div class="section-title"><span class="badge badge-p" x-text="t('ui.tier.t2')"></span> <span x-text="t('sec.t2')"></span></div>
           <div class="grid-4 text-sm mb-2">
             <div class="text-center text-xs text-slate-500">FL</div>
             <div class="text-center text-xs text-slate-500">FR</div>
@@ -835,7 +835,7 @@ canvas{max-height:300px}
 
         <!-- Tier 3: Advanced -->
         <div x-show="tier >= 3" x-transition>
-          <div class="section-title"><span class="badge badge-g">Tier 3</span> <span x-text="t('sec.t3')"></span></div>
+          <div class="section-title"><span class="badge badge-g" x-text="t('ui.tier.t3')"></span> <span x-text="t('sec.t3')"></span></div>
 
           <!-- Corner weights -->
           <div class="text-xs text-slate-400 mb-1" x-text="t('lbl.cornerWeight')"></div>
@@ -2505,7 +2505,7 @@ canvas{max-height:300px}
       <p x-html="t('gd.about.p1')"></p>
       <p x-html="t('gd.about.p2')"></p>
       <p x-text="t('gd.about.p3')"></p>
-      <p class="text-slate-600">v3.4 Desktop · USADA-KARROT</p>
+      <p class="text-slate-600">v3.4 <span x-text="t('ui.edition.desktop')"></span> · USADA-KARROT</p>
     </div>
   </div>
 
@@ -2524,7 +2524,7 @@ canvas{max-height:300px}
       <input type="file" accept=".csv,.txt" @change="importCSV($event)" class="text-xs">
       <button class="text-xs px-2 py-1 rounded bg-slate-700 hover:bg-slate-600" x-show="telem.imported" @click="telemUnload()" x-text="t('ui.telem.unload')"></button>
     </div>
-    <div x-show="telem.error" class="text-xs text-red-400" x-text="telem.error"></div>
+    <div x-show="telem.error" class="text-xs text-red-400" x-text="tErr(telem.error)"></div>
     <div x-show="telem.imported && telem.importSummary" class="text-xs text-slate-300 mt-2 space-y-1">
       <div><span class="text-slate-200" x-text="telem.importSummary.fileName"></span> · <span x-text="telem.importSummary.rowCount"></span> <span x-text="t('ui.telem.rows')"></span> · <span x-text="telem.importSummary.columnCount"></span> <span x-text="t('ui.telem.cols')"></span><template x-if="telem.importSummary.sampleRateHz"> · <span x-text="telem.importSummary.sampleRateHz+' Hz'"></span></template><template x-if="telem.importSummary.timeRange"> · <span x-text="telem.importSummary.timeRange.duration.toFixed(1)+' s'"></span></template></div>
       <template x-for="w in telem.importSummary.warnings"><div class="text-amber-400" x-text="'⚠ '+telemDiag(w)"></div></template>
@@ -3222,7 +3222,7 @@ function app(){return{
   // === i18n (English primary / 繁中 / 日本語) ===
   lang: (typeof localStorage!=='undefined' && localStorage.getItem('lang')) || 'en',
   langs:[{id:'en',label:'EN'},{id:'zh',label:'繁'},{id:'ja',label:'日'}],
-  setLang(l){ this.lang=l; try{localStorage.setItem('lang',l)}catch(e){} try{document.documentElement.lang=(l==='zh'?'zh-TW':l)}catch(e){} if(this.carPresets.length) this.loadPresets(); if(this.advisorResult && this.result) this.runAdvisor(); },
+  setLang(l){ this.lang=l; try{localStorage.setItem('lang',l)}catch(e){} try{document.documentElement.lang=(l==='zh'?'zh-TW':l); document.title=this.t('ui.appTitle')}catch(e){} if(this.carPresets.length) this.loadPresets(); if(this.advisorResult && this.result) this.runAdvisor(); },
   t(k){ const D=(typeof I18N!=='undefined')?I18N:null; if(!D) return k;
         const has=(o)=>o && Object.prototype.hasOwnProperty.call(o,k); // 用 hasOwnProperty 避免命中原型鏈(toString…)
         if(has(D[this.lang])) return D[this.lang][k]; // 尊重「刻意空字串」翻譯(如 EN ui.lapPost='')，不誤當缺漏
@@ -3261,7 +3261,7 @@ function app(){return{
   // 資料驅動名稱(車款/輪胎)：英文/日文模式用英文 name，繁中用 name_zh
   nm(o){ if(!o) return ''; return (this.lang==='zh' && o.name_zh) ? o.name_zh : (o.name || o.name_zh || ''); },
   // 資料驅動備註(車款/輪胎)：繁中用 notes，英文/日文用 notes_en（日文回退英文）
-  noteOf(o){ if(!o) return ''; return (this.lang==='zh') ? (o.notes||'') : (o.notes_en||o.notes||''); },
+  noteOf(o){ if(!o) return ''; if(this.lang==='zh') return o.notes||''; if(this.lang==='ja') return o.notes_ja||''; return o.notes_en||o.notes||''; },
   // 可信度等級 badge：Physics(◆ 教科書硬公式) / Model(◈ 工程估算) / Heuristic(◇ 手調調味)。
   // 重用既有 conf badge 的視覺語彙；以 x-html 嵌入，語言切換時隨 t() 自動重繪。
   tierBadge(level){
@@ -3372,21 +3372,21 @@ function app(){return{
   telemCanonOptions(){ return (typeof TelemetryCore!=='undefined') ? [''].concat(Object.keys(TelemetryCore.CHANNEL_PATTERNS)) : []; },
   importCSV(e){
     const f=e.target.files && e.target.files[0]; if(!f) return;
-    if(typeof TelemetryCore==='undefined' || typeof TelemetryView==='undefined'){ this.telem.error='telemetry-core not loaded'; e.target.value=''; return; }
+    if(typeof TelemetryCore==='undefined' || typeof TelemetryView==='undefined'){ this.telem.error='modules_not_loaded'; e.target.value=''; return; }
     const token=++telemetryDataHolder.importToken; this.telem.error=null;
     const reader=new FileReader();
     reader.onload=()=>{ if(token!==telemetryDataHolder.importToken) return; // stale import cancelled
       try{ const parsed=TelemetryCore.parseCsv(reader.result);
         if(parsed.errors && parsed.errors.length){ // fatal parse errors (e.g. CSV_UNCLOSED_QUOTE / EMPTY / NO_ROWS) → not a usable dataset
-          const msg=parsed.errors.map(e=>(e&&(e.message||e.code))||String(e)).join('; ');
+          const msg=(parsed.errors[0]&&parsed.errors[0].code)||'PARSE_ERROR';
           this.telemUnload();        // clear any prior session FIRST (telemUnload resets this.telem)
           this.telem.error=msg;      // …THEN surface this import's fatal error (order matters)
           return;                    // do NOT build a session or run preflight
         }
         telemetryDataHolder.session=TelemetryView.newSession(f.name||null, parsed, this.telem.profileId);
         this.telem.imported=true; this.telemRefresh();
-      }catch(err){ this.telem.error=String((err&&err.message)||err); this.telemUnload(); } };
-    reader.onerror=()=>{ if(token===telemetryDataHolder.importToken) this.telem.error='file read error'; };
+      }catch(err){ this.telem.error='unexpected_error'; this.telemUnload(); } };
+    reader.onerror=()=>{ if(token===telemetryDataHolder.importToken) this.telem.error='file_read_error'; };
     reader.readAsText(f);
     e.target.value=''; // clean-room: do not retain the file path/handle
   },
@@ -3908,7 +3908,7 @@ function app(){return{
     }
     // Catch any unmatched
     const others = this.carPresets.filter(c => !used.has(c.id));
-    if (others.length) groups.push({ label: this.lang==='zh' ? '其他 Other' : this.lang==='ja' ? 'その他 Other' : 'Other', cars: others });
+    if (others.length) groups.push({ label: this.t('ui.group.other'), cars: others });
     this.carPresetGroups = groups;
   },
 
