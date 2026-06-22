@@ -18,6 +18,7 @@ input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 
 .btn{padding:8px 16px;border-radius:8px;font-weight:600;cursor:pointer;transition:.15s;font-size:.85rem;border:none}
 .btn-primary{background:var(--accent);color:#0f172a}.btn-primary:hover{background:#7dd3fc}
 .btn-sm{padding:4px 12px;font-size:.75rem;border-radius:6px}
+[x-cloak]{display:none!important}
 .nav-btn{padding:12px 16px;border-radius:10px;cursor:pointer;transition:.2s;border:1px solid transparent;text-align:center;min-width:80px}
 .nav-btn:hover{background:rgba(56,189,248,.08)}
 .nav-btn.active{background:rgba(56,189,248,.15);border-color:rgba(56,189,248,.3)}
@@ -56,11 +57,9 @@ canvas{max-height:300px}
     <div class="text-xs text-slate-600"><span x-text="t('chrome.subtitle')"></span> v3.4</div>
   </div>
   <div class="flex items-center gap-2">
-    <template x-for="tab in tabs" :key="tab.id">
-      <div class="nav-btn" :class="{'active': currentTab===tab.id}" @click="switchTab(tab.id)">
-        <div class="text-xs font-semibold" x-text="t(tab.key)"></div>
-      </div>
-    </template>
+    <div class="text-xs text-slate-500" x-show="shellSection==='cases' && analysisView" x-cloak>
+      <span>Case status </span><span class="text-sky-300 font-semibold" x-text="(caseShellState()&&caseShellState().status)||''"></span>
+    </div>
     <!-- Language switcher -->
     <div class="flex ml-2 rounded-lg overflow-hidden border border-white/10">
       <template x-for="lg in langs" :key="lg.id">
@@ -72,10 +71,115 @@ canvas{max-height:300px}
   </div>
 </header>
 
-<main class="p-6 max-w-7xl mx-auto">
+<!-- R3.0A: Analysis-Case app shell — left main navigation -->
+<aside id="shellSidebar" class="fixed left-0 top-[53px] bottom-0 w-52 border-r border-white/5 overflow-y-auto py-3 px-2 z-20" style="background:var(--bg2)">
+  <div class="text-[10px] uppercase tracking-wide text-slate-600 px-3 mb-2">Workspace</div>
+  <template x-for="item in mainNav" :key="item.id">
+    <button class="w-full text-left px-3 py-2 rounded-lg mb-1 text-sm transition-colors"
+      :class="shellSection===item.id ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30' : 'text-slate-400 hover:bg-white/5 border border-transparent'"
+      @click="setShellSection(item.id)"><span x-text="item.label"></span><span class="float-right text-[10px] text-amber-400/70" x-show="item.deferred" x-cloak x-text="item.deferred"></span></button>
+  </template>
+  <div class="mt-3 pt-3 border-t border-white/5 text-[11px] text-slate-500 px-2">
+    <div>Status</div>
+    <div class="text-sky-300 font-semibold" x-text="(caseShellState()&&caseShellState().status)||'empty'"></div>
+  </div>
+</aside>
+
+<!-- R3.0A: right fixed Context/Trust panel (Analysis Cases section) -->
+<aside id="shellTrustPanel" class="fixed right-0 top-[53px] bottom-0 w-72 border-l border-white/5 overflow-y-auto py-3 px-3 z-20 text-xs" style="background:var(--bg2)" x-show="shellSection==='cases' && analysisView" x-cloak>
+  <template x-if="caseShellState()">
+   <div class="space-y-2">
+    <div class="text-slate-300 font-semibold text-sm">Context &amp; Trust</div>
+    <div>Status: <span class="text-sky-300 font-semibold" x-text="caseShellState().status"></span></div>
+    <div>Credibility: <span x-text="caseShellState().trustPanel.credibility"></span></div>
+    <div>Confidence: <span x-text="caseShellState().trustPanel.confidence||'—'"></span></div>
+    <div>Mapping: <span x-text="caseShellState().trustPanel.mappingStatus"></span></div>
+    <div>Calibration: <span x-text="caseShellState().trustPanel.calibrationStatus"></span></div>
+    <div>Provenance: <span x-text="caseShellState().trustPanel.dataProvenance||'—'"></span></div>
+    <div class="pt-1">Next action: <span class="text-emerald-300" x-text="caseShellState().nextAction.key"></span>
+      <button class="ml-1 px-1.5 py-0.5 rounded bg-slate-700 hover:bg-slate-600 text-[10px]" x-show="caseSubviewIds.includes(caseShellState().nextAction.target)" @click="setCaseSubview(caseShellState().nextAction.target)">go</button>
+    </div>
+    <div class="pt-1 text-slate-400" x-show="caseShellState().trustPanel.blockedReasons.length">Blocked reasons</div>
+    <template x-for="(b,bi) in caseShellState().trustPanel.blockedReasons" :key="bi">
+      <div class="text-[11px] text-amber-400/80" x-text="(b.layer?b.layer+': ':'')+(b.code||b)"></div>
+    </template>
+    <div class="pt-1 text-slate-400" x-show="caseShellState().trustPanel.limitations.length">Limitations</div>
+    <template x-for="(lim,li) in caseShellState().trustPanel.limitations" :key="li">
+      <div class="text-[11px] text-slate-500" x-text="lim"></div>
+    </template>
+   </div>
+  </template>
+</aside>
+
+<main class="p-6 ml-52" :class="shellSection==='cases' ? 'mr-72' : 'mr-4'">
+
+<!-- R3.0A: Case Context bar + per-case navigation (Analysis Cases section, across subviews) -->
+<div x-show="shellSection==='cases'" x-cloak class="mb-4">
+  <template x-if="caseShellState()">
+   <div class="mb-3 rounded-lg border border-slate-700 bg-slate-800/40 px-4 py-2 text-xs flex flex-wrap gap-x-4 gap-y-1">
+     <div>Case <b class="text-slate-200" x-text="caseShellState().contextBar.caseName||'—'"></b></div>
+     <div>Vehicle <b x-text="caseShellState().contextBar.vehicle||'—'"></b></div>
+     <div>Session <b x-text="caseShellState().contextBar.session||'—'"></b></div>
+     <div>Telemetry <b x-text="caseShellState().contextBar.telemetrySource||'none'"></b></div>
+     <div>Status <b class="text-sky-300" x-text="caseShellState().status"></b></div>
+   </div>
+  </template>
+  <div class="mb-2 text-[11px] text-amber-400/70 flex items-center gap-1" x-show="shellSection==='cases'" x-cloak>
+    <span class="px-1.5 py-0.5 rounded bg-amber-900/30 border border-amber-700/40">Deferred to R3.0B</span>
+    <span>Saving, reopening, duplicating and a searchable multi-case library arrive in R3.0B — this session shows the current in-memory case only. No case is silently persisted.</span>
+  </div>
+  <div class="flex flex-wrap gap-1" x-show="analysisView">
+    <template x-for="cn in caseNav" :key="cn.id">
+      <button class="px-2.5 py-1 rounded text-xs transition-colors"
+        :class="caseSubview===cn.id ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30' : 'text-slate-400 hover:bg-white/5 border border-transparent'"
+        @click="setCaseSubview(cn.id)"><span x-text="cn.label"></span><span class="ml-1 text-slate-600" x-show="!caseNavAvailable(cn.id)" x-cloak title="not yet available in this case">○</span></button>
+    </template>
+  </div>
+</div>
+
+<!-- R3.0A: Dashboard -->
+<div x-show="showPane('dashboard')" x-cloak x-transition>
+  <h2 class="text-xl font-bold mb-3">Dashboard</h2>
+  <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700 max-w-2xl">
+    <div class="text-sm text-slate-300 mb-2">Current Analysis Case</div>
+    <template x-if="analysisView">
+      <div class="text-sm space-y-1">
+        <div>Case: <b x-text="(analysisView.caseHeader&&analysisView.caseHeader.caseId)||'—'"></b></div>
+        <div>Vehicle: <b x-text="(analysisView.caseHeader&&analysisView.caseHeader.vehicle)||'—'"></b></div>
+        <div>Status: <b class="text-sky-300" x-text="(caseShellState()&&caseShellState().status)||'—'"></b></div>
+        <div class="pt-2"><button class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm" @click="setShellSection('cases')">Open case</button></div>
+      </div>
+    </template>
+    <template x-if="!analysisView">
+      <div class="text-sm text-slate-400">No analysis case yet.
+        <div class="pt-2 flex gap-2">
+          <button class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm" @click="setShellSection('cases'); loadDemoAnalysisCase()">Load Demo Case</button>
+          <button class="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-sm" @click="setShellSection('import')">Import Telemetry</button>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>
+
+<!-- R3.0A: Comparisons (explicitly deferred to R3.0C — non-actionable info panel, not a fake control) -->
+<div x-show="showPane('comparisons')" x-cloak x-transition>
+  <h2 class="text-xl font-bold mb-3">Comparisons</h2>
+  <div class="bg-slate-800/40 rounded-lg p-4 border border-amber-700/40 max-w-2xl text-sm text-slate-300">
+    <div class="text-amber-300 font-semibold mb-1">Deferred to R3.0C</div>
+    Cross-lap / cross-session reference-lap and corner-delta comparison is not yet available. It arrives in
+    milestone R3.0C (Reference Lap &amp; Corner Delta Intelligence). No comparison is fabricated here.
+  </div>
+</div>
+
+<!-- R3.0A: Setup Library sub-navigation -->
+<div x-show="shellSection==='setup_library'" x-cloak class="mb-3 flex flex-wrap gap-1">
+  <template x-for="lt in setupLibraryTabs" :key="lt.id">
+    <button class="px-2.5 py-1 rounded text-xs transition-colors" :class="currentTab===lt.id ? 'bg-sky-500/15 text-sky-300 border border-sky-500/30' : 'text-slate-400 hover:bg-white/5 border border-transparent'" @click="currentTab=lt.id" x-text="lt.label"></button>
+  </template>
+</div>
 
 <!-- ==================== TAB: Handling Prediction ==================== -->
-<div x-show="currentTab==='predict'" x-transition>
+<div x-show="showPane('predict')" x-transition>
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-xl font-bold" x-text="t('h2.predict')"></h2>
     <!-- Mode toggle -->
@@ -871,7 +975,7 @@ canvas{max-height:300px}
           <div x-show="lihpaoResult && !lihpaoResult.error" class="card2 p-4 mb-4" style="background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.18)">
             <div class="flex items-center justify-between mb-2">
               <div class="text-xs text-sky-300 font-semibold"><span x-text="t('ui.lihpaoG2Title')"></span> <span x-html="tierBadge('model')"></span></div>
-              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-600 text-slate-300 hover:bg-slate-500" @click="currentTab='lihpao'" x-text="t('btn.lapDetail')"></button>
+              <button class="text-[10px] px-2 py-0.5 rounded bg-slate-600 text-slate-300 hover:bg-slate-500" @click="setShellSection('setup_library'); currentTab='lihpao'" x-text="t('btn.lapDetail')"></button>
             </div>
             <template x-if="lihpaoResult">
               <div>
@@ -1134,7 +1238,7 @@ canvas{max-height:300px}
 </div>
 
 <!-- ==================== TAB: Setup Advisor ==================== -->
-<div x-show="currentTab==='advisor'" x-transition>
+<div x-show="showPane('advisor')" x-transition>
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-xl font-bold" x-text="t('h2.advisor')"></h2>
     <button class="btn btn-primary" @click="runAdvisor()" :disabled="!result">
@@ -1203,7 +1307,7 @@ canvas{max-height:300px}
 </div>
 
 <!-- ==================== TAB: Spring Calculator ==================== -->
-<div x-show="currentTab==='spring'" x-transition>
+<div x-show="showPane('spring')" x-transition>
   <h2 class="text-xl font-bold mb-4" x-text="t('h2.spring')"></h2>
 
   <div class="grid-2">
@@ -1418,7 +1522,7 @@ canvas{max-height:300px}
 </div>
 
 <!-- ==================== TAB: Tire Analysis ==================== -->
-<div x-show="currentTab==='tire'" x-transition>
+<div x-show="showPane('tire')" x-transition>
   <h2 class="text-xl font-bold mb-4" x-text="t('h2.tire')"></h2>
   <!-- Import real tire model (.tir) — user loads their own file at runtime; nothing bundled/uploaded -->
   <div class="card p-5 mb-4">
@@ -1884,7 +1988,7 @@ canvas{max-height:300px}
 </div>
 
 <!-- ==================== TAB: Lihpao Lap ==================== -->
-<div x-show="currentTab==='lihpao'" x-transition>
+<div x-show="showPane('lihpao')" x-transition>
   <h2 class="text-xl font-bold mb-1" x-text="t('h2.lihpao')"></h2>
   <p class="text-xs text-slate-500 mb-4" x-text="t('lihpao.sub')"></p>
   <div class="grid-2">
@@ -1958,7 +2062,7 @@ canvas{max-height:300px}
 </div>
 
 <!-- ==================== TAB: User Guide ==================== -->
-<div x-show="currentTab==='guide'" x-transition>
+<div x-show="showPane('guide')" x-transition>
   <h2 class="text-xl font-bold mb-4" x-text="t('h2.guide')"></h2>
 
   <!-- Quick Start -->
@@ -2359,7 +2463,7 @@ canvas{max-height:300px}
 </div>
 
 <!-- ===== Telemetry CSV Evidence viewer (V1 Step 2B): import + mapping + fail-closed preflight. No curves / no yaw metrics / no model overlay. ===== -->
-<div x-show="currentTab==='telemetry'" x-transition>
+<div x-show="showPane('telemetry')" x-transition>
   <div class="card p-5 mb-4">
     <div class="section-title">📈 <span x-text="t('ui.telem.title')"></span></div>
     <div class="text-xs text-slate-500 mb-3" x-text="t('ui.telem.hint')"></div>
@@ -2573,7 +2677,7 @@ canvas{max-height:300px}
 </div>
 
 <!-- ==================== TAB: Analysis Workspace (R2.2 end-to-end) ==================== -->
-<div x-show="currentTab==='analysis'" x-transition>
+<div x-show="showPane('analysis')" x-transition>
   <div class="flex items-center justify-between mb-4">
     <h2 class="text-xl font-bold" x-text="t('tab.analysis')"></h2>
     <button id="loadDemoAnalysisCase" class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm font-semibold" @click="loadDemoAnalysisCase()">Load Demo Analysis Case</button>
@@ -2656,7 +2760,7 @@ canvas{max-height:300px}
     </div>
 
     <!-- C · Vehicle & Setup Inputs -->
-    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+    <div x-show="svShow('setup_model')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
       <div class="text-xs text-slate-400 mb-2">C · Vehicle &amp; Setup Inputs <span x-html="credBadge('Derived')"></span></div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
         <div>Front wheel rate: <b x-text="fmt(analysisView.setupInputs.frontWheelRate.value)"></b> <span x-text="analysisView.setupInputs.frontWheelRate.unit"></span> <span class="text-slate-500" x-text="'· '+analysisView.setupInputs.frontWheelRate.basis"></span> <span x-html="credBadge(analysisView.setupInputs.frontWheelRate.credibility)"></span></div>
@@ -2670,7 +2774,7 @@ canvas{max-height:300px}
     </div>
 
     <!-- D · Model Prediction -->
-    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700" x-show="analysisView.modelPrediction.available">
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700" x-show="svShow('setup_model') && analysisView.modelPrediction.available">
       <div class="text-xs text-slate-400 mb-2">D · Model Prediction <span x-html="credBadge('Model')"></span></div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
         <div>Front/Rear wheel rate: <b x-text="fmt(analysisView.modelPrediction.frontWheelRate.value)"></b> / <b x-text="fmt(analysisView.modelPrediction.rearWheelRate.value)"></b> N/mm <span x-html="credBadge('Physics')"></span></div>
@@ -2684,13 +2788,13 @@ canvas{max-height:300px}
         <div class="md:col-span-2">Predicted tendency: <b class="text-sky-300" x-text="analysisView.modelPrediction.predictedTendency.value"></b> <span x-html="credBadge('Model')"></span></div>
       </div>
     </div>
-    <div class="bg-slate-800/40 rounded-lg p-4 border border-amber-700/50" x-show="!analysisView.modelPrediction.available">
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-amber-700/50" x-show="svShow('setup_model') && !analysisView.modelPrediction.available">
       <div class="text-xs text-amber-400 mb-1">D · Model Prediction — blocked</div>
       <template x-for="b in analysisView.modelPrediction.blockedReasons" :key="b.code"><div class="text-xs text-slate-400" x-text="b.code + (b.parameterKey?(' · '+b.parameterKey):'')"></div></template>
     </div>
 
     <!-- E · Telemetry Observation -->
-    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+    <div x-show="svShow('telemetry')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
       <div class="text-xs text-slate-400 mb-2">E · Telemetry Observation <span x-html="credBadge(analysisView.telemetryObservation.available ? 'Heuristic' : 'Unavailable')"></span></div>
       <template x-if="analysisView.telemetryObservation.available">
         <div class="text-sm space-y-1">
@@ -2706,7 +2810,7 @@ canvas{max-height:300px}
     </div>
 
     <!-- F · Model vs Actual -->
-    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+    <div x-show="svShow('model_vs_actual')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
       <div class="text-xs text-slate-400 mb-2">F · Model vs Actual <span x-html="credBadge('Heuristic')"></span></div>
       <template x-if="analysisView.modelVsActual.available">
         <div class="text-sm space-y-1">
@@ -2720,7 +2824,7 @@ canvas{max-height:300px}
     </div>
 
     <!-- F2 · Measured Metrics (R2.4) -->
-    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+    <div x-show="svShow('measured_metrics')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
       <div class="text-xs text-slate-400 mb-2">F2 · Measured Metrics <span x-html="credBadge('Measured')"></span></div>
       <template x-if="analysisView.measuredMetrics.available">
         <div class="text-xs space-y-1">
@@ -2735,7 +2839,7 @@ canvas{max-height:300px}
     </div>
 
     <!-- F3 · Quantitative Recommendation (R2.5) -->
-    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+    <div x-show="svShow('recommendations')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
       <div class="text-xs text-slate-400 mb-2">F3 · Quantitative Recommendation <span x-html="credBadge('Model')"></span></div>
       <div class="flex items-end gap-2 text-xs flex-wrap mb-2">
         <label class="flex flex-col gap-0.5">metric
@@ -2774,7 +2878,7 @@ canvas{max-height:300px}
     </div>
 
     <!-- F4 · Setup A/B (R2.5) -->
-    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+    <div x-show="svShow('recommendations')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
       <div class="text-xs text-slate-400 mb-2">F4 · Setup A/B (model what-if) <span x-html="credBadge('Model')"></span></div>
       <div class="flex items-end gap-2 text-xs flex-wrap mb-2">
         <label class="flex flex-col gap-0.5">parameter
@@ -2810,7 +2914,7 @@ canvas{max-height:300px}
     </div>
 
     <!-- G · Race Engineer -->
-    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700" x-show="analysisView.raceEngineer.available">
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700" x-show="svShow('recommendations') && analysisView.raceEngineer.available">
       <div class="text-xs text-slate-400 mb-2">G · Race Engineer <span x-html="credBadge('Heuristic')"></span></div>
       <div class="text-sm space-y-2">
         <div>Summary: <span class="text-slate-300" x-text="analysisView.raceEngineer.summary"></span></div>
@@ -2822,7 +2926,7 @@ canvas{max-height:300px}
     </div>
 
     <!-- H · Driver Coach -->
-    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700" x-show="analysisView.driverCoach.available">
+    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700" x-show="svShow('recommendations') && analysisView.driverCoach.available">
       <div class="text-xs text-slate-400 mb-2">H · Driver Coach <span x-html="credBadge('Heuristic')"></span></div>
       <div class="text-sm space-y-2">
         <div>Observations: <template x-for="o in analysisView.driverCoach.observations" :key="o.code"><span class="inline-block bg-slate-700 rounded px-1.5 py-0.5 text-xs mr-1 mb-1" x-text="o.code + (o.qualitative?(' · '+o.qualitative):'')"></span></template></div>
@@ -2832,7 +2936,7 @@ canvas{max-height:300px}
     </div>
 
     <!-- J · Track Intelligence / Corner Coaching (R2.6) -->
-    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+    <div x-show="svShow('corner_coaching')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
       <div class="text-xs text-slate-400 mb-2">J · Corner Coaching <span x-html="credBadge('Heuristic')"></span></div>
       <template x-if="analysisView.trackIntelligence.available">
         <div class="text-xs space-y-2">
@@ -2852,7 +2956,7 @@ canvas{max-height:300px}
     </div>
 
     <!-- I · Evidence / Provenance Drawer -->
-    <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
+    <div x-show="svShow('evidence_trust')" class="bg-slate-800/40 rounded-lg p-4 border border-slate-700">
       <div class="text-xs text-slate-400 mb-2">I · Evidence &amp; Provenance</div>
       <div class="text-xs text-slate-500 mb-2">Credibility: <template x-for="l in analysisView.evidenceDrawer.credibilityLegend" :key="l"><span class="mr-1" x-html="credBadge(l)"></span></template></div>
       <div class="text-[11px] text-slate-400">Model: <span x-text="analysisView.evidenceDrawer.modelVersion"></span></div>
@@ -2923,6 +3027,7 @@ canvas{max-height:300px}
 <script src="js/track-intelligence.js"></script>
 <script src="js/analysis-workspace.js"></script>
 <script src="js/analysis-workspace-viewmodel.js"></script>
+<script src="js/case-shell.js"></script>
 <script src="js/demo-analysis-case.js"></script>
 <!-- R2.3 real-telemetry validation modules (dependency order) -->
 <script src="js/telemetry-import-adapter.js"></script>
@@ -2946,13 +3051,13 @@ function app(){return{
   analysisError: null,
   loadDemoAnalysisCase(){
     try {
-      if (typeof DemoAnalysisCase==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof AnalysisWorkspaceViewModel==='undefined'){ this.analysisError='analysis modules not loaded'; this.analysisView=null; return; }
+      if (typeof DemoAnalysisCase==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof AnalysisWorkspaceViewModel==='undefined'){ this.analysisError='analysis modules not loaded'; this.analysisView=null; this._shellEvidence=null; return; }
       const demo = DemoAnalysisCase.buildDemoAnalysisCase();
       const ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, demo.telemetrySession, demo.window, {}); // global Tier1BasicBalance as the model runner
       this._lastCase = demo.analysisCase; this._lastSession = demo.telemetrySession; this._lastWindow = demo.window; this._lastVmOpts = { suspensionNormalizationView: demo.suspensionNormalizationView };
-      this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, { suspensionNormalizationView: demo.suspensionNormalizationView });
+      this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, { suspensionNormalizationView: demo.suspensionNormalizationView }); this._shellEvidence=this._mkShellEvidence(ws,'demo_case');
       this.analysisError = null;
-    } catch(e){ this.analysisError = String((e&&e.message)||e); this.analysisView=null; }
+    } catch(e){ this.analysisError = String((e&&e.message)||e); this.analysisView=null; this._shellEvidence=null; }
   },
   // R2.3 import workflow — UI calls services only; no physics recompute, no UI-side capability derivation
   importCsvText: '',
@@ -2968,7 +3073,7 @@ function app(){return{
       var d=parseFloat(this.quantDelta);
       var opts={ quantitative: { target: { metric: this.quantMetric, delta: isFinite(d)?d:0 }, parameterKey: this.quantParameter } };
       var ws=AnalysisWorkspace.runAnalysisWorkspace(this._lastCase, this._lastSession, this._lastWindow, opts);
-      this.analysisView=AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, this._lastCase, this._lastVmOpts||{});
+      this.analysisView=AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, this._lastCase, this._lastVmOpts||{}); this._shellEvidence=this._mkShellEvidence(ws,(this._shellEvidence&&this._shellEvidence.source)||'demo_case');
     } catch(e){ this.analysisError=String((e&&e.message)||e); }
   },
   runSetupAbCompare(){
@@ -3020,8 +3125,8 @@ function app(){return{
       var demo = DemoAnalysisCase.buildDemoAnalysisCase(); // vehicle/setup binding; imported telemetry session
       var ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, session, null, {});
       this._lastCase = demo.analysisCase; this._lastSession = session; this._lastWindow = null; this._lastVmOpts = {};
-      this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, {});
-    } catch(e){ this.importError=String((e&&e.message)||e); this.analysisView=null; }
+      this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, {}); this._shellEvidence=this._mkShellEvidence(ws,'imported_csv');
+    } catch(e){ this.importError=String((e&&e.message)||e); this.analysisView=null; this._shellEvidence=null; }
   },
   fmt(v){ return (v==null || (typeof v==='number' && !isFinite(v))) ? '—' : (typeof v==='number' ? (Math.round(v*100)/100) : v); },
   credBadge(level){
@@ -3332,7 +3437,7 @@ function app(){return{
     // fixed fallback order: localized key → English message → code → generic; a missing {param} is kept verbatim (never silently blanked, so stray placeholders stay findable)
     const base=(tpl!==key)?tpl:(d.message||code||this.t('ui.telem.diag.WARNING')); const p=d.params||{};
     return base.replace(/\{(\w+)\}/g,(m,k)=>(p[k]!=null?String(p[k]):m)); },
-  currentTab:'predict',
+  currentTab:'analysis',
   tabs:[
     {id:'predict',key:'tab.predict'},
     {id:'advisor',key:'tab.advisor'},
@@ -3343,6 +3448,35 @@ function app(){return{
     {id:'analysis',key:'tab.analysis'},
     {id:'guide',key:'tab.guide'},
   ],
+  shellSection:'cases',
+  caseSubview:'overview',
+  caseSubviewIds:['overview','setup_model','telemetry','measured_metrics','model_vs_actual','recommendations','corner_coaching','evidence_trust'],
+  mainNav:[{id:'dashboard',label:'Dashboard'},{id:'cases',label:'Analysis Cases'},{id:'import',label:'Import Telemetry'},{id:'setup_library',label:'Setup Library'},{id:'comparisons',label:'Comparisons',deferred:'R3.0C'},{id:'settings',label:'Settings'}],
+  caseNav:[{id:'overview',label:'Overview'},{id:'setup_model',label:'Setup & Model'},{id:'telemetry',label:'Telemetry'},{id:'measured_metrics',label:'Measured Metrics'},{id:'model_vs_actual',label:'Model vs Actual'},{id:'recommendations',label:'Recommendations'},{id:'corner_coaching',label:'Corner Coaching'},{id:'evidence_trust',label:'Evidence & Trust'}],
+  setupLibraryTabs:[{id:'spring',label:'Spring Calculator'},{id:'tire',label:'Tire Analysis'},{id:'advisor',label:'Setup Advisor'},{id:'lihpao',label:'Lihpao Lap'},{id:'telemetry',label:'Telemetry Viewer (raw CSV)'}],
+  _shellEvidence:null,
+  setShellSection(id){ this.shellSection=id;
+    if(id==='dashboard') this.currentTab='dashboard';
+    else if(id==='cases'){ this.caseSubview='overview'; this.currentTab='analysis'; }
+    else if(id==='import'){ this.caseSubview='overview'; this.currentTab='analysis'; }
+    else if(id==='setup_library'){ if(['spring','tire','advisor','lihpao','telemetry'].indexOf(this.currentTab)<0) this.currentTab='spring'; }
+    else if(id==='comparisons') this.currentTab='comparisons';
+    else if(id==='settings') this.currentTab='guide'; },
+  setCaseSubview(id){ this.shellSection='cases'; this.caseSubview=id;
+    if(id==='setup_model') this.currentTab='predict';
+    else this.currentTab='analysis'; },
+  showPane(id){ var s=this.shellSection;
+    if(s==='dashboard') return id==='dashboard';
+    if(s==='comparisons') return id==='comparisons';
+    if(s==='import') return id==='analysis'; /* canonical R2.3 import panel lives at the top of the analysis/cases pane */
+    if(s==='settings') return id==='guide';
+    if(s==='setup_library') return ['spring','tire','advisor','lihpao','telemetry'].indexOf(id)>=0 && this.currentTab===id;
+    if(s==='cases'){ if(this.caseSubview==='setup_model') return id==='predict'; return id==='analysis'; }
+    return false; },
+  svShow(name){ if(this.shellSection!=='cases') return true; return this.caseSubview==='overview' || this.caseSubview===name; },
+  caseNavAvailable(id){ try{ var st=this.caseShellState(); if(!st) return false; var n=(st.navSections||[]).find(function(x){return x.key===id;}); return !!(n&&n.available); }catch(e){ return false; } },
+  _mkShellEvidence(ws, source){ try{ return { capability:(ws&&ws.capability)||null, observation:(ws&&ws.observation)?{ blockedReasons:((ws.observation.blockedReasons)||[]).map(function(b){return {code:(b&&b.code)||String(b)};}) }:null, source: source||null }; }catch(e){ return null; } },
+  caseShellState(){ try{ var CS=(typeof CaseShell!=='undefined')?CaseShell:((typeof globalThis!=='undefined'&&globalThis.CaseShell)||null); if(!CS||!CS.deriveCaseShellState) return null; return CS.deriveCaseShellState({ workspaceResult:this._shellEvidence||null, analysisView:this.analysisView||null, importState:null, caseMeta:{ hasCase:!!this.analysisView, caseName:(this.analysisView&&this.analysisView.caseHeader&&this.analysisView.caseHeader.caseId)||null, vehicle:(this.analysisView&&this.analysisView.caseHeader&&this.analysisView.caseHeader.vehicle)||null, session:(this.analysisView&&this.analysisView.caseHeader&&this.analysisView.caseHeader.telemetrySession)||null, telemetrySource:(this._shellEvidence&&this._shellEvidence.source)||null } }); }catch(e){ return null; } },
   tier:1,
   // Prediction inputs
   pred:{front_spring_rate:240,rear_spring_rate:925,front_arb:300,rear_arb:200,front_track:1440,rear_track:1380,front_motion_ratio:1.0,rear_motion_ratio:1.0,weight_front_pct:41.5,total_weight:570,cg_height:280,wheelbase:2730,tire_spring_rate:220,front_roll_center_height:50,rear_roll_center_height:50},
