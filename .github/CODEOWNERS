@@ -1,0 +1,12 @@
+# R3-GATE0 governance ownership.
+#
+# These paths DEFINE the trusted verification gate itself (workflow, verifier scripts, frozen manifest).
+# A PR that rewrites them could make the gate pass itself, so they require code-owner review. Combined
+# with branch protection on `main` ("Require review from Code Owners" + the trusted-verification status
+# check as a required check), this is the trust anchor a PR cannot bypass by editing the guard.
+# CODEOWNERS only takes effect once that branch protection is configured — a POST-MERGE admin action
+# (see docs/r3-gate0-trusted-verification.md §8). This file is harmless without it.
+
+/.github/                      @USADA-KARROT
+/scripts/                      @USADA-KARROT
+/scripts/frozen-files.json     @USADA-KARROT

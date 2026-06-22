@@ -156,12 +156,23 @@ The session that builds/changes CI may **not** merge. It stops at `READY TO MERG
 Merging happens only under a separate, explicit human authorization (`merge R3-GATE0 PR`). Branch
 protection / required checks are configured by a human after this gate lands (see §8).
 
-## 8. Branch protection (post-merge admin action)
+## 8. Governance enforcement & the self-referential trust boundary (post-merge admin action)
 
-`main` currently has no branch protection. That is not a blocker for landing this gate, but it means
-the gate is not yet *enforced*. After this PR merges and the workflow runs green on `main`, an
-authorised human should mark `trusted-verification-gate / trusted-verification` as a **required status
-check** on `main` so future PRs cannot merge without it. CI cannot and must not configure this itself.
+This gate runs from the PR checkout, so a PR that rewrites the gate itself (the workflow, a verifier
+script, or `scripts/frozen-files.json`) could in principle make the gate pass itself. Two measures narrow
+that inside the PR, and one closes it at the governance layer:
+
+- **Base-anchored frozen set** — `check-frozen-boundary.js` reads the frozen manifest from BOTH the base
+  commit (immutable within the PR) and the head, and uses their union, so a PR cannot drop an entry to
+  slip a frozen file through.
+- **CODEOWNERS** — `.github/CODEOWNERS` marks `.github/`, `scripts/`, and the frozen manifest as
+  code-owner–owned, so edits to the gate require owner review.
+- **Branch protection (the closing anchor)** — `main` currently has no branch protection. After this PR
+  merges and the workflow runs green on `main`, an authorised human must, on `main`: (a) make
+  `trusted-verification-gate / trusted-verification` a **required status check**; (b) enable **Require
+  review from Code Owners**; and (c) require a PR before merging. Only then is it impossible to merge a PR
+  that has rewritten the gate to pass itself. CI cannot and must not configure branch protection itself —
+  it is a repo-admin / governance decision, deliberately left as a POST-MERGE action.
 
 ## 9. How R3.0C (and future milestones) use this pipeline
 
