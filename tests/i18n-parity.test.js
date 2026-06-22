@@ -103,5 +103,32 @@ chk('missing key returns the key itself', tzh('ui.__nonexistent__') === 'ui.__no
 chk('intentional EN empty respected (returns "", not the key)', ten('ui.lapPost') === '');
 chk('present key returns the localized value', tzh('ui.case.save') === '儲存');
 
+// 7) CP-I18N-3: service-derived dynamic-code inventory — production blocker/cannotConclude codes need a 3-lang key
+const svcDir = path.join(__dirname, '../renderer/js');
+let svcSrc = '';
+fs.readdirSync(svcDir).filter(f => /\.js$/.test(f) && !/^i18n/.test(f)).forEach(f => svcSrc += fs.readFileSync(path.join(svcDir, f), 'utf8'));
+const uniq = a => [...new Set(a)];
+const tri = (ns, c) => has(en, ns + '.' + c) && has(zh, ns + '.' + c) && has(ja, ns + '.' + c);
+// internal/exception/model-pipeline codes may humanize (not a normal user-facing path)
+const INTERNAL = /_EXCEPTION$|^EXECUTION_|MALFORMED|NOT_CANONICAL|FORBIDDEN_|_GUARD$|ANALYSIS_CASE_INVALID|CANONICAL_SNAPSHOT|CANONICAL_INPUT_NOT_MODEL|TELEMETRY_SESSION_MISSING|MODEL_ENGINE_UNAVAILABLE|MODEL_RUN_FAILED|MODEL_RESULT_NOT|BASELINE_|PARAMETER_|PERTURBED_|PROBE_|RECOMMENDED_|PREDICTED_RESULT|SETUP_[AB]_MODEL|DEGENERATE_|IMPLAUSIBLE_|UNKNOWN_TARGET|UNKNOWN_PARAMETER|BAD_TARGET|ANALYSIS_EXECUTION_UNAVAILABLE/;
+const blockerCodes = uniq([...svcSrc.matchAll(/_blocker\(['"]([A-Z0-9_]+)['"]/g)].map(m => m[1]));
+const cannotCodes = uniq([...svcSrc.matchAll(/cannotConclude\.push\(['"]([a-z0-9_]+)['"]/g)].map(m => m[1]));
+const missBlocker = blockerCodes.filter(c => !INTERNAL.test(c) && !tri('ui.blocker', c));
+const missCannot = cannotCodes.filter(c => !tri('ui.cannot', c));
+chk('every production blocker code has a 3-lang key (internal/exception allowlisted)', missBlocker.length === 0, missBlocker);
+chk('every cannotConclude code has a 3-lang key', missCannot.length === 0, missCannot);
+
+// 8) CP-I18N-3: UI-layer helpers (tCode recorder + tErr) + a11y lang are wired in index.html
+const idxHtml = fs.readFileSync(path.join(__dirname, '../renderer/index.html'), 'utf8');
+chk('tCode records unknown codes (dev detection, not silent)', /tCode\(prefix, code\)\{[\s\S]{0,500}__i18nMissingCodes/.test(idxHtml));
+chk('tCode humanizes unknown codes as a last resort', /tCode\(prefix, code\)\{[\s\S]{0,900}toUpperCase/.test(idxHtml));
+chk('tErr maps error codes with a localized generic fallback', /tErr\(v\)\{[\s\S]{0,500}ui\.err\.generic/.test(idxHtml) && tri.length && has(en, 'ui.err.generic') && has(zh, 'ui.err.generic') && has(ja, 'ui.err.generic'));
+chk('error displays route through tErr (no raw importError/analysisError/storageError)', /x-text="tErr\(importError\)"/.test(idxHtml) && /x-text="tErr\(analysisError\)"/.test(idxHtml) && /tErr\(storageError\)/.test(idxHtml));
+chk('document lang bound to the active locale (a11y)', /documentElement\.lang=\(l==='zh'\?'zh-TW':l\)/.test(idxHtml));
+// CP-I18N-3 #1: legacy .bmsbin viewer adapter titles are no longer English in zh/ja
+['ui.telem.cadapter.title', 'ui.telem.sadapter.title'].forEach(k => {
+  chk('legacy adapter title localized: ' + k, has(en, k) && zh[k] !== en[k] && ja[k] !== en[k]);
+});
+
 console.log('i18n-parity: ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);

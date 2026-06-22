@@ -48,7 +48,7 @@ canvas{max-height:300px}
 ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px}
 </style>
 </head>
-<body x-data="app()" x-init="init()">
+<body x-data="app()" x-init="init(); try{document.documentElement.lang=(lang==='zh'?'zh-TW':lang)}catch(e){}">
 
 <!-- Top Nav -->
 <header class="flex items-center justify-between px-6 py-3 border-b border-white/5" style="background:var(--bg2)">
@@ -136,7 +136,7 @@ canvas{max-height:300px}
         <label class="flex items-center gap-1 text-[11px] text-slate-400 px-1" :title="t('ui.case.autosave.tip')"><input type="checkbox" x-model="autosaveEnabled"> <span x-text="t('ui.case.autosave')"></span></label>
       </div>
     </div>
-    <div class="text-[11px] text-rose-400 mb-1" x-show="storageError" x-cloak x-text="t('ui.case.storageError')+' '+storageError"></div>
+    <div class="text-[11px] text-rose-400 mb-1" x-show="storageError" x-cloak x-text="t('ui.case.storageError')+' '+tErr(storageError)"></div>
     <div class="text-[11px] text-amber-400/70 mb-1" x-show="importedSummaryOpen" x-cloak x-text="t('ui.case.importedBanner')"></div>
     <div class="flex flex-wrap gap-2 mb-2 text-xs">
       <input x-model="libFilters.search" @input="refreshLibrary()" :placeholder="t('ui.case.filter.search')" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 flex-1 min-w-[8rem]">
@@ -2732,7 +2732,7 @@ canvas{max-height:300px}
     <button id="loadDemoAnalysisCase" class="px-3 py-1.5 rounded bg-sky-700 hover:bg-sky-600 text-sm font-semibold" @click="loadDemoAnalysisCase()" x-text="t('aw.label.load_demo_analysis_case')"></button>
   </div>
   <div class="text-xs text-slate-400 mb-3" x-text="t('aw.hint.intro_paragraph')"></div>
-  <div x-show="analysisError" class="text-red-400 text-sm mb-3" x-text="analysisError"></div>
+  <div x-show="analysisError" class="text-red-400 text-sm mb-3" x-text="tErr(analysisError)"></div>
 
   <!-- Import real/imported telemetry → map channels → run the SAME production pipeline (R2.3) -->
   <div class="bg-slate-800/40 rounded-lg p-4 border border-slate-700 mb-4" id="importTelemetryPanel">
@@ -2743,7 +2743,7 @@ canvas{max-height:300px}
       <button class="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-xs" @click="loadCornerSampleCsv()" x-text="t('aw.label.load_corner_sample')"></button>
       <button id="importTelemetryBtn" class="px-2 py-1 rounded bg-sky-700 hover:bg-sky-600 text-xs font-semibold" @click="importTelemetryCsv()" x-text="t('aw.label.Import')"></button>
     </div>
-    <div x-show="importError" class="text-red-400 text-xs mb-2" x-text="importError"></div>
+    <div x-show="importError" class="text-red-400 text-xs mb-2" x-text="tErr(importError)"></div>
     <template x-if="importedChannels.length">
       <div>
         <div class="text-xs text-slate-400 mb-1" x-text="t('aw.hint.map_columns_hint')"></div>
@@ -3137,7 +3137,7 @@ function app(){return{
   analysisError: null,
   loadDemoAnalysisCase(){
     try {
-      if (typeof DemoAnalysisCase==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof AnalysisWorkspaceViewModel==='undefined'){ this.analysisError='analysis modules not loaded'; this.analysisView=null; this._shellEvidence=null; return; }
+      if (typeof DemoAnalysisCase==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof AnalysisWorkspaceViewModel==='undefined'){ this.analysisError='modules_not_loaded'; this.analysisView=null; this._shellEvidence=null; return; }
       const demo = DemoAnalysisCase.buildDemoAnalysisCase();
       const ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, demo.telemetrySession, demo.window, {}); // global Tier1BasicBalance as the model runner
       caseDataHolder.lastCase = demo.analysisCase; caseDataHolder.lastSession = demo.telemetrySession; caseDataHolder.lastWindow = demo.window; caseDataHolder.lastVmOpts = { suspensionNormalizationView: demo.suspensionNormalizationView }; this._persistSession(demo.telemetrySession);
@@ -3154,7 +3154,7 @@ function app(){return{
   abParameter: 'frontArbRollStiffnessNmDeg', abChangePct: '10', abResult: null,
   runQuantitativeRecommendation(){
     try {
-      if (!caseDataHolder.lastCase || typeof AnalysisWorkspace==='undefined'){ this.analysisError='run an analysis first'; return; }
+      if (!caseDataHolder.lastCase || typeof AnalysisWorkspace==='undefined'){ this.analysisError='run_analysis_first'; return; }
       var d=parseFloat(this.quantDelta);
       var opts={ quantitative: { target: { metric: this.quantMetric, delta: isFinite(d)?d:0 }, parameterKey: this.quantParameter } };
       var ws=AnalysisWorkspace.runAnalysisWorkspace(caseDataHolder.lastCase, caseDataHolder.lastSession, caseDataHolder.lastWindow, opts);
@@ -3163,11 +3163,11 @@ function app(){return{
   },
   runSetupAbCompare(){
     try {
-      if (!caseDataHolder.lastCase || typeof SetupAB==='undefined'){ this.analysisError='run an analysis first'; return; }
+      if (!caseDataHolder.lastCase || typeof SetupAB==='undefined'){ this.analysisError='run_analysis_first'; return; }
       var whatif=JSON.parse(JSON.stringify(caseDataHolder.lastCase));
       var snap=whatif.modelSnapshot && whatif.modelSnapshot.canonicalInputSnapshot; var p=snap && snap[this.abParameter];
       var pct=parseFloat(this.abChangePct);
-      if (!p || !isFinite(pct)){ this.analysisError='pick a parameter and a % change'; return; }
+      if (!p || !isFinite(pct)){ this.analysisError='pick_param_pct'; return; }
       p.value = p.value * (1 + pct/100);
       this.abResult = SetupAB.compareSetups(caseDataHolder.lastCase, whatif, {}); this.autosaveCurrentCase();
     } catch(e){ this.analysisError=String((e&&e.message)||e); this.abResult=null; }
@@ -3179,7 +3179,7 @@ function app(){return{
   importTelemetryCsv(){
     try {
       this.importError=null; this.importedChannels=[]; caseDataHolder.importedBundle=null;
-      if (typeof TelemetryImportAdapter==='undefined' || typeof ChannelMapping==='undefined'){ this.importError='import modules not loaded'; return; }
+      if (typeof TelemetryImportAdapter==='undefined' || typeof ChannelMapping==='undefined'){ this.importError='modules_not_loaded'; return; }
       var r = TelemetryImportAdapter.importTelemetry({ format:'csv', text:this.importCsvText });
       if (!r.ok){ this.importError = (r.parseErrors && r.parseErrors[0] && r.parseErrors[0].code) || 'import_failed'; return; }
       caseDataHolder.importedBundle = r;
@@ -3191,7 +3191,7 @@ function app(){return{
   runImportedAnalysis(){
     try {
       this.importError=null;
-      if (typeof CanonicalTelemetrySession==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof DemoAnalysisCase==='undefined'){ this.importError='analysis modules not loaded'; return; }
+      if (typeof CanonicalTelemetrySession==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof DemoAnalysisCase==='undefined'){ this.importError='modules_not_loaded'; return; }
       var assignments = this.importedChannels.filter(function(c){ return c.assigned; }).map(function(c){ return { rawColumnId:c.rawColumnId, canonicalChannel:c.assigned, userConfirmed: c.confirmed===true }; });
       var mapping = ChannelMapping.buildChannelMapping(caseDataHolder.importedBundle.rawChannels, assignments);
       var SESS='imported_session';
@@ -3222,7 +3222,7 @@ function app(){return{
   // === i18n (English primary / 繁中 / 日本語) ===
   lang: (typeof localStorage!=='undefined' && localStorage.getItem('lang')) || 'en',
   langs:[{id:'en',label:'EN'},{id:'zh',label:'繁'},{id:'ja',label:'日'}],
-  setLang(l){ this.lang=l; try{localStorage.setItem('lang',l)}catch(e){} if(this.carPresets.length) this.loadPresets(); if(this.advisorResult && this.result) this.runAdvisor(); },
+  setLang(l){ this.lang=l; try{localStorage.setItem('lang',l)}catch(e){} try{document.documentElement.lang=(l==='zh'?'zh-TW':l)}catch(e){} if(this.carPresets.length) this.loadPresets(); if(this.advisorResult && this.result) this.runAdvisor(); },
   t(k){ const D=(typeof I18N!=='undefined')?I18N:null; if(!D) return k;
         const has=(o)=>o && Object.prototype.hasOwnProperty.call(o,k); // 用 hasOwnProperty 避免命中原型鏈(toString…)
         if(has(D[this.lang])) return D[this.lang][k]; // 尊重「刻意空字串」翻譯(如 EN ui.lapPost='')，不誤當缺漏
@@ -3244,6 +3244,14 @@ function app(){return{
         return this.tCode('ui.cred', s.replace(/[^a-z0-9]+/g,'_')); },
   // generic enum value (provenance/confidence/…) → normalize hyphens/spaces/case to a snake_case code, then translate.
   enumCode(prefix, v){ if(v==null||v==='') return ''; return this.tCode(prefix, String(v).toLowerCase().replace(/[^a-z0-9]+/g,'_')); },
+  // error/failure-path messages: known UI/service codes → ui.err.*; a 'prefix: CODE' compound is split; an unknown
+  // code → generic + the code in parens; free-text (a caught Error.message) → generic only (never raw English).
+  tErr(v){ if(v==null||v==='') return ''; var s=String(v);
+        if(/^[a-z][a-z_]*: /.test(s)){ var i=s.indexOf(': '); return this.tErr(s.slice(0,i))+'：'+this.tErr(s.slice(i+2)); }
+        var k='ui.err.'+s; var tv=this.t(k); if(tv!==k) return tv;
+        try{ (globalThis.__i18nMissingCodes||(globalThis.__i18nMissingCodes={}))[k]=1; }catch(e){}
+        if(/^[A-Za-z][A-Za-z0-9_]*$/.test(s)) return this.t('ui.err.generic')+' ('+s+')';
+        return this.t('ui.err.generic'); },
   // composite raceEngineer / corner summary codes: parse the prefix, then translate each sub-part.
   awSummary(s){ if(s==null||s==='') return ''; var p=String(s); var self=this;
         if(p.indexOf('directional_insight:')===0) return this.t('aw.summary.directional_insight')+' '+this.tCode('aw.diff', p.slice(20));
@@ -3583,15 +3591,15 @@ function app(){return{
   _persistSession(session){ try{ var tok=++caseDataHolder.sessionOpToken; if(!session||!this.ensureStore()||!caseDataHolder.sessionStore) { if(tok===caseDataHolder.sessionOpToken){ caseDataHolder.lastSessionId=null; caseDataHolder.sessionPersistPromise=Promise.resolve(); } return; } var self=this; var ch=(session.channels&&typeof session.channels==='object')?Object.keys(session.channels).slice(0,64):[]; if(tok===caseDataHolder.sessionOpToken) caseDataHolder.lastSessionId=null; caseDataHolder.sessionPersistPromise = caseDataHolder.sessionStore.put({ summary:{ sourceSessionId: session.sessionId||null, channels: ch }, raw: session }).then(function(r){ if(tok!==caseDataHolder.sessionOpToken) return; caseDataHolder.lastSessionId=(r&&r.ok)?r.sessionId:null; if(r&&!r.ok&&r.code!=='SESSION_TOO_LARGE'&&r.code!=='SESSION_EXCEEDS_BUDGET') self.storageError='session: '+r.code; }).catch(function(){ if(tok===caseDataHolder.sessionOpToken) caseDataHolder.lastSessionId=null; }); }catch(e){ caseDataHolder.lastSessionId=null; } },
   _mkShellEvidence(ws, source){ try{ return { capability:(ws&&ws.capability)||null, observation:(ws&&ws.observation)?{ blockedReasons:((ws.observation.blockedReasons)||[]).map(function(b){return {code:(b&&b.code)||String(b)};}) }:null, source: source||null }; }catch(e){ return null; } },
   caseShellState(){ try{ var CS=(typeof CaseShell!=='undefined')?CaseShell:((typeof globalThis!=='undefined'&&globalThis.CaseShell)||null); if(!CS||!CS.deriveCaseShellState) return null; return CS.deriveCaseShellState({ workspaceResult:this._shellEvidence||null, analysisView:this.analysisView||null, importState:null, caseMeta:{ hasCase:!!this.analysisView, caseName:(this.analysisView&&this.analysisView.caseHeader&&this.analysisView.caseHeader.caseId)||null, vehicle:(this.analysisView&&this.analysisView.caseHeader&&this.analysisView.caseHeader.vehicle)||null, session:(this.analysisView&&this.analysisView.caseHeader&&this.analysisView.caseHeader.telemetrySession)||null, telemetrySource:(this._shellEvidence&&this._shellEvidence.source)||null } }); }catch(e){ return null; } },
-  ensureStore(){ if(caseDataHolder.caseStore) return true; try{ if(typeof StorageBackend==='undefined'||typeof CaseStore==='undefined'){ this.storageError='storage modules not loaded'; return false; } var be=StorageBackend.IndexedDBBackend({}); caseDataHolder.caseStore=CaseStore.createCaseStore(be); caseDataHolder.sessionStore=SessionStore.createSessionStore(be); this.storageError=null; return true; }catch(e){ this.storageError=(e&&e.code)||(e&&e.message)||String(e); return false; } },
+  ensureStore(){ if(caseDataHolder.caseStore) return true; try{ if(typeof StorageBackend==='undefined'||typeof CaseStore==='undefined'){ this.storageError='modules_not_loaded'; return false; } var be=StorageBackend.IndexedDBBackend({}); caseDataHolder.caseStore=CaseStore.createCaseStore(be); caseDataHolder.sessionStore=SessionStore.createSessionStore(be); this.storageError=null; return true; }catch(e){ this.storageError=(e&&e.code)||(e&&e.message)||String(e); return false; } },
   refreshLibrary(){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.list().then(function(rows){ self.library=CaseLibraryViewModel.buildCaseLibraryView(rows, self.libFilters); }).catch(function(e){ self.storageError=String((e&&e.message)||e); }); },
   libSections(){ if(!this.library) return []; var b=this.library.buckets||{}; var out=[]; if((b.pinned||[]).length) out.push({key:'pinned',label:'Pinned',rows:b.pinned}); out.push({key:'recent',label:'Recent',rows:b.recent||[]}); if(this.libFilters.includeArchived && (b.archived||[]).length) out.push({key:'archived',label:'Archived',rows:b.archived}); return out; },
   pinCase(id, pinned){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.setPinned(id, pinned).then(function(){ self.refreshLibrary(); }); },
   _setupSnapshotFromView(){ var si=(this.analysisView&&this.analysisView.setupInputs)||{}; var g=function(k){ return (si[k]&&typeof si[k].value==='number')?si[k].value:null; }; return { frontWheelRate:g('frontWheelRate'), rearWheelRate:g('rearWheelRate'), frontArb:g('frontArb'), rearArb:g('rearArb'), mass:g('mass'), frontWeightPct:g('frontWeightPct'), cgHeight:g('cgHeight') }; },
   _saveInput(forceNew){ var ch=(this.analysisView&&this.analysisView.caseHeader)||{}; return { caseId: forceNew?undefined:(this.currentCaseId||undefined), metadata:{ title: ch.caseId||'Untitled case', vehicle: ch.vehicle||null, track:null, status:'complete' }, setupSnapshot:this._setupSnapshotFromView(), associations:{ telemetrySessionId: caseDataHolder.lastSessionId||null }, analysisResults: JSON.parse(JSON.stringify(this.analysisView)), shellEvidence: this._shellEvidence||{ capability:{}, observation:{blockedReasons:[]}, source:'demo_case' } }; },
-  saveCurrentCase(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='Imported summaries cannot be overwritten — use Save as new'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.save(self._saveInput(false)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.storageError=null; self.refreshLibrary(); } else { self.storageError=r.code+(r.violations?(' '+JSON.stringify(r.violations.slice(0,2))):''); } }); },
+  saveCurrentCase(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='cannot_overwrite_imported'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.save(self._saveInput(false)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.storageError=null; self.refreshLibrary(); } else { self.storageError=r.code; } }); },
   autosaveCurrentCase(){ var self=this; if(!this.autosaveEnabled || !this.currentCaseId || this.importedSummaryOpen || !this.analysisView || !caseDataHolder.caseStore) return; try{ if(caseDataHolder.autosaveTimer) clearTimeout(caseDataHolder.autosaveTimer); caseDataHolder.autosaveTimer=setTimeout(function(){ caseDataHolder.autosaveTimer=0; if(self.autosaveEnabled && self.currentCaseId && !self.importedSummaryOpen && self.analysisView) self.saveCurrentCase(); }, 1500); }catch(e){} },
-  saveCurrentCaseAsNew(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='Imported summaries cannot be promoted to a full case — re-run locally'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.create(self._saveInput(true)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.refreshLibrary(); } else self.storageError=r.code; }); },
+  saveCurrentCaseAsNew(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='cannot_promote_imported'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.create(self._saveInput(true)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.refreshLibrary(); } else self.storageError=r.code; }); },
   openCase(id){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.open(id).then(function(o){ if(!o.ok){ self.storageError=o.code; return; } self.analysisView=o.analysisResults; self._shellEvidence={ capability:(o.shellEvidence&&o.shellEvidence.capability)||{}, observation:(o.shellEvidence&&o.shellEvidence.observation)||{blockedReasons:[]}, source:(o.shellEvidence&&o.shellEvidence.source)||null }; self.currentCaseId=id; self.importedSummaryOpen=!!o.degraded; ++caseDataHolder.sessionOpToken; caseDataHolder.lastSessionId=(o.associations&&o.associations.telemetrySessionId)||null; caseDataHolder.sessionPersistPromise=Promise.resolve(); self.caseSubview='overview'; self.shellSection='cases'; self.currentTab='analysis'; }); },
   duplicateCase(id){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.duplicate(id).then(function(r){ if(r.ok) self.refreshLibrary(); else self.storageError=r.code; }); },
   archiveCase(id,arch){ var self=this; if(!this.ensureStore()) return; (arch?caseDataHolder.caseStore.archive(id):caseDataHolder.caseStore.unarchive(id)).then(function(){ self.refreshLibrary(); }); },

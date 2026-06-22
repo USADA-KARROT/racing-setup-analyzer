@@ -63,7 +63,7 @@ chk('delete uses confirm', /deleteCase\(id\)\{[\s\S]{0,200}confirm\(/.test(html)
 chk('remove passes confirm:true', /\.remove\(id, ?\{ ?confirm: ?true ?\}\)/.test(html));
 chk('open restores analysisView + shellEvidence', /openCase\(id\)\{[\s\S]{0,400}self\.analysisView=o\.analysisResults[\s\S]{0,200}self\._shellEvidence/.test(html));
 chk('save serializes the view model (display-safe)', /analysisResults: JSON\.parse\(JSON\.stringify\(this\.analysisView\)\)/.test(html));
-chk('storageError surfaced', /t\('ui\.case\.storageError'\)\+' '\+storageError/.test(html) && tri('ui.case.storageError'));
+chk('storageError surfaced', /t\('ui\.case\.storageError'\)\+' '\+tErr\(storageError\)/.test(html) && tri('ui.case.storageError'));
 // CP3: autosave (§7.3) — debounced, gated to a saved local_full case (never auto-creates / never promotes imported)
 chk('autosave method gated to saved local_full', /autosaveCurrentCase\(\)\{[\s\S]{0,220}!this\.currentCaseId \|\| this\.importedSummaryOpen/.test(html));
 chk('autosave debounced (timer)', /caseDataHolder\.autosaveTimer=setTimeout/.test(html));
