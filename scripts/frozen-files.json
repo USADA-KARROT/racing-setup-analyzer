@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "description": "R3-GATE0 frozen-boundary manifest. These production modules + data are contracts/schemas/physics that MUST NOT change in ordinary maintenance PRs. A milestone explicitly authorised to change one of these must add it to an allowlist (FROZEN_ALLOW env, comma-separated repo-relative paths) — the whole check is never disabled. Authority is git history, not any derived hash.",
+  "frozen": [
+    { "path": "renderer/js/dynamics-model.js", "concept": "physics_dynamics_model" },
+    { "path": "renderer/js/telemetry-core.js", "concept": "telemetry_authority" },
+    { "path": "renderer/js/canonical-telemetry-session.js", "concept": "canonical_telemetry_core" },
+    { "path": "renderer/js/telemetry-schema.js", "concept": "telemetry_authority" },
+    { "path": "renderer/js/channel-mapping.js", "concept": "telemetry_authority" },
+    { "path": "renderer/js/calibration-registry.js", "concept": "telemetry_authority" },
+    { "path": "renderer/js/analysis-case.js", "concept": "analysis_case_schema" },
+    { "path": "renderer/js/setup-snapshot.js", "concept": "analysis_case_schema" },
+    { "path": "renderer/js/canonical-parameters.js", "concept": "canonical_parameter_contract" },
+    { "path": "renderer/js/parameter-conversions.js", "concept": "canonical_parameter_contract" },
+    { "path": "renderer/js/canonical-model-input.js", "concept": "canonical_parameter_contract" },
+    { "path": "renderer/js/suspension-input-normalizer.js", "concept": "suspension_normalization_contract" },
+    { "path": "renderer/js/analysis-case-export.js", "concept": "case_export_schema" },
+    { "path": "renderer/js/storage-backend.js", "concept": "persistence_schema" },
+    { "path": "renderer/js/schema-migration.js", "concept": "persistence_schema" },
+    { "path": "renderer/js/case-record-schema.js", "concept": "persistence_schema" },
+    { "path": "renderer/js/case-store.js", "concept": "persistence_schema" },
+    { "path": "renderer/js/session-store.js", "concept": "persistence_schema" },
+    { "path": "renderer/js/case-library-viewmodel.js", "concept": "r3_0b_contract" },
+    { "path": "renderer/js/feature-registry.js", "concept": "r3_0a_product_shell_contract" },
+    { "path": "renderer/js/feature-router.js", "concept": "r3_0a_product_shell_contract" },
+    { "path": "renderer/js/car-presets.js", "concept": "car_preset_data" },
+    { "path": "renderer/js/vehicle-profile-f312.js", "concept": "vehicle_profile_data" }
+  ]
+}

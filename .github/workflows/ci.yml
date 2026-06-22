@@ -1,0 +1,134 @@
+name: trusted-verification-gate
+
+# R3-GATE0 — the authoritative remote verification gate.
+# Local stdout / npm exit codes / `gh pr merge` output are NOT trusted; the truth is this workflow's
+# conclusion + the structured artifact it uploads, both bound to a concrete commit SHA.
+# This workflow is read-only: it never commits, pushes, tags, releases, or mutates the repo.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege: read the checkout, nothing else. No write scopes anywhere.
+permissions:
+  contents: read
+
+concurrency:
+  group: trusted-verification-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: trusted-verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ARTIFACT_DIR: ${{ github.workspace }}/artifacts
+      TEST_TIMEOUT_MS: '180000'
+    steps:
+      # Pin every third-party Action to a full commit SHA (never a moving tag).
+      - name: Checkout (PR HEAD commit, not the synthetic merge ref)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Setup Node 22 LTS
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22'
+
+      - name: Resolve base/head identity (pass GitHub context via env, never inline)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          GH_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=0 origin main >/dev/null 2>&1 || git fetch --no-tags origin main >/dev/null 2>&1 || true
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE="$PR_BASE"; HEAD="$PR_HEAD"
+          elif [ "$EVENT_NAME" = "push" ]; then
+            BASE="$PUSH_BEFORE"; HEAD="$GH_SHA"
+          else
+            BASE="$(git rev-parse origin/main 2>/dev/null || git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)"
+            HEAD="$(git rev-parse HEAD)"
+          fi
+          case "$BASE" in ""|0000000000000000000000000000000000000000) BASE="$(git rev-parse origin/main 2>/dev/null || git rev-parse HEAD)";; esac
+          echo "BASE_SHA=$BASE" >> "$GITHUB_ENV"
+          echo "HEAD_SHA=$HEAD" >> "$GITHUB_ENV"
+          echo "resolved event=$EVENT_NAME BASE_SHA=$BASE HEAD_SHA=$HEAD"
+
+      - name: Verify checked-out SHA matches the event-reported SHA
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          ACTUAL="$(git rev-parse HEAD)"
+          echo "checked-out=$ACTUAL  expected HEAD_SHA=$HEAD_SHA  github.sha=${{ github.sha }}"
+          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "push" ]; then
+            if [ "$ACTUAL" != "$HEAD_SHA" ]; then
+              echo "::error::checked-out SHA ($ACTUAL) != expected HEAD_SHA ($HEAD_SHA)"; exit 1
+            fi
+          fi
+
+      # Dependency-free lane: this repo has never tracked a lockfile and verification needs no third-party
+      # package (deps={} ; tests/scripts use only Node builtins + relative requires). The job therefore
+      # installs nothing; the dependency audit below proves that contract. (Electron packaging is a
+      # separate future milestone, not this gate.)
+      - name: Confirm dependency-free lane (this job installs nothing)
+        run: |
+          set -euo pipefail
+          echo "Dependency-free verification lane: only node scripts run here."
+          echo "node version: $(node -v)"
+          echo "npm version: $(npm -v)"
+
+      - name: A0 — Dependency audit (no third-party packages reachable)
+        if: ${{ !cancelled() }}
+        run: node scripts/check-verification-dependencies.js
+
+      - name: A — Full per-file test manifest
+        if: ${{ !cancelled() }}
+        run: node scripts/run-tests-manifest.js
+
+      - name: B — i18n three-language parity
+        if: ${{ !cancelled() }}
+        run: node scripts/check-i18n.js
+
+      - name: C — Feature registry / reachability
+        if: ${{ !cancelled() }}
+        run: node scripts/check-feature-registry.js
+
+      - name: D — Vehicle preset integrity
+        if: ${{ !cancelled() }}
+        run: node scripts/check-preset-integrity.js
+
+      - name: E — Frozen-boundary guard
+        if: ${{ !cancelled() }}
+        run: node scripts/check-frozen-boundary.js
+
+      - name: F — Package version policy
+        if: ${{ !cancelled() }}
+        run: node scripts/check-version-policy.js
+
+      - name: G — R3.0C scope guard
+        if: ${{ !cancelled() }}
+        run: node scripts/check-r3-0c-guard.js
+
+      - name: Collect evidence + summary (final gate)
+        if: ${{ !cancelled() }}
+        run: node scripts/collect-evidence.js
+
+      - name: Upload trusted-verification-evidence
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: trusted-verification-evidence
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 90
