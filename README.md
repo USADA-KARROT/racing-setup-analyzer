@@ -11,7 +11,7 @@ Grounded in textbook vehicle dynamics (Milliken, Gillespie, OptimumG) and cross-
 - **Transparent balance prediction** — an understeer-gradient model that combines weight distribution, roll-stiffness distribution (LLTD) and tyre load sensitivity, with every output badged **Physics / Model / Heuristic**.
 - **Honest, fail-closed telemetry analysis** — import a CSV, map channels, confirm identity; a *measured* understeer gradient (K_us) is produced **only** when a verified steering calibration *and* the data quality pass every gate — otherwise it stays blocked with a reason.
 - **Local-first case workspace** — build an Analysis Case (vehicle + setup + optional telemetry), save / reopen / duplicate / archive / export — all in a local Case Library. No cloud, no accounts; raw telemetry never leaves your device.
-- **Trilingual UI** — English / 繁體中文（台灣）/ 日本語, switchable at runtime.
+- **Trilingual UI** — English / 繁體中文（台灣）/ 日本語, switchable at runtime across the app shell and the full analysis workspace.
 - **Source as teaching material** — embedded "knowledge essays" (`docs/fsae/`) walk intuition → physics → formula → code for FSAE / track-day engineers.
 
 ## Current status
@@ -162,7 +162,7 @@ MIT-spirit personal/educational project — contributions and corrections welcom
 - **透明的平衡預測** — 轉向不足梯度模型整合配重、側傾剛度分配（LLTD）與輪胎負載敏感度，每個輸出都標 **物理計算（Physics）／模型結果（Model）／啟發式判定（Heuristic）**。
 - **誠實、fail-closed 的遙測分析** — 匯入 CSV、對應通道、確認身分；**唯有**當一份經驗證的轉向校正*與*資料品質全數通過閘門，才會輸出*量測所得*的轉向不足梯度（K_us）——否則維持「無法執行」並附原因。
 - **本機優先的案例工作台** — 建立分析案例（車輛＋設定＋可選遙測），可儲存／重新開啟／建立副本／封存／匯出，全在本機案例庫。無雲端、無帳號；原始遙測資料絕不離開你的裝置。
-- **三語介面** — English／繁體中文（台灣）／日本語，可即時切換。
+- **三語介面** — English／繁體中文（台灣）／日本語，可即時切換，涵蓋 app 外殼與完整分析工作台。
 - **原始碼即教材** — 內嵌寫給 FSAE／賽道工程師的「知識文」（`docs/fsae/`）：直覺 → 物理 → 公式 → 程式碼。
 
 ### 目前狀態
@@ -313,7 +313,7 @@ MIT 精神的個人／教育專案——歡迎貢獻與指正。在台灣打造�
 - **透明なバランス予測** — 重量配分・ロール剛性配分（LLTD）・タイヤ荷重感度を統合したアンダーステア勾配モデル。各出力に **物理計算（Physics）／モデル推定（Model）／ヒューリスティック（Heuristic）** のバッジ。
 - **誠実な fail-closed テレメトリ解析** — CSV を読み込み、チャンネルを対応付け、識別を確認する。検証済みステアリングキャリブレーション*と*データ品質がすべてのゲートを通過した場合**のみ**、*計測値*のアンダーステア勾配（K_us）を出力する——そうでなければ理由付きで実行不可のまま。
 - **ローカルファーストのケースワークスペース** — 解析ケース（車両＋セットアップ＋任意のテレメトリ）を作成し、保存／再オープン／複製／アーカイブ／エクスポートできる。クラウドなし・アカウントなし；生テレメトリはデバイスから出ない。
-- **3 言語 UI** — English／繁體中文（台湾）／日本語、実行時に切替可能。
+- **3 言語 UI** — English／繁體中文（台湾）／日本語、実行時に切替可能（アプリシェルと解析ワークスペース全体に対応）。
 - **コードが教材** — FSAE／サーキット走行エンジニア向けの「知識ノート」（`docs/fsae/`）を同梱：直感 → 物理 → 数式 → コード。
 
 ### 現在のステータス

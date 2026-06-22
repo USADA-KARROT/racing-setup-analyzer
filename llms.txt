@@ -1,6 +1,6 @@
 # Racing Setup Analyzer
 
-> A case-centric vehicle-dynamics workspace that predicts handling balance, sizes spring / ARB / damper numbers, simulates a tyre stint, and — with real telemetry and a verified calibration — reports honestly-gated measured metrics. Every value is labelled by how it was derived; every blocked feature states why. Local-first, no cloud, no account, trilingual (English / 繁體中文 / 日本語).
+> A case-centric vehicle-dynamics workspace that predicts handling balance, sizes spring / ARB / damper numbers, simulates a tyre stint, and — with real telemetry and a verified calibration — reports honestly-gated measured metrics. Every value is labelled by how it was derived; every blocked feature states why. Local-first, no cloud, no account, trilingual (English / 繁體中文 / 日本語) across the app shell and the analysis workspace.
 
 It is an Electron desktop app (also runs in a browser) built on textbook vehicle dynamics (Milliken, Gillespie, OptimumG). The physics runs locally in plain JavaScript. It is aimed at FSAE, track-day and sim engineers who know the formulas and want to see how they turn into decisions — and to do so without overclaiming.
 
