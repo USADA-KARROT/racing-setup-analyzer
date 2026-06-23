@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0",
+  "phases": ["R3.0C", "R3.0D", "R3.0E", "R3.0F"],
+  "currentPhase": "R3.0C",
+  "currentPhaseCheckpoint": "C0_BOOTSTRAP",
+  "phaseStates": {
+    "R3.0C": {
+      "governanceDir": "governance/r3.0c",
+      "currentCheckpoint": "C0_BOOTSTRAP",
+      "finalActivationCheckpoint": "C8_ACTIVATION",
+      "started": true,
+      "finalActivationReached": false
+    },
+    "R3.0D": {
+      "governanceDir": "governance/r3.0d",
+      "currentCheckpoint": "D0_BOOTSTRAP",
+      "finalActivationCheckpoint": "D5_ACTIVATION",
+      "started": false,
+      "finalActivationReached": false
+    },
+    "R3.0E": {
+      "governanceDir": "governance/r3.0e",
+      "currentCheckpoint": "E0_BOOTSTRAP",
+      "finalActivationCheckpoint": "E5_ACTIVATION",
+      "started": false,
+      "finalActivationReached": false
+    },
+    "R3.0F": {
+      "governanceDir": "governance/r3.0f",
+      "currentCheckpoint": "F0_BOOTSTRAP",
+      "finalActivationCheckpoint": "F6_RELEASE",
+      "started": false,
+      "finalActivationReached": false
+    }
+  },
+  "trainStatus": "GOVERNANCE_READY",
+  "trainStartSha": "1103336e0a87156eeda013a1162c5271b46f3253",
+  "targetVersion": "2.0.0",
+  "targetTag": "v2.0.0",
+  "intermediateReleaseAllowed": false,
+  "r4Excluded": true,
+  "scopePinMirror": {
+    "comparisonScope": {
+      "sameAnalysisCaseOnly": true,
+      "sameSessionOnly": true,
+      "crossSessionForbidden": true
+    },
+    "deltaSign": "comparison-reference",
+    "referenceSelectionPolicy": {
+      "explicitUserSelectionOnly": true,
+      "fastestValidEnabled": false,
+      "medianValidEnabled": false,
+      "bestSectorCompositeEnabled": false
+    },
+    "hypothesisStorage": {
+      "useIndependentNamespaces": true,
+      "extendR3bCaseRecordSchema": false
+    }
+  },
+  "note": "R3.0 Integrated Delivery Train state. GOVERNANCE_READY means G1 (this PR) has scaffolded the train rails; no feature branch has been opened, no production code added, no capability enabled. After G1 merges and SKYLINE authorizes the feature train, feat/r3.0-integrated-delivery is created from main; trainStatus moves to IN_PROGRESS and per-phase currentCheckpoint advances under checkpoint authorization. Final merge happens once at R3.0F F6_RELEASE; v2.0.0 tag + GitHub Release are created post-merge after the new main trusted-verification PASS. trainStatus then becomes MERGED."
+}

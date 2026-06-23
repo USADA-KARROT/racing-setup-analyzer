@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0D",
+  "title": "R3.0D Virtual Race Engineer Decision Engine — schema",
+  "note": "Defines the legal universe of checkpoints, capabilities, transitions, and authorized-path rules for the R3.0D phase of the R3.0 Integrated Delivery Train. D0 establishes the schema; D1..D5 are NOT yet authorized — they describe future intent so the validator can refuse premature activation. R3.0D depends on R3.0C completing all the way to C8_ACTIVATION before any non-bootstrap D checkpoint may advance — that cross-phase rule is enforced by scripts/check-r3-0-train.js, not by this single-phase schema.",
+  "checkpoints": [
+    "D0_BOOTSTRAP",
+    "D1_CONTRACT_FOUNDATION",
+    "D2_HYPOTHESIS_ENGINE",
+    "D3_PRIORITY_ENGINE",
+    "D4_ENGINEER_BRIEF",
+    "D5_ACTIVATION"
+  ],
+  "transitions": {
+    "D0_BOOTSTRAP": ["D1_CONTRACT_FOUNDATION"],
+    "D1_CONTRACT_FOUNDATION": ["D2_HYPOTHESIS_ENGINE"],
+    "D2_HYPOTHESIS_ENGINE": ["D3_PRIORITY_ENGINE"],
+    "D3_PRIORITY_ENGINE": ["D4_ENGINEER_BRIEF"],
+    "D4_ENGINEER_BRIEF": ["D5_ACTIVATION"],
+    "D5_ACTIVATION": []
+  },
+  "checkpointOrder": [
+    "D0_BOOTSTRAP",
+    "D1_CONTRACT_FOUNDATION",
+    "D2_HYPOTHESIS_ENGINE",
+    "D3_PRIORITY_ENGINE",
+    "D4_ENGINEER_BRIEF",
+    "D5_ACTIVATION"
+  ],
+  "capabilities": [
+    "contract_foundation_present",
+    "governance_bootstrap_present",
+    "hypothesis_engine_present",
+    "priority_engine_present",
+    "engineer_brief_present",
+    "feature_registry_active"
+  ],
+  "governanceCapabilities": [
+    "contract_foundation_present",
+    "governance_bootstrap_present"
+  ],
+  "productionCapabilities": [
+    "hypothesis_engine_present",
+    "priority_engine_present",
+    "engineer_brief_present",
+    "feature_registry_active"
+  ],
+  "capabilityUnlockFloor": {
+    "contract_foundation_present": "D1_CONTRACT_FOUNDATION",
+    "governance_bootstrap_present": "D0_BOOTSTRAP",
+    "hypothesis_engine_present": "D2_HYPOTHESIS_ENGINE",
+    "priority_engine_present": "D3_PRIORITY_ENGINE",
+    "engineer_brief_present": "D4_ENGINEER_BRIEF",
+    "feature_registry_active": "D5_ACTIVATION"
+  },
+  "runtimeConsumerCheckpoint": "D2_HYPOTHESIS_ENGINE",
+  "algorithmCheckpoint": "D3_PRIORITY_ENGINE",
+  "uiCheckpoint": "D4_ENGINEER_BRIEF",
+  "featureRegistryActivationCheckpoint": "D5_ACTIVATION",
+  "bootstrapCheckpoint": "D0_BOOTSTRAP",
+  "contractPrefix": "contracts/r3.0d",
+  "authorizedPathRules": {
+    "mustBeRepoRelative": true,
+    "mustBeExact": true,
+    "forbiddenSubstrings": ["..", "*", "?", "["],
+    "forbiddenPrefixes": ["/"],
+    "allowedRoots": ["renderer/js/", "contracts/r3.0d/", "main.js", "preload.js", "renderer/index.html", "renderer/css/"],
+    "note": "R3.0D production authorization is by exact repo-relative path only. No wildcards/regex/globs. Tests and docs are never authorized as production paths."
+  }
+}

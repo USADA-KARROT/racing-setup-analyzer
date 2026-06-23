@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0F",
+  "title": "R3.0F Product Hardening, Migration & Release — schema",
+  "note": "Defines the legal universe of checkpoints, capabilities, transitions, and authorized-path rules for the R3.0F (final) phase of the R3.0 Integrated Delivery Train. F0 establishes the schema; F1..F6 are NOT yet authorized — they describe future intent so the validator can refuse premature activation. R3.0F depends on R3.0E completing all the way to E5_ACTIVATION before any non-bootstrap F checkpoint may advance — that cross-phase rule is enforced by scripts/check-r3-0-train.js. Per SKYLINE ruling: NO intermediate release; the R3.0 Integrated Delivery Train merges once at F6_RELEASE with package version 2.0.0 and tag v2.0.0 created AFTER merge + new main CI PASS. F6 advancement permits exactly one package.json version bump (1.4.0 → 2.0.0).",
+  "checkpoints": [
+    "F0_BOOTSTRAP",
+    "F1_MIGRATION_ENGINE",
+    "F2_E2E_AUTOMATION",
+    "F3_QUALITY_HARDENING",
+    "F4_DOCUMENTATION",
+    "F5_RELEASE_GATE",
+    "F6_RELEASE"
+  ],
+  "transitions": {
+    "F0_BOOTSTRAP": ["F1_MIGRATION_ENGINE"],
+    "F1_MIGRATION_ENGINE": ["F2_E2E_AUTOMATION"],
+    "F2_E2E_AUTOMATION": ["F3_QUALITY_HARDENING"],
+    "F3_QUALITY_HARDENING": ["F4_DOCUMENTATION"],
+    "F4_DOCUMENTATION": ["F5_RELEASE_GATE"],
+    "F5_RELEASE_GATE": ["F6_RELEASE"],
+    "F6_RELEASE": []
+  },
+  "checkpointOrder": [
+    "F0_BOOTSTRAP",
+    "F1_MIGRATION_ENGINE",
+    "F2_E2E_AUTOMATION",
+    "F3_QUALITY_HARDENING",
+    "F4_DOCUMENTATION",
+    "F5_RELEASE_GATE",
+    "F6_RELEASE"
+  ],
+  "capabilities": [
+    "governance_bootstrap_present",
+    "migration_engine_present",
+    "e2e_automation_present",
+    "quality_hardening_present",
+    "documentation_present",
+    "release_gate_present",
+    "release_executed"
+  ],
+  "governanceCapabilities": [
+    "governance_bootstrap_present"
+  ],
+  "productionCapabilities": [
+    "migration_engine_present",
+    "e2e_automation_present",
+    "quality_hardening_present",
+    "documentation_present",
+    "release_gate_present",
+    "release_executed"
+  ],
+  "capabilityUnlockFloor": {
+    "governance_bootstrap_present": "F0_BOOTSTRAP",
+    "migration_engine_present": "F1_MIGRATION_ENGINE",
+    "e2e_automation_present": "F2_E2E_AUTOMATION",
+    "quality_hardening_present": "F3_QUALITY_HARDENING",
+    "documentation_present": "F4_DOCUMENTATION",
+    "release_gate_present": "F5_RELEASE_GATE",
+    "release_executed": "F6_RELEASE"
+  },
+  "runtimeConsumerCheckpoint": "F1_MIGRATION_ENGINE",
+  "algorithmCheckpoint": "F1_MIGRATION_ENGINE",
+  "uiCheckpoint": "F3_QUALITY_HARDENING",
+  "featureRegistryActivationCheckpoint": "F6_RELEASE",
+  "bootstrapCheckpoint": "F0_BOOTSTRAP",
+  "contractPrefix": "contracts/r3.0f",
+  "authorizedPathRules": {
+    "mustBeRepoRelative": true,
+    "mustBeExact": true,
+    "forbiddenSubstrings": ["..", "*", "?", "["],
+    "forbiddenPrefixes": ["/"],
+    "allowedRoots": ["renderer/js/", "contracts/r3.0f/", "main.js", "preload.js", "renderer/index.html", "renderer/css/", "scripts/migrators/", "docs/", "tests/e2e/", "package.json", "CHANGELOG.md"],
+    "note": "R3.0F production authorization is by exact repo-relative path only. F6_RELEASE may authorize package.json for a single 1.4.0 → 2.0.0 version bump. No wildcards/regex/globs. The frozen R3.0B persistence schema MUST NOT be modified; F1 migration engine reads/writes via migration scripts only."
+  }
+}

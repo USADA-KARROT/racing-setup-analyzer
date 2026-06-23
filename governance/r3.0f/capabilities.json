@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0F",
+  "title": "R3.0F Capability Ledger",
+  "note": "Defines each capability the R3.0F (final) phase of the Integrated Delivery Train may eventually enable, its kind, and the earliest checkpoint at which it may be unlocked. A capability being DEFINED here does NOT mean it is ENABLED. Enablement is governed by governance/r3.0f/state.json (enabledCapabilities). F0 only defines the universe; no production capability is enabled at F0. release_executed is the only capability tied to the actual semver bump + tag/release creation.",
+  "capabilities": {
+    "governance_bootstrap_present": {
+      "kind": "governance",
+      "unlockFloor": "F0_BOOTSTRAP",
+      "description": "R3.0F Integrated Delivery Governance scaffold present: schema, state, capabilities, checkpoint-manifest schema, and integration with the train-level validators."
+    },
+    "migration_engine_present": {
+      "kind": "production",
+      "unlockFloor": "F1_MIGRATION_ENGINE",
+      "description": "Unified schema migration engine + per-store migrators (R2 export / R3 case / session / comparison [R3.0C] / experiment / outcome / hypothesis / follow-up). Old readable, future fail-closed, deterministic, no silent drop, backup + rollback. MUST NOT alter the frozen R3.0B case-record schema; migrators read/write via store APIs only."
+    },
+    "e2e_automation_present": {
+      "kind": "production",
+      "unlockFloor": "F2_E2E_AUTOMATION",
+      "description": "8 E2E flow automation (new user / real telemetry / measured / reference lap / VRE / setup experiment / driver experiment / export-import) for browser + Electron. Zero console error; no stale UI."
+    },
+    "quality_hardening_present": {
+      "kind": "production",
+      "unlockFloor": "F3_QUALITY_HARDENING",
+      "description": "Quality bar: no console error / no unhandled rejection / no stale UI; keyboard nav; desktop responsive; large library; storage failure handled; no raw arrays in view model / Alpine reactive tree; busy states; destructive confirmations."
+    },
+    "documentation_present": {
+      "kind": "production",
+      "unlockFloor": "F4_DOCUMENTATION",
+      "description": "README / positioning / capability-map / r3-architecture / r3-user-workflow / r3-data-and-privacy / r3-credibility-model / r3-experiment-loop / CHANGELOG — all consistent with shipped surface. No 'professional validated' / 'AI replaced race engineer' claims."
+    },
+    "release_gate_present": {
+      "kind": "production",
+      "unlockFloor": "F5_RELEASE_GATE",
+      "description": "12-condition release gate script (preflight, tests, E2E, frozen 0, preset 501, i18n parity, reachability, no orphans, Electron build OK, release notes drafted, CHANGELOG, tag policy). MUST run fail-closed."
+    },
+    "release_executed": {
+      "kind": "activation",
+      "unlockFloor": "F6_RELEASE",
+      "description": "Final activation: package.json version 1.4.0 → 2.0.0 (single bump); the R3.0 Integrated Delivery Train Draft PR is merged; tag v2.0.0 and the corresponding GitHub Release are created AFTER merge + the new main CI PASS. release_executed=true on the post-merge state.json mirror records that this final activation completed; in the train branch itself this capability remains disabled until F6 checkpoint is staged."
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0F",
+  "currentCheckpoint": "F0_BOOTSTRAP",
+  "authorizedProductionPaths": [],
+  "enabledCapabilities": [],
+  "runtimeConsumersAllowed": false,
+  "uiAllowed": false,
+  "featureRegistryActivationAllowed": false,
+  "algorithmsAllowed": false,
+  "note": "R3.0F Integrated Delivery Governance state. F0 BOOTSTRAP fixes every production switch OFF. authorizedProductionPaths is intentionally empty; enabledCapabilities is intentionally empty. The four *Allowed flags are intentionally false. Mutating any field above the F0 baseline requires a separately-authorized Integrated Delivery Train checkpoint AND requires R3.0E state.currentCheckpoint === 'E5_ACTIVATION' per cross-phase rule. F6_RELEASE is the only checkpoint that may bump package.json version (1.4.0 → 2.0.0) and may authorize tag/release creation post-merge."
+}

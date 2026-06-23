@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0D",
+  "checkpoint": "D0_BOOTSTRAP",
+  "baseSha": "1103336e0a87156eeda013a1162c5271b46f3253",
+  "headSha": null,
+  "previousCheckpoint": null,
+  "authorizedPaths": [],
+  "enabledCapabilitiesBefore": [],
+  "enabledCapabilitiesAfter": [],
+  "forbiddenCapabilities": [
+    "contract_foundation_present",
+    "hypothesis_engine_present",
+    "priority_engine_present",
+    "engineer_brief_present",
+    "feature_registry_active"
+  ],
+  "tests": null,
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": null,
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": [],
+    "expectedRendererAdapter": false,
+    "note": "R3.0D has no Feature IDs registered at D0. Any future activation must happen at D5 only."
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "crossPhaseGate": {
+    "r3cCheckpoint": "C0_BOOTSTRAP",
+    "requiredFor": "D0_BOOTSTRAP",
+    "satisfied": true,
+    "note": "D0 bootstrap does not require R3.0C C8. Only non-bootstrap D checkpoints require R3.0C state.currentCheckpoint === 'C8_ACTIVATION'."
+  },
+  "note": "D0 establishes the R3.0D Integrated Delivery Governance scaffold. Production switches stay OFF: zero authorized paths, zero enabled production capabilities, all *Allowed flags false. The trusted-verification artifact bound to this PR's head SHA is the PASS authority — this file stays 'pending' in-commit. headSha / workflowRunId / artifactId / artifactBoundSha / codexVerdict / createdAt are intentionally null in the commit; they refer to runtime evidence the artifact records."
+}
