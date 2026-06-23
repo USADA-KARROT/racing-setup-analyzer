@@ -26,6 +26,7 @@ const VL = require('../contracts/r3.0c/valid-lap-contract.js');
 const NP = require('../contracts/r3.0c/normalized-position-contract.js');
 const CE = require('../contracts/r3.0c/comparison-eligibility-contract.js');
 const EX = require('../contracts/r3.0c/comparison-export-contract.js');
+const RAC = require('../contracts/r3.0c/reference-and-corner-contract.js');
 const IDX = require('../contracts/r3.0c/index.js');
 // distinctness oracles — the real frozen case-export modules (independent of the SUT)
 const CaseExport = require('../renderer/js/analysis-case-export.js');
@@ -53,7 +54,7 @@ function fullComparisonInput(over) {
 }
 
 // ── A. reason codes: stable / unique / machine-readable ──
-chk('35 reason codes total (16 mandated + 3 scope/metric extensions + 16 normalized-distance extensions)', RC.ALL_REASON_CODES.length === 35, RC.ALL_REASON_CODES.length);
+chk('51 reason codes total (16 mandated + 3 scope/metric + 16 normalized-distance + 16 reference-and-corner extensions)', RC.ALL_REASON_CODES.length === 51, RC.ALL_REASON_CODES.length);
 chk('reason codes unique', new Set(RC.ALL_REASON_CODES).size === RC.ALL_REASON_CODES.length);
 chk('reason codes are UPPER_SNAKE', RC.ALL_REASON_CODES.every(c => /^[A-Z][A-Z0-9_]*$/.test(c)));
 chk('REASON_CODES keyed by own value (stable)', Object.keys(RC.REASON_CODES).every(k => RC.REASON_CODES[k] === k));
@@ -69,6 +70,14 @@ chk('REASON_CODES keyed by own value (stable)', Object.keys(RC.REASON_CODES).eve
   'NORMALIZED_DISTANCE_TIME_GAP_TOO_LARGE', 'NORMALIZED_DISTANCE_EXTRAPOLATION_REQUIRED',
   'NORMALIZED_DISTANCE_IDENTITY_MISMATCH', 'NORMALIZED_DISTANCE_AUTHORITY_FORGED']
   .forEach(c => chk('C3 normalized-distance code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
+// C4_REFERENCE_AND_CORNER extensions — seventeen distinct refusal semantics over reference-lap
+// selection, corner segmentation, and cross-lap pairing.
+['REFERENCE_NOT_SELECTED', 'REFERENCE_AUTO_SELECTION_FORBIDDEN', 'REFERENCE_STALE_OR_DELETED', 'REFERENCE_AUTHORITY_FORGED',
+  'CORNER_SEGMENTATION_INSUFFICIENT_CHANNELS', 'CORNER_SEGMENTATION_REDUCED_AUTHORITY', 'CORNER_SEGMENTATION_NO_USABLE_CHANNELS',
+  'CORNER_SEGMENTATION_SEGMENT_TOO_SHORT', 'CORNER_SEGMENTATION_OVERLAPPING_SEGMENTS', 'CORNER_SEGMENTATION_WRAP_BOUNDARY',
+  'CORNER_SEGMENTATION_ALGORITHM_VERSION_MISMATCH', 'CORNER_PAIRING_INSUFFICIENT_OVERLAP', 'CORNER_PAIRING_AMBIGUOUS',
+  'CORNER_PAIRING_ORDINAL_FORBIDDEN', 'CORNER_PAIRING_PARTIAL_COVERAGE', 'CORNER_CONFIRMATION_CANNOT_UPGRADE_TELEMETRY']
+  .forEach(c => chk('C4 reference-and-corner code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
 chk('METRIC_REQUIRED_CHANNEL_UNAVAILABLE explanationKey is stable lowercase hook', RC.explanationKeyFor('METRIC_REQUIRED_CHANNEL_UNAVAILABLE') === 'r3_0c.reason.metric_required_channel_unavailable');
 chk('NORMALIZED_DISTANCE_MULTIPLE_WRAPS explanationKey is stable lowercase hook', RC.explanationKeyFor('NORMALIZED_DISTANCE_MULTIPLE_WRAPS') === 'r3_0c.reason.normalized_distance_multiple_wraps');
 chk('NORMALIZED_DISTANCE_AUTHORITY_FORGED explanationKey is stable lowercase hook', RC.explanationKeyFor('NORMALIZED_DISTANCE_AUTHORITY_FORGED') === 'r3_0c.reason.normalized_distance_authority_forged');
@@ -239,6 +248,67 @@ chk('shape gate valid request → eligible', NP.evaluateNormalizeDistanceRequest
 // shape gate result is frozen
 (() => { const r = NP.evaluateNormalizeDistanceRequestShape(validNormalizeRequest()); chk('shape-valid result frozen', Object.isFrozen(r)); })();
 
+// ── C4 reference-and-corner shape gates (contract layer; no algorithm) ──
+chk('RAC.ACCEPTED_REFERENCE_SELECTION_MODES === ["user"]', RAC.ACCEPTED_REFERENCE_SELECTION_MODES.length === 1 && RAC.ACCEPTED_REFERENCE_SELECTION_MODES[0] === 'user');
+chk('RAC.FORBIDDEN_REFERENCE_SELECTION_MODES includes fastestValid / medianValid / bestSectorComposite',
+  RAC.FORBIDDEN_REFERENCE_SELECTION_MODES.indexOf('fastestValid') !== -1
+  && RAC.FORBIDDEN_REFERENCE_SELECTION_MODES.indexOf('medianValid') !== -1
+  && RAC.FORBIDDEN_REFERENCE_SELECTION_MODES.indexOf('bestSectorComposite') !== -1);
+chk('RAC.MIN_SEGMENT_NORMALIZED_LENGTH > 0', RAC.MIN_SEGMENT_NORMALIZED_LENGTH > 0 && RAC.MIN_SEGMENT_NORMALIZED_LENGTH < 1);
+chk('RAC.MIN_PAIR_NORMALIZED_OVERLAP >= 0.5', RAC.MIN_PAIR_NORMALIZED_OVERLAP >= 0.5);
+chk('RAC.R4C_REFERENCE_REASON_CODES closed allowlist', Array.isArray(RAC.R4C_REFERENCE_REASON_CODES) && RAC.R4C_REFERENCE_REASON_CODES.every(c => RC.ALL_REASON_CODES.indexOf(c) !== -1));
+chk('RAC.R4C_SEGMENTATION_REASON_CODES closed allowlist', Array.isArray(RAC.R4C_SEGMENTATION_REASON_CODES) && RAC.R4C_SEGMENTATION_REASON_CODES.every(c => RC.ALL_REASON_CODES.indexOf(c) !== -1));
+chk('RAC.R4C_PAIRING_REASON_CODES closed allowlist', Array.isArray(RAC.R4C_PAIRING_REASON_CODES) && RAC.R4C_PAIRING_REASON_CODES.every(c => RC.ALL_REASON_CODES.indexOf(c) !== -1));
+chk('RAC.R4C_REASON_CODES is the union of three service allowlists', Array.isArray(RAC.R4C_REASON_CODES));
+chk('RAC.ACCEPTED_REFERENCE_SELECTION_MODES frozen', Object.isFrozen(RAC.ACCEPTED_REFERENCE_SELECTION_MODES));
+
+// reference selection shape gate
+function validRefSelectionRequest(over) {
+  return Object.assign({
+    identity: { caseId: 'case_1', sessionId: 'sess_1' },
+    trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' },
+    selection: { selectedBy: 'user', lapId: 'lap_3', sourceId: 'csv_import:foo.csv', selectedAt: '2026-06-23T12:00:00Z' },
+  }, over || {});
+}
+chk('ref selection valid → eligible', RAC.evaluateReferenceSelectionRequestShape(validRefSelectionRequest()).eligible === true);
+[null, undefined, 'x', 42, []].forEach(v => chk('ref selection malformed ' + JSON.stringify(v) + ' → blocked', RAC.evaluateReferenceSelectionRequestShape(v).eligible === false));
+(() => { const r = validRefSelectionRequest(); r.selection = null; chk('ref selection null → REFERENCE_NOT_SELECTED', hasCode(RAC.evaluateReferenceSelectionRequestShape(r), 'REFERENCE_NOT_SELECTED')); })();
+['fastestValid', 'medianValid', 'bestSectorComposite', 'implicitPrevious', 'autoFirstLap', 'auto'].forEach(mode => {
+  const r = validRefSelectionRequest(); r.selection.selectedBy = mode;
+  chk('ref auto mode ' + mode + ' → REFERENCE_AUTO_SELECTION_FORBIDDEN', hasCode(RAC.evaluateReferenceSelectionRequestShape(r), 'REFERENCE_AUTO_SELECTION_FORBIDDEN'));
+});
+(() => { const r = validRefSelectionRequest(); r.selection = { selectedBy: 'user', authoritative: true }; chk('ref forged authority (no lapId/sourceId/selectedAt) → REFERENCE_AUTHORITY_FORGED', hasCode(RAC.evaluateReferenceSelectionRequestShape(r), 'REFERENCE_AUTHORITY_FORGED')); })();
+(() => { const r = validRefSelectionRequest(); r.trackIdentity = { trackId: 'silverstone', layoutId: 'gp' }; chk('ref track identity not explicit → MISSING_TRACK_IDENTITY', hasCode(RAC.evaluateReferenceSelectionRequestShape(r), 'MISSING_TRACK_IDENTITY')); })();
+
+// corner segmentation shape gate
+function validSegRequest(over) {
+  const positions = []; for (let i = 0; i < 600; i++) positions.push(i / 599);
+  const channels = { steering: new Array(600).fill(0), lateral_accel: new Array(600).fill(0), yaw_rate: new Array(600).fill(0), speed: new Array(600).fill(50) };
+  return Object.assign({
+    identity: { caseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_3', sourceId: 'src' },
+    trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' },
+    normalizedDistanceAxis: { eligible: true, positions },
+    channels,
+    algorithmVersion: 1,
+  }, over || {});
+}
+chk('seg shape valid → eligible', RAC.evaluateCornerSegmentationRequestShape(validSegRequest()).eligible === true);
+(() => { const r = validSegRequest(); r.channels = {}; chk('seg empty channels → NO_USABLE_CHANNELS', hasCode(RAC.evaluateCornerSegmentationRequestShape(r), 'CORNER_SEGMENTATION_NO_USABLE_CHANNELS')); })();
+(() => { const r = validSegRequest(); r.algorithmVersion = 99; chk('seg algorithm version mismatch → ALGORITHM_VERSION_MISMATCH', hasCode(RAC.evaluateCornerSegmentationRequestShape(r), 'CORNER_SEGMENTATION_ALGORITHM_VERSION_MISMATCH')); })();
+(() => { const r = validSegRequest(); r.normalizedDistanceAxis = null; chk('seg missing axis → MISSING_NORMALIZED_DISTANCE_AUTHORITY', hasCode(RAC.evaluateCornerSegmentationRequestShape(r), 'MISSING_NORMALIZED_DISTANCE_AUTHORITY')); })();
+
+// corner pairing shape gate
+function validPairRequest(over) {
+  const refSeg = { eligible: true, identity: { caseId: 'case_1', sessionId: 'sess_1' }, trackIdentity: { trackId: 'silverstone', layoutId: 'gp' }, segments: [{ id: 's1', start: 0, end: 0.1 }] };
+  const cmpSeg = { eligible: true, identity: { caseId: 'case_1', sessionId: 'sess_1' }, trackIdentity: { trackId: 'silverstone', layoutId: 'gp' }, segments: [{ id: 's1', start: 0, end: 0.1 }] };
+  return Object.assign({ referenceSegmentation: refSeg, comparisonSegmentation: cmpSeg, policy: { allowOrdinalPairing: false } }, over || {});
+}
+chk('pair shape valid → eligible', RAC.evaluateCornerPairingRequestShape(validPairRequest()).eligible === true);
+(() => { const r = validPairRequest(); r.policy.allowOrdinalPairing = true; chk('pair ordinal pairing forbidden → ORDINAL_FORBIDDEN', hasCode(RAC.evaluateCornerPairingRequestShape(r), 'CORNER_PAIRING_ORDINAL_FORBIDDEN')); })();
+(() => { const r = validPairRequest(); r.comparisonSegmentation.identity.sessionId = 'sess_2'; chk('pair cross-session → CROSS_SESSION_COMPARISON_UNSUPPORTED', hasCode(RAC.evaluateCornerPairingRequestShape(r), 'CROSS_SESSION_COMPARISON_UNSUPPORTED')); })();
+(() => { const r = validPairRequest(); r.comparisonSegmentation.identity.caseId = 'case_2'; chk('pair cross-case → CROSS_CASE_COMPARISON_UNSUPPORTED', hasCode(RAC.evaluateCornerPairingRequestShape(r), 'CROSS_CASE_COMPARISON_UNSUPPORTED')); })();
+(() => { const r = validPairRequest(); r.comparisonSegmentation.trackIdentity.layoutId = 'national'; chk('pair track mismatch → TRACK_IDENTITY_MISMATCH', hasCode(RAC.evaluateCornerPairingRequestShape(r), 'TRACK_IDENTITY_MISMATCH')); })();
+
 // ── export envelope behaviour ──
 (() => { const env = EX.buildComparisonExportEnvelope(); chk('envelope payload null in CP1', env.payload === null && env.generatedAt === null); chk('envelope validates', EX.validateComparisonExportEnvelope(env).valid === true); })();
 (() => { const big = {}; const arr = []; for (let i = 0; i < 1000; i++) arr.push(i); big.samples = arr; chk('oversized array payload → blocked', EX.buildComparisonExportEnvelope(big).eligible === false); })();
@@ -253,12 +323,12 @@ chk('eligible lap result has null result', VL.evaluateLapAuthority(fullLapAuthor
 chk('metric-supported result has null result', CE.evaluateMetricSupport('speedDelta').result === null);
 
 // ── index aggregate ──
-chk('index re-exports all surfaces', !!(IDX.reasonCodes && IDX.credibility && IDX.validLap && IDX.normalizedPosition && IDX.comparisonEligibility && IDX.comparisonExport));
+chk('index re-exports all surfaces (incl. referenceAndCorner)', !!(IDX.reasonCodes && IDX.credibility && IDX.validLap && IDX.normalizedPosition && IDX.comparisonEligibility && IDX.comparisonExport && IDX.referenceAndCorner));
 chk('index identity constant', IDX.COMPARISON_EXPORT_IDENTITY === 'racing-analyzer/comparison-export');
 
 // ── K/L. contracts have NO renderer dependency and NO algorithm (static scan) ──
 const contractFiles = fs.readdirSync(CONTRACT_DIR).filter(f => f.endsWith('.js'));
-chk('6 contract modules + index', contractFiles.length === 7, contractFiles);
+chk('7 contract modules + index', contractFiles.length === 8, contractFiles);
 // strip whole-line comments so the algorithm scan inspects CODE, not the prose that describes what the
 // contract deliberately does NOT do (a JSDoc line may legitimately say "no interpolation").
 function stripComments(s) { return s.split('\n').map(line => { const t = line.trim(); return (t.indexOf('*') === 0 || t.indexOf('/*') === 0 || t.indexOf('*/') === 0 || t.indexOf('//') === 0) ? '' : line; }).join('\n'); }
