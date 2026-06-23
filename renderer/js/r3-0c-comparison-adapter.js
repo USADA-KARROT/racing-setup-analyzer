@@ -41,6 +41,9 @@
   var TrackIdentity = null;
   var DistanceAuthority = null;
   var NormalizedDistance = null;
+  var ReferenceSelection = null;
+  var CornerSegmentation = null;
+  var CornerPairing = null;
   if (typeof module !== 'undefined' && module.exports) {
     try { Contracts = require('../../contracts/r3.0c/index.js'); }
     catch (e) { Contracts = null; }
@@ -55,12 +58,21 @@
     catch (e) { DistanceAuthority = null; }
     try { NormalizedDistance = require('./r3-0c-normalized-distance.js'); }
     catch (e) { NormalizedDistance = null; }
+    try { ReferenceSelection = require('./r3-0c-reference-selection.js'); }
+    catch (e) { ReferenceSelection = null; }
+    try { CornerSegmentation = require('./r3-0c-corner-segmentation.js'); }
+    catch (e) { CornerSegmentation = null; }
+    try { CornerPairing = require('./r3-0c-corner-pairing.js'); }
+    catch (e) { CornerPairing = null; }
   }
   if (!Contracts && typeof R3_0C_Contracts !== 'undefined') Contracts = R3_0C_Contracts;
   if (!LapAuthority && typeof R3_0C_LapAuthority !== 'undefined') LapAuthority = R3_0C_LapAuthority;
   if (!TrackIdentity && typeof R3_0C_TrackIdentity !== 'undefined') TrackIdentity = R3_0C_TrackIdentity;
   if (!DistanceAuthority && typeof R3_0C_DistanceAuthority !== 'undefined') DistanceAuthority = R3_0C_DistanceAuthority;
   if (!NormalizedDistance && typeof R3_0C_NormalizedDistance !== 'undefined') NormalizedDistance = R3_0C_NormalizedDistance;
+  if (!ReferenceSelection && typeof R3_0C_ReferenceSelection !== 'undefined') ReferenceSelection = R3_0C_ReferenceSelection;
+  if (!CornerSegmentation && typeof R3_0C_CornerSegmentation !== 'undefined') CornerSegmentation = R3_0C_CornerSegmentation;
+  if (!CornerPairing && typeof R3_0C_CornerPairing !== 'undefined') CornerPairing = R3_0C_CornerPairing;
   if (!Contracts) {
     throw new Error('renderer/js/r3-0c-comparison-adapter.js requires contracts/r3.0c/index.js (Node require or R3_0C_Contracts global)');
   }
@@ -160,6 +172,24 @@
     return Contracts.normalizedPosition.ACCEPTED_DISTANCE_UNITS;
   }
 
+  // ── C4 delegations — pure passthrough to reference-selection / corner-segmentation /
+  //    corner-pairing services. The adapter still adds no algorithm. ──
+  function selectReference(request) {
+    return _requireService(ReferenceSelection, 'reference-selection').selectReference(request);
+  }
+  function segmentCorners(request) {
+    return _requireService(CornerSegmentation, 'corner-segmentation').segmentCorners(request);
+  }
+  function applyCornerUserConfirmation(segResult, confirmations) {
+    return _requireService(CornerSegmentation, 'corner-segmentation').applyUserConfirmation(segResult, confirmations);
+  }
+  function pairCorners(request) {
+    return _requireService(CornerPairing, 'corner-pairing').pairCorners(request);
+  }
+  function referenceAndCornerForbiddenSelectionModes() {
+    return Contracts.referenceAndCorner.FORBIDDEN_REFERENCE_SELECTION_MODES;
+  }
+
   // Capability inventory — grows with each checkpoint. activeCheckpoint() reports the LATEST
   // checkpoint whose surface this adapter exposes; exposes() lists capability ids derived from
   // which service modules loaded successfully.
@@ -169,12 +199,16 @@
     if (TrackIdentity) caps.push('track_identity_authoritative');
     if (DistanceAuthority) caps.push('lap_authority_present'); // distance backs lap_authority cluster
     if (NormalizedDistance) caps.push('normalized_distance_present');
+    if (ReferenceSelection) caps.push('reference_selection_present');
+    if (CornerSegmentation) caps.push('corner_segmentation_present');
+    if (CornerPairing) caps.push('corner_pairing_present');
     // dedupe while preserving order
     var seen = {}, out = [];
     caps.forEach(function (c) { if (!seen[c]) { seen[c] = true; out.push(c); } });
     return Object.freeze(out);
   }
   function activeCheckpoint() {
+    if (ReferenceSelection || CornerSegmentation || CornerPairing) return 'C4_REFERENCE_AND_CORNER';
     if (NormalizedDistance) return 'C3_NORMALIZED_DISTANCE';
     if (LapAuthority || TrackIdentity || DistanceAuthority) return 'C2_LAP_AUTHORITY';
     return 'C1_PRODUCTION_ADAPTER';
@@ -213,6 +247,12 @@
     normalizeAtTarget: normalizeAtTarget,
     normalizedDistanceDefaultThresholds: normalizedDistanceDefaultThresholds,
     normalizedDistanceAcceptedUnits: normalizedDistanceAcceptedUnits,
+    // C4 surface
+    selectReference: selectReference,
+    segmentCorners: segmentCorners,
+    applyCornerUserConfirmation: applyCornerUserConfirmation,
+    pairCorners: pairCorners,
+    referenceAndCornerForbiddenSelectionModes: referenceAndCornerForbiddenSelectionModes,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

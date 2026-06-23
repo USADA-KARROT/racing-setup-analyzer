@@ -1,18 +1,21 @@
 {
   "schemaVersion": 1,
   "program": "R3.0C",
-  "currentCheckpoint": "C3_NORMALIZED_DISTANCE",
+  "currentCheckpoint": "C4_REFERENCE_AND_CORNER",
   "authorizedProductionPaths": [
     { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
     { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
     { "path": "renderer/js/r3-0c-track-identity.js", "capability": "track_identity_authoritative" },
     { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" },
-    { "path": "renderer/js/r3-0c-normalized-distance.js", "capability": "normalized_distance_present" }
+    { "path": "renderer/js/r3-0c-normalized-distance.js", "capability": "normalized_distance_present" },
+    { "path": "renderer/js/r3-0c-reference-selection.js", "capability": "reference_selection_present" },
+    { "path": "renderer/js/r3-0c-corner-segmentation.js", "capability": "corner_segmentation_present" },
+    { "path": "renderer/js/r3-0c-corner-pairing.js", "capability": "corner_pairing_present" }
   ],
-  "enabledCapabilities": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present"],
+  "enabledCapabilities": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present"],
   "runtimeConsumersAllowed": true,
   "uiAllowed": false,
   "featureRegistryActivationAllowed": false,
   "algorithmsAllowed": true,
-  "note": "R3.0C C3_NORMALIZED_DISTANCE state. Five authorized renderer/js production paths: C1 adapter + three C2 services (lap-authority, track-identity, distance-authority) + the C3 normalize-distance service. normalized_distance_present is the new C3 capability, unlocked at C3_NORMALIZED_DISTANCE per schema.json. The C3 service consumes the contract's normalize-distance request shape gate and the C2 distance-authority descriptor; it canonicalizes raw distance/time series into a [0,1] normalized axis using fixture-derived conservative thresholds (coverage 0.95 / minimumSamples 200 / normalizedMaxGap 0.02 / timeGapSeconds 0.5, calibrationStatus 'fixture_derived_pending_field_validation'), produces every eligible result with the limitation 'thresholds_fixture_calibrated_not_field_validated' on its evidence side-channel, refuses caller-forged authority status, refuses extrapolation beyond observed sample range, and emits reason codes only from the closed allowlist contracts/r3.0c/normalized-position-contract.js exposes as C3_NORMALIZE_REASON_CODES. uiAllowed / featureRegistryActivationAllowed remain false: UI lives at C7_UI, activation at C8_ACTIVATION. Reference-lap selection / corner segmentation / corner pairing / delta metrics / comparison export remain locked behind C4..C6. The three R3.0C feature IDs (case_comparison, reference_lap, corner_delta) remain availability='deferred' in renderer/js/feature-registry.js with NO rendererAdapter until C8 authorizes activation."
+  "note": "R3.0C C4_REFERENCE_AND_CORNER state. Eight authorized renderer/js production paths: C1 adapter + three C2 services (lap-authority, track-identity, distance-authority) + C3 normalize-distance + three C4 services (reference-selection, corner-segmentation, corner-pairing). Three new C4 capabilities (reference_selection_present, corner_segmentation_present, corner_pairing_present) are unlocked at C4_REFERENCE_AND_CORNER per schema.json. The C4 reference-selection service ONLY honours selectedBy='user' with full supporting evidence; auto modes (fastestValid, medianValid, bestSectorComposite, implicitPrevious, autoFirstLap) are fail-closed per the scope pin in governance/r3.0/train.schema.json. Corner segmentation is a DATA-DRIVEN PROPOSAL (never an official apex / corner-number claim) using deterministic fingerprints; full-vs-reduced authority is decided by which channels are present (steering+yaw_rate+lateral_accel+speed = full, lateral_accel-only = reduced); short / overlapping / wrap-spanning candidates are fail-closed. Corner pairing requires ≥50% normalized overlap, refuses ordinal pairing, refuses one-to-many ambiguity; partial coverage adds a limitation but does NOT block. Three C4 services consume only contract+service surfaces above them — they touch no telemetry-core, no R3.0B persistence, no UI, no feature registry. uiAllowed / featureRegistryActivationAllowed remain false: UI lives at C7_UI, activation at C8_ACTIVATION. Delta metrics / comparison export remain locked behind C5..C6. The three R3.0C feature IDs (case_comparison, reference_lap, corner_delta) remain availability='deferred' in renderer/js/feature-registry.js with NO rendererAdapter until C8 authorizes activation."
 }

@@ -62,10 +62,17 @@ function fullComparisonInput(over) {
 // ── A. constants + identity round-trip ──
 chk('A1 ADAPTER_VERSION === 2 (C2 surface added)', Adapter.ADAPTER_VERSION === 2);
 chk('A2 CHECKPOINT_FLOOR === C1_PRODUCTION_ADAPTER (historical authorization point, does NOT advance)', Adapter.CHECKPOINT_FLOOR === 'C1_PRODUCTION_ADAPTER');
-chk('A2b activeCheckpoint() === C3_NORMALIZED_DISTANCE (latest surface available)', Adapter.activeCheckpoint() === 'C3_NORMALIZED_DISTANCE');
-chk('A2c exposes() includes production_adapter_present + lap_authority_present + track_identity_authoritative + normalized_distance_present', (() => {
+chk('A2b activeCheckpoint() === C4_REFERENCE_AND_CORNER (latest surface available)', Adapter.activeCheckpoint() === 'C4_REFERENCE_AND_CORNER');
+chk('A2c exposes() includes C1..C4 capability set', (() => {
   const c = Adapter.exposes();
-  return Array.isArray(c) && c.includes('production_adapter_present') && c.includes('lap_authority_present') && c.includes('track_identity_authoritative') && c.includes('normalized_distance_present');
+  return Array.isArray(c)
+    && c.includes('production_adapter_present')
+    && c.includes('lap_authority_present')
+    && c.includes('track_identity_authoritative')
+    && c.includes('normalized_distance_present')
+    && c.includes('reference_selection_present')
+    && c.includes('corner_segmentation_present')
+    && c.includes('corner_pairing_present');
 })());
 chk('A3 loadContracts() returns contract namespace identity', Adapter.loadContracts() === Contracts);
 chk('A4 deltaSignFormula() === contract.deltaSignFormula()', Adapter.deltaSignFormula() === CE.deltaSignFormula());
@@ -155,28 +162,30 @@ const allowedKeys = new Set([
   'deriveDistanceAuthority', 'distanceAuthorityForbiddenSources',
   // C3 surface
   'normalizeDistance', 'normalizeAtTarget', 'normalizedDistanceDefaultThresholds', 'normalizedDistanceAcceptedUnits',
+  // C4 surface
+  'selectReference', 'segmentCorners', 'applyCornerUserConfirmation', 'pairCorners', 'referenceAndCornerForbiddenSelectionModes',
 ]);
 const actualKeys = Object.keys(Adapter).sort();
 const unknownKeys = actualKeys.filter(k => !allowedKeys.has(k));
 chk('G1 adapter exposes exactly the allowlisted keys (no unknown surface)', unknownKeys.length === 0, unknownKeys);
-chk('G2 adapter does not expose lap segmentation', typeof Adapter.segmentLap === 'undefined');
-chk('G3 adapter does not expose corner pairing', typeof Adapter.pairCorners === 'undefined' && typeof Adapter.matchCorners === 'undefined');
+chk('G2 adapter does not expose lap segmentation as segmentLap', typeof Adapter.segmentLap === 'undefined');
+chk('G3 adapter does not expose matchCorners (pairCorners is C4)', typeof Adapter.matchCorners === 'undefined');
 chk('G4 adapter does not expose delta computation', typeof Adapter.computeDelta === 'undefined' && typeof Adapter.deltaCumulative === 'undefined');
-chk('G5 adapter does not expose reference selection', typeof Adapter.selectReferenceLap === 'undefined' && typeof Adapter.chooseFastestValidLap === 'undefined');
-chk('G6 adapter does not expose post-C3 surface (corner / reference / delta / export)',
-  typeof Adapter.normalizedPosition === 'undefined' && typeof Adapter.segmentCorners === 'undefined' && typeof Adapter.buildComparisonExport === 'undefined');
+chk('G5 adapter does not expose auto reference selection', typeof Adapter.chooseFastestValidLap === 'undefined' && typeof Adapter.selectReferenceLap === 'undefined');
+chk('G6 adapter does not expose post-C4 surface (delta / export)',
+  typeof Adapter.computeDelta === 'undefined' && typeof Adapter.buildComparisonExport === 'undefined');
 chk('G7 adapter does not expose export', typeof Adapter.exportComparison === 'undefined' && typeof Adapter.buildComparisonExport === 'undefined');
 chk('G8 adapter does not bind into Feature Registry', typeof Adapter.registerWithFeatureRegistry === 'undefined' && typeof Adapter.activateFeature === 'undefined');
 
-// ── H. static-source inspection: top-level literal contract require, no C4+ surface names ──
+// ── H. static-source inspection: top-level literal contract require, no C5+ surface names ──
 (() => {
   const src = fs.readFileSync(ADAPTER_PATH, 'utf8');
   // The require must be a literal string the no-consumer validator can see.
   chk('H1 adapter source contains literal require of contracts/r3.0c/index.js', /require\(\s*(['"`])\.\.\/\.\.\/contracts\/r3\.0c\/index\.js\1\s*\)/.test(src));
-  // C4+ surface names must NOT appear in the adapter source (normalizeDistance is now C3 surface,
-  // so it IS allowed — only post-C3 algorithms remain forbidden).
-  const c4Surface = ['cornerSegmentation', 'pairCorners', 'selectReferenceLap', 'computeDelta', 'deltaCumulative', 'exportComparison', 'fastest_valid', 'median_valid', 'best_sector_composite'];
-  c4Surface.forEach(name => chk('H2 adapter source does not implement ' + name, src.indexOf(name + '(') === -1 && src.indexOf('function ' + name) === -1));
+  // C5+ surface names must NOT appear in the adapter source. normalizeDistance / segmentCorners /
+  // pairCorners / selectReference are all legitimate C3/C4 surface now.
+  const c5Surface = ['computeDelta', 'deltaCumulative', 'exportComparison', 'fastest_valid', 'median_valid', 'best_sector_composite', 'selectReferenceLap'];
+  c5Surface.forEach(name => chk('H2 adapter source does not implement ' + name, src.indexOf(name + '(') === -1 && src.indexOf('function ' + name) === -1));
   // The adapter source must NOT include any runtime LLM hook.
   ['fetch(', 'XMLHttpRequest', 'WebSocket', 'eval(', 'new Function('].forEach(s => chk('H3 adapter source does not include ' + s, src.indexOf(s) === -1));
 })();
@@ -339,6 +348,109 @@ chk('J16 normalizedDistanceDefaultThresholds() identity-equal to service constan
   Adapter.normalizedDistanceDefaultThresholds() === NormalizedDistance.DEFAULT_THRESHOLDS);
 chk('J16b normalizedDistanceAcceptedUnits() identity-equal to contract constant',
   Adapter.normalizedDistanceAcceptedUnits() === Contracts.normalizedPosition.ACCEPTED_DISTANCE_UNITS);
+
+// ── J17+: C4 reference / segmentation / pairing delegation ──
+const ReferenceSelection = require('../renderer/js/r3-0c-reference-selection.js');
+const CornerSegmentation = require('../renderer/js/r3-0c-corner-segmentation.js');
+const CornerPairing = require('../renderer/js/r3-0c-corner-pairing.js');
+
+function validReferenceRequest(over) {
+  return Object.assign({
+    identity: { caseId: 'case_1', sessionId: 'sess_1' },
+    trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' },
+    selection: { selectedBy: 'user', lapId: 'lap_3', sourceId: 'csv_import:foo.csv', selectedAt: '2026-06-23T12:00:00Z' },
+    candidateLap: {
+      caseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_3', sourceId: 'csv_import:foo.csv',
+      provenance: 'real',
+      trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' },
+      timing: { lapStartTime: 100, lapEndTime: 159.95, lapTimeMs: 59950 },
+      samples: { count: 600, timebaseMedianSeconds: 0.1, timebaseMaxGapSeconds: 0.15 },
+      distance: null,
+      channelsAvailable: ['time', 'speed'],
+    },
+  }, over || {});
+}
+
+// J17: adapter selectReference ≡ service selectReference.
+(() => {
+  const req = validReferenceRequest();
+  const a = Adapter.selectReference(req);
+  const s = ReferenceSelection.selectReference(req);
+  chk('J17 selectReference adapter ≡ service (eligible)', a.eligible === true && s.eligible === true && JSON.stringify(a) === JSON.stringify(s));
+})();
+
+// J18: auto-mode selection → REFERENCE_AUTO_SELECTION_FORBIDDEN.
+(() => {
+  const req = validReferenceRequest(); req.selection.selectedBy = 'fastestValid';
+  const r = Adapter.selectReference(req);
+  chk('J18 fastestValid auto-mode → REFERENCE_AUTO_SELECTION_FORBIDDEN', r.eligible === false && r.reasonCodes.indexOf('REFERENCE_AUTO_SELECTION_FORBIDDEN') !== -1);
+})();
+
+// J19: missing candidate lap → REFERENCE_STALE_OR_DELETED.
+(() => {
+  const req = validReferenceRequest(); req.candidateLap = null;
+  const r = Adapter.selectReference(req);
+  chk('J19 missing candidate lap → REFERENCE_STALE_OR_DELETED', r.eligible === false && r.reasonCodes.indexOf('REFERENCE_STALE_OR_DELETED') !== -1);
+})();
+
+// J20: segmentCorners — straight lap (no cornering) → eligible with empty segments.
+(() => {
+  const positions = []; for (let i = 0; i < 600; i++) positions.push(i / 599);
+  const channels = { steering: new Array(600).fill(0), lateral_accel: new Array(600).fill(0.5), yaw_rate: new Array(600).fill(0.01), speed: new Array(600).fill(50) };
+  const req = { identity: { caseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_3', sourceId: 'src' }, trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' }, normalizedDistanceAxis: { eligible: true, positions }, channels, algorithmVersion: 1 };
+  const a = Adapter.segmentCorners(req);
+  chk('J20 straight-lap segmentation eligible (no corners detected)', a.eligible === true && Array.isArray(a.segments) && a.segments.length === 0);
+})();
+
+// J21: segmentCorners — cornering signal exceeds threshold → segments produced.
+(() => {
+  const positions = []; for (let i = 0; i < 600; i++) positions.push(i / 599);
+  const lat = new Array(600).fill(0);
+  for (let i = 100; i < 200; i++) lat[i] = 8; // big cornering load mid-lap
+  const channels = { steering: new Array(600).fill(0.1), lateral_accel: lat, yaw_rate: new Array(600).fill(0.05), speed: new Array(600).fill(40) };
+  const req = { identity: { caseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_3', sourceId: 'src' }, trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' }, normalizedDistanceAxis: { eligible: true, positions }, channels, algorithmVersion: 1 };
+  const a = Adapter.segmentCorners(req);
+  chk('J21 detected one cornering segment', a.eligible === true && a.segments.length === 1);
+  chk('J21b segment has fingerprint id', /^seg:/.test(a.segments[0].id));
+})();
+
+// J22: applyCornerUserConfirmation — refuses confirmation that lifts telemetry credibility.
+(() => {
+  const positions = []; for (let i = 0; i < 600; i++) positions.push(i / 599);
+  const lat = new Array(600).fill(0); for (let i = 100; i < 200; i++) lat[i] = 8;
+  const channels = { steering: new Array(600).fill(0.1), lateral_accel: lat, yaw_rate: new Array(600).fill(0.05), speed: new Array(600).fill(40) };
+  const seg = Adapter.segmentCorners({ identity: { caseId: 'c1', sessionId: 's1', lapId: 'l3', sourceId: 'src' }, trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' }, normalizedDistanceAxis: { eligible: true, positions }, channels, algorithmVersion: 1 });
+  const r = Adapter.applyCornerUserConfirmation(seg, [{ segmentId: seg.segments[0].id, userLabel: 'Copse', confirmedBy: 'user', liftTelemetryCredibility: true }]);
+  chk('J22 confirmation refusing to lift telemetry credibility', r.eligible === false && r.reasonCodes.indexOf('CORNER_CONFIRMATION_CANNOT_UPGRADE_TELEMETRY') !== -1);
+})();
+
+// J23: pairCorners — two laps with one overlapping corner.
+(() => {
+  const seg = function (lapId) {
+    const positions = []; for (let i = 0; i < 600; i++) positions.push(i / 599);
+    const lat = new Array(600).fill(0); for (let i = 100; i < 200; i++) lat[i] = 8;
+    const channels = { steering: new Array(600).fill(0.1), lateral_accel: lat, yaw_rate: new Array(600).fill(0.05), speed: new Array(600).fill(40) };
+    return Adapter.segmentCorners({ identity: { caseId: 'c1', sessionId: 's1', lapId: lapId, sourceId: 'src' }, trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' }, normalizedDistanceAxis: { eligible: true, positions }, channels, algorithmVersion: 1 });
+  };
+  const ref = seg('lap_3'); const cmp = seg('lap_5');
+  const r = Adapter.pairCorners({ referenceSegmentation: ref, comparisonSegmentation: cmp, policy: { allowOrdinalPairing: false } });
+  chk('J23 corner pairing eligible + one pair', r.eligible === true && r.pairs.length === 1);
+  chk('J23b coverage === 1.0', r.coverage === 1);
+})();
+
+// J24: pairCorners — ordinal pairing → blocked.
+(() => {
+  const r = Adapter.pairCorners({
+    referenceSegmentation: { eligible: true, identity: { caseId: 'c1', sessionId: 's1' }, trackIdentity: { trackId: 't', layoutId: 'l' }, segments: [] },
+    comparisonSegmentation: { eligible: true, identity: { caseId: 'c1', sessionId: 's1' }, trackIdentity: { trackId: 't', layoutId: 'l' }, segments: [] },
+    policy: { allowOrdinalPairing: true },
+  });
+  chk('J24 ordinal pairing forbidden', r.eligible === false && r.reasonCodes.indexOf('CORNER_PAIRING_ORDINAL_FORBIDDEN') !== -1);
+})();
+
+// J25: referenceAndCornerForbiddenSelectionModes returns the contract constant.
+chk('J25 referenceAndCornerForbiddenSelectionModes() identity-equal to contract',
+  Adapter.referenceAndCornerForbiddenSelectionModes() === Contracts.referenceAndCorner.FORBIDDEN_REFERENCE_SELECTION_MODES);
 
 console.log('r3-0c-comparison-adapter: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);
