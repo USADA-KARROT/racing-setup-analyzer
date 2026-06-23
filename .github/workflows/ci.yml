@@ -139,6 +139,24 @@ jobs:
         timeout-minutes: 2
         run: node scripts/check-r3-0c-guard.js
 
+      # R3.0C C0 — Integrated Delivery Governance.
+      # The three checks below are UNCONDITIONAL: they run on every PR and every push to main, never
+      # short-circuited by "this PR did not touch R3.0C" — governance truth must be validated continuously.
+      - name: H — R3.0C governance state
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        run: node scripts/check-r3-0c-governance.js
+
+      - name: I — R3.0C no-runtime-consumer
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        run: node scripts/check-r3-0c-no-consumer.js
+
+      - name: J — R3.0C governance integrity (visibility)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        run: node scripts/check-r3-0c-governance-integrity.js
+
       - name: Collect evidence + summary (final gate)
         if: ${{ !cancelled() }}
         timeout-minutes: 2
