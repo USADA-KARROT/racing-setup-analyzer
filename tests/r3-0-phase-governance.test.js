@@ -277,6 +277,14 @@ for (const phase of PHASES) {
   const dir5 = writeStrippedManifest(phase, badPaths);
   const r5 = runValidator(phase, dir5);
   chk(phase + ' FAIL manifest authorizedPaths not array', hasViolation(r5.artifact, 'CHECKPOINT_MANIFEST_REQUIRED_FIELD_NOT_ARRAY'));
+
+  // 6) E/F only: r3bCaseRecordSchemaUntouched not boolean (Codex G1 round 2 LOW finding regression)
+  if (phase !== 'R3.0D') {
+    const badR3b = { schemaVersion: 1, program: phase, checkpoint: BOOTSTRAP[phase], status: 'pending', headSha: null, governanceChanged: true, crossPhaseGate: {}, authorizedPaths: [], enabledCapabilitiesAfter: [], r3bCaseRecordSchemaUntouched: 'yes' };
+    const dir6 = writeStrippedManifest(phase, badR3b);
+    const r6 = runValidator(phase, dir6);
+    chk(phase + ' FAIL manifest r3bCaseRecordSchemaUntouched not boolean', hasViolation(r6.artifact, 'CHECKPOINT_MANIFEST_R3B_FLAG_NOT_BOOLEAN'));
+  }
 }
 
 console.log('phase-governance: ' + pass + ' passed, ' + fail + ' failed');
