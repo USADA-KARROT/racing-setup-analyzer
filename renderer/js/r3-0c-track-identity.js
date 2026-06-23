@@ -158,18 +158,36 @@
     });
   }
 
+  // _toDerivedForEquality(x) — coerce either RAW metadata OR a prior deriveTrackIdentity result
+  // into a freshly re-derived authoritative claim. NEVER trust a caller-attached `authoritative:true`
+  // flag in isolation: a forged `{authoritative:true, identity:{trackId, layoutId}}` (missing
+  // source, or carrying source='name_match' etc) would otherwise bypass the explicit-source rule.
+  // For a real prior-derived result the round-trip is a no-op (identity carries source='explicit');
+  // for a forgery the re-derivation fails closed exactly as if the caller supplied raw metadata.
+  function _toDerivedForEquality(x) {
+    if (_isPlain(x) && x.authoritative === true && _isPlain(x.identity)) {
+      return deriveTrackIdentity({
+        trackId: x.identity.trackId,
+        layoutId: x.identity.layoutId,
+        source: x.identity.source,
+      });
+    }
+    return deriveTrackIdentity(x);
+  }
+
   /**
    * equalsTrackIdentity(a, b) — strict equality of two AUTHORITATIVE identity claims.
    *   • Either operand non-authoritative → equal=false + MISSING_TRACK_IDENTITY (record which
    *     side was non-authoritative so the comparison layer can guide the user precisely).
    *   • Both authoritative but trackId+layoutId differ → equal=false + TRACK_IDENTITY_MISMATCH.
    *   • Both authoritative AND (trackId, layoutId) match → equal=true.
-   * Operands may be the raw metadata or the result object of deriveTrackIdentity — the service
-   * re-derives if it sees a raw metadata shape so callers can chain either way.
+   * Operands may be the raw metadata or the result object of deriveTrackIdentity — _toDerivedForEquality
+   * always re-derives so a caller cannot bypass the explicit-source rule by attaching
+   * `{authoritative:true}` to an arbitrary identity object.
    */
   function equalsTrackIdentity(a, b) {
-    var aRes = (_isPlain(a) && a.authoritative === true) ? a : deriveTrackIdentity(a);
-    var bRes = (_isPlain(b) && b.authoritative === true) ? b : deriveTrackIdentity(b);
+    var aRes = _toDerivedForEquality(a);
+    var bRes = _toDerivedForEquality(b);
     if (!aRes.authoritative || !bRes.authoritative) {
       var which = [];
       if (!aRes.authoritative) which.push('a');

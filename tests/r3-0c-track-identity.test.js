@@ -165,5 +165,44 @@ chk('A6 FORBIDDEN_INFERENCE_FIELDS frozen', Object.isFrozen(Service.FORBIDDEN_IN
   chk('M2 blocked result frozen', Object.isFrozen(r2));
 })();
 
+// ── N. forged-authority defence (Codex Gate C-A round 2 BLOCK fix). equalsTrackIdentity must
+//      NEVER trust a caller-attached `authoritative:true` flag in isolation — it must always
+//      re-derive from the underlying identity to reject forgeries that skip the explicit-source
+//      rule. Without this defence, a caller could attach the flag to any identity object and
+//      have it compare equal to a real explicit identity. ──
+(() => {
+  const validExplicit = { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' };
+  // forgery 1: authoritative=true with NO source on inner identity
+  const forgedNoSource = { authoritative: true, identity: { trackId: 'silverstone', layoutId: 'gp' } };
+  const r1 = Service.equalsTrackIdentity(forgedNoSource, validExplicit);
+  chk('N1 forged authoritative WITHOUT source field → blocked + MISSING_TRACK_IDENTITY',
+    r1.equal === false && hasCode(r1, CODES.MISSING_TRACK_IDENTITY));
+
+  // forgery 2: authoritative=true with non-explicit source on inner identity
+  const forgedNameMatch = { authoritative: true, identity: { trackId: 'silverstone', layoutId: 'gp', source: 'name_match' } };
+  const r2 = Service.equalsTrackIdentity(forgedNameMatch, validExplicit);
+  chk('N2 forged authoritative with source="name_match" → blocked + MISSING_TRACK_IDENTITY',
+    r2.equal === false && hasCode(r2, CODES.MISSING_TRACK_IDENTITY));
+
+  // forgery 3: forged but with source='explicit' on inner identity — should re-derive successfully
+  // (this is functionally indistinguishable from the caller having passed raw explicit metadata,
+  // which is the threat-model limit: forgery WITH valid identity content is the same as raw input)
+  const forgedButValid = { authoritative: true, identity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' } };
+  const r3 = Service.equalsTrackIdentity(forgedButValid, validExplicit);
+  chk('N3 forged-but-valid (carries source=explicit) → equal=true (threat-model limit: equivalent to passing raw explicit metadata)', r3.equal === true);
+
+  // forgery 4: a derived result a is correctly re-derived round-trip with the chainable contract
+  const realDerived = Service.deriveTrackIdentity(validExplicit);
+  const r4 = Service.equalsTrackIdentity(realDerived, validExplicit);
+  chk('N4 real prior-derived result still chains to equal=true (regression guard for K1)', r4.equal === true);
+
+  // forgery 5: forged with completely different identity numbers — re-derivation succeeds (since
+  // source=explicit is present), then equality returns MISMATCH (NOT equal=true).
+  const forgedDifferent = { authoritative: true, identity: { trackId: 'forged', layoutId: 'gp', source: 'explicit' } };
+  const r5 = Service.equalsTrackIdentity(forgedDifferent, validExplicit);
+  chk('N5 forged-but-valid with different trackId → equal=false + TRACK_IDENTITY_MISMATCH (not false-equal)',
+    r5.equal === false && hasCode(r5, CODES.TRACK_IDENTITY_MISMATCH));
+})();
+
 console.log('r3-0c-track-identity: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);
