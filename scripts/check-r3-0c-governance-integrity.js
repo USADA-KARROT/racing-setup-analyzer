@@ -22,6 +22,9 @@ const crypto = require('crypto');
 
 const REPO = path.resolve(__dirname, '..');
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR ? path.resolve(process.env.ARTIFACT_DIR) : path.join(REPO, 'artifacts');
+// INTEGRITY_REPO defaults to the real repo. R3_0C_INTEGRITY_REPO_OVERRIDE is for test fixtures ONLY —
+// changes WHERE the inventory is taken from, never WHETHER to take it.
+const INTEGRITY_REPO = process.env.R3_0C_INTEGRITY_REPO_OVERRIDE ? path.resolve(process.env.R3_0C_INTEGRITY_REPO_OVERRIDE) : REPO;
 
 const REQUIRED = [
   'governance/r3.0c/schema.json',
@@ -38,7 +41,7 @@ const REQUIRED = [
 ];
 
 function listAllCheckpointManifests() {
-  const dir = path.join(REPO, 'governance', 'r3.0c', 'checkpoints');
+  const dir = path.join(INTEGRITY_REPO, 'governance', 'r3.0c', 'checkpoints');
   try {
     return fs.readdirSync(dir)
       .filter(f => f.endsWith('.json'))
@@ -48,7 +51,7 @@ function listAllCheckpointManifests() {
 }
 
 function hashFile(rel) {
-  const abs = path.join(REPO, rel);
+  const abs = path.join(INTEGRITY_REPO, rel);
   const buf = fs.readFileSync(abs);
   return {
     path: rel,

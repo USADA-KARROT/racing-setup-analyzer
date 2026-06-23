@@ -26,7 +26,9 @@ const path = require('path');
 
 const REPO = path.resolve(__dirname, '..');
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR ? path.resolve(process.env.ARTIFACT_DIR) : path.join(REPO, 'artifacts');
-const GOV_DIR = path.join(REPO, 'governance', 'r3.0c');
+// Default scans the real governance dir. R3_0C_GOV_DIR_OVERRIDE is for test fixtures ONLY — it changes
+// WHERE to look, never WHETHER to look. There is no skip-this-check switch.
+const GOV_DIR = process.env.R3_0C_GOV_DIR_OVERRIDE ? path.resolve(process.env.R3_0C_GOV_DIR_OVERRIDE) : path.join(REPO, 'governance', 'r3.0c');
 
 function readJson(rel) {
   const abs = path.isAbsolute(rel) ? rel : path.join(GOV_DIR, rel);
