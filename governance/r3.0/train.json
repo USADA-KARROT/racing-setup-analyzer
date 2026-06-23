@@ -3,11 +3,11 @@
   "program": "R3.0",
   "phases": ["R3.0C", "R3.0D", "R3.0E", "R3.0F"],
   "currentPhase": "R3.0C",
-  "currentPhaseCheckpoint": "C0_BOOTSTRAP",
+  "currentPhaseCheckpoint": "C1_PRODUCTION_ADAPTER",
   "phaseStates": {
     "R3.0C": {
       "governanceDir": "governance/r3.0c",
-      "currentCheckpoint": "C0_BOOTSTRAP",
+      "currentCheckpoint": "C1_PRODUCTION_ADAPTER",
       "finalActivationCheckpoint": "C8_ACTIVATION",
       "started": true,
       "finalActivationReached": false

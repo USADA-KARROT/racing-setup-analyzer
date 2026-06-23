@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0C",
+  "checkpoint": "C1_PRODUCTION_ADAPTER",
+  "baseSha": "e8a17aaed822aeb877f4a8e9a62ffaf07cca75cc",
+  "headSha": null,
+  "previousCheckpoint": "C0_BOOTSTRAP",
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" }
+  ],
+  "enabledCapabilitiesBefore": [],
+  "enabledCapabilitiesAfter": ["production_adapter_present"],
+  "forbiddenCapabilities": [
+    "lap_authority_present",
+    "track_identity_authoritative",
+    "normalized_distance_present",
+    "reference_selection_present",
+    "corner_segmentation_present",
+    "corner_pairing_present",
+    "delta_metrics_present",
+    "comparison_export_present",
+    "ui_present",
+    "feature_registry_active"
+  ],
+  "changedFiles": [
+    "governance/r3.0c/state.json",
+    "governance/r3.0c/checkpoints/C1.json",
+    "governance/r3.0/train.json",
+    "scripts/check-r3-0c-no-consumer.js",
+    "renderer/js/r3-0c-comparison-adapter.js",
+    "tests/r3-0c-no-consumer.test.js",
+    "tests/r3-0c-governance.test.js",
+    "tests/r3-0-train.test.js",
+    "tests/r3-0c-comparison-adapter.test.js",
+    "package.json"
+  ],
+  "tests": null,
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": null,
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "expectedRendererAdapter": false
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "note": "C1 plumbs the contracts/r3.0c surface into the renderer tree through a single authorized adapter, generalises the no-runtime-consumer validator to be state-aware (allowing one authorized consumer per state.authorizedProductionPaths capability backing), and enables the production_adapter_present capability. NO algorithm is added: every adapter call delegates to the contract layer. UI / activation / lap authority / normalization / corner segmentation / delta metrics / export remain locked behind C2..C8. The R3.0C feature IDs stay deferred with no rendererAdapter. Trusted-verification artifact bound to headSha is the PASS authority — headSha / workflowRunId / artifactId / artifactBoundSha / codexVerdict / createdAt are intentionally null in-commit."
+}

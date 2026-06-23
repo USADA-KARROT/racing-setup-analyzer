@@ -111,13 +111,13 @@ function writeFixture(opts) {
   const r = runValidator(null);
   chk('A1 real-repo validator exits 0', r.status === 0, r.stderr);
   chk('A2 real-repo ok===true', !!(r.artifact && r.artifact.ok === true), r.artifact && r.artifact.violations);
-  chk('A3 real-repo checkpoint=C0_BOOTSTRAP', !!(r.artifact && r.artifact.currentCheckpoint === 'C0_BOOTSTRAP'));
-  chk('A4 real-repo authPathCount=0', !!(r.artifact && r.artifact.authorizedProductionPathCount === 0));
-  chk('A5 real-repo enabledCapCount=0', !!(r.artifact && r.artifact.enabledCapabilityCount === 0));
-  chk('A6 real-repo runtimeConsumers=false', r.artifact && r.artifact.runtimeConsumersAllowed === false);
-  chk('A7 real-repo uiAllowed=false', r.artifact && r.artifact.uiAllowed === false);
-  chk('A8 real-repo featureActivationAllowed=false', r.artifact && r.artifact.featureRegistryActivationAllowed === false);
-  chk('A9 real-repo algorithmsAllowed=false', r.artifact && r.artifact.algorithmsAllowed === false);
+  chk('A3 real-repo checkpoint=C1_PRODUCTION_ADAPTER', !!(r.artifact && r.artifact.currentCheckpoint === 'C1_PRODUCTION_ADAPTER'));
+  chk('A4 real-repo authPathCount=1', !!(r.artifact && r.artifact.authorizedProductionPathCount === 1));
+  chk('A5 real-repo enabledCapCount=1 (production_adapter_present)', !!(r.artifact && r.artifact.enabledCapabilityCount === 1));
+  chk('A6 real-repo runtimeConsumers=true (C1 floor)', r.artifact && r.artifact.runtimeConsumersAllowed === true);
+  chk('A7 real-repo uiAllowed=false (C7 floor)', r.artifact && r.artifact.uiAllowed === false);
+  chk('A8 real-repo featureActivationAllowed=false (C8 floor)', r.artifact && r.artifact.featureRegistryActivationAllowed === false);
+  chk('A9 real-repo algorithmsAllowed=false (C2 floor)', r.artifact && r.artifact.algorithmsAllowed === false);
 })();
 
 // ── B. schema.json invariants ──
