@@ -34,7 +34,7 @@
       "finalActivationReached": false
     }
   },
-  "trainStatus": "GOVERNANCE_READY",
+  "trainStatus": "IN_PROGRESS",
   "trainStartSha": "1103336e0a87156eeda013a1162c5271b46f3253",
   "targetVersion": "2.0.0",
   "targetTag": "v2.0.0",
@@ -58,5 +58,5 @@
       "extendR3bCaseRecordSchema": false
     }
   },
-  "note": "R3.0 Integrated Delivery Train state. GOVERNANCE_READY means G1 (this PR) has scaffolded the train rails; no feature branch has been opened, no production code added, no capability enabled. After G1 merges and SKYLINE authorizes the feature train, feat/r3.0-integrated-delivery is created from main; trainStatus moves to IN_PROGRESS and per-phase currentCheckpoint advances under checkpoint authorization. Final merge happens once at R3.0F F6_RELEASE; v2.0.0 tag + GitHub Release are created post-merge after the new main trusted-verification PASS. trainStatus then becomes MERGED."
+  "note": "R3.0 Integrated Delivery Train state. IN_PROGRESS means SKYLINE has authorized the feature train; feat/r3.0-integrated-delivery has been opened from main at the G1 head SHA. No production code is added by this commit and no capability is enabled — opening the branch is the only state change. Per-phase currentCheckpoint advances under separately-authorized Train checkpoints (C1..C8, D1..D5, E1..E5, F1..F5). Final merge happens once at R3.0F F6_RELEASE; v2.0.0 tag + GitHub Release are created post-merge after the new main trusted-verification PASS. trainStatus then becomes MERGED."
 }
