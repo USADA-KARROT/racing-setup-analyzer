@@ -38,6 +38,10 @@ const frozen = readJson('frozen-boundary-result.json');
 const version = readJson('version-policy.json');
 const r30c = readJson('r3-0c-guard.json');
 const depAudit = readJson('dependency-audit.json');
+// R3.0C C0 — Integrated Delivery Governance evidence (each folds into allOk below).
+const r3cGovernance = readJson('r3-0c-governance.json');
+const r3cNoConsumer = readJson('r3-0c-no-consumer.json');
+const r3cGovernanceIntegrity = readJson('r3-0c-governance-integrity.json');
 const pkg = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
 const dependencyInstallPerformed = false; // dependency-free lane: CI installs nothing (version-policy enforces the workflow has no install step)
 const lockfileTracked = !!gitOut(['ls-files', 'package-lock.json']);
@@ -98,19 +102,26 @@ const frozenOk = !!(frozen && frozen.ok);
 const versionOk = !!(version && version.ok);
 const r30cOk = !!(r30c && r30c.ok);
 const depAuditOk = !!(depAudit && depAudit.ok);
+const r3cGovernanceOk = !!(r3cGovernance && r3cGovernance.ok);
+const r3cNoConsumerOk = !!(r3cNoConsumer && r3cNoConsumer.ok);
+const r3cGovernanceIntegrityOk = !!(r3cGovernanceIntegrity && r3cGovernanceIntegrity.ok);
 
 const integrity = {
   dependencyAudit: depAuditOk, manifest: manifestOk, i18n: i18nOk, featureRegistry: registryOk, preset: presetOk,
   frozenBoundary: frozenOk, versionPolicy: versionOk, r3_0cScopeGuard: r30cOk,
+  r3cGovernance: r3cGovernanceOk, r3cNoConsumer: r3cNoConsumerOk, r3cGovernanceIntegrity: r3cGovernanceIntegrityOk,
   dependencyInstallPerformed, lockfileTracked, shaMatch,
   present: {
     'dependency-audit.json': !!depAudit, 'test-manifest.json': !!manifest, 'i18n-result.json': !!i18n,
     'feature-registry-result.json': !!registry, 'preset-integrity.json': !!preset,
     'frozen-boundary-result.json': !!frozen, 'version-policy.json': !!version, 'r3-0c-guard.json': !!r30c,
+    'r3-0c-governance.json': !!r3cGovernance, 'r3-0c-no-consumer.json': !!r3cNoConsumer,
+    'r3-0c-governance-integrity.json': !!r3cGovernanceIntegrity,
   },
 };
 
 const allOk = depAuditOk && manifestOk && i18nOk && registryOk && presetOk && frozenOk && versionOk && r30cOk
+  && r3cGovernanceOk && r3cNoConsumerOk && r3cGovernanceIntegrityOk
   && dependencyInstallPerformed === false && shaMatch;
 
 const summary = {
@@ -129,6 +140,21 @@ const summary = {
   packageVersion: pkg.version,
   dependencyAuditExternalImports: depAudit ? (depAudit.externalImports || []).length : -1,
   dependencyAuditDynamicUnresolved: depAudit ? (depAudit.dynamicUnresolved || []).length : -1,
+  // R3.0C C0 — Integrated Delivery Governance surface (each contributes to allOk above).
+  r3cGovernanceCheckpoint: r3cGovernance ? (r3cGovernance.currentCheckpoint || null) : null,
+  r3cGovernanceSchemaVersion: r3cGovernance ? (r3cGovernance.schemaVersion || null) : null,
+  r3cAuthorizedProductionPathCount: r3cGovernance ? (typeof r3cGovernance.authorizedProductionPathCount === 'number' ? r3cGovernance.authorizedProductionPathCount : -1) : -1,
+  r3cEnabledCapabilityCount: r3cGovernance ? (typeof r3cGovernance.enabledCapabilityCount === 'number' ? r3cGovernance.enabledCapabilityCount : -1) : -1,
+  r3cRuntimeConsumersAllowed: r3cGovernance ? !!r3cGovernance.runtimeConsumersAllowed : null,
+  r3cUiAllowed: r3cGovernance ? !!r3cGovernance.uiAllowed : null,
+  r3cFeatureActivationAllowed: r3cGovernance ? !!r3cGovernance.featureRegistryActivationAllowed : null,
+  r3cAlgorithmsAllowed: r3cGovernance ? !!r3cGovernance.algorithmsAllowed : null,
+  r3cNoConsumer: r3cNoConsumerOk,
+  r3cNoConsumerCount: r3cNoConsumer ? (typeof r3cNoConsumer.runtimeConsumerCount === 'number' ? r3cNoConsumer.runtimeConsumerCount : -1) : -1,
+  r3cGovernanceIntegrity: r3cGovernanceIntegrityOk,
+  r3cGovernanceIntegrityBundleSha256: r3cGovernanceIntegrity ? (r3cGovernanceIntegrity.bundleSha256 || null) : null,
+  r3cDeferredStillDeferred: r30c ? !!r30c.deferredStillDeferred : (r3cNoConsumer ? !!r3cNoConsumer.deferredStillDeferred : false),
+  r3cProductionDiff: r30c && typeof r30c.r3_0c_production_diff === 'number' ? r30c.r3_0c_production_diff : -1,
   dependencyInstallPerformed,
   shaMatch,
   overall: allOk ? 'PASS' : 'FAIL',
