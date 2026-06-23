@@ -1,17 +1,18 @@
 {
   "schemaVersion": 1,
   "program": "R3.0C",
-  "currentCheckpoint": "C2_LAP_AUTHORITY",
+  "currentCheckpoint": "C3_NORMALIZED_DISTANCE",
   "authorizedProductionPaths": [
     { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
     { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
     { "path": "renderer/js/r3-0c-track-identity.js", "capability": "track_identity_authoritative" },
-    { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" }
+    { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-normalized-distance.js", "capability": "normalized_distance_present" }
   ],
-  "enabledCapabilities": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative"],
+  "enabledCapabilities": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present"],
   "runtimeConsumersAllowed": true,
   "uiAllowed": false,
   "featureRegistryActivationAllowed": false,
   "algorithmsAllowed": true,
-  "note": "R3.0C C2_LAP_AUTHORITY state. Four authorized renderer/js production paths: the C1 adapter (production_adapter_present) plus three C2 services — lap-authority (lap_authority_present), track-identity (track_identity_authoritative) and distance-authority (lap_authority_present, secondary). algorithmsAllowed flips true here because C2 is the algorithmCheckpoint per schema.json — lap authority is re-derived from raw evidence rather than trusted from caller claims, the lap-authority service computes coverage / sample count / discontinuity from fixture-derived conservative thresholds (DEFAULT_THRESHOLDS marked calibrationStatus='fixture_derived_pending_field_validation', evidence carries 'thresholds_fixture_calibrated_not_field_validated' limitation), track identity is decided only from explicit {trackId, layoutId, source:'explicit'} (no inference from name / filename / lap length / sample shape / GPS), and distance authority accepts only authorityStatus='channel_source_declared' (sample-index, elapsed-time ratio, speed integral, GPS proximity, track-length guess all enumerated and refused). uiAllowed / featureRegistryActivationAllowed remain false: UI lives at C7_UI, activation at C8_ACTIVATION. Normalized distance / corner segmentation / pairing / delta metrics / export remain locked behind C3..C6. The three R3.0C feature IDs (case_comparison, reference_lap, corner_delta) remain availability='deferred' in renderer/js/feature-registry.js with NO rendererAdapter until C8 authorizes activation."
+  "note": "R3.0C C3_NORMALIZED_DISTANCE state. Five authorized renderer/js production paths: C1 adapter + three C2 services (lap-authority, track-identity, distance-authority) + the C3 normalize-distance service. normalized_distance_present is the new C3 capability, unlocked at C3_NORMALIZED_DISTANCE per schema.json. The C3 service consumes the contract's normalize-distance request shape gate and the C2 distance-authority descriptor; it canonicalizes raw distance/time series into a [0,1] normalized axis using fixture-derived conservative thresholds (coverage 0.95 / minimumSamples 200 / normalizedMaxGap 0.02 / timeGapSeconds 0.5, calibrationStatus 'fixture_derived_pending_field_validation'), produces every eligible result with the limitation 'thresholds_fixture_calibrated_not_field_validated' on its evidence side-channel, refuses caller-forged authority status, refuses extrapolation beyond observed sample range, and emits reason codes only from the closed allowlist contracts/r3.0c/normalized-position-contract.js exposes as C3_NORMALIZE_REASON_CODES. uiAllowed / featureRegistryActivationAllowed remain false: UI lives at C7_UI, activation at C8_ACTIVATION. Reference-lap selection / corner segmentation / corner pairing / delta metrics / comparison export remain locked behind C4..C6. The three R3.0C feature IDs (case_comparison, reference_lap, corner_delta) remain availability='deferred' in renderer/js/feature-registry.js with NO rendererAdapter until C8 authorizes activation."
 }

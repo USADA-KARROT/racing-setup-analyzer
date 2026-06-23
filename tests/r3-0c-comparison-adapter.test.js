@@ -62,10 +62,10 @@ function fullComparisonInput(over) {
 // ── A. constants + identity round-trip ──
 chk('A1 ADAPTER_VERSION === 2 (C2 surface added)', Adapter.ADAPTER_VERSION === 2);
 chk('A2 CHECKPOINT_FLOOR === C1_PRODUCTION_ADAPTER (historical authorization point, does NOT advance)', Adapter.CHECKPOINT_FLOOR === 'C1_PRODUCTION_ADAPTER');
-chk('A2b activeCheckpoint() === C2_LAP_AUTHORITY (latest surface available)', Adapter.activeCheckpoint() === 'C2_LAP_AUTHORITY');
-chk('A2c exposes() includes production_adapter_present + lap_authority_present + track_identity_authoritative', (() => {
+chk('A2b activeCheckpoint() === C3_NORMALIZED_DISTANCE (latest surface available)', Adapter.activeCheckpoint() === 'C3_NORMALIZED_DISTANCE');
+chk('A2c exposes() includes production_adapter_present + lap_authority_present + track_identity_authoritative + normalized_distance_present', (() => {
   const c = Adapter.exposes();
-  return Array.isArray(c) && c.includes('production_adapter_present') && c.includes('lap_authority_present') && c.includes('track_identity_authoritative');
+  return Array.isArray(c) && c.includes('production_adapter_present') && c.includes('lap_authority_present') && c.includes('track_identity_authoritative') && c.includes('normalized_distance_present');
 })());
 chk('A3 loadContracts() returns contract namespace identity', Adapter.loadContracts() === Contracts);
 chk('A4 deltaSignFormula() === contract.deltaSignFormula()', Adapter.deltaSignFormula() === CE.deltaSignFormula());
@@ -153,6 +153,8 @@ const allowedKeys = new Set([
   'deriveLapAuthority', 'assessMetricChannelRequirements', 'lapAuthorityDefaultThresholds', 'lapAuthorityMetricChannels',
   'deriveTrackIdentity', 'equalsTrackIdentity',
   'deriveDistanceAuthority', 'distanceAuthorityForbiddenSources',
+  // C3 surface
+  'normalizeDistance', 'normalizeAtTarget', 'normalizedDistanceDefaultThresholds', 'normalizedDistanceAcceptedUnits',
 ]);
 const actualKeys = Object.keys(Adapter).sort();
 const unknownKeys = actualKeys.filter(k => !allowedKeys.has(k));
@@ -161,18 +163,20 @@ chk('G2 adapter does not expose lap segmentation', typeof Adapter.segmentLap ===
 chk('G3 adapter does not expose corner pairing', typeof Adapter.pairCorners === 'undefined' && typeof Adapter.matchCorners === 'undefined');
 chk('G4 adapter does not expose delta computation', typeof Adapter.computeDelta === 'undefined' && typeof Adapter.deltaCumulative === 'undefined');
 chk('G5 adapter does not expose reference selection', typeof Adapter.selectReferenceLap === 'undefined' && typeof Adapter.chooseFastestValidLap === 'undefined');
-chk('G6 adapter does not expose normalization distance', typeof Adapter.normalizeDistance === 'undefined' && typeof Adapter.normalizedPosition === 'undefined');
+chk('G6 adapter does not expose post-C3 surface (corner / reference / delta / export)',
+  typeof Adapter.normalizedPosition === 'undefined' && typeof Adapter.segmentCorners === 'undefined' && typeof Adapter.buildComparisonExport === 'undefined');
 chk('G7 adapter does not expose export', typeof Adapter.exportComparison === 'undefined' && typeof Adapter.buildComparisonExport === 'undefined');
 chk('G8 adapter does not bind into Feature Registry', typeof Adapter.registerWithFeatureRegistry === 'undefined' && typeof Adapter.activateFeature === 'undefined');
 
-// ── H. static-source inspection: top-level literal contract require, no C2+ surface names ──
+// ── H. static-source inspection: top-level literal contract require, no C4+ surface names ──
 (() => {
   const src = fs.readFileSync(ADAPTER_PATH, 'utf8');
   // The require must be a literal string the no-consumer validator can see.
   chk('H1 adapter source contains literal require of contracts/r3.0c/index.js', /require\(\s*(['"`])\.\.\/\.\.\/contracts\/r3\.0c\/index\.js\1\s*\)/.test(src));
-  // C2+ surface names must NOT appear in the adapter source (other than in this comment-style mention).
-  const c2Surface = ['cornerSegmentation', 'pairCorners', 'normalizeDistance', 'selectReferenceLap', 'computeDelta', 'deltaCumulative', 'exportComparison', 'fastest_valid', 'median_valid', 'best_sector_composite'];
-  c2Surface.forEach(name => chk('H2 adapter source does not implement ' + name, src.indexOf(name + '(') === -1 && src.indexOf('function ' + name) === -1));
+  // C4+ surface names must NOT appear in the adapter source (normalizeDistance is now C3 surface,
+  // so it IS allowed — only post-C3 algorithms remain forbidden).
+  const c4Surface = ['cornerSegmentation', 'pairCorners', 'selectReferenceLap', 'computeDelta', 'deltaCumulative', 'exportComparison', 'fastest_valid', 'median_valid', 'best_sector_composite'];
+  c4Surface.forEach(name => chk('H2 adapter source does not implement ' + name, src.indexOf(name + '(') === -1 && src.indexOf('function ' + name) === -1));
   // The adapter source must NOT include any runtime LLM hook.
   ['fetch(', 'XMLHttpRequest', 'WebSocket', 'eval(', 'new Function('].forEach(s => chk('H3 adapter source does not include ' + s, src.indexOf(s) === -1));
 })();
@@ -288,6 +292,53 @@ chk('J5 lapAuthorityMetricChannels() identity-equal to service constant',
 // J12: distanceAuthorityForbiddenSources — identity-equal to service constant.
 chk('J12 distanceAuthorityForbiddenSources() identity-equal to service constant',
   Adapter.distanceAuthorityForbiddenSources() === DistanceAuthority.FORBIDDEN_INFERENCE_SOURCES);
+
+// ── J13+: C3 normalize-distance delegation ──
+const NormalizedDistance = require('../renderer/js/r3-0c-normalized-distance.js');
+
+function buildValidNormalizeRequest(over) {
+  const n = 600;
+  const distances = []; const times = [];
+  for (let i = 0; i < n; i++) { distances.push(i * 5); times.push(i * 0.1); }
+  return Object.assign({
+    identity: { caseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_3', sourceId: 'csv_import:foo.csv' },
+    distanceAuthority: { sourceChannel: 'lap_distance', unit: 'm', direction: 'forward', wrapSemantics: 'no_wrap', authorityStatus: 'channel_source_declared' },
+    samples: { distances, times },
+    policy: { monotonicity: 'non_decreasing', duplicatePositions: 'collapse', endpointConvention: 'half_open_0_inclusive_1_exclusive', coverage: 0.95, minimumSamples: 200, normalizedMaxGap: 0.02, timeGapSeconds: 0.5 },
+  }, over || {});
+}
+
+// J13: adapter normalizeDistance ≡ service normalizeDistance (byte-for-byte).
+(() => {
+  const req = buildValidNormalizeRequest();
+  const a = Adapter.normalizeDistance(req);
+  const s = NormalizedDistance.normalizeDistance(req);
+  chk('J13 normalizeDistance adapter ≡ service (eligible)', a.eligible === true && s.eligible === true && JSON.stringify(a) === JSON.stringify(s));
+})();
+
+// J14: forged authority → blocked + NORMALIZED_DISTANCE_AUTHORITY_FORGED.
+(() => {
+  const req = buildValidNormalizeRequest();
+  req.distanceAuthority.authorityStatus = 'inferred_from_sample_index';
+  const r = Adapter.normalizeDistance(req);
+  chk('J14 forged authority → blocked + NORMALIZED_DISTANCE_AUTHORITY_FORGED', r.eligible === false && r.reasonCodes.indexOf('NORMALIZED_DISTANCE_AUTHORITY_FORGED') !== -1);
+})();
+
+// J15: normalizeAtTarget bounded interpolation.
+(() => {
+  const axis = Adapter.normalizeDistance(buildValidNormalizeRequest());
+  const r = Adapter.normalizeAtTarget(axis, 0.5);
+  chk('J15 normalizeAtTarget(0.5) eligible', r.eligible === true && r.normalizedTarget === 0.5);
+  chk('J15b normalizeAtTarget(0.5) brackets [left, right]', r.sampleIndexLeft >= 0 && r.sampleIndexRight === r.sampleIndexLeft + 1);
+  const r2 = Adapter.normalizeAtTarget(axis, 1.5);
+  chk('J15c normalizeAtTarget(1.5) → extrapolation refused', r2.eligible === false && r2.reasonCodes.indexOf('NORMALIZED_DISTANCE_EXTRAPOLATION_REQUIRED') !== -1);
+})();
+
+// J16: adapter exposes normalizedDistanceDefaultThresholds + normalizedDistanceAcceptedUnits via service constants.
+chk('J16 normalizedDistanceDefaultThresholds() identity-equal to service constant',
+  Adapter.normalizedDistanceDefaultThresholds() === NormalizedDistance.DEFAULT_THRESHOLDS);
+chk('J16b normalizedDistanceAcceptedUnits() identity-equal to contract constant',
+  Adapter.normalizedDistanceAcceptedUnits() === Contracts.normalizedPosition.ACCEPTED_DISTANCE_UNITS);
 
 console.log('r3-0c-comparison-adapter: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

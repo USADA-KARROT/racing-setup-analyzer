@@ -40,6 +40,7 @@
   var LapAuthority = null;
   var TrackIdentity = null;
   var DistanceAuthority = null;
+  var NormalizedDistance = null;
   if (typeof module !== 'undefined' && module.exports) {
     try { Contracts = require('../../contracts/r3.0c/index.js'); }
     catch (e) { Contracts = null; }
@@ -52,11 +53,14 @@
     catch (e) { TrackIdentity = null; }
     try { DistanceAuthority = require('./r3-0c-distance-authority.js'); }
     catch (e) { DistanceAuthority = null; }
+    try { NormalizedDistance = require('./r3-0c-normalized-distance.js'); }
+    catch (e) { NormalizedDistance = null; }
   }
   if (!Contracts && typeof R3_0C_Contracts !== 'undefined') Contracts = R3_0C_Contracts;
   if (!LapAuthority && typeof R3_0C_LapAuthority !== 'undefined') LapAuthority = R3_0C_LapAuthority;
   if (!TrackIdentity && typeof R3_0C_TrackIdentity !== 'undefined') TrackIdentity = R3_0C_TrackIdentity;
   if (!DistanceAuthority && typeof R3_0C_DistanceAuthority !== 'undefined') DistanceAuthority = R3_0C_DistanceAuthority;
+  if (!NormalizedDistance && typeof R3_0C_NormalizedDistance !== 'undefined') NormalizedDistance = R3_0C_NormalizedDistance;
   if (!Contracts) {
     throw new Error('renderer/js/r3-0c-comparison-adapter.js requires contracts/r3.0c/index.js (Node require or R3_0C_Contracts global)');
   }
@@ -138,6 +142,24 @@
     return _requireService(DistanceAuthority, 'distance-authority').FORBIDDEN_INFERENCE_SOURCES;
   }
 
+  // ── C3 delegations — pure passthrough to the normalize-distance service. The adapter still
+  //    has NO algorithm: shape validation, unit conversion, wrap detection, monotonicity check,
+  //    coverage / gap thresholds, bounded interpolation all live in the service module so the
+  //    no-consumer validator counts it as an authorized renderer/js consumer of contracts/r3.0c
+  //    AND so future calibration changes do not ripple through the adapter surface. ──
+  function normalizeDistance(request) {
+    return _requireService(NormalizedDistance, 'normalized-distance').normalizeDistance(request);
+  }
+  function normalizeAtTarget(axisResult, normalizedTarget) {
+    return _requireService(NormalizedDistance, 'normalized-distance').normalizeAtTarget(axisResult, normalizedTarget);
+  }
+  function normalizedDistanceDefaultThresholds() {
+    return _requireService(NormalizedDistance, 'normalized-distance').DEFAULT_THRESHOLDS;
+  }
+  function normalizedDistanceAcceptedUnits() {
+    return Contracts.normalizedPosition.ACCEPTED_DISTANCE_UNITS;
+  }
+
   // Capability inventory — grows with each checkpoint. activeCheckpoint() reports the LATEST
   // checkpoint whose surface this adapter exposes; exposes() lists capability ids derived from
   // which service modules loaded successfully.
@@ -146,12 +168,14 @@
     if (LapAuthority) caps.push('lap_authority_present');
     if (TrackIdentity) caps.push('track_identity_authoritative');
     if (DistanceAuthority) caps.push('lap_authority_present'); // distance backs lap_authority cluster
+    if (NormalizedDistance) caps.push('normalized_distance_present');
     // dedupe while preserving order
     var seen = {}, out = [];
     caps.forEach(function (c) { if (!seen[c]) { seen[c] = true; out.push(c); } });
     return Object.freeze(out);
   }
   function activeCheckpoint() {
+    if (NormalizedDistance) return 'C3_NORMALIZED_DISTANCE';
     if (LapAuthority || TrackIdentity || DistanceAuthority) return 'C2_LAP_AUTHORITY';
     return 'C1_PRODUCTION_ADAPTER';
   }
@@ -184,6 +208,11 @@
     equalsTrackIdentity: equalsTrackIdentity,
     deriveDistanceAuthority: deriveDistanceAuthority,
     distanceAuthorityForbiddenSources: distanceAuthorityForbiddenSources,
+    // C3 surface
+    normalizeDistance: normalizeDistance,
+    normalizeAtTarget: normalizeAtTarget,
+    normalizedDistanceDefaultThresholds: normalizedDistanceDefaultThresholds,
+    normalizedDistanceAcceptedUnits: normalizedDistanceAcceptedUnits,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
