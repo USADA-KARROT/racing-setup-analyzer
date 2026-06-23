@@ -157,6 +157,78 @@ jobs:
         timeout-minutes: 2
         run: node scripts/check-r3-0c-governance-integrity.js
 
+      # R3.0 G1 — Integrated Delivery Train per-phase governance (D / E / F) + train-level validator.
+      # All steps below are UNCONDITIONAL: they run on every PR and every push to main, never short-circuited
+      # by "this PR did not touch R3.0D/E/F" — governance truth must be validated continuously across the
+      # entire R3.0 Integrated Delivery Train scope, not only when a particular phase's files change.
+      - name: K — R3.0D governance state
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        env:
+          R3_PHASE_PROGRAM: R3.0D
+        run: node scripts/check-r3-phase-governance.js
+
+      - name: K2 — R3.0D no-runtime-consumer
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        env:
+          R3_PHASE_PROGRAM: R3.0D
+        run: node scripts/check-r3-phase-no-consumer.js
+
+      - name: K3 — R3.0D governance integrity (visibility)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        env:
+          R3_PHASE_PROGRAM: R3.0D
+        run: node scripts/check-r3-phase-governance-integrity.js
+
+      - name: L — R3.0E governance state
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        env:
+          R3_PHASE_PROGRAM: R3.0E
+        run: node scripts/check-r3-phase-governance.js
+
+      - name: L2 — R3.0E no-runtime-consumer
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        env:
+          R3_PHASE_PROGRAM: R3.0E
+        run: node scripts/check-r3-phase-no-consumer.js
+
+      - name: L3 — R3.0E governance integrity (visibility)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        env:
+          R3_PHASE_PROGRAM: R3.0E
+        run: node scripts/check-r3-phase-governance-integrity.js
+
+      - name: M — R3.0F governance state
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        env:
+          R3_PHASE_PROGRAM: R3.0F
+        run: node scripts/check-r3-phase-governance.js
+
+      - name: M2 — R3.0F no-runtime-consumer
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        env:
+          R3_PHASE_PROGRAM: R3.0F
+        run: node scripts/check-r3-phase-no-consumer.js
+
+      - name: M3 — R3.0F governance integrity (visibility)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        env:
+          R3_PHASE_PROGRAM: R3.0F
+        run: node scripts/check-r3-phase-governance-integrity.js
+
+      - name: N — R3.0 Integrated Delivery Train (cross-phase + scope pin + historical lineage)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 3
+        run: node scripts/check-r3-0-train.js
+
       - name: Collect evidence + summary (final gate)
         if: ${{ !cancelled() }}
         timeout-minutes: 2
