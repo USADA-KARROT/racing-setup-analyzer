@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0E",
+  "title": "R3.0E Recommendation Experiment & Outcome Loop — schema",
+  "note": "Defines the legal universe of checkpoints, capabilities, transitions, and authorized-path rules for the R3.0E phase of the R3.0 Integrated Delivery Train. E0 establishes the schema; E1..E5 are NOT yet authorized — they describe future intent so the validator can refuse premature activation. R3.0E depends on R3.0D completing all the way to D5_ACTIVATION before any non-bootstrap E checkpoint may advance — that cross-phase rule is enforced by scripts/check-r3-0-train.js, not by this single-phase schema. Per SKYLINE D12/E1 ruling: Experiment / Outcome / Hypothesis / follow-up linkage live in SEPARATE versioned IndexedDB namespaces and MUST NOT extend the frozen R3.0B case-record schema.",
+  "checkpoints": [
+    "E0_BOOTSTRAP",
+    "E1_CONTRACT_FOUNDATION",
+    "E2_EXPERIMENT_STORE",
+    "E3_OUTCOME_CLASSIFIER",
+    "E4_CASE_TIMELINE",
+    "E5_ACTIVATION"
+  ],
+  "transitions": {
+    "E0_BOOTSTRAP": ["E1_CONTRACT_FOUNDATION"],
+    "E1_CONTRACT_FOUNDATION": ["E2_EXPERIMENT_STORE"],
+    "E2_EXPERIMENT_STORE": ["E3_OUTCOME_CLASSIFIER"],
+    "E3_OUTCOME_CLASSIFIER": ["E4_CASE_TIMELINE"],
+    "E4_CASE_TIMELINE": ["E5_ACTIVATION"],
+    "E5_ACTIVATION": []
+  },
+  "checkpointOrder": [
+    "E0_BOOTSTRAP",
+    "E1_CONTRACT_FOUNDATION",
+    "E2_EXPERIMENT_STORE",
+    "E3_OUTCOME_CLASSIFIER",
+    "E4_CASE_TIMELINE",
+    "E5_ACTIVATION"
+  ],
+  "capabilities": [
+    "contract_foundation_present",
+    "governance_bootstrap_present",
+    "experiment_store_present",
+    "outcome_classifier_present",
+    "case_timeline_present",
+    "feature_registry_active"
+  ],
+  "governanceCapabilities": [
+    "contract_foundation_present",
+    "governance_bootstrap_present"
+  ],
+  "productionCapabilities": [
+    "experiment_store_present",
+    "outcome_classifier_present",
+    "case_timeline_present",
+    "feature_registry_active"
+  ],
+  "capabilityUnlockFloor": {
+    "contract_foundation_present": "E1_CONTRACT_FOUNDATION",
+    "governance_bootstrap_present": "E0_BOOTSTRAP",
+    "experiment_store_present": "E2_EXPERIMENT_STORE",
+    "outcome_classifier_present": "E3_OUTCOME_CLASSIFIER",
+    "case_timeline_present": "E4_CASE_TIMELINE",
+    "feature_registry_active": "E5_ACTIVATION"
+  },
+  "runtimeConsumerCheckpoint": "E2_EXPERIMENT_STORE",
+  "algorithmCheckpoint": "E3_OUTCOME_CLASSIFIER",
+  "uiCheckpoint": "E4_CASE_TIMELINE",
+  "featureRegistryActivationCheckpoint": "E5_ACTIVATION",
+  "bootstrapCheckpoint": "E0_BOOTSTRAP",
+  "contractPrefix": "contracts/r3.0e",
+  "authorizedPathRules": {
+    "mustBeRepoRelative": true,
+    "mustBeExact": true,
+    "forbiddenSubstrings": ["..", "*", "?", "["],
+    "forbiddenPrefixes": ["/"],
+    "allowedRoots": ["renderer/js/", "contracts/r3.0e/", "main.js", "preload.js", "renderer/index.html", "renderer/css/"],
+    "note": "R3.0E production authorization is by exact repo-relative path only. No wildcards/regex/globs. Tests and docs are never authorized as production paths. R3.0E MUST NOT modify the frozen R3.0B case-record schema; experiment/outcome/hypothesis/follow-up data live in separate IndexedDB namespaces."
+  }
+}

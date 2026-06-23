@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0",
+  "title": "R3.0 Integrated Delivery Train — schema",
+  "note": "Defines the legal universe of phases, phase ordering, cross-phase rules, and pinned product/scope semantics for the R3.0 Integrated Delivery Train spanning R3.0C, R3.0D, R3.0E, R3.0F. This schema does not duplicate per-phase schemas — each phase's own governance/r3.0X/schema.json defines its checkpoint universe; train.schema.json defines the rules ACROSS phases and the scope pin SKYLINE/ChatGPT froze before G1.",
+  "phases": ["R3.0C", "R3.0D", "R3.0E", "R3.0F"],
+  "phaseOrder": ["R3.0C", "R3.0D", "R3.0E", "R3.0F"],
+  "phaseGovernanceDirs": {
+    "R3.0C": "governance/r3.0c",
+    "R3.0D": "governance/r3.0d",
+    "R3.0E": "governance/r3.0e",
+    "R3.0F": "governance/r3.0f"
+  },
+  "phaseBootstrapCheckpoint": {
+    "R3.0C": "C0_BOOTSTRAP",
+    "R3.0D": "D0_BOOTSTRAP",
+    "R3.0E": "E0_BOOTSTRAP",
+    "R3.0F": "F0_BOOTSTRAP"
+  },
+  "phaseFinalActivationCheckpoint": {
+    "R3.0C": "C8_ACTIVATION",
+    "R3.0D": "D5_ACTIVATION",
+    "R3.0E": "E5_ACTIVATION",
+    "R3.0F": "F6_RELEASE"
+  },
+  "crossPhaseAdvanceRequires": {
+    "R3.0D": "R3.0C:C8_ACTIVATION",
+    "R3.0E": "R3.0D:D5_ACTIVATION",
+    "R3.0F": "R3.0E:E5_ACTIVATION"
+  },
+  "scopePin": {
+    "comparisonScope": {
+      "sameAnalysisCaseOnly": true,
+      "sameSessionOnly": true,
+      "crossSessionForbidden": true,
+      "crossCaseForbidden": true
+    },
+    "deltaSign": "comparison-reference",
+    "referenceSelectionPolicy": {
+      "explicitUserSelectionOnly": true,
+      "fastestValidEnabled": false,
+      "medianValidEnabled": false,
+      "bestSectorCompositeEnabled": false,
+      "noSelectionMustBlock": true
+    },
+    "hypothesisStorage": {
+      "useIndependentNamespaces": true,
+      "extendR3bCaseRecordSchema": false,
+      "namespaces": ["hypothesis", "experiment", "outcome", "follow-up"]
+    },
+    "release": {
+      "intermediateReleaseAllowed": false,
+      "targetVersion": "2.0.0",
+      "targetTag": "v2.0.0",
+      "currentVersionPin": "1.4.0",
+      "currentTagCount": 9,
+      "tagCreationTiming": "post-merge-after-new-main-ci-pass"
+    },
+    "r4Exclusion": {
+      "r4Excluded": true,
+      "forbiddenCapabilityPrefixes": ["r4_", "r40_", "r4.0_"]
+    }
+  },
+  "trainStatusValues": ["GOVERNANCE_READY", "IN_PROGRESS", "PAUSED", "READY_FOR_MERGE", "MERGED", "ABORTED"],
+  "trainStateRequired": [
+    "schemaVersion",
+    "program",
+    "phases",
+    "currentPhase",
+    "currentPhaseCheckpoint",
+    "phaseStates",
+    "trainStatus",
+    "trainStartSha",
+    "targetVersion",
+    "targetTag",
+    "intermediateReleaseAllowed",
+    "r4Excluded"
+  ],
+  "capabilityMonotonicity": {
+    "neverDecreaseEnabledCapabilityCount": true,
+    "neverRemoveAuthorizedPathOnceAdded": true,
+    "neverDowngradeAllowFlagFromTrueToFalse": true,
+    "note": "These invariants apply across the per-phase checkpoint history. Removing an authorized path or downgrading an *Allowed flag from true→false is forbidden because it would mask a withdrawal of a previously-granted capability. Aborting a phase is expressed via trainStatus=ABORTED at the train level, not by erasing per-phase history."
+  },
+  "historicalCheckpointPolicy": {
+    "perCheckpointShaMustBeFinalHeadAncestor": true,
+    "perCheckpointManifestStatusFlow": ["pending", "candidate", "PASS", "FAIL"],
+    "artifactMustBeShaBound": true,
+    "artifactDoesNotReplaceLatestHeadVerification": true,
+    "finalHeadMustReVerifyAllPriorPhases": true
+  },
+  "governanceChangeVisibility": {
+    "governanceChangedRequiredWhenTouchingGovernanceFiles": true,
+    "guardWeakeningAndFeatureAdditionMustBeSeparateCommits": true,
+    "note": "If a single commit both weakens a guard/validator AND adds a capability that the weakened guard would have caught, the change is rejected fail-closed. Split into two commits with explicit Codex review of each."
+  }
+}

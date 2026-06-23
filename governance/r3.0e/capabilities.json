@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0E",
+  "title": "R3.0E Capability Ledger",
+  "note": "Defines each capability the R3.0E phase of the Integrated Delivery Train may eventually enable, its kind, and the earliest checkpoint at which it may be unlocked. A capability being DEFINED here does NOT mean it is ENABLED. Enablement is governed by governance/r3.0e/state.json (enabledCapabilities). E0 only defines the universe; no production capability is enabled at E0.",
+  "capabilities": {
+    "contract_foundation_present": {
+      "kind": "contract",
+      "unlockFloor": "E1_CONTRACT_FOUNDATION",
+      "description": "R3.0E E1 contracts present under contracts/r3.0e/ (Experiment / Outcome / Control Variables / Case Timeline / follow-up linkage). NON-PRODUCTION at E1: no rendererAdapter, no runtime consumer, no algorithm."
+    },
+    "governance_bootstrap_present": {
+      "kind": "governance",
+      "unlockFloor": "E0_BOOTSTRAP",
+      "description": "R3.0E Integrated Delivery Governance scaffold present: schema, state, capabilities, checkpoint-manifest schema, and integration with the train-level validators."
+    },
+    "experiment_store_present": {
+      "kind": "production",
+      "unlockFloor": "E2_EXPERIMENT_STORE",
+      "description": "Renderer module backed by a SEPARATE versioned IndexedDB namespace storing Experiment objects (experimentId / sourceCaseId / hypothesisId / recommendationId / targetMetric / baselineValue / expectedDirection / expectedMagnitudeRange / setupChange / driverInstruction / controlVariables / validationPlan / stopConditions / status / followUpCaseIds / outcome). status enum: draft/planned/applied/completed/abandoned/invalid. MUST include schemaVersion, future-version fail-closed, atomicity, orphan handling and rollback. MUST NOT extend the frozen R3.0B case-record schema."
+    },
+    "outcome_classifier_present": {
+      "kind": "production",
+      "unlockFloor": "E3_OUTCOME_CLASSIFIER",
+      "description": "Outcome classifier comparing expected vs observed direction + magnitude + side-effects + driver-feedback + data-quality + comparability. Output enum: confirmed / partially_confirmed / contradicted / inconclusive / invalid_comparison. Missing control variables → inconclusive_due_to_confounders. NO auto-mutation of model / tyre-calib / preset; local evidence history only."
+    },
+    "case_timeline_present": {
+      "kind": "production",
+      "unlockFloor": "E4_CASE_TIMELINE",
+      "description": "Case Timeline rendering: baseline → recommendation → applied setup → follow-up → outcome. Bidirectional parent ↔ follow-up linkage. Deleted parent case → follow-up flagged as orphan, not silently broken."
+    },
+    "feature_registry_active": {
+      "kind": "activation",
+      "unlockFloor": "E5_ACTIVATION",
+      "description": "Feature Registry registers the R3.0E feature IDs (experiment_loop / case_timeline — to be named exactly at E5 authorization time) as available, attaching their rendererAdapter. Only valid at E5."
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0E",
+  "checkpoint": "E0_BOOTSTRAP",
+  "baseSha": "1103336e0a87156eeda013a1162c5271b46f3253",
+  "headSha": null,
+  "previousCheckpoint": null,
+  "authorizedPaths": [],
+  "enabledCapabilitiesBefore": [],
+  "enabledCapabilitiesAfter": [],
+  "forbiddenCapabilities": [
+    "contract_foundation_present",
+    "experiment_store_present",
+    "outcome_classifier_present",
+    "case_timeline_present",
+    "feature_registry_active"
+  ],
+  "tests": null,
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": null,
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": [],
+    "expectedRendererAdapter": false,
+    "note": "R3.0E has no Feature IDs registered at E0. Any future activation must happen at E5 only."
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "crossPhaseGate": {
+    "r3dCheckpoint": "D0_BOOTSTRAP",
+    "requiredFor": "E0_BOOTSTRAP",
+    "satisfied": true,
+    "note": "E0 bootstrap does not require R3.0D D5. Only non-bootstrap E checkpoints require R3.0D state.currentCheckpoint === 'D5_ACTIVATION'."
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "note": "E0 establishes the R3.0E Integrated Delivery Governance scaffold. Production switches stay OFF: zero authorized paths, zero enabled production capabilities, all *Allowed flags false. The frozen R3.0B case-record schema is untouched. The trusted-verification artifact bound to this PR's head SHA is the PASS authority — this file stays 'pending' in-commit."
+}

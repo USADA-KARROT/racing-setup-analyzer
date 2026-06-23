@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0F",
+  "checkpoint": "F0_BOOTSTRAP",
+  "baseSha": "1103336e0a87156eeda013a1162c5271b46f3253",
+  "headSha": null,
+  "previousCheckpoint": null,
+  "authorizedPaths": [],
+  "enabledCapabilitiesBefore": [],
+  "enabledCapabilitiesAfter": [],
+  "forbiddenCapabilities": [
+    "migration_engine_present",
+    "e2e_automation_present",
+    "quality_hardening_present",
+    "documentation_present",
+    "release_gate_present",
+    "release_executed"
+  ],
+  "tests": null,
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": null,
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "expectedRendererAdapter": false,
+    "note": "At F0 the R3.0C deferred IDs remain deferred (R3.0C C8 not yet executed in this train). R3.0D/E feature IDs are not yet registered."
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "crossPhaseGate": {
+    "r3eCheckpoint": "E0_BOOTSTRAP",
+    "requiredFor": "F0_BOOTSTRAP",
+    "satisfied": true,
+    "note": "F0 bootstrap does not require R3.0E E5. Only non-bootstrap F checkpoints require R3.0E state.currentCheckpoint === 'E5_ACTIVATION'."
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "releaseRecord": null,
+  "note": "F0 establishes the R3.0F Integrated Delivery Governance scaffold. Production switches stay OFF: zero authorized paths, zero enabled production capabilities, all *Allowed flags false. Package version remains 1.4.0. No tag, no release. The R3.0 Integrated Delivery Train has not started its feature work yet."
+}

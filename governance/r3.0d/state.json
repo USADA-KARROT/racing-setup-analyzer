@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0D",
+  "currentCheckpoint": "D0_BOOTSTRAP",
+  "authorizedProductionPaths": [],
+  "enabledCapabilities": [],
+  "runtimeConsumersAllowed": false,
+  "uiAllowed": false,
+  "featureRegistryActivationAllowed": false,
+  "algorithmsAllowed": false,
+  "note": "R3.0D Integrated Delivery Governance state. D0 BOOTSTRAP fixes every production switch OFF. authorizedProductionPaths is intentionally empty; enabledCapabilities is intentionally empty. The four *Allowed flags are intentionally false. R3.0D introduces NO Feature Registry IDs at D0 — feature IDs (decision_engine / hypothesis / engineer_brief) are reserved for D5_ACTIVATION and are deliberately absent from renderer/js/feature-registry.js. Mutating any field above the D0 baseline requires a separately-authorized Integrated Delivery Train checkpoint AND requires R3.0C state.currentCheckpoint === 'C8_ACTIVATION' per cross-phase rule."
+}
