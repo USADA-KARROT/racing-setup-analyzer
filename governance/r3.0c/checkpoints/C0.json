@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0C",
+  "checkpoint": "C0_BOOTSTRAP",
+  "baseSha": "97ddd33bbf66ea5edcc2d811df5986e3f3ac3bfa",
+  "headSha": null,
+  "previousCheckpoint": null,
+  "authorizedPaths": [],
+  "enabledCapabilitiesBefore": [],
+  "enabledCapabilitiesAfter": [],
+  "forbiddenCapabilities": [
+    "production_adapter_present",
+    "lap_authority_present",
+    "track_identity_authoritative",
+    "normalized_distance_present",
+    "reference_selection_present",
+    "corner_segmentation_present",
+    "corner_pairing_present",
+    "delta_metrics_present",
+    "comparison_export_present",
+    "ui_present",
+    "feature_registry_active"
+  ],
+  "tests": null,
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": null,
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "expectedRendererAdapter": false
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "note": "C0 establishes the Integrated Delivery Governance scaffold. Production switches stay OFF: zero authorized paths, zero enabled production capabilities, all *Allowed flags false. The trusted-verification artifact bound to this PR's head SHA is the PASS authority — this file stays 'pending' in-commit. headSha / workflowRunId / artifactId / artifactBoundSha / codexVerdict / createdAt are intentionally null in the commit; they refer to runtime evidence the artifact records."
+}

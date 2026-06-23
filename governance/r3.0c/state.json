@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0C",
+  "currentCheckpoint": "C0_BOOTSTRAP",
+  "authorizedProductionPaths": [],
+  "enabledCapabilities": [],
+  "runtimeConsumersAllowed": false,
+  "uiAllowed": false,
+  "featureRegistryActivationAllowed": false,
+  "algorithmsAllowed": false,
+  "note": "R3.0C Integrated Delivery Governance state. C0 BOOTSTRAP fixes EVERY production switch OFF. authorizedProductionPaths is intentionally empty; enabledCapabilities is intentionally empty. The four *Allowed flags are intentionally false. The R3.0C feature IDs (case_comparison, reference_lap, corner_delta) remain deferred in renderer/js/feature-registry.js with NO rendererAdapter. Mutating any field above C0 baseline requires a separately-authorized Integrated Delivery Train checkpoint."
+}

@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0C",
+  "title": "R3.0C Capability Ledger",
+  "note": "Defines each capability the Integrated Delivery Train may eventually enable, its kind, and the earliest checkpoint at which it may be unlocked. A capability being DEFINED here does NOT mean it is ENABLED. Enablement is governed by governance/r3.0c/state.json (enabledCapabilities). C0 only defines the universe; no production capability is enabled at C0.",
+  "capabilities": {
+    "contract_foundation_present": {
+      "kind": "contract",
+      "unlockFloor": "C0_BOOTSTRAP",
+      "description": "R3.0C CP1 comparison contracts present under contracts/r3.0c/. NON-PRODUCTION at C0: no rendererAdapter, no runtime consumer, no algorithm."
+    },
+    "governance_bootstrap_present": {
+      "kind": "governance",
+      "unlockFloor": "C0_BOOTSTRAP",
+      "description": "R3.0C Integrated Delivery Governance scaffold present: schema, state, capabilities, checkpoint-manifest schema, three fail-closed validators, and trusted-verification integration."
+    },
+    "production_adapter_present": {
+      "kind": "production",
+      "unlockFloor": "C1_PRODUCTION_ADAPTER",
+      "description": "Renderer-level adapter that exposes the contract surface to production code. Adds no algorithm; just plumbs the contract through a single authorized renderer/js module."
+    },
+    "lap_authority_present": {
+      "kind": "production",
+      "unlockFloor": "C2_LAP_AUTHORITY",
+      "description": "Authority that decides whether a lap is valid for comparison (drives reasonCodes from valid-lap-contract)."
+    },
+    "track_identity_authoritative": {
+      "kind": "production",
+      "unlockFloor": "C2_LAP_AUTHORITY",
+      "description": "Track-identity equality decision; gates comparison eligibility across laps from different sessions."
+    },
+    "normalized_distance_present": {
+      "kind": "production",
+      "unlockFloor": "C3_NORMALIZED_DISTANCE",
+      "description": "Normalized-distance/position implementation backing normalized-position-contract."
+    },
+    "reference_selection_present": {
+      "kind": "production",
+      "unlockFloor": "C4_REFERENCE_AND_CORNER",
+      "description": "Reference-lap selection policy."
+    },
+    "corner_segmentation_present": {
+      "kind": "production",
+      "unlockFloor": "C4_REFERENCE_AND_CORNER",
+      "description": "Corner segmentation from telemetry."
+    },
+    "corner_pairing_present": {
+      "kind": "production",
+      "unlockFloor": "C4_REFERENCE_AND_CORNER",
+      "description": "Cross-lap corner pairing."
+    },
+    "delta_metrics_present": {
+      "kind": "production",
+      "unlockFloor": "C5_DELTA_METRICS",
+      "description": "Per-corner / per-lap delta metric computation."
+    },
+    "comparison_export_present": {
+      "kind": "production",
+      "unlockFloor": "C6_EXPORT",
+      "description": "Comparison export schema implementation honouring comparison-export-contract."
+    },
+    "ui_present": {
+      "kind": "production",
+      "unlockFloor": "C7_UI",
+      "description": "Comparison UI surface in renderer/index.html and supporting renderer/js modules."
+    },
+    "feature_registry_active": {
+      "kind": "activation",
+      "unlockFloor": "C8_ACTIVATION",
+      "description": "Feature Registry flips the deferred R3.0C feature IDs (case_comparison, reference_lap, corner_delta) to available, attaching their rendererAdapter. Only valid at C8."
+    }
+  }
+}
