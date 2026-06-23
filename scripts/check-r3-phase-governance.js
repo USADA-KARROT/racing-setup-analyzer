@@ -50,13 +50,24 @@ function listCheckpointManifests() {
 
 function checkpointIndex(order, id) { return order.indexOf(id); }
 
+// Allowlist grammar for repo-relative production paths: each slash-delimited segment is
+// [A-Za-z0-9_.-]+. This rejects every regex/glob metacharacter (^ $ + ? * ( ) | \ { } [ ] ~ #),
+// every whitespace + control character, every absolute path (leading /), parent-segment traversal,
+// and any character outside the conservative file-naming set. The earlier denylist let
+// 'renderer/js/^decision+.js' and similar pseudo-glob/regex shapes through; the allowlist makes
+// that fail-closed.
+const SAFE_SEGMENT_RE = /^[A-Za-z0-9_.-]+$/;
 function validatePathString(p) {
   if (typeof p !== 'string' || p.length === 0) return 'empty';
   if (p.startsWith('/')) return 'absolute';
   if (p.includes('..')) return 'parent-segment';
-  if (/[\*\?\[\]]/.test(p)) return 'wildcard-or-glob';
-  if (/[\r\n\t]/.test(p)) return 'control-char';
   if (p !== p.trim()) return 'whitespace';
+  if (/[\r\n\t]/.test(p)) return 'control-char';
+  const segments = p.split('/');
+  for (const seg of segments) {
+    if (seg.length === 0) return 'empty-segment';
+    if (!SAFE_SEGMENT_RE.test(seg)) return 'invalid-segment-char';
+  }
   return null;
 }
 
@@ -221,14 +232,29 @@ function run() {
     if (state.algorithmsAllowed !== false) fail('BOOTSTRAP_ALGORITHMS_ALLOWED', 'must be false at bootstrap');
   }
 
-  // ---- per-checkpoint manifests must point at known checkpoints ----
+  // ---- per-checkpoint manifests: program + checkpoint + status + required-field shape ----
+  // The manifest schema's `required` list is the audit contract. Every required key must be present
+  // (not undefined) AND non-empty array fields must actually be arrays. A stripped manifest that
+  // omits governanceChanged / crossPhaseGate / r3bCaseRecordSchemaUntouched / authorizedPaths must
+  // fail closed — otherwise the train validator's cross-phase / governance-visibility / frozen-path
+  // assertions can be bypassed by simply deleting the keys.
   const seenManifests = listCheckpointManifests();
+  const requiredManifestFields = Array.isArray(manifestSchema.required) ? manifestSchema.required : [];
+  const arrayManifestFields = new Set(['authorizedPaths', 'enabledCapabilitiesBefore', 'enabledCapabilitiesAfter', 'forbiddenCapabilities']);
   for (const f of seenManifests) {
     let m;
     try { m = readJson(path.join('checkpoints', f)); } catch (e) { fail('CHECKPOINT_MANIFEST_UNREADABLE', f + ': ' + e.message, { file: PHASE.dir + '/checkpoints/' + f }); continue; }
     if (!m || m.program !== PHASE_PROGRAM) { fail('CHECKPOINT_MANIFEST_PROGRAM_MISMATCH', f, { file: PHASE.dir + '/checkpoints/' + f }); continue; }
+    if (typeof m.schemaVersion !== 'number' || m.schemaVersion !== 1) fail('CHECKPOINT_MANIFEST_SCHEMA_VERSION_UNSUPPORTED', f + ' schemaVersion=' + m.schemaVersion, { file: PHASE.dir + '/checkpoints/' + f });
     if (!schema.checkpoints.includes(m.checkpoint)) fail('CHECKPOINT_MANIFEST_CHECKPOINT_UNKNOWN', f + ' checkpoint=' + m.checkpoint, { file: PHASE.dir + '/checkpoints/' + f });
     if (m.status && !manifestSchema.allowedStatus.includes(m.status)) fail('CHECKPOINT_MANIFEST_STATUS_INVALID', f + ' status=' + m.status, { file: PHASE.dir + '/checkpoints/' + f });
+    for (const key of requiredManifestFields) {
+      if (!(key in m)) { fail('CHECKPOINT_MANIFEST_REQUIRED_FIELD_MISSING', f + ' missing ' + key, { file: PHASE.dir + '/checkpoints/' + f, field: key }); continue; }
+      if (arrayManifestFields.has(key) && !Array.isArray(m[key])) fail('CHECKPOINT_MANIFEST_REQUIRED_FIELD_NOT_ARRAY', f + ' ' + key + ' must be array', { file: PHASE.dir + '/checkpoints/' + f, field: key });
+    }
+    if ('governanceChanged' in m && typeof m.governanceChanged !== 'boolean') fail('CHECKPOINT_MANIFEST_GOVERNANCE_CHANGED_NOT_BOOLEAN', f + ' governanceChanged=' + m.governanceChanged, { file: PHASE.dir + '/checkpoints/' + f });
+    if ('crossPhaseGate' in m && (m.crossPhaseGate == null || typeof m.crossPhaseGate !== 'object' || Array.isArray(m.crossPhaseGate))) fail('CHECKPOINT_MANIFEST_CROSS_PHASE_GATE_INVALID', f + ' crossPhaseGate must be object', { file: PHASE.dir + '/checkpoints/' + f });
+    if (PHASE_PROGRAM !== 'R3.0D' && 'r3bCaseRecordSchemaUntouched' in m && typeof m.r3bCaseRecordSchemaUntouched !== 'boolean') fail('CHECKPOINT_MANIFEST_R3B_FLAG_NOT_BOOLEAN', f + ' r3bCaseRecordSchemaUntouched=' + m.r3bCaseRecordSchemaUntouched, { file: PHASE.dir + '/checkpoints/' + f });
   }
 
   return finish({

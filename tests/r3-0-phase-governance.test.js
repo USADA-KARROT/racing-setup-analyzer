@@ -214,5 +214,70 @@ for (const phase of PHASES) {
   chk(phase + ' FAIL enabled production cap without path', hasViolation(r.artifact, 'ENABLED_CAPABILITY_NO_AUTHORIZED_PATH'));
 }
 
+// ── FAIL: regex-metacharacter path (Codex G1 round 1 BLOCKER 2 regression) ──
+for (const phase of PHASES) {
+  const advCheckpoint = phase === 'R3.0D' ? 'D2_HYPOTHESIS_ENGINE' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
+  const advCases = [
+    ['regex caret', 'renderer/js/^decision+.js'],
+    ['regex anchor $', 'renderer/js/x$.js'],
+    ['regex paren', 'renderer/js/(group).js'],
+    ['regex pipe', 'renderer/js/a|b.js'],
+    ['brace glob', 'renderer/js/{a,b}.js'],
+    ['backslash escape', 'renderer/js/\\d.js'],
+    ['hash char', 'renderer/js/x#y.js'],
+    ['tilde char', 'renderer/js/~x.js'],
+  ];
+  for (const [label, pathStr] of advCases) {
+    const s = baseState(phase); s.currentCheckpoint = advCheckpoint;
+    s.enabledCapabilities = ['production_cap_present'];
+    s.authorizedProductionPaths = [{ path: pathStr, capability: 'production_cap_present' }];
+    const dir = writeFixture(s, baseSchema(phase), baseCapabilities(phase), baseManifestSchema(phase));
+    const r = runValidator(phase, dir);
+    chk(phase + ' FAIL ' + label + ' rejected', hasViolation(r.artifact, 'AUTH_PATH_INVALID_FORMAT'), { pathStr, violations: r.artifact && r.artifact.violations });
+  }
+}
+
+// ── FAIL: checkpoint manifest required-field validation (Codex G1 round 1 BLOCKER 1 regression) ──
+// Build the bootstrap fixture (PASS) then add a stripped manifest under checkpoints/. The validator
+// must enforce manifest.schema.json.required + schemaVersion + boolean/object shape for governanceChanged
+// and crossPhaseGate, so the audit fields cannot be silently omitted.
+function writeStrippedManifest(phase, manifestObj) {
+  const dir = writeFixture(baseState(phase), baseSchema(phase), baseCapabilities(phase), { schemaVersion: 1, program: phase, required: ['program', 'checkpoint', 'headSha', 'status', 'governanceChanged', 'crossPhaseGate', 'authorizedPaths', 'enabledCapabilitiesAfter'], allowedStatus: ['pending', 'candidate', 'PASS', 'FAIL'] });
+  fs.writeFileSync(path.join(dir, 'checkpoints', BOOTSTRAP[phase] + '.json'), JSON.stringify(manifestObj));
+  return dir;
+}
+
+for (const phase of PHASES) {
+  // 1) totally stripped manifest (only program + checkpoint + status)
+  const stripped = { schemaVersion: 1, program: phase, checkpoint: BOOTSTRAP[phase], status: 'pending' };
+  const dir1 = writeStrippedManifest(phase, stripped);
+  const r1 = runValidator(phase, dir1);
+  chk(phase + ' FAIL stripped manifest required-field missing', hasViolation(r1.artifact, 'CHECKPOINT_MANIFEST_REQUIRED_FIELD_MISSING'));
+
+  // 2) manifest with schemaVersion=2 (unsupported)
+  const wrongVer = { schemaVersion: 2, program: phase, checkpoint: BOOTSTRAP[phase], status: 'pending', headSha: null, governanceChanged: true, crossPhaseGate: {}, authorizedPaths: [], enabledCapabilitiesAfter: [] };
+  const dir2 = writeStrippedManifest(phase, wrongVer);
+  const r2 = runValidator(phase, dir2);
+  chk(phase + ' FAIL manifest schemaVersion unsupported', hasViolation(r2.artifact, 'CHECKPOINT_MANIFEST_SCHEMA_VERSION_UNSUPPORTED'));
+
+  // 3) manifest with governanceChanged not boolean
+  const badGov = { schemaVersion: 1, program: phase, checkpoint: BOOTSTRAP[phase], status: 'pending', headSha: null, governanceChanged: 'yes', crossPhaseGate: {}, authorizedPaths: [], enabledCapabilitiesAfter: [] };
+  const dir3 = writeStrippedManifest(phase, badGov);
+  const r3 = runValidator(phase, dir3);
+  chk(phase + ' FAIL manifest governanceChanged not boolean', hasViolation(r3.artifact, 'CHECKPOINT_MANIFEST_GOVERNANCE_CHANGED_NOT_BOOLEAN'));
+
+  // 4) manifest with crossPhaseGate not object (string)
+  const badGate = { schemaVersion: 1, program: phase, checkpoint: BOOTSTRAP[phase], status: 'pending', headSha: null, governanceChanged: true, crossPhaseGate: 'not-an-object', authorizedPaths: [], enabledCapabilitiesAfter: [] };
+  const dir4 = writeStrippedManifest(phase, badGate);
+  const r4 = runValidator(phase, dir4);
+  chk(phase + ' FAIL manifest crossPhaseGate not object', hasViolation(r4.artifact, 'CHECKPOINT_MANIFEST_CROSS_PHASE_GATE_INVALID'));
+
+  // 5) manifest with authorizedPaths not array (number)
+  const badPaths = { schemaVersion: 1, program: phase, checkpoint: BOOTSTRAP[phase], status: 'pending', headSha: null, governanceChanged: true, crossPhaseGate: {}, authorizedPaths: 0, enabledCapabilitiesAfter: [] };
+  const dir5 = writeStrippedManifest(phase, badPaths);
+  const r5 = runValidator(phase, dir5);
+  chk(phase + ' FAIL manifest authorizedPaths not array', hasViolation(r5.artifact, 'CHECKPOINT_MANIFEST_REQUIRED_FIELD_NOT_ARRAY'));
+}
+
 console.log('phase-governance: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);
