@@ -27,10 +27,10 @@
     "governance/r3.0c/checkpoints/C1.json",
     "governance/r3.0/train.json",
     "scripts/check-r3-0c-no-consumer.js",
+    "scripts/check-r3-0c-guard.js",
     "renderer/js/r3-0c-comparison-adapter.js",
     "tests/r3-0c-no-consumer.test.js",
     "tests/r3-0c-governance.test.js",
-    "tests/r3-0-train.test.js",
     "tests/r3-0c-comparison-adapter.test.js",
     "package.json"
   ],
