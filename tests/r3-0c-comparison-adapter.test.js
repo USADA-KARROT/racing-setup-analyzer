@@ -60,8 +60,13 @@ function fullComparisonInput(over) {
 }
 
 // ── A. constants + identity round-trip ──
-chk('A1 ADAPTER_VERSION === 1', Adapter.ADAPTER_VERSION === 1);
-chk('A2 CHECKPOINT_FLOOR === C1_PRODUCTION_ADAPTER', Adapter.CHECKPOINT_FLOOR === 'C1_PRODUCTION_ADAPTER');
+chk('A1 ADAPTER_VERSION === 2 (C2 surface added)', Adapter.ADAPTER_VERSION === 2);
+chk('A2 CHECKPOINT_FLOOR === C1_PRODUCTION_ADAPTER (historical authorization point, does NOT advance)', Adapter.CHECKPOINT_FLOOR === 'C1_PRODUCTION_ADAPTER');
+chk('A2b activeCheckpoint() === C2_LAP_AUTHORITY (latest surface available)', Adapter.activeCheckpoint() === 'C2_LAP_AUTHORITY');
+chk('A2c exposes() includes production_adapter_present + lap_authority_present + track_identity_authoritative', (() => {
+  const c = Adapter.exposes();
+  return Array.isArray(c) && c.includes('production_adapter_present') && c.includes('lap_authority_present') && c.includes('track_identity_authoritative');
+})());
 chk('A3 loadContracts() returns contract namespace identity', Adapter.loadContracts() === Contracts);
 chk('A4 deltaSignFormula() === contract.deltaSignFormula()', Adapter.deltaSignFormula() === CE.deltaSignFormula());
 chk('A5 deltaSign() identity-equal to contract DELTA_SIGN', Adapter.deltaSign() === CE.DELTA_SIGN);
@@ -139,11 +144,15 @@ chk('F5 assessNormalizationCompatibility(matching) === contract(matching)', JSON
 
 // ── G. adapter has NO algorithm surface beyond delegation ──
 const allowedKeys = new Set([
-  'ADAPTER_VERSION', 'CHECKPOINT_FLOOR',
+  'ADAPTER_VERSION', 'CHECKPOINT_FLOOR', 'activeCheckpoint', 'exposes',
   'loadContracts', 'comparisonScope', 'deltaSign', 'deltaSignFormula',
   'supportedMetrics', 'reasonCodes', 'allReasonCodes',
   'evaluateMetricSupport', 'evaluateComparisonEligibility',
   'validateCredibilityMetadata', 'evaluateLapAuthority', 'assessNormalizationCompatibility',
+  // C2 surface
+  'deriveLapAuthority', 'assessMetricChannelRequirements', 'lapAuthorityDefaultThresholds', 'lapAuthorityMetricChannels',
+  'deriveTrackIdentity', 'equalsTrackIdentity',
+  'deriveDistanceAuthority', 'distanceAuthorityForbiddenSources',
 ]);
 const actualKeys = Object.keys(Adapter).sort();
 const unknownKeys = actualKeys.filter(k => !allowedKeys.has(k));
@@ -171,6 +180,114 @@ chk('G8 adapter does not bind into Feature Registry', typeof Adapter.registerWit
 // ── I. UMD shape ──
 chk('I1 adapter is a CommonJS export object', typeof Adapter === 'object' && Adapter !== null);
 chk('I2 adapter exposes its API on globalThis under R3_0C_ComparisonAdapter', typeof globalThis.R3_0C_ComparisonAdapter === 'object' && globalThis.R3_0C_ComparisonAdapter === Adapter);
+
+// ── J. C2 delegation — adapter forwards to lap-authority / track-identity / distance-authority services ──
+const LapAuthority = require('../renderer/js/r3-0c-lap-authority.js');
+const TrackIdentity = require('../renderer/js/r3-0c-track-identity.js');
+const DistanceAuthority = require('../renderer/js/r3-0c-distance-authority.js');
+
+// J1: deriveLapAuthority — adapter output ≡ service output (byte-for-byte JSON round-trip).
+(() => {
+  const ev = {
+    caseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_5', sourceId: 'csv_import:foo.csv',
+    provenance: 'real',
+    trackIdentity: { trackId: 'trackA', layoutId: 'layout1', source: 'explicit' },
+    timing: { lapStartTime: 100, lapEndTime: 160, lapTimeMs: 60000 },
+    samples: { count: 600, timebaseMedianSeconds: 0.1, timebaseMaxGapSeconds: 0.15 },
+    distance: null,
+    channelsAvailable: ['time', 'speed', 'lateral_accel', 'steering'],
+  };
+  chk('J1 deriveLapAuthority(adapter) ≡ deriveLapAuthority(service)',
+    JSON.stringify(Adapter.deriveLapAuthority(ev)) === JSON.stringify(LapAuthority.deriveLapAuthority(ev)));
+})();
+
+// J2: assessMetricChannelRequirements — supported metric with channel present → eligible.
+(() => {
+  const ev = { channelsAvailable: ['time', 'speed', 'steering'] };
+  const r = Adapter.assessMetricChannelRequirements('steeringCorrectionDelta', ev);
+  chk('J2 metric channel present → eligible', r.eligible === true && r.metric === 'steeringCorrectionDelta');
+})();
+
+// J3: assessMetricChannelRequirements — supported metric with channel ABSENT → METRIC_REQUIRED_CHANNEL_UNAVAILABLE.
+(() => {
+  const ev = { channelsAvailable: ['time', 'speed'] }; // no brake
+  const r = Adapter.assessMetricChannelRequirements('brakingOnsetDelta', ev);
+  chk('J3 missing required channel → blocked + METRIC_REQUIRED_CHANNEL_UNAVAILABLE',
+    r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf('METRIC_REQUIRED_CHANNEL_UNAVAILABLE') !== -1);
+  chk('J3b adapter response includes missingChannels=brake', Array.isArray(r.missingChannels) && r.missingChannels.indexOf('brake') !== -1);
+})();
+
+// J4: lapAuthorityDefaultThresholds — adapter returns the service constant (identity equality).
+chk('J4 lapAuthorityDefaultThresholds() identity-equal to service constant',
+  Adapter.lapAuthorityDefaultThresholds() === LapAuthority.DEFAULT_THRESHOLDS);
+
+// J5: lapAuthorityMetricChannels — adapter returns the service constant.
+chk('J5 lapAuthorityMetricChannels() identity-equal to service constant',
+  Adapter.lapAuthorityMetricChannels() === LapAuthority.METRIC_REQUIRED_CHANNELS);
+
+// J6: deriveTrackIdentity — explicit identity → authoritative.
+(() => {
+  const r = Adapter.deriveTrackIdentity({ trackId: 'silverstone', layoutId: 'gp', source: 'explicit' });
+  chk('J6 explicit track identity → authoritative', r.authoritative === true && r.identity.trackId === 'silverstone');
+})();
+
+// J7: deriveTrackIdentity — name-only metadata → blocked + MISSING_TRACK_IDENTITY.
+(() => {
+  const r = Adapter.deriveTrackIdentity({ name: 'Silverstone GP', filename: 'silverstone.csv' });
+  chk('J7 name-only metadata → blocked + MISSING_TRACK_IDENTITY',
+    r.authoritative === false && r.reasonCodes.indexOf('MISSING_TRACK_IDENTITY') !== -1);
+  chk('J7b adapter records rejected inference signals (name, filename)',
+    Array.isArray(r.rejectedInferenceSignals) && r.rejectedInferenceSignals.indexOf('name') !== -1 && r.rejectedInferenceSignals.indexOf('filename') !== -1);
+})();
+
+// J8: equalsTrackIdentity — equal authoritative identities.
+(() => {
+  const a = { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' };
+  const b = { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' };
+  chk('J8 equalsTrackIdentity equal', Adapter.equalsTrackIdentity(a, b).equal === true);
+})();
+
+// J9: equalsTrackIdentity — different layout → TRACK_IDENTITY_MISMATCH.
+(() => {
+  const a = { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' };
+  const b = { trackId: 'silverstone', layoutId: 'national', source: 'explicit' };
+  const r = Adapter.equalsTrackIdentity(a, b);
+  chk('J9 different layout → blocked + TRACK_IDENTITY_MISMATCH',
+    r.equal === false && r.reasonCodes.indexOf('TRACK_IDENTITY_MISMATCH') !== -1);
+})();
+
+// J10: deriveDistanceAuthority — explicit channel proposal → eligible.
+(() => {
+  const ev = {
+    proposedChannels: [{
+      channelName: 'lap_distance', unit: 'm', direction: 'forward',
+      wrapSemantics: 'no_wrap', authorityStatus: 'channel_source_declared', limitations: [],
+    }],
+    fallbackInferences: [],
+  };
+  const r = Adapter.deriveDistanceAuthority(ev);
+  chk('J10 explicit channel proposal → eligible', r.eligible === true && r.authority.sourceChannel === 'lap_distance');
+})();
+
+// J11: deriveDistanceAuthority — only inferential proposal → blocked + MISSING_NORMALIZED_DISTANCE_AUTHORITY.
+(() => {
+  const ev = {
+    proposedChannels: [{
+      channelName: 'derived_distance', unit: 'm', direction: 'forward',
+      wrapSemantics: 'no_wrap', authorityStatus: 'inferred_from_sample_index', limitations: [],
+    }],
+    fallbackInferences: ['inferred_from_speed_integral'],
+  };
+  const r = Adapter.deriveDistanceAuthority(ev);
+  chk('J11 inferential authority status → blocked + MISSING_NORMALIZED_DISTANCE_AUTHORITY',
+    r.eligible === false && r.reasonCodes.indexOf('MISSING_NORMALIZED_DISTANCE_AUTHORITY') !== -1);
+  chk('J11b records rejected proposal as inferential', r.rejectedProposals.length === 1 && r.rejectedProposals[0].rejectedReason === 'authority_status_inferential_rejected');
+  chk('J11c records rejected fallback inferences', r.rejectedInferentialSources.indexOf('inferred_from_speed_integral') !== -1);
+})();
+
+// J12: distanceAuthorityForbiddenSources — identity-equal to service constant.
+chk('J12 distanceAuthorityForbiddenSources() identity-equal to service constant',
+  Adapter.distanceAuthorityForbiddenSources() === DistanceAuthority.FORBIDDEN_INFERENCE_SOURCES);
 
 console.log('r3-0c-comparison-adapter: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

@@ -1,14 +1,17 @@
 {
   "schemaVersion": 1,
   "program": "R3.0C",
-  "currentCheckpoint": "C1_PRODUCTION_ADAPTER",
+  "currentCheckpoint": "C2_LAP_AUTHORITY",
   "authorizedProductionPaths": [
-    { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" }
+    { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
+    { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-track-identity.js", "capability": "track_identity_authoritative" },
+    { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" }
   ],
-  "enabledCapabilities": ["production_adapter_present"],
+  "enabledCapabilities": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative"],
   "runtimeConsumersAllowed": true,
   "uiAllowed": false,
   "featureRegistryActivationAllowed": false,
-  "algorithmsAllowed": false,
-  "note": "R3.0C C1_PRODUCTION_ADAPTER state. One renderer/js production adapter is authorized — renderer/js/r3-0c-comparison-adapter.js — backing the production_adapter_present capability. The adapter carries NO algorithm: every public surface delegates to contracts/r3.0c/ and yields either a blocked result with reason codes or an `eligible_pending_production` marker with no numeric payload. runtimeConsumersAllowed=true unlocks the state-aware allowance in scripts/check-r3-0c-no-consumer.js for this single path. uiAllowed / featureRegistryActivationAllowed / algorithmsAllowed remain false: UI lives at C7_UI, activation at C8_ACTIVATION, lap authority / normalization / corner segmentation / delta metrics / export at C2..C6. The three R3.0C feature IDs (case_comparison, reference_lap, corner_delta) remain availability='deferred' in renderer/js/feature-registry.js with NO rendererAdapter until C8 authorizes activation."
+  "algorithmsAllowed": true,
+  "note": "R3.0C C2_LAP_AUTHORITY state. Four authorized renderer/js production paths: the C1 adapter (production_adapter_present) plus three C2 services — lap-authority (lap_authority_present), track-identity (track_identity_authoritative) and distance-authority (lap_authority_present, secondary). algorithmsAllowed flips true here because C2 is the algorithmCheckpoint per schema.json — lap authority is re-derived from raw evidence rather than trusted from caller claims, the lap-authority service computes coverage / sample count / discontinuity from fixture-derived conservative thresholds (DEFAULT_THRESHOLDS marked calibrationStatus='fixture_derived_pending_field_validation', evidence carries 'thresholds_fixture_calibrated_not_field_validated' limitation), track identity is decided only from explicit {trackId, layoutId, source:'explicit'} (no inference from name / filename / lap length / sample shape / GPS), and distance authority accepts only authorityStatus='channel_source_declared' (sample-index, elapsed-time ratio, speed integral, GPS proximity, track-length guess all enumerated and refused). uiAllowed / featureRegistryActivationAllowed remain false: UI lives at C7_UI, activation at C8_ACTIVATION. Normalized distance / corner segmentation / pairing / delta metrics / export remain locked behind C3..C6. The three R3.0C feature IDs (case_comparison, reference_lap, corner_delta) remain availability='deferred' in renderer/js/feature-registry.js with NO rendererAdapter until C8 authorizes activation."
 }

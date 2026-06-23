@@ -68,11 +68,15 @@ function deferredOk() {
   const r = runValidator();
   chk('A1 real-repo exits 0', r.status === 0, r.stderr);
   chk('A2 real-repo ok===true', !!(r.artifact && r.artifact.ok === true), r.artifact && r.artifact.violations);
-  chk('A3 real-repo runtimeConsumerCount===1 (authorized C1 adapter)', !!(r.artifact && r.artifact.runtimeConsumerCount === 1));
-  chk('A3b real-repo authorizedConsumerCount===1', !!(r.artifact && r.artifact.authorizedConsumerCount === 1));
+  chk('A3 real-repo runtimeConsumerCount===4 (C1 adapter + 3 C2 services)', !!(r.artifact && r.artifact.runtimeConsumerCount === 4));
+  chk('A3b real-repo authorizedConsumerCount===4', !!(r.artifact && r.artifact.authorizedConsumerCount === 4));
   chk('A3c real-repo unauthorizedRendererConsumerCount===0', !!(r.artifact && r.artifact.unauthorizedRendererConsumerCount === 0));
-  chk('A3d real-repo authorized path includes adapter', !!(r.artifact && Array.isArray(r.artifact.authorizedConsumerPaths) && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-comparison-adapter.js')));
-  chk('A3e real-repo currentCheckpoint===C1_PRODUCTION_ADAPTER', !!(r.artifact && r.artifact.currentCheckpoint === 'C1_PRODUCTION_ADAPTER'));
+  chk('A3d real-repo authorized paths include C1 adapter and three C2 services', !!(r.artifact && Array.isArray(r.artifact.authorizedConsumerPaths)
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-comparison-adapter.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-lap-authority.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-track-identity.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-distance-authority.js')));
+  chk('A3e real-repo currentCheckpoint===C2_LAP_AUTHORITY', !!(r.artifact && r.artifact.currentCheckpoint === 'C2_LAP_AUTHORITY'));
   chk('A3f real-repo runtimeConsumersAllowed===true', !!(r.artifact && r.artifact.runtimeConsumersAllowed === true));
   chk('A4 real-repo deferredStillDeferred===true', !!(r.artifact && r.artifact.deferredStillDeferred === true));
 })();
