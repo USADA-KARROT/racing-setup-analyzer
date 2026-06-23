@@ -26,6 +26,13 @@ const path = require('path');
 
 const REPO = path.resolve(__dirname, '..');
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR ? path.resolve(process.env.ARTIFACT_DIR) : path.join(REPO, 'artifacts');
+// SCAN_BASE defaults to the real repo. R3_0C_NO_CONSUMER_BASE_OVERRIDE is for test fixtures ONLY —
+// it changes WHERE to scan, never WHETHER to scan. Tests set it to a synthetic directory tree.
+const SCAN_BASE = process.env.R3_0C_NO_CONSUMER_BASE_OVERRIDE ? path.resolve(process.env.R3_0C_NO_CONSUMER_BASE_OVERRIDE) : REPO;
+// FIXTURE_FEATURES_JSON is for test fixtures ONLY — it overrides the in-memory FEATURES object so the
+// fail paths (rendererAdapter present, availability flipped) can be exercised. When unset, the real
+// renderer/js/feature-registry.js is required statically (dependency-audit friendly).
+const FIXTURE_FEATURES_JSON = process.env.R3_0C_NO_CONSUMER_FIXTURE_FEATURES_JSON || '';
 
 const CONTRACT_PREFIX = 'contracts/r3.0c';
 const R3_0C_FEATURE_NAME_RE = /(reference[-_]?lap|corner[-_]?delta|case[-_]?comparison)/i;
@@ -47,11 +54,12 @@ function listJsFiles(dir) {
 }
 
 function resolvedTargetIfContract(fromFile, spec) {
-  // Resolve a relative specifier from the importing file and report whether it lands inside contracts/r3.0c.
+  // Resolve a relative specifier from the importing file and report whether it lands inside contracts/r3.0c
+  // relative to SCAN_BASE (which equals REPO in production; tests override it).
   if (typeof spec !== 'string' || spec.length === 0) return null;
   if (!(spec.startsWith('./') || spec.startsWith('../') || spec === '.' || spec === '..')) return null;
   const abs = path.resolve(path.dirname(fromFile), spec);
-  const rel = path.relative(REPO, abs).split(path.sep).join('/');
+  const rel = path.relative(SCAN_BASE, abs).split(path.sep).join('/');
   if (rel === CONTRACT_PREFIX || rel.startsWith(CONTRACT_PREFIX + '/')) return rel;
   return null;
 }
@@ -84,7 +92,7 @@ function scanFile(file, violations) {
 }
 
 function scanIndexHtml(violations) {
-  const file = path.join(REPO, 'renderer', 'index.html');
+  const file = path.join(SCAN_BASE, 'renderer', 'index.html');
   let src;
   try { src = fs.readFileSync(file, 'utf8'); }
   catch (e) { violations.push({ code: 'INDEX_HTML_UNREADABLE', message: e.message }); return; }
@@ -97,13 +105,27 @@ function scanIndexHtml(violations) {
   }
 }
 
-function checkFeatureRegistryStillDeferred(violations) {
+function loadFeaturesObject(violations) {
+  if (FIXTURE_FEATURES_JSON) {
+    try {
+      const o = JSON.parse(FIXTURE_FEATURES_JSON);
+      if (o && typeof o === 'object') return { FEATURES: o.FEATURES && typeof o.FEATURES === 'object' ? o.FEATURES : o, source: 'fixture' };
+      violations.push({ code: 'FIXTURE_FEATURES_JSON_INVALID_SHAPE', message: 'parsed JSON is not an object' });
+      return null;
+    } catch (e) { violations.push({ code: 'FIXTURE_FEATURES_JSON_PARSE_ERROR', message: e.message }); return null; }
+  }
   let R;
   try { R = require('../renderer/js/feature-registry.js'); } // static relative — dependency-audit friendly
   catch (e) { violations.push({ code: 'FEATURE_REGISTRY_UNREADABLE', message: e.message }); return null; }
+  return { FEATURES: R && R.FEATURES, source: 'real-registry' };
+}
+
+function checkFeatureRegistryStillDeferred(violations) {
+  const loaded = loadFeaturesObject(violations);
+  if (!loaded) return null;
   const ids = ['case_comparison', 'reference_lap', 'corner_delta'];
-  const F = R && R.FEATURES;
-  if (!F || typeof F !== 'object') { violations.push({ code: 'FEATURE_REGISTRY_FEATURES_MISSING', message: 'R.FEATURES missing' }); return null; }
+  const F = loaded.FEATURES;
+  if (!F || typeof F !== 'object') { violations.push({ code: 'FEATURE_REGISTRY_FEATURES_MISSING', message: 'FEATURES missing/non-object' }); return null; }
   const detail = {};
   let allOk = true;
   for (const id of ids) {
@@ -123,11 +145,11 @@ function checkFeatureRegistryStillDeferred(violations) {
 function run() {
   const violations = [];
 
-  const rendererJs = listJsFiles(path.join(REPO, 'renderer', 'js'));
+  const rendererJs = listJsFiles(path.join(SCAN_BASE, 'renderer', 'js'));
   for (const f of rendererJs) scanFile(f, violations);
 
   for (const entry of ['main.js', 'preload.js']) {
-    const full = path.join(REPO, entry);
+    const full = path.join(SCAN_BASE, entry);
     if (fs.existsSync(full)) scanFile(full, violations);
   }
 
@@ -138,7 +160,8 @@ function run() {
 
   return {
     check: 'r3-0c-no-consumer',
-    scannedFiles: rendererJs.length + (fs.existsSync(path.join(REPO, 'main.js')) ? 1 : 0) + (fs.existsSync(path.join(REPO, 'preload.js')) ? 1 : 0) + 1 /* index.html */,
+    scanBase: SCAN_BASE === REPO ? '<repo>' : SCAN_BASE,
+    scannedFiles: rendererJs.length + (fs.existsSync(path.join(SCAN_BASE, 'main.js')) ? 1 : 0) + (fs.existsSync(path.join(SCAN_BASE, 'preload.js')) ? 1 : 0) + 1 /* index.html */,
     productionConsumerCount,
     runtimeConsumerCount: productionConsumerCount,
     deferredFeatureProbe: registryProbe,
