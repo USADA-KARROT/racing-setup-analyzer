@@ -68,10 +68,10 @@ function deferredOk() {
   const r = runValidator();
   chk('A1 real-repo exits 0', r.status === 0, r.stderr);
   chk('A2 real-repo ok===true', !!(r.artifact && r.artifact.ok === true), r.artifact && r.artifact.violations);
-  chk('A3 real-repo runtimeConsumerCount===8 (C1 adapter + 3 C2 services + C3 normalize-distance + 3 C4 services)', !!(r.artifact && r.artifact.runtimeConsumerCount === 8));
-  chk('A3b real-repo authorizedConsumerCount===8', !!(r.artifact && r.artifact.authorizedConsumerCount === 8));
+  chk('A3 real-repo runtimeConsumerCount===9 (C1..C4 + C5 delta-metrics)', !!(r.artifact && r.artifact.runtimeConsumerCount === 9));
+  chk('A3b real-repo authorizedConsumerCount===9', !!(r.artifact && r.artifact.authorizedConsumerCount === 9));
   chk('A3c real-repo unauthorizedRendererConsumerCount===0', !!(r.artifact && r.artifact.unauthorizedRendererConsumerCount === 0));
-  chk('A3d real-repo authorized paths include C1 adapter, three C2 services, C3 normalize-distance, and three C4 services', !!(r.artifact && Array.isArray(r.artifact.authorizedConsumerPaths)
+  chk('A3d real-repo authorized paths include C1 adapter, three C2 services, C3 normalize-distance, three C4 services, and C5 delta-metrics', !!(r.artifact && Array.isArray(r.artifact.authorizedConsumerPaths)
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-comparison-adapter.js')
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-lap-authority.js')
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-track-identity.js')
@@ -79,8 +79,9 @@ function deferredOk() {
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-normalized-distance.js')
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-reference-selection.js')
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-corner-segmentation.js')
-    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-corner-pairing.js')));
-  chk('A3e real-repo currentCheckpoint===C4_REFERENCE_AND_CORNER', !!(r.artifact && r.artifact.currentCheckpoint === 'C4_REFERENCE_AND_CORNER'));
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-corner-pairing.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-delta-metrics.js')));
+  chk('A3e real-repo currentCheckpoint===C5_DELTA_METRICS', !!(r.artifact && r.artifact.currentCheckpoint === 'C5_DELTA_METRICS'));
   chk('A3f real-repo runtimeConsumersAllowed===true', !!(r.artifact && r.artifact.runtimeConsumersAllowed === true));
   chk('A4 real-repo deferredStillDeferred===true', !!(r.artifact && r.artifact.deferredStillDeferred === true));
 })();

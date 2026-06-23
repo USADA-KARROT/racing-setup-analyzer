@@ -19,7 +19,8 @@
   var CE = _req('./comparison-eligibility-contract.js', typeof R3_0C_ComparisonEligibilityContract !== 'undefined' ? R3_0C_ComparisonEligibilityContract : undefined);
   var EX = _req('./comparison-export-contract.js', typeof R3_0C_ComparisonExportContract !== 'undefined' ? R3_0C_ComparisonExportContract : undefined);
   var RAC = _req('./reference-and-corner-contract.js', typeof R3_0C_ReferenceAndCornerContract !== 'undefined' ? R3_0C_ReferenceAndCornerContract : undefined);
-  if (!RC || !CR || !VL || !NP || !CE || !EX || !RAC) throw new Error('contracts/r3.0c/index.js could not load the contract modules');
+  var DM = _req('./delta-metrics-contract.js', typeof R3_0C_DeltaMetricsContract !== 'undefined' ? R3_0C_DeltaMetricsContract : undefined);
+  if (!RC || !CR || !VL || !NP || !CE || !EX || !RAC || !DM) throw new Error('contracts/r3.0c/index.js could not load the contract modules');
 
   var api = {
     reasonCodes: RC,
@@ -29,6 +30,7 @@
     comparisonEligibility: CE,
     comparisonExport: EX,
     referenceAndCorner: RAC,
+    deltaMetrics: DM,
     // convenience top-level constants
     REASON_CODES: RC.REASON_CODES,
     ALL_REASON_CODES: RC.ALL_REASON_CODES,

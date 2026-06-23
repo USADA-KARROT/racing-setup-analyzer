@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0C",
+  "checkpoint": "C5_DELTA_METRICS",
+  "baseSha": "3a3bb8e422562eb97b8bc33ce56a1f213e3bb7e7",
+  "headSha": null,
+  "previousCheckpoint": "C4_REFERENCE_AND_CORNER",
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
+    { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-track-identity.js", "capability": "track_identity_authoritative" },
+    { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-normalized-distance.js", "capability": "normalized_distance_present" },
+    { "path": "renderer/js/r3-0c-reference-selection.js", "capability": "reference_selection_present" },
+    { "path": "renderer/js/r3-0c-corner-segmentation.js", "capability": "corner_segmentation_present" },
+    { "path": "renderer/js/r3-0c-corner-pairing.js", "capability": "corner_pairing_present" },
+    { "path": "renderer/js/r3-0c-delta-metrics.js", "capability": "delta_metrics_present" }
+  ],
+  "enabledCapabilitiesBefore": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present"],
+  "enabledCapabilitiesAfter": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present"],
+  "forbiddenCapabilities": [
+    "comparison_export_present",
+    "ui_present",
+    "feature_registry_active"
+  ],
+  "changedFiles": [
+    "contracts/r3.0c/reason-codes.js",
+    "contracts/r3.0c/delta-metrics-contract.js",
+    "contracts/r3.0c/index.js",
+    "renderer/js/r3-0c-delta-metrics.js",
+    "renderer/js/r3-0c-comparison-adapter.js",
+    "governance/r3.0c/state.json",
+    "governance/r3.0c/checkpoints/C5.json",
+    "governance/r3.0/train.json",
+    "tests/r3.0c-contract-foundation.test.js",
+    "tests/r3-0c-comparison-adapter.test.js",
+    "tests/r3-0c-delta-metrics.test.js",
+    "tests/r3-0c-governance.test.js",
+    "tests/r3-0c-no-consumer.test.js",
+    "package.json"
+  ],
+  "tests": null,
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": null,
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "expectedRendererAdapter": false
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "note": "C5 delta metrics: one new renderer/js production service (r3-0c-delta-metrics.js) + a new contract module (contracts/r3.0c/delta-metrics-contract.js, registered in index.js). Four new reason codes (DELTA_METRIC_NUMERIC_INVALID, DELTA_METRIC_EMPTY_INPUT, DELTA_METRIC_CORNER_PAIR_REQUIRED, DELTA_METRIC_SIGN_FORBIDDEN) bring the total to 55. The C5 service computes six allowlisted metrics from caller-supplied lap timing + paired-corner zone timing with the SINGLE pinned sign delta = comparison - reference. The sign convention is enforced at both layers — contract shape gate refuses policy.deltaSign mismatches, production service uses the contract constant. Partial-result behaviour: a corner-scope metric with all-NaN pairs blocks ONLY that metric and emits DELTA_METRIC_NUMERIC_INVALID inline; unrelated metrics and lap-scope metrics still compute. Self-vs-self yields exact zero deltas; A/B-swap yields delta(A,B) === -delta(B,A) (the test layer enforces this); cumulative_end ≈ lap_time when pairing covers the full lap (partial coverage surfaces the existing CORNER_PAIRING_PARTIAL_COVERAGE limitation from C4). State-aware validators (scripts/check-r3-0c-no-consumer.js, scripts/check-r3-0c-guard.js) generalised at C1 automatically extend allowance to the new renderer/js path — NO validator weakening at C5. The trusted-verification artifact bound to headSha is the PASS authority; headSha / workflowRunId / artifactId / artifactBoundSha / codexVerdict / createdAt are intentionally null in-commit."
+}

@@ -27,6 +27,7 @@ const NP = require('../contracts/r3.0c/normalized-position-contract.js');
 const CE = require('../contracts/r3.0c/comparison-eligibility-contract.js');
 const EX = require('../contracts/r3.0c/comparison-export-contract.js');
 const RAC = require('../contracts/r3.0c/reference-and-corner-contract.js');
+const DM = require('../contracts/r3.0c/delta-metrics-contract.js');
 const IDX = require('../contracts/r3.0c/index.js');
 // distinctness oracles — the real frozen case-export modules (independent of the SUT)
 const CaseExport = require('../renderer/js/analysis-case-export.js');
@@ -54,7 +55,7 @@ function fullComparisonInput(over) {
 }
 
 // ── A. reason codes: stable / unique / machine-readable ──
-chk('51 reason codes total (16 mandated + 3 scope/metric + 16 normalized-distance + 16 reference-and-corner extensions)', RC.ALL_REASON_CODES.length === 51, RC.ALL_REASON_CODES.length);
+chk('55 reason codes total (16 mandated + 3 scope/metric + 16 normalized-distance + 16 reference-and-corner + 4 delta-metrics extensions)', RC.ALL_REASON_CODES.length === 55, RC.ALL_REASON_CODES.length);
 chk('reason codes unique', new Set(RC.ALL_REASON_CODES).size === RC.ALL_REASON_CODES.length);
 chk('reason codes are UPPER_SNAKE', RC.ALL_REASON_CODES.every(c => /^[A-Z][A-Z0-9_]*$/.test(c)));
 chk('REASON_CODES keyed by own value (stable)', Object.keys(RC.REASON_CODES).every(k => RC.REASON_CODES[k] === k));
@@ -78,6 +79,10 @@ chk('REASON_CODES keyed by own value (stable)', Object.keys(RC.REASON_CODES).eve
   'CORNER_SEGMENTATION_ALGORITHM_VERSION_MISMATCH', 'CORNER_PAIRING_INSUFFICIENT_OVERLAP', 'CORNER_PAIRING_AMBIGUOUS',
   'CORNER_PAIRING_ORDINAL_FORBIDDEN', 'CORNER_PAIRING_PARTIAL_COVERAGE', 'CORNER_CONFIRMATION_CANNOT_UPGRADE_TELEMETRY']
   .forEach(c => chk('C4 reference-and-corner code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
+// C5_DELTA_METRICS extensions — four distinct refusal semantics over the closed-allowlist delta
+// metrics + fixed sign convention.
+['DELTA_METRIC_NUMERIC_INVALID', 'DELTA_METRIC_EMPTY_INPUT', 'DELTA_METRIC_CORNER_PAIR_REQUIRED', 'DELTA_METRIC_SIGN_FORBIDDEN']
+  .forEach(c => chk('C5 delta-metrics code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
 chk('METRIC_REQUIRED_CHANNEL_UNAVAILABLE explanationKey is stable lowercase hook', RC.explanationKeyFor('METRIC_REQUIRED_CHANNEL_UNAVAILABLE') === 'r3_0c.reason.metric_required_channel_unavailable');
 chk('NORMALIZED_DISTANCE_MULTIPLE_WRAPS explanationKey is stable lowercase hook', RC.explanationKeyFor('NORMALIZED_DISTANCE_MULTIPLE_WRAPS') === 'r3_0c.reason.normalized_distance_multiple_wraps');
 chk('NORMALIZED_DISTANCE_AUTHORITY_FORGED explanationKey is stable lowercase hook', RC.explanationKeyFor('NORMALIZED_DISTANCE_AUTHORITY_FORGED') === 'r3_0c.reason.normalized_distance_authority_forged');
@@ -309,6 +314,37 @@ chk('pair shape valid → eligible', RAC.evaluateCornerPairingRequestShape(valid
 (() => { const r = validPairRequest(); r.comparisonSegmentation.identity.caseId = 'case_2'; chk('pair cross-case → CROSS_CASE_COMPARISON_UNSUPPORTED', hasCode(RAC.evaluateCornerPairingRequestShape(r), 'CROSS_CASE_COMPARISON_UNSUPPORTED')); })();
 (() => { const r = validPairRequest(); r.comparisonSegmentation.trackIdentity.layoutId = 'national'; chk('pair track mismatch → TRACK_IDENTITY_MISMATCH', hasCode(RAC.evaluateCornerPairingRequestShape(r), 'TRACK_IDENTITY_MISMATCH')); })();
 
+// ── C5 delta-metrics contract shape gate ──
+chk('DM.DELTA_SIGN_FORMULA literal === comparison_minus_reference', DM.DELTA_SIGN_FORMULA === 'comparison_minus_reference');
+chk('DM.SUPPORTED_DELTA_METRICS === 6 items', DM.SUPPORTED_DELTA_METRICS.length === 6
+  && DM.SUPPORTED_DELTA_METRICS.indexOf('lap_time') !== -1
+  && DM.SUPPORTED_DELTA_METRICS.indexOf('delta_cumulative') !== -1
+  && DM.SUPPORTED_DELTA_METRICS.indexOf('sector_delta') !== -1
+  && DM.SUPPORTED_DELTA_METRICS.indexOf('entry_delta') !== -1
+  && DM.SUPPORTED_DELTA_METRICS.indexOf('mid_delta') !== -1
+  && DM.SUPPORTED_DELTA_METRICS.indexOf('exit_delta') !== -1);
+chk('DM.LAP_SCOPE_METRICS frozen', Object.isFrozen(DM.LAP_SCOPE_METRICS));
+chk('DM.CORNER_SCOPE_METRICS frozen', Object.isFrozen(DM.CORNER_SCOPE_METRICS));
+chk('DM.R5_DELTA_REASON_CODES closed allowlist', Array.isArray(DM.R5_DELTA_REASON_CODES) && DM.R5_DELTA_REASON_CODES.every(c => RC.ALL_REASON_CODES.indexOf(c) !== -1));
+function validDeltaRequest(over) {
+  return Object.assign({
+    identity: { caseId: 'c1', sessionId: 's1' },
+    referenceLap: { lapTimeMs: 90000 },
+    comparisonLap: { lapTimeMs: 89500 },
+    pairing: { pairs: [{ referenceCorner: { id: 'r1', fullTimeMs: 10000 }, comparisonCorner: { id: 'c1', fullTimeMs: 9800 } }] },
+    requestedMetrics: ['lap_time', 'sector_delta'],
+    policy: { deltaSign: 'comparison_minus_reference' },
+  }, over || {});
+}
+chk('DM valid shape → eligible', DM.evaluateDeltaMetricsRequestShape(validDeltaRequest()).eligible === true);
+(() => { const r = validDeltaRequest(); r.policy.deltaSign = 'reference_minus_comparison'; chk('DM wrong sign → DELTA_METRIC_SIGN_FORBIDDEN', hasCode(DM.evaluateDeltaMetricsRequestShape(r), 'DELTA_METRIC_SIGN_FORBIDDEN')); })();
+(() => { const r = validDeltaRequest(); r.requestedMetrics = ['nonexistent_metric']; chk('DM unsupported metric → UNSUPPORTED_METRIC', hasCode(DM.evaluateDeltaMetricsRequestShape(r), 'UNSUPPORTED_METRIC')); })();
+(() => { const r = validDeltaRequest(); r.requestedMetrics = []; chk('DM empty requestedMetrics → EMPTY_INPUT', hasCode(DM.evaluateDeltaMetricsRequestShape(r), 'DELTA_METRIC_EMPTY_INPUT')); })();
+(() => { const r = validDeltaRequest(); r.referenceLap.lapTimeMs = -1; chk('DM invalid lapTimeMs → NUMERIC_INVALID', hasCode(DM.evaluateDeltaMetricsRequestShape(r), 'DELTA_METRIC_NUMERIC_INVALID')); })();
+(() => { const r = validDeltaRequest(); r.pairing.pairs = []; r.requestedMetrics = ['sector_delta']; chk('DM corner-scope w/o pairs → CORNER_PAIR_REQUIRED', hasCode(DM.evaluateDeltaMetricsRequestShape(r), 'DELTA_METRIC_CORNER_PAIR_REQUIRED')); })();
+(() => { const r = validDeltaRequest(); r.pairing.pairs = []; r.requestedMetrics = ['lap_time']; chk('DM lap-scope without pairs eligible', DM.evaluateDeltaMetricsRequestShape(r).eligible === true); })();
+[null, undefined, 'x', 42, []].forEach(v => chk('DM malformed ' + JSON.stringify(v) + ' → blocked', DM.evaluateDeltaMetricsRequestShape(v).eligible === false));
+
 // ── export envelope behaviour ──
 (() => { const env = EX.buildComparisonExportEnvelope(); chk('envelope payload null in CP1', env.payload === null && env.generatedAt === null); chk('envelope validates', EX.validateComparisonExportEnvelope(env).valid === true); })();
 (() => { const big = {}; const arr = []; for (let i = 0; i < 1000; i++) arr.push(i); big.samples = arr; chk('oversized array payload → blocked', EX.buildComparisonExportEnvelope(big).eligible === false); })();
@@ -323,12 +359,12 @@ chk('eligible lap result has null result', VL.evaluateLapAuthority(fullLapAuthor
 chk('metric-supported result has null result', CE.evaluateMetricSupport('speedDelta').result === null);
 
 // ── index aggregate ──
-chk('index re-exports all surfaces (incl. referenceAndCorner)', !!(IDX.reasonCodes && IDX.credibility && IDX.validLap && IDX.normalizedPosition && IDX.comparisonEligibility && IDX.comparisonExport && IDX.referenceAndCorner));
+chk('index re-exports all surfaces (incl. referenceAndCorner + deltaMetrics)', !!(IDX.reasonCodes && IDX.credibility && IDX.validLap && IDX.normalizedPosition && IDX.comparisonEligibility && IDX.comparisonExport && IDX.referenceAndCorner && IDX.deltaMetrics));
 chk('index identity constant', IDX.COMPARISON_EXPORT_IDENTITY === 'racing-analyzer/comparison-export');
 
 // ── K/L. contracts have NO renderer dependency and NO algorithm (static scan) ──
 const contractFiles = fs.readdirSync(CONTRACT_DIR).filter(f => f.endsWith('.js'));
-chk('7 contract modules + index', contractFiles.length === 8, contractFiles);
+chk('8 contract modules + index', contractFiles.length === 9, contractFiles);
 // strip whole-line comments so the algorithm scan inspects CODE, not the prose that describes what the
 // contract deliberately does NOT do (a JSDoc line may legitimately say "no interpolation").
 function stripComments(s) { return s.split('\n').map(line => { const t = line.trim(); return (t.indexOf('*') === 0 || t.indexOf('/*') === 0 || t.indexOf('*/') === 0 || t.indexOf('//') === 0) ? '' : line; }).join('\n'); }

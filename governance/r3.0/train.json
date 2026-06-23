@@ -3,11 +3,11 @@
   "program": "R3.0",
   "phases": ["R3.0C", "R3.0D", "R3.0E", "R3.0F"],
   "currentPhase": "R3.0C",
-  "currentPhaseCheckpoint": "C4_REFERENCE_AND_CORNER",
+  "currentPhaseCheckpoint": "C5_DELTA_METRICS",
   "phaseStates": {
     "R3.0C": {
       "governanceDir": "governance/r3.0c",
-      "currentCheckpoint": "C4_REFERENCE_AND_CORNER",
+      "currentCheckpoint": "C5_DELTA_METRICS",
       "finalActivationCheckpoint": "C8_ACTIVATION",
       "started": true,
       "finalActivationReached": false

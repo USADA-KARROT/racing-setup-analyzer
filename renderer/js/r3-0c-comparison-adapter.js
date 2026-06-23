@@ -44,6 +44,7 @@
   var ReferenceSelection = null;
   var CornerSegmentation = null;
   var CornerPairing = null;
+  var DeltaMetrics = null;
   if (typeof module !== 'undefined' && module.exports) {
     try { Contracts = require('../../contracts/r3.0c/index.js'); }
     catch (e) { Contracts = null; }
@@ -64,6 +65,8 @@
     catch (e) { CornerSegmentation = null; }
     try { CornerPairing = require('./r3-0c-corner-pairing.js'); }
     catch (e) { CornerPairing = null; }
+    try { DeltaMetrics = require('./r3-0c-delta-metrics.js'); }
+    catch (e) { DeltaMetrics = null; }
   }
   if (!Contracts && typeof R3_0C_Contracts !== 'undefined') Contracts = R3_0C_Contracts;
   if (!LapAuthority && typeof R3_0C_LapAuthority !== 'undefined') LapAuthority = R3_0C_LapAuthority;
@@ -73,6 +76,7 @@
   if (!ReferenceSelection && typeof R3_0C_ReferenceSelection !== 'undefined') ReferenceSelection = R3_0C_ReferenceSelection;
   if (!CornerSegmentation && typeof R3_0C_CornerSegmentation !== 'undefined') CornerSegmentation = R3_0C_CornerSegmentation;
   if (!CornerPairing && typeof R3_0C_CornerPairing !== 'undefined') CornerPairing = R3_0C_CornerPairing;
+  if (!DeltaMetrics && typeof R3_0C_DeltaMetrics !== 'undefined') DeltaMetrics = R3_0C_DeltaMetrics;
   if (!Contracts) {
     throw new Error('renderer/js/r3-0c-comparison-adapter.js requires contracts/r3.0c/index.js (Node require or R3_0C_Contracts global)');
   }
@@ -190,6 +194,17 @@
     return Contracts.referenceAndCorner.FORBIDDEN_REFERENCE_SELECTION_MODES;
   }
 
+  // ── C5 delegation — pure passthrough to the delta-metrics service. ──
+  function computeDeltaMetrics(request) {
+    return _requireService(DeltaMetrics, 'delta-metrics').computeDeltaMetrics(request);
+  }
+  function supportedDeltaMetrics() {
+    return Contracts.deltaMetrics.SUPPORTED_DELTA_METRICS;
+  }
+  function deltaMetricsSignFormula() {
+    return Contracts.deltaMetrics.DELTA_SIGN_FORMULA;
+  }
+
   // Capability inventory — grows with each checkpoint. activeCheckpoint() reports the LATEST
   // checkpoint whose surface this adapter exposes; exposes() lists capability ids derived from
   // which service modules loaded successfully.
@@ -202,12 +217,14 @@
     if (ReferenceSelection) caps.push('reference_selection_present');
     if (CornerSegmentation) caps.push('corner_segmentation_present');
     if (CornerPairing) caps.push('corner_pairing_present');
+    if (DeltaMetrics) caps.push('delta_metrics_present');
     // dedupe while preserving order
     var seen = {}, out = [];
     caps.forEach(function (c) { if (!seen[c]) { seen[c] = true; out.push(c); } });
     return Object.freeze(out);
   }
   function activeCheckpoint() {
+    if (DeltaMetrics) return 'C5_DELTA_METRICS';
     if (ReferenceSelection || CornerSegmentation || CornerPairing) return 'C4_REFERENCE_AND_CORNER';
     if (NormalizedDistance) return 'C3_NORMALIZED_DISTANCE';
     if (LapAuthority || TrackIdentity || DistanceAuthority) return 'C2_LAP_AUTHORITY';
@@ -253,6 +270,10 @@
     applyCornerUserConfirmation: applyCornerUserConfirmation,
     pairCorners: pairCorners,
     referenceAndCornerForbiddenSelectionModes: referenceAndCornerForbiddenSelectionModes,
+    // C5 surface
+    computeDeltaMetrics: computeDeltaMetrics,
+    supportedDeltaMetrics: supportedDeltaMetrics,
+    deltaMetricsSignFormula: deltaMetricsSignFormula,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

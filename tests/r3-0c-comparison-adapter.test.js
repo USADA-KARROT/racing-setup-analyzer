@@ -62,8 +62,8 @@ function fullComparisonInput(over) {
 // ── A. constants + identity round-trip ──
 chk('A1 ADAPTER_VERSION === 2 (C2 surface added)', Adapter.ADAPTER_VERSION === 2);
 chk('A2 CHECKPOINT_FLOOR === C1_PRODUCTION_ADAPTER (historical authorization point, does NOT advance)', Adapter.CHECKPOINT_FLOOR === 'C1_PRODUCTION_ADAPTER');
-chk('A2b activeCheckpoint() === C4_REFERENCE_AND_CORNER (latest surface available)', Adapter.activeCheckpoint() === 'C4_REFERENCE_AND_CORNER');
-chk('A2c exposes() includes C1..C4 capability set', (() => {
+chk('A2b activeCheckpoint() === C5_DELTA_METRICS (latest surface available)', Adapter.activeCheckpoint() === 'C5_DELTA_METRICS');
+chk('A2c exposes() includes C1..C5 capability set', (() => {
   const c = Adapter.exposes();
   return Array.isArray(c)
     && c.includes('production_adapter_present')
@@ -72,7 +72,8 @@ chk('A2c exposes() includes C1..C4 capability set', (() => {
     && c.includes('normalized_distance_present')
     && c.includes('reference_selection_present')
     && c.includes('corner_segmentation_present')
-    && c.includes('corner_pairing_present');
+    && c.includes('corner_pairing_present')
+    && c.includes('delta_metrics_present');
 })());
 chk('A3 loadContracts() returns contract namespace identity', Adapter.loadContracts() === Contracts);
 chk('A4 deltaSignFormula() === contract.deltaSignFormula()', Adapter.deltaSignFormula() === CE.deltaSignFormula());
@@ -164,16 +165,18 @@ const allowedKeys = new Set([
   'normalizeDistance', 'normalizeAtTarget', 'normalizedDistanceDefaultThresholds', 'normalizedDistanceAcceptedUnits',
   // C4 surface
   'selectReference', 'segmentCorners', 'applyCornerUserConfirmation', 'pairCorners', 'referenceAndCornerForbiddenSelectionModes',
+  // C5 surface
+  'computeDeltaMetrics', 'supportedDeltaMetrics', 'deltaMetricsSignFormula',
 ]);
 const actualKeys = Object.keys(Adapter).sort();
 const unknownKeys = actualKeys.filter(k => !allowedKeys.has(k));
 chk('G1 adapter exposes exactly the allowlisted keys (no unknown surface)', unknownKeys.length === 0, unknownKeys);
 chk('G2 adapter does not expose lap segmentation as segmentLap', typeof Adapter.segmentLap === 'undefined');
 chk('G3 adapter does not expose matchCorners (pairCorners is C4)', typeof Adapter.matchCorners === 'undefined');
-chk('G4 adapter does not expose delta computation', typeof Adapter.computeDelta === 'undefined' && typeof Adapter.deltaCumulative === 'undefined');
+chk('G4 adapter does not expose lower-level delta helpers', typeof Adapter.computeDelta === 'undefined' && typeof Adapter.deltaCumulative === 'undefined');
 chk('G5 adapter does not expose auto reference selection', typeof Adapter.chooseFastestValidLap === 'undefined' && typeof Adapter.selectReferenceLap === 'undefined');
-chk('G6 adapter does not expose post-C4 surface (delta / export)',
-  typeof Adapter.computeDelta === 'undefined' && typeof Adapter.buildComparisonExport === 'undefined');
+chk('G6 adapter does not expose post-C5 surface (export / UI / feature activation)',
+  typeof Adapter.buildComparisonExport === 'undefined' && typeof Adapter.exportComparison === 'undefined');
 chk('G7 adapter does not expose export', typeof Adapter.exportComparison === 'undefined' && typeof Adapter.buildComparisonExport === 'undefined');
 chk('G8 adapter does not bind into Feature Registry', typeof Adapter.registerWithFeatureRegistry === 'undefined' && typeof Adapter.activateFeature === 'undefined');
 
@@ -184,8 +187,8 @@ chk('G8 adapter does not bind into Feature Registry', typeof Adapter.registerWit
   chk('H1 adapter source contains literal require of contracts/r3.0c/index.js', /require\(\s*(['"`])\.\.\/\.\.\/contracts\/r3\.0c\/index\.js\1\s*\)/.test(src));
   // C5+ surface names must NOT appear in the adapter source. normalizeDistance / segmentCorners /
   // pairCorners / selectReference are all legitimate C3/C4 surface now.
-  const c5Surface = ['computeDelta', 'deltaCumulative', 'exportComparison', 'fastest_valid', 'median_valid', 'best_sector_composite', 'selectReferenceLap'];
-  c5Surface.forEach(name => chk('H2 adapter source does not implement ' + name, src.indexOf(name + '(') === -1 && src.indexOf('function ' + name) === -1));
+  const c6Surface = ['exportComparison', 'buildComparisonExport', 'fastest_valid', 'median_valid', 'best_sector_composite', 'selectReferenceLap'];
+  c6Surface.forEach(name => chk('H2 adapter source does not implement ' + name, src.indexOf(name + '(') === -1 && src.indexOf('function ' + name) === -1));
   // The adapter source must NOT include any runtime LLM hook.
   ['fetch(', 'XMLHttpRequest', 'WebSocket', 'eval(', 'new Function('].forEach(s => chk('H3 adapter source does not include ' + s, src.indexOf(s) === -1));
 })();
@@ -451,6 +454,62 @@ function validReferenceRequest(over) {
 // J25: referenceAndCornerForbiddenSelectionModes returns the contract constant.
 chk('J25 referenceAndCornerForbiddenSelectionModes() identity-equal to contract',
   Adapter.referenceAndCornerForbiddenSelectionModes() === Contracts.referenceAndCorner.FORBIDDEN_REFERENCE_SELECTION_MODES);
+
+// ── J26+: C5 delta-metrics delegation ──
+const DeltaMetricsService = require('../renderer/js/r3-0c-delta-metrics.js');
+function validDeltaReq(over) {
+  return Object.assign({
+    identity: { caseId: 'c1', sessionId: 's1' },
+    referenceLap: { lapTimeMs: 90000 },
+    comparisonLap: { lapTimeMs: 89500 },
+    pairing: { pairs: [{ referenceCorner: { id: 'r1', fullTimeMs: 10000, entryTimeMs: 3000, midTimeMs: 4000, exitTimeMs: 3000 }, comparisonCorner: { id: 'c1', fullTimeMs: 9800, entryTimeMs: 2900, midTimeMs: 4000, exitTimeMs: 2900 } }] },
+    requestedMetrics: ['lap_time', 'sector_delta', 'entry_delta', 'mid_delta', 'exit_delta'],
+    policy: { deltaSign: 'comparison_minus_reference' },
+  }, over || {});
+}
+// J26: adapter computeDeltaMetrics ≡ service.
+(() => {
+  const req = validDeltaReq();
+  const a = Adapter.computeDeltaMetrics(req);
+  const s = DeltaMetricsService.computeDeltaMetrics(req);
+  chk('J26 computeDeltaMetrics adapter ≡ service', a.eligible === true && JSON.stringify(a) === JSON.stringify(s));
+})();
+// J27: sign is comparison - reference (negative when cmp faster).
+(() => {
+  const out = Adapter.computeDeltaMetrics(validDeltaReq());
+  chk('J27 lap_time = cmp - ref = -500ms', out.metrics.lap_time.value === -500);
+})();
+// J28: self-vs-self → all deltas = 0.
+(() => {
+  const req = validDeltaReq();
+  req.comparisonLap = { lapTimeMs: req.referenceLap.lapTimeMs };
+  req.pairing.pairs[0].comparisonCorner = Object.assign({}, req.pairing.pairs[0].referenceCorner, { id: 'c1' });
+  const out = Adapter.computeDeltaMetrics(req);
+  chk('J28 self-vs-self lap_time = 0', out.metrics.lap_time.value === 0);
+  chk('J28b self-vs-self sector_delta[0] = 0', out.metrics.sector_delta.perCorner[0].value === 0);
+})();
+// J29: A/B swap → sign symmetric.
+(() => {
+  const req = validDeltaReq();
+  const a = Adapter.computeDeltaMetrics(req);
+  const swap = validDeltaReq({
+    referenceLap: req.comparisonLap,
+    comparisonLap: req.referenceLap,
+    pairing: { pairs: [{ referenceCorner: req.pairing.pairs[0].comparisonCorner, comparisonCorner: req.pairing.pairs[0].referenceCorner }] },
+  });
+  const b = Adapter.computeDeltaMetrics(swap);
+  chk('J29 swap → lap_time negates', a.metrics.lap_time.value === -b.metrics.lap_time.value);
+  chk('J29b swap → sector_delta negates', a.metrics.sector_delta.perCorner[0].value === -b.metrics.sector_delta.perCorner[0].value);
+})();
+// J30: wrong sign → DELTA_METRIC_SIGN_FORBIDDEN.
+(() => {
+  const req = validDeltaReq(); req.policy.deltaSign = 'reference_minus_comparison';
+  const out = Adapter.computeDeltaMetrics(req);
+  chk('J30 wrong sign → blocked', out.eligible === false && out.reasonCodes.indexOf('DELTA_METRIC_SIGN_FORBIDDEN') !== -1);
+})();
+// J31: supportedDeltaMetrics / sign formula identity.
+chk('J31 supportedDeltaMetrics() identity-equal to contract', Adapter.supportedDeltaMetrics() === Contracts.deltaMetrics.SUPPORTED_DELTA_METRICS);
+chk('J31b deltaMetricsSignFormula() === comparison_minus_reference', Adapter.deltaMetricsSignFormula() === 'comparison_minus_reference');
 
 console.log('r3-0c-comparison-adapter: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);
