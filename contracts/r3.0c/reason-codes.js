@@ -25,7 +25,13 @@
   //    introduced at C2_LAP_AUTHORITY) covers the partial-channel-gating semantic — a metric is
   //    structurally supported (passes evaluateMetricSupport) but the lap evidence does NOT carry the
   //    raw channels that metric requires, so the metric (and only that metric) must be blocked
-  //    without poisoning the lap-level authority or unrelated metrics. See
+  //    without poisoning the lap-level authority or unrelated metrics. The fourteen
+  //    NORMALIZED_DISTANCE_* extensions (introduced at C3_NORMALIZED_DISTANCE) split the
+  //    normalized-distance failure modes that MISSING_NORMALIZED_DISTANCE_AUTHORITY +
+  //    INCOMPATIBLE_NORMALIZATION cannot disambiguate — they describe a normalization the contract
+  //    REFUSED TO PRODUCE rather than refusing to ACCEPT, so downstream UI can explain to the
+  //    user precisely which property of the raw distance series caused the refusal (e.g. multiple
+  //    wraps in a single lap vs a non-monotonic reversal vs an oversized normalized gap). See
   //    docs/r3.0c-contract-foundation.md §"Reason code extensions". ──
   var REASON_CODES = Object.freeze({
     MISSING_TRACK_IDENTITY: 'MISSING_TRACK_IDENTITY',
@@ -50,6 +56,26 @@
     // documented partial-channel-gating extension — the metric is in the supported allowlist but the
     // raw channel(s) it requires are absent from the lap evidence; only that metric is blocked.
     METRIC_REQUIRED_CHANNEL_UNAVAILABLE: 'METRIC_REQUIRED_CHANNEL_UNAVAILABLE',
+    // documented normalized-distance refusal extensions (C3_NORMALIZED_DISTANCE) — each names a
+    // distinct property of the raw distance series that prevents canonical normalization; the
+    // contract refuses to produce a normalized axis fail-closed and emits the precise reason so
+    // downstream UI / credibility can explain WHY rather than just "normalization failed".
+    NORMALIZED_DISTANCE_EMPTY_INPUT: 'NORMALIZED_DISTANCE_EMPTY_INPUT',
+    NORMALIZED_DISTANCE_SINGLE_SAMPLE: 'NORMALIZED_DISTANCE_SINGLE_SAMPLE',
+    NORMALIZED_DISTANCE_NUMERIC_INVALID: 'NORMALIZED_DISTANCE_NUMERIC_INVALID',
+    NORMALIZED_DISTANCE_UNSUPPORTED_UNIT: 'NORMALIZED_DISTANCE_UNSUPPORTED_UNIT',
+    NORMALIZED_DISTANCE_UNKNOWN_DIRECTION: 'NORMALIZED_DISTANCE_UNKNOWN_DIRECTION',
+    NORMALIZED_DISTANCE_INCONSISTENT_DIRECTION: 'NORMALIZED_DISTANCE_INCONSISTENT_DIRECTION',
+    NORMALIZED_DISTANCE_NON_MONOTONIC: 'NORMALIZED_DISTANCE_NON_MONOTONIC',
+    NORMALIZED_DISTANCE_INVALID_WRAP: 'NORMALIZED_DISTANCE_INVALID_WRAP',
+    NORMALIZED_DISTANCE_MULTIPLE_WRAPS: 'NORMALIZED_DISTANCE_MULTIPLE_WRAPS',
+    NORMALIZED_DISTANCE_INSUFFICIENT_SAMPLES: 'NORMALIZED_DISTANCE_INSUFFICIENT_SAMPLES',
+    NORMALIZED_DISTANCE_INSUFFICIENT_COVERAGE: 'NORMALIZED_DISTANCE_INSUFFICIENT_COVERAGE',
+    NORMALIZED_DISTANCE_GAP_TOO_LARGE: 'NORMALIZED_DISTANCE_GAP_TOO_LARGE',
+    NORMALIZED_DISTANCE_TIME_GAP_TOO_LARGE: 'NORMALIZED_DISTANCE_TIME_GAP_TOO_LARGE',
+    NORMALIZED_DISTANCE_EXTRAPOLATION_REQUIRED: 'NORMALIZED_DISTANCE_EXTRAPOLATION_REQUIRED',
+    NORMALIZED_DISTANCE_IDENTITY_MISMATCH: 'NORMALIZED_DISTANCE_IDENTITY_MISMATCH',
+    NORMALIZED_DISTANCE_AUTHORITY_FORGED: 'NORMALIZED_DISTANCE_AUTHORITY_FORGED',
   });
 
   var ALL_REASON_CODES = Object.freeze(Object.keys(REASON_CODES).map(function (k) { return REASON_CODES[k]; }));

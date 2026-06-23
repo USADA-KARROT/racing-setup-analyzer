@@ -53,13 +53,25 @@ function fullComparisonInput(over) {
 }
 
 // ── A. reason codes: stable / unique / machine-readable ──
-chk('19 reason codes total (16 mandated + 3 documented extensions)', RC.ALL_REASON_CODES.length === 19, RC.ALL_REASON_CODES.length);
+chk('35 reason codes total (16 mandated + 3 scope/metric extensions + 16 normalized-distance extensions)', RC.ALL_REASON_CODES.length === 35, RC.ALL_REASON_CODES.length);
 chk('reason codes unique', new Set(RC.ALL_REASON_CODES).size === RC.ALL_REASON_CODES.length);
 chk('reason codes are UPPER_SNAKE', RC.ALL_REASON_CODES.every(c => /^[A-Z][A-Z0-9_]*$/.test(c)));
 chk('REASON_CODES keyed by own value (stable)', Object.keys(RC.REASON_CODES).every(k => RC.REASON_CODES[k] === k));
 ['MISSING_TRACK_IDENTITY', 'TRACK_IDENTITY_MISMATCH', 'MISSING_LAP_IDENTITY', 'INCOMPLETE_LAP', 'INVALID_TIMING', 'INSUFFICIENT_SAMPLE_COVERAGE', 'DISCONTINUOUS_SAMPLES', 'MISSING_NORMALIZED_DISTANCE_AUTHORITY', 'INCOMPATIBLE_NORMALIZATION', 'REFERENCE_LAP_UNAVAILABLE', 'COMPARISON_LAP_UNAVAILABLE', 'CORNER_PAIRING_UNAVAILABLE', 'UNSUPPORTED_METRIC', 'INSUFFICIENT_CREDIBILITY_METADATA', 'SYNTHETIC_ONLY_LIMITATION', 'INTERNAL_CONTRACT_VIOLATION'].forEach(c => chk('mandated code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
 ['CROSS_CASE_COMPARISON_UNSUPPORTED', 'CROSS_SESSION_COMPARISON_UNSUPPORTED', 'METRIC_REQUIRED_CHANNEL_UNAVAILABLE'].forEach(c => chk('extension code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
+// C3_NORMALIZED_DISTANCE extensions — sixteen distinct refusal semantics over the normalized-distance
+// production surface. Each is asserted as a literal (oracle independence): the test does not derive
+// these names from the module under test.
+['NORMALIZED_DISTANCE_EMPTY_INPUT', 'NORMALIZED_DISTANCE_SINGLE_SAMPLE', 'NORMALIZED_DISTANCE_NUMERIC_INVALID',
+  'NORMALIZED_DISTANCE_UNSUPPORTED_UNIT', 'NORMALIZED_DISTANCE_UNKNOWN_DIRECTION', 'NORMALIZED_DISTANCE_INCONSISTENT_DIRECTION',
+  'NORMALIZED_DISTANCE_NON_MONOTONIC', 'NORMALIZED_DISTANCE_INVALID_WRAP', 'NORMALIZED_DISTANCE_MULTIPLE_WRAPS',
+  'NORMALIZED_DISTANCE_INSUFFICIENT_SAMPLES', 'NORMALIZED_DISTANCE_INSUFFICIENT_COVERAGE', 'NORMALIZED_DISTANCE_GAP_TOO_LARGE',
+  'NORMALIZED_DISTANCE_TIME_GAP_TOO_LARGE', 'NORMALIZED_DISTANCE_EXTRAPOLATION_REQUIRED',
+  'NORMALIZED_DISTANCE_IDENTITY_MISMATCH', 'NORMALIZED_DISTANCE_AUTHORITY_FORGED']
+  .forEach(c => chk('C3 normalized-distance code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
 chk('METRIC_REQUIRED_CHANNEL_UNAVAILABLE explanationKey is stable lowercase hook', RC.explanationKeyFor('METRIC_REQUIRED_CHANNEL_UNAVAILABLE') === 'r3_0c.reason.metric_required_channel_unavailable');
+chk('NORMALIZED_DISTANCE_MULTIPLE_WRAPS explanationKey is stable lowercase hook', RC.explanationKeyFor('NORMALIZED_DISTANCE_MULTIPLE_WRAPS') === 'r3_0c.reason.normalized_distance_multiple_wraps');
+chk('NORMALIZED_DISTANCE_AUTHORITY_FORGED explanationKey is stable lowercase hook', RC.explanationKeyFor('NORMALIZED_DISTANCE_AUTHORITY_FORGED') === 'r3_0c.reason.normalized_distance_authority_forged');
 chk('isReasonCode true for valid', RC.isReasonCode('INCOMPLETE_LAP') === true);
 chk('isReasonCode false for junk', RC.isReasonCode('NOPE') === false && RC.isReasonCode(42) === false);
 chk('explanationKey is a stable i18n key (not prose)', RC.explanationKeyFor('INCOMPLETE_LAP') === 'r3_0c.reason.incomplete_lap');
@@ -147,6 +159,85 @@ chk('lap-distance authority valid', NP.evaluateNormalizedPositionAuthority(normA
 (() => { const a = normAuth(); delete a.distanceAuthority; chk('no distance authority → MISSING_NORMALIZED_DISTANCE_AUTHORITY', hasCode(NP.evaluateNormalizedPositionAuthority(a), 'MISSING_NORMALIZED_DISTANCE_AUTHORITY')); })();
 chk('normalized range is [0,1)', NP.NORMALIZED_RANGE.min === 0 && NP.NORMALIZED_RANGE.maxExclusive === 1);
 (() => { const r = normAuth(); const c = normAuth(); c.positionUnit = 'ft'; chk('unit mismatch → INCOMPATIBLE_NORMALIZATION', hasCode(NP.assessNormalizationCompatibility(r, c), 'INCOMPATIBLE_NORMALIZATION')); })();
+
+// ── C3 normalize-distance request shape gate (contract layer; no numerics) ──
+chk('NP.ACCEPTED_DISTANCE_UNITS includes m and normalized', NP.ACCEPTED_DISTANCE_UNITS.indexOf('m') !== -1 && NP.ACCEPTED_DISTANCE_UNITS.indexOf('normalized') !== -1);
+chk('NP.ACCEPTED_DIRECTIONS forward and reverse', NP.ACCEPTED_DIRECTIONS.length === 2 && NP.ACCEPTED_DIRECTIONS.indexOf('forward') !== -1 && NP.ACCEPTED_DIRECTIONS.indexOf('reverse') !== -1);
+chk('NP.ACCEPTED_WRAP_SEMANTICS = no_wrap + wraps_at_lap_end + wraps_at_value', NP.ACCEPTED_WRAP_SEMANTICS.length === 3);
+chk('NP.ACCEPTED_MONOTONICITY non_decreasing + strictly_increasing', NP.ACCEPTED_MONOTONICITY.length === 2);
+chk('NP.ACCEPTED_DUPLICATE_POSITION_POLICIES collapse/retain/reject', NP.ACCEPTED_DUPLICATE_POSITION_POLICIES.length === 3);
+chk('NP.ACCEPTED_ENDPOINT_CONVENTIONS half_open + closed', NP.ACCEPTED_ENDPOINT_CONVENTIONS.length === 2);
+chk('NP.C3_NORMALIZE_REASON_CODES non-empty closed allowlist', Array.isArray(NP.C3_NORMALIZE_REASON_CODES) && NP.C3_NORMALIZE_REASON_CODES.length >= 17 && NP.C3_NORMALIZE_REASON_CODES.every(c => RC.ALL_REASON_CODES.indexOf(c) !== -1));
+chk('NP.ACCEPTED_DISTANCE_UNITS frozen', Object.isFrozen(NP.ACCEPTED_DISTANCE_UNITS));
+chk('NP.C3_NORMALIZE_REASON_CODES frozen', Object.isFrozen(NP.C3_NORMALIZE_REASON_CODES));
+function validNormalizeRequest(over) {
+  return Object.assign({
+    identity: { caseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_3', sourceId: 'src_alpha' },
+    distanceAuthority: { sourceChannel: 'lap_distance', unit: 'm', direction: 'forward', wrapSemantics: 'no_wrap', authorityStatus: 'channel_source_declared' },
+    samples: { distances: [0, 10, 20], times: [0, 1, 2] },
+    policy: { monotonicity: 'non_decreasing', duplicatePositions: 'collapse', endpointConvention: 'half_open_0_inclusive_1_exclusive', coverage: 0.95, minimumSamples: 3, normalizedMaxGap: 0.02, timeGapSeconds: 0.5 },
+  }, over || {});
+}
+chk('shape gate valid request → eligible', NP.evaluateNormalizeDistanceRequestShape(validNormalizeRequest()).eligible === true);
+[null, undefined, 'x', 42, [], true].forEach(v => chk('shape gate malformed ' + JSON.stringify(v) + ' → blocked', NP.evaluateNormalizeDistanceRequestShape(v).eligible === false));
+(() => {
+  const r = validNormalizeRequest(); delete r.identity;
+  chk('missing identity → NORMALIZED_DISTANCE_IDENTITY_MISMATCH', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_IDENTITY_MISMATCH'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.distanceAuthority = null;
+  chk('missing distance authority → MISSING_NORMALIZED_DISTANCE_AUTHORITY', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'MISSING_NORMALIZED_DISTANCE_AUTHORITY'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.distanceAuthority.authorityStatus = 'inferred_from_sample_index';
+  chk('forged authority status → NORMALIZED_DISTANCE_AUTHORITY_FORGED', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_AUTHORITY_FORGED'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.distanceAuthority.unit = 'furlong';
+  chk('unsupported unit → NORMALIZED_DISTANCE_UNSUPPORTED_UNIT', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_UNSUPPORTED_UNIT'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.distanceAuthority.direction = 'diagonal';
+  chk('unknown direction → NORMALIZED_DISTANCE_UNKNOWN_DIRECTION', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_UNKNOWN_DIRECTION'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.distanceAuthority.wrapSemantics = 'spirals';
+  chk('invalid wrap → NORMALIZED_DISTANCE_INVALID_WRAP', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_INVALID_WRAP'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.samples.distances = []; r.samples.times = [];
+  chk('empty samples → NORMALIZED_DISTANCE_EMPTY_INPUT', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_EMPTY_INPUT'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.samples.distances = [0]; r.samples.times = [0];
+  chk('single sample → NORMALIZED_DISTANCE_SINGLE_SAMPLE', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_SINGLE_SAMPLE'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.samples.distances = [0, 10]; r.samples.times = [0, 1, 2];
+  chk('distances/times length mismatch → NORMALIZED_DISTANCE_EMPTY_INPUT', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_EMPTY_INPUT'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.policy.monotonicity = 'random';
+  chk('unknown monotonicity → NORMALIZED_DISTANCE_NON_MONOTONIC', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_NON_MONOTONIC'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.policy.coverage = 0;
+  chk('coverage<=0 → NORMALIZED_DISTANCE_INSUFFICIENT_COVERAGE', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_INSUFFICIENT_COVERAGE'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.policy.minimumSamples = 0;
+  chk('minimumSamples<=0 → NORMALIZED_DISTANCE_INSUFFICIENT_SAMPLES', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_INSUFFICIENT_SAMPLES'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.policy.normalizedMaxGap = 0;
+  chk('normalizedMaxGap<=0 → NORMALIZED_DISTANCE_GAP_TOO_LARGE', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_GAP_TOO_LARGE'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.policy.timeGapSeconds = 0;
+  chk('timeGapSeconds<=0 → NORMALIZED_DISTANCE_TIME_GAP_TOO_LARGE', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_TIME_GAP_TOO_LARGE'));
+})();
+// shape gate result is frozen
+(() => { const r = NP.evaluateNormalizeDistanceRequestShape(validNormalizeRequest()); chk('shape-valid result frozen', Object.isFrozen(r)); })();
 
 // ── export envelope behaviour ──
 (() => { const env = EX.buildComparisonExportEnvelope(); chk('envelope payload null in CP1', env.payload === null && env.generatedAt === null); chk('envelope validates', EX.validateComparisonExportEnvelope(env).valid === true); })();
