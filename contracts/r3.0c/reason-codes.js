@@ -17,9 +17,16 @@
 (function (root) {
   'use strict';
 
-  // ── reason codes (stable / unique / frozen). The first 16 are the directive's mandated set; the two
-  //    scope codes are documented extensions for the same-Analysis-Case boundary (see
-  //    docs/r3.0c-contract-foundation.md §"Reason code extensions"). ──
+  // ── reason codes (stable / unique / frozen). The first 16 are the directive's mandated set; the
+  //    documented extensions below carry the same stability + uniqueness guarantee and are added only
+  //    when a checkpoint introduces a genuinely distinct rejection semantic that the mandated set
+  //    cannot express. Two scope extensions cover the same-Analysis-Case / same-session boundary
+  //    (introduced at CP1 / C1); one metric-channel extension (METRIC_REQUIRED_CHANNEL_UNAVAILABLE,
+  //    introduced at C2_LAP_AUTHORITY) covers the partial-channel-gating semantic — a metric is
+  //    structurally supported (passes evaluateMetricSupport) but the lap evidence does NOT carry the
+  //    raw channels that metric requires, so the metric (and only that metric) must be blocked
+  //    without poisoning the lap-level authority or unrelated metrics. See
+  //    docs/r3.0c-contract-foundation.md §"Reason code extensions". ──
   var REASON_CODES = Object.freeze({
     MISSING_TRACK_IDENTITY: 'MISSING_TRACK_IDENTITY',
     TRACK_IDENTITY_MISMATCH: 'TRACK_IDENTITY_MISMATCH',
@@ -40,6 +47,9 @@
     // documented scope extensions — the comparison contract is bounded to a single Analysis Case / session:
     CROSS_CASE_COMPARISON_UNSUPPORTED: 'CROSS_CASE_COMPARISON_UNSUPPORTED',
     CROSS_SESSION_COMPARISON_UNSUPPORTED: 'CROSS_SESSION_COMPARISON_UNSUPPORTED',
+    // documented partial-channel-gating extension — the metric is in the supported allowlist but the
+    // raw channel(s) it requires are absent from the lap evidence; only that metric is blocked.
+    METRIC_REQUIRED_CHANNEL_UNAVAILABLE: 'METRIC_REQUIRED_CHANNEL_UNAVAILABLE',
   });
 
   var ALL_REASON_CODES = Object.freeze(Object.keys(REASON_CODES).map(function (k) { return REASON_CODES[k]; }));

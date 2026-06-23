@@ -53,12 +53,13 @@ function fullComparisonInput(over) {
 }
 
 // ── A. reason codes: stable / unique / machine-readable ──
-chk('18 reason codes total (16 mandated + 2 documented extensions)', RC.ALL_REASON_CODES.length === 18, RC.ALL_REASON_CODES.length);
+chk('19 reason codes total (16 mandated + 3 documented extensions)', RC.ALL_REASON_CODES.length === 19, RC.ALL_REASON_CODES.length);
 chk('reason codes unique', new Set(RC.ALL_REASON_CODES).size === RC.ALL_REASON_CODES.length);
 chk('reason codes are UPPER_SNAKE', RC.ALL_REASON_CODES.every(c => /^[A-Z][A-Z0-9_]*$/.test(c)));
 chk('REASON_CODES keyed by own value (stable)', Object.keys(RC.REASON_CODES).every(k => RC.REASON_CODES[k] === k));
 ['MISSING_TRACK_IDENTITY', 'TRACK_IDENTITY_MISMATCH', 'MISSING_LAP_IDENTITY', 'INCOMPLETE_LAP', 'INVALID_TIMING', 'INSUFFICIENT_SAMPLE_COVERAGE', 'DISCONTINUOUS_SAMPLES', 'MISSING_NORMALIZED_DISTANCE_AUTHORITY', 'INCOMPATIBLE_NORMALIZATION', 'REFERENCE_LAP_UNAVAILABLE', 'COMPARISON_LAP_UNAVAILABLE', 'CORNER_PAIRING_UNAVAILABLE', 'UNSUPPORTED_METRIC', 'INSUFFICIENT_CREDIBILITY_METADATA', 'SYNTHETIC_ONLY_LIMITATION', 'INTERNAL_CONTRACT_VIOLATION'].forEach(c => chk('mandated code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
-['CROSS_CASE_COMPARISON_UNSUPPORTED', 'CROSS_SESSION_COMPARISON_UNSUPPORTED'].forEach(c => chk('extension code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
+['CROSS_CASE_COMPARISON_UNSUPPORTED', 'CROSS_SESSION_COMPARISON_UNSUPPORTED', 'METRIC_REQUIRED_CHANNEL_UNAVAILABLE'].forEach(c => chk('extension code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
+chk('METRIC_REQUIRED_CHANNEL_UNAVAILABLE explanationKey is stable lowercase hook', RC.explanationKeyFor('METRIC_REQUIRED_CHANNEL_UNAVAILABLE') === 'r3_0c.reason.metric_required_channel_unavailable');
 chk('isReasonCode true for valid', RC.isReasonCode('INCOMPLETE_LAP') === true);
 chk('isReasonCode false for junk', RC.isReasonCode('NOPE') === false && RC.isReasonCode(42) === false);
 chk('explanationKey is a stable i18n key (not prose)', RC.explanationKeyFor('INCOMPLETE_LAP') === 'r3_0c.reason.incomplete_lap');
