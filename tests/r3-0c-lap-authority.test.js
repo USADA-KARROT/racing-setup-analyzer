@@ -327,5 +327,45 @@ CE.SUPPORTED_METRICS.forEach(m => {
   chk('L1 eligible evaluation label === evidence_derived (honest scope, not contract_structural)', r.evaluation === 'evidence_derived');
 })();
 
+// ── M. coverage threshold enforcement (Codex Gate C-A finding: DEFAULT_THRESHOLDS.coverage was
+//      declared but never compared against the duration-derived coverage ratio). Boundary tests:
+//      a lap with adequate sample count + acceptable maxGap but with coverage below threshold
+//      MUST be blocked with INSUFFICIENT_SAMPLE_COVERAGE (not DISCONTINUOUS_SAMPLES — coverage
+//      is a density failure, not a single-gap failure). ──
+(() => {
+  // 60s lap, declared median 0.05s ⇒ expected ≈ 1200 samples; actual 300 ⇒ coverage = 0.25.
+  // Sample count (300) exceeds DEFAULT_THRESHOLDS.minimumSamples (200) AND maxGap (0.1) is well
+  // under timeGapSeconds (0.5) — every previous gate passes. Only the coverage threshold catches it.
+  const ev = nominalLap({ samples: { count: 300, timebaseMedianSeconds: 0.05, timebaseMaxGapSeconds: 0.1 } });
+  const r = Service.deriveLapAuthority(ev);
+  chk('M1 coverage below threshold → blocked (Codex C-A BLOCK fix)', r.eligible === false);
+  chk('M1b routes INSUFFICIENT_SAMPLE_COVERAGE (NOT DISCONTINUOUS_SAMPLES — density vs gap)',
+    hasCode(r, CODES.INSUFFICIENT_SAMPLE_COVERAGE) && !hasCode(r, CODES.DISCONTINUOUS_SAMPLES));
+  chk('M1c descriptor.sampleContinuity.discontinuous === false (density not gap)',
+    r.descriptor.sampleContinuity.discontinuous === false);
+  chk('M1d evidence.samples.coverage records the computed ratio', r.evidence.samples.coverage > 0 && r.evidence.samples.coverage < 0.5);
+})();
+(() => {
+  // Boundary above threshold (coverage exactly 0.96, just above 0.95) — should pass.
+  // 60s lap, median 0.1s ⇒ expected 600; actual 576 ⇒ coverage = 0.96. Gap acceptable.
+  const ev = nominalLap({ samples: { count: 576, timebaseMedianSeconds: 0.1, timebaseMaxGapSeconds: 0.12 } });
+  const r = Service.deriveLapAuthority(ev);
+  chk('M2 coverage just above threshold (0.96 > 0.95) → eligible', r.eligible === true);
+})();
+(() => {
+  // Boundary below threshold (coverage exactly 0.94, just below 0.95) — should fail.
+  // 60s lap, median 0.1s ⇒ expected 600; actual 564 ⇒ coverage = 0.94.
+  const ev = nominalLap({ samples: { count: 564, timebaseMedianSeconds: 0.1, timebaseMaxGapSeconds: 0.12 } });
+  const r = Service.deriveLapAuthority(ev);
+  chk('M3 coverage just below threshold (0.94 < 0.95) → blocked', r.eligible === false);
+  chk('M3b routes INSUFFICIENT_SAMPLE_COVERAGE', hasCode(r, CODES.INSUFFICIENT_SAMPLE_COVERAGE));
+})();
+(() => {
+  // Caller-supplied looser coverage threshold (0.5) accepts the previously-failing 0.25 case.
+  const ev = nominalLap({ samples: { count: 300, timebaseMedianSeconds: 0.05, timebaseMaxGapSeconds: 0.1 } });
+  const r = Service.deriveLapAuthority(ev, { thresholds: { coverage: 0.2, minimumSamples: 50, normalizedMaxGap: 0.1, timeGapSeconds: 2.0 } });
+  chk('M4 caller-supplied looser coverage threshold overrides default', r.eligible === true);
+})();
+
 console.log('r3-0c-lap-authority: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

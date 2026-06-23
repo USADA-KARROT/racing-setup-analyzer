@@ -85,7 +85,7 @@ Service.FORBIDDEN_INFERENCE_SOURCES.forEach(badStatus => {
   chk(name + ' rejectedReason=' + expectedReason, r.rejectedProposals.length === 1 && r.rejectedProposals[0].rejectedReason === expectedReason);
 });
 
-// ── E. multi-proposal ordering — first VALID wins, earlier invalid ones recorded ──
+// ── E. multi-proposal ordering — first VALID wins, EVERY other proposal recorded (pre AND post) ──
 (() => {
   const r = Service.deriveDistanceAuthority({
     proposedChannels: [
@@ -96,8 +96,9 @@ Service.FORBIDDEN_INFERENCE_SOURCES.forEach(badStatus => {
     ],
   });
   chk('E1 first valid wins', r.authority.sourceChannel === 'real_lap_distance');
-  chk('E1b rejectedProposals=2 (skipped before the first valid)', r.rejectedProposals.length === 2);
-  chk('E1c proposedCount=4 (records all four offered)', r.proposedCount === 4);
+  chk('E1b rejectedProposals=3 (2 pre-chosen invalid + 1 post-chosen skipped, per C-A WARN fix)', r.rejectedProposals.length === 3);
+  chk('E1c second_real_distance recorded as skipped_after_first_valid', r.rejectedProposals.find(p => p.channelName === 'second_real_distance').rejectedReason === 'skipped_after_first_valid');
+  chk('E1d proposedCount=4 (records all four offered)', r.proposedCount === 4);
 })();
 
 // ── F. fallbackInferences recorded but NEVER accepted ──
@@ -167,6 +168,28 @@ Service.FORBIDDEN_INFERENCE_SOURCES.forEach(badStatus => {
   chk('M1 all-inferential proposals → blocked', r.eligible === false);
   chk('M1b all 3 recorded as rejected with inferential reason',
     r.rejectedProposals.length === 3 && r.rejectedProposals.every(p => p.rejectedReason === 'authority_status_inferential_rejected'));
+})();
+
+// ── N. post-chosen enumeration (Codex Gate C-A WARN fix) — inferential proposals offered AFTER
+//      the first valid one MUST also be recorded as refused, so the evidence trail is honest about
+//      every distance source the caller offered. ──
+(() => {
+  const r = Service.deriveDistanceAuthority({
+    proposedChannels: [
+      validProp({ channelName: 'real_lap_distance' }),                                                          // chosen
+      validProp({ channelName: 'fake_inferred_after', authorityStatus: 'inferred_from_sample_index' }),         // must be recorded
+      validProp({ channelName: 'fake_speed_integral', authorityStatus: 'inferred_from_speed_integral' }),       // must be recorded
+      validProp({ channelName: 'another_valid_one' }),                                                          // must be recorded as skipped
+    ],
+  });
+  chk('N1 first valid chosen', r.eligible === true && r.authority.sourceChannel === 'real_lap_distance');
+  chk('N1b post-chosen inferential proposals recorded as inferential rejections',
+    r.rejectedProposals.length === 3
+    && r.rejectedProposals.filter(p => p.rejectedReason === 'authority_status_inferential_rejected').length === 2);
+  chk('N1c post-chosen valid proposal recorded as skipped_after_first_valid',
+    r.rejectedProposals.filter(p => p.rejectedReason === 'skipped_after_first_valid').length === 1
+    && r.rejectedProposals.find(p => p.rejectedReason === 'skipped_after_first_valid').channelName === 'another_valid_one');
+  chk('N1d proposedCount reflects total offered', r.proposedCount === 4);
 })();
 
 console.log('r3-0c-distance-authority: ' + pass + ' passed, ' + fail + ' failed');

@@ -198,6 +198,15 @@
     }
     var bigTimeGap = s.timebaseMaxGapSeconds > thresholds.timeGapSeconds;
     if (bigTimeGap) return { satisfied: false, discontinuous: true, reasonHint: 'time_gap_exceeds_threshold' };
+    // coverage gate — declared sample count divided by samples expected from (lapDuration / median).
+    // Below threshold means the lap evidence is internally inconsistent (declared median + duration
+    // imply many more samples than were collected — i.e. either large untimed gaps or misreporting).
+    // Treated as INSUFFICIENT_SAMPLE_COVERAGE (NOT DISCONTINUOUS_SAMPLES) — coverage is a density
+    // failure, not a single-gap failure. timeGap failures above already routed to DISCONTINUOUS.
+    var coverage = _coverage(ev, thresholds);
+    if (coverage < thresholds.coverage) {
+      return { satisfied: false, discontinuous: false, reasonHint: 'below_coverage_threshold' };
+    }
     // distance-domain gap is checked only when distance evidence is present AND authoritative.
     if (_isPlain(ev.distance) && _isPlain(ev.distance.samples)) {
       var d = ev.distance.samples;

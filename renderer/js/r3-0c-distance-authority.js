@@ -130,14 +130,21 @@
 
     var rejectedProposals = [];
     var chosen = null;
+    // Iterate EVERY proposal so the evidence trail records every offered candidate. Pick the first
+    // valid one as the authority; subsequent proposals (valid or invalid) are recorded with their
+    // actual reason. This is the contract: "the service refuses to accept a distance derived from
+    // [forbidden] signals regardless of how it is dressed up" — refusal must be visible even when a
+    // valid proposal earlier in the list has already supplied the authority.
     for (var i = 0; i < proposals.length; i++) {
       var c = proposals[i];
-      if (_isValidChannel(c)) { chosen = c; break; }
+      var validHere = _isValidChannel(c);
+      if (validHere && !chosen) { chosen = c; continue; }
+      var reason = validHere ? 'skipped_after_first_valid' : _rejectedReason(c);
       rejectedProposals.push(Object.freeze({
         index: i,
         channelName: _isPlain(c) && _nonEmptyStr(c.channelName) ? c.channelName : null,
         authorityStatus: _isPlain(c) && _nonEmptyStr(c.authorityStatus) ? c.authorityStatus : null,
-        rejectedReason: _rejectedReason(c),
+        rejectedReason: reason,
       }));
     }
 
