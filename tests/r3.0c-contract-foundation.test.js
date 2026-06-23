@@ -151,6 +151,9 @@ chk('normalized range is [0,1)', NP.NORMALIZED_RANGE.min === 0 && NP.NORMALIZED_
 (() => { const env = EX.buildComparisonExportEnvelope(); chk('envelope payload null in CP1', env.payload === null && env.generatedAt === null); chk('envelope validates', EX.validateComparisonExportEnvelope(env).valid === true); })();
 (() => { const big = {}; const arr = []; for (let i = 0; i < 1000; i++) arr.push(i); big.samples = arr; chk('oversized array payload → blocked', EX.buildComparisonExportEnvelope(big).eligible === false); })();
 (() => { const env = { schemaIdentity: 'racing-analyzer/comparison-export', schemaVersion: 999, payload: null }; chk('future schema version → blocked', EX.validateComparisonExportEnvelope(env).eligible === false); })();
+// fail-closed: ONLY the exact current schema version validates; -1/0/0.5/future/non-number all reject (Codex CP1 finding)
+[-1, 0, 0.5, 2, 999, '1', NaN, null].forEach(v => chk('non-exact schema version ' + JSON.stringify(v) + ' → blocked', EX.validateComparisonExportEnvelope({ schemaIdentity: 'racing-analyzer/comparison-export', schemaVersion: v, payload: null }).eligible === false));
+chk('exact schema version 1 → valid', EX.validateComparisonExportEnvelope({ schemaIdentity: 'racing-analyzer/comparison-export', schemaVersion: 1, payload: null }).valid === true);
 (() => { const env = { schemaIdentity: 'racing-analyzer/case-export', schemaVersion: 1, payload: null }; chk('wrong identity → blocked', EX.validateComparisonExportEnvelope(env).eligible === false); })();
 
 // ── M. eligible results never carry a numeric comparison payload ──

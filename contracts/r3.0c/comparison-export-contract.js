@@ -64,13 +64,15 @@
   /**
    * validateComparisonExportEnvelope(env) — fail-closed validator.
    *   • non-object / wrong schemaIdentity → INTERNAL_CONTRACT_VIOLATION;
-   *   • FUTURE schemaVersion (> current) → INTERNAL_CONTRACT_VIOLATION (never silently downgraded);
+   *   • any schemaVersion other than EXACTLY the current one (−1 / 0 / 0.5 / future / non-number) →
+   *     INTERNAL_CONTRACT_VIOLATION (fail-closed; never silently downgraded);
    *   • payload containing a raw/oversized array → INTERNAL_CONTRACT_VIOLATION.
    */
   function validateComparisonExportEnvelope(env) {
     if (!_isPlain(env)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'envelope not an object' });
     if (env.schemaIdentity !== COMPARISON_EXPORT_IDENTITY) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'wrong schema identity' });
-    if (typeof env.schemaVersion !== 'number' || !isFinite(env.schemaVersion) || env.schemaVersion > COMPARISON_EXPORT_SCHEMA_VERSION) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'unsupported schema version' });
+    // fail-closed: CP1 recognises EXACTLY this schema version; -1 / 0 / 0.5 / future / non-number all reject.
+    if (env.schemaVersion !== COMPARISON_EXPORT_SCHEMA_VERSION) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'unsupported schema version' });
     if (env.payload !== null && env.payload !== undefined) {
       if (!_isPlain(env.payload)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'payload not an object' });
       var errors = [];
