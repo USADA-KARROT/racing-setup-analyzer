@@ -49,11 +49,17 @@
     "delta_metrics_present",
     "comparison_export_present",
     "ui_present",
-    "feature_registry_active"
+    "feature_registry_active",
+    "phase_boundary_contract",
+    "viewmodel_state_transition_contract",
+    "framing_source_structured_contract"
   ],
   "governanceCapabilities": [
     "contract_foundation_present",
-    "governance_bootstrap_present"
+    "governance_bootstrap_present",
+    "phase_boundary_contract",
+    "viewmodel_state_transition_contract",
+    "framing_source_structured_contract"
   ],
   "productionCapabilities": [
     "production_adapter_present",
@@ -81,7 +87,10 @@
     "delta_metrics_present": "C5_DELTA_METRICS",
     "comparison_export_present": "C6_EXPORT",
     "ui_present": "C7_UI",
-    "feature_registry_active": "C8_ACTIVATION"
+    "feature_registry_active": "C8_ACTIVATION",
+    "phase_boundary_contract": "C7_UI",
+    "viewmodel_state_transition_contract": "C7_UI",
+    "framing_source_structured_contract": "C7_UI"
   },
   "runtimeConsumerCheckpoint": "C1_PRODUCTION_ADAPTER",
   "algorithmCheckpoint": "C2_LAP_AUTHORITY",
