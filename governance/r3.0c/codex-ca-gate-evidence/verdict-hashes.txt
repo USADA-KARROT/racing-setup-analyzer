@@ -1,0 +1,26 @@
+# sha256 of each formal Codex C-A gate verdict block (TIER-2 relayed-structured)
+#
+# The hash is computed over the EXACT verdict-block text inside the triple-backtick
+# fenced code block whose opening line is `== FORMAL CODEX C-A GATE VERDICT ==`, in
+# each round-*.md file in this directory. The hash excludes the backtick fence
+# itself; it covers exactly the text from the first `== FORMAL` line through the
+# last line BEFORE the closing fence, with newlines preserved as authored.
+#
+# Verification recipe (POSIX shell, mac/linux):
+#
+#   python3 - <<'PY' > /tmp/verdict.txt
+#   import re,sys
+#   content = open('round-4-cf28bed.md').read()
+#   blocks = re.findall(r'```\n(.*?)\n```', content, re.DOTALL)
+#   v = [b for b in blocks if 'FORMAL CODEX C-A GATE VERDICT' in b]
+#   print(v[-1])
+#   PY
+#   shasum -a 256 /tmp/verdict.txt
+#
+# If a verdict-block hash here does NOT match the recomputed value, the
+# corresponding round-*.md file has been edited after evidence persistence and
+# its tier-2 claim is no longer trustworthy.
+
+59ebca5ea9e55e9621e0dc0ef3c5520b8ca7943500f0fc2ee2c422a6fb55e32d  round-2-e3ac3d6.md  (BLOCK)
+6fb88f50e9cbfd21d52673110ebd31e30fa52497c2036c477e24c8ea68d61af0  round-3-2dab434.md  (BLOCK)
+c8da5c44f1fd865e31a3a8f88590b39d892e4465974b13859d084f76e27484d3  round-4-cf28bed.md  (PASS · authoritative)
