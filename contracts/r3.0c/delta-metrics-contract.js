@@ -12,6 +12,17 @@
  * corner-scope metrics (sector_delta + entry/mid/exit) REQUIRE a corner pair for
  * computation; an unpaired or absent pair surfaces DELTA_METRIC_CORNER_PAIR_REQUIRED.
  *
+ * CP1 round-2 retrofit (governance/r3.0c/cp1-retrofit-matrix.md F6 — phase-boundary gate):
+ *   • PHASE_SCOPE_METRICS = ['entry_delta', 'mid_delta', 'exit_delta'] is a strict subset of
+ *     CORNER_SCOPE_METRICS that REQUIRES a service-owned deterministic phase-boundary contract
+ *     to be authorised on the request.policy. Without it, those three metrics fail closed with
+ *     PHASE_BOUNDARY_CONTRACT_UNAUTHORISED (sector_delta is unaffected — sector spans the whole
+ *     corner so it does not depend on a phase split).
+ *   • The authorisation is structural at the contract layer; the actual capability gate lives in
+ *     governance/r3.0c/capabilities.json (phase_boundary_contract.enabled). The orchestrator
+ *     MUST refuse to fabricate the authorisation. A separate governance test asserts no
+ *     production code path supplies the authorisation while the capability is disabled.
+ *
  * The contract NEVER computes a delta; it only validates SHAPES. The production service
  * (renderer/js/r3-0c-delta-metrics.js) does the arithmetic AND enforces the sign convention as
  * a second layer.
@@ -31,12 +42,18 @@
   var DELTA_SIGN_MINUEND = 'comparison';
   var DELTA_SIGN_SUBTRAHEND = 'reference';
 
-  // Closed metric allowlist for C5. Two scopes:
-  //   lap_*  scope = LAP    (no corner pair required)
+  // Closed metric allowlist for C5. Three scopes:
+  //   lap_*    scope = LAP    (no corner pair required)
   //   corner_* scope = CORNER (a paired corner is required; an unpaired pair → fail-closed)
+  //   phase_*  scope = PHASE  (entry/mid/exit; CORNER + phase-boundary contract required)
   var SUPPORTED_DELTA_METRICS = Object.freeze(['lap_time', 'delta_cumulative', 'sector_delta', 'entry_delta', 'mid_delta', 'exit_delta']);
   var LAP_SCOPE_METRICS = Object.freeze(['lap_time', 'delta_cumulative']);
   var CORNER_SCOPE_METRICS = Object.freeze(['sector_delta', 'entry_delta', 'mid_delta', 'exit_delta']);
+  // CP1 round-2 retrofit (F6): the three phase metrics specifically need a service-owned
+  // deterministic phase-boundary contract authorisation; sector_delta does NOT (it spans the
+  // whole corner). The authorisation lives on request.policy.phaseBoundaryAuthorisation and is
+  // checked structurally here; governance/capabilities check whether it is allowed at runtime.
+  var PHASE_SCOPE_METRICS = Object.freeze(['entry_delta', 'mid_delta', 'exit_delta']);
 
   function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; }
   function _isFiniteNum(v) { return typeof v === 'number' && isFinite(v); }
@@ -94,6 +111,22 @@
     if (!_isPlain(policy)) reasons.push(CODES.INTERNAL_CONTRACT_VIOLATION);
     else if (policy.deltaSign !== DELTA_SIGN_FORMULA) reasons.push(CODES.DELTA_METRIC_SIGN_FORBIDDEN);
 
+    // CP1 round-2 retrofit (F6): if any of the three phase metrics is requested, the policy MUST
+    // declare a service-owned deterministic phase-boundary contract authorisation. The required
+    // shape is { contractRef:non-empty-string, serviceOwned:true, deterministic:true }. Any other
+    // shape (missing field / non-true literal / inferred caller-provided boundary) fails closed.
+    if (Array.isArray(metrics)) {
+      var anyPhaseScope = metrics.some(function (m) { return PHASE_SCOPE_METRICS.indexOf(m) !== -1; });
+      if (anyPhaseScope) {
+        var auth = _isPlain(policy) ? policy.phaseBoundaryAuthorisation : null;
+        var authOk = _isPlain(auth)
+          && typeof auth.contractRef === 'string' && auth.contractRef.length > 0
+          && auth.serviceOwned === true
+          && auth.deterministic === true;
+        if (!authOk) reasons.push(CODES.PHASE_BOUNDARY_CONTRACT_UNAUTHORISED);
+      }
+    }
+
     if (reasons.length) {
       // dedupe preserving order
       var seen = {}, deduped = [];
@@ -115,6 +148,7 @@
     CODES.DELTA_METRIC_CORNER_PAIR_REQUIRED,
     CODES.DELTA_METRIC_SIGN_FORBIDDEN,
     CODES.METRIC_REQUIRED_CHANNEL_UNAVAILABLE,
+    CODES.PHASE_BOUNDARY_CONTRACT_UNAUTHORISED,
     CODES.INTERNAL_CONTRACT_VIOLATION,
   ]);
 
@@ -125,6 +159,7 @@
     SUPPORTED_DELTA_METRICS: SUPPORTED_DELTA_METRICS,
     LAP_SCOPE_METRICS: LAP_SCOPE_METRICS,
     CORNER_SCOPE_METRICS: CORNER_SCOPE_METRICS,
+    PHASE_SCOPE_METRICS: PHASE_SCOPE_METRICS,
     R5_DELTA_REASON_CODES: R5_DELTA_REASON_CODES,
     evaluateDeltaMetricsRequestShape: evaluateDeltaMetricsRequestShape,
   };

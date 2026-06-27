@@ -81,7 +81,7 @@ function deferredOk() {
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-corner-segmentation.js')
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-corner-pairing.js')
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-delta-metrics.js')));
-  chk('A3e real-repo currentCheckpoint===C5_DELTA_METRICS', !!(r.artifact && r.artifact.currentCheckpoint === 'C5_DELTA_METRICS'));
+  chk('A3e real-repo currentCheckpoint===C5R_CP1_RETROFIT', !!(r.artifact && r.artifact.currentCheckpoint === 'C5R_CP1_RETROFIT'));
   chk('A3f real-repo runtimeConsumersAllowed===true', !!(r.artifact && r.artifact.runtimeConsumersAllowed === true));
   chk('A4 real-repo deferredStillDeferred===true', !!(r.artifact && r.artifact.deferredStillDeferred === true));
 })();

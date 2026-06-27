@@ -151,11 +151,18 @@
     // IS a valid (eligible) outcome — corner segmentation is allowed to return [].
 
     // Overlap detection (post-filter). Mutual exclusion is structurally true after _runsToSegments
-    // (each index in [start, end] of one run cannot also belong to another), so any overlap
-    // indicates a defect in the pipeline.
-    for (var oi = 1; oi < kept.length; oi++) {
-      if (_hasOverlap(kept[oi - 1], kept[oi])) {
-        return _blocked([CODES.CORNER_SEGMENTATION_OVERLAPPING_SEGMENTS], 'segment ' + oi + ' overlaps previous');
+    // for INDEX ranges, but the NORMALIZED-position ranges can drift if the request's positions
+    // array is non-monotonic (e.g. a wrap-misshapen or hand-crafted axis) so that two non-adjacent
+    // index runs map to overlapping normalized intervals. The formal Codex round-2 F10 finding
+    // showed a shaped request where seg[0] and seg[2] overlapped in normalized space while seg[1]
+    // sat between them. The previous adjacent-only loop missed it. Use an all-pairs scan
+    // (kept.length ≤ MAX_CORNERS ≤ 64 so O(n^2) is bounded and cheap) and fail-closed on any
+    // overlap detected.
+    for (var oi = 0; oi < kept.length; oi++) {
+      for (var oj = oi + 1; oj < kept.length; oj++) {
+        if (_hasOverlap(kept[oi], kept[oj])) {
+          return _blocked([CODES.CORNER_SEGMENTATION_OVERLAPPING_SEGMENTS], 'segment ' + oj + ' overlaps segment ' + oi);
+        }
       }
     }
 
