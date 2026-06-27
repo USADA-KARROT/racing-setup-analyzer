@@ -48,7 +48,8 @@ const hasCode = (res, code) => !!(res && Array.isArray(res.reasonCodes) && res.r
 function fullLapAuthority() {
   return { lapIdentity: { satisfied: true }, completeness: { satisfied: true }, timingValidity: { satisfied: true }, trackIdentity: { satisfied: true }, sampleContinuity: { satisfied: true } };
 }
-function ident(over) { return Object.assign({ analysisCaseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_1', trackId: 'trackA', layoutId: 'layout1' }, over || {}); }
+// CP1 round-2 retrofit (F5): identity must declare positionBasis + positionDirection.
+function ident(over) { return Object.assign({ analysisCaseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_1', trackId: 'trackA', layoutId: 'layout1', positionBasis: 'lap_distance', positionDirection: 'increasing' }, over || {}); }
 function normAuth() { return { basis: 'lap_distance', distanceAuthority: { satisfied: true }, positionUnit: 'm' }; }
 function fullComparisonInput(over) {
   return Object.assign({
@@ -457,6 +458,10 @@ chk('J25 referenceAndCornerForbiddenSelectionModes() identity-equal to contract'
 
 // ── J26+: C5 delta-metrics delegation ──
 const DeltaMetricsService = require('../renderer/js/r3-0c-delta-metrics.js');
+// CP1 round-2 retrofit (F6): phase metrics require a service-owned deterministic phase-boundary
+// authorisation; the test fixture supplies a test-only contractRef (governance test elsewhere
+// asserts no renderer/js path supplies it while phase_boundary_contract is disabled).
+const PHASE_BOUNDARY_TEST_FIXTURE = { contractRef: 'r3.0c/phase-boundary-test-fixture', serviceOwned: true, deterministic: true };
 function validDeltaReq(over) {
   return Object.assign({
     identity: { caseId: 'c1', sessionId: 's1' },
@@ -464,7 +469,7 @@ function validDeltaReq(over) {
     comparisonLap: { lapTimeMs: 89500 },
     pairing: { pairs: [{ referenceCorner: { id: 'r1', fullTimeMs: 10000, entryTimeMs: 3000, midTimeMs: 4000, exitTimeMs: 3000 }, comparisonCorner: { id: 'c1', fullTimeMs: 9800, entryTimeMs: 2900, midTimeMs: 4000, exitTimeMs: 2900 } }] },
     requestedMetrics: ['lap_time', 'sector_delta', 'entry_delta', 'mid_delta', 'exit_delta'],
-    policy: { deltaSign: 'comparison_minus_reference' },
+    policy: { deltaSign: 'comparison_minus_reference', phaseBoundaryAuthorisation: PHASE_BOUNDARY_TEST_FIXTURE },
   }, over || {});
 }
 // J26: adapter computeDeltaMetrics ≡ service.

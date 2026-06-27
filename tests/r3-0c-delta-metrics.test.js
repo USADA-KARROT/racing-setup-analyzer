@@ -24,6 +24,11 @@ function pair(refFull, cmpFull, refZones, cmpZones) {
     comparisonCorner: Object.assign({ id: 'c' + cmpFull, fullTimeMs: cmpFull, entryTimeMs: cmpFull / 3, midTimeMs: cmpFull / 3, exitTimeMs: cmpFull / 3 }, cmpZones),
   };
 }
+// CP1 round-2 retrofit (F6): the three phase metrics require a service-owned deterministic
+// phase-boundary authorisation. Tests inside this file supply a test-only fixture authorisation
+// (capabilities.json phase_boundary_contract is DISABLED at C5R; the fixture contractRef is
+// strictly for tests — a separate governance test forbids any renderer/js path from supplying it).
+var PHASE_BOUNDARY_TEST_FIXTURE = { contractRef: 'r3.0c/phase-boundary-test-fixture', serviceOwned: true, deterministic: true };
 function req(over) {
   return Object.assign({
     identity: { caseId: 'c1', sessionId: 's1' },
@@ -31,7 +36,7 @@ function req(over) {
     comparisonLap: { lapTimeMs: 89500 },
     pairing: { pairs: [pair(10000, 9800), pair(15000, 14800), pair(12000, 11900)] },
     requestedMetrics: ['lap_time', 'delta_cumulative', 'sector_delta', 'entry_delta', 'mid_delta', 'exit_delta'],
-    policy: { deltaSign: 'comparison_minus_reference' },
+    policy: { deltaSign: 'comparison_minus_reference', phaseBoundaryAuthorisation: PHASE_BOUNDARY_TEST_FIXTURE },
   }, over || {});
 }
 
@@ -167,6 +172,60 @@ chk('A3 SIGN_FORMULA === comparison_minus_reference', Service.SIGN_FORMULA === '
   const r = Service.computeDeltaMetrics(bad);
   chk('N.malformed-' + i + ' → blocked', r.eligible === false);
 });
+
+// O. CP1 round-2 retrofit (F6) — phase-boundary contract authorisation gate.
+//    The three phase metrics (entry_delta, mid_delta, exit_delta) require a service-owned
+//    deterministic phase-boundary authorisation on policy. Sector_delta and lap-scope metrics
+//    are unaffected (they do not depend on a phase split).
+(() => {
+  // O1: phase metrics requested but policy carries NO authorisation → blocked with
+  //     PHASE_BOUNDARY_CONTRACT_UNAUTHORISED.
+  const r1 = req();
+  r1.policy = { deltaSign: 'comparison_minus_reference' };
+  const out1 = Service.computeDeltaMetrics(r1);
+  chk('O1 phase metrics without authorisation → blocked', out1.eligible === false);
+  chk('O1 PHASE_BOUNDARY_CONTRACT_UNAUTHORISED emitted', hasCode(out1, CODES.PHASE_BOUNDARY_CONTRACT_UNAUTHORISED));
+})();
+(() => {
+  // O2: forged authorisation — serviceOwned not literal true → blocked.
+  const r2 = req();
+  r2.policy = { deltaSign: 'comparison_minus_reference', phaseBoundaryAuthorisation: { contractRef: 'r3.0c/some-ref', serviceOwned: 'true', deterministic: true } };
+  const out2 = Service.computeDeltaMetrics(r2);
+  chk('O2 forged authorisation (serviceOwned not literal true) → blocked', out2.eligible === false);
+  chk('O2 PHASE_BOUNDARY_CONTRACT_UNAUTHORISED emitted', hasCode(out2, CODES.PHASE_BOUNDARY_CONTRACT_UNAUTHORISED));
+})();
+(() => {
+  // O3: forged authorisation — deterministic missing → blocked.
+  const r3 = req();
+  r3.policy = { deltaSign: 'comparison_minus_reference', phaseBoundaryAuthorisation: { contractRef: 'r3.0c/some-ref', serviceOwned: true } };
+  const out3 = Service.computeDeltaMetrics(r3);
+  chk('O3 forged authorisation (deterministic missing) → blocked', out3.eligible === false);
+  chk('O3 PHASE_BOUNDARY_CONTRACT_UNAUTHORISED emitted', hasCode(out3, CODES.PHASE_BOUNDARY_CONTRACT_UNAUTHORISED));
+})();
+(() => {
+  // O4: forged authorisation — empty contractRef → blocked.
+  const r4 = req();
+  r4.policy = { deltaSign: 'comparison_minus_reference', phaseBoundaryAuthorisation: { contractRef: '', serviceOwned: true, deterministic: true } };
+  const out4 = Service.computeDeltaMetrics(r4);
+  chk('O4 empty contractRef → blocked', out4.eligible === false);
+  chk('O4 PHASE_BOUNDARY_CONTRACT_UNAUTHORISED emitted', hasCode(out4, CODES.PHASE_BOUNDARY_CONTRACT_UNAUTHORISED));
+})();
+(() => {
+  // O5: only sector_delta + lap-scope metrics (no phase trio) — authorisation is NOT required.
+  const r5 = req();
+  r5.requestedMetrics = ['lap_time', 'delta_cumulative', 'sector_delta'];
+  r5.policy = { deltaSign: 'comparison_minus_reference' }; // no authorisation supplied — should be OK
+  const out5 = Service.computeDeltaMetrics(r5);
+  chk('O5 sector_delta + lap-scope without authorisation → eligible', out5.eligible === true);
+})();
+(() => {
+  // O6: PHASE_SCOPE_METRICS constant is exposed by the contract and matches the three phase names.
+  chk('O6 PHASE_SCOPE_METRICS exposed', Array.isArray(DM.PHASE_SCOPE_METRICS));
+  chk('O6 PHASE_SCOPE_METRICS = entry/mid/exit', DM.PHASE_SCOPE_METRICS.length === 3
+    && DM.PHASE_SCOPE_METRICS.indexOf('entry_delta') !== -1
+    && DM.PHASE_SCOPE_METRICS.indexOf('mid_delta') !== -1
+    && DM.PHASE_SCOPE_METRICS.indexOf('exit_delta') !== -1);
+})();
 
 console.log('r3-0c-delta-metrics: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

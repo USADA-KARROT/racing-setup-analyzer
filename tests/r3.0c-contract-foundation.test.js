@@ -42,7 +42,10 @@ const hasCode = (res, code) => !!(res && Array.isArray(res.reasonCodes) && res.r
 function fullLapAuthority() {
   return { lapIdentity: { satisfied: true }, completeness: { satisfied: true }, timingValidity: { satisfied: true }, trackIdentity: { satisfied: true }, sampleContinuity: { satisfied: true } };
 }
-function ident(over) { return Object.assign({ analysisCaseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_1', trackId: 'trackA', layoutId: 'layout1' }, over || {}); }
+// CP1 round-2 retrofit (F5): identity now MUST declare positionBasis + positionDirection. The
+// fixture supplies the architecture v3-aligned values; per-test mutations drop these to exercise
+// the new fail-closed gates.
+function ident(over) { return Object.assign({ analysisCaseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_1', trackId: 'trackA', layoutId: 'layout1', positionBasis: 'lap_distance', positionDirection: 'increasing' }, over || {}); }
 function normAuth() { return { basis: 'lap_distance', distanceAuthority: { satisfied: true }, positionUnit: 'm' }; }
 function fullComparisonInput(over) {
   const base = {
@@ -55,7 +58,9 @@ function fullComparisonInput(over) {
 }
 
 // ── A. reason codes: stable / unique / machine-readable ──
-chk('55 reason codes total (16 mandated + 3 scope/metric + 16 normalized-distance + 16 reference-and-corner + 4 delta-metrics extensions)', RC.ALL_REASON_CODES.length === 55, RC.ALL_REASON_CODES.length);
+// CP1 round-2 retrofit (F1+F2+F3+F5+F6) added 9 new codes: 4 position-axis codes (F5), 4 export
+// codes (F1/F2/F3), 1 phase-boundary gate (F6). Total = 55 + 9 = 64.
+chk('64 reason codes total (16 mandated + 3 scope/metric + 16 normalized-distance + 16 reference-and-corner + 4 delta-metrics + 9 CP1R retrofit extensions)', RC.ALL_REASON_CODES.length === 64, RC.ALL_REASON_CODES.length);
 chk('reason codes unique', new Set(RC.ALL_REASON_CODES).size === RC.ALL_REASON_CODES.length);
 chk('reason codes are UPPER_SNAKE', RC.ALL_REASON_CODES.every(c => /^[A-Z][A-Z0-9_]*$/.test(c)));
 chk('REASON_CODES keyed by own value (stable)', Object.keys(RC.REASON_CODES).every(k => RC.REASON_CODES[k] === k));
@@ -166,6 +171,112 @@ chk('unsupported metric → blocked UNSUPPORTED_METRIC', CE.evaluateMetricSuppor
 (() => { const inp = fullComparisonInput(); delete inp.comparison.lapAuthority.timingValidity; chk('bad comparison lap → COMPARISON_LAP_UNAVAILABLE', hasCode(CE.evaluateComparisonEligibility(inp), 'COMPARISON_LAP_UNAVAILABLE')); })();
 (() => { const inp = fullComparisonInput(); inp.comparison.normalizationAuthority.basis = 'gps'; chk('non-lap-distance basis → INCOMPATIBLE_NORMALIZATION', hasCode(CE.evaluateComparisonEligibility(inp), 'INCOMPATIBLE_NORMALIZATION')); })();
 (() => { const inp = fullComparisonInput(); inp.credibilityMetadata = {}; chk('no credibility → INSUFFICIENT_CREDIBILITY_METADATA', hasCode(CE.evaluateComparisonEligibility(inp), 'INSUFFICIENT_CREDIBILITY_METADATA')); })();
+
+// ── CP1 round-2 retrofit (F5) — positionBasis / positionDirection in identity ──
+// All 9 new codes are present in the reason-code registry.
+['MISSING_POSITION_BASIS', 'INCOMPATIBLE_POSITION_BASIS', 'MISSING_POSITION_DIRECTION', 'INCOMPATIBLE_POSITION_DIRECTION',
+  'EXPORT_ENVELOPE_UNKNOWN_KEY', 'EXPORT_PAYLOAD_NON_FINITE_NUMBER', 'EXPORT_PAYLOAD_STRING_TOO_LONG',
+  'EXPORT_PAYLOAD_ENVELOPE_TOO_LARGE', 'PHASE_BOUNDARY_CONTRACT_UNAUTHORISED']
+  .forEach(c => chk('CP1R retrofit code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
+chk('CE.ACCEPTED_POSITION_BASES is closed allowlist', Array.isArray(CE.ACCEPTED_POSITION_BASES) && CE.ACCEPTED_POSITION_BASES.length === 3 && Object.isFrozen(CE.ACCEPTED_POSITION_BASES));
+chk('CE.ACCEPTED_POSITION_DIRECTIONS = increasing / decreasing', CE.ACCEPTED_POSITION_DIRECTIONS.length === 2 && CE.ACCEPTED_POSITION_DIRECTIONS.indexOf('increasing') !== -1 && CE.ACCEPTED_POSITION_DIRECTIONS.indexOf('decreasing') !== -1);
+chk('CE.FRAMING_KEY_SHAPE declared (F12 structural)', !!(CE.FRAMING_KEY_SHAPE && Array.isArray(CE.FRAMING_KEY_SHAPE.requiredKeys) && CE.FRAMING_KEY_SHAPE.requiredKeys.indexOf('reasonCode') !== -1 && CE.FRAMING_KEY_SHAPE.requiredKeys.indexOf('i18nKey') !== -1));
+(() => { const inp = fullComparisonInput(); delete inp.reference.identity.positionBasis; chk('F5 missing reference positionBasis → MISSING_POSITION_BASIS', hasCode(CE.evaluateComparisonEligibility(inp), 'MISSING_POSITION_BASIS')); })();
+(() => { const inp = fullComparisonInput(); inp.reference.identity.positionBasis = 'gps_polar'; chk('F5 bogus positionBasis → MISSING_POSITION_BASIS (out-of-allowlist)', hasCode(CE.evaluateComparisonEligibility(inp), 'MISSING_POSITION_BASIS')); })();
+(() => { const inp = fullComparisonInput(); inp.comparison.identity.positionBasis = 'distance_m'; chk('F5 ref vs cmp basis mismatch → INCOMPATIBLE_POSITION_BASIS', hasCode(CE.evaluateComparisonEligibility(inp), 'INCOMPATIBLE_POSITION_BASIS')); })();
+(() => { const inp = fullComparisonInput(); delete inp.reference.identity.positionDirection; chk('F5 missing reference positionDirection → MISSING_POSITION_DIRECTION', hasCode(CE.evaluateComparisonEligibility(inp), 'MISSING_POSITION_DIRECTION')); })();
+(() => { const inp = fullComparisonInput(); inp.comparison.identity.positionDirection = 'decreasing'; chk('F5 direction mismatch → INCOMPATIBLE_POSITION_DIRECTION', hasCode(CE.evaluateComparisonEligibility(inp), 'INCOMPATIBLE_POSITION_DIRECTION')); })();
+
+// ── CP1 round-2 retrofit (F4) — validateComparisonContextAgainstCase ──
+chk('CE.validateComparisonContextAgainstCase exposed', typeof CE.validateComparisonContextAgainstCase === 'function');
+(() => {
+  const caseRecord = { caseId: 'case_1', associations: { trackId: 'trackA', layoutId: 'layout1', positionBasis: 'lap_distance', positionDirection: 'increasing' } };
+  const context = { analysisCaseId: 'case_1', trackId: 'trackA', layoutId: 'layout1', positionBasis: 'lap_distance', positionDirection: 'increasing' };
+  chk('F4 context binding valid → eligible', CE.validateComparisonContextAgainstCase(caseRecord, context).valid === true);
+})();
+(() => {
+  // self-consistent forged trackId (both ref+cmp claim 'X') but case associates 'Z' → BLOCKED.
+  const caseRecord = { caseId: 'case_1', associations: { trackId: 'trackZ', layoutId: 'layout1' } };
+  const context = { analysisCaseId: 'case_1', trackId: 'trackA', layoutId: 'layout1' };
+  chk('F4 forged trackId → TRACK_IDENTITY_MISMATCH', hasCode(CE.validateComparisonContextAgainstCase(caseRecord, context), 'TRACK_IDENTITY_MISMATCH'));
+})();
+(() => {
+  // case association forces direction; context disagrees → INCOMPATIBLE_POSITION_DIRECTION.
+  const caseRecord = { caseId: 'case_1', associations: { trackId: 'trackA', layoutId: 'layout1', positionDirection: 'increasing' } };
+  const context = { analysisCaseId: 'case_1', trackId: 'trackA', layoutId: 'layout1', positionDirection: 'decreasing' };
+  chk('F4 case-vs-context direction → INCOMPATIBLE_POSITION_DIRECTION', hasCode(CE.validateComparisonContextAgainstCase(caseRecord, context), 'INCOMPATIBLE_POSITION_DIRECTION'));
+})();
+(() => {
+  // wrong analysisCaseId in context → CROSS_CASE_COMPARISON_UNSUPPORTED.
+  const caseRecord = { caseId: 'case_1', associations: { trackId: 'trackA', layoutId: 'layout1' } };
+  const context = { analysisCaseId: 'case_2', trackId: 'trackA', layoutId: 'layout1' };
+  chk('F4 case-id mismatch → CROSS_CASE_COMPARISON_UNSUPPORTED', hasCode(CE.validateComparisonContextAgainstCase(caseRecord, context), 'CROSS_CASE_COMPARISON_UNSUPPORTED'));
+})();
+(() => {
+  // composite eligibility with caseRecord present and binding fails → composite blocks.
+  const inp = fullComparisonInput();
+  inp.caseRecord = { caseId: 'case_1', associations: { trackId: 'trackZ', layoutId: 'layout1' } };
+  chk('F4 composite eligibility with bad caseRecord → blocks', !CE.evaluateComparisonEligibility(inp).eligible && hasCode(CE.evaluateComparisonEligibility(inp), 'TRACK_IDENTITY_MISMATCH'));
+})();
+
+// ── CP1 round-2 retrofit (F1) — comparison export envelope closed own-key set ──
+(() => {
+  // smuggling a secret field on the envelope → EXPORT_ENVELOPE_UNKNOWN_KEY.
+  const env = { schemaIdentity: 'racing-analyzer/comparison-export', schemaVersion: 1, generatedAt: null, payload: null, secret: 'x'.repeat(100) };
+  const r = EX.validateComparisonExportEnvelope(env);
+  chk('F1 unknown envelope key → EXPORT_ENVELOPE_UNKNOWN_KEY', !r.eligible && r.eligible === false);
+  chk('F1 reason code emitted', hasCode(r, 'EXPORT_ENVELOPE_UNKNOWN_KEY'));
+})();
+(() => {
+  // even a benign-looking extra field is refused.
+  const env = { schemaIdentity: 'racing-analyzer/comparison-export', schemaVersion: 1, generatedAt: null, payload: null, version: '2.0' };
+  chk('F1 extra benign-looking key still refused', hasCode(EX.validateComparisonExportEnvelope(env), 'EXPORT_ENVELOPE_UNKNOWN_KEY'));
+})();
+
+// ── CP1 round-2 retrofit (F2) — non-finite numbers in payload are rejected ──
+[NaN, Infinity, -Infinity].forEach(v => {
+  const r = EX.buildComparisonExportEnvelope({ delta: v });
+  chk('F2 payload number ' + (v === Infinity ? 'Infinity' : (v === -Infinity ? '-Infinity' : 'NaN')) + ' → blocked', !r.eligible && hasCode(r, 'EXPORT_PAYLOAD_NON_FINITE_NUMBER'));
+});
+(() => {
+  // finite numbers still pass.
+  const r = EX.buildComparisonExportEnvelope({ delta: -0.5, count: 0, big: 1e6 });
+  chk('F2 finite numbers still pass', r.schemaIdentity === 'racing-analyzer/comparison-export');
+})();
+
+// ── CP1 round-2 retrofit (F3) — per-string + total envelope byte caps ──
+(() => {
+  const oversized = 'x'.repeat(EX.MAX_STRING_UTF8_BYTES + 1);
+  const r = EX.buildComparisonExportEnvelope({ notes: oversized });
+  chk('F3 per-string cap → EXPORT_PAYLOAD_STRING_TOO_LONG', !r.eligible && hasCode(r, 'EXPORT_PAYLOAD_STRING_TOO_LONG'));
+})();
+(() => {
+  // smuggled base64 raw telemetry (>4 KiB) refused by per-string cap.
+  const r = EX.buildComparisonExportEnvelope({ rawSamplesBase64: 'A'.repeat(5000) });
+  chk('F3 smuggled base64 raw telemetry → blocked', !r.eligible && hasCode(r, 'EXPORT_PAYLOAD_STRING_TOO_LONG'));
+})();
+(() => {
+  // envelope total cap (constructive): every string ≤ MAX_STRING_UTF8_BYTES (4 KiB) but the
+  // sum across many fields crosses MAX_ENVELOPE_UTF8_BYTES (256 KiB). We build 100 fields each
+  // ~3000 bytes → 100 × 3000 ≈ 300 KiB > 256 KiB.
+  const payload = {};
+  for (let i = 0; i < 100; i++) payload['f' + i] = 'a'.repeat(3000);
+  const r = EX.buildComparisonExportEnvelope(payload);
+  chk('F3 envelope total cap → EXPORT_PAYLOAD_ENVELOPE_TOO_LARGE',
+    !r.eligible && hasCode(r, 'EXPORT_PAYLOAD_ENVELOPE_TOO_LARGE'));
+})();
+(() => {
+  // F1 also blocks unknown keys at build time? buildComparisonExportEnvelope wraps a plain payload,
+  // it does NOT accept envelope-style outer keys. We confirm validateComparisonExportEnvelope is the
+  // gate.
+  const env = EX.buildComparisonExportEnvelope({});
+  chk('F1 build returns a clean envelope', env.schemaIdentity === 'racing-analyzer/comparison-export' && env.payload && Object.keys(env.payload).length === 0);
+})();
+(() => {
+  // exotic objects in payload (Date) still refused — existing behaviour preserved.
+  const r = EX.buildComparisonExportEnvelope({ when: new Date() });
+  chk('exotic Date still refused', !r.eligible);
+})();
 
 // ── normalized position contract ──
 chk('lap-distance authority valid', NP.evaluateNormalizedPositionAuthority(normAuth()).eligible === true);
