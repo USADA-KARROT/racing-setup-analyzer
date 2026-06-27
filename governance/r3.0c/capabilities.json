@@ -71,19 +71,19 @@
     },
     "phase_boundary_contract": {
       "kind": "contract",
-      "unlockFloor": "C7_UI",
+      "unlockFloor": "C5R_CP1_RETROFIT",
       "enabled": false,
       "description": "CP1 round-2 retrofit (cp1-retrofit-matrix.md F6). Service-owned deterministic phase-boundary contract authorising the three phase delta metrics (entry_delta, mid_delta, exit_delta). Disabled at C5R: any production caller requesting a phase metric without a registered, service-owned, deterministic phase-boundary authorisation MUST be refused with PHASE_BOUNDARY_CONTRACT_UNAUTHORISED. Test fixtures may declare a test-only authorisation (contractRef = 'r3.0c/phase-boundary-test-fixture') strictly inside test files; a governance test asserts no renderer/js path supplies a phase-boundary authorisation while this capability is disabled."
     },
     "viewmodel_state_transition_contract": {
       "kind": "contract",
-      "unlockFloor": "C7_UI",
+      "unlockFloor": "C5R_CP1_RETROFIT",
       "enabled": false,
       "description": "CP1 round-2 retrofit (cp1-retrofit-matrix.md F11). Viewmodel state-transition contract: on every input change (reference, comparison, case association, channel mapping) the viewmodel MUST clear the prior result + render a loading state; the orchestrator MUST commit results only under a request token, dropping stale-token results. Disabled at C5R because no viewmodel exists yet; C7_UI cannot ship without this capability being enabled with a registered contract document."
     },
     "framing_source_structured_contract": {
       "kind": "contract",
-      "unlockFloor": "C7_UI",
+      "unlockFloor": "C5R_CP1_RETROFIT",
       "enabled": false,
       "description": "CP1 round-2 retrofit (cp1-retrofit-matrix.md F12). Framing-source contract: every framing entry the orchestrator emits MUST be a plain object { reasonCode, i18nKey, params? } — never free-form prose. The renderer maps i18nKey to a frozen wording table; the source layer never authors UI prose. Disabled at C5R because no orchestrator exists yet; C7_UI cannot ship without this capability being enabled with a registered framing key registry."
     }

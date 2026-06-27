@@ -111,7 +111,7 @@ function writeFixture(opts) {
   const r = runValidator(null);
   chk('A1 real-repo validator exits 0', r.status === 0, r.stderr);
   chk('A2 real-repo ok===true', !!(r.artifact && r.artifact.ok === true), r.artifact && r.artifact.violations);
-  chk('A3 real-repo checkpoint=C5_DELTA_METRICS', !!(r.artifact && r.artifact.currentCheckpoint === 'C5_DELTA_METRICS'));
+  chk('A3 real-repo checkpoint=C5R_CP1_RETROFIT', !!(r.artifact && r.artifact.currentCheckpoint === 'C5R_CP1_RETROFIT'));
   chk('A4 real-repo authPathCount=9 (C1..C4 paths + C5 delta-metrics)', !!(r.artifact && r.artifact.authorizedProductionPathCount === 9));
   chk('A5 real-repo enabledCapCount=8 (C1..C4 capabilities + delta_metrics_present)', !!(r.artifact && r.artifact.enabledCapabilityCount === 8));
   chk('A6 real-repo runtimeConsumers=true (C1 floor)', r.artifact && r.artifact.runtimeConsumersAllowed === true);

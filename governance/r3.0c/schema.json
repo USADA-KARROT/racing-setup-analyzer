@@ -10,6 +10,7 @@
     "C3_NORMALIZED_DISTANCE",
     "C4_REFERENCE_AND_CORNER",
     "C5_DELTA_METRICS",
+    "C5R_CP1_RETROFIT",
     "C6_EXPORT",
     "C7_UI",
     "C8_ACTIVATION"
@@ -20,7 +21,8 @@
     "C2_LAP_AUTHORITY": ["C3_NORMALIZED_DISTANCE"],
     "C3_NORMALIZED_DISTANCE": ["C4_REFERENCE_AND_CORNER"],
     "C4_REFERENCE_AND_CORNER": ["C5_DELTA_METRICS"],
-    "C5_DELTA_METRICS": ["C6_EXPORT"],
+    "C5_DELTA_METRICS": ["C5R_CP1_RETROFIT"],
+    "C5R_CP1_RETROFIT": ["C6_EXPORT"],
     "C6_EXPORT": ["C7_UI"],
     "C7_UI": ["C8_ACTIVATION"],
     "C8_ACTIVATION": []
@@ -32,6 +34,7 @@
     "C3_NORMALIZED_DISTANCE",
     "C4_REFERENCE_AND_CORNER",
     "C5_DELTA_METRICS",
+    "C5R_CP1_RETROFIT",
     "C6_EXPORT",
     "C7_UI",
     "C8_ACTIVATION"
@@ -88,9 +91,9 @@
     "comparison_export_present": "C6_EXPORT",
     "ui_present": "C7_UI",
     "feature_registry_active": "C8_ACTIVATION",
-    "phase_boundary_contract": "C7_UI",
-    "viewmodel_state_transition_contract": "C7_UI",
-    "framing_source_structured_contract": "C7_UI"
+    "phase_boundary_contract": "C5R_CP1_RETROFIT",
+    "viewmodel_state_transition_contract": "C5R_CP1_RETROFIT",
+    "framing_source_structured_contract": "C5R_CP1_RETROFIT"
   },
   "runtimeConsumerCheckpoint": "C1_PRODUCTION_ADAPTER",
   "algorithmCheckpoint": "C2_LAP_AUTHORITY",
