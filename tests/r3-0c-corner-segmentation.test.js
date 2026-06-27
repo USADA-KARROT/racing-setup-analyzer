@@ -167,5 +167,34 @@ chk('A4 LATERAL_ACCEL_THRESHOLD_MPS2 > 0', Service.LATERAL_ACCEL_THRESHOLD_MPS2 
   chk('N.malformed-' + i + ' → blocked', r.eligible === false);
 });
 
+// O. Formal Codex round-2 fix (F10 partial → closed): non-adjacent overlap detection.
+//    Hand-crafted non-monotonic positions axis produces three runs whose normalized ranges are:
+//      run0 ≈ [0.10, 0.30]
+//      run1 ≈ [0.40, 0.50]   (sits between, no overlap with either neighbour)
+//      run2 ≈ [0.15, 0.25]   (overlaps run0 in normalized space)
+//    The previous adjacent-only loop checked run0↔run1 and run1↔run2 and saw no overlap. The
+//    all-pairs loop catches run0↔run2 and fail-closes with CORNER_SEGMENTATION_OVERLAPPING_SEGMENTS.
+(() => {
+  const n = 300;
+  // monotonic baseline 0..1, then deliberately jump backwards for index ≥ 100.
+  const positions = new Array(n);
+  for (let i = 0; i < 50; i++) positions[i] = 0.10 + (i / 49) * (0.30 - 0.10);     // 0.10..0.30
+  for (let i = 50; i < 100; i++) positions[i] = 0.40 + ((i - 50) / 49) * (0.50 - 0.40); // 0.40..0.50
+  // jump backwards for run2
+  for (let i = 100; i < n; i++) positions[i] = 0.15 + ((i - 100) / (n - 100 - 1)) * (0.25 - 0.15); // 0.15..0.25
+  const lat = new Array(n).fill(0);
+  // three cornering runs (lateral_accel above LATERAL_ACCEL_THRESHOLD_MPS2):
+  for (let i = 5; i < 45; i++) lat[i] = 5;     // run0 → normalized ~ [0.10, 0.28]
+  for (let i = 55; i < 95; i++) lat[i] = 5;    // run1 → normalized ~ [0.41, 0.49]
+  for (let i = 105; i < 290; i++) lat[i] = 5;  // run2 → normalized ~ [0.15, 0.25]
+  const r = req({
+    normalizedDistanceAxis: { eligible: true, positions: positions },
+    channels: Object.assign(fullChannels(n), { lateral_accel: lat }),
+  });
+  const out = Service.segmentCorners(r);
+  chk('O1 non-adjacent overlap → blocked', out.eligible === false);
+  chk('O1 CORNER_SEGMENTATION_OVERLAPPING_SEGMENTS emitted', hasCode(out, CODES.CORNER_SEGMENTATION_OVERLAPPING_SEGMENTS));
+})();
+
 console.log('r3-0c-corner-segmentation: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

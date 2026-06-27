@@ -127,6 +127,13 @@
     EXPORT_PAYLOAD_STRING_TOO_LONG: 'EXPORT_PAYLOAD_STRING_TOO_LONG',
     EXPORT_PAYLOAD_ENVELOPE_TOO_LARGE: 'EXPORT_PAYLOAD_ENVELOPE_TOO_LARGE',
     PHASE_BOUNDARY_CONTRACT_UNAUTHORISED: 'PHASE_BOUNDARY_CONTRACT_UNAUTHORISED',
+    // F12 (framing-source contract) — the orchestrator's structural fallback when a service
+    // observed a difference but cannot attribute it to a specific channel-aligned cause. This
+    // code lets the framing entry remain a {reasonCode, i18nKey, params} triple (per
+    // FRAMING_KEY_SHAPE) instead of degenerating into free-form prose. Without this code the
+    // framing-source contract would document an internally-impossible state — formal Codex
+    // round-2 F12 finding.
+    CANNOT_DISTINGUISH: 'CANNOT_DISTINGUISH',
   });
 
   var ALL_REASON_CODES = Object.freeze(Object.keys(REASON_CODES).map(function (k) { return REASON_CODES[k]; }));

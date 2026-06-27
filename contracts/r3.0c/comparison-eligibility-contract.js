@@ -106,13 +106,18 @@
     else if (assoc.layoutId !== context.layoutId) reasons.push(CODES.TRACK_IDENTITY_MISMATCH);
     // positionBasis / positionDirection are CHECKED against the case associations IF the case carries
     // them. A case that omits these falls through (the per-side identity check still demands them
-    // structurally). A case that carries them but the context contradicts → fail-closed.
-    if (assoc.positionBasis != null && _inAllowed(ACCEPTED_POSITION_BASES, assoc.positionBasis)) {
-      if (!_inAllowed(ACCEPTED_POSITION_BASES, context.positionBasis)) reasons.push(CODES.MISSING_POSITION_BASIS);
+    // structurally). A case that carries them but the value is OUT-OF-ALLOWLIST is itself an
+    // INVALID case record and fails closed (formal Codex round-2 F4 finding: a bogus value cannot
+    // be silently treated as "case did not carry it"). A case that carries a valid value but the
+    // context contradicts → fail-closed.
+    if (assoc.positionBasis != null) {
+      if (!_inAllowed(ACCEPTED_POSITION_BASES, assoc.positionBasis)) reasons.push(CODES.INCOMPATIBLE_POSITION_BASIS);
+      else if (!_inAllowed(ACCEPTED_POSITION_BASES, context.positionBasis)) reasons.push(CODES.MISSING_POSITION_BASIS);
       else if (assoc.positionBasis !== context.positionBasis) reasons.push(CODES.INCOMPATIBLE_POSITION_BASIS);
     }
-    if (assoc.positionDirection != null && _inAllowed(ACCEPTED_POSITION_DIRECTIONS, assoc.positionDirection)) {
-      if (!_inAllowed(ACCEPTED_POSITION_DIRECTIONS, context.positionDirection)) reasons.push(CODES.MISSING_POSITION_DIRECTION);
+    if (assoc.positionDirection != null) {
+      if (!_inAllowed(ACCEPTED_POSITION_DIRECTIONS, assoc.positionDirection)) reasons.push(CODES.INCOMPATIBLE_POSITION_DIRECTION);
+      else if (!_inAllowed(ACCEPTED_POSITION_DIRECTIONS, context.positionDirection)) reasons.push(CODES.MISSING_POSITION_DIRECTION);
       else if (assoc.positionDirection !== context.positionDirection) reasons.push(CODES.INCOMPATIBLE_POSITION_DIRECTION);
     }
     // dedupe preserving first-seen order

@@ -59,8 +59,10 @@ function fullComparisonInput(over) {
 
 // ── A. reason codes: stable / unique / machine-readable ──
 // CP1 round-2 retrofit (F1+F2+F3+F5+F6) added 9 new codes: 4 position-axis codes (F5), 4 export
-// codes (F1/F2/F3), 1 phase-boundary gate (F6). Total = 55 + 9 = 64.
-chk('64 reason codes total (16 mandated + 3 scope/metric + 16 normalized-distance + 16 reference-and-corner + 4 delta-metrics + 9 CP1R retrofit extensions)', RC.ALL_REASON_CODES.length === 64, RC.ALL_REASON_CODES.length);
+// codes (F1/F2/F3), 1 phase-boundary gate (F6). Formal Codex round-2 F12 adds 1 more
+// (CANNOT_DISTINGUISH) so the framing-source contract is internally satisfiable.
+// Total = 55 + 9 + 1 = 65.
+chk('65 reason codes total (16 mandated + 3 scope/metric + 16 normalized-distance + 16 reference-and-corner + 4 delta-metrics + 9 CP1R retrofit + 1 F12 framing extensions)', RC.ALL_REASON_CODES.length === 65, RC.ALL_REASON_CODES.length);
 chk('reason codes unique', new Set(RC.ALL_REASON_CODES).size === RC.ALL_REASON_CODES.length);
 chk('reason codes are UPPER_SNAKE', RC.ALL_REASON_CODES.every(c => /^[A-Z][A-Z0-9_]*$/.test(c)));
 chk('REASON_CODES keyed by own value (stable)', Object.keys(RC.REASON_CODES).every(k => RC.REASON_CODES[k] === k));
@@ -176,7 +178,7 @@ chk('unsupported metric → blocked UNSUPPORTED_METRIC', CE.evaluateMetricSuppor
 // All 9 new codes are present in the reason-code registry.
 ['MISSING_POSITION_BASIS', 'INCOMPATIBLE_POSITION_BASIS', 'MISSING_POSITION_DIRECTION', 'INCOMPATIBLE_POSITION_DIRECTION',
   'EXPORT_ENVELOPE_UNKNOWN_KEY', 'EXPORT_PAYLOAD_NON_FINITE_NUMBER', 'EXPORT_PAYLOAD_STRING_TOO_LONG',
-  'EXPORT_PAYLOAD_ENVELOPE_TOO_LARGE', 'PHASE_BOUNDARY_CONTRACT_UNAUTHORISED']
+  'EXPORT_PAYLOAD_ENVELOPE_TOO_LARGE', 'PHASE_BOUNDARY_CONTRACT_UNAUTHORISED', 'CANNOT_DISTINGUISH']
   .forEach(c => chk('CP1R retrofit code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
 chk('CE.ACCEPTED_POSITION_BASES is closed allowlist', Array.isArray(CE.ACCEPTED_POSITION_BASES) && CE.ACCEPTED_POSITION_BASES.length === 3 && Object.isFrozen(CE.ACCEPTED_POSITION_BASES));
 chk('CE.ACCEPTED_POSITION_DIRECTIONS = increasing / decreasing', CE.ACCEPTED_POSITION_DIRECTIONS.length === 2 && CE.ACCEPTED_POSITION_DIRECTIONS.indexOf('increasing') !== -1 && CE.ACCEPTED_POSITION_DIRECTIONS.indexOf('decreasing') !== -1);
@@ -217,6 +219,25 @@ chk('CE.validateComparisonContextAgainstCase exposed', typeof CE.validateCompari
   const inp = fullComparisonInput();
   inp.caseRecord = { caseId: 'case_1', associations: { trackId: 'trackZ', layoutId: 'layout1' } };
   chk('F4 composite eligibility with bad caseRecord → blocks', !CE.evaluateComparisonEligibility(inp).eligible && hasCode(CE.evaluateComparisonEligibility(inp), 'TRACK_IDENTITY_MISMATCH'));
+})();
+// Formal Codex round-2 fix (F4 partial → closed): a case record carrying an out-of-allowlist
+// positionBasis / positionDirection used to silently pass because the if-branch only ran when
+// the value was already valid. Now any non-null bogus value emits the INCOMPATIBLE_* code.
+(() => {
+  const caseRecord = { caseId: 'case_1', associations: { trackId: 'trackA', layoutId: 'layout1', positionBasis: 'bogus' } };
+  const context = { analysisCaseId: 'case_1', trackId: 'trackA', layoutId: 'layout1', positionBasis: 'lap_distance', positionDirection: 'increasing' };
+  chk('F4 case associations bogus positionBasis → INCOMPATIBLE_POSITION_BASIS', hasCode(CE.validateComparisonContextAgainstCase(caseRecord, context), 'INCOMPATIBLE_POSITION_BASIS'));
+})();
+(() => {
+  const caseRecord = { caseId: 'case_1', associations: { trackId: 'trackA', layoutId: 'layout1', positionDirection: 'sideways' } };
+  const context = { analysisCaseId: 'case_1', trackId: 'trackA', layoutId: 'layout1', positionBasis: 'lap_distance', positionDirection: 'increasing' };
+  chk('F4 case associations bogus positionDirection → INCOMPATIBLE_POSITION_DIRECTION', hasCode(CE.validateComparisonContextAgainstCase(caseRecord, context), 'INCOMPATIBLE_POSITION_DIRECTION'));
+})();
+(() => {
+  // composite catches it too when caseRecord is supplied.
+  const inp = fullComparisonInput();
+  inp.caseRecord = { caseId: 'case_1', associations: { trackId: 'trackA', layoutId: 'layout1', positionBasis: 'bogus' } };
+  chk('F4 composite catches bogus case positionBasis', hasCode(CE.evaluateComparisonEligibility(inp), 'INCOMPATIBLE_POSITION_BASIS'));
 })();
 
 // ── CP1 round-2 retrofit (F1) — comparison export envelope closed own-key set ──
