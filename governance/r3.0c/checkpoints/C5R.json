@@ -3,17 +3,17 @@
   "program": "R3.0C",
   "checkpoint": "C5R_CP1_RETROFIT",
   "baseSha": "5f70aafa82d4539dda5229da4a288ebaca62767d",
-  "headSha": null,
+  "headSha": "5d2d2aa8fbea5077b19c5ea2d5022f88c39ddb33",
   "previousCheckpoint": "C5_DELTA_METRICS",
 
   "shaSeparation": {
-    "note": "Per SKYLINE 2026-06-28 ruling, this manifest distinguishes three orthogonal SHAs. A future reader MUST NOT conflate them. The headSha field above mirrors integrationSha; until integration lands it is null. reviewedCandidateSha is the pre-integration SHA Codex actually reviewed.",
+    "note": "Per SKYLINE 2026-06-28 ruling, this manifest distinguishes three orthogonal SHAs. A future reader MUST NOT conflate them. headSha mirrors integrationSha now that the PR has merged. reviewedCandidateSha remains the pre-integration SHA Codex actually reviewed and is NOT advanced by merge.",
     "reviewedCandidateSha": "cf28bed48f19c9909406cf645bed804195caf597",
-    "reviewedCandidateNote": "The exact retrofit-branch HEAD that the formal Codex C-A gate verdict (round 4 PASS) was issued against. See governance/r3.0c/codex-ca-gate-evidence/round-4-cf28bed.md and verdict-hashes.txt.",
-    "manifestCommitSha": null,
-    "manifestCommitNote": "The git commit SHA produced when this manifest itself lands on the retrofit branch. Filled by a follow-up evidence-anchoring commit AFTER this manifest is merged into Train. Until then, null is the honest value; substituting this for reviewedCandidateSha would be a tier violation.",
-    "integrationSha": null,
-    "integrationNote": "The Train-branch HEAD AFTER the retrofit PR is merged into feat/r3.0-integrated-delivery. Filled only after the branch-to-branch PR is merged AND the Train target-context CI / trusted-verification has passed at that integration HEAD. headSha mirrors this value when set. A separate Codex re-gate against integrationSha would be required for any claim of post-merge Codex review."
+    "reviewedCandidateNote": "The exact retrofit-branch HEAD that the formal Codex C-A gate verdict (round 4 PASS) was issued against. See governance/r3.0c/codex-ca-gate-evidence/round-4-cf28bed.md and verdict-hashes.txt. This SHA is permanently reachable from the Train branch (verified via git merge-base --is-ancestor at integration time).",
+    "manifestCommitSha": "2390df49a4bb339f0e988848f3948798208b0445",
+    "manifestCommitNote": "The git commit SHA that authored this manifest on the retrofit branch (commit title: cp1r(c5r): C5R_CP1_RETROFIT checkpoint manifest + governance state advance). Distinct from reviewedCandidateSha; substituting one for the other is a tier violation.",
+    "integrationSha": "5d2d2aa8fbea5077b19c5ea2d5022f88c39ddb33",
+    "integrationNote": "The Train-branch HEAD AFTER PR #17 (retrofit → Train) was merged into feat/r3.0-integrated-delivery via merge_commit method on 2026-06-27T23:44:43Z. This is a merge-commit SHA (two parents: previous Train HEAD 5f70aaf + retrofit HEAD 2390df4). Train target-context CI / trusted-verification PASS was bound to the retrofit HEAD 2390df4 (not this merge-commit SHA); a separate Codex re-gate against integrationSha would be required for any claim of post-merge Codex review, and a separate trusted-verification run against integrationSha would be required for any claim of post-merge CI authority. The current Train PR #16 (Train → main) carries this as its new headRefOid."
   },
 
   "authorizedPaths": [
@@ -111,8 +111,10 @@
     ]
   },
 
-  "createdAt": null,
-  "status": "pending",
+  "createdAt": "2026-06-27T23:44:43Z",
+  "createdAtNote": "Filled with the PR #17 merge timestamp (gh pulls/17 mergedAt) so the value is bound to a CI-verifiable moment, not to a local clock. The original draft of this manifest at commit 2390df4 carried null per checkpoint-manifest.schema convention.",
+  "status": "candidate",
+  "statusNote": "'candidate' is set on this post-merge anchoring commit because the trusted-verification artifact bound to integrationSha (5d2d2aa8) does not yet exist — pre-merge CI ran against the retrofit HEAD 2390df4, not the merge-commit SHA. A subsequent CI run on the merged Train HEAD would bind PASS authority to 5d2d2aa8; until then status remains 'candidate'. PASS lives in the artifact bound to integrationSha, not in this file.",
   "governanceChanged": true,
 
   "note": "C5R is a retrofit checkpoint. It does NOT advance any productionCapability beyond C5; enabledCapabilitiesBefore === enabledCapabilitiesAfter. It brings the C1-C5 surface into honesty alignment with the formal Codex C-A round-2 BLOCK adjudication (F1-F12 closure detailed above). The retrofit modifies one already-authorised production file (renderer/js/r3-0c-corner-segmentation.js — bounded O(n^2) overlap-scan extension, no algorithm replacement) and four contracts; declares three new governance-capabilities (phase_boundary_contract / viewmodel_state_transition_contract / framing_source_structured_contract — all DISABLED) that gate the deferred C7_UI surface; persists Codex C-A evidence in tiered form under governance/r3.0c/codex-ca-gate-evidence/; and explicitly separates reviewedCandidateSha / manifestCommitSha / integrationSha so future audits cannot conflate them. The trusted-verification artifact bound to the eventual Train integrationSha is the PASS authority for THAT integration; reviewedCandidateSha is the PASS authority only for the pre-merge retrofit candidate. headSha / workflowRunId / artifactId / artifactBoundSha / createdAt are intentionally null in-commit, mirroring the existing C0-C5 manifest convention. status='pending' per the same convention; PASS lives in the trusted-verification artifact, not in this file."
