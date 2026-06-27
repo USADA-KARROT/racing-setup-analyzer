@@ -102,6 +102,31 @@
     DELTA_METRIC_EMPTY_INPUT: 'DELTA_METRIC_EMPTY_INPUT',
     DELTA_METRIC_CORNER_PAIR_REQUIRED: 'DELTA_METRIC_CORNER_PAIR_REQUIRED',
     DELTA_METRIC_SIGN_FORBIDDEN: 'DELTA_METRIC_SIGN_FORBIDDEN',
+    // documented CP1 round-2 retrofit extensions (C5R_CP1_RETROFIT). Each closes a contract gap
+    // surfaced by the round-2 adversarial review (governance/r3.0c/cp1-retrofit-matrix.md F1–F12):
+    //   • MISSING_POSITION_BASIS / INCOMPATIBLE_POSITION_BASIS — identity must carry positionBasis
+    //     (architecture v3 §(1)); without it the comparison cannot rule out a flipped axis.
+    //   • MISSING_POSITION_DIRECTION / INCOMPATIBLE_POSITION_DIRECTION — identity must carry
+    //     positionDirection; without it a clockwise vs counter-clockwise lap on the same layout
+    //     could pair on an inverted axis.
+    //   • EXPORT_ENVELOPE_UNKNOWN_KEY — the comparison export envelope has a closed own-key set;
+    //     any extra own-key fails closed (smuggled-payload prevention).
+    //   • EXPORT_PAYLOAD_NON_FINITE_NUMBER — payload numbers must be finite; NaN / Infinity /
+    //     -Infinity reject (round-trip JSON would silently drop them, so they're refused at source).
+    //   • EXPORT_PAYLOAD_STRING_TOO_LONG / EXPORT_PAYLOAD_ENVELOPE_TOO_LARGE — per-string UTF-8
+    //     byte cap and total envelope byte cap.
+    //   • PHASE_BOUNDARY_CONTRACT_UNAUTHORISED — the four corner-phase delta metrics
+    //     (entry/mid/exit + sector phase split) are governance-locked until a service-owned
+    //     deterministic phase-boundary contract is enabled in governance/r3.0c/capabilities.json.
+    MISSING_POSITION_BASIS: 'MISSING_POSITION_BASIS',
+    INCOMPATIBLE_POSITION_BASIS: 'INCOMPATIBLE_POSITION_BASIS',
+    MISSING_POSITION_DIRECTION: 'MISSING_POSITION_DIRECTION',
+    INCOMPATIBLE_POSITION_DIRECTION: 'INCOMPATIBLE_POSITION_DIRECTION',
+    EXPORT_ENVELOPE_UNKNOWN_KEY: 'EXPORT_ENVELOPE_UNKNOWN_KEY',
+    EXPORT_PAYLOAD_NON_FINITE_NUMBER: 'EXPORT_PAYLOAD_NON_FINITE_NUMBER',
+    EXPORT_PAYLOAD_STRING_TOO_LONG: 'EXPORT_PAYLOAD_STRING_TOO_LONG',
+    EXPORT_PAYLOAD_ENVELOPE_TOO_LARGE: 'EXPORT_PAYLOAD_ENVELOPE_TOO_LARGE',
+    PHASE_BOUNDARY_CONTRACT_UNAUTHORISED: 'PHASE_BOUNDARY_CONTRACT_UNAUTHORISED',
   });
 
   var ALL_REASON_CODES = Object.freeze(Object.keys(REASON_CODES).map(function (k) { return REASON_CODES[k]; }));
