@@ -111,9 +111,9 @@ function writeFixture(opts) {
   const r = runValidator(null);
   chk('A1 real-repo validator exits 0', r.status === 0, r.stderr);
   chk('A2 real-repo ok===true', !!(r.artifact && r.artifact.ok === true), r.artifact && r.artifact.violations);
-  chk('A3 real-repo checkpoint=C5R_CP1_RETROFIT', !!(r.artifact && r.artifact.currentCheckpoint === 'C5R_CP1_RETROFIT'));
-  chk('A4 real-repo authPathCount=9 (C1..C4 paths + C5 delta-metrics)', !!(r.artifact && r.artifact.authorizedProductionPathCount === 9));
-  chk('A5 real-repo enabledCapCount=8 (C1..C4 capabilities + delta_metrics_present)', !!(r.artifact && r.artifact.enabledCapabilityCount === 8));
+  chk('A3 real-repo checkpoint=C6_EXPORT', !!(r.artifact && r.artifact.currentCheckpoint === 'C6_EXPORT'));
+  chk('A4 real-repo authPathCount=10 (C1..C5 paths + C6 comparison-export)', !!(r.artifact && r.artifact.authorizedProductionPathCount === 10));
+  chk('A5 real-repo enabledCapCount=9 (C1..C5 capabilities + comparison_export_present)', !!(r.artifact && r.artifact.enabledCapabilityCount === 9));
   chk('A6 real-repo runtimeConsumers=true (C1 floor)', r.artifact && r.artifact.runtimeConsumersAllowed === true);
   chk('A7 real-repo uiAllowed=false (C7 floor)', r.artifact && r.artifact.uiAllowed === false);
   chk('A8 real-repo featureActivationAllowed=false (C8 floor)', r.artifact && r.artifact.featureRegistryActivationAllowed === false);

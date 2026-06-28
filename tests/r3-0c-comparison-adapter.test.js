@@ -63,7 +63,7 @@ function fullComparisonInput(over) {
 // ── A. constants + identity round-trip ──
 chk('A1 ADAPTER_VERSION === 2 (C2 surface added)', Adapter.ADAPTER_VERSION === 2);
 chk('A2 CHECKPOINT_FLOOR === C1_PRODUCTION_ADAPTER (historical authorization point, does NOT advance)', Adapter.CHECKPOINT_FLOOR === 'C1_PRODUCTION_ADAPTER');
-chk('A2b activeCheckpoint() === C5_DELTA_METRICS (latest surface available)', Adapter.activeCheckpoint() === 'C5_DELTA_METRICS');
+chk('A2b activeCheckpoint() === C6_EXPORT (latest surface available)', Adapter.activeCheckpoint() === 'C6_EXPORT');
 chk('A2c exposes() includes C1..C5 capability set', (() => {
   const c = Adapter.exposes();
   return Array.isArray(c)
@@ -168,6 +168,8 @@ const allowedKeys = new Set([
   'selectReference', 'segmentCorners', 'applyCornerUserConfirmation', 'pairCorners', 'referenceAndCornerForbiddenSelectionModes',
   // C5 surface
   'computeDeltaMetrics', 'supportedDeltaMetrics', 'deltaMetricsSignFormula',
+  // C6 surface
+  'buildComparisonExport', 'comparisonExportIdentity', 'comparisonExportSchemaVersion', 'comparisonExportEnvelopeKeys',
 ]);
 const actualKeys = Object.keys(Adapter).sort();
 const unknownKeys = actualKeys.filter(k => !allowedKeys.has(k));
@@ -176,9 +178,9 @@ chk('G2 adapter does not expose lap segmentation as segmentLap', typeof Adapter.
 chk('G3 adapter does not expose matchCorners (pairCorners is C4)', typeof Adapter.matchCorners === 'undefined');
 chk('G4 adapter does not expose lower-level delta helpers', typeof Adapter.computeDelta === 'undefined' && typeof Adapter.deltaCumulative === 'undefined');
 chk('G5 adapter does not expose auto reference selection', typeof Adapter.chooseFastestValidLap === 'undefined' && typeof Adapter.selectReferenceLap === 'undefined');
-chk('G6 adapter does not expose post-C5 surface (export / UI / feature activation)',
-  typeof Adapter.buildComparisonExport === 'undefined' && typeof Adapter.exportComparison === 'undefined');
-chk('G7 adapter does not expose export', typeof Adapter.exportComparison === 'undefined' && typeof Adapter.buildComparisonExport === 'undefined');
+chk('G6 adapter does not expose post-C6 surface (UI / feature activation)',
+  typeof Adapter.renderComparisonWorkspace === 'undefined' && typeof Adapter.activateFeature === 'undefined');
+chk('G7 adapter exposes buildComparisonExport (C6 delegation)', typeof Adapter.buildComparisonExport === 'function');
 chk('G8 adapter does not bind into Feature Registry', typeof Adapter.registerWithFeatureRegistry === 'undefined' && typeof Adapter.activateFeature === 'undefined');
 
 // ── H. static-source inspection: top-level literal contract require, no C5+ surface names ──
@@ -186,10 +188,11 @@ chk('G8 adapter does not bind into Feature Registry', typeof Adapter.registerWit
   const src = fs.readFileSync(ADAPTER_PATH, 'utf8');
   // The require must be a literal string the no-consumer validator can see.
   chk('H1 adapter source contains literal require of contracts/r3.0c/index.js', /require\(\s*(['"`])\.\.\/\.\.\/contracts\/r3\.0c\/index\.js\1\s*\)/.test(src));
-  // C5+ surface names must NOT appear in the adapter source. normalizeDistance / segmentCorners /
-  // pairCorners / selectReference are all legitimate C3/C4 surface now.
-  const c6Surface = ['exportComparison', 'buildComparisonExport', 'fastest_valid', 'median_valid', 'best_sector_composite', 'selectReferenceLap'];
-  c6Surface.forEach(name => chk('H2 adapter source does not implement ' + name, src.indexOf(name + '(') === -1 && src.indexOf('function ' + name) === -1));
+  // Post-C6 surface names must NOT appear in the adapter source (e.g. auto-reference helpers, UI
+  // shortcuts, runtime LLM hooks). normalizeDistance / segmentCorners / pairCorners /
+  // selectReference / buildComparisonExport are all legitimate C3..C6 surface now.
+  const postC6Surface = ['exportComparison', 'fastest_valid', 'median_valid', 'best_sector_composite', 'selectReferenceLap', 'renderComparisonWorkspace'];
+  postC6Surface.forEach(name => chk('H2 adapter source does not implement ' + name, src.indexOf(name + '(') === -1 && src.indexOf('function ' + name) === -1));
   // The adapter source must NOT include any runtime LLM hook.
   ['fetch(', 'XMLHttpRequest', 'WebSocket', 'eval(', 'new Function('].forEach(s => chk('H3 adapter source does not include ' + s, src.indexOf(s) === -1));
 })();

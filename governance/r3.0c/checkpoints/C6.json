@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0C",
+  "checkpoint": "C6_EXPORT",
+  "baseSha": "4d3f219ea5f7d9f260b531ca2af6f757114b1543",
+  "headSha": null,
+  "previousCheckpoint": "C5R_CP1_RETROFIT",
+
+  "shaSeparation": {
+    "note": "Per SKYLINE 2026-06-28 Continuous Delivery Master Directive, every checkpoint manifest preserves the three-way SHA separation. reviewedCandidateSha is the exact SHA Codex C6 review was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD. Substituting one for another is a tier violation.",
+    "reviewedCandidateSha": null,
+    "reviewedCandidateNote": "Filled when the C6 adversarial Codex review issues PASS. Until then, null is the honest value — Codex has not yet been run on a candidate SHA.",
+    "manifestCommitSha": null,
+    "manifestCommitNote": "Filled by a follow-up evidence-anchoring commit after integrationSha is known; mirrors the C5R convention.",
+    "integrationSha": null,
+    "integrationNote": "Filled only after the C6 branch-to-branch PR merges into feat/r3.0-integrated-delivery AND the Train target-context trusted-verification PASSes at that integration HEAD."
+  },
+
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
+    { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-track-identity.js", "capability": "track_identity_authoritative" },
+    { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-normalized-distance.js", "capability": "normalized_distance_present" },
+    { "path": "renderer/js/r3-0c-reference-selection.js", "capability": "reference_selection_present" },
+    { "path": "renderer/js/r3-0c-corner-segmentation.js", "capability": "corner_segmentation_present" },
+    { "path": "renderer/js/r3-0c-corner-pairing.js", "capability": "corner_pairing_present" },
+    { "path": "renderer/js/r3-0c-delta-metrics.js", "capability": "delta_metrics_present" },
+    { "path": "renderer/js/r3-0c-comparison-export.js", "capability": "comparison_export_present" }
+  ],
+
+  "newlyAuthorizedPath": "renderer/js/r3-0c-comparison-export.js",
+  "newlyEnabledCapability": "comparison_export_present",
+
+  "enabledCapabilitiesBefore": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present"],
+  "enabledCapabilitiesAfter": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present", "comparison_export_present"],
+  "forbiddenCapabilities": [
+    "ui_present",
+    "feature_registry_active"
+  ],
+
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3-0c-comparison-export.test.js",
+    "newSuiteAssertions": 63,
+    "evidenceTier": "TIER 3 — Claude-verified at the C6 branch HEAD; CI re-run on integrationSha is the authority for the Train target context."
+  },
+
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+
+  "codexVerdict": null,
+
+  "exportContractSurface": {
+    "envelopeKeys": ["schemaIdentity", "schemaVersion", "generatedAt", "payload"],
+    "eligiblePayloadKeys": [
+      "comparisonStatus", "referenceLap", "comparisonLap", "association",
+      "cumulativeDelta", "corners", "metricAvailability",
+      "credibility", "confidence", "provenance",
+      "limitations", "blockers", "cannotConclude",
+      "alternativeExplanations", "nextValidationAction"
+    ],
+    "blockedPayloadKeys": ["comparisonStatus", "status", "reasonCodes", "limitations", "identity", "nextValidationAction"],
+    "forbiddenPayloadContents": [
+      "raw telemetry", "normalized grids", "per-sample traces", "channel arrays",
+      "full session objects", "IndexedDB keys", "filenames", "private paths",
+      "arbitrary user metadata", "reactive UI state",
+      "class instance", "Date / Map / Set / typed arrays",
+      "callback / function", "unbounded prose",
+      "the caller's complete result spread"
+    ],
+    "builderSteps": [
+      "1. validate result is shaped like a C5 service output (status + sign + identity)",
+      "2. validate association block (caseId / sessionId / track / layout / basis / direction)",
+      "3. validate non-empty generationToken",
+      "4. allowlist payload — only the directive-named fields",
+      "5. rebuild plain object from scratch — never spread the caller's result",
+      "6. apply bounded item caps + per-string + total UTF-8 byte caps (envelope contract)",
+      "7. validate the envelope (pre-serialize)",
+      "8. JSON.stringify the envelope (deterministic order)",
+      "9. JSON.parse the serialized string",
+      "10. re-validate the parsed envelope (round-trip determinism)"
+    ],
+    "staleResultGuard": "result.identity { caseId, sessionId } MUST match association.{caseId, sessionId}; mismatch fails closed with CROSS_CASE_COMPARISON_UNSUPPORTED / CROSS_SESSION_COMPARISON_UNSUPPORTED.",
+    "phaseGatePreservation": "PHASE_SCOPE_METRICS (entry/mid/exit_delta) are reported metricAvailability:false in the export while phase_boundary_contract.enabled is false (F6 governance gate carried from CP1R)."
+  },
+
+  "frozenDiff": 0,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "expectedRendererAdapter": false
+  },
+
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+
+  "note": "C6 Comparison Export. Adds ONE production capability (comparison_export_present) backed by renderer/js/r3-0c-comparison-export.js. The service is a closed-allowlist gateway: it validates input authority, rebuilds a plain payload from explicit allowlist fields (never spreads the caller's result), invokes contracts/r3.0c/comparison-export-contract.js for envelope construction + bounds, then JSON.serialize → parse → re-validate for deterministic round-trip equivalence. Stale-result guard: result.identity must match association. F6 governance gate preserved: phase metrics report metricAvailability:false until phase_boundary_contract.enabled becomes true. Blocked-result export contains only status / reasonCodes / limitations / identity / nextValidationAction — no fabricated metrics, no raw telemetry, no per-sample arrays, no exotic objects. No UI activation. No feature-registry change. C6 adversarial Codex review + Train target-context CI will fill the null SHA / verdict / artifact fields per the SHA-separation discipline before integration."
+}

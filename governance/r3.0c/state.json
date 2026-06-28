@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "program": "R3.0C",
-  "currentCheckpoint": "C5R_CP1_RETROFIT",
+  "currentCheckpoint": "C6_EXPORT",
   "authorizedProductionPaths": [
     { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
     { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
@@ -11,13 +11,14 @@
     { "path": "renderer/js/r3-0c-reference-selection.js", "capability": "reference_selection_present" },
     { "path": "renderer/js/r3-0c-corner-segmentation.js", "capability": "corner_segmentation_present" },
     { "path": "renderer/js/r3-0c-corner-pairing.js", "capability": "corner_pairing_present" },
-    { "path": "renderer/js/r3-0c-delta-metrics.js", "capability": "delta_metrics_present" }
+    { "path": "renderer/js/r3-0c-delta-metrics.js", "capability": "delta_metrics_present" },
+    { "path": "renderer/js/r3-0c-comparison-export.js", "capability": "comparison_export_present" }
   ],
-  "enabledCapabilities": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present"],
+  "enabledCapabilities": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present", "comparison_export_present"],
   "declaredButDisabledGovernanceCapabilities": ["phase_boundary_contract", "viewmodel_state_transition_contract", "framing_source_structured_contract"],
   "runtimeConsumersAllowed": true,
   "uiAllowed": false,
   "featureRegistryActivationAllowed": false,
   "algorithmsAllowed": true,
-  "note": "R3.0C C5R_CP1_RETROFIT state. CP1 round-2 BLOCK adjudication F1-F12 closed against retrofit-branch candidate SHA cf28bed48f19c9909406cf645bed804195caf597 by formal Codex C-A gate round 4 = PASS (see governance/r3.0c/checkpoints/C5R.json + governance/r3.0c/codex-ca-gate-evidence/). C5R does NOT enable any new productionCapability: enabledCapabilities is identical to the C5 state, and the three NEWLY DECLARED governance capabilities (phase_boundary_contract / viewmodel_state_transition_contract / framing_source_structured_contract) all remain enabled:false in capabilities.json — they document deferred contracts that C7_UI cannot ship without first being enabled with a registered backing contract. The 14 retrofit-branch file changes (4 contracts, 1 already-authorised production module renderer/js/r3-0c-corner-segmentation.js with bounded O(n^2) overlap-scan extension, 2 governance files, 2 deferred contract docs, 1 retrofit matrix, 3 test files, 1 evidence README + 3 verdict files + 1 hash file + 1 manifest, package.json untouched) keep the existing 9 authorizedProductionPaths unchanged. uiAllowed / featureRegistryActivationAllowed remain false: UI lives at C7_UI, activation at C8_ACTIVATION. Comparison export remains locked behind C6. The three R3.0C feature IDs (case_comparison, reference_lap, corner_delta) remain availability='deferred' in renderer/js/feature-registry.js with NO rendererAdapter until C8 authorizes activation. The next checkpoint per schema.transitions is C6_EXPORT."
+  "note": "R3.0C C6_EXPORT state. Adds ONE production capability (comparison_export_present) backed by the new authorized path renderer/js/r3-0c-comparison-export.js — the closed-allowlist gateway that turns an authoritative C5 delta-metrics result into a bounded portable envelope per contracts/r3.0c/comparison-export-contract.js. The export service does NOT compute any new value; it validates the result is service-produced (status + sign + identity), validates association/credibility, rebuilds an explicit allowlisted plain-object payload (never spreads the caller's result), applies envelope caps via the contract, then JSON.serialize → parse → re-validate the envelope for deterministic round-trip equivalence. Stale-result guard: result.identity {caseId,sessionId} must match association.{caseId,sessionId} or the export is fail-closed (CROSS_CASE_COMPARISON_UNSUPPORTED / CROSS_SESSION_COMPARISON_UNSUPPORTED). F6 governance gate preserved: phase metrics (entry/mid/exit_delta) are reported metricAvailability:false in the export until phase_boundary_contract.enabled becomes true. Blocked-result export contains only status/reasonCodes/limitations/identity/nextValidationAction — no fabricated metrics, no raw telemetry, no per-sample arrays, no exotic objects. uiAllowed / featureRegistryActivationAllowed remain false: UI lives at C7_UI, activation at C8_ACTIVATION. The three R3.0C feature IDs (case_comparison, reference_lap, corner_delta) remain availability='deferred' in renderer/js/feature-registry.js with NO rendererAdapter until C8 authorizes activation. The next checkpoint per schema.transitions is C7_UI."
 }
