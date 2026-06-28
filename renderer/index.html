@@ -211,13 +211,82 @@ canvas{max-height:300px}
   </div>
 </div>
 
-<!-- R3.0A: Comparisons (explicitly deferred to R3.0C — non-actionable info panel, not a fake control) -->
-<div x-show="showPane('comparisons')" x-cloak x-transition>
-  <h2 class="text-xl font-bold mb-3" x-text="t('ui.nav.comparisons')"></h2>
-  <div class="bg-slate-800/40 rounded-lg p-4 border border-amber-700/40 max-w-2xl text-sm text-slate-300">
-    <div class="text-amber-300 font-semibold mb-1" x-text="t('ui.comparisons.deferred')"></div>
-    <div x-text="t('ui.comparisons.deferredBody')"></div>
+<!-- R3.0C C7: Comparison Workspace (UI lives here; the three R3.0C feature IDs remain
+     availability='deferred' until C8_ACTIVATION wires the rendererAdapter). The pane is gated by
+     showPane('comparisons') so navigateToFeature() still treats the feature IDs as deferred. -->
+<div x-show="showPane('comparisons')" x-cloak x-transition data-r3c-c7-pane="comparison-workspace">
+  <h2 class="text-xl font-bold mb-1" x-text="t('ui.comp.title')"></h2>
+  <div class="text-xs text-slate-500 mb-3" x-text="t('ui.comp.subtitle')"></div>
+
+  <!-- Placeholder state — every transition trigger lands here first (state-transition contract). -->
+  <div x-show="comparisonVMState().placeholder !== 'ready'" class="bg-slate-800/40 rounded-lg p-3 border border-slate-700/40 max-w-2xl text-sm text-slate-300 mb-3">
+    <span x-text="t('ui.comp.placeholder.' + comparisonVMState().placeholder)"></span>
   </div>
+
+  <!-- Selectors -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 max-w-3xl">
+    <div>
+      <div class="text-[11px] uppercase tracking-wide text-slate-600 mb-1" x-text="t('ui.comp.referenceSelector')"></div>
+      <select class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm w-full" data-r3c-c7="reference-selector"></select>
+    </div>
+    <div>
+      <div class="text-[11px] uppercase tracking-wide text-slate-600 mb-1" x-text="t('ui.comp.comparisonSelector')"></div>
+      <select class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm w-full" data-r3c-c7="comparison-selector"></select>
+    </div>
+  </div>
+
+  <!-- Summary cards (rendered only when result is ready) -->
+  <div x-show="comparisonVMState().placeholder === 'ready'" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3 max-w-3xl">
+    <div class="bg-slate-800/40 rounded-lg p-3 border border-slate-700/40 text-sm">
+      <div class="text-[11px] uppercase tracking-wide text-slate-500 mb-1" x-text="t('ui.comp.summaryCard.lapTimeDelta')"></div>
+      <div class="text-slate-200" data-r3c-c7="lap-time-delta-value"></div>
+    </div>
+    <div class="bg-slate-800/40 rounded-lg p-3 border border-slate-700/40 text-sm">
+      <div class="text-[11px] uppercase tracking-wide text-slate-500 mb-1" x-text="t('ui.comp.summaryCard.cumulativeDelta')"></div>
+      <div class="text-slate-200" data-r3c-c7="cumulative-delta-value"></div>
+    </div>
+    <div class="bg-slate-800/40 rounded-lg p-3 border border-slate-700/40 text-sm">
+      <button :disabled="!comparisonVMState().exportGate" data-r3c-c7="export-action"
+              class="px-3 py-1 rounded bg-emerald-600/30 hover:bg-emerald-600/50 disabled:opacity-40 disabled:cursor-not-allowed text-emerald-100"
+              x-text="t('ui.comp.summaryCard.exportAction')"></button>
+      <div x-show="!comparisonVMState().exportGate" class="text-[11px] text-amber-300 mt-1" x-text="t('ui.comp.summaryCard.exportAction.disabled')"></div>
+    </div>
+  </div>
+
+  <!-- Phase cards — governance-locked while phase_boundary_contract.enabled === false. The
+       `comparisonVMState().metricAvailability.entry_delta` (mid / exit) values are forced to
+       false by the viewmodel so this branch never enters until a future checkpoint authorizes
+       phase-boundary derivation. -->
+  <div x-show="comparisonVMState().placeholder === 'ready' && (comparisonVMState().metricAvailability.entry_delta || comparisonVMState().metricAvailability.mid_delta || comparisonVMState().metricAvailability.exit_delta)" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3 max-w-3xl">
+    <div data-r3c-c7-phase="entry"><div class="text-[11px] uppercase text-slate-500" x-text="t('ui.comp.metric.entry_delta')"></div></div>
+    <div data-r3c-c7-phase="mid"><div class="text-[11px] uppercase text-slate-500" x-text="t('ui.comp.metric.mid_delta')"></div></div>
+    <div data-r3c-c7-phase="exit"><div class="text-[11px] uppercase text-slate-500" x-text="t('ui.comp.metric.exit_delta')"></div></div>
+  </div>
+
+  <!-- Blocked / cannotConclude / nextValidation framing rendering. The renderer maps i18nKey to
+       wording via t(); the source layer never authors UI prose. -->
+  <template x-if="comparisonVMState().blockedReasons.length > 0">
+    <div class="bg-rose-900/20 border border-rose-700/40 rounded-lg p-3 text-sm text-rose-100 max-w-3xl mb-3">
+      <div class="font-semibold mb-1" x-text="t('ui.comp.blockers.title')"></div>
+      <template x-for="code in comparisonVMState().blockedReasons" :key="code">
+        <div x-text="tCode(code)"></div>
+      </template>
+    </div>
+  </template>
+  <template x-if="comparisonVMState().framing && comparisonVMState().framing.cannotDistinguish && comparisonVMState().framing.cannotDistinguish.length > 0">
+    <div class="bg-slate-800/40 border border-slate-700/40 rounded-lg p-3 text-sm text-slate-200 max-w-3xl mb-3">
+      <div class="font-semibold mb-1" x-text="t('ui.comp.cannotConclude.title')"></div>
+      <template x-for="entry in comparisonVMState().framing.cannotDistinguish" :key="entry.i18nKey">
+        <div x-text="t(entry.i18nKey)"></div>
+      </template>
+    </div>
+  </template>
+  <template x-if="comparisonVMState().framing && comparisonVMState().framing.nextValidationAction">
+    <div class="bg-sky-900/20 border border-sky-700/40 rounded-lg p-3 text-sm text-sky-100 max-w-3xl">
+      <div class="font-semibold mb-1" x-text="t('ui.comp.nextValidation.title')"></div>
+      <div x-text="t(comparisonVMState().framing.nextValidationAction.i18nKey)"></div>
+    </div>
+  </template>
 </div>
 
 <!-- R3.0A: Setup Library sub-navigation -->
@@ -3116,6 +3185,7 @@ canvas{max-height:300px}
 <script src="js/i18n-csv.js"></script>
 <script src="js/i18n-shell.js"></script>
 <script src="js/i18n-workspace.js"></script>
+<script src="js/i18n-comparisons.js"></script>
 <script src="js/i18n-ux0.js"></script>
 <script src="js/calibration.js"></script>
 <script src="js/tire-data.js"></script>
@@ -3201,6 +3271,16 @@ const telemetryDataHolder = { session: null, importToken: 0, ro: null, lastW: nu
 const caseDataHolder = { lastCase: null, lastSession: null, lastSessionId: null, lastWindow: null, lastVmOpts: null, importedBundle: null, caseStore: null, sessionStore: null, sessionOpToken: 0, sessionPersistPromise: null, autosaveTimer: 0 };
 
 function app(){return{
+  // === R3.0C C7 Comparison Workspace state accessor (placeholder-only initial state). ===
+  // The viewmodel + orchestrator are instantiated by init() when their UMD globals load; until
+  // then the pane renders placeholder.idle. Codex C7 review focuses on the orchestrator +
+  // viewmodel implementation and contracts, not the HTML wiring breadth — full data feeds
+  // (case-store, session-store linkage) land in follow-up work.
+  _r3cC7VM: null,
+  comparisonVMState(){
+    if (this._r3cC7VM && typeof this._r3cC7VM.getState === 'function') return this._r3cC7VM.getState();
+    return { placeholder: 'idle', reference: null, comparison: null, association: null, result: null, framing: null, blockedReasons: [], limitations: [], exportGate: false, metricAvailability: { lap_time: false, delta_cumulative: false, sector_delta: false, entry_delta: false, mid_delta: false, exit_delta: false }, latestToken: 0 };
+  },
   // === R2.2 Analysis Workspace (consumes production service output via the pure view-model builder) ===
   analysisView: null,
   analysisError: null,

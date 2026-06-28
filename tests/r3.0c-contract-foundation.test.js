@@ -496,7 +496,7 @@ chk('index identity constant', IDX.COMPARISON_EXPORT_IDENTITY === 'racing-analyz
 
 // ── K/L. contracts have NO renderer dependency and NO algorithm (static scan) ──
 const contractFiles = fs.readdirSync(CONTRACT_DIR).filter(f => f.endsWith('.js'));
-chk('8 contract modules + index', contractFiles.length === 9, contractFiles);
+chk('10 contract modules + index (C7 adds framing + viewmodel-state-transition)', contractFiles.length === 11, contractFiles);
 // strip whole-line comments so the algorithm scan inspects CODE, not the prose that describes what the
 // contract deliberately does NOT do (a JSDoc line may legitimately say "no interpolation").
 function stripComments(s) { return s.split('\n').map(line => { const t = line.trim(); return (t.indexOf('*') === 0 || t.indexOf('/*') === 0 || t.indexOf('*/') === 0 || t.indexOf('//') === 0) ? '' : line; }).join('\n'); }

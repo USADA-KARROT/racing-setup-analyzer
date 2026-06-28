@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0C",
+  "checkpoint": "C7_UI",
+  "baseSha": "9044a7f3c880d4d85dfaaca3d7cca9c0b124eaa9",
+  "headSha": null,
+  "previousCheckpoint": "C6_EXPORT",
+
+  "shaSeparation": {
+    "note": "Per SKYLINE 2026-06-28 Continuous Delivery Master Directive, every checkpoint manifest preserves the three-way SHA separation. reviewedCandidateSha is the exact SHA Codex C7 review was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD. Substituting one for another is a tier violation.",
+    "reviewedCandidateSha": null,
+    "reviewedCandidateNote": "Filled when the C7 adversarial Codex review issues PASS.",
+    "manifestCommitSha": null,
+    "integrationSha": null
+  },
+
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
+    { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-track-identity.js", "capability": "track_identity_authoritative" },
+    { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-normalized-distance.js", "capability": "normalized_distance_present" },
+    { "path": "renderer/js/r3-0c-reference-selection.js", "capability": "reference_selection_present" },
+    { "path": "renderer/js/r3-0c-corner-segmentation.js", "capability": "corner_segmentation_present" },
+    { "path": "renderer/js/r3-0c-corner-pairing.js", "capability": "corner_pairing_present" },
+    { "path": "renderer/js/r3-0c-delta-metrics.js", "capability": "delta_metrics_present" },
+    { "path": "renderer/js/r3-0c-comparison-export.js", "capability": "comparison_export_present" },
+    { "path": "renderer/js/r3-0c-comparison-orchestrator.js", "capability": "ui_present" },
+    { "path": "renderer/js/r3-0c-comparison-viewmodel.js", "capability": "ui_present" },
+    { "path": "renderer/js/i18n-comparisons.js", "capability": "ui_present" }
+  ],
+
+  "newlyAuthorizedPaths": [
+    "renderer/js/r3-0c-comparison-orchestrator.js",
+    "renderer/js/r3-0c-comparison-viewmodel.js",
+    "renderer/js/i18n-comparisons.js"
+  ],
+  "newlyEnabledCapabilities": ["ui_present", "viewmodel_state_transition_contract", "framing_source_structured_contract"],
+
+  "enabledCapabilitiesBefore": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present", "comparison_export_present"],
+  "enabledCapabilitiesAfter": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present", "comparison_export_present", "ui_present", "viewmodel_state_transition_contract", "framing_source_structured_contract"],
+  "forbiddenCapabilities": [
+    "feature_registry_active"
+  ],
+
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3-0c-comparison-workspace.test.js",
+    "newSuiteAssertions": 66,
+    "evidenceTier": "TIER 3 — Claude-verified on C7 branch HEAD; CI re-run on integrationSha is the authority for the Train target context."
+  },
+
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+
+  "codexVerdict": null,
+
+  "uiSurface": {
+    "paneTemplate": "renderer/index.html data-r3c-c7-pane=\"comparison-workspace\" region",
+    "stateAccessor": "app().comparisonVMState() — returns the viewmodel state or placeholder.idle default",
+    "scriptLoadOrder": [
+      "renderer/js/i18n-comparisons.js (after i18n-workspace, before i18n-ux0)",
+      "renderer/js/r3-0c-comparison-orchestrator.js (loaded by app() init when UMD globals available)",
+      "renderer/js/r3-0c-comparison-viewmodel.js (same)"
+    ],
+    "stateTransitionContract": "contracts/r3.0c/viewmodel-state-transition-contract.js",
+    "framingSourceContract": "contracts/r3.0c/framing-i18n-key-registry.js",
+    "phaseCardsBehavior": "Hidden by metricAvailability.entry_delta || mid_delta || exit_delta; viewmodel forces all three to false while phase_boundary_contract.enabled === false",
+    "exportButtonGate": "viewmodel exportGate predicate — disabled binding on the button + click-time recheck"
+  },
+
+  "scopeBoundary": {
+    "frozenFilesUntouched": true,
+    "r30bPersistenceUntouched": true,
+    "featureRegistryUnchanged": true,
+    "deferredFeatureIdsStillDeferred": ["case_comparison", "reference_lap", "corner_delta"],
+    "phaseBoundaryContractEnabled": false
+  },
+
+  "frozenDiff": 0,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "expectedRendererAdapter": false
+  },
+
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+
+  "note": "C7 Comparison Workspace UI. Adds the ui_present production capability + flips the two CP1R-declared governance capabilities (viewmodel_state_transition_contract and framing_source_structured_contract) to enabled:true. Three new authorized renderer/js paths: r3-0c-comparison-orchestrator.js (request-token issuer + framing emitter), r3-0c-comparison-viewmodel.js (pure state machine implementing the 7 transition triggers + stale-token drop), i18n-comparisons.js (en/zh/ja closed wording table for FRAMING_I18N_KEY_REGISTRY). Two new contract modules: framing-i18n-key-registry.js + viewmodel-state-transition-contract.js. UI lives in renderer/index.html — the deferred comparisons placeholder is replaced with a real pane gated by showPane('comparisons'). Phase cards (entry/mid/exit_delta) are hidden by the viewmodel forcing metricAvailability=false while phase_boundary_contract.enabled === false. Three R3.0C feature IDs (case_comparison / reference_lap / corner_delta) REMAIN availability='deferred' — feature_registry_active is forbidden until C8. Frozen physics / R3.0B persistence schema / feature-registry: untouched."
+}

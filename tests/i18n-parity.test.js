@@ -26,6 +26,7 @@ require('../renderer/js/i18n-csv.js');
 require('../renderer/js/i18n-advisor.js');
 require('../renderer/js/i18n-shell.js');
 require('../renderer/js/i18n-workspace.js');
+require('../renderer/js/i18n-comparisons.js');
 const { en, zh, ja } = global.I18N;
 const ek = Object.keys(en), zk = Object.keys(zh), jk = Object.keys(ja);
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
