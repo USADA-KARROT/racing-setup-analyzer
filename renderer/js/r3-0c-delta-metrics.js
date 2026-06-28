@@ -182,16 +182,30 @@
     return result;
   }
 
-  // C6 authenticity gate (formal Codex C6 finding F-C6-A1): C6 export must refuse a caller-forged
-  // result. Module-private WeakSet records every result THIS service produced; isAuthenticResult is
-  // exposed so the export service can confirm the object came out of computeDeltaMetrics rather
-  // than from a caller fabricating the shape. WeakSet is the right primitive: it never extends the
-  // result's serialized surface, never leaks across module reloads via JSON, and never lets a
-  // caller forge membership.
+  // C6 authenticity gate (formal Codex C6 finding F-C6-A1 round 1 + round 2): C6 export must
+  // refuse a caller-forged OR caller-mutated result. Module-private WeakSet records every result
+  // THIS service produced. WeakSet alone is not enough — the original result tree is shallow-
+  // frozen, so inner objects (metrics.delta_cumulative, metrics.sector_delta.perCorner[i]) can
+  // still be mutated post-registration. _deepFreezeAndRegister walks the entire result graph and
+  // (a) Object.freeze every plain object + array (b) WeakSet.add every node. After this, any
+  // attempt to mutate a leaf throws under strict mode and silently no-ops under non-strict; either
+  // way the value the C6 export reads is the value the service produced. isAuthenticResult only
+  // returns true when the EXACT object passed was added by this service.
   var _AUTHENTIC = (typeof WeakSet !== 'undefined') ? new WeakSet() : null;
-  function _registerAuthentic(r) {
-    if (_AUTHENTIC && r !== null && typeof r === 'object') { try { _AUTHENTIC.add(r); } catch (e) { /* no-op */ } }
+  function _deepFreezeAndRegister(node) {
+    if (node === null || typeof node !== 'object') return;
+    if (_AUTHENTIC) { try { _AUTHENTIC.add(node); } catch (e) { /* no-op */ } }
+    try {
+      if (Array.isArray(node)) {
+        for (var i = 0; i < node.length; i++) _deepFreezeAndRegister(node[i]);
+      } else {
+        var ks = Object.keys(node);
+        for (var k = 0; k < ks.length; k++) _deepFreezeAndRegister(node[ks[k]]);
+      }
+      if (!Object.isFrozen(node)) Object.freeze(node);
+    } catch (e) { /* no-op */ }
   }
+  function _registerAuthentic(r) { _deepFreezeAndRegister(r); }
   function isAuthenticResult(r) {
     if (!_AUTHENTIC) return false;
     if (r === null || typeof r !== 'object') return false;

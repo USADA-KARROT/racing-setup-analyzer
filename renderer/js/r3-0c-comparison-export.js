@@ -102,14 +102,21 @@
   var MAX_PARAM_STRING_BYTES = 256;       // matches FRAMING_KEY_SHAPE.paramsValueRule short_string
   var MAX_GENERAL_STRING_BYTES = EX.MAX_STRING_UTF8_BYTES; // 4096
 
-  // C6 bounded identifier grammar (formal Codex C6 finding F-C6-A3): caller-supplied identifiers
-  // (caseId / sessionId / lapId / trackId / layoutId / cornerId) MUST NOT carry path-, URI-,
-  // filename- or whitespace-shaped content. The grammar accepts the small ASCII set used by R2.6 /
-  // R3.0B identifiers (alphanumerics, underscore, hyphen, dot, colon) up to 64 chars. Forbidden
-  // content (slashes / backslashes / wildcards / whitespace / control chars / schemes) cannot
-  // smuggle into an exported identifier field.
+  // C6 bounded identifier grammar (formal Codex C6 finding F-C6-A3 round 1 + round 2):
+  // caller-supplied identifiers (caseId / sessionId / lapId / trackId / layoutId / cornerId) MUST
+  // NOT carry path-, URI-, filename-, or whitespace-shaped content. The grammar accepts the small
+  // ASCII set used by R2.6 / R3.0B identifiers (alphanumerics, underscore, hyphen, dot, colon) up
+  // to 64 chars. Round 2 supplement: even a dotted ID can be filename-shaped (e.g. 'telemetry.csv').
+  // We reject any ID ending in a recognized data / archive / config / key file extension while
+  // keeping legitimate dotted IDs like 'lap.42', 'corner.T1', 'sess.alpha'.
   var ID_GRAMMAR = /^[A-Za-z0-9._:\-]{1,64}$/;
-  function _isBoundedId(s) { return typeof s === 'string' && ID_GRAMMAR.test(s); }
+  var FORBIDDEN_FILENAME_EXTENSIONS = /\.(?:csv|tsv|xlsx?|sqlite|sqlite3|db|json|jsonl|ndjson|xml|yaml|yml|ini|conf|cfg|txt|log|dat|bin|bak|tmp|cache|key|pem|crt|cer|asc|gpg|p12|pfx|env|html?|md|pdf|zip|gz|tar|7z|rar|sql|map|min|wasm|exe|dll|so|dylib|app|dmg|iso|img|bmsbin|csv\.gz|tar\.gz)$/i;
+  function _isBoundedId(s) {
+    if (typeof s !== 'string') return false;
+    if (!ID_GRAMMAR.test(s)) return false;
+    if (FORBIDDEN_FILENAME_EXTENSIONS.test(s)) return false;
+    return true;
+  }
 
   // helpers
   function _isPlain(v) {
@@ -222,27 +229,34 @@
     });
   }
 
-  // Authority shape gates (steps 1–3 of the directive).
+  // Authority shape gates (steps 1–3 of the directive). All caller-controlled property accesses go
+  // through _safeGet so a Proxy with a throwing get trap (formal Codex C6 finding F-C6-A2 round 2)
+  // fails closed without crashing the public builder.
   function _validateRequestShape(request) {
     if (!_isPlain(request)) return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'request not a plain object' };
-    if (!_nonEmptyStr(request.generationToken)) return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'missing generationToken' };
-    if (_utf8ByteLength(request.generationToken) > MAX_GENERAL_STRING_BYTES) return { ok: false, reasons: [CODES.EXPORT_PAYLOAD_STRING_TOO_LONG], detail: 'generationToken too long' };
-    if (!_isPlain(request.result)) return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'result not a plain object' };
-    // C6 authenticity gate (formal Codex C6 finding F-C6-A1): the result MUST have come from the
-    // C5 delta-metrics service's own production path. A caller-fabricated result — even one with
-    // perfect shape, matching identity, and the correct sign — is not exportable. The check uses
-    // a module-private WeakSet on the C5 service side; the caller has no way to forge membership.
+    var token = _safeGet(request, 'generationToken');
+    if (!_nonEmptyStr(token)) return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'missing generationToken' };
+    if (_utf8ByteLength(token) > MAX_GENERAL_STRING_BYTES) return { ok: false, reasons: [CODES.EXPORT_PAYLOAD_STRING_TOO_LONG], detail: 'generationToken too long' };
+    var result = _safeGet(request, 'result');
+    if (!_isPlain(result)) return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'result not a plain object' };
+    // C6 authenticity gate (formal Codex C6 finding F-C6-A1 round 1 + round 2): the result MUST
+    // have come from the C5 delta-metrics service's own production path AND every node in the
+    // result graph must be authentic-and-frozen. The C5 service's _deepFreezeAndRegister walks
+    // every leaf; a post-registration mutation either throws (strict) or no-ops (non-strict) but
+    // never changes the value the C6 export reads.
     if (DeltaMetricsService && typeof DeltaMetricsService.isAuthenticResult === 'function') {
-      if (!DeltaMetricsService.isAuthenticResult(request.result)) {
+      if (!DeltaMetricsService.isAuthenticResult(result)) {
         return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'result not produced by C5 service (authenticity check failed)' };
       }
     }
-    if (typeof request.result.eligible !== 'boolean') return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'result.eligible not boolean' };
-    if (typeof request.result.status !== 'string') return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'result.status not string' };
-    var st = request.result.status;
-    if (request.result.eligible === true && st !== ELIGIBLE_RESULT_STATUS) return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'eligible result must carry status delta_metrics_computed' };
-    if (request.result.eligible === false && st !== BLOCKED_RESULT_STATUS) return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'blocked result must carry status blocked' };
-    if (request.result.eligible === true && request.result.sign !== SIGN_FORMULA) return { ok: false, reasons: [CODES.DELTA_METRIC_SIGN_FORBIDDEN], detail: 'eligible result sign mismatch' };
+    var eligibleFlag = _safeGet(result, 'eligible');
+    if (typeof eligibleFlag !== 'boolean') return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'result.eligible not boolean' };
+    var st = _safeGet(result, 'status');
+    if (typeof st !== 'string') return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'result.status not string' };
+    if (eligibleFlag === true && st !== ELIGIBLE_RESULT_STATUS) return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'eligible result must carry status delta_metrics_computed' };
+    if (eligibleFlag === false && st !== BLOCKED_RESULT_STATUS) return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'blocked result must carry status blocked' };
+    var resultSign = _safeGet(result, 'sign');
+    if (eligibleFlag === true && resultSign !== SIGN_FORMULA) return { ok: false, reasons: [CODES.DELTA_METRIC_SIGN_FORBIDDEN], detail: 'eligible result sign mismatch' };
     return { ok: true };
   }
 
@@ -471,6 +485,15 @@
    *   - or _blockedExport([reasonCodes]) — never a partial envelope.
    */
   function buildComparisonExport(request) {
+    try { return _buildComparisonExportInner(request); }
+    catch (e) {
+      // Catch-all fail-closed boundary (formal Codex C6 finding F-C6-A2 round 2): any unhandled
+      // throw from caller-controlled traversal (e.g. a Proxy with a throwing get trap on a top-
+      // level field that the inner reads bypass) returns a blocked export rather than crashing.
+      return _blockedExport([CODES.INTERNAL_CONTRACT_VIOLATION], 'unhandled throw in buildComparisonExport: ' + (e && e.message ? String(e.message).slice(0, 60) : 'unknown'));
+    }
+  }
+  function _buildComparisonExportInner(request) {
     // 1. shape gate
     var shape = _validateRequestShape(request);
     if (!shape.ok) return _blockedExport(shape.reasons, shape.detail);

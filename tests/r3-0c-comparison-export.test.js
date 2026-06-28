@@ -440,5 +440,94 @@ chk('P0 DeltaMetricsService.isAuthenticResult exposed', typeof DeltaMetricsServi
   });
 })();
 
+
+// S. Codex C6 round 2 — deep-freeze authenticity (F-C6-A1 round 2 closure)
+(() => {
+  const real = DeltaMetricsService.computeDeltaMetrics({
+    identity: { caseId: 'caseA', sessionId: 'sess1' },
+    referenceLap: { lapTimeMs: 90000 },
+    comparisonLap: { lapTimeMs: 89500 },
+    pairing: { pairs: [{ referenceCorner: { id: 'C1', fullTimeMs: 10000, entryTimeMs: 3000, midTimeMs: 4000, exitTimeMs: 3000 }, comparisonCorner: { id: 'C1', fullTimeMs: 9900, entryTimeMs: 2950, midTimeMs: 4000, exitTimeMs: 2950 } }] },
+    requestedMetrics: ['lap_time', 'delta_cumulative', 'sector_delta'],
+    policy: { deltaSign: 'comparison_minus_reference' },
+  });
+  chk('S1 metrics.delta_cumulative frozen', Object.isFrozen(real.metrics.delta_cumulative));
+  chk('S2 metrics.sector_delta frozen', Object.isFrozen(real.metrics.sector_delta));
+  chk('S3 metrics.sector_delta.perCorner[0] frozen', Object.isFrozen(real.metrics.sector_delta.perCorner[0]));
+  // Mutation does NOT change the read value (non-strict no-op or strict throw). Use a try/catch to
+  // tolerate either runtime mode.
+  let originalCum = real.metrics.delta_cumulative.value;
+  try { real.metrics.delta_cumulative.value = 777777; } catch (e) { /* strict throws */ }
+  chk('S4 delta_cumulative.value unchanged after attempted mutation', real.metrics.delta_cumulative.value === originalCum);
+  let originalPC = real.metrics.sector_delta.perCorner[0].value;
+  try { real.metrics.sector_delta.perCorner[0].value = 888888; } catch (e) { /* strict throws */ }
+  chk('S5 perCorner[0].value unchanged after attempted mutation', real.metrics.sector_delta.perCorner[0].value === originalPC);
+})();
+
+// T. Codex C6 round 2 — outer try/catch boundary (F-C6-A2 round 2 closure)
+(() => {
+  // A Proxy whose generationToken getter throws — request structure is a plain target so _isPlain
+  // passes, but the access via _safeGet now catches the throw.
+  const realResult = DeltaMetricsService.computeDeltaMetrics({
+    identity: { caseId: 'caseA', sessionId: 'sess1' },
+    referenceLap: { lapTimeMs: 90000 },
+    comparisonLap: { lapTimeMs: 89500 },
+    pairing: { pairs: [{ referenceCorner: { id: 'C1', fullTimeMs: 10000, entryTimeMs: 3000, midTimeMs: 4000, exitTimeMs: 3000 }, comparisonCorner: { id: 'C1', fullTimeMs: 9900, entryTimeMs: 2950, midTimeMs: 4000, exitTimeMs: 2950 } }] },
+    requestedMetrics: ['lap_time'],
+    policy: { deltaSign: 'comparison_minus_reference' },
+  });
+  const trappy = new Proxy({}, {
+    get(target, prop) {
+      if (prop === 'generationToken') throw new Error('trapped getter');
+      if (prop === 'result') return realResult;
+      if (prop === 'association') return { caseId: 'caseA', sessionId: 'sess1', trackId: 'silverstone', layoutId: 'gp', positionBasis: 'lap_distance', positionDirection: 'increasing' };
+      if (prop === 'credibilityMetadata') return credibility();
+      if (prop === 'referenceLap') return { sessionId: 'sess1', lapId: 'lap_ref', lapTimeMs: 90000 };
+      if (prop === 'comparisonLap') return { sessionId: 'sess1', lapId: 'lap_cmp', lapTimeMs: 89500 };
+      if (prop === 'framing') return { cannotConclude: [], alternativeExplanations: [], nextValidationAction: null };
+      return undefined;
+    },
+  });
+  const out = Service.buildComparisonExport(trappy);
+  chk('T1 throwing generationToken getter → blocked, no crash', out.eligible === false);
+})();
+
+// U. Codex C6 round 2 — filename ID grammar (F-C6-A3 round 2 closure)
+(() => {
+  const realResult = DeltaMetricsService.computeDeltaMetrics({
+    identity: { caseId: 'caseA', sessionId: 'sess1' },
+    referenceLap: { lapTimeMs: 90000 },
+    comparisonLap: { lapTimeMs: 89500 },
+    pairing: { pairs: [{ referenceCorner: { id: 'C1', fullTimeMs: 10000, entryTimeMs: 3000, midTimeMs: 4000, exitTimeMs: 3000 }, comparisonCorner: { id: 'C1', fullTimeMs: 9900, entryTimeMs: 2950, midTimeMs: 4000, exitTimeMs: 2950 } }] },
+    requestedMetrics: ['lap_time'],
+    policy: { deltaSign: 'comparison_minus_reference' },
+  });
+  ['telemetry.csv', 'session.sqlite', 'data.json', 'archive.zip', 'config.ini', 'private.key', 'cert.pem', 'lap.log', 'foo.db', 'bar.bmsbin', 'mix.tar.gz'].forEach((evil, i) => {
+    const out = Service.buildComparisonExport({
+      result: realResult,
+      association: { caseId: 'caseA', sessionId: 'sess1', trackId: 'silverstone', layoutId: 'gp', positionBasis: 'lap_distance', positionDirection: 'increasing' },
+      credibilityMetadata: credibility(),
+      generationToken: 'gen-token-U' + i,
+      referenceLap: { sessionId: 'sess1', lapId: evil, lapTimeMs: 90000 },
+      comparisonLap: { sessionId: 'sess1', lapId: 'lap_cmp', lapTimeMs: 89500 },
+      framing: { cannotConclude: [], alternativeExplanations: [], nextValidationAction: null },
+    });
+    chk('U' + i + ' filename-shaped lapId blocked (' + evil + ')', out.eligible === false);
+  });
+  // legitimate dotted IDs that are NOT filename-shaped still pass.
+  ['lap.42', 'corner.T1', 'sess.alpha', 'track.gp_2025'].forEach((good, i) => {
+    const out = Service.buildComparisonExport({
+      result: realResult,
+      association: { caseId: 'caseA', sessionId: 'sess1', trackId: 'silverstone', layoutId: 'gp', positionBasis: 'lap_distance', positionDirection: 'increasing' },
+      credibilityMetadata: credibility(),
+      generationToken: 'gen-token-UG' + i,
+      referenceLap: { sessionId: 'sess1', lapId: good, lapTimeMs: 90000 },
+      comparisonLap: { sessionId: 'sess1', lapId: 'lap_cmp', lapTimeMs: 89500 },
+      framing: { cannotConclude: [], alternativeExplanations: [], nextValidationAction: null },
+    });
+    chk('U dotted-but-not-filename lapId accepted (' + good + ')', out.eligible === true);
+  });
+})();
+
 console.log('r3-0c-comparison-export: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);
