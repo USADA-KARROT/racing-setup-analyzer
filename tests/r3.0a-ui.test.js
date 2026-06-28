@@ -82,8 +82,18 @@ chk('Setup Analyzer (predict) is reachable as Setup & Model', /caseSubview==='se
 chk('C7 comparison workspace pane present', /data-r3c-c7-pane="comparison-workspace"/.test(html));
 chk('C7 placeholder accessor wired', /comparisonVMState\(\)/.test(html));
 chk('C7 deferred copy still in shell dictionary', /Deferred to R3\.0C/.test(SHELL.en['ui.comparisons.deferred']));
-chk('deferred marker on nav item (registry-derived)', (REG.deriveMainNav().find(function (n) { return n.id === 'comparisons'; }) || {}).deferred === 'R3.0C' && /x-text="item\.deferred"/.test(html));
-chk('R3.0C deferred features are stable deferred IDs, not fake controls', ['case_comparison', 'reference_lap', 'corner_delta'].every(function (id) { var f = REG.getFeature(id); return !!f && f.availability === 'deferred' && f.deferredReason === 'R3.0C' && (!f.allowedActions || f.allowedActions.length === 0) && !f.rendererAdapter; }));
+// R3.0C C8_ACTIVATION (state-aware): deferred nav marker + deferred feature shape hold while
+// governance/r3.0c/state.json.featureRegistryActivationAllowed=false (C0–C7). After C8 flips the
+// flag the comparisons nav loses its deferred marker and the three IDs switch to active+adapter.
+// Fail-closed reading of state.json defaults to activation=false so the deferred assertions hold.
+var _r30cActAllowed = (function () { try { var p = require('path'); var fsm = require('fs'); var st = JSON.parse(fsm.readFileSync(p.join(__dirname, '..', 'governance', 'r3.0c', 'state.json'), 'utf8')); return st && st.featureRegistryActivationAllowed === true; } catch (_) { return false; } })();
+if (_r30cActAllowed) {
+  chk('C8 activation: comparisons nav has no deferred marker', (REG.deriveMainNav().find(function (n) { return n.id === 'comparisons'; }) || {}).deferred === undefined && /x-text="item\.deferred"/.test(html));
+  chk('C8 activation: R3.0C feature IDs are available with rendererAdapter→comparisons', ['case_comparison', 'reference_lap', 'corner_delta'].every(function (id) { var f = REG.getFeature(id); return !!f && f.availability === 'available' && !!f.rendererAdapter && f.rendererAdapter.paneId === 'comparisons' && f.deferredReason === undefined; }));
+} else {
+  chk('deferred marker on nav item (registry-derived)', (REG.deriveMainNav().find(function (n) { return n.id === 'comparisons'; }) || {}).deferred === 'R3.0C' && /x-text="item\.deferred"/.test(html));
+  chk('R3.0C deferred features are stable deferred IDs, not fake controls', ['case_comparison', 'reference_lap', 'corner_delta'].every(function (id) { var f = REG.getFeature(id); return !!f && f.availability === 'deferred' && f.deferredReason === 'R3.0C' && (!f.allowedActions || f.allowedActions.length === 0) && !f.rendererAdapter; }));
+}
 
 // existing panes still gated by showPane (single visibility mechanism)
 chk('showPane drives panes', (html.match(/x-show="showPane\('/g) || []).length >= 10);

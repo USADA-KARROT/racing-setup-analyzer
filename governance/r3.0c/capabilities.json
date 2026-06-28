@@ -67,7 +67,10 @@
     "feature_registry_active": {
       "kind": "activation",
       "unlockFloor": "C8_ACTIVATION",
-      "description": "Feature Registry flips the deferred R3.0C feature IDs (case_comparison, reference_lap, corner_delta) to available, attaching their rendererAdapter. Only valid at C8."
+      "enabled": true,
+      "enabledAt": "C8_ACTIVATION",
+      "authorisedPath": "renderer/js/feature-registry.js",
+      "description": "Feature Registry flips the deferred R3.0C feature IDs (case_comparison, reference_lap, corner_delta) to availability='available' and attaches rendererAdapter={paneId:'comparisons',focusTarget:null}; NAV_NODES.comparisons drops deferredReason. The renderer simultaneously wires the R3.0B case-store open boundary into the renderer-private WeakSet that backs the orchestrator's authenticityPredicate; imported_summary records are refused (fail-closed). Activation does NOT widen comparison scope — same-Analysis-Case / same-session-only / explicit reference selection / delta=comparison-reference all remain enforced by contracts + orchestrator + viewmodel from C1–C7."
     },
     "phase_boundary_contract": {
       "kind": "contract",

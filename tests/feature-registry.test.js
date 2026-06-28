@@ -2,10 +2,31 @@
  * tests/feature-registry.test.js — R3-UX0: the registry is the single source of truth; navigation is derived; no
  * second whitelist; no orphan. Verifies completeness, the orphan fix (predict reachable in Setup Library), and
  * derivation determinism.
+ *
+ * R3.0C C8_ACTIVATION (state-aware from C8): the three R3.0C feature IDs (case_comparison /
+ * reference_lap / corner_delta) and the NAV_NODES.comparisons section switch between two expected
+ * shapes depending on governance/r3.0c/state.json.featureRegistryActivationAllowed:
+ *   false  → deferred shape (availability='deferred', deferredReason='R3.0C', no rendererAdapter; nav deferred)
+ *   true   → active shape  (availability='available', rendererAdapter.paneId='comparisons'; nav not deferred)
+ * The state.json file is the SINGLE source of truth — neither expectation is hard-coded; both branches
+ * are exercised by per-checkpoint manifest evidence. A missing state.json fails CLOSED to the deferred
+ * expectation so a malicious state.json deletion cannot relax the deferred contract.
  */
 'use strict';
+const fs = require('fs');
+const path = require('path');
 const R = require('../renderer/js/feature-registry.js');
 let pass = 0, fail = 0; const chk = (n, c, d) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n + (d !== undefined ? '  ' + JSON.stringify(d) : '')); } };
+
+function readGovernanceActivationAllowed() {
+  // Default false → expect the deferred shape (C0–C7 contract). Reading is fail-closed: any parse / IO
+  // failure leaves activation=false so the deferred invariant continues to hold.
+  try {
+    const st = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'governance', 'r3.0c', 'state.json'), 'utf8'));
+    return st && st.featureRegistryActivationAllowed === true;
+  } catch (_) { return false; }
+}
+const ACTIVATION_ALLOWED = readGovernanceActivationAllowed();
 
 // registry self-validation
 (() => { const v = R.validateRegistry(); chk('registry validates (no errors)', v.ok === true, v.errors); })();
@@ -19,7 +40,11 @@ chk('all feature ids unique + self-keyed', Object.keys(R.FEATURES).every(k => R.
 
 // derivations
 chk('mainNav = 6 shell sections', R.deriveMainNav().length === 6);
-chk('mainNav comparisons is deferred R3.0C', R.deriveMainNav().find(n => n.id === 'comparisons').deferred === 'R3.0C');
+if (ACTIVATION_ALLOWED) {
+  chk('mainNav comparisons is active (C8_ACTIVATION)', R.deriveMainNav().find(n => n.id === 'comparisons').deferred === undefined);
+} else {
+  chk('mainNav comparisons is deferred R3.0C', R.deriveMainNav().find(n => n.id === 'comparisons').deferred === 'R3.0C');
+}
 chk('caseNav = 8 subviews', R.deriveCaseNav().length === 8);
 chk('caseSubviewIds === caseNav ids (no separate whitelist)', JSON.stringify(R.deriveCaseSubviewIds()) === JSON.stringify(R.deriveCaseNav().map(n => n.id)));
 
@@ -29,11 +54,28 @@ chk('caseSubviewIds === caseNav ids (no separate whitelist)', JSON.stringify(R.d
 // setup library areas
 (() => { const areas = R.deriveSetupLibraryAreas(); chk('3 setup-library areas', areas.length === 3); const vs = areas.find(a => a.areaId === 'setuplib:vehicle_setup'); chk('vehicle_setup area lists presets/custom/handling', vs && ['vehicle_presets', 'custom_setup', 'handling_prediction'].every(id => vs.features.some(f => f.id === id))); chk('vehicle_preset_detail NOT a top-level area card (entryPoints.desktop=false)', vs && !vs.features.some(f => f.id === 'vehicle_preset_detail')); const et = areas.find(a => a.areaId === 'setuplib:engineering_tools'); chk('engineering_tools lists arb/kinematics/corner_weight/wheel_upgrade (no longer buried-only)', et && ['arb_calculator', 'suspension_kinematics', 'corner_weight', 'wheel_upgrade'].every(id => et.features.some(f => f.id === id))); })();
 
-// deferred features
-(() => { ['case_comparison', 'reference_lap', 'corner_delta'].forEach(id => { const f = R.FEATURES[id]; chk('deferred: ' + id, f.availability === 'deferred' && f.deferredReason === 'R3.0C' && !f.rendererAdapter); }); })();
+// R3.0C feature shape — state-aware
+(() => {
+  ['case_comparison', 'reference_lap', 'corner_delta'].forEach(id => {
+    const f = R.FEATURES[id];
+    if (ACTIVATION_ALLOWED) {
+      chk('active: ' + id + ' availability=available', f.availability === 'available');
+      chk('active: ' + id + ' has rendererAdapter→comparisons', !!f.rendererAdapter && f.rendererAdapter.paneId === 'comparisons');
+      chk('active: ' + id + ' deferredReason absent', f.deferredReason === undefined);
+    } else {
+      chk('deferred: ' + id, f.availability === 'deferred' && f.deferredReason === 'R3.0C' && !f.rendererAdapter);
+    }
+  });
+})();
 
-// every renderer pane referenced is a known production pane; the standalone setup-library panes each map to >=1 feature
-(() => { const known = ['predict', 'spring', 'tire', 'advisor', 'lihpao', 'telemetry', 'analysis']; const used = {}; Object.keys(R.FEATURES).forEach(id => { const a = R.FEATURES[id].rendererAdapter; if (a) used[a.paneId] = true; }); chk('all adapter panes are known', Object.keys(used).every(p => known.indexOf(p) !== -1), Object.keys(used)); })();
+// every renderer pane referenced is a known production pane; the standalone setup-library panes each map to >=1 feature.
+// 'comparisons' joins the known set at C8_ACTIVATION (when the R3.0C IDs attach their rendererAdapter).
+(() => {
+  const known = ['predict', 'spring', 'tire', 'advisor', 'lihpao', 'telemetry', 'analysis'];
+  if (ACTIVATION_ALLOWED) known.push('comparisons');
+  const used = {}; Object.keys(R.FEATURES).forEach(id => { const a = R.FEATURES[id].rendererAdapter; if (a) used[a.paneId] = true; });
+  chk('all adapter panes are known', Object.keys(used).every(p => known.indexOf(p) !== -1), Object.keys(used));
+})();
 
 // derivation determinism (projecting twice is identical)
 chk('derivation deterministic', JSON.stringify(R.deriveSetupLibraryAreas()) === JSON.stringify(R.deriveSetupLibraryAreas()) && JSON.stringify(R.deriveMainNav()) === JSON.stringify(R.deriveMainNav()));

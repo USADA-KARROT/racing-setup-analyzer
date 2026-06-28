@@ -125,7 +125,13 @@ function scanFile(file, options, violations) {
   return { authorized: isAuthorizedConsumerPath && consumed && options && options.runtimeConsumersAllowed === true, consumed: consumed };
 }
 
-function scanIndexHtml(violations) {
+function scanIndexHtml(uiAllowed, violations) {
+  // Index.html may NEVER <script src="..."> into contracts/r3.0c at any checkpoint (the contracts
+  // ship via the generated bundle under renderer/js/, never as a direct script include). While
+  // uiAllowed === false the legacy ban also forbids ANY <script src=> naming an R3.0C feature
+  // module (e.g. r3-0c-comparison-export.js). Once uiAllowed === true (C7_UI onwards) the renderer
+  // legitimately loads the named feature modules, so the name-only ban is lifted (the path
+  // allowance is governed separately by no-consumer + governance authorized paths).
   const file = path.join(SCAN_BASE, 'renderer', 'index.html');
   let src;
   try { src = fs.readFileSync(file, 'utf8'); }
@@ -135,7 +141,7 @@ function scanIndexHtml(violations) {
   while ((m = scriptRe.exec(src)) !== null) {
     const s = m[2];
     if (s.indexOf(CONTRACT_PREFIX) !== -1) violations.push({ code: 'INDEX_HTML_SCRIPT_LOADS_CONTRACTS', src: s });
-    else if (R3_0C_FEATURE_NAME_RE.test(s)) violations.push({ code: 'INDEX_HTML_SCRIPT_NAMES_R3_0C_FEATURE', src: s });
+    else if (!uiAllowed && R3_0C_FEATURE_NAME_RE.test(s)) violations.push({ code: 'INDEX_HTML_SCRIPT_NAMES_R3_0C_FEATURE', src: s });
   }
 }
 
@@ -154,26 +160,49 @@ function loadFeaturesObject(violations) {
   return { FEATURES: R && R.FEATURES, source: 'real-registry' };
 }
 
-function checkFeatureRegistryStillDeferred(violations) {
+function checkFeatureRegistryContract(state, violations) {
+  // State-aware R3.0C registry contract check.
+  // While featureRegistryActivationAllowed === false (C0–C7) the three IDs MUST be deferred without a
+  // rendererAdapter. After C8_ACTIVATION flips the flag to true they MUST be available with a
+  // rendererAdapter pointing at paneId='comparisons'. state===null collapses to activation=false
+  // (the deferred contract continues to hold — fail-closed).
   const loaded = loadFeaturesObject(violations);
   if (!loaded) return null;
   const ids = ['case_comparison', 'reference_lap', 'corner_delta'];
   const F = loaded.FEATURES;
   if (!F || typeof F !== 'object') { violations.push({ code: 'FEATURE_REGISTRY_FEATURES_MISSING', message: 'FEATURES missing/non-object' }); return null; }
+  const activationAllowed = !!(state && state.featureRegistryActivationAllowed === true);
   const detail = {};
   let allOk = true;
   for (const id of ids) {
     const f = F[id];
-    if (!f) { violations.push({ code: 'DEFERRED_FEATURE_MISSING', featureId: id }); allOk = false; detail[id] = { present: false }; continue; }
-    const okAvailability = f.availability === 'deferred';
-    const okReason = f.deferredReason === 'R3.0C';
-    const okNoAdapter = !f.rendererAdapter;
-    if (!okAvailability) { violations.push({ code: 'DEFERRED_FEATURE_AVAILABILITY_WRONG', featureId: id, value: f.availability }); allOk = false; }
-    if (!okReason) { violations.push({ code: 'DEFERRED_FEATURE_REASON_WRONG', featureId: id, value: f.deferredReason }); allOk = false; }
-    if (!okNoAdapter) { violations.push({ code: 'DEFERRED_FEATURE_HAS_RENDERER_ADAPTER', featureId: id }); allOk = false; }
-    detail[id] = { present: true, availability: f.availability, deferredReason: f.deferredReason, rendererAdapter: !!f.rendererAdapter };
+    if (!f) {
+      violations.push({ code: activationAllowed ? 'ACTIVATED_FEATURE_MISSING' : 'DEFERRED_FEATURE_MISSING', featureId: id });
+      allOk = false;
+      detail[id] = { present: false };
+      continue;
+    }
+    if (activationAllowed) {
+      const okAvailability = f.availability === 'available';
+      const okAdapter = !!(f.rendererAdapter && f.rendererAdapter.paneId === 'comparisons');
+      const okNoDeferredReason = f.deferredReason === undefined;
+      if (!okAvailability) { violations.push({ code: 'ACTIVATED_FEATURE_AVAILABILITY_WRONG', featureId: id, value: f.availability }); allOk = false; }
+      if (!okAdapter) { violations.push({ code: 'ACTIVATED_FEATURE_ADAPTER_WRONG', featureId: id, adapter: f.rendererAdapter || null }); allOk = false; }
+      if (!okNoDeferredReason) { violations.push({ code: 'ACTIVATED_FEATURE_DEFERRED_REASON_PRESENT', featureId: id, value: f.deferredReason }); allOk = false; }
+      detail[id] = { present: true, availability: f.availability, rendererAdapter: !!f.rendererAdapter, paneId: f.rendererAdapter && f.rendererAdapter.paneId };
+    } else {
+      const okAvailability = f.availability === 'deferred';
+      const okReason = f.deferredReason === 'R3.0C';
+      const okNoAdapter = !f.rendererAdapter;
+      if (!okAvailability) { violations.push({ code: 'DEFERRED_FEATURE_AVAILABILITY_WRONG', featureId: id, value: f.availability }); allOk = false; }
+      if (!okReason) { violations.push({ code: 'DEFERRED_FEATURE_REASON_WRONG', featureId: id, value: f.deferredReason }); allOk = false; }
+      if (!okNoAdapter) { violations.push({ code: 'DEFERRED_FEATURE_HAS_RENDERER_ADAPTER', featureId: id }); allOk = false; }
+      detail[id] = { present: true, availability: f.availability, deferredReason: f.deferredReason, rendererAdapter: !!f.rendererAdapter };
+    }
   }
-  return { allDeferred: allOk, detail };
+  // Returned shape keeps legacy "allDeferred" key for downstream artifact consumers; meaning shifts to
+  // "the R3.0C registry contract holds (deferred OR activated, whichever state.json mandates)".
+  return { activationAllowed, contractHolds: allOk, allDeferred: allOk, detail };
 }
 
 function loadStateAndSchema(violations) {
@@ -258,8 +287,9 @@ function run() {
     if (fs.existsSync(full)) scanFile(full, hostOptions, violations);
   }
 
-  scanIndexHtml(violations);
-  const registryProbe = checkFeatureRegistryStillDeferred(violations);
+  const uiAllowed = !!(state && state.uiAllowed === true);
+  scanIndexHtml(uiAllowed, violations);
+  const registryProbe = checkFeatureRegistryContract(state, violations);
 
   const violationConsumerCodes = ['PROD_REQUIRES_R3_0C_CONTRACTS', 'INDEX_HTML_SCRIPT_LOADS_CONTRACTS', 'INDEX_HTML_SCRIPT_NAMES_R3_0C_FEATURE'];
   const productionConsumerCount = violations.filter(v => violationConsumerCodes.includes(v.code)).length;

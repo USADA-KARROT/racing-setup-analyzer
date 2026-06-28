@@ -69,12 +69,29 @@ function loadAuthorizedAdapterPaths() {
   return set;
 }
 
+function readActivationAllowed() {
+  // Fail-closed: state.json unreadable → activation=false → guard demands the deferred contract.
+  try {
+    const st = JSON.parse(fs.readFileSync(path.join(REPO, 'governance', 'r3.0c', 'state.json'), 'utf8'));
+    return st && st.featureRegistryActivationAllowed === true;
+  } catch (_) { return false; }
+}
+
 function run() {
   const R = require('../renderer/js/feature-registry.js'); // static relative (dependency-audit friendly)
   const FEATURES = R.FEATURES;
-  const deferredStillDeferred = DEFERRED_R30C.every(id => {
+  // State-aware registry contract: deferred shape while activation forbidden (C0–C7); active shape
+  // (availability='available', rendererAdapter.paneId='comparisons', no deferredReason) once
+  // governance/r3.0c/state.json.featureRegistryActivationAllowed=true at C8_ACTIVATION. State.json
+  // unreadable → activation=false → the deferred contract continues to hold (fail-closed).
+  const activationAllowed = readActivationAllowed();
+  const deferredStillDeferred = activationAllowed ? true : DEFERRED_R30C.every(id => {
     const f = FEATURES[id];
     return f && f.availability === 'deferred' && f.deferredReason === 'R3.0C' && !f.rendererAdapter;
+  });
+  const activatedShapeIntact = !activationAllowed ? true : DEFERRED_R30C.every(id => {
+    const f = FEATURES[id];
+    return f && f.availability === 'available' && !!f.rendererAdapter && f.rendererAdapter.paneId === 'comparisons' && f.deferredReason === undefined;
   });
 
   const base = process.env.BASE_SHA || 'origin/main';
@@ -106,11 +123,13 @@ function run() {
     }
   }
 
-  const ok = deferredStillDeferred && r3_0c_production_files.length === 0 && r3_0c_symbol_hits.length === 0;
+  const ok = deferredStillDeferred && activatedShapeIntact && r3_0c_production_files.length === 0 && r3_0c_symbol_hits.length === 0;
   return {
     check: 'r3-0c-scope-guard',
     deferredR30cIds: DEFERRED_R30C,
+    activationAllowed,
     deferredStillDeferred,
+    activatedShapeIntact,
     r3_0c_production_files,
     r3_0c_symbol_hits,
     r3_0c_production_diff: r3_0c_production_files.length + r3_0c_symbol_hits.length,
@@ -122,8 +141,8 @@ function run() {
 
 let result, exitCode;
 try { result = run(); exitCode = result.ok ? 0 : 1; }
-catch (e) { result = { check: 'r3-0c-scope-guard', fatalError: String((e && e.stack) || e), deferredStillDeferred: false, r3_0c_production_diff: -1, ok: false }; exitCode = 2; }
+catch (e) { result = { check: 'r3-0c-scope-guard', fatalError: String((e && e.stack) || e), deferredStillDeferred: false, activatedShapeIntact: false, r3_0c_production_diff: -1, ok: false }; exitCode = 2; }
 fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
 fs.writeFileSync(path.join(ARTIFACT_DIR, 'r3-0c-guard.json'), JSON.stringify(result, null, 2));
-console.log('R3.0C-GUARD ' + JSON.stringify({ deferredStillDeferred: result.deferredStillDeferred, productionDiff: result.r3_0c_production_diff, ok: result.ok }));
+console.log('R3.0C-GUARD ' + JSON.stringify({ activationAllowed: result.activationAllowed, deferredStillDeferred: result.deferredStillDeferred, activatedShapeIntact: result.activatedShapeIntact, productionDiff: result.r3_0c_production_diff, ok: result.ok }));
 process.exit(exitCode);

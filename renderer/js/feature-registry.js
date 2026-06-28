@@ -21,7 +21,7 @@
     cases: { id: 'cases', kind: 'shell_section', labelKey: 'nav.cases', order: 1, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'overview', currentTab: 'analysis' } },
     import: { id: 'import', kind: 'shell_section', labelKey: 'nav.import', order: 2, availability: 'available', legacyRouting: { shellSection: 'import', caseSubview: 'overview', currentTab: 'analysis' } },
     setup_library: { id: 'setup_library', kind: 'shell_section', labelKey: 'nav.setup_library', order: 3, availability: 'available', legacyRouting: { shellSection: 'setup_library' } },
-    comparisons: { id: 'comparisons', kind: 'shell_section', labelKey: 'nav.comparisons', order: 4, availability: 'deferred', deferredReason: 'R3.0C', legacyRouting: { shellSection: 'comparisons', currentTab: 'comparisons' } },
+    comparisons: { id: 'comparisons', kind: 'shell_section', labelKey: 'nav.comparisons', order: 4, availability: 'available', legacyRouting: { shellSection: 'comparisons', currentTab: 'comparisons' } },
     settings: { id: 'settings', kind: 'shell_section', labelKey: 'nav.settings', order: 5, availability: 'available', legacyRouting: { shellSection: 'settings', currentTab: 'guide' } },
     // setup-library areas
     'setuplib:vehicle_setup': { id: 'setuplib:vehicle_setup', kind: 'setuplib_area', parentNodeId: 'setup_library', labelKey: 'setuplib.area.vehicle_setup', order: 0, availability: 'available' },
@@ -71,10 +71,14 @@
     recommendations: F('recommendations', 'case_scoped', 'case:recommendations', 'analysis', { availability: 'available_conditional' }),
     corner_coaching: F('corner_coaching', 'case_scoped', 'case:corner_coaching', 'analysis', { availability: 'available_conditional' }),
     evidence_trust: F('evidence_trust', 'case_scoped', 'case:evidence_trust', 'analysis'),
-    // Deferred (R3.0C) — no rendererAdapter; non-actionable
-    case_comparison: F('case_comparison', 'deferred', 'comparisons', null, { availability: 'deferred', deferredReason: 'R3.0C', allowedActions: [], entryPoints: { desktop: true, mobile: false } }),
-    reference_lap: F('reference_lap', 'deferred', 'comparisons', null, { availability: 'deferred', deferredReason: 'R3.0C', allowedActions: [], entryPoints: { desktop: true, mobile: false } }),
-    corner_delta: F('corner_delta', 'deferred', 'comparisons', null, { availability: 'deferred', deferredReason: 'R3.0C', allowedActions: [], entryPoints: { desktop: true, mobile: false } }),
+    // R3.0C — activated at C8_ACTIVATION (governance/r3.0c/state.json featureRegistryActivationAllowed=true).
+    // Pane id 'comparisons' is served by the Comparison Workspace UI (renderer/index.html data-r3c-c7-pane).
+    // Same-Analysis-Case / same-session scope is enforced by the orchestrator + viewmodel; feature-router only
+    // resolves the route (shellSection=comparisons / currentTab=comparisons via NAV_NODES.comparisons.legacyRouting).
+    // Mobile entry point stays false: the workspace is a multi-pane desktop surface.
+    case_comparison: F('case_comparison', 'case_comparison', 'comparisons', 'comparisons', { allowedActions: ['compare'], entryPoints: { desktop: true, mobile: false } }),
+    reference_lap: F('reference_lap', 'case_comparison', 'comparisons', 'comparisons', { allowedActions: ['select_reference'], entryPoints: { desktop: true, mobile: false } }),
+    corner_delta: F('corner_delta', 'case_comparison', 'comparisons', 'comparisons', { allowedActions: ['inspect_corner'], entryPoints: { desktop: true, mobile: false } }),
   };
 
   // ── derivation (the single projection algorithm) ──

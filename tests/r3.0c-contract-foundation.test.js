@@ -510,19 +510,56 @@ contractFiles.forEach(f => {
   ALGO_TOKENS.forEach(t => chk('no algorithm token "' + t + '" in code of ' + f, code.indexOf(t) === -1));
 });
 
-// ── P. the three R3.0C feature ids remain deferred with no renderer adapter (CP1 enables no UI) ──
-['case_comparison', 'reference_lap', 'corner_delta'].forEach(id => { const fdef = Registry.FEATURES[id]; chk('feature ' + id + ' still deferred, no adapter', !!fdef && fdef.availability === 'deferred' && fdef.deferredReason === 'R3.0C' && !fdef.rendererAdapter); });
+// ── P. the three R3.0C feature ids stay in their governance-declared shape.
+//      CP1 ships no UI: at that time the IDs were deferred with no rendererAdapter. C8_ACTIVATION
+//      flips them to availability='available' with rendererAdapter.paneId='comparisons' once
+//      governance/r3.0c/state.json.featureRegistryActivationAllowed=true. This assertion now reads
+//      state.json (fail-closed default = deferred) so the CP1 contract continues to hold pre-C8
+//      while the C8 activation can land without falsely tripping a CP1 invariant.
+const _r30cActAllowed = (function () { try { return JSON.parse(fs.readFileSync(path.join(REPO, 'governance', 'r3.0c', 'state.json'), 'utf8')).featureRegistryActivationAllowed === true; } catch (_) { return false; } })();
+['case_comparison', 'reference_lap', 'corner_delta'].forEach(id => {
+  const fdef = Registry.FEATURES[id];
+  if (_r30cActAllowed) {
+    chk('feature ' + id + ' activated (C8): available + rendererAdapter→comparisons', !!fdef && fdef.availability === 'available' && !!fdef.rendererAdapter && fdef.rendererAdapter.paneId === 'comparisons' && fdef.deferredReason === undefined);
+  } else {
+    chk('feature ' + id + ' still deferred, no adapter', !!fdef && fdef.availability === 'deferred' && fdef.deferredReason === 'R3.0C' && !fdef.rendererAdapter);
+  }
+});
 
 // ── N/O. the R3.0C scope guard + frozen boundary still pass with this change present ──
-function runScript(rel, artifactName) {
+// R3.0C C8_ACTIVATION (Codex C-B Round 1): the activation milestone is explicitly authorized to change
+// renderer/js/feature-registry.js (flipping the three R3.0C IDs from deferred to active) — the
+// frozen-boundary mechanism reserves an explicit FROZEN_ALLOW env var for exactly this milestone-
+// authorized boundary touch. We compute the allowlist from governance/r3.0c/state.json: if the
+// featureRegistryActivationAllowed flag is true AND feature-registry.js is among the
+// authorizedProductionPaths for the feature_registry_active capability, this commit is the
+// authorized C8 milestone change and the allowlist surfaces it. Otherwise (C0–C7) the allowlist is
+// empty and the original frozen invariant holds (a malicious touch is still blocked).
+function runScript(rel, artifactName, extraEnv) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-cp1-'));
-  const r = cp.spawnSync('node', [rel], { cwd: REPO, encoding: 'utf8', env: Object.assign({}, process.env, { ARTIFACT_DIR: tmp }) });
+  const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp }, extraEnv || {});
+  const r = cp.spawnSync('node', [rel], { cwd: REPO, encoding: 'utf8', env });
   let artifact = null;
   try { artifact = JSON.parse(fs.readFileSync(path.join(tmp, artifactName), 'utf8')); } catch (e) { artifact = null; }
   return { status: r.status, artifact, stderr: r.stderr };
 }
+function _frozenAllowForActivation() {
+  try {
+    const st = JSON.parse(fs.readFileSync(path.join(REPO, 'governance', 'r3.0c', 'state.json'), 'utf8'));
+    if (st && st.featureRegistryActivationAllowed === true && Array.isArray(st.authorizedProductionPaths)) {
+      const has = st.authorizedProductionPaths.some(e => e && e.path === 'renderer/js/feature-registry.js' && e.capability === 'feature_registry_active');
+      if (has) return 'renderer/js/feature-registry.js';
+    }
+  } catch (_) {}
+  return '';
+}
 (() => { const g = runScript('scripts/check-r3-0c-guard.js', 'r3-0c-guard.json'); chk('R3.0C scope guard exits 0', g.status === 0, g.stderr); chk('R3.0C scope guard ok===true', !!(g.artifact && g.artifact.ok === true), g.artifact); chk('R3.0C guard sees no R3.0C production diff', !!(g.artifact && g.artifact.r3_0c_production_diff === 0), g.artifact); })();
-(() => { const f = runScript('scripts/check-frozen-boundary.js', 'frozen-boundary-result.json'); chk('frozen-boundary exits 0', f.status === 0, f.stderr); chk('frozen-boundary 0 diff', !!(f.artifact && f.artifact.frozenDiffCount === 0 && f.artifact.ok === true), f.artifact); })();
+(() => {
+  const allow = _frozenAllowForActivation();
+  const f = runScript('scripts/check-frozen-boundary.js', 'frozen-boundary-result.json', allow ? { FROZEN_ALLOW: allow } : null);
+  chk('frozen-boundary exits 0', f.status === 0, f.stderr);
+  chk('frozen-boundary 0 diff', !!(f.artifact && f.artifact.frozenDiffCount === 0 && f.artifact.ok === true), f.artifact);
+})();
 
 console.log(`r3.0c-contract-foundation: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);
