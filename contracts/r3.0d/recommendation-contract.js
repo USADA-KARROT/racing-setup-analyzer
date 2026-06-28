@@ -75,26 +75,45 @@
 
   function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
   function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
-  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Object.keys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) if (allowed.indexOf(keys[i]) === -1) return false; return true; }
+  // Codex D1 R1 Finding RN-01 closure.
+  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (typeof k === 'symbol') return false; if (allowed.indexOf(k) === -1) return false; } return true; }
   function _utf8Bytes(s) { try { return (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s).length : Buffer.byteLength(s, 'utf8'); } catch (e) { return (typeof s === 'string') ? s.length * 4 : 0; } }
-  function _isIdArray(v, cap) { if (!Array.isArray(v) || v.length > cap) return false; for (var i = 0; i < v.length; i++) if (typeof v[i] !== 'string' || v[i].length === 0) return false; return true; }
+  // Codex D1 R1 Finding RN-05 closure: ID-array elements MUST pass byte cap + id grammar.
+  function _isIdArray(v, cap) {
+    if (!Array.isArray(v) || v.length > cap) return false;
+    for (var i = 0; i < v.length; i++) {
+      var e = v[i];
+      if (typeof e !== 'string' || e.length === 0) return false;
+      if (REC_ID_FORBIDDEN_RE.test(e) || !REC_ID_RE.test(e)) return false;
+      if (_utf8Bytes(e) > STRING_BYTE_CAP) return false;
+    }
+    return true;
+  }
 
   /**
    * validatePriorityKey(k) — must be one of PRIORITY_KEYS. Returns { valid:true, rank } or blocked.
    */
   function validatePriorityKey(k) {
-    if (typeof k !== 'string' || PRIORITY_KEY_RANK[k] === undefined) return RC.buildBlockedResult([CODES.RECOMMENDATION_PRIORITY_INVALID]);
-    return Object.freeze({ valid: true, rank: PRIORITY_KEY_RANK[k] });
+    try {
+      if (typeof k !== 'string' || PRIORITY_KEY_RANK[k] === undefined) return RC.buildBlockedResult([CODES.RECOMMENDATION_PRIORITY_INVALID]);
+      return Object.freeze({ valid: true, rank: PRIORITY_KEY_RANK[k] });
+    } catch (e) {
+      return RC.buildBlockedResult([CODES.RECOMMENDATION_PRIORITY_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION]);
+    }
   }
 
   /**
    * validateApplyMode(m) — strict whitelist; forbidden auto_* values map to their specific reason.
    */
   function validateApplyMode(m) {
-    if (typeof m !== 'string') return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID]);
-    if (APPLY_MODE_FORBIDDEN[m]) return RC.buildBlockedResult([APPLY_MODE_FORBIDDEN[m]]);
-    if (APPLY_MODE_ALLOWED.indexOf(m) === -1) return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID]);
-    return Object.freeze({ valid: true });
+    try {
+      if (typeof m !== 'string') return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID]);
+      if (APPLY_MODE_FORBIDDEN[m]) return RC.buildBlockedResult([APPLY_MODE_FORBIDDEN[m]]);
+      if (APPLY_MODE_ALLOWED.indexOf(m) === -1) return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID]);
+      return Object.freeze({ valid: true });
+    } catch (e) {
+      return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION]);
+    }
   }
 
   /**

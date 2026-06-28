@@ -361,5 +361,93 @@ chk('BRIEF future schema rejected', EB.validateEngineerBriefShape(validBrief({ s
   }
 })();
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Section K — Codex D1 Round 1 finding closures (RN-01 .. RN-05)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// RN-01 — Reflect.ownKeys rejects Symbol-keyed and non-enumerable own properties
+(function () {
+  var sym = Symbol('hostile');
+  var id = validId(); id[sym] = 'oops';
+  chk('RN-01: SI rejects Symbol-keyed own property', SI.validateSourceIdentity(id).valid === undefined);
+  var c = { state: 'unresolved' }; c[sym] = 'oops';
+  chk('RN-01: confidence rejects Symbol-keyed own property', CR.validateConfidenceShape(c).valid === undefined);
+  var c2 = { state: 'unresolved' }; Object.defineProperty(c2, 'hidden', { value: 'oops', enumerable: false });
+  chk('RN-01: confidence rejects non-enumerable own property', CR.validateConfidenceShape(c2).valid === undefined);
+  var n = validEvidenceNode(); n[sym] = 'oops';
+  chk('RN-01: evidence-node rejects Symbol-keyed own property', EN.validateEvidenceNodeShape(n).valid === undefined);
+  var n2 = validEvidenceNode(); Object.defineProperty(n2, 'hidden', { value: 'oops', enumerable: false });
+  chk('RN-01: evidence-node rejects non-enumerable own property', EN.validateEvidenceNodeShape(n2).valid === undefined);
+  var h = validHypothesis(); h[sym] = 'oops';
+  chk('RN-01: hypothesis rejects Symbol-keyed own property', HC.validateHypothesisShape(h).valid === undefined);
+  var r = validRec(); r[sym] = 'oops';
+  chk('RN-01: recommendation rejects Symbol-keyed own property', REC.validateRecommendationShape(r).valid === undefined);
+  var b = validBrief(); b[sym] = 'oops';
+  chk('RN-01: brief rejects Symbol-keyed own property', EB.validateEngineerBriefShape(b).valid === undefined);
+})();
+
+// RN-02 — Every exported validator wraps hostile-getter throws into a structured result
+(function () {
+  function hostileGetter(o, key) { try { Object.defineProperty(o, key, { get: function () { throw new Error('hostile-' + key); }, enumerable: true, configurable: true }); } catch (_) {} return o; }
+  var i = hostileGetter(validId(), 'caseId');
+  var threw = false; var r;
+  try { r = SI.validateSourceIdentity(i); } catch (_) { threw = true; }
+  chk('RN-02: SI hostile getter on caseId does not throw past boundary', !threw && r && r.valid === undefined);
+  var c = hostileGetter({ state: 'unresolved' }, 'state');
+  threw = false; try { r = CR.validateConfidenceShape(c); } catch (_) { threw = true; }
+  chk('RN-02: confidence hostile getter does not throw past boundary', !threw && r && r.valid === undefined);
+  var o = hostileGetter({ kind: 'metric_value', i18nKey: 'x' }, 'kind');
+  threw = false; try { r = EN.validateObservationShape(o); } catch (_) { threw = true; }
+  chk('RN-02: observation hostile getter does not throw past boundary', !threw && r && r.valid === undefined);
+  var p = hostileGetter({ a: 1 }, 'a');
+  threw = false; try { r = HC.validateParamsShape(p); } catch (_) { threw = true; }
+  chk('RN-02: params hostile getter does not throw past boundary', !threw && r && r.valid === undefined);
+  var alt = hostileGetter(validAlt(), 'alternativeId');
+  threw = false; try { r = HC.validateAlternativeExplanationShape(alt); } catch (_) { threw = true; }
+  chk('RN-02: alt hostile getter does not throw past boundary', !threw && r && r.valid === undefined);
+  var act = hostileGetter(validAction(), 'actionId');
+  threw = false; try { r = HC.validateValidationActionShape(act); } catch (_) { threw = true; }
+  chk('RN-02: action hostile getter does not throw past boundary', !threw && r && r.valid === undefined);
+})();
+
+// RN-03 — Causal-overclaim guard normalizes hyphens, em-dashes, whitespace, case
+(function () {
+  var variants = ['DRIVER-FAULT', 'driver-fault', 'guaranteed-fix-recommended', 'professional-diagnosis-confirmed', 'GUARANTEED FIX', 'exact—cause' /* em-dash */, 'fastest-setup'];
+  variants.forEach(function (v) {
+    var h = validHypothesis({ i18nKey: 'r3_0d.h.' + v });
+    var r = HC.validateHypothesisShape(h);
+    chk('RN-03: hypothesis rejects causal-overclaim variant "' + v + '"', r.reasonCodes && r.reasonCodes.indexOf(CODES.HYPOTHESIS_CAUSAL_OVERCLAIM) !== -1);
+  });
+})();
+
+// RN-04 — Engineer Brief nested entries enforce closed key set + contradiction validates contradictingEvidenceIds + nested params
+(function () {
+  var b = validBrief({ evidenceSummary: [{ nodeId: 'ev_001', i18nKey: 'k', params: null, extra: 'oops' }] });
+  chk('RN-04: brief evidenceSummary entry rejects extra own key', EB.validateEngineerBriefShape(b).valid === undefined);
+  b = validBrief({ contradictions: [{ hypothesisId: 'h1', i18nKey: 'k', contradictingEvidenceIds: ['ev_001'] }] });
+  chk('RN-04: brief contradiction with valid contradictingEvidenceIds accepted', EB.validateEngineerBriefShape(b).valid === true);
+  b = validBrief({ contradictions: [{ hypothesisId: 'h1', i18nKey: 'k', contradictingEvidenceIds: ['../escape'] }] });
+  chk('RN-04: brief contradiction with id-grammar-violating contradictingEvidenceIds rejected', EB.validateEngineerBriefShape(b).valid === undefined);
+  b = validBrief({ contradictions: [{ hypothesisId: 'h1', i18nKey: 'k', contradictingEvidenceIds: ['ev_001'], unknown: 1 }] });
+  chk('RN-04: brief contradiction with extra own key rejected', EB.validateEngineerBriefShape(b).valid === undefined);
+  b = validBrief({ alternativeExplanations: [{ alternativeId: 'alt_001', i18nKey: 'k', params: { msg: 'this is driver fault' } }] });
+  chk('RN-04: brief alternative with overclaim in string param value rejected', EB.validateEngineerBriefShape(b).valid === undefined);
+})();
+
+// RN-05 — ID-array elements enforce byte cap + id grammar
+(function () {
+  var huge = 'x'.repeat(600);
+  var h = validHypothesis({ supportingEvidenceIds: [huge] });
+  chk('RN-05: hypothesis supportingEvidenceIds rejects oversized id', HC.validateHypothesisShape(h).valid === undefined);
+  h = validHypothesis({ supportingEvidenceIds: ['../escape'] });
+  chk('RN-05: hypothesis supportingEvidenceIds rejects path-traversal id', HC.validateHypothesisShape(h).valid === undefined);
+  h = validHypothesis({ validationActionIds: [huge] });
+  chk('RN-05: hypothesis validationActionIds rejects oversized id', HC.validateHypothesisShape(h).valid === undefined);
+  var r = validRec({ blockingPrerequisiteIds: [huge] });
+  chk('RN-05: recommendation blockingPrerequisiteIds rejects oversized id', REC.validateRecommendationShape(r).valid === undefined);
+  r = validRec({ blockingPrerequisiteIds: ['..'] });
+  chk('RN-05: recommendation blockingPrerequisiteIds rejects path-traversal id', REC.validateRecommendationShape(r).valid === undefined);
+})();
+
 console.log('r3.0d-contract-foundation: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

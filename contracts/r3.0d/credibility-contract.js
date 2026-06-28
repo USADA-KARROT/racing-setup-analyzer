@@ -48,10 +48,15 @@
   function _inEnum(list, v) { return typeof v === 'string' && list.indexOf(v) !== -1; }
   function _ownKeys(o) { try { return Object.keys(o); } catch (e) { return null; } }
 
+  // Codex D1 R1 Finding RN-01 closure: Reflect.ownKeys catches non-enumerable + Symbol-keyed own
+  // properties that Object.keys silently ignores. Symbols always fail the string-allowlist indexOf.
   function _hasOnlyAllowedKeys(o, allowed) {
-    var keys = _ownKeys(o);
-    if (keys === null) return false;
-    for (var i = 0; i < keys.length; i++) if (allowed.indexOf(keys[i]) === -1) return false;
+    var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; }
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (typeof k === 'symbol') return false;
+      if (allowed.indexOf(k) === -1) return false;
+    }
     return true;
   }
 
@@ -60,16 +65,26 @@
    * Returns { valid:true } or buildBlockedResult.
    */
   function validateEvidenceCredibility(value) {
-    if (!_inEnum(EVIDENCE_CREDIBILITY, value)) return RC.buildBlockedResult([CODES.EVIDENCE_CREDIBILITY_INVALID]);
-    return Object.freeze({ valid: true });
+    // RN-02 closure: outer try/catch. Even an enum-lookup against a hostile object can throw if the
+    // value is a Proxy whose toString/conversion throws; pin the boundary.
+    try {
+      if (!_inEnum(EVIDENCE_CREDIBILITY, value)) return RC.buildBlockedResult([CODES.EVIDENCE_CREDIBILITY_INVALID]);
+      return Object.freeze({ valid: true });
+    } catch (e) {
+      return RC.buildBlockedResult([CODES.EVIDENCE_CREDIBILITY_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION]);
+    }
   }
 
   /**
    * validateProvenance(value) — caller supplies a string from PROVENANCE.
    */
   function validateProvenance(value) {
-    if (!_inEnum(PROVENANCE, value)) return RC.buildBlockedResult([CODES.EVIDENCE_PROVENANCE_INVALID]);
-    return Object.freeze({ valid: true });
+    try {
+      if (!_inEnum(PROVENANCE, value)) return RC.buildBlockedResult([CODES.EVIDENCE_PROVENANCE_INVALID]);
+      return Object.freeze({ valid: true });
+    } catch (e) {
+      return RC.buildBlockedResult([CODES.EVIDENCE_PROVENANCE_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION]);
+    }
   }
 
   /**
@@ -78,18 +93,26 @@
    * → HYPOTHESIS_CONFIDENCE_FORBIDDEN. Any extra own key → UNKNOWN_OWN_KEY.
    */
   function validateConfidenceShape(c) {
-    if (!_isPlain(c)) return RC.buildBlockedResult([CODES.HYPOTHESIS_CONFIDENCE_FORBIDDEN], { detail: 'confidence not plain object' });
-    if (!_hasOnlyAllowedKeys(c, ['state'])) return RC.buildBlockedResult([CODES.HYPOTHESIS_CONFIDENCE_FORBIDDEN, CODES.UNKNOWN_OWN_KEY], { detail: 'confidence carries forbidden own key' });
-    if (!_inEnum(CONFIDENCE_STATES, c.state)) return RC.buildBlockedResult([CODES.HYPOTHESIS_CONFIDENCE_FORBIDDEN], { detail: 'confidence.state not in allowed enum' });
-    return Object.freeze({ valid: true, state: c.state });
+    try {
+      if (!_isPlain(c)) return RC.buildBlockedResult([CODES.HYPOTHESIS_CONFIDENCE_FORBIDDEN], { detail: 'confidence not plain object' });
+      if (!_hasOnlyAllowedKeys(c, ['state'])) return RC.buildBlockedResult([CODES.HYPOTHESIS_CONFIDENCE_FORBIDDEN, CODES.UNKNOWN_OWN_KEY], { detail: 'confidence carries forbidden own key' });
+      if (!_inEnum(CONFIDENCE_STATES, c.state)) return RC.buildBlockedResult([CODES.HYPOTHESIS_CONFIDENCE_FORBIDDEN], { detail: 'confidence.state not in allowed enum' });
+      return Object.freeze({ valid: true, state: c.state });
+    } catch (e) {
+      return RC.buildBlockedResult([CODES.HYPOTHESIS_CONFIDENCE_FORBIDDEN, CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'confidence validator threw on hostile input' });
+    }
   }
 
   /**
    * validateAvailability(value) — caller supplies a string from AVAILABILITY.
    */
   function validateAvailability(value) {
-    if (!_inEnum(AVAILABILITY, value)) return RC.buildBlockedResult([CODES.EVIDENCE_OBSERVATION_INVALID]);
-    return Object.freeze({ valid: true });
+    try {
+      if (!_inEnum(AVAILABILITY, value)) return RC.buildBlockedResult([CODES.EVIDENCE_OBSERVATION_INVALID]);
+      return Object.freeze({ valid: true });
+    } catch (e) {
+      return RC.buildBlockedResult([CODES.EVIDENCE_OBSERVATION_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION]);
+    }
   }
 
   // synthetic-honesty constraint: a `synthetic` provenance MUST carry the LIMITATION_SYNTHETIC_ONLY

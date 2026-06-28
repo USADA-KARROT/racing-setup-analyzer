@@ -56,7 +56,8 @@
 
   function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
   function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
-  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Object.keys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) if (allowed.indexOf(keys[i]) === -1) return false; return true; }
+  // Codex D1 R1 Finding RN-01 closure.
+  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (typeof k === 'symbol') return false; if (allowed.indexOf(k) === -1) return false; } return true; }
 
   /**
    * validateDecisionInputShape(input) — D1 STRUCTURAL gate over the composed graph.

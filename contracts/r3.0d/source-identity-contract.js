@@ -38,9 +38,16 @@
   function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
   function _utf8Bytes(s) { try { return (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s).length : Buffer.byteLength(s, 'utf8'); } catch (e) { return s.length * 4; /* worst-case */ } }
 
+  // Codex D1 Round 1 Finding RN-01 closure: use Reflect.ownKeys so non-enumerable own properties AND
+  // Symbol-keyed properties are also enumerated. Symbols are not in the allowlist (a string array) →
+  // they fail the indexOf check. Proxy ownKeys traps that throw collapse to false (fail-closed).
   function _hasOnlyAllowedKeys(o, allowed) {
-    var keys; try { keys = Object.keys(o); } catch (e) { return false; }
-    for (var i = 0; i < keys.length; i++) if (allowed.indexOf(keys[i]) === -1) return false;
+    var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; }
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (typeof k === 'symbol') return false;
+      if (allowed.indexOf(k) === -1) return false;
+    }
     return true;
   }
 
@@ -65,6 +72,9 @@
    *   • freshness not ISO-8601 shape   → SOURCE_IDENTITY_INVALID
    */
   function validateSourceIdentity(id) {
+    // Codex D1 Round 1 Finding RN-02 closure: outer try/catch so any hostile getter throw collapses
+    // to a structured SOURCE_IDENTITY_INVALID + INTERNAL_CONTRACT_VIOLATION instead of escaping.
+    try {
     if (!_isPlain(id)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'identity not a plain object' });
     if (!_hasOnlyAllowedKeys(id, SOURCE_IDENTITY_KEYS)) return RC.buildBlockedResult([CODES.SOURCE_IDENTITY_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'identity carries forbidden own key' });
     var reasons = [];
@@ -101,6 +111,9 @@
         freshness: id.freshness,
       }),
     });
+    } catch (e) {
+      return RC.buildBlockedResult([CODES.SOURCE_IDENTITY_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'source-identity validator threw on hostile input' });
+    }
   }
 
   /**

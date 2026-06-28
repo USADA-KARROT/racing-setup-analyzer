@@ -69,7 +69,8 @@
 
   function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
   function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
-  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Object.keys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) if (allowed.indexOf(keys[i]) === -1) return false; return true; }
+  // Codex D1 R1 Finding RN-01 closure.
+  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (typeof k === 'symbol') return false; if (allowed.indexOf(k) === -1) return false; } return true; }
   function _utf8Bytes(s) { try { return (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s).length : Buffer.byteLength(s, 'utf8'); } catch (e) { return (typeof s === 'string') ? s.length * 4 : 0; } }
   function _hasCausalOverclaim(s) { if (typeof s !== 'string') return false; var lower = s.toLowerCase(); for (var i = 0; i < HC.CAUSAL_OVERCLAIM_TERMS.length; i++) if (lower.indexOf(HC.CAUSAL_OVERCLAIM_TERMS[i]) !== -1) return true; return false; }
   function _checkI18nKey(v, reasons) {
@@ -114,21 +115,42 @@
       else if (b[rule.key].length > ARRAY_CAP) reasons.push(CODES.ARRAY_CAP_EXCEEDED);
     });
 
-    // contradictions, alternativeExplanations entries — each is { id, i18nKey, params? }-like shape
-    function _checkEntries(arr, idKey, missingCode) {
-      if (!Array.isArray(arr)) return;
-      for (var i = 0; i < arr.length; i++) {
-        var e = arr[i];
-        if (!_isPlain(e)) { reasons.push(missingCode); break; }
-        if (!_nonEmptyStr(e[idKey])) { reasons.push(missingCode); break; }
-        if (!_nonEmptyStr(e.i18nKey)) { reasons.push(missingCode); break; }
-        if (_utf8Bytes(e.i18nKey) > STRING_BYTE_CAP) reasons.push(CODES.BYTE_CAP_EXCEEDED);
-        if (_hasCausalOverclaim(e.i18nKey)) reasons.push(CODES.HYPOTHESIS_CAUSAL_OVERCLAIM);
+    // Codex D1 R1 Finding RN-04 closure: each nested entry is a CLOSED-key shape with its own
+    // validator. Extra own keys → BRIEF_INVALID + UNKNOWN_OWN_KEY. Contradiction entries also
+    // validate contradictingEvidenceIds (id array with grammar + byte cap). Nested params validated.
+    var EVIDENCE_SUMMARY_KEYS = ['nodeId', 'i18nKey', 'params'];
+    var CONTRADICTION_KEYS = ['hypothesisId', 'contradictingEvidenceIds', 'i18nKey', 'params'];
+    var ALT_ENTRY_KEYS = ['alternativeId', 'i18nKey', 'params'];
+    function _checkBriefIdArray(v, cap) {
+      if (!Array.isArray(v) || v.length > cap) return false;
+      for (var i = 0; i < v.length; i++) {
+        var e = v[i];
+        if (typeof e !== 'string' || e.length === 0) return false;
+        if (BRIEF_ID_FORBIDDEN_RE.test(e) || !BRIEF_ID_RE.test(e)) return false;
+        if (_utf8Bytes(e) > STRING_BYTE_CAP) return false;
+      }
+      return true;
+    }
+    function _checkEntry(entry, allowedKeys, idKey, missingCode, requireContradictingEvidence) {
+      if (!_isPlain(entry)) { reasons.push(missingCode); return; }
+      if (!_hasOnlyAllowedKeys(entry, allowedKeys)) { reasons.push(missingCode); reasons.push(CODES.UNKNOWN_OWN_KEY); return; }
+      if (!_nonEmptyStr(entry[idKey])) { reasons.push(missingCode); return; }
+      if (BRIEF_ID_FORBIDDEN_RE.test(entry[idKey]) || !BRIEF_ID_RE.test(entry[idKey])) { reasons.push(missingCode); return; }
+      if (_utf8Bytes(entry[idKey]) > STRING_BYTE_CAP) reasons.push(CODES.BYTE_CAP_EXCEEDED);
+      if (!_nonEmptyStr(entry.i18nKey)) { reasons.push(missingCode); return; }
+      if (_utf8Bytes(entry.i18nKey) > STRING_BYTE_CAP) reasons.push(CODES.BYTE_CAP_EXCEEDED);
+      if (_hasCausalOverclaim(entry.i18nKey)) reasons.push(CODES.HYPOTHESIS_CAUSAL_OVERCLAIM);
+      if ('params' in entry) {
+        var pc = HC.validateParamsShape(entry.params);
+        if (pc.valid !== true) reasons.push.apply(reasons, pc.reasonCodes || [missingCode]);
+      }
+      if (requireContradictingEvidence) {
+        if (!_checkBriefIdArray(entry.contradictingEvidenceIds, ARRAY_CAP)) reasons.push(CODES.BRIEF_CONTRADICTION_HIDDEN);
       }
     }
-    _checkEntries(b.evidenceSummary || [], 'nodeId', CODES.BRIEF_INVALID);
-    _checkEntries(b.contradictions || [], 'hypothesisId', CODES.BRIEF_CONTRADICTION_HIDDEN);
-    _checkEntries(b.alternativeExplanations || [], 'alternativeId', CODES.BRIEF_INVALID);
+    if (Array.isArray(b.evidenceSummary)) for (var ei = 0; ei < b.evidenceSummary.length; ei++) _checkEntry(b.evidenceSummary[ei], EVIDENCE_SUMMARY_KEYS, 'nodeId', CODES.BRIEF_INVALID, false);
+    if (Array.isArray(b.contradictions)) for (var coi = 0; coi < b.contradictions.length; coi++) _checkEntry(b.contradictions[coi], CONTRADICTION_KEYS, 'hypothesisId', CODES.BRIEF_CONTRADICTION_HIDDEN, true);
+    if (Array.isArray(b.alternativeExplanations)) for (var ali = 0; ali < b.alternativeExplanations.length; ali++) _checkEntry(b.alternativeExplanations[ali], ALT_ENTRY_KEYS, 'alternativeId', CODES.BRIEF_INVALID, false);
 
     // cannotConcludeReasonCodes + limitations — each entry MUST be a known reason code
     if (Array.isArray(b.cannotConcludeReasonCodes)) for (var ci = 0; ci < b.cannotConcludeReasonCodes.length; ci++) if (!RC.isReasonCode(b.cannotConcludeReasonCodes[ci])) { reasons.push(CODES.BRIEF_INVALID); break; }

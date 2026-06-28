@@ -99,38 +99,74 @@
 
   function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
   function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
-  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Object.keys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) if (allowed.indexOf(keys[i]) === -1) return false; return true; }
+  // Codex D1 R1 Finding RN-01 closure.
+  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (typeof k === 'symbol') return false; if (allowed.indexOf(k) === -1) return false; } return true; }
   function _isFiniteNum(v) { return typeof v === 'number' && v === v && v !== Infinity && v !== -Infinity; }
   function _utf8Bytes(s) { try { return (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s).length : Buffer.byteLength(s, 'utf8'); } catch (e) { return (typeof s === 'string') ? s.length * 4 : 0; } }
-  function _isIdArray(v, cap) { if (!Array.isArray(v) || v.length > cap) return false; for (var i = 0; i < v.length; i++) if (typeof v[i] !== 'string' || v[i].length === 0) return false; return true; }
-  function _hasCausalOverclaim(s) { if (typeof s !== 'string') return false; var lower = s.toLowerCase(); for (var i = 0; i < CAUSAL_OVERCLAIM_TERMS.length; i++) if (lower.indexOf(CAUSAL_OVERCLAIM_TERMS[i]) !== -1) return true; return false; }
+  // Codex D1 R1 Finding RN-05 closure: ID-array elements MUST also pass the byte cap and the
+  // grammar regex (same as the parent id). Otherwise an arbitrarily-long string can pad an id slot
+  // before envelope validation. _isIdArray therefore takes the same id grammar + byte cap as the
+  // owning shape.
+  function _isIdArray(v, cap) {
+    if (!Array.isArray(v) || v.length > cap) return false;
+    for (var i = 0; i < v.length; i++) {
+      var e = v[i];
+      if (typeof e !== 'string' || e.length === 0) return false;
+      if (HYPOTHESIS_ID_FORBIDDEN_RE.test(e) || !HYPOTHESIS_ID_RE.test(e)) return false;
+      if (_utf8Bytes(e) > STRING_BYTE_CAP) return false;
+    }
+    return true;
+  }
+  // Codex D1 R1 Finding RN-03 closure: normalize hyphens / dashes / whitespace runs to a single
+  // underscore before scanning. Catches DRIVER-FAULT, driver—fault (em-dash), 'guaranteed-fix-recommended',
+  // 'driver_FAULT_now', etc. The CAUSAL_OVERCLAIM_TERMS canonical list uses underscores.
+  function _hasCausalOverclaim(s) {
+    if (typeof s !== 'string') return false;
+    var normalized = s.toLowerCase().replace(/[\s‐-―\-]+/g, '_');
+    for (var i = 0; i < CAUSAL_OVERCLAIM_TERMS.length; i++) {
+      // Compare against the underscore form of each canonical term (the term list contains both
+      // forms already; we additionally normalize the input so hyphen / space variants collapse to
+      // the underscore form).
+      var t = CAUSAL_OVERCLAIM_TERMS[i].toLowerCase().replace(/[\s‐-―\-]+/g, '_');
+      if (normalized.indexOf(t) !== -1) return true;
+    }
+    return false;
+  }
 
   /**
    * validateParamsShape(p) — closed key plain object, values ∈ { finite number, boolean, null, short
    * string }. Same posture as evidence-node observation params.
    */
   function validateParamsShape(p) {
-    if (p === null || p === undefined) return Object.freeze({ valid: true });
-    if (!_isPlain(p)) return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID]);
-    var keys; try { keys = Object.keys(p); } catch (e) { return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID]); }
-    for (var i = 0; i < keys.length; i++) {
-      var v = p[keys[i]];
-      if (v === null || typeof v === 'boolean') continue;
-      if (typeof v === 'number') { if (!_isFiniteNum(v)) return RC.buildBlockedResult([CODES.NUMERIC_INVALID]); continue; }
-      if (typeof v === 'string') {
-        if (_utf8Bytes(v) > PARAMS_VALUE_BYTE_CAP) return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED]);
-        if (_hasCausalOverclaim(v)) return RC.buildBlockedResult([CODES.HYPOTHESIS_CAUSAL_OVERCLAIM]);
-        continue;
+    // RN-02 closure: outer try/catch. RN-01 closure: Reflect.ownKeys rejects Symbol-keyed extras.
+    try {
+      if (p === null || p === undefined) return Object.freeze({ valid: true });
+      if (!_isPlain(p)) return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID]);
+      var keys; try { keys = Reflect.ownKeys(p); } catch (e) { return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID]); }
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        if (typeof k === 'symbol') return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY]);
+        var v = p[k];
+        if (v === null || typeof v === 'boolean') continue;
+        if (typeof v === 'number') { if (!_isFiniteNum(v)) return RC.buildBlockedResult([CODES.NUMERIC_INVALID]); continue; }
+        if (typeof v === 'string') {
+          if (_utf8Bytes(v) > PARAMS_VALUE_BYTE_CAP) return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED]);
+          if (_hasCausalOverclaim(v)) return RC.buildBlockedResult([CODES.HYPOTHESIS_CAUSAL_OVERCLAIM]);
+          continue;
+        }
+        return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID]);
       }
-      return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID]);
+      return Object.freeze({ valid: true });
+    } catch (e) {
+      return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'params validator threw on hostile input' });
     }
-    return Object.freeze({ valid: true });
   }
 
   /**
    * validateAlternativeExplanationShape(a) — closed-key plain object.
    */
   function validateAlternativeExplanationShape(a) {
+    try {
     if (!_isPlain(a)) return RC.buildBlockedResult([CODES.HYPOTHESIS_ALTERNATIVE_INVALID]);
     if (!_hasOnlyAllowedKeys(a, ALTERNATIVE_EXPLANATION_KEYS)) return RC.buildBlockedResult([CODES.HYPOTHESIS_ALTERNATIVE_INVALID, CODES.UNKNOWN_OWN_KEY]);
     if (!_nonEmptyStr(a.alternativeId) || HYPOTHESIS_ID_FORBIDDEN_RE.test(a.alternativeId) || !HYPOTHESIS_ID_RE.test(a.alternativeId)) return RC.buildBlockedResult([CODES.HYPOTHESIS_ALTERNATIVE_INVALID]);
@@ -143,12 +179,16 @@
       if (!_isIdArray(a.supportingEvidenceIds, ID_ARRAY_CAP)) return RC.buildBlockedResult([CODES.HYPOTHESIS_ALTERNATIVE_INVALID, CODES.ARRAY_CAP_EXCEEDED]);
     }
     return Object.freeze({ valid: true });
+    } catch (e) {
+      return RC.buildBlockedResult([CODES.HYPOTHESIS_ALTERNATIVE_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'alternative validator threw on hostile input' });
+    }
   }
 
   /**
    * validateValidationActionShape(a) — closed-key plain object with kind ∈ VALIDATION_ACTION_KIND_ALLOWED.
    */
   function validateValidationActionShape(a) {
+    try {
     if (!_isPlain(a)) return RC.buildBlockedResult([CODES.VALIDATION_ACTION_INVALID]);
     if (!_hasOnlyAllowedKeys(a, VALIDATION_ACTION_KEYS)) return RC.buildBlockedResult([CODES.VALIDATION_ACTION_INVALID, CODES.UNKNOWN_OWN_KEY]);
     if (!_nonEmptyStr(a.actionId) || HYPOTHESIS_ID_FORBIDDEN_RE.test(a.actionId) || !HYPOTHESIS_ID_RE.test(a.actionId)) return RC.buildBlockedResult([CODES.VALIDATION_ACTION_INVALID]);
@@ -166,6 +206,9 @@
       if (_hasCausalOverclaim(a.expectedObservationI18nKey)) return RC.buildBlockedResult([CODES.HYPOTHESIS_CAUSAL_OVERCLAIM]);
     }
     return Object.freeze({ valid: true });
+    } catch (e) {
+      return RC.buildBlockedResult([CODES.VALIDATION_ACTION_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'validation-action validator threw on hostile input' });
+    }
   }
 
   /**

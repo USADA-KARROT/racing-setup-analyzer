@@ -67,7 +67,8 @@
 
   function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
   function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
-  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Object.keys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) if (allowed.indexOf(keys[i]) === -1) return false; return true; }
+  // Codex D1 R1 Finding RN-01 closure: Reflect.ownKeys catches non-enumerable + Symbol-keyed.
+  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (typeof k === 'symbol') return false; if (allowed.indexOf(k) === -1) return false; } return true; }
   function _isFiniteNum(v) { return typeof v === 'number' && v === v && v !== Infinity && v !== -Infinity; }
   function _utf8Bytes(s) { try { return (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s).length : Buffer.byteLength(s, 'utf8'); } catch (e) { return (typeof s === 'string') ? s.length * 4 : 0; } }
   function _isStringCodeArray(v, cap) { if (!Array.isArray(v) || v.length > cap) return false; for (var i = 0; i < v.length; i++) if (typeof v[i] !== 'string' || v[i].length === 0) return false; return true; }
@@ -78,6 +79,8 @@
    * finite numbers, booleans, null, or short strings (≤ PARAMS_VALUE_BYTE_CAP).
    */
   function validateObservationShape(o) {
+    // RN-02 closure: outer try/catch.
+    try {
     if (!_isPlain(o)) return RC.buildBlockedResult([CODES.EVIDENCE_OBSERVATION_INVALID], { detail: 'observation not a plain object' });
     if (!_hasOnlyAllowedKeys(o, OBSERVATION_KEYS)) return RC.buildBlockedResult([CODES.EVIDENCE_OBSERVATION_INVALID, CODES.UNKNOWN_OWN_KEY]);
     if (OBSERVATION_KIND_ALLOWED.indexOf(o.kind) === -1) return RC.buildBlockedResult([CODES.EVIDENCE_OBSERVATION_INVALID], { detail: 'observation.kind not allowed' });
@@ -96,6 +99,9 @@
       }
     }
     return Object.freeze({ valid: true });
+    } catch (e) {
+      return RC.buildBlockedResult([CODES.EVIDENCE_OBSERVATION_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'observation validator threw on hostile input' });
+    }
   }
 
   /**
