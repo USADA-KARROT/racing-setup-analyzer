@@ -110,8 +110,26 @@
 
   "codexVerdict": {
     "verdict": "PENDING",
-    "rounds": [],
-    "tierDisclosure": "Codex C-B (the final R3.0C phase gate) will be invoked against the C8 branch candidate SHA. Tier 1 raw stdout MUST be captured and persisted under governance/r3.0c/codex-checkpoint-evidence/C-B/round-N-<sha>.md for every round (BLOCK and PASS)."
+    "rounds": [
+      {
+        "round": 1,
+        "reviewedSha": "0caa8c8ffea5400fbfbef92a85a578c77fe66d65",
+        "verdict": "BLOCK",
+        "evidence": "governance/r3.0c/codex-checkpoint-evidence/C-B/round-1-0caa8c8.md",
+        "evidenceSha256": "3efd8de2ffd2414583479883270e69a4399b09ea2f9328cb6c465eece5f3c411",
+        "findings": [
+          { "id": "C8-CB-RN-01", "title": "Renderer callers can mint arbitrary authentic case records", "triage": "ACCEPT", "fixCommit": "round-2", "fixSummary": "Move WeakSet + register helpers into IIFE-scope closure (r3cC8Authority); remove _r3cC7RegisterAuthenticCaseRecord + _r3cC7AuthenticCaseRecords from app() public API." },
+          { "id": "C8-CB-RN-02", "title": "Authentic records lose identity before reaching WeakSet predicate", "triage": "ACCEPT", "fixCommit": "round-2", "fixSummary": "Viewmodel setAssociation preserves caseRecord reference identity when input is plain + frozen; rejects non-frozen / hostile Proxy to null. Renderer-side builder always emits frozen records." },
+          { "id": "C8-CB-RN-03", "title": "Case reopen preserves stale authority/framing/result/export", "triage": "ACCEPT", "fixCommit": "round-2", "fixSummary": "openCase + loadDemoAnalysisCase null _r3cC8LatestAuthorityRecord and call vm.notifyCaseReopen() SYNCHRONOUSLY at initiation; only repopulate on successful non-degraded registration." },
+          { "id": "C8-CB-RN-04", "title": "Concurrent opens can commit older case after newer navigation", "triage": "ACCEPT", "fixCommit": "round-2", "fixSummary": "Monotonic _r3cC8OpenToken bumped at openCase entry; promise commit drops stale completions." },
+          { "id": "C8-CB-RN-05", "title": "Degraded-case rejection accepts truthy non-boolean values", "triage": "ACCEPT", "fixCommit": "round-2", "fixSummary": "r3cC8Authority.forCaseStore requires o.degraded === false strict; any other value (1, 'yes', undefined, throwing accessor) fails closed." },
+          { "id": "C8-CB-RN-06", "title": "Activated comparison route exposes a non-functional workspace", "triage": "ACCEPT WITH NARROWER FIX", "fixCommit": "round-2", "fixSummary": "Wire reference/comparison selectors @change → vm.setReference/setComparison; wire export @click → orchestrator.exportComparison + _downloadJson; auto-call setAssociation on successful case open; selectors populate from caseDataHolder.lastSession.laps when available (demo session has no laps array yet — selectors render empty placeholder; vm stays in SELECTING; full multi-lap session population is the next product deliverable but the wiring is in place)." },
+          { "id": "C8-CB-RN-07", "title": "Activation tests bypass actual renderer authority implementation", "triage": "ACCEPT", "fixCommit": "round-2", "fixSummary": "Add source-pattern assertions on renderer/index.html for the closure pattern + strict degraded + open clearing + token guard + selector handlers + export handler; add viewmodel identity-preservation tests with stub orchestrator capturing the requestComparison input." },
+          { "id": "C8-CB-RN-08", "title": "Required test-integrity exits were not achieved (Codex sandbox EPERM)", "triage": "OVERLY CONSERVATIVE", "fixCommit": null, "fixSummary": "Codex CLI ran with read-only sandbox; mkdtemp failed inside the sandbox. Claude-verified npm test EXIT=0 in writable environment (this commit AND round-2 commit); CI re-run on the integration SHA is the authoritative writable-environment evidence." }
+        ]
+      }
+    ],
+    "tierDisclosure": "Codex C-B (the final R3.0C phase gate). Tier 1 raw stdout for Round 1 persisted at governance/r3.0c/codex-checkpoint-evidence/C-B/round-1-0caa8c8.md (sha256 3efd8de2ffd2414583479883270e69a4399b09ea2f9328cb6c465eece5f3c411). Round 2 will be invoked against the post-fix SHA; raw stdout to be persisted at round-2-<sha>.md."
   },
 
   "scopeBoundary": {
@@ -138,17 +156,27 @@
   "governanceChanged": true,
   "changedFiles": [
     "renderer/js/feature-registry.js",
+    "renderer/js/r3-0c-comparison-viewmodel.js",
+    "renderer/js/i18n-comparisons.js",
     "renderer/index.html",
     "scripts/check-feature-registry.js",
     "scripts/check-r3-0c-guard.js",
     "scripts/check-r3-0c-no-consumer.js",
     "tests/feature-registry.test.js",
     "tests/feature-router.test.js",
+    "tests/r3.0a-ui.test.js",
+    "tests/r3.0b-ui.test.js",
+    "tests/r3.0c-contract-foundation.test.js",
     "tests/r3-0c-activation.test.js",
+    "tests/r3-0c-governance.test.js",
+    "tests/r3-0c-no-consumer.test.js",
+    "tests/r3-0-train.test.js",
     "governance/r3.0c/state.json",
     "governance/r3.0c/capabilities.json",
     "governance/r3.0c/checkpoints/C8.json",
+    "governance/r3.0c/codex-checkpoint-evidence/C-B/round-1-0caa8c8.md",
     "governance/r3.0/train.json",
+    ".github/workflows/ci.yml",
     "package.json"
   ],
 

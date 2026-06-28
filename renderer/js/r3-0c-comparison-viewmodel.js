@@ -250,27 +250,22 @@
       try {
         var assocCopy = _safeShallowCopy(assoc);
         _state.association = assocCopy ? Object.freeze(assocCopy) : null;
-        // Codex C7-R2-A-01 closure: the viewmodel NO LONGER registers the caseRecord with the
-        // orchestrator. The viewmodel is renderer-accessible (any caller can invoke
-        // setAssociation with a forged caseRecord); treating that path as an authoritative
-        // boundary was the D1 vulnerability. We still hold a private reference to the record so
-        // requestComparison can pass it to the orchestrator, but the orchestrator's
-        // authenticityPredicate (injected at construction) is what grants authority — NOT this
-        // viewmodel.
+        // Codex C-B Round 1 finding C8-CB-RN-02 closure (identity preservation): the orchestrator's
+        // authenticityPredicate is WeakSet-membership based — clone loses identity → forever blocked.
+        // Codex C7-R6 hardened OTHER mutators against hostile-Proxy ownKeys via _safeShallowCopy, but
+        // for caseRecord SPECIFICALLY we MUST keep the reference identity so a renderer-minted
+        // authoritative record actually matches the WeakSet. Hostile-Proxy / accessor concerns are
+        // addressed differently: (a) the read of assoc.caseRecord is guarded by try/catch so a
+        // throwing getter yields null, (b) we accept the reference only when it passes _isPlain
+        // (rejects Proxies whose getPrototypeOf throws or returns non-Object.prototype) AND
+        // Object.isFrozen (the renderer-side r3cC8Authority closure always emits a frozen record;
+        // any non-frozen value is rejected fail-closed). The downstream authenticityPredicate is the
+        // final gate — even a plain frozen non-authoritative object will fail there.
         if (assocCopy) {
-          // Read caseRecord via _safeShallowCopy too — assoc may be a Proxy whose
-          // `caseRecord` getter throws even though Object.assign succeeded earlier (Object.assign
-          // copies enumerable own-string-key data properties; a property whose value is an object
-          // with a throwing getter doesn't crash Object.assign — but iterating it does).
           var crSrc = null;
           try { crSrc = assoc && assoc.caseRecord; } catch (e) { crSrc = null; }
-          var cr = _safeShallowCopy(crSrc);
-          if (cr) {
-            var assocAssoc = null;
-            try { assocAssoc = crSrc && crSrc.associations; } catch (e) { assocAssoc = null; }
-            var nested = _safeShallowCopy(assocAssoc);
-            if (nested) cr.associations = nested;
-            _state.caseRecord = cr;
+          if (crSrc !== null && _isPlain(crSrc) && Object.isFrozen(crSrc)) {
+            _state.caseRecord = crSrc;
           } else {
             _state.caseRecord = null;
           }

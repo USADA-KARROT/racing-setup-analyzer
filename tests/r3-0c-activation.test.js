@@ -361,20 +361,88 @@ function _wellFormedInput(caseRecord) {
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Section 8 — Renderer wiring presence (the four C8 helpers MUST be source-visible)
+// Section 8 — Renderer wiring presence + Codex C-B Round 1 hardening
 // ─────────────────────────────────────────────────────────────────────────────
 (function () {
   const html = fs.readFileSync(path.join(REPO, 'renderer', 'index.html'), 'utf8');
-  chk('index.html declares _r3cC8LatestAuthorityRecord', html.indexOf('_r3cC8LatestAuthorityRecord') !== -1);
-  chk('index.html declares _r3cC8BuildAuthoritativeRecord', html.indexOf('_r3cC8BuildAuthoritativeRecord') !== -1);
-  chk('index.html declares _r3cC8RegisterAuthoritativeFromCaseStore', html.indexOf('_r3cC8RegisterAuthoritativeFromCaseStore') !== -1);
-  chk('index.html declares _r3cC8RegisterAuthoritativeFromDemoCase', html.indexOf('_r3cC8RegisterAuthoritativeFromDemoCase') !== -1);
-  chk('index.html openCase invokes C8 case-store register', /openCase[\s\S]{0,2000}_r3cC8RegisterAuthoritativeFromCaseStore/.test(html));
-  chk('index.html loadDemoAnalysisCase invokes C8 demo register', /loadDemoAnalysisCase[\s\S]{0,3000}_r3cC8RegisterAuthoritativeFromDemoCase/.test(html));
-  // Defense: helper short-circuits on degraded (imported_summary)
-  chk('index.html helper checks o.degraded', html.indexOf('o.degraded === true') !== -1);
+  // Codex C-B Finding C8-CB-RN-01 closure — r3cC8Authority is an IIFE-scope closure (module-level,
+  // not on the Alpine app() instance). Alpine templates and any caller of app() cannot reach it.
+  chk('renderer declares r3cC8Authority closure at module scope', /const r3cC8Authority = \(function/.test(html));
+  chk('renderer authority closure exposes forCaseStore', /forCaseStore: function/.test(html));
+  chk('renderer authority closure exposes forDemo', /forDemo: function/.test(html));
+  chk('renderer authority closure exposes predicate', /predicate: function/.test(html));
+  // The C7-era register helper MUST no longer be exposed on the Alpine component (closure migration).
+  chk('app() no longer exposes _r3cC7RegisterAuthenticCaseRecord method', !/_r3cC7RegisterAuthenticCaseRecord\(caseRecord\)\s*\{/.test(html));
+  chk('app() no longer holds _r3cC7AuthenticCaseRecords WeakSet field', !/_r3cC7AuthenticCaseRecords:\s*\(typeof WeakSet/.test(html));
+  // Codex C-B Finding C8-CB-RN-05 closure — STRICT degraded rejection (=== false, not !== true).
+  chk('authority closure requires o.degraded === false strict', /deg !== false/.test(html));
+  // Codex C-B Finding C8-CB-RN-03 closure — openCase + loadDemoAnalysisCase clear authority + notifyCaseReopen.
+  chk('openCase clears _r3cC8LatestAuthorityRecord at start', /openCase\(id\)\{[\s\S]{0,1500}this\._r3cC8LatestAuthorityRecord = null;/.test(html));
+  chk('openCase invokes notifyCaseReopen at start', /openCase\(id\)\{[\s\S]{0,800}_r3cC7VM[\s\S]{0,200}notifyCaseReopen/.test(html));
+  chk('loadDemoAnalysisCase clears _r3cC8LatestAuthorityRecord at start', /loadDemoAnalysisCase\(\)\{[\s\S]{0,400}this\._r3cC8LatestAuthorityRecord = null;/.test(html));
+  chk('loadDemoAnalysisCase invokes notifyCaseReopen at start', /loadDemoAnalysisCase\(\)\{[\s\S]{0,800}_r3cC7VM[\s\S]{0,200}notifyCaseReopen/.test(html));
+  // Codex C-B Finding C8-CB-RN-04 closure — openCase uses a monotonic token to drop stale completions.
+  chk('openCase declares _r3cC8OpenToken state field', /_r3cC8OpenToken:\s*0/.test(html));
+  chk('openCase bumps token + drops stale completion', /var tok = \+\+this\._r3cC8OpenToken[\s\S]{0,800}if \(tok !== self\._r3cC8OpenToken\) return;/.test(html));
+  // Codex C-B Finding C8-CB-RN-06 closure — selectors + export button have @-handlers wired through vm.
+  chk('reference selector has @change handler', /reference-selector"[\s\S]{0,200}@change="r3cC8OnReferenceSelected/.test(html));
+  chk('comparison selector has @change handler', /comparison-selector"[\s\S]{0,200}@change="r3cC8OnComparisonSelected/.test(html));
+  chk('export button has @click handler', /data-r3c-c7="export-action"[\s\S]{0,200}@click="r3cC8OnExportClick/.test(html));
+  // Helpers are present
+  chk('app() declares r3cC8LapCandidates', /r3cC8LapCandidates\(\)\{/.test(html));
+  chk('app() declares r3cC8OnReferenceSelected', /r3cC8OnReferenceSelected\(lapId\)\{/.test(html));
+  chk('app() declares r3cC8OnComparisonSelected', /r3cC8OnComparisonSelected\(lapId\)\{/.test(html));
+  chk('app() declares r3cC8OnExportClick', /r3cC8OnExportClick\(\)\{/.test(html));
+  chk('app() declares _r3cC8SyncAssociationFromCase', /_r3cC8SyncAssociationFromCase\(rec, caseSource\)\{/.test(html));
   // Comparison Workspace pane wiring from C7 remains
   chk('index.html keeps Comparison Workspace pane', html.indexOf('data-r3c-c7-pane="comparison-workspace"') !== -1);
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section 9 — Viewmodel preserves caseRecord identity (Codex C-B Finding C8-CB-RN-02)
+// ─────────────────────────────────────────────────────────────────────────────
+(function () {
+  const VM = require('../renderer/js/r3-0c-comparison-viewmodel.js');
+  // Stub orchestrator — the viewmodel calls requestComparison synchronously after every mutator,
+  // but we ONLY want to assert that _state.caseRecord preserved identity. requestComparison
+  // returning blocked is fine; what matters is what reference the viewmodel passed back IF we
+  // could observe it. We instead read getState().reference / comparison and verify the test
+  // input identity is held — but caseRecord itself is private. We check identity preservation
+  // by reading the orchestrator-side input: capture the input synchronously.
+  let captured = null;
+  const orch = {
+    requestComparison: function (input) { captured = input; return { status: 'blocked', reasonCodes: [CODES.INTERNAL_CONTRACT_VIOLATION], framing: null, generationToken: input && input.generationToken || 0 }; },
+  };
+  const vm = VM.createComparisonViewModel({ orchestrator: orch, capabilities: _capsAllOn() });
+  const authoritative = Object.freeze({ caseId: 'case_demo', associations: Object.freeze({ trackId: 'tk1', layoutId: 'l1', positionBasis: 'lap_distance', positionDirection: 'increasing' }) });
+  vm.setAssociation({
+    caseId: 'case_demo', analysisCaseId: 'case_demo', sessionId: 'sess_demo', trackId: 'tk1', layoutId: 'l1', positionBasis: 'lap_distance', positionDirection: 'increasing',
+    caseRecord: authoritative,
+  });
+  vm.setChannelMapping({ pairing: { pairs: [] } });
+  vm.setReference({ lapId: 'lap_R', lapTimeMs: 90000 });
+  vm.setComparison({ lapId: 'lap_C', lapTimeMs: 90100 });
+  chk('vm preserves caseRecord identity through setAssociation→requestComparison', captured && captured.caseRecord === authoritative);
+  // A non-frozen plain object — viewmodel MUST reject it (identity check requires frozen).
+  let captured2 = null;
+  const orch2 = { requestComparison: function (input) { captured2 = input; return { status: 'blocked', reasonCodes: [CODES.INTERNAL_CONTRACT_VIOLATION], framing: null, generationToken: 0 }; } };
+  const vm2 = VM.createComparisonViewModel({ orchestrator: orch2, capabilities: _capsAllOn() });
+  const nonFrozen = { caseId: 'case_demo', associations: { trackId: 'tk1', layoutId: 'l1' } };
+  vm2.setAssociation({ caseId: 'case_demo', analysisCaseId: 'case_demo', sessionId: 'sess_demo', trackId: 'tk1', layoutId: 'l1', positionBasis: 'lap_distance', positionDirection: 'increasing', caseRecord: nonFrozen });
+  vm2.setChannelMapping({ pairing: { pairs: [] } });
+  vm2.setReference({ lapId: 'lap_R', lapTimeMs: 90000 });
+  vm2.setComparison({ lapId: 'lap_C', lapTimeMs: 90100 });
+  chk('vm rejects non-frozen caseRecord (caseRecord becomes null)', captured2 && captured2.caseRecord === null);
+  // Hostile Proxy whose ownKeys throws — viewmodel reads via try/catch so caseRecord becomes null.
+  let captured3 = null;
+  const orch3 = { requestComparison: function (input) { captured3 = input; return { status: 'blocked', reasonCodes: [CODES.INTERNAL_CONTRACT_VIOLATION], framing: null, generationToken: 0 }; } };
+  const vm3 = VM.createComparisonViewModel({ orchestrator: orch3, capabilities: _capsAllOn() });
+  const hostile = new Proxy({}, { ownKeys: function () { throw new Error('hostile'); }, getPrototypeOf: function () { return Object.prototype; } });
+  vm3.setAssociation({ caseId: 'case_demo', analysisCaseId: 'case_demo', sessionId: 'sess_demo', trackId: 'tk1', layoutId: 'l1', positionBasis: 'lap_distance', positionDirection: 'increasing', caseRecord: hostile });
+  vm3.setChannelMapping({ pairing: { pairs: [] } });
+  vm3.setReference({ lapId: 'lap_R', lapTimeMs: 90000 });
+  vm3.setComparison({ lapId: 'lap_C', lapTimeMs: 90100 });
+  chk('vm rejects hostile-Proxy caseRecord (caseRecord becomes null)', captured3 && captured3.caseRecord === null);
 })();
 
 console.log('r3-0c-activation: ' + pass + ' passed, ' + fail + ' failed');
