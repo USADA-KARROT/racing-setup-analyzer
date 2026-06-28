@@ -434,6 +434,25 @@ chk('BRIEF future schema rejected', EB.validateEngineerBriefShape(validBrief({ s
   chk('RN-04: brief alternative with overclaim in string param value rejected', EB.validateEngineerBriefShape(b).valid === undefined);
 })();
 
+// RN-11 — toCleanCopy must not silently transform class instances via inherited toJSON()
+(function () {
+  // A class with a toJSON method that forges a clean identity. If _toCleanCopy fell back to
+  // JSON.stringify, the toJSON method would be invoked and the validator would receive a forged
+  // plain object. With the R3 fix (structuredClone required; no JSON fallback) the class instance
+  // is rejected — structuredClone DataCloneError on class instances → toCleanCopy returns null →
+  // validator rejects.
+  function HostileClass() {}
+  HostileClass.prototype.toJSON = function () { return { caseId: 'forged_case', sessionId: 'forged_sess', sourceId: 'forged', sourceVersion: 'v1', freshness: NOW }; };
+  var hostile = new HostileClass();
+  chk('RN-11: SI rejects class instance with inherited toJSON', SI.validateSourceIdentity(hostile).valid === undefined);
+  // Symbol values inside an otherwise-plain object — structuredClone preserves nothing useful for
+  // Symbol values; an inherited toJSON would have dropped them silently. RC.toCleanCopy uses
+  // structuredClone which throws on Symbol VALUES (not keys) → rejected.
+  var hostile2 = { caseId: 'x', sessionId: 'y', sourceId: 'z', sourceVersion: 'v', freshness: NOW, symValue: Symbol('hostile') };
+  // The extra own key 'symValue' is rejected at the closed-key allowlist anyway — confirms layered defense.
+  chk('RN-11: SI rejects object with Symbol VALUE in extra key', SI.validateSourceIdentity(hostile2).valid === undefined);
+})();
+
 // RN-05 — ID-array elements enforce byte cap + id grammar
 (function () {
   var huge = 'x'.repeat(600);

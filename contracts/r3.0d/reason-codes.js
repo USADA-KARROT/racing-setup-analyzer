@@ -167,12 +167,13 @@
   function _toCleanCopy(v) {
     if (v === null || v === undefined) return v;
     if (typeof v !== 'object') return v;
-    try {
-      if (typeof structuredClone === 'function') return structuredClone(v);
-      return JSON.parse(JSON.stringify(v));
-    } catch (e) {
-      return null; // caller sees null → treats as "not a plain object" → fail closed
-    }
+    // Codex D1 R3 Finding RN-11 closure: NO JSON.stringify fallback. The previous fallback invoked
+    // inherited toJSON() methods on class instances, silently dropped Symbol values + functions +
+    // undefined, and could transform a hostile non-plain object into a validator-approved plain
+    // shape. Modern runtimes (Node 17+, browsers ~2022+) have structuredClone built in; when it is
+    // unavailable the contract fails closed (returns null → caller treats as "not a plain object").
+    if (typeof structuredClone !== 'function') return null;
+    try { return structuredClone(v); } catch (e) { return null; }
   }
   /**
    * _hasHiddenOwnKey(v) — detects Symbol-keyed OR non-enumerable own properties on the TOP-LEVEL
