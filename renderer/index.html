@@ -3247,6 +3247,15 @@ canvas{max-height:300px}
 <script src="js/case-library-viewmodel.js"></script>
 <script src="js/feature-registry.js"></script>
 <script src="js/feature-router.js"></script>
+<!-- R3.0C C7 note: The Comparison Workspace orchestrator + viewmodel are NOT loaded via
+     <script> tags in this checkpoint. The contracts/r3.0c/ directory is governance-classified
+     NON-PRODUCTION (no UI consumer); the no-consumer validator forbids index.html from loading
+     them, and the renderer service modules depend on the contracts global. Browser-side wiring
+     of the C7 UMD stack is a follow-up integration task (likely via a bundler or a dedicated
+     contracts-globals shim). At C7 the production pane is reachable via the deferred
+     placeholder.idle state — the three R3.0C feature IDs remain availability='deferred' until
+     C8_ACTIVATION, so this absence is consistent with the deferred-feature contract. -->
+
 <script src="js/vehicle-preset-usecases.js"></script>
 <script src="js/vehicle-preset-viewmodel.js"></script>
 <script src="js/case-shell.js"></script>
@@ -3900,6 +3909,19 @@ function app(){return{
 
   init(){
     this.tireOptions = api.getTires();
+    // R3.0C C7 Comparison Workspace: instantiate the orchestrator + viewmodel once the UMD
+    // globals are loaded. Capabilities mirror governance/r3.0c/capabilities.json — phase
+    // boundary contract remains disabled at C7. The viewmodel is stored in a non-reactive
+    // holder (_r3cC7VM) so async commits never trigger Alpine reactive re-derivation during
+    // an in-flight comparison. Codex C7 finding C7-J1 closure.
+    try {
+      if (typeof R3_0C_ComparisonOrchestrator !== 'undefined' && typeof R3_0C_ComparisonViewModel !== 'undefined') {
+        const caps = { phaseBoundaryContractEnabled: false, viewmodelStateTransitionContractEnabled: true, framingSourceStructuredContractEnabled: true };
+        const _orch = R3_0C_ComparisonOrchestrator.createOrchestrator({ capabilities: caps });
+        this._r3cC7VM = R3_0C_ComparisonViewModel.createComparisonViewModel({ orchestrator: _orch, capabilities: caps });
+        this._r3cC7Orch = _orch;
+      }
+    } catch (e) { this._r3cC7VM = null; this._r3cC7Orch = null; }
   },
 
   // === OEM Specs 統一介面 ===

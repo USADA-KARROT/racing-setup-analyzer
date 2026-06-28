@@ -86,6 +86,30 @@
     function _nextToken() { _generationCounter = _generationCounter + 1; return _generationCounter; }
     function currentToken() { return _generationCounter; }
 
+    // Codex C7 finding C7-D1 closure: case binding required a caller-controlled caseRecord
+    // matched against caller-controlled association — self-consistent forgery passed. The fix is
+    // an orchestrator-private WeakSet of case records that have been REGISTERED via an
+    // authoritative path. The expected caller is the R3.0B case-store integration (a follow-up
+    // task); for unit tests + manual integration, the explicit registerAuthenticCaseRecord
+    // entrypoint registers a freshly-loaded caseRecord. Any caseRecord that did NOT pass through
+    // this entry point is refused at requestComparison time.
+    var _authenticCaseRecords = (typeof WeakSet !== 'undefined') ? new WeakSet() : null;
+    function registerAuthenticCaseRecord(caseRecord) {
+      if (!_isPlain(caseRecord)) return false;
+      // Defensive freeze so the registered object cannot be mutated post-registration to swap
+      // associations under the orchestrator. Shallow freeze is sufficient because the
+      // associations sub-object is also frozen by the case-store boundary (R3.0B convention).
+      try { if (!Object.isFrozen(caseRecord)) Object.freeze(caseRecord); } catch (e) { /* no-op */ }
+      try { if (_isPlain(caseRecord.associations) && !Object.isFrozen(caseRecord.associations)) Object.freeze(caseRecord.associations); } catch (e) { /* no-op */ }
+      if (_authenticCaseRecords) { try { _authenticCaseRecords.add(caseRecord); } catch (e) { return false; } }
+      return true;
+    }
+    function isAuthenticCaseRecord(caseRecord) {
+      if (!_authenticCaseRecords) return false;
+      if (!_isPlain(caseRecord)) return false;
+      try { return _authenticCaseRecords.has(caseRecord); } catch (e) { return false; }
+    }
+
     function _blockedResponse(reasonCodes, detail, framing, token) {
       var arr = (reasonCodes || []).filter(function (c) { return RC.isReasonCode(c); });
       if (arr.length === 0) arr = [CODES.INTERNAL_CONTRACT_VIOLATION];
@@ -164,7 +188,15 @@
       }
       if (!_isPlain(input)) return _blockedResponse([CODES.INTERNAL_CONTRACT_VIOLATION], 'input not a plain object', null, token);
 
-      // 1. case ↔ context binding (F4)
+      // 1. case authenticity (Codex C7 finding C7-D1): the caseRecord MUST have been registered
+      //    via the authoritative entrypoint. A literal-built caseRecord (even one whose
+      //    associations consistently match the caller-supplied association + eligibility
+      //    identities) fails closed here.
+      if (!isAuthenticCaseRecord(input.caseRecord)) {
+        return _blockedResponse([CODES.INTERNAL_CONTRACT_VIOLATION], 'caseRecord not registered via registerAuthenticCaseRecord — caller-controlled case authority refused', null, token);
+      }
+
+      // 2. case ↔ context binding (F4)
       var bindCheck = CE.validateComparisonContextAgainstCase(input.caseRecord, input.association);
       if (bindCheck && bindCheck.valid !== true) {
         return _blockedResponse(bindCheck.reasonCodes ? bindCheck.reasonCodes.slice() : [CODES.TRACK_IDENTITY_MISMATCH], 'case/context binding failed', null, token);
@@ -289,6 +321,8 @@
       CHECKPOINT_FLOOR: CHECKPOINT_FLOOR,
       SIGN_FORMULA: SIGN_FORMULA,
       currentToken: currentToken,
+      registerAuthenticCaseRecord: registerAuthenticCaseRecord,
+      isAuthenticCaseRecord: isAuthenticCaseRecord,
       requestComparison: requestComparison,
       exportComparison: exportComparison,
     });

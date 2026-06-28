@@ -114,6 +114,14 @@ chk('C18 placeholderForTrigger unknown → BLOCKED (fail-closed)', VST.placehold
 
 // F. Orchestrator — full eligible path (drives real C5)
 function caseRecord() { return { caseId: 'case_A', associations: { trackId: 'silverstone', layoutId: 'gp', positionBasis: 'lap_distance', positionDirection: 'increasing' } }; }
+// helper: build an orchestrator AND register the caseRecord so requestComparison can pass the
+// authenticity gate (Codex C7 finding C7-D1 closure). Tests that want to probe the unauth path
+// skip this helper and supply a literal caseRecord.
+function authOrch(caps) {
+  const o = OrchService.createOrchestrator({ capabilities: caps });
+  return o;
+}
+function regCase(orch, cr) { orch.registerAuthenticCaseRecord(cr); return cr; }
 function association() { return { caseId: 'case_A', sessionId: 'sess_1', trackId: 'silverstone', layoutId: 'gp', positionBasis: 'lap_distance', positionDirection: 'increasing', analysisCaseId: 'case_A', credibilityMetadata: { credibility: 'Heuristic', provenance: 'real', confidence: 'low', limitations: [], blockedReasons: [] } }; }
 function eligibilityInput() {
   return {
@@ -137,7 +145,8 @@ function deltaMetricsRequest() {
 }
 (() => {
   const orch = OrchService.createOrchestrator({ capabilities: allCapsOn });
-  const r = orch.requestComparison({ caseRecord: caseRecord(), association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: deltaMetricsRequest() });
+  const cr = caseRecord(); orch.registerAuthenticCaseRecord(cr);
+  const r = orch.requestComparison({ caseRecord: cr, association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: deltaMetricsRequest() });
   chk('F1 eligible end-to-end', r.status === 'eligible');
   chk('F2 framing is structured (not prose)', r.framing && typeof r.framing.observedDelta === 'object');
   chk('F3 framing.observedDelta.faster_overall', r.framing.observedDelta && r.framing.observedDelta.i18nKey === 'r3_0c.framing.observed_delta.faster_overall');
@@ -148,15 +157,23 @@ function deltaMetricsRequest() {
 (() => {
   const orch = OrchService.createOrchestrator({ capabilities: allCapsOn });
   const caseRec = { caseId: 'case_A', associations: { trackId: 'imola', layoutId: 'gp', positionBasis: 'lap_distance', positionDirection: 'increasing' } };
+  orch.registerAuthenticCaseRecord(caseRec);
   const r = orch.requestComparison({ caseRecord: caseRec, association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: deltaMetricsRequest() });
   chk('G1 case associations trackId mismatch → blocked', r.status === 'blocked' && hasCode(r, CODES.TRACK_IDENTITY_MISMATCH));
+})();
+// G2. Orchestrator — caseRecord NOT registered → blocked by authenticity (Codex C7-D1 closure)
+(() => {
+  const orch = OrchService.createOrchestrator({ capabilities: allCapsOn });
+  const r = orch.requestComparison({ caseRecord: caseRecord(), association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: deltaMetricsRequest() });
+  chk('G2 caller-forged caseRecord (not registered) → blocked', r.status === 'blocked' && hasCode(r, CODES.INTERNAL_CONTRACT_VIOLATION));
 })();
 // H. Orchestrator — phase metric requested without capability → filtered out + limitation
 (() => {
   const orch = OrchService.createOrchestrator({ capabilities: allCapsOn });
+  const cr = caseRecord(); orch.registerAuthenticCaseRecord(cr);
   const dm = deltaMetricsRequest();
   dm.requestedMetrics = ['lap_time', 'delta_cumulative', 'entry_delta'];
-  const r = orch.requestComparison({ caseRecord: caseRecord(), association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: dm });
+  const r = orch.requestComparison({ caseRecord: cr, association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: dm });
   chk('H1 phase metric without capability → still eligible (filtered)', r.status === 'eligible');
   chk('H2 limitations include PHASE_BOUNDARY_CONTRACT_UNAUTHORISED', r.limitations.indexOf(CODES.PHASE_BOUNDARY_CONTRACT_UNAUTHORISED) !== -1);
   chk('H3 framing.cannotDistinguish names phase_metric_unauthorised', r.framing.cannotDistinguish.some(e => e.i18nKey === 'r3_0c.framing.cannot_distinguish.phase_metric_unauthorised'));
@@ -164,13 +181,15 @@ function deltaMetricsRequest() {
 // I. Orchestrator — caller smuggled prose framing → fall back to validated/fallback
 (() => {
   const orch = OrchService.createOrchestrator({ capabilities: allCapsOn });
-  const r = orch.requestComparison({ caseRecord: caseRecord(), association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: deltaMetricsRequest(), framing: { observedDelta: 'driver was late on brakes' } });
+  const cr = caseRecord(); orch.registerAuthenticCaseRecord(cr);
+  const r = orch.requestComparison({ caseRecord: cr, association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: deltaMetricsRequest(), framing: { observedDelta: 'driver was late on brakes' } });
   chk('I1 caller-smuggled prose dropped (observedDelta is structured)', r.status === 'eligible' && typeof r.framing.observedDelta === 'object' && r.framing.observedDelta.i18nKey !== undefined);
 })();
 // J. Orchestrator — caller-smuggled unregistered i18nKey → dropped
 (() => {
   const orch = OrchService.createOrchestrator({ capabilities: allCapsOn });
-  const r = orch.requestComparison({ caseRecord: caseRecord(), association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: deltaMetricsRequest(), framing: { nextValidationAction: { reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.evil_made_up_key' } } });
+  const cr = caseRecord(); orch.registerAuthenticCaseRecord(cr);
+  const r = orch.requestComparison({ caseRecord: cr, association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: deltaMetricsRequest(), framing: { nextValidationAction: { reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.evil_made_up_key' } } });
   chk('J1 unregistered i18nKey in nextValidationAction → not committed', r.framing.nextValidationAction === null);
 })();
 

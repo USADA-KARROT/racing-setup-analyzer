@@ -70,6 +70,12 @@
     }
 
     function _clearAndPlaceholder(triggerName) {
+      // Codex C7 finding C7-A1 closure: advance latestToken on EVERY trigger so that any
+      // in-flight orchestrator response that hasn't committed yet is invalidated. Without this,
+      // a trigger like notifyAuthorityRevoked that does not itself issue a new request would
+      // leave latestToken unchanged, allowing a delayed eligible response to overwrite the
+      // revoked-placeholder state.
+      _state.latestToken = _state.latestToken + 1;
       var placeholder = VST.placeholderForTrigger(triggerName);
       _state.placeholder = placeholder;
       _state.result = null;
@@ -205,7 +211,25 @@
     // ── Public mutators (the 7 transition triggers) ──
     function setReference(sel) { _clearAndPlaceholder('reference_selection_changed'); _state.reference = _isPlain(sel) ? Object.freeze(Object.assign({}, sel)) : null; _runRequest(); }
     function setComparison(sel) { _clearAndPlaceholder('comparison_selection_changed'); _state.comparison = _isPlain(sel) ? Object.freeze(Object.assign({}, sel)) : null; _runRequest(); }
-    function setAssociation(assoc) { _clearAndPlaceholder('case_association_changed'); _state.association = _isPlain(assoc) ? Object.freeze(Object.assign({}, assoc)) : null; _state.caseRecord = _isPlain(assoc) && _isPlain(assoc.caseRecord) ? Object.freeze(Object.assign({}, assoc.caseRecord)) : null; _runRequest(); }
+    function setAssociation(assoc) {
+      _clearAndPlaceholder('case_association_changed');
+      _state.association = _isPlain(assoc) ? Object.freeze(Object.assign({}, assoc)) : null;
+      if (_isPlain(assoc) && _isPlain(assoc.caseRecord)) {
+        var cr = Object.assign({}, assoc.caseRecord);
+        if (_isPlain(assoc.caseRecord.associations)) cr.associations = Object.assign({}, assoc.caseRecord.associations);
+        _state.caseRecord = cr;
+        // Codex C7 finding C7-D1: the viewmodel registers the caseRecord with the orchestrator
+        // before any request can fire. The orchestrator's WeakSet only accepts records that
+        // pass through THIS authoritative path; a caller bypassing setAssociation cannot get a
+        // forged caseRecord into the orchestrator.
+        if (typeof orch.registerAuthenticCaseRecord === 'function') {
+          try { orch.registerAuthenticCaseRecord(_state.caseRecord); } catch (e) { /* no-op */ }
+        }
+      } else {
+        _state.caseRecord = null;
+      }
+      _runRequest();
+    }
     function setChannelMapping(mapping) { _clearAndPlaceholder('channel_mapping_changed'); _state.channelMapping = _isPlain(mapping) ? Object.freeze(Object.assign({}, mapping)) : null; _runRequest(); }
     function notifyCaseReopen() { _clearAndPlaceholder('case_reopen'); _state.reference = null; _state.comparison = null; _state.association = null; _state.channelMapping = null; _state.caseRecord = null; }
     function notifyAuthorityRevoked() { _clearAndPlaceholder('user_confirmed_authority_revoked'); }

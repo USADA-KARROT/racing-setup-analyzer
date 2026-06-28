@@ -74,6 +74,8 @@
 
   function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
   function _isFiniteNum(v) { return typeof v === 'number' && v === v && v !== Infinity && v !== -Infinity; }
+  function _safeOwnKeys(o) { try { return Reflect && typeof Reflect.ownKeys === 'function' ? Reflect.ownKeys(o) : Object.keys(o); } catch (e) { return null; } }
+  function _safeGet(o, k) { try { return o[k]; } catch (e) { return undefined; } }
   function _utf8ByteLength(s) {
     if (typeof Buffer !== 'undefined' && typeof Buffer.byteLength === 'function') return Buffer.byteLength(s, 'utf8');
     if (typeof TextEncoder !== 'undefined') { try { return new TextEncoder().encode(s).length; } catch (e) { /* fall through */ } }
@@ -106,26 +108,43 @@
    * Returns { valid:true } or { valid:false, reasonCode, detail }.
    */
   function validateFramingEntry(entry) {
-    if (!_isPlain(entry)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing entry not a plain object' };
-    var keys = Object.keys(entry);
-    var ALLOWED = { reasonCode: true, i18nKey: true, params: true };
-    for (var i = 0; i < keys.length; i++) if (!ALLOWED[keys[i]]) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing entry has unknown key: ' + String(keys[i]).slice(0, 60) };
-    if (!RC.isReasonCode(entry.reasonCode)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing reasonCode unregistered' };
-    if (!isRegisteredFramingI18nKey(entry.i18nKey)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing i18nKey not in registry: ' + String(entry.i18nKey).slice(0, 80) };
-    if (entry.params !== undefined) {
-      if (!_isPlain(entry.params)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params not a plain object' };
-      var pks = Object.keys(entry.params);
-      for (var j = 0; j < pks.length; j++) {
-        var k = pks[j];
-        if (typeof k !== 'string' || k.length === 0) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has empty / non-string key' };
-        var v = entry.params[k];
-        if (v === null || typeof v === 'boolean') continue;
-        if (typeof v === 'number') { if (!_isFiniteNum(v)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has non-finite number' }; continue; }
-        if (typeof v === 'string') { if (_utf8ByteLength(v) > MAX_PARAM_STRING_BYTES) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has oversized string' }; continue; }
-        return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has unsupported value type' };
+    try {
+      if (!_isPlain(entry)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing entry not a plain object' };
+      // Codex C7 finding C7-F1 closure: use Reflect.ownKeys so non-enumerable + Symbol-keyed extras
+      // are detected. Object.keys missed both.
+      var keys = _safeOwnKeys(entry);
+      if (keys === null) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing entry own-key enumeration threw (Proxy)' };
+      var ALLOWED = { reasonCode: true, i18nKey: true, params: true };
+      for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        if (typeof key !== 'string') return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing entry has non-string (e.g. Symbol) own-key' };
+        if (!ALLOWED[key]) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing entry has unknown key: ' + String(key).slice(0, 60) };
       }
+      var reasonCode = _safeGet(entry, 'reasonCode');
+      if (!RC.isReasonCode(reasonCode)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing reasonCode unregistered' };
+      var i18nKey = _safeGet(entry, 'i18nKey');
+      if (!isRegisteredFramingI18nKey(i18nKey)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing i18nKey not in registry' };
+      var paramsRaw = _safeGet(entry, 'params');
+      if (paramsRaw !== undefined) {
+        if (!_isPlain(paramsRaw)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params not a plain object' };
+        var pks = _safeOwnKeys(paramsRaw);
+        if (pks === null) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params own-key enumeration threw (Proxy)' };
+        for (var j = 0; j < pks.length; j++) {
+          var k = pks[j];
+          if (typeof k !== 'string' || k.length === 0) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has empty / non-string (e.g. Symbol) key' };
+          var v = _safeGet(paramsRaw, k);
+          if (v === null || typeof v === 'boolean') continue;
+          if (typeof v === 'number') { if (!_isFiniteNum(v)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has non-finite number' }; continue; }
+          if (typeof v === 'string') { if (_utf8ByteLength(v) > MAX_PARAM_STRING_BYTES) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has oversized string' }; continue; }
+          return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has unsupported value type' };
+        }
+      }
+      return { valid: true };
+    } catch (e) {
+      // Codex C7 finding C7-B1 closure: any throw from a Proxy / accessor / inherited trap
+      // results in fail-closed at this top-level boundary.
+      return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing validation threw — fail-closed' };
     }
-    return { valid: true };
   }
 
   /**
