@@ -92,7 +92,7 @@
   "tests": {
     "command": "npm test",
     "newSuiteForThisCheckpoint": "tests/r3.0d-evidence-graph.test.js",
-    "newSuiteAssertions": 162,
+    "newSuiteAssertions": 170,
     "stateAwareRefactor": "tests/r3.0d-contract-foundation.test.js Section I + J were refactored to be state-aware (D1 invariants when currentCheckpoint === D1_CONTRACT_FOUNDATION; D2 invariants when currentCheckpoint === D2_EVIDENCE_GRAPH). No D1-era assertion was deleted; the D1 branch is preserved and an additional D2 branch added.",
     "evidenceTier": "TIER 3 — Claude-verified on D2 branch HEAD; CI re-run on integrationSha is the authority for the Train target context."
   },
@@ -194,9 +194,22 @@
           "RN-17": "CLOSED. DEL (101 KB actual) builds successfully; full char-class table verified (C1, LRM/RLM, PUA, supplementary, lone surrogates all encode correctly)."
         },
         "evidence": "governance/r3.0d/codex-checkpoint-evidence/D2/round-7-90bf868.raw.txt"
+      },
+      {
+        "round": 8,
+        "reviewedSha": "497c14343283c06a8d63bcfe9d0b6297160a5000",
+        "verdict": "BLOCK",
+        "closed": ["RN-16"],
+        "stillOpen": [],
+        "newFindings": ["RN-18"],
+        "findingDetail": {
+          "RN-16": "CLOSED. Exact 35*30*195 same-source attack now rejects at Step 11.5 with 264,011 bytes; 35*30*190 builds with 595 edges (negative control passes).",
+          "RN-18": "NEW. Inherited Object.prototype.toJSON installed BEFORE buildEvidenceGraph executes during Step 11.5 / Step 17 _JSONStringify calls (ES §25.5.2.2 SerializeJSONObject performs [[Get]] for toJSON on every nested object). Two attack vectors: (a) the toJSON hook can mutate the shared `edges` array AFTER Step 11's EDGE_KIND_ALLOWED enforcement → injection of an {kind:'invalid_kind'} edge ends up in the materialised graph (still frozen, but invalid kind); (b) stateful toJSON returns different sizes between Step 11.5 and Step 17, disproving the exact-equivalence claim (Step 11.5 passes at 0 bytes, Step 17 rejects at 262,159 bytes)."
+        },
+        "evidence": "governance/r3.0d/codex-checkpoint-evidence/D2/round-8-497c143.raw.txt"
       }
     ],
-    "tierDisclosure": "Codex D2 Round 1 BLOCK on 10766c0 (12 findings); Round 2 BLOCK on ad6474a (closed 6 / 6 still-open); Round 3 BLOCK on 63ecf69 (closed 5 + RN-13/RN-14 NEW + RN-09 partial); Round 4 BLOCK on e84d22c (closed RN-09 + RN-14 + RN-15 NEW + RN-13 still partial); Round 5 BLOCK on ec00b88 (RN-13 round-4 STILL-OPEN, FPC replacement; RN-15 round-4 STILL-OPEN, lone surrogates); Round 6 BLOCK on d7c045f (RN-15 round-4 CLOSED; RN-13 round-4 STILL-OPEN, Array.prototype['0'] setter; RN-16 + RN-17 NEW); Round 7 BLOCK on 90bf868 (RN-13 round-4 CLOSED via captured _ObjectDefineProperty bypass through [[DefineOwnProperty]]; RN-17 CLOSED with full char-class table verified; RN-16 STILL-OPEN via NEW angle — 35 same-source nodes synthesise 595 correlated_with edges (~71 KB) which Step 4.5 per-node estimate doesn't count, slipping past to Step 17 at 264,011 bytes). Round 8 candidate adds Step 11.5: after edges + correlationGroups are built (Steps 9-10) and the edge count cap is verified (Step 11), build the EXACT preview idPayload (same shape as Step 16's canonicalisation source) using captured intrinsics and run _utf8len(_JSONStringify(preview)) for the authoritative pre-canonicalisation envelope check — failing closed with BYTE_CAP_EXCEEDED and a 'pre-materialization envelope byte estimate X exceeds ENVELOPE_BYTE_CAP=...' detail BEFORE cycle DFS / topological sort / per-element freeze / graphId derivation. Step 4.5 remains as a cheap per-node early-reject; Step 17 stays as belt-and-suspenders on the actual idPayload. Adversarial regressions added in Section S (35 same-source 595-edge attack rejected at pre-materialization; negative control: 35 distinct-source compact nodes still build with 0 correlated_with edges). Tier 1 raw stdout for all seven rounds at round-{1..7}-<sha>.raw.txt."
+    "tierDisclosure": "Codex D2 Round 1 BLOCK on 10766c0 (12 findings); Round 2 BLOCK on ad6474a (closed 6 / 6 still-open); Round 3 BLOCK on 63ecf69 (closed 5 + RN-13/RN-14 NEW + RN-09 partial); Round 4 BLOCK on e84d22c (closed RN-09 + RN-14 + RN-15 NEW + RN-13 still partial); Round 5 BLOCK on ec00b88 (RN-13 round-4 + RN-15 round-4 STILL-OPEN); Round 6 BLOCK on d7c045f (RN-15 round-4 CLOSED; RN-13 round-4 STILL-OPEN via Array.prototype['0'] setter; RN-16 + RN-17 NEW); Round 7 BLOCK on 90bf868 (RN-13 round-4 + RN-17 CLOSED; RN-16 STILL-OPEN via same-source 595-edge); Round 8 BLOCK on 497c143 (RN-16 CLOSED via Step 11.5 exact preview; RN-18 NEW — Object.prototype.toJSON hook invoked by _JSONStringify can mutate shared edges array OR return stateful different sizes between Step 11.5 and Step 17). Round 9 candidate switches Step 4.5 (per-node estimator) + Step 11.5 (preview check) + Step 17 (belt-and-suspenders) from _JSONStringify to _stableStringify. _stableStringify walks via captured _ObjectKeys + manual indexed array recursion + direct primitive encoding — it NEVER performs a [[Get]] for the toJSON property anywhere in the value tree, foreclosing both the mutation vector (toJSON cannot fire on the previewIdPayload reference holding the shared `edges` array) AND the stateful-size vector (toJSON is not invoked, so any installed hook is benign for byte cap purposes). _stableStringify also patched to use captured _ObjectKeys / _ArrayIsArray / _JSONStringify (the only _JSONStringify call left is on primitive strings, where ES Quote runs without any toJSON [[Get]]). Adversarial regressions added in Section T (Object.prototype.toJSON mutation / stateful-size / Array.prototype.toJSON / throwing toJSON — all fail-closed without hook firing). Tier 1 raw stdout for all eight rounds at round-{1..8}-<sha>.raw.txt."
   },
 
   "scopeBoundary": {
@@ -246,6 +259,7 @@
     "governance/r3.0d/codex-checkpoint-evidence/D2/round-5-ec00b88.raw.txt",
     "governance/r3.0d/codex-checkpoint-evidence/D2/round-6-d7c045f.raw.txt",
     "governance/r3.0d/codex-checkpoint-evidence/D2/round-7-90bf868.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D2/round-8-497c143.raw.txt",
     "governance/r3.0d/schema.json",
     "governance/r3.0d/state.json",
     "governance/r3.0e/checkpoint-manifest.schema.json",
@@ -261,7 +275,7 @@
     "tests/r3.0d-contract-foundation.test.js",
     "tests/r3.0d-evidence-graph.test.js"
   ],
-  "changedFilesNote": "Computed from the exact baseSha (f8a598b) → Round 8 candidate HEAD diff. Includes the cross-phase rename commit (governance/r3.0e files + docs/r3-0-train-governance.md), the state-aware guard-enhancement commit (scripts/check-r3-phase-no-consumer.js + tests/r3-0-phase-no-consumer.test.js), every Codex evidence file from Round 1 through Round 7 (so the candidate carries its own evidence lineage), plus all D2 production / test / governance artifacts. RN-12 closure.",
+  "changedFilesNote": "Computed from the exact baseSha (f8a598b) → Round 9 candidate HEAD diff. Includes the cross-phase rename commit (governance/r3.0e files + docs/r3-0-train-governance.md), the state-aware guard-enhancement commit (scripts/check-r3-phase-no-consumer.js + tests/r3-0-phase-no-consumer.test.js), every Codex evidence file from Round 1 through Round 8 (so the candidate carries its own evidence lineage), plus all D2 production / test / governance artifacts. RN-12 closure.",
 
   "note": "D2_EVIDENCE_GRAPH — the first non-bootstrap R3.0D PRODUCTION checkpoint. Lifts ONE production capability (evidence_graph_present); enables runtimeConsumersAllowed=true + algorithmsAllowed=true; introduces renderer/js/r3-0d-evidence-graph.js as the single new authorized production path; keeps uiAllowed=false + featureRegistryActivationAllowed=false (D5 only). The 5-phase D-flow is renamed atomically alongside this checkpoint per the directive; the rename is recorded in governanceRename above with full lineage. C-B Codex review runs against the exact D2 candidate SHA; tier-1 raw stdout to be persisted under governance/r3.0d/codex-checkpoint-evidence/D2/."
 }

@@ -344,7 +344,9 @@
     };
   }
   function _estimateNodeUtf8Bytes(node) {
-    try { return _utf8len(_JSONStringify(_perNodeIdPayloadShape(node))); }
+    // Codex D2 Round 8 RN-18 closure: use _stableStringify (no toJSON callback) instead of
+    // _JSONStringify (which invokes inherited Object.prototype.toJSON per ES §25.5.2.2).
+    try { return _utf8len(_stableStringify(_perNodeIdPayloadShape(node))); }
     catch (e) { return ENVELOPE_BYTE_CAP + 1; } // pessimistic fail-closed on stringify failure
   }
   // Wrapper byte allowance covering the post-canonical idPayload outer structure:
@@ -356,30 +358,35 @@
   var WRAPPER_FIXED_BYTES = 256;
 
   // Stable canonical JSON serialiser — sorted keys at every depth; arrays preserved in order. Used
-  // for semantic dedup keys + graphId hashing. The caller is expected to pass D1-sanitized values
-  // (frozen plain primitives only); the implementation is descriptor-safe and never invokes a
-  // caller getter (no accessor descriptors are reachable on a D1 sanitized output).
+  // for semantic dedup keys + graphId hashing + Round 9 byte cap measurements. Codex D2 Round 8
+  // RN-18 closure: this serialiser walks via Object.keys + manual indexed array recursion + direct
+  // primitive encoding, so it NEVER triggers ES §25.5.2.2 SerializeJSONObject's toJSON [[Get]] hook.
+  // An attacker that installs Object.prototype.toJSON before the build call cannot intercept the
+  // canonical bytes here (whereas `JSON.stringify` would invoke the hostile toJSON on every nested
+  // object, allowing both mutation of shared arrays AND stateful size manipulation between calls).
+  // All intrinsic refs are captured at module init so a global rebind cannot tamper post-import.
   function _stableStringify(value) {
     if (value === null) return 'null';
     var t = typeof value;
-    if (t === 'string') return JSON.stringify(value);
+    if (t === 'string') return _JSONStringify(value);
     if (t === 'number') {
       if (!_isFiniteNum(value)) return 'null';
       return String(value);
     }
     if (t === 'boolean') return value ? 'true' : 'false';
     if (t === 'undefined') return 'null';
-    if (Array.isArray(value)) {
+    if (_ArrayIsArray(value)) {
       var parts = [];
       for (var i = 0; i < value.length; i++) parts.push(_stableStringify(value[i]));
       return '[' + parts.join(',') + ']';
     }
     if (t === 'object') {
-      var keys = Object.keys(value).sort();
+      var keys; try { keys = _ObjectKeys(value); } catch (e) { return 'null'; }
+      keys.sort();
       var pp = [];
       for (var j = 0; j < keys.length; j++) {
         var k = keys[j];
-        pp.push(JSON.stringify(k) + ':' + _stableStringify(value[k]));
+        pp.push(_JSONStringify(k) + ':' + _stableStringify(value[k]));
       }
       return '{' + pp.join(',') + '}';
     }
@@ -921,8 +928,16 @@
         edges: edges,
         correlationGroups: correlationGroups.map(function (g) { return { correlationGroupId: g.correlationGroupId, memberNodeIds: g.memberNodeIds, independenceWeight: g.independenceWeight }; }),
       };
+      // Codex D2 Round 8 RN-18 closure: use _stableStringify (descriptor-safe, no toJSON callback)
+      // instead of _JSONStringify. A hostile Object.prototype.toJSON installed before this call
+      // was previously invoked by JSON.stringify on every nested object, allowing (a) mutation of
+      // the shared `edges` array AFTER the Step 11 cap/enum checks → injection of an invalid_kind
+      // edge into the materialised graph, and (b) stateful size returns so Step 11.5 measured a
+      // different envelope than Step 17 (breaking the exact-equivalence claim). _stableStringify
+      // walks via _ObjectKeys + manual indexed array recursion + direct primitive encoding, never
+      // performing a [[Get]] for the `toJSON` property anywhere in the value tree.
       var previewBytes;
-      try { previewBytes = _utf8len(_JSONStringify(previewIdPayload)); }
+      try { previewBytes = _utf8len(_stableStringify(previewIdPayload)); }
       catch (e) { previewBytes = Infinity; }
       if (previewBytes > ENVELOPE_BYTE_CAP) {
         return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'pre-materialization envelope byte estimate ' + previewBytes + ' exceeds ENVELOPE_BYTE_CAP=' + ENVELOPE_BYTE_CAP });
@@ -1005,12 +1020,15 @@
       };
       var graphId = 'graph_' + _hash64('graphid|v' + GRAPH_SCHEMA_VERSION + '|' + _stableStringify(idPayload));
 
-      // Step 17 — RN-09 closure: post-sanitization JSON byte cap. Safe to _JSONStringify because
-      // every sanitized value is a plain frozen primitive (no accessors, Proxies, class instances).
-      // Uses captured _JSONStringify + _utf8len (Codex Round 3 RN-13 closure) so an opts.clock that
-      // replaces JSON.stringify / TextEncoder after import cannot influence the byte check.
+      // Step 17 — RN-09 + Round 8 RN-18 closure: belt-and-suspenders post-canonical byte cap.
+      // Uses _stableStringify (no toJSON callback; descriptor-safe) — same canonical-bytes
+      // measurement as Step 11.5, so an attacker cannot use a stateful Object.prototype.toJSON to
+      // make Step 11.5 pass while Step 17 rejects (or vice versa). Now structurally redundant with
+      // Step 11.5 because both measure the same content via the same serialiser, but retained as
+      // a defensive check in case any future refactor changes Step 14's sort/freeze to alter byte
+      // count (which would be a serious determinism regression).
       var envBytes;
-      try { envBytes = _utf8len(_JSONStringify(idPayload)); }
+      try { envBytes = _utf8len(_stableStringify(idPayload)); }
       catch (e) { envBytes = Infinity; }
       if (envBytes > ENVELOPE_BYTE_CAP) {
         return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'post-sanitization JSON size ' + envBytes + ' exceeds ENVELOPE_BYTE_CAP=' + ENVELOPE_BYTE_CAP });

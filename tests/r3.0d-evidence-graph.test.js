@@ -1219,5 +1219,113 @@ function freshInput(over) {
   chk('RN-16 r7-control: zero correlated_with edges (each source group has 1 member)', r.valid === true && r.graph.edges.every(e => e.kind !== 'correlated_with'));
 })();
 
+// ── Section T — Codex D2 Round 8 finding closure (RN-18 inherited toJSON hook) ──────
+(function sectionT_RN18_objectPrototypeToJsonMutation() {
+  // RN-18 NEW at Round 8 (Codex evidence on 497c143): a hostile `Object.prototype.toJSON`
+  // installed before buildEvidenceGraph was previously invoked by JSON.stringify during the
+  // Step 11.5 envelope preview. The hook mutated the shared `edges` array, injecting an
+  // `{kind:"invalid_kind"}` entry that bypassed Step 11's EDGE_KIND_ALLOWED enforcement and
+  // ended up in the materialised graph (still frozen, but with a forbidden kind).
+  // Round 9 fix: byte cap measurement switched from _JSONStringify to _stableStringify which
+  // walks via Object.keys + manual recursion and never performs a [[Get]] for `toJSON`.
+  let fired = 0;
+  Object.defineProperty(Object.prototype, 'toJSON', {
+    configurable: true,
+    enumerable: false,
+    value: function () {
+      if (!fired && this && this.caseAssociation && Array.isArray(this.nodes) && Array.isArray(this.edges) && Array.isArray(this.correlationGroups)) {
+        fired++;
+        this.edges.push({ from: 'attacker', to: 'attacker', kind: 'invalid_kind' });
+      }
+      return this;
+    },
+  });
+  let r;
+  try {
+    const arr = [];
+    for (let i = 0; i < 3; i++) {
+      arr.push(freshNode({
+        nodeId: 'ev_to_' + i,
+        identity: freshId({ sourceId: 'shared_to' }),
+        observation: { kind: 'metric_value', i18nKey: 'r3.x', params: { v: 'x' }, channel: 'rpm_' + i },
+      }));
+    }
+    r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
+  } finally {
+    delete Object.prototype.toJSON;
+  }
+  chk('RN-18: hostile Object.prototype.toJSON never fires during build', fired === 0);
+  chk('RN-18: graph has no injected invalid_kind edges', r.valid === true && r.graph.edges.every(e => e.kind !== 'invalid_kind'));
+  chk('RN-18: graph edge count is exactly the legitimate count (3 nodes × correlated_with = 3)', r.valid === true && r.graph.edges.length === 3);
+})();
+
+(function sectionT_RN18_statefulSizeAttack() {
+  // Round 8 evidence variant: a STATEFUL Object.prototype.toJSON returns one shape on the first
+  // envelope call (Step 11.5) and a different oversized shape on the second (Step 17). This
+  // previously made Step 11.5 pass while Step 17 rejected, breaking exact equivalence between
+  // the two checks. With _stableStringify, toJSON is never invoked, so the size measurement is
+  // deterministic and matches between checks.
+  let envelopeCalls = 0;
+  Object.defineProperty(Object.prototype, 'toJSON', {
+    configurable: true,
+    enumerable: false,
+    value: function () {
+      if (this && this.caseAssociation && Array.isArray(this.nodes) && Array.isArray(this.edges) && Array.isArray(this.correlationGroups)) {
+        envelopeCalls++;
+        if (envelopeCalls === 1) return {};
+        if (envelopeCalls === 2) return { payload: 'x'.repeat(EG.ENVELOPE_BYTE_CAP + 1) };
+      }
+      return this;
+    },
+  });
+  let r;
+  try {
+    const arr = [];
+    for (let i = 0; i < 3; i++) {
+      arr.push(freshNode({
+        nodeId: 'ev_st_' + i,
+        identity: freshId({ sourceId: 'shared_st' }),
+        observation: { kind: 'metric_value', i18nKey: 'r3.x', params: { v: 'x' }, channel: 'rpm_' + i },
+      }));
+    }
+    r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
+  } finally {
+    delete Object.prototype.toJSON;
+  }
+  chk('RN-18: stateful toJSON envelope hook never fires', envelopeCalls === 0);
+  chk('RN-18: graph builds normally despite stateful prototype hook', r.valid === true && r.graph.nodes.length === 3);
+})();
+
+(function sectionT_RN18_arrayPrototypeToJson() {
+  // Symmetric coverage on Array.prototype.toJSON. The previous JSON.stringify call also performed
+  // [[Get]] for `toJSON` on every array (not just objects), so this is the same exploit class.
+  let fired = 0;
+  Object.defineProperty(Array.prototype, 'toJSON', {
+    configurable: true,
+    enumerable: false,
+    value: function () { fired++; return ['tampered']; },
+  });
+  let r;
+  try { r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK }); }
+  finally { delete Array.prototype.toJSON; }
+  chk('RN-18: hostile Array.prototype.toJSON never fires', fired === 0);
+  chk('RN-18: arrays-with-toJSON exploit produces clean graph', r.valid === true && r.graph.nodes.length === 1);
+})();
+
+(function sectionT_RN18_throwingToJson() {
+  // Edge case: a toJSON that throws would have crashed the original JSON.stringify path and
+  // collapsed via the outer try/catch to INTERNAL_CONTRACT_VIOLATION. With _stableStringify, the
+  // hook is never invoked, so the build proceeds normally.
+  Object.defineProperty(Object.prototype, 'toJSON', {
+    configurable: true,
+    enumerable: false,
+    value: function () { throw new Error('attacker'); },
+  });
+  let r;
+  try { r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK }); }
+  finally { delete Object.prototype.toJSON; }
+  chk('RN-18: throwing toJSON does not crash the build', r.valid === true && r.graph.nodes.length === 1);
+})();
+
 console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
 if (fail > 0) process.exit(1);
