@@ -209,32 +209,97 @@
     }
 
     // ── Public mutators (the 7 transition triggers) ──
-    function setReference(sel) { _clearAndPlaceholder('reference_selection_changed'); _state.reference = _isPlain(sel) ? Object.freeze(Object.assign({}, sel)) : null; _runRequest(); }
-    function setComparison(sel) { _clearAndPlaceholder('comparison_selection_changed'); _state.comparison = _isPlain(sel) ? Object.freeze(Object.assign({}, sel)) : null; _runRequest(); }
+    // Codex C7-R6-01 closure: each public mutator is wrapped in fail-closed plumbing. _isPlain
+    // only checks the prototype chain — a Proxy with Object.prototype getPrototypeOf but a
+    // throwing ownKeys trap passes _isPlain and then explodes inside Object.assign({}, sel).
+    // _safeShallowCopy below classifies any throw during the descriptor enumeration as "invalid
+    // input" and yields null, which the mutator coerces into a clean reset of the relevant slot.
+    // After Codex Round 6 confirmed all four object-shaped mutators (setReference / setComparison
+    // / setAssociation / setChannelMapping) threw on the hostile ownKeys trap, every public
+    // mutator body additionally lives inside its own try/catch that maps any residual throw to
+    // a structured blocked placeholder.
+    function _safeShallowCopy(o) {
+      if (!_isPlain(o)) return null;
+      try { return Object.assign({}, o); } catch (e) { return null; }
+    }
+    function _hostileBlocked() {
+      _state.placeholder = VST.PLACEHOLDER_STATES.BLOCKED;
+      _state.blockedReasons = [CODES.INTERNAL_CONTRACT_VIOLATION];
+      _state.result = null;
+      _state.framing = null;
+      _state.exportGate = false;
+    }
+    function setReference(sel) {
+      _clearAndPlaceholder('reference_selection_changed');
+      try {
+        var copy = _safeShallowCopy(sel);
+        _state.reference = copy ? Object.freeze(copy) : null;
+        _runRequest();
+      } catch (e) { _state.reference = null; _hostileBlocked(); }
+    }
+    function setComparison(sel) {
+      _clearAndPlaceholder('comparison_selection_changed');
+      try {
+        var copy = _safeShallowCopy(sel);
+        _state.comparison = copy ? Object.freeze(copy) : null;
+        _runRequest();
+      } catch (e) { _state.comparison = null; _hostileBlocked(); }
+    }
     function setAssociation(assoc) {
       _clearAndPlaceholder('case_association_changed');
-      _state.association = _isPlain(assoc) ? Object.freeze(Object.assign({}, assoc)) : null;
-      if (_isPlain(assoc) && _isPlain(assoc.caseRecord)) {
+      try {
+        var assocCopy = _safeShallowCopy(assoc);
+        _state.association = assocCopy ? Object.freeze(assocCopy) : null;
         // Codex C7-R2-A-01 closure: the viewmodel NO LONGER registers the caseRecord with the
         // orchestrator. The viewmodel is renderer-accessible (any caller can invoke
         // setAssociation with a forged caseRecord); treating that path as an authoritative
         // boundary was the D1 vulnerability. We still hold a private reference to the record so
         // requestComparison can pass it to the orchestrator, but the orchestrator's
         // authenticityPredicate (injected at construction) is what grants authority — NOT this
-        // viewmodel. A forged caller-built caseRecord routed through setAssociation will reach
-        // the orchestrator and be refused by the predicate.
-        var cr = Object.assign({}, assoc.caseRecord);
-        if (_isPlain(assoc.caseRecord.associations)) cr.associations = Object.assign({}, assoc.caseRecord.associations);
-        _state.caseRecord = cr;
-      } else {
-        _state.caseRecord = null;
-      }
-      _runRequest();
+        // viewmodel.
+        if (assocCopy) {
+          // Read caseRecord via _safeShallowCopy too — assoc may be a Proxy whose
+          // `caseRecord` getter throws even though Object.assign succeeded earlier (Object.assign
+          // copies enumerable own-string-key data properties; a property whose value is an object
+          // with a throwing getter doesn't crash Object.assign — but iterating it does).
+          var crSrc = null;
+          try { crSrc = assoc && assoc.caseRecord; } catch (e) { crSrc = null; }
+          var cr = _safeShallowCopy(crSrc);
+          if (cr) {
+            var assocAssoc = null;
+            try { assocAssoc = crSrc && crSrc.associations; } catch (e) { assocAssoc = null; }
+            var nested = _safeShallowCopy(assocAssoc);
+            if (nested) cr.associations = nested;
+            _state.caseRecord = cr;
+          } else {
+            _state.caseRecord = null;
+          }
+        } else {
+          _state.caseRecord = null;
+        }
+        _runRequest();
+      } catch (e) { _state.association = null; _state.caseRecord = null; _hostileBlocked(); }
     }
-    function setChannelMapping(mapping) { _clearAndPlaceholder('channel_mapping_changed'); _state.channelMapping = _isPlain(mapping) ? Object.freeze(Object.assign({}, mapping)) : null; _runRequest(); }
-    function notifyCaseReopen() { _clearAndPlaceholder('case_reopen'); _state.reference = null; _state.comparison = null; _state.association = null; _state.channelMapping = null; _state.caseRecord = null; }
-    function notifyAuthorityRevoked() { _clearAndPlaceholder('user_confirmed_authority_revoked'); }
-    function notifyEligibilityRevoked() { _clearAndPlaceholder('orchestrator_eligibility_revoked'); }
+    function setChannelMapping(mapping) {
+      _clearAndPlaceholder('channel_mapping_changed');
+      try {
+        var copy = _safeShallowCopy(mapping);
+        _state.channelMapping = copy ? Object.freeze(copy) : null;
+        _runRequest();
+      } catch (e) { _state.channelMapping = null; _hostileBlocked(); }
+    }
+    function notifyCaseReopen() {
+      try {
+        _clearAndPlaceholder('case_reopen');
+        _state.reference = null; _state.comparison = null; _state.association = null; _state.channelMapping = null; _state.caseRecord = null;
+      } catch (e) { _hostileBlocked(); }
+    }
+    function notifyAuthorityRevoked() {
+      try { _clearAndPlaceholder('user_confirmed_authority_revoked'); } catch (e) { _hostileBlocked(); }
+    }
+    function notifyEligibilityRevoked() {
+      try { _clearAndPlaceholder('orchestrator_eligibility_revoked'); } catch (e) { _hostileBlocked(); }
+    }
 
     // ── Read-only state accessor ──
     function getState() {

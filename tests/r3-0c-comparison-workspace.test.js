@@ -358,6 +358,43 @@ function deltaMetricsRequest() {
   chk('G4c exportComparison does NOT throw on hostile extraInputs accessor', threw2 === false);
   chk('G4d exportComparison handles hostile extras as null (no crash)', out2 !== null);
 })();
+// G5. Codex C7-R6-01 closure: every viewmodel public mutator must NOT throw on hostile
+// caller-supplied selections. _isPlain alone is not enough — a Proxy with Object.prototype
+// getPrototypeOf but a throwing ownKeys trap passes _isPlain and then explodes inside
+// Object.assign({}, sel). Each mutator now uses _safeShallowCopy (which catches Object.assign
+// throws and yields null), so a hostile slot is silently coerced to null. The outer try/catch
+// is an additional defence against any residual throw past _safeShallowCopy. After the
+// hostile-input transition the result is: (a) NO throw escapes, (b) the slot is null, (c)
+// _runRequest sees an incomplete selection set and parks the viewmodel at SELECTING (or BLOCKED
+// if the outer try/catch fired), (d) NEVER READY, (e) exportGate stays false, (f) result=null.
+(() => {
+  const orch = authOrch(allCapsOn);
+  const hostile = new Proxy({}, {
+    getPrototypeOf() { return Object.prototype; },
+    ownKeys() { throw new Error('ownKeys trap'); },
+  });
+  const slotName = { setReference: 'reference', setComparison: 'comparison', setAssociation: 'association', setChannelMapping: 'channelMapping' };
+  ['setReference', 'setComparison', 'setAssociation', 'setChannelMapping'].forEach((trigger, i) => {
+    const vm = VMService.createComparisonViewModel({ orchestrator: orch, capabilities: allCapsOn });
+    let threw = false;
+    try { vm[trigger](hostile); } catch (e) { threw = true; }
+    chk('G5.' + (i + 1) + ' viewmodel.' + trigger + ' does NOT throw on hostile Proxy ownKeys trap', threw === false);
+    const s = vm.getState();
+    chk('G5.' + (i + 1) + 'b viewmodel.' + trigger + ' never reaches READY on hostile input', s.placeholder !== VST.PLACEHOLDER_STATES.READY);
+    // channelMapping is internal to _state and intentionally NOT exposed via getState; for the
+    // other three slots a `!s[slot]` check covers both `null` and `undefined` (unexposed).
+    chk('G5.' + (i + 1) + 'c viewmodel.' + trigger + ' hostile slot coerced to null/undefined', !s[slotName[trigger]]);
+    chk('G5.' + (i + 1) + 'd viewmodel.' + trigger + ' result=null, exportGate=false', s.result === null && s.exportGate === false);
+  });
+  // notifyCaseReopen / notifyAuthorityRevoked / notifyEligibilityRevoked don't accept caller
+  // objects, but their body is still try/catch-wrapped against any internal throw.
+  ['notifyCaseReopen', 'notifyAuthorityRevoked', 'notifyEligibilityRevoked'].forEach((trigger, i) => {
+    const vm = VMService.createComparisonViewModel({ orchestrator: orch, capabilities: allCapsOn });
+    let threw = false;
+    try { vm[trigger](); } catch (e) { threw = true; }
+    chk('G5.no' + (i + 1) + ' viewmodel.' + trigger + '() does NOT throw', threw === false);
+  });
+})();
 // H. Orchestrator — phase metric requested without capability → filtered out + limitation
 (() => {
   const orch = authOrch(allCapsOn);
