@@ -8,8 +8,8 @@
 
   "shaSeparation": {
     "note": "Per SKYLINE 2026-06-28 Continuous Delivery Master Directive §22 the C8 manifest preserves the three-way SHA separation. reviewedCandidateSha is the exact SHA Codex C-B was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD. Substituting one for another is a tier violation.",
-    "reviewedCandidateSha": null,
-    "reviewedCandidateNote": "Filled by a follow-up evidence-anchoring commit after Codex C-B issues PASS against the exact candidate SHA on feat/r3.0c-c8-activation.",
+    "reviewedCandidateSha": "f9deb13e5fb1a59bc6e4beba74cc332b74702c3f",
+    "reviewedCandidateNote": "Codex C-B Round 6 returned VERDICT: PASS against this exact SHA on 2026-06-28. Six prior rounds (R1-R5) closed 21 distinct findings; the post-fix manifest commit at f9deb13 was the first round with zero new findings. Tier 1 raw stdout for every round persisted under governance/r3.0c/codex-checkpoint-evidence/C-B/round-{1..6}-*.md.",
     "manifestCommitSha": null,
     "manifestCommitNote": "Filled by the same follow-up evidence-anchoring commit; mirrors C5R / C6 / C7 convention.",
     "integrationSha": null,
@@ -129,8 +129,22 @@
   "artifactBoundSha": null,
 
   "codexVerdict": {
-    "verdict": "PENDING",
+    "verdict": "PASS",
+    "verdictRound": 6,
+    "verdictAt": "reviewedCandidateSha",
+    "reviewedCandidateSha": "f9deb13e5fb1a59bc6e4beba74cc332b74702c3f",
+    "verdictEvidenceFile": "governance/r3.0c/codex-checkpoint-evidence/C-B/round-6-f9deb13.md",
+    "verdictEvidenceSha256": "4c801451008fb8bd001209f8621c6b6c71b5ee1390754f55449437e4825227d0",
+    "passNote": "Round 6 verified: manifest accuracy with file:line evidence (C8.json:74,92-113 ↔ renderer/index.html:3332-3336, 3604-3638); CSV boundary (live builder at 3710, session-only registration at 3719, no forCaseStore/forDemo); authority gate (private WeakSets + strict degraded at 3345-3417, predicate injection at 4311-4315); cross-case/session isolation (transition invalidation at 3456-3468, authenticated session+ID gates at 3524-3538); race/stale-state closure (openCase invalidates before ensureStore + token check at 4122-4137); identity preservation (viewmodel.js:248-276; orchestrator.js:99-105,204-216); phase metrics (capability disabled at capabilities.json:75-79; filtering at orchestrator.js:225-240; viewmodel availability forced false at viewmodel.js:121-139); state-aware activation (state.json:20-26, feature-registry.js:74-81, check-feature-registry.js:20-53); governance lineage (Round 1-5 evidence hashes match C8.json:135-201; JSON parses); scope boundary (d317c1f → f9deb13 diff is governance/evidence only — no production or test changes); test integrity (182 activation assertions PASS; feature-registry 27/0; feature-router 20/0; full npm test reached known read-only sandbox mkdtemp EPERM — not an assertion failure).",
     "rounds": [
+      {
+        "round": 6,
+        "reviewedSha": "f9deb13e5fb1a59bc6e4beba74cc332b74702c3f",
+        "verdict": "PASS",
+        "evidence": "governance/r3.0c/codex-checkpoint-evidence/C-B/round-6-f9deb13.md",
+        "evidenceSha256": "4c801451008fb8bd001209f8621c6b6c71b5ee1390754f55449437e4825227d0",
+        "findings": []
+      },
       {
         "round": 5,
         "reviewedSha": "d317c1f646eb951f382d434943ba035c1ad1904a",
@@ -198,7 +212,7 @@
         ]
       }
     ],
-    "tierDisclosure": "Codex C-B (the final R3.0C phase gate). Tier 1 raw stdout persisted for all rounds at governance/r3.0c/codex-checkpoint-evidence/C-B/. Round 1: round-1-0caa8c8.md (sha256 3efd8de2ffd2414583479883270e69a4399b09ea2f9328cb6c465eece5f3c411). Round 2: round-2-49ab0d5.md (sha256 f02fe253a6c1cdc891456cbde853bbe5fc26d403c10e27b6b4d89978aee58f7e). Round 3: round-3-a768306.md (sha256 9bf71ec705b756960ca8ff2a7d44be54ef3ea03b04a194e07172c85803b2c6ff). Round 4: round-4-09345c4.md (sha256 072aa725adf0b36cebb60bfacf32b81fde174c08babbee04407a4253d1d1e4f0). Round 5: round-5-d317c1f.md (sha256 fc43f70b7e8b0446ed44236cef4a4012fba471cd64540a057e056efdcd14585e). Round 6 runs against the post-fix SHA; raw stdout to be persisted at round-6-<sha>.md."
+    "tierDisclosure": "Codex C-B (the final R3.0C phase gate). Tier 1 raw stdout persisted for all rounds at governance/r3.0c/codex-checkpoint-evidence/C-B/. Round 1: round-1-0caa8c8.md (sha256 3efd8de2ffd2414583479883270e69a4399b09ea2f9328cb6c465eece5f3c411). Round 2: round-2-49ab0d5.md (sha256 f02fe253a6c1cdc891456cbde853bbe5fc26d403c10e27b6b4d89978aee58f7e). Round 3: round-3-a768306.md (sha256 9bf71ec705b756960ca8ff2a7d44be54ef3ea03b04a194e07172c85803b2c6ff). Round 4: round-4-09345c4.md (sha256 072aa725adf0b36cebb60bfacf32b81fde174c08babbee04407a4253d1d1e4f0). Round 5: round-5-d317c1f.md (sha256 fc43f70b7e8b0446ed44236cef4a4012fba471cd64540a057e056efdcd14585e). Round 6: round-6-f9deb13.md (sha256 4c801451008fb8bd001209f8621c6b6c71b5ee1390754f55449437e4825227d0) — FINAL VERDICT PASS."
   },
 
   "scopeBoundary": {
@@ -248,6 +262,7 @@
     "governance/r3.0c/codex-checkpoint-evidence/C-B/round-3-a768306.md",
     "governance/r3.0c/codex-checkpoint-evidence/C-B/round-4-09345c4.md",
     "governance/r3.0c/codex-checkpoint-evidence/C-B/round-5-d317c1f.md",
+    "governance/r3.0c/codex-checkpoint-evidence/C-B/round-6-f9deb13.md",
     "governance/r3.0/train.json",
     ".github/workflows/ci.yml",
     "package.json"
