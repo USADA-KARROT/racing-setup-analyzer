@@ -183,6 +183,13 @@
   var _NumberIsFinite = Number.isFinite;
   var _NumberIsNaN = Number.isNaN;
   var _RegExpPrototypeTest = RegExp.prototype.test;
+  // Codex D2 Round 13 RN-29 closure: structuredClone is reachable from the contract module
+  // (_toCleanCopy / RC.toCleanCopy Proxy cleansing) AND now from the renderer Step 0.3 input
+  // pre-clone. Capture at module init + include in integrity guard.
+  var _StructuredClone = (typeof structuredClone === 'function') ? structuredClone : null;
+  // Codex D2 Round 13 RN-28 closure: TextEncoder is already captured below as _TextEncoder
+  // (used by _utf8len). The guard verifies the captured reference still matches the live
+  // global so a between-guard rebind is detected.
 
   // Codex D2 Round 10 RN-21..RN-25 closure: intrinsic integrity guard. At the entry of
   // buildEvidenceGraph (and again immediately after _resolveClock fires) verify that every
@@ -265,6 +272,11 @@
         numIsFinite: _readDescVal(_Number, 'isFinite'),
         numIsNaN: _readDescVal(_Number, 'isNaN'),
         regexpProtoTest: _readDescVal(_ObjectGetPrototypeOf(/x/), 'test'),
+        // Codex D2 Round 13 RN-28 + RN-29 closure: TextEncoder + structuredClone integrity.
+        // Both are reachable from contract validation paths and (for structuredClone) from the
+        // Step 0.3 input pre-clone, so a rebind anywhere along the chain must trip the guard.
+        textEncoder: _GlobalThis ? _readDescVal(_GlobalThis, 'TextEncoder') : _INTRINSIC_SENTINEL,
+        structuredCloneGlobal: _GlobalThis ? _readDescVal(_GlobalThis, 'structuredClone') : _INTRINSIC_SENTINEL,
         // Also verify the container globals themselves were not re-bound at globalThis level
         // since we hold captured references — if globalThis.Object is now an accessor, our
         // _Object reference is still the original constructor (captured at module init), but a
@@ -324,7 +336,9 @@
         && s.globalMath === _Math
         && s.globalNumber === _Number
         && s.globalRegExp === _RegExp
-        && s.globalFunction === _Function;
+        && s.globalFunction === _Function
+        && s.textEncoder === _TextEncoder
+        && s.structuredCloneGlobal === _StructuredClone;
     } catch (e) { return false; }
   }
   var _TextEncoder = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;
@@ -769,11 +783,18 @@
     if (!reDesc || !('value' in reDesc)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence must be a data property' });
     var re = reDesc.value;
     if (!_ArrayIsArray(re)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence must be an array' });
-    try { if (Object.getPrototypeOf(re) !== Array.prototype) return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence is not a plain Array (subclass / mutated prototype rejected)' }); }
+    try { if (_ObjectGetPrototypeOf(re) !== _Array.prototype) return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence is not a plain Array (subclass / mutated prototype rejected)' }); }
     catch (e) { return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence prototype access threw' }); }
+    // Codex D2 Round 13 RN-21/27 closure: read length via the captured descriptor reader (avoids
+    // [[Get]] which would invoke a Proxy `get` trap that could rebind globals; structurally just
+    // returns the own descriptor). Length-read trap is the specific RN-21/27 exploit surface.
     var reLen;
-    try { reLen = re.length; if (typeof reLen !== 'number' || !_isFiniteNum(reLen) || reLen < 0 || Math.floor(reLen) !== reLen) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence.length malformed' }); }
-    catch (e) { return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence.length read threw' }); }
+    try {
+      var lenDesc = _ObjectGetOwnPropertyDescriptor(re, 'length');
+      if (!lenDesc || !('value' in lenDesc)) return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence.length is not a data property' });
+      reLen = lenDesc.value;
+      if (typeof reLen !== 'number' || !_isFiniteNum(reLen) || reLen < 0 || _MathFloor(reLen) !== reLen) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence.length malformed' });
+    } catch (e) { return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence.length descriptor read threw' }); }
     if (reLen > INPUT_RAW_EVIDENCE_CAP) return RC.buildBlockedResult([CODES.GRAPH_CAP_EXCEEDED], { detail: 'rawEvidence array length ' + reLen + ' exceeds cap ' + INPUT_RAW_EVIDENCE_CAP });
     // optional generationToken — descriptor-safe read
     var gt = null;
@@ -1008,9 +1029,36 @@
           result: null,
         });
       }
-      // Step 1 — input envelope structural gate + TRUSTED SNAPSHOT (RN-01 closure).
+
+      // Step 1 — input envelope structural gate + TRUSTED SNAPSHOT (RN-01 closure). Envelope-
+      // level shape rejection (non-plain envelope / Symbol keys / non-enumerable / nested class /
+      // accessor descriptors / Array subclass) is preserved on the ORIGINAL input — these checks
+      // use captured intrinsics and reject hostile shapes BEFORE they enter any iteration loop.
       var env = _validateInputEnvelope(inputIn);
       if (!env.ok) return env;
+
+      // Step 1.5 — Codex D2 Round 13 RN-21/27 closure: re-check intrinsic integrity AFTER
+      // envelope validation. Envelope reads on a Proxy input (e.g. caseAssociation accessor,
+      // rawEvidence Proxy descriptors) can fire user-controlled traps that rebind globals between
+      // Step 0 entry guard and Step 17.6 post-clock guard, with the clock callback later
+      // restoring the binding so the post-clock guard alone passes. This re-check catches any
+      // such rebinding immediately after the envelope's input-touching reads.
+      if (!_intrinsicsIntact()) {
+        var postEnvReasonCodes = [];
+        _ObjectDefineProperty(postEnvReasonCodes, 0, { value: CODES.INTERNAL_CONTRACT_VIOLATION, writable: true, enumerable: true, configurable: true });
+        _ObjectFreeze(postEnvReasonCodes);
+        var postEnvExplanationKeys = [];
+        _ObjectDefineProperty(postEnvExplanationKeys, 0, { value: 'r3_0d.reason.internal_contract_violation', writable: true, enumerable: true, configurable: true });
+        _ObjectFreeze(postEnvExplanationKeys);
+        return _ObjectFreeze({
+          eligible: false,
+          status: 'blocked',
+          reasonCodes: postEnvReasonCodes,
+          explanationKeys: postEnvExplanationKeys,
+          detail: 'intrinsic-tampering detected post-envelope: input Proxy trap rebound a captured global primitive method during envelope validation',
+          result: null,
+        });
+      }
       var caseAssociation = env.snapshot.caseAssociation;
       var generationToken = env.snapshot.generationToken;
       var contextVersion = env.snapshot.contextVersion;
@@ -1071,6 +1119,30 @@
           rejectedCount++; tally(CODES.EVIDENCE_IMPORTED_SUMMARY_ELEVATION_FORBIDDEN); continue;
         }
         _arrPush(sanitized, san);
+      }
+
+      // Step 3.5 — Codex D2 Round 13 RN-21/27 closure: re-check intrinsic integrity AFTER all
+      // per-rawEvidence-index descriptor reads + contract validators have completed. A Proxy
+      // [[GetOwnProperty]] trap on any rawEvidence index, OR a hostile getter at any node
+      // sub-field, could have fired during the iteration above and rebound a captured global.
+      // The clock callback at Step 17.5 might restore the binding so the Step 17.6 post-clock
+      // guard alone passes. This re-check catches any such mid-iteration rebinding immediately
+      // before Step 4's NODES_CAP check (which uses sanitized.length, intrinsic-safe).
+      if (!_intrinsicsIntact()) {
+        var postIterReasonCodes = [];
+        _ObjectDefineProperty(postIterReasonCodes, 0, { value: CODES.INTERNAL_CONTRACT_VIOLATION, writable: true, enumerable: true, configurable: true });
+        _ObjectFreeze(postIterReasonCodes);
+        var postIterExplanationKeys = [];
+        _ObjectDefineProperty(postIterExplanationKeys, 0, { value: 'r3_0d.reason.internal_contract_violation', writable: true, enumerable: true, configurable: true });
+        _ObjectFreeze(postIterExplanationKeys);
+        return _ObjectFreeze({
+          eligible: false,
+          status: 'blocked',
+          reasonCodes: postIterReasonCodes,
+          explanationKeys: postIterExplanationKeys,
+          detail: 'intrinsic-tampering detected post-iteration: input Proxy/getter trap rebound a captured global primitive method during per-node validation',
+          result: null,
+        });
       }
 
       // Step 4 — cap on accepted nodes.

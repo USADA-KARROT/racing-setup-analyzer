@@ -1789,5 +1789,95 @@ function freshInput(over) {
   chk('RN-27: RegExp.prototype.test rebinding caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
 })();
 
+// ── Section Y — Codex D2 Round 13 finding closures (RN-21/27 Proxy + RN-28/29 globals) ──
+(function sectionY_RN21_RN27_proxyLengthTrap() {
+  // RN-21/27 STILL-OPEN at Round 13 (Codex evidence on 2f0e588): a Proxy on rawEvidence with a
+  // `length` get trap rebinds Array.prototype.push (or Number.isInteger, Math.floor, etc.)
+  // when envelope validation reads `re.length`. Clock callback later restores the binding so
+  // the post-clock guard at Step 17.6 sees a clean state. Build runs with hostile push for the
+  // intervening window, admitting forbidden_category nodes.
+  //
+  // Round 14 fix: (a) envelope validation reads rawEvidence.length via captured
+  // `_ObjectGetOwnPropertyDescriptor` (fires [[GetOwnProperty]] instead of [[Get]] — a Proxy
+  // `get` trap on "length" never fires); (b) new Step 1.5 + Step 3.5 integrity re-checks
+  // catch any trap-mediated rebinding that happened during envelope or per-node iteration.
+  function bad() {
+    return Object.assign(freshNode(), { category: 'forbidden_category' });
+  }
+  const origPush = Array.prototype.push;
+  const target = [bad()];
+  let lengthHits = 0;
+  const p = new Proxy(target, {
+    get(t, k, r) {
+      if (k === 'length') { lengthHits++; Array.prototype.push = function () { return 0; }; }
+      return Reflect.get(t, k, r);
+    },
+  });
+  let attacked;
+  try {
+    attacked = EG.buildEvidenceGraph(freshInput({ rawEvidence: p }), {
+      clock: function () { Array.prototype.push = origPush; return NOW; },
+    });
+  } finally { Array.prototype.push = origPush; }
+  chk('RN-21 Proxy: length descriptor read does NOT fire Proxy get trap (lengthHits=0)', lengthHits === 0);
+  chk('RN-21 Proxy: forbidden_category does NOT enter the graph', !(attacked.valid === true && attacked.graph.nodes.some(n => n.category === 'forbidden_category')));
+})();
+
+(function sectionY_RN27_proxyMathFloorTrap() {
+  // Same Proxy attack vector targeting Math.floor — the envelope length integer check uses
+  // _MathFloor (captured). A Proxy length-getter rebinding Math.floor is irrelevant because
+  // we use the captured ref AND the post-envelope / post-iteration guard catches the rebind.
+  const origFloor = Math.floor;
+  const target = [freshNode()];
+  const p = new Proxy(target, {
+    get(t, k, r) { if (k === 'length') { Math.floor = x => x; } return Reflect.get(t, k, r); },
+  });
+  let attacked;
+  try {
+    attacked = EG.buildEvidenceGraph(freshInput({ rawEvidence: p }), {
+      clock: function () { Math.floor = origFloor; return NOW; },
+    });
+  } finally { Math.floor = origFloor; }
+  // length descriptor read doesn't fire the get trap, so Math.floor rebind never happens.
+  // Build proceeds normally with the legitimate node.
+  chk('RN-27 Proxy: Math.floor rebind via Proxy length trap never fires (build succeeds normally)', attacked.valid === true && attacked.graph.nodes.length === 1);
+})();
+
+(function sectionY_RN28_textEncoderRebind() {
+  // RN-28 NEW at Round 13: ambient TextEncoder used by contract byte-length validation.
+  // Rebinding admits oversized i18nKey. Round 14 closure: entry guard checks
+  // globalThis.TextEncoder against captured _TextEncoder.
+  const origTE = globalThis.TextEncoder;
+  let r;
+  try {
+    globalThis.TextEncoder = function () { return { encode(s) { return { length: 0 }; } }; };
+    r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK });
+  } finally { globalThis.TextEncoder = origTE; }
+  chk('RN-28: TextEncoder rebinding caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+})();
+
+(function sectionY_RN29_structuredCloneRebind() {
+  // RN-29 NEW at Round 13: ambient structuredClone used by contract Proxy cleansing. Rebinding
+  // defeats Proxy cleansing. Round 14 closure: entry guard checks globalThis.structuredClone
+  // against captured _StructuredClone.
+  const origSC = globalThis.structuredClone;
+  let r;
+  try {
+    globalThis.structuredClone = function (v) { return v; }; // identity defeats Proxy cleansing
+    r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK });
+  } finally { globalThis.structuredClone = origSC; }
+  chk('RN-29: structuredClone rebinding caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+})();
+
+(function sectionY_inClockMath_postClock() {
+  // Belt-and-suspenders: in-clock rebinding of Math.floor / Number.isInteger / RegExp.prototype.test
+  // caught by post-clock guard (Step 17.6).
+  const origFloor = Math.floor;
+  let r;
+  try { r = EG.buildEvidenceGraph(freshInput(), { clock: function () { Math.floor = x => x; return NOW; } }); }
+  finally { Math.floor = origFloor; }
+  chk('RN-27 post-clock: in-clock Math.floor rebind caught by Step 17.6', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+})();
+
 console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
 if (fail > 0) process.exit(1);

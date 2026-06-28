@@ -92,7 +92,7 @@
   "tests": {
     "command": "npm test",
     "newSuiteForThisCheckpoint": "tests/r3.0d-evidence-graph.test.js",
-    "newSuiteAssertions": 221,
+    "newSuiteAssertions": 227,
     "stateAwareRefactor": "tests/r3.0d-contract-foundation.test.js Section I + J were refactored to be state-aware (D1 invariants when currentCheckpoint === D1_CONTRACT_FOUNDATION; D2 invariants when currentCheckpoint === D2_EVIDENCE_GRAPH). No D1-era assertion was deleted; the D1 branch is preserved and an additional D2 branch added.",
     "evidenceTier": "TIER 3 — Claude-verified on D2 branch HEAD; CI re-run on integrationSha is the authority for the Train target context."
   },
@@ -270,6 +270,21 @@
           "RN-27": "NEW. Math.floor (line 711 envelope length-integer check), Number.isInteger (contract validator), RegExp.prototype.test (line 305 ISO timestamp regex) used but unguarded. Hostile Math.floor admitted forbidden_category; Number.isInteger rebind admitted schemaVersion:NaN; in-clock RegExp.prototype.test rebind produced valid graph with createdAt:'not-an-iso-timestamp'."
         },
         "evidence": "governance/r3.0d/codex-checkpoint-evidence/D2/round-12-0a61f06.raw.txt"
+      },
+      {
+        "round": 13,
+        "reviewedSha": "2f0e58861ec1e4a49a0176b13d16d4c48a2d4e3e",
+        "verdict": "BLOCK",
+        "closed": [],
+        "stillOpen": ["RN-21", "RN-27"],
+        "newFindings": ["RN-28", "RN-29"],
+        "findingDetail": {
+          "RN-21": "STILL-OPEN via Proxy length-trap variant. Proxy on rawEvidence with a `get` trap on 'length' fires when envelope validation reads re.length, rebinding Array.prototype.push. Clock callback restores push so post-clock guard passes. Build runs with hostile push between guards, admitting forbidden_category nodes with valid:true.",
+          "RN-27": "STILL-OPEN via same Proxy length-trap. Rebinding Number.isInteger admits schemaVersion:NaN. Rebinding Math.floor admits rawEvidence.length=1.5.",
+          "RN-28": "NEW. Ambient TextEncoder (contract evidence-node-contract.js:73 byte-length validation). Rebind to identity-encoder admits 513-byte i18nKey.",
+          "RN-29": "NEW. Ambient structuredClone (contract reason-codes.js:167 _toCleanCopy Proxy cleansing). Rebind to identity defeats Proxy cleansing — stateful Proxy returns allowed category during validation + forbidden during sanitization, yielding valid:true."
+        },
+        "evidence": "governance/r3.0d/codex-checkpoint-evidence/D2/round-13-2f0e588.raw.txt"
       }
     ],
     "tierDisclosure": "Codex D2 Round 1 BLOCK on 10766c0 (12 findings); Round 2 BLOCK on ad6474a (closed 6 / 6 still-open); Round 3 BLOCK on 63ecf69 (closed 5 + RN-13/RN-14 NEW + RN-09 partial); Round 4 BLOCK on e84d22c (closed RN-09 + RN-14 + RN-15 NEW + RN-13 still partial); Round 5 BLOCK on ec00b88 (RN-13 round-4 + RN-15 round-4 STILL-OPEN); Round 6 BLOCK on d7c045f (RN-15 round-4 CLOSED; RN-13 round-4 STILL-OPEN via Array.prototype['0'] setter; RN-16 + RN-17 NEW); Round 7 BLOCK on 90bf868 (RN-13 round-4 + RN-17 CLOSED; RN-16 STILL-OPEN via same-source 595-edge); Round 8 BLOCK on 497c143 (RN-16 CLOSED via Step 11.5 exact preview; RN-18 NEW — Object.prototype.toJSON hook invoked by _JSONStringify can mutate shared edges array OR return stateful different sizes between Step 11.5 and Step 17). Round 9 candidate switches Step 4.5 (per-node estimator) + Step 11.5 (preview check) + Step 17 (belt-and-suspenders) from _JSONStringify to _stableStringify. _stableStringify walks via captured _ObjectKeys + manual indexed array recursion + direct primitive encoding — it NEVER performs a [[Get]] for the toJSON property anywhere in the value tree, foreclosing both the mutation vector (toJSON cannot fire on the previewIdPayload reference holding the shared `edges` array) AND the stateful-size vector (toJSON is not invoked, so any installed hook is benign for byte cap purposes). _stableStringify also patched to use captured _ObjectKeys / _ArrayIsArray / _JSONStringify (the only _JSONStringify call left is on primitive strings, where ES Quote runs without any toJSON [[Get]]). Adversarial regressions added in Section T (Object.prototype.toJSON mutation / stateful-size / Array.prototype.toJSON / throwing toJSON — all fail-closed without hook firing). Tier 1 raw stdout for all eight rounds at round-{1..8}-<sha>.raw.txt."
@@ -327,6 +342,7 @@
     "governance/r3.0d/codex-checkpoint-evidence/D2/round-10-4928a5e.raw.txt",
     "governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt",
     "governance/r3.0d/codex-checkpoint-evidence/D2/round-12-0a61f06.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D2/round-13-2f0e588.raw.txt",
     "governance/r3.0d/schema.json",
     "governance/r3.0d/state.json",
     "governance/r3.0e/checkpoint-manifest.schema.json",
@@ -342,7 +358,7 @@
     "tests/r3.0d-contract-foundation.test.js",
     "tests/r3.0d-evidence-graph.test.js"
   ],
-  "changedFilesNote": "Computed from the exact baseSha (f8a598b) → Round 13 candidate HEAD diff. Includes the cross-phase rename commit (governance/r3.0e files + docs/r3-0-train-governance.md), the state-aware guard-enhancement commit (scripts/check-r3-phase-no-consumer.js + tests/r3-0-phase-no-consumer.test.js), every Codex evidence file from Round 1 through Round 10 (so the candidate carries its own evidence lineage), plus all D2 production / test / governance artifacts. RN-12 closure.",
+  "changedFilesNote": "Computed from the exact baseSha (f8a598b) → Round 14 candidate HEAD diff. Includes the cross-phase rename commit (governance/r3.0e files + docs/r3-0-train-governance.md), the state-aware guard-enhancement commit (scripts/check-r3-phase-no-consumer.js + tests/r3-0-phase-no-consumer.test.js), every Codex evidence file from Round 1 through Round 10 (so the candidate carries its own evidence lineage), plus all D2 production / test / governance artifacts. RN-12 closure.",
 
   "note": "D2_EVIDENCE_GRAPH — the first non-bootstrap R3.0D PRODUCTION checkpoint. Lifts ONE production capability (evidence_graph_present); enables runtimeConsumersAllowed=true + algorithmsAllowed=true; introduces renderer/js/r3-0d-evidence-graph.js as the single new authorized production path; keeps uiAllowed=false + featureRegistryActivationAllowed=false (D5 only). The 5-phase D-flow is renamed atomically alongside this checkpoint per the directive; the rename is recorded in governanceRename above with full lineage. C-B Codex review runs against the exact D2 candidate SHA; tier-1 raw stdout to be persisted under governance/r3.0d/codex-checkpoint-evidence/D2/."
 }
