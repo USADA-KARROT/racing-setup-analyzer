@@ -8,8 +8,8 @@
 
   "shaSeparation": {
     "note": "Per SKYLINE 2026-06-28 Continuous Delivery Master Directive, every checkpoint manifest preserves the three-way SHA separation. reviewedCandidateSha is the exact SHA Codex C6 review was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD. Substituting one for another is a tier violation.",
-    "reviewedCandidateSha": null,
-    "reviewedCandidateNote": "Filled when the C6 adversarial Codex review issues PASS. Until then, null is the honest value — Codex has not yet been run on a candidate SHA.",
+    "reviewedCandidateSha": "48be2c0c9f515006113964bda4f018d20cf9fb39",
+    "reviewedCandidateNote": "The retrofit-branch HEAD where the formal Codex C6 adversarial review issued PASS (round 4). Anchored in governance/r3.0c/codex-checkpoint-evidence/C6/round-4-48be2c0-PASS.md with sha256 1ee819413f5ad1a8cfe8ab76968510febbdc52d3ca399591bff3e35b3308c962.",
     "manifestCommitSha": null,
     "manifestCommitNote": "Filled by a follow-up evidence-anchoring commit after integrationSha is known; mirrors the C5R convention.",
     "integrationSha": null,
@@ -50,7 +50,28 @@
   "artifactId": null,
   "artifactBoundSha": null,
 
-  "codexVerdict": null,
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 4,
+    "verdictAt": "reviewedCandidateSha",
+    "reviewedCandidateSha": "48be2c0c9f515006113964bda4f018d20cf9fb39",
+    "verdictEvidenceFile": "governance/r3.0c/codex-checkpoint-evidence/C6/round-4-48be2c0-PASS.md",
+    "verdictBlockSha256": "1ee819413f5ad1a8cfe8ab76968510febbdc52d3ca399591bff3e35b3308c962",
+    "verdictHashesFile": "governance/r3.0c/codex-checkpoint-evidence/C6/verdict-hashes.txt",
+    "priorRoundEvidence": [
+      { "round": 1, "file": "governance/r3.0c/codex-checkpoint-evidence/C6/round-1-eff0d41.md", "sha": "eff0d41beb6b7262af104793544558cc15ec0f1f", "result": "BLOCK", "verdictBlockSha256": "50bdb9b2d0150ec92440c3eb1ff22f115e58cbd71271ea33bbafff270d363f07" },
+      { "round": 2, "file": "governance/r3.0c/codex-checkpoint-evidence/C6/round-2-2b6e568.md", "sha": "2b6e568d2b24b40ab68dc6b3a81a5f66c1f13e99", "result": "BLOCK", "verdictBlockSha256": "2d4f7c97d4cffc4459180b45bb4908b0bb200e49a624bc13579f2144cbf392cd" },
+      { "round": 3, "file": "governance/r3.0c/codex-checkpoint-evidence/C6/round-3-a87c7d5.md", "sha": "a87c7d580f7b290aaac4e6879a17b7665b692d81", "result": "BLOCK", "verdictBlockSha256": "65189ff8bcb1c2d9804e9b72de9d9b5757e51050b0a3f35f3edb4dbd95078706" }
+    ],
+    "codexToolchain": {
+      "cliVersion": "codex-cli 0.141.0",
+      "subAgentType": "codex:codex-rescue",
+      "subAgentId": "a22bd6ccbf8a9946d",
+      "host": "macOS Darwin 25.5.0 / Apple Silicon"
+    },
+    "evidenceTierDisclosure": "Per governance/r3.0c/codex-checkpoint-evidence/C6/README.md: TIER 1 (raw codex CLI stdout) NOT CAPTURED; TIER 2 (sub-agent relayed verdict block) and TIER 3 (Claude prompts + Claude-verified baseline values) ARE CAPTURED VERBATIM in the round-*.md files.",
+    "findingsClosed": ["F-C6-A1", "F-C6-A2", "F-C6-A3", "F-C6-A1-R2", "F-C6-A2-R2", "F-C6-A3-R2", "F-C6-A4"]
+  },
 
   "exportContractSurface": {
     "envelopeKeys": ["schemaIdentity", "schemaVersion", "generatedAt", "payload"],
