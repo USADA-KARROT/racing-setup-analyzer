@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "program": "R3.0E",
   "title": "R3.0E Checkpoint Evidence Manifest — schema",
-  "note": "Format for governance/r3.0e/checkpoints/<CHECKPOINT_ID>.json. E0 establishes the schema and writes its own manifest as 'pending'; final PASS is expressed by the trusted-verification artifact bound to artifactBoundSha. The checkpoint manifest never self-asserts PASS — only the CI artifact does. Cross-phase advancement of any non-bootstrap E checkpoint additionally requires R3.0D state.currentCheckpoint === 'D5_ACTIVATION' per scripts/check-r3-0-train.js.",
+  "note": "Format for governance/r3.0e/checkpoints/<CHECKPOINT_ID>.json. E0 establishes the schema and writes its own manifest as 'pending'; final PASS is expressed by the trusted-verification artifact bound to artifactBoundSha. The checkpoint manifest never self-asserts PASS — only the CI artifact does. Cross-phase advancement of any non-bootstrap E checkpoint additionally requires R3.0D state.currentCheckpoint === 'D5_ENGINEER_BRIEF_ACTIVATION' per scripts/check-r3-0-train.js.",
   "required": [
     "program",
     "checkpoint",
