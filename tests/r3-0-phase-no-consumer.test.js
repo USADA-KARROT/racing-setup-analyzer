@@ -45,10 +45,15 @@ function buildSyntheticTree(consumerLine) {
 }
 
 // ── PASS: real repo ──
+// Per-phase consumer authorization: the validator's PASS posture is "every consumer is listed in
+// state.authorizedProductionPaths". The real repo may carry 0..N authorized consumers depending on
+// where each phase's currentCheckpoint sits — assert unauthorizedConsumerCount===0 instead of
+// runtimeConsumerCount===0 (which would falsely fail for R3.0D after D2 advances).
 for (const phase of PHASES) {
   const r = runValidator(phase, null);
   chk(phase + ' PASS real repo rc=0', r.status === 0, { status: r.status, violations: r.artifact && r.artifact.violations });
-  chk(phase + ' PASS no consumer count=0', r.artifact && r.artifact.runtimeConsumerCount === 0);
+  chk(phase + ' PASS unauthorizedConsumerCount=0', r.artifact && r.artifact.unauthorizedConsumerCount === 0);
+  chk(phase + ' PASS every consumer is authorized (consumers === authorizedConsumers)', r.artifact && r.artifact.runtimeConsumerCount === r.artifact.authorizedConsumerCount);
   chk(phase + ' PASS contractPrefix=' + CONTRACT_PREFIX[phase], r.artifact && r.artifact.contractPrefix === CONTRACT_PREFIX[phase]);
 }
 
@@ -65,13 +70,17 @@ for (const phase of PHASES) {
 }
 
 // ── FAIL: synthetic renderer/js/ file requires contracts/<phase>/ ──
+// The synthetic file (renderer/js/maybe-consumer.js) is NEVER in state.authorizedProductionPaths
+// for any phase (the real repo's state only authorizes the actual phase production paths). So a
+// synthetic consumer is always flagged as PROD_UNAUTHORIZED_CONSUMER.
 for (const phase of PHASES) {
   const prefix = CONTRACT_PREFIX[phase];
   const tree = buildSyntheticTree('var c = require("../../' + prefix + '/index.js");\nmodule.exports = c;\n');
   const r = runValidator(phase, tree);
   chk(phase + ' FAIL synthetic consumer rc!=0', r.status !== 0);
   chk(phase + ' FAIL synthetic consumer detected', r.artifact && r.artifact.runtimeConsumerCount > 0);
-  chk(phase + ' FAIL synthetic consumer PROD_REQUIRES_PHASE_CONTRACTS', r.artifact && r.artifact.violations.some(v => v.code === 'PROD_REQUIRES_PHASE_CONTRACTS'));
+  chk(phase + ' FAIL synthetic consumer PROD_UNAUTHORIZED_CONSUMER', r.artifact && r.artifact.violations.some(v => v.code === 'PROD_UNAUTHORIZED_CONSUMER'));
+  chk(phase + ' FAIL synthetic consumer unauthorizedConsumerCount>0', r.artifact && r.artifact.unauthorizedConsumerCount > 0);
 }
 
 // ── FAIL: synthetic index.html loads contracts/<phase>/ script ──

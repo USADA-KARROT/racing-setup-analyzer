@@ -1,19 +1,30 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * R3.0 Integrated Delivery Train — per-phase no-runtime-consumer validator (D / E / F).
+ * R3.0 Integrated Delivery Train — per-phase production-consumer authorization validator (D / E / F).
  *
  * Parameterized variant of scripts/check-r3-0c-no-consumer.js (which guards R3.0C).
  * The phase to validate is selected by env R3_PHASE_PROGRAM (one of 'R3.0D', 'R3.0E', 'R3.0F').
  *
- * Inspects the CURRENT WORKING-TREE STATE: confirms that no production code path consumes the phase's
- * contract directory (e.g. contracts/r3.0d/ for R3.0D) at runtime. Specifically:
+ * Inspects the CURRENT WORKING-TREE STATE: confirms that EVERY production code consumer of the
+ * phase's contract directory (e.g. contracts/r3.0d/ for R3.0D) is explicitly listed in
+ * governance/<phase-dir>/state.json :: authorizedProductionPaths. Specifically:
  *
- *   1. No renderer/js/*.js file requires or imports anything under contracts/<phase>/
- *   2. main.js / preload.js do not require contracts/<phase>/
- *   3. renderer/index.html contains no <script src="..."> pointing into contracts/<phase>/
+ *   1. Every renderer/js/*.js file that requires/imports anything under contracts/<phase>/
+ *      MUST be listed in state.authorizedProductionPaths.
+ *   2. main.js / preload.js consumers MUST be similarly authorized.
+ *   3. renderer/index.html script src pointing into contracts/<phase>/ is ALWAYS forbidden
+ *      (contracts are UMD modules consumed via require/import, never loaded as scripts).
  *
- * Tests under tests/ and docs under docs/ ARE allowed to reference contracts/<phase>/.
+ * Tests under tests/ and docs under docs/ ARE allowed to reference contracts/<phase>/ freely.
+ *
+ * Authorization gate behaviour:
+ *   • At the bootstrap / contracts-only checkpoint (e.g. D1_CONTRACT_FOUNDATION),
+ *     state.authorizedProductionPaths is empty → ANY consumer fails as PROD_UNAUTHORIZED_CONSUMER.
+ *   • At a production checkpoint (e.g. D2_EVIDENCE_GRAPH), the authorized list contains the
+ *     specific renderer/js files allowed to require contracts. Consumers on the list PASS;
+ *     consumers off the list FAIL as PROD_UNAUTHORIZED_CONSUMER. The presence of authorization
+ *     does NOT weaken the check — it strictly defines the allow surface.
  *
  * Unconditional: runs every PR and every push to main. Internal exceptions fail closed (ok=false, exit 2).
  *
@@ -26,9 +37,9 @@ const REPO = path.resolve(__dirname, '..');
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR ? path.resolve(process.env.ARTIFACT_DIR) : path.join(REPO, 'artifacts');
 
 const PHASE_CONFIG = {
-  'R3.0D': { contractPrefix: 'contracts/r3.0d', artifact: 'r3-0d-no-consumer.json', label: 'R3.0D-NOCONSUMER' },
-  'R3.0E': { contractPrefix: 'contracts/r3.0e', artifact: 'r3-0e-no-consumer.json', label: 'R3.0E-NOCONSUMER' },
-  'R3.0F': { contractPrefix: 'contracts/r3.0f', artifact: 'r3-0f-no-consumer.json', label: 'R3.0F-NOCONSUMER' },
+  'R3.0D': { contractPrefix: 'contracts/r3.0d', artifact: 'r3-0d-no-consumer.json', label: 'R3.0D-NOCONSUMER', stateDir: 'governance/r3.0d' },
+  'R3.0E': { contractPrefix: 'contracts/r3.0e', artifact: 'r3-0e-no-consumer.json', label: 'R3.0E-NOCONSUMER', stateDir: 'governance/r3.0e' },
+  'R3.0F': { contractPrefix: 'contracts/r3.0f', artifact: 'r3-0f-no-consumer.json', label: 'R3.0F-NOCONSUMER', stateDir: 'governance/r3.0f' },
 };
 
 const PHASE_PROGRAM = String(process.env.R3_PHASE_PROGRAM || '').trim();
@@ -72,18 +83,30 @@ function extractRequireSpecs(src) {
   return specs;
 }
 
-function scanFile(file, violations) {
+function scanFile(file, violations, authorizedSet, allConsumers) {
   let src;
   try { src = fs.readFileSync(file, 'utf8'); }
   catch (e) { violations.push({ code: 'FILE_UNREADABLE', file: path.relative(REPO, file), message: e.message }); return; }
   const specs = extractRequireSpecs(src);
+  const relFile = path.relative(SCAN_BASE === REPO ? REPO : SCAN_BASE, file).split(path.sep).join('/');
   for (const spec of specs) {
+    let isConsumer = false;
+    let specifierForReport = null;
+    let targetForReport = null;
     if (spec.indexOf(CONTRACT_PREFIX) !== -1) {
-      violations.push({ code: 'PROD_REQUIRES_PHASE_CONTRACTS', file: path.relative(REPO, file), specifier: spec, phase: PHASE_PROGRAM });
-      continue;
+      isConsumer = true;
+      specifierForReport = spec;
+    } else {
+      const target = resolvedTargetIfContract(file, spec);
+      if (target) { isConsumer = true; specifierForReport = spec; targetForReport = target; }
     }
-    const target = resolvedTargetIfContract(file, spec);
-    if (target) violations.push({ code: 'PROD_REQUIRES_PHASE_CONTRACTS', file: path.relative(REPO, file), specifier: spec, target, phase: PHASE_PROGRAM });
+    if (!isConsumer) continue;
+    allConsumers.push({ file: relFile, specifier: specifierForReport, target: targetForReport });
+    if (!authorizedSet.has(relFile)) {
+      const v = { code: 'PROD_UNAUTHORIZED_CONSUMER', file: relFile, specifier: specifierForReport, phase: PHASE_PROGRAM };
+      if (targetForReport) v.target = targetForReport;
+      violations.push(v);
+    }
   }
 }
 
@@ -104,31 +127,59 @@ function finish(payload) {
   return Object.assign({ check: PHASE ? ('r3-' + PHASE_PROGRAM.toLowerCase().replace('.', '-') + '-no-consumer').replace('--', '-') : 'r3-phase-no-consumer', program: PHASE_PROGRAM || null }, payload);
 }
 
+function loadAuthorizedSet() {
+  // Read state.json :: authorizedProductionPaths. Fail-closed: if unreadable or malformed, the set
+  // is EMPTY (no consumer authorized → any consumer becomes a violation). The check itself is never
+  // skipped — the strictest posture is always applied on parse error.
+  if (!PHASE) return { set: new Set(), readError: null };
+  const stateOverride = process.env.R3_PHASE_STATE_FILE_OVERRIDE ? path.resolve(process.env.R3_PHASE_STATE_FILE_OVERRIDE) : null;
+  const statePath = stateOverride || path.join(REPO, PHASE.stateDir, 'state.json');
+  let raw;
+  try { raw = fs.readFileSync(statePath, 'utf8'); }
+  catch (e) { return { set: new Set(), readError: 'STATE_UNREADABLE: ' + e.message }; }
+  let st;
+  try { st = JSON.parse(raw); }
+  catch (e) { return { set: new Set(), readError: 'STATE_PARSE_ERROR: ' + e.message }; }
+  const list = Array.isArray(st && st.authorizedProductionPaths) ? st.authorizedProductionPaths : [];
+  const set = new Set();
+  for (const entry of list) {
+    if (entry && typeof entry === 'object' && typeof entry.path === 'string' && entry.path.length > 0) set.add(entry.path);
+  }
+  return { set: set, readError: null };
+}
+
 function run() {
   if (!PHASE) {
-    return finish({ ok: false, violations: [{ code: 'PHASE_PROGRAM_INVALID', message: 'R3_PHASE_PROGRAM must be one of R3.0D / R3.0E / R3.0F; got ' + JSON.stringify(PHASE_PROGRAM) }], productionConsumerCount: -1, runtimeConsumerCount: -1 });
+    return finish({ ok: false, violations: [{ code: 'PHASE_PROGRAM_INVALID', message: 'R3_PHASE_PROGRAM must be one of R3.0D / R3.0E / R3.0F; got ' + JSON.stringify(PHASE_PROGRAM) }], productionConsumerCount: -1, runtimeConsumerCount: -1, authorizedPathCount: -1 });
   }
 
   const violations = [];
+  const allConsumers = [];
+  const { set: authorizedSet, readError } = loadAuthorizedSet();
+  if (readError) violations.push({ code: 'STATE_AUTHORIZED_PATHS_READ_ERROR', message: readError });
 
   const rendererJs = listJsFiles(path.join(SCAN_BASE, 'renderer', 'js'));
-  for (const f of rendererJs) scanFile(f, violations);
+  for (const f of rendererJs) scanFile(f, violations, authorizedSet, allConsumers);
 
   for (const entry of ['main.js', 'preload.js']) {
     const full = path.join(SCAN_BASE, entry);
-    if (fs.existsSync(full)) scanFile(full, violations);
+    if (fs.existsSync(full)) scanFile(full, violations, authorizedSet, allConsumers);
   }
 
   scanIndexHtml(violations);
 
-  const productionConsumerCount = violations.filter(v => v.code === 'PROD_REQUIRES_PHASE_CONTRACTS' || v.code === 'INDEX_HTML_SCRIPT_LOADS_CONTRACTS').length;
+  const unauthorizedConsumerCount = violations.filter(v => v.code === 'PROD_UNAUTHORIZED_CONSUMER' || v.code === 'INDEX_HTML_SCRIPT_LOADS_CONTRACTS').length;
+  const authorizedConsumerCount = allConsumers.length - unauthorizedConsumerCount;
 
   return finish({
     scanBase: SCAN_BASE === REPO ? '<repo>' : SCAN_BASE,
     contractPrefix: CONTRACT_PREFIX,
     scannedFiles: rendererJs.length + (fs.existsSync(path.join(SCAN_BASE, 'main.js')) ? 1 : 0) + (fs.existsSync(path.join(SCAN_BASE, 'preload.js')) ? 1 : 0) + 1,
-    productionConsumerCount,
-    runtimeConsumerCount: productionConsumerCount,
+    authorizedPathCount: authorizedSet.size,
+    productionConsumerCount: allConsumers.length,
+    authorizedConsumerCount: authorizedConsumerCount,
+    unauthorizedConsumerCount: unauthorizedConsumerCount,
+    runtimeConsumerCount: allConsumers.length,
     violations,
     ok: violations.length === 0,
   });
@@ -141,6 +192,7 @@ catch (e) {
     ok: false,
     productionConsumerCount: -1,
     runtimeConsumerCount: -1,
+    authorizedPathCount: -1,
     violations: [{ code: 'INTERNAL_VALIDATOR_FAILURE', message: String((e && e.stack) || e) }],
   });
   exitCode = 2;
@@ -152,7 +204,10 @@ const label = PHASE ? PHASE.label : 'R3-PHASE-NOCONSUMER';
 console.log(label + ' ' + JSON.stringify({
   program: result.program,
   scanned: result.scannedFiles,
+  authorizedPaths: result.authorizedPathCount,
   consumers: result.runtimeConsumerCount,
+  authorizedConsumers: result.authorizedConsumerCount,
+  unauthorizedConsumers: result.unauthorizedConsumerCount,
   violations: (result.violations || []).length,
   ok: result.ok,
 }));
