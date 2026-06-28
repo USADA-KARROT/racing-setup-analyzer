@@ -221,7 +221,14 @@
     if (depth > 32) return true;
     if (v === null || typeof v !== 'object') return false;
     var isArr = Array.isArray(v);
-    if (!isArr) {
+    // Codex D1 R6 Finding RN-11 (array subclass) closure: arrays must be EXACTLY Array.prototype-
+    // proto. An `Array` subclass instance OR an array with a mutated prototype (Object.setPrototypeOf
+    // applied) passes Array.isArray() but does NOT have the standard array prototype; reject those
+    // with the same posture as a class instance.
+    if (isArr) {
+      try { var ap = Object.getPrototypeOf(v); if (ap !== Array.prototype) return true; }
+      catch (e) { return true; }
+    } else {
       try { var p = Object.getPrototypeOf(v); if (!(p === Object.prototype || p === null)) return true; }
       catch (e) { return true; }
     }

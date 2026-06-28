@@ -500,6 +500,17 @@ chk('BRIEF future schema rejected', EB.validateEngineerBriefShape(validBrief({ s
   var ident = Object.assign({}, withAccessor.identity);
   Object.defineProperty(ident, 'caseId', { get: function () { return 'forged'; }, enumerable: true, configurable: true });
   chk('RN-11 (nested): EN rejects nested accessor descriptor', EN.validateEvidenceNodeShape(Object.assign({}, withAccessor, { identity: ident })).valid === undefined);
+  // R6 attack: Array subclass instance + Array with mutated prototype at any depth
+  (function () {
+    function HostileArray() {} HostileArray.prototype = Object.create(Array.prototype);
+    var hostileArr = new HostileArray(); hostileArr.length = 1; hostileArr[0] = 'ev_001';
+    var nodeHostileArr = validEvidenceNode({ supportingEdges: hostileArr });
+    chk('RN-11 (R6): EN rejects Array subclass in supportingEdges', EN.validateEvidenceNodeShape(nodeHostileArr).valid === undefined);
+    // Mutated-prototype array
+    var mutatedArr = ['ev_001'];
+    Object.setPrototypeOf(mutatedArr, { __unknown__: true });
+    chk('RN-11 (R6): EN rejects array with mutated prototype', EN.validateEvidenceNodeShape(validEvidenceNode({ supportingEdges: mutatedArr })).valid === undefined);
+  })();
 })();
 
 // RN-05 — ID-array elements enforce byte cap + id grammar
