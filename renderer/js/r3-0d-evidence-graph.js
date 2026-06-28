@@ -75,16 +75,26 @@
  *          diff (including the separate guard-enhancement commit and the cross-phase rename
  *          commit), populated in governance/r3.0d/checkpoints/D2.json.
  *
- * Codex D2 Round 5 closures embedded (RN-13 round-4 + RN-15 round-4):
- *   RN-13 round-4 (round-5 closure): `_safeSlice` / `_safeMap` no longer go through
- *          `Function.prototype.call`. A hostile opts.clock cannot inject `{tampered:true}`
- *          entries into nodes / correlationGroups / topologicalOrder by reassigning
- *          `Function.prototype.call`. The helpers use direct indexed reads/writes only.
- *   RN-15 round-4 (round-5 closure): `_jsonStringWidth` now accounts for lone surrogates
- *          (high or low) as 6 bytes each (`\uXXXX` JSON escape). The previous implementation
- *          undercount lone low surrogates as 3 bytes (BMP 3-byte UTF-8). The Round 5 exploit
- *          (35×30×70 lone low surrogate values) is rejected at Step 4.5 (per-node running
- *          total) instead of slipping through to Step 17 (post-canonical envelope cap).
+ * Codex D2 Round 6 closures embedded (RN-13 round-4 final / RN-16 NEW / RN-17 NEW):
+ *   RN-13 round-4 (Round 6 / Round 7 final closure): `_safeSlice` / `_safeMap` plus the two
+ *          `_materializeGraph` programmatic keyed assignments (`copy[k] = r[k]` for
+ *          rejectedSourceReplays + `rrsCopy[k] = ...` for rejectedReasonsSummary) now use
+ *          captured `_ObjectDefineProperty` to install own data descriptors via
+ *          [[DefineOwnProperty]]. A hostile clock installing
+ *          `Object.defineProperty(Array.prototype, "0", { set: ... })` (or any prototype-chain
+ *          accessor on Array.prototype / Object.prototype) cannot intercept the assignment
+ *          because [[DefineOwnProperty]] bypasses the [[Set]] protocol entirely.
+ *   RN-15 round-4 (Round 5 closure): `_jsonStringWidth` accounts for lone surrogates (high or
+ *          low) as 6 bytes each (`\uXXXX` JSON escape).
+ *   RN-16 NEW (Round 7 closure): `_estimateNodeUtf8Bytes` replaced with exact
+ *          `_utf8len(_JSONStringify(perNodeIdPayloadShape))` using captured intrinsics. The
+ *          previous approximation missed top-level structural keys and nested braces, allowing
+ *          a 35×30×225 ASCII payload (~265 KB actual) to bypass Step 4.5 (~256 KB estimated).
+ *          Step 4.5 now also adds WRAPPER_FIXED_BYTES + inter-node commas for envelope overhead.
+ *   RN-17 NEW (Round 7 closure): `_jsonStringWidth` no longer treats DEL (U+007F) as a 6-byte
+ *          JSON escape. Per ES §25.5.2.2 Quote(value), only U+0000..U+001F (plus " and \) MUST
+ *          be escaped; DEL passes through as 1 byte. A DEL-heavy payload that fits the envelope
+ *          (~101 KB actual) is no longer over-rejected at Step 4.5.
  *
  * Defence-in-depth surface (mirrors R3.0D D1 RN-01..RN-11 closures, extended by the D2 closures
  * listed above): every external entry validates the original input prototype, hidden own keys,
@@ -118,6 +128,7 @@
   var _ObjectAssign = Object.assign;
   var _ObjectKeys = Object.keys;
   var _ObjectCreate = Object.create;
+  var _ObjectDefineProperty = Object.defineProperty;
   var _ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
   var _ObjectGetPrototypeOf = Object.getPrototypeOf;
   var _ObjectPrototypeHasOwnProperty = Object.prototype.hasOwnProperty;
@@ -192,28 +203,31 @@
     return s.length * 4; // worst-case bound when neither API is present
   }
 
-  // Codex D2 Round 4 RN-15 + Round 5 RN-15 round-4 closure: JSON canonical width estimator. Counts
-  // the actual byte width a string occupies when serialised to canonical JSON, accounting for:
-  //   - " and \ → 2 bytes each (escaped)
-  //   - control chars 0x00..0x1F and DEL → 6 bytes (\uXXXX form)
-  //   - ASCII 0x20..0x7E (minus " and \) → 1 byte
+  // Codex D2 Round 4 RN-15 + Round 5 RN-15 round-4 + Round 6 RN-17 closure: JSON canonical width
+  // estimator. Counts the actual byte width a string occupies when serialised to canonical JSON
+  // per ES spec §25.5.2.2 Quote(value):
+  //   - " and \ → 2 bytes each (escaped as `\"` / `\\`)
+  //   - control chars U+0000..U+001F → 6 bytes (`\uXXXX` form) — only this range MUST be escaped
+  //   - ASCII printable (U+0020..U+007E) + DEL (U+007F) → 1 byte (DEL is NOT escaped per spec)
   //   - UTF-8 multi-byte sequences (2 / 3 / 4-byte) → exact width
   //   - VALID surrogate pair (high 0xD800-0xDBFF immediately followed by low 0xDC00-0xDFFF) →
   //     4-byte UTF-8 (the supplementary-plane codepoint)
   //   - LONE high surrogate (0xD800-0xDBFF without a following low) → 6 bytes (`\uXXXX`)
   //   - LONE low surrogate (0xDC00-0xDFFF anywhere) → 6 bytes (`\uXXXX`)
   //
+  // Round 6 RN-17 closure: a previous version treated DEL (U+007F) as a 6-byte JSON escape.
+  // `JSON.stringify` does NOT escape DEL — Quote(value) only escapes U+0000-U+001F (plus " and \).
+  // A DEL-heavy payload that actually fits within the post-canonical envelope cap was being
+  // over-rejected at Step 4.5 (101,214 actual bytes incorrectly estimated as ~471 KB).
+  //
   // Round 5 closure: the previous implementation skipped the surrogate-pair check by always
   // assuming a high surrogate had a paired low, AND let lone LOW surrogates fall through to the
   // default `n += 3` (BMP 3-byte UTF-8). Per the ES spec since 2019, `JSON.stringify` MUST escape
   // lone surrogates as `\uXXXX` — so a 70-char `\udc00` value JSON-encodes to ~420 chars, not 210.
-  // The Round 5 exploit (35×30×70 lone low surrogates) bypassed the per-node estimator (estimated
-  // ~245 KB, actual ~471 KB) and was only caught by the post-canonical envelope check. After this
-  // fix the per-node running total (Step 4.5) trips BYTE_CAP_EXCEEDED before any single canonical
-  // serialisation runs.
   //
-  // Always overestimates rather than underestimates: the pre-canonical estimator never lets
-  // through a payload that exceeds the cap. Includes the surrounding "..." quotes (+2).
+  // Always overestimates rather than underestimates for the legitimately-escaped range: the pre-
+  // canonical estimator never lets through a payload that exceeds the cap. Includes the
+  // surrounding "..." quotes (+2).
   function _jsonStringWidth(s) {
     if (typeof s !== 'string') return 4; // typical "null" / unknown wrapper
     var n = 2; // surrounding quotes
@@ -221,8 +235,8 @@
     for (var i = 0; i < len; i++) {
       var c = s.charCodeAt(i);
       if (c === 0x22 || c === 0x5C) { n += 2; continue; }                  // " or \  → escaped
-      if (c < 0x20 || c === 0x7F) { n += 6; continue; }                    // control → \uXXXX
-      if (c < 0x80) { n += 1; continue; }                                  // ASCII printable
+      if (c < 0x20) { n += 6; continue; }                                  // control U+0000..U+001F → \uXXXX
+      if (c < 0x80) { n += 1; continue; }                                  // ASCII printable + DEL (no escape)
       if (c < 0x800) { n += 2; continue; }                                 // UTF-8 2-byte
       if (c >= 0xDC00 && c <= 0xDFFF) { n += 6; continue; }                // LONE low surrogate → \uXXXX
       if (c >= 0xD800 && c <= 0xDBFF) {                                    // high surrogate — check pairing
@@ -237,23 +251,37 @@
     return n;
   }
 
-  // Codex D2 Round 5 RN-13 round-4 closure: direct-loop array copy / map helpers. The previous
-  // implementation invoked `_ArrayPrototypeSlice.call(arr)` / `_ArrayPrototypeMap.call(arr, fn)`,
-  // which routes through `Function.prototype.call` — a global a hostile opts.clock can replace
-  // (clock fires before _materializeGraph runs). The Round 5 exploit demonstrated:
-  //     Function.prototype.call = function(){ if (this===origSlice||this===origMap) return [{tampered:true}]; ... };
-  // injecting `{tampered:true}` into nodes / correlationGroups / topologicalOrder (with `frozen:false`
-  // because the unfrozen attacker object slipped past the outer Object.freeze of the array).
-  // Direct indexed-property reads + writes never traverse Function.prototype.call, Array.prototype.push,
-  // or any other monkey-patchable hop. Sanitized inputs are plain frozen primitives, so `arr.length`
-  // and `arr[i]` reads cannot trigger accessor descriptors.
+  // Codex D2 Round 5 RN-13 round-4 closure (Round 7 final): array copy / map helpers safe against
+  // both Function.prototype.call replacement AND Array.prototype indexed setter installation.
+  //
+  // Round 5 BLOCK: `_ArrayPrototypeSlice.call(arr)` / `_ArrayPrototypeMap.call(arr, fn)` routed
+  // through `Function.prototype.call`, which a hostile opts.clock could replace to return
+  // `[{tampered:true}]`. Round 6 fix moved to direct-loop `out[i] = arr[i]`.
+  //
+  // Round 6 BLOCK: a hostile clock could install `Object.defineProperty(Array.prototype, "0",
+  // { set: function(v) { Object.defineProperty(this, "0", { value: {tampered:true}, ... }); } })`.
+  // Then `out[i] = ...` on a freshly-created `out = []` would use OrdinarySet → check own
+  // descriptor (none) → traverse prototype chain → find the setter on Array.prototype → invoke it
+  // on `out` as the receiver. The setter then installs its OWN data descriptor on `out[0]` with
+  // the attacker shape, so `out[0]` thereafter returns `{tampered:true}`. Codex Round 6 evidence
+  // reproduced this with `nodes/groups/topology = [{tampered:true}]`, entries unfrozen.
+  //
+  // Round 7 closure: indexed assignment uses captured `_ObjectDefineProperty` with a full data
+  // descriptor — `_ObjectDefineProperty(out, i, { value, writable: true, enumerable: true,
+  // configurable: true })`. Per ES spec §10.1.6 [[DefineOwnProperty]] directly installs an own
+  // data descriptor without invoking the [[Set]] protocol or any prototype-chain accessor.
+  // Subsequent `out[i]` reads return the own value because own properties shadow the prototype.
+  // The captured `_ObjectDefineProperty` reference is taken at module-init time so a clock that
+  // overwrites `Object.defineProperty` later cannot tamper with this helper.
   function _safeSlice(arr) {
     var out = [];
     var len;
     try { len = (arr == null) ? 0 : arr.length; } catch (e) { return out; }
     if (typeof len !== 'number' || len !== len || len < 0) return out;
     len = len | 0;
-    for (var i = 0; i < len; i++) out[i] = arr[i];
+    for (var i = 0; i < len; i++) {
+      _ObjectDefineProperty(out, i, { value: arr[i], writable: true, enumerable: true, configurable: true });
+    }
     return out;
   }
   function _safeMap(arr, fn) {
@@ -262,51 +290,65 @@
     try { len = (arr == null) ? 0 : arr.length; } catch (e) { return out; }
     if (typeof len !== 'number' || len !== len || len < 0) return out;
     len = len | 0;
-    for (var i = 0; i < len; i++) out[i] = fn(arr[i], i);
+    for (var i = 0; i < len; i++) {
+      _ObjectDefineProperty(out, i, { value: fn(arr[i], i), writable: true, enumerable: true, configurable: true });
+    }
     return out;
   }
 
-  // Codex D2 Round 3 RN-14 + Round 4 RN-15 closure: per-node canonical-JSON byte width estimate.
-  // Uses _jsonStringWidth() for every string that will be embedded in the canonical JSON output
-  // (params keys + string values especially), so control-character escape expansion (NUL →  
-  // = 6 bytes) is counted accurately. Numbers/bool/null pay a small fixed overhead estimate.
-  function _estimateNodeUtf8Bytes(node) {
-    var n = 64; // small fixed overhead per node (JSON object brackets + commas + key wrappers)
-    n += _jsonStringWidth(node.nodeId);
-    n += _jsonStringWidth(node.category);
-    n += _jsonStringWidth(node.credibility);
-    n += _jsonStringWidth(node.provenance);
-    n += _jsonStringWidth(node.availability);
-    if (node.confidence && node.confidence.state) n += _jsonStringWidth(node.confidence.state);
-    if (node.identity) {
-      n += _jsonStringWidth(node.identity.caseId || '');
-      n += _jsonStringWidth(node.identity.sessionId || '');
-      n += _jsonStringWidth(node.identity.lapId || '');
-      n += _jsonStringWidth(node.identity.sourceId || '');
-      n += _jsonStringWidth(node.identity.sourceVersion || '');
-      n += _jsonStringWidth(node.identity.freshness || '');
-    }
-    if (node.observation) {
-      n += _jsonStringWidth(node.observation.kind || '');
-      n += _jsonStringWidth(node.observation.channel || '');
-      n += _jsonStringWidth(node.observation.i18nKey || '');
-      if (node.observation.params) {
-        var pk;
-        try { pk = _ObjectKeys(node.observation.params); } catch (e) { pk = []; }
-        for (var i = 0; i < pk.length; i++) {
-          var k = pk[i];
-          n += _jsonStringWidth(k) + 2; // key + colon + comma JSON syntax
-          var v = node.observation.params[k];
-          if (typeof v === 'string') n += _jsonStringWidth(v);
-          else n += 16; // number/bool/null overhead estimate
-        }
-      }
-    }
-    if (node.supportingEdges) for (var si = 0; si < node.supportingEdges.length; si++) n += _jsonStringWidth(node.supportingEdges[si]) + 2;
-    if (node.contradictingEdges) for (var ci = 0; ci < node.contradictingEdges.length; ci++) n += _jsonStringWidth(node.contradictingEdges[ci]) + 2;
-    if (node.limitations) for (var li = 0; li < node.limitations.length; li++) n += _jsonStringWidth(node.limitations[li]) + 2;
-    return n;
+  // Codex D2 Round 6 RN-16 closure: exact per-node byte measurement via captured _JSONStringify +
+  // _utf8len. The previous approximation summed _jsonStringWidth across SELECTED fields and
+  // missed top-level structural keys ("nodeId":, "category":, etc.), nested object braces, and
+  // inter-field commas — combined undercount of ~300+ bytes per node. Codex Round 6 exploit (35
+  // x 30 x 225 ASCII chars = ~265 KB actual) bypassed Step 4.5 (~256 KB estimated) and was only
+  // caught by post-canonical Step 17.
+  //
+  // Round 7 fix: build the SAME per-node idPayload shape that Step 16 constructs (mirroring the
+  // mapping at the graphId derivation site exactly), run captured _JSONStringify on it, and use
+  // _utf8len for UTF-8-byte-accurate width. The result is EXACT for each sanitized node (no
+  // approximation). The outer envelope adds a small fixed wrapper constant accounted for at
+  // Step 4.5's running-total starting value (WRAPPER_FIXED_BYTES).
+  //
+  // Sanitized inputs are plain frozen primitives (D1 contract guarantee), so JSON.stringify never
+  // encounters accessor descriptors, Proxies, or throwing getters. Captured _JSONStringify means
+  // a hostile clock that replaces JSON.stringify after import cannot tamper with this measurement.
+  function _perNodeIdPayloadShape(n) {
+    return {
+      nodeId: n.nodeId,
+      category: n.category,
+      credibility: n.credibility,
+      provenance: n.provenance,
+      availability: n.availability,
+      confidence: { state: (n.confidence && n.confidence.state) ? n.confidence.state : null },
+      identity: {
+        caseId: n.identity.caseId,
+        sessionId: n.identity.sessionId,
+        lapId: n.identity.lapId,
+        sourceId: n.identity.sourceId,
+        sourceVersion: n.identity.sourceVersion,
+      },
+      observation: {
+        kind: n.observation.kind,
+        channel: n.observation.channel,
+        i18nKey: n.observation.i18nKey,
+        params: n.observation.params,
+      },
+      limitations: n.limitations,
+      supportingEdges: n.supportingEdges,
+      contradictingEdges: n.contradictingEdges,
+    };
   }
+  function _estimateNodeUtf8Bytes(node) {
+    try { return _utf8len(_JSONStringify(_perNodeIdPayloadShape(node))); }
+    catch (e) { return ENVELOPE_BYTE_CAP + 1; } // pessimistic fail-closed on stringify failure
+  }
+  // Wrapper byte allowance covering the post-canonical idPayload outer structure:
+  //   {"caseAssociation":{caseId,sessionId,lapId},"nodes":[<NODES>],"edges":[<EDGES>],"correlationGroups":[<GROUPS>]}
+  // Sized to cover the caseAssociation object + outer braces + 5 JSON keys + 4 commas + array
+  // bracket pairs, plus inter-node commas (n-1 added per Step 4.5 running total). Edges and
+  // correlationGroups arrays are bounded separately by EDGES_CAP_TOTAL / CORRELATION_GROUPS_CAP
+  // checks, and any envelope overflow they cause is the authoritative Step 17 check's job.
+  var WRAPPER_FIXED_BYTES = 256;
 
   // Stable canonical JSON serialiser — sorted keys at every depth; arrays preserved in order. Used
   // for semantic dedup keys + graphId hashing. The caller is expected to pass D1-sanitized values
@@ -583,9 +625,14 @@
       });
     });
     var rejReplaysFrozen = _safeMap(o.dedup.rejectedSourceReplays, function (r) {
-      var copy = {};
+      // Codex D2 Round 6 RN-13 round-4 closure: use _ObjectDefineProperty so a hostile clock-
+      // installed setter on Object.prototype[<key>] cannot intercept the keyed assignment and
+      // inject a `{tampered:true}` value into the materialised graph.
+      var copy = _ObjectCreate(null);
       var kk; try { kk = _ObjectKeys(r); } catch (e) { kk = []; }
-      for (var i = 0; i < kk.length; i++) copy[kk[i]] = r[kk[i]];
+      for (var i = 0; i < kk.length; i++) {
+        _ObjectDefineProperty(copy, kk[i], { value: r[kk[i]], writable: true, enumerable: true, configurable: true });
+      }
       return _ObjectFreeze(copy);
     });
     var dedupSummaryFrozen = _ObjectFreeze({
@@ -593,9 +640,14 @@
       rejectedSemanticDuplicates: _ObjectFreeze(rejSemFrozen),
       rejectedSourceReplays: _ObjectFreeze(rejReplaysFrozen),
     });
-    var rrsCopy = {};
+    // Codex D2 Round 6 RN-13 round-4 closure: Object.create(null) + defineProperty so a hostile
+    // clock-installed setter on Object.prototype[<reasonCode>] cannot intercept the keyed
+    // assignment and inject a `{tampered:true}` count into rejectedReasonsSummary.
+    var rrsCopy = _ObjectCreate(null);
     var rrsKeys; try { rrsKeys = _ObjectKeys(o.provenance.rejectedReasonsSummary); } catch (e) { rrsKeys = []; }
-    for (var ri = 0; ri < rrsKeys.length; ri++) rrsCopy[rrsKeys[ri]] = o.provenance.rejectedReasonsSummary[rrsKeys[ri]];
+    for (var ri = 0; ri < rrsKeys.length; ri++) {
+      _ObjectDefineProperty(rrsCopy, rrsKeys[ri], { value: o.provenance.rejectedReasonsSummary[rrsKeys[ri]], writable: true, enumerable: true, configurable: true });
+    }
     var graph = {
       schemaVersion: GRAPH_SCHEMA_VERSION,
       graphId: o.graphId,
@@ -701,14 +753,19 @@
         return RC.buildBlockedResult([CODES.GRAPH_CAP_EXCEEDED], { detail: 'sanitized node count ' + sanitized.length + ' exceeds NODES_CAP=' + NODES_CAP });
       }
 
-      // Step 4.5 — RN-09 round-3 + RN-14 closure: accurate UTF-8 byte estimate BEFORE canonical
-      // serialization. Uses _estimateNodeUtf8Bytes() which actually sums UTF-8 byte widths over
-      // sanitized fields (no fixed 4096-byte per-node overhead). Bails before _stableStringify
-      // runs across the whole array if the running total would exceed ENVELOPE_BYTE_CAP.
-      var roughTotal = 0;
+      // Step 4.5 — RN-09 round-3 + RN-14 + Round 6 RN-16 closure: exact UTF-8 byte estimate
+      // BEFORE canonical serialisation. Uses _estimateNodeUtf8Bytes() which runs captured
+      // _JSONStringify on the SAME per-node idPayload shape that Step 16 constructs, then captured
+      // _utf8len for actual UTF-8 width. Adds WRAPPER_FIXED_BYTES for the outer envelope
+      // (caseAssociation + nodes/edges/correlationGroups array brackets + 4 JSON keys), and +1
+      // per node for inter-node commas inside the "nodes":[...] array. Bails on the first node
+      // whose accumulated running total would exceed ENVELOPE_BYTE_CAP — Step 17 remains the
+      // authoritative post-canonical check.
+      var roughTotal = WRAPPER_FIXED_BYTES;
       for (var rb = 0; rb < sanitized.length; rb++) {
         try { roughTotal += _estimateNodeUtf8Bytes(sanitized[rb]); }
         catch (e) { /* defensive: ignore individual estimate errors */ }
+        if (rb > 0) roughTotal += 1; // inter-node comma
         if (roughTotal > ENVELOPE_BYTE_CAP) {
           return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'pre-canonicalization byte estimate exceeded ENVELOPE_BYTE_CAP=' + ENVELOPE_BYTE_CAP });
         }
