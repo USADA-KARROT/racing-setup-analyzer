@@ -407,14 +407,14 @@ function _wellFormedInput(caseRecord) {
   // outer IIFE; only `root.app = app;` is exposed to globalThis. The IIFE wrapper opens just before the
   // r3cC8Authority declaration and closes after the function app() block, with an explicit `root.app = app;`
   // exposure line that Alpine's x-data="app()" resolves through globalThis.
-  chk('renderer wraps r3cC8Authority + app() in outer IIFE', /;\(function \(root\) \{[\s\S]{0,200}'use strict';[\s\S]{0,3500}const r3cC8Authority = \(function/.test(html));
+  chk('renderer wraps r3cC8Authority + app() in outer IIFE', /;\(function \(root\) \{[\s\S]{0,200}'use strict';[\s\S]{0,6000}const r3cC8Authority = \(function/.test(html));
   // Codex C-B Round 3 Findings C8-CB-RN-15 / C8-CB-RN-16 closure — caseDataHolder is now inside the
   // IIFE (closure-private) and r3cC8SessionAuthority is a closure-private session WeakSet.
   chk('caseDataHolder is INSIDE the outer IIFE (closure-private)', /;\(function \(root\) \{[\s\S]{0,2000}const caseDataHolder = /.test(html));
   chk('renderer declares r3cC8SessionAuthority closure', /const r3cC8SessionAuthority = \(function \(\) \{/.test(html));
   chk('r3cC8SessionAuthority exposes register + isAuthentic only', /r3cC8SessionAuthority[\s\S]{0,400}register: function[\s\S]{0,400}isAuthentic: function/.test(html));
   chk('_r3cC8AuthoritativeSession requires r3cC8SessionAuthority.isAuthentic', /_r3cC8AuthoritativeSession\(\)\{[\s\S]{0,800}r3cC8SessionAuthority\.isAuthentic\(s\)/.test(html));
-  chk('loadDemoAnalysisCase registers demo.telemetrySession', /loadDemoAnalysisCase\(\)\{[\s\S]{0,2000}r3cC8SessionAuthority\.register\(demo\.telemetrySession\)/.test(html));
+  chk('loadDemoAnalysisCase registers demo.telemetrySession', /loadDemoAnalysisCase\(\)\{[\s\S]{0,4000}r3cC8SessionAuthority\.register\(demo\.telemetrySession\)/.test(html));
   chk('runImportedAnalysis registers session', /runImportedAnalysis\(\)\{[\s\S]{0,4000}r3cC8SessionAuthority\.register\(session\)/.test(html));
   // Codex C-B Round 3 Finding C8-CB-RN-15 closure — independent try/catch per field clear.
   chk('_r3cBeginCaseTransition clears each field in its own try/catch', /try \{ caseDataHolder\.lastSession = null; \} catch \(_\) \{\}[\s\S]{0,200}try \{ caseDataHolder\.lastSessionId = null; \} catch \(_\) \{\}/.test(html));
@@ -613,26 +613,102 @@ function _wellFormedInput(caseRecord) {
   inst.openCase.call(inst, 'fake_case_id');
   const tokAfter = inst._r3cC8OpenToken;
   chk('openCase bumps token SYNCHRONOUSLY before ensureStore', tokAfter === tokBefore + 1, { tokBefore, tokAfter });
-  chk('openCase clears authority synchronously even on ensureStore failure', inst._r3cC8LatestAuthorityRecord === null);
-  // (b) loadDemoAnalysisCase also bumps the token at entry
-  const tokBefore2 = inst._r3cC8OpenToken;
+  // (b) loadDemoAnalysisCase populates authority — proving the trusted path works
   inst.loadDemoAnalysisCase.call(inst);
-  const tokAfter2 = inst._r3cC8OpenToken;
-  chk('loadDemoAnalysisCase bumps token at synchronous entry', tokAfter2 >= tokBefore2 + 1, { tokBefore2, tokAfter2 });
-  // After successful loadDemo, the demo session IS registered + authoritative
   chk('loadDemoAnalysisCase populates authority for demo case', inst._r3cC8LatestAuthorityRecord && inst._r3cC8LatestAuthorityRecord.caseId === 'demo');
-  // (c) Forged session injection — inject via globalThis.app's closure access. We cannot reach the
-  // closure-private caseDataHolder directly, but we CAN demonstrate that a forged session that bears
-  // the same sessionId but is NOT registered fails the lap gate. We invoke the gate helper with an
-  // approach that doesn't require closure access: call inst._r3cC8AuthoritativeSession() and confirm
-  // the only way to get a non-null return is via the trusted register path. We then "inject" a forged
-  // session as a property of the legitimate session and ensure the gate still treats the legitimate
-  // one (already in WeakSet) — proving the gate's identity check, not just string match.
   const authSession = inst._r3cC8AuthoritativeSession();
   chk('authoritative-session gate accepts trusted demo session', authSession !== null && authSession.sessionId === 'demo_sess');
-  // Lap candidates come from the gated session and demo provides 2 laps
   const lapCandidates = inst.r3cC8LapCandidates();
   chk('lap candidates surface when session is trusted + sessionId matches', Array.isArray(lapCandidates) && lapCandidates.length === 2, lapCandidates);
+  // (c) Codex C-B Round 4 Finding C8-CB-RN-20 closure — NON-VACUOUS test that openCase clears
+  // PRE-EXISTING authority on ensureStore failure. We seeded authority via loadDemoAnalysisCase above;
+  // now openCase against a fake id MUST null _r3cC8LatestAuthorityRecord synchronously even though
+  // ensureStore throws (StorageBackend.IndexedDBBackend in this fixture throws no_storage_in_test).
+  chk('preflight: authority is non-null after loadDemo', inst._r3cC8LatestAuthorityRecord !== null);
+  const tokBefore3 = inst._r3cC8OpenToken;
+  inst.openCase.call(inst, 'another_fake_id');
+  chk('openCase clears pre-existing authority synchronously even on ensureStore failure', inst._r3cC8LatestAuthorityRecord === null);
+  chk('openCase bumps token even after ensureStore failure', inst._r3cC8OpenToken === tokBefore3 + 1);
+  chk('openCase clears lap candidates synchronously on storage failure', inst.r3cC8LapCandidates().length === 0);
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section 12 — Trusted demo-builder capture defends against same-realm replacement
+//   Codex C-B Round 4 Finding C8-CB-RN-19 closure
+// ─────────────────────────────────────────────────────────────────────────────
+// Verify that even if same-realm code replaces DemoAnalysisCase.buildDemoAnalysisCase AFTER the IIFE
+// captured the original reference, loadDemoAnalysisCase still uses the LEGITIMATE captured builder —
+// the attacker cannot mint authoritative case+session data via the demo path.
+(function () {
+  const vm = require('vm');
+  const html = fs.readFileSync(path.join(REPO, 'renderer', 'index.html'), 'utf8');
+  const scriptMatches = html.match(/<script>([\s\S]*?)<\/script>/g) || [];
+  const appBlock = scriptMatches.find(s => /function app\(/.test(s));
+  if (!appBlock) { chk('found app() script block (Section 12)', false); return; }
+  const code = appBlock.replace(/^<script>/, '').replace(/<\/script>$/, '');
+  const stubFn = function () { return null; };
+  // The LEGITIMATE demo builder — captured by the IIFE at parse time.
+  const legitDemoFactory = function () {
+    return {
+      analysisCase: { caseId: 'legit_demo', associations: { trackId: null, layoutId: null, telemetrySessionId: 'legit_sess' } },
+      telemetrySession: { sessionId: 'legit_sess', laps: [{ lapId: 'LEG1', lapTimeMs: 88000 }] },
+    };
+  };
+  // The FORGED demo builder — same-realm attacker replaces DemoAnalysisCase.buildDemoAnalysisCase
+  // AFTER the script loaded. If the renderer uses the live property, this forged data would be
+  // registered as authoritative. The capture-at-IIFE design prevents this.
+  const forgedDemoFactory = function () {
+    return {
+      analysisCase: { caseId: 'PWNED', associations: { trackId: 'EVIL', layoutId: 'EVIL', telemetrySessionId: 'evil_sess' } },
+      telemetrySession: { sessionId: 'evil_sess', laps: [{ lapId: 'X', lapTimeMs: 1 }] },
+    };
+  };
+  const realm = {
+    console, Date, Math, JSON, Array, Object, Number, String, Boolean, Symbol, Promise, WeakSet, WeakMap, Map, Set, RegExp, Error, isFinite,
+    setTimeout: function () { return 0; }, clearTimeout: function () {},
+    document: { addEventListener: stubFn, getElementById: stubFn, body: { __x: null }, documentElement: { lang: '' } },
+    window: {}, location: { hostname: '' },
+    Chart: function () { return { destroy: stubFn }; },
+    api: { getTires: function () { return []; }, getPresets: function () { return []; }, estimateTireSpring: stubFn, suggestRimSizes: function () { return []; }, compare: function () { return {}; } },
+    FeatureRegistry: { FEATURES: {}, NAV_NODES: {}, deriveMainNav: function () { return []; }, getFeature: stubFn, isFeatureReachable: stubFn, deriveCaseSubviewIds: function () { return []; }, deriveSetupLibraryPaneIds: function () { return []; } },
+    FeatureRouter: { navigateToFeature: stubFn, applyRoute: function (r, ns) { return Object.assign({}, ns); } },
+    StorageBackend: { IndexedDBBackend: function () { return {}; } },
+    CaseStore: { createCaseStore: function () { return { list: function () { return Promise.resolve([]); }, open: function () { return Promise.resolve({ ok: false }); } }; } },
+    SessionStore: { createSessionStore: function () { return { put: function () { return Promise.resolve({ ok: false }); } }; } },
+    CaseLibraryViewModel: { buildCaseLibraryView: function () { return {}; } },
+    AnalysisWorkspace: { runAnalysisWorkspace: function () { return {}; } },
+    AnalysisWorkspaceViewModel: { buildAnalysisWorkspaceViewModel: function () { return {}; } },
+    // Initially LEGITIMATE — the IIFE will capture this reference at parse-time.
+    DemoAnalysisCase: { buildDemoAnalysisCase: legitDemoFactory, buildDemoTelemetryCsv: function () { return ''; }, buildDemoCornerTelemetryCsv: function () { return ''; } },
+    R3_0C_ComparisonOrchestrator: { createOrchestrator: function () { return { requestComparison: stubFn, exportComparison: stubFn, currentToken: function () { return 0; } }; } },
+    R3_0C_ComparisonViewModel: { createComparisonViewModel: function () { return { setReference: stubFn, setComparison: stubFn, setAssociation: stubFn, setChannelMapping: stubFn, notifyCaseReopen: stubFn, notifyAuthorityRevoked: stubFn, notifyEligibilityRevoked: stubFn, getState: function () { return { placeholder: 'idle', metricAvailability: {} }; } }; } },
+    CanonicalTelemetrySession: { buildCanonicalSession: function () { return {}; } },
+    ChannelMapping: { buildChannelMapping: function () { return { suggestions: [], mappingEntries: [] }; }, projectionSignature: stubFn },
+    CalibrationRegistry: { CALIBRATION_TYPE: { STEERING_SIGN: 'ss', STEERING_ZERO: 'sz', STEERING_RATIO: 'sr' } },
+    Tier1BasicBalance: {},
+    requestAnimationFrame: function () { return 0; }, cancelAnimationFrame: stubFn,
+    ResizeObserver: function () { return { observe: stubFn, disconnect: stubFn }; },
+  };
+  realm.globalThis = realm;
+  const ctx = vm.createContext(realm);
+  let runOk = false;
+  try { vm.runInContext(code, ctx, { filename: 'renderer/index.html (sec12)', timeout: 5000 }); runOk = true; } catch (e) { chk('renderer script executes (Section 12)', false, String(e).slice(0, 200)); }
+  if (!runOk) return;
+  // ATTACKER REPLACES DemoAnalysisCase.buildDemoAnalysisCase AFTER IIFE init
+  realm.DemoAnalysisCase.buildDemoAnalysisCase = forgedDemoFactory;
+  // Verify the global IS now forged (control)
+  chk('control: forged builder installed on global', realm.DemoAnalysisCase.buildDemoAnalysisCase === forgedDemoFactory);
+  // Now call loadDemoAnalysisCase — the IIFE captured legitimate builder; forged should NOT execute
+  const inst = vm.runInContext('app()', ctx);
+  try { inst.init.call(inst); } catch (_) {}
+  inst.loadDemoAnalysisCase.call(inst);
+  const auth = inst._r3cC8LatestAuthorityRecord;
+  chk('demo-builder replacement attack defeated — authority is LEGITIMATE caseId', auth && auth.caseId === 'legit_demo', auth);
+  chk('demo-builder replacement attack defeated — forged caseId NOT registered', !auth || auth.caseId !== 'PWNED');
+  // Same for the session — the legitimate session should be registered, NOT the evil one
+  const sess = inst._r3cC8AuthoritativeSession();
+  chk('demo-builder replacement attack defeated — session is LEGITIMATE', sess && sess.sessionId === 'legit_sess');
+  chk('demo-builder replacement attack defeated — evil session NOT in lap candidates', !inst.r3cC8LapCandidates().some(l => l.lapId === 'X'));
 })();
 
 console.log('r3-0c-activation: ' + pass + ' passed, ' + fail + ' failed');

@@ -3323,6 +3323,18 @@ const telemetryDataHolder = { session: null, importToken: 0, ro: null, lastW: nu
 // telemetry CSV viewer's RAW arrays remain outside Alpine's reactive proxy by design.)
 const caseDataHolder = { lastCase: null, lastSession: null, lastSessionId: null, lastWindow: null, lastVmOpts: null, importedBundle: null, caseStore: null, sessionStore: null, sessionOpToken: 0, sessionPersistPromise: null, autosaveTimer: 0 };
 
+// R3.0C C8 Round 4 (Finding C8-CB-RN-19) — capture the DemoAnalysisCase builder at IIFE init time
+// and use the captured reference inside loadDemoAnalysisCase. Same-realm code that later replaces
+// `DemoAnalysisCase.buildDemoAnalysisCase` with a forged function CANNOT mint authoritative case +
+// session pairs via the demo load path: the captured reference still points at the original
+// builder. The capture happens during script parse before any other code can run; once captured the
+// reference is closure-private and unreachable from any caller in the same realm.
+const _trustedDemoBuilder = (function () {
+  if (typeof DemoAnalysisCase !== 'object' || DemoAnalysisCase === null) return null;
+  var fn = DemoAnalysisCase.buildDemoAnalysisCase;
+  return (typeof fn === 'function') ? fn : null;
+})();
+
 // R3.0C C8 Round 3 (Finding C8-CB-RN-16) — unforgeable session-identity registry. The lap-candidate
 // gate previously trusted any session whose sessionId string matched the authoritative record's
 // telemetrySessionId; attacker-supplied or cross-case sessions with the matching string would pass.
@@ -3600,8 +3612,15 @@ function app(){return{
     // so its in-flight comparison commit is dropped at the next stale-token check.
     this._r3cBeginCaseTransition();
     try {
-      if (typeof DemoAnalysisCase==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof AnalysisWorkspaceViewModel==='undefined'){ this.analysisError='modules_not_loaded'; this.analysisView=null; this._shellEvidence=null; return; }
-      const demo = DemoAnalysisCase.buildDemoAnalysisCase();
+      // R3.0C C8 Round 4 Finding C8-CB-RN-19 closure — use the IIFE-captured _trustedDemoBuilder
+      // reference, NOT the live DemoAnalysisCase.buildDemoAnalysisCase property. If same-realm code
+      // has replaced the global with a forged function, the captured reference still points to the
+      // original. AnalysisWorkspace + AnalysisWorkspaceViewModel are still read via globals because
+      // they are pure (no authority-conferring side effects); the threat model only applies to the
+      // demo case+session data that gets registered into the r3cC8Authority / r3cC8SessionAuthority
+      // closures.
+      if (typeof _trustedDemoBuilder !== 'function' || typeof AnalysisWorkspace==='undefined' || typeof AnalysisWorkspaceViewModel==='undefined'){ this.analysisError='modules_not_loaded'; this.analysisView=null; this._shellEvidence=null; return; }
+      const demo = _trustedDemoBuilder();
       const ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, demo.telemetrySession, demo.window, {}); // global Tier1BasicBalance as the model runner
       caseDataHolder.lastCase = demo.analysisCase; caseDataHolder.lastSession = demo.telemetrySession; caseDataHolder.lastWindow = demo.window; caseDataHolder.lastVmOpts = { suspensionNormalizationView: demo.suspensionNormalizationView }; this._persistSession(demo.telemetrySession);
       // R3.0C C8 Round 3 Finding C8-CB-RN-16 — register the trusted demo telemetry session in the

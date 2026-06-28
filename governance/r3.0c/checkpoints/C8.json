@@ -128,6 +128,17 @@
     "verdict": "PENDING",
     "rounds": [
       {
+        "round": 4,
+        "reviewedSha": "09345c40ad7df2d71e25a05f8e097921836ba9d5",
+        "verdict": "BLOCK",
+        "evidence": "governance/r3.0c/codex-checkpoint-evidence/C-B/round-4-09345c4.md",
+        "evidenceSha256": "072aa725adf0b36cebb60bfacf32b81fde174c08babbee04407a4253d1d1e4f0",
+        "findings": [
+          { "id": "C8-CB-RN-19", "title": "Mutable demo provider can mint both authoritative case and session identities", "triage": "ACCEPT", "fixCommit": "round-5", "fixSummary": "Capture _trustedDemoBuilder = DemoAnalysisCase.buildDemoAnalysisCase at IIFE init time; loadDemoAnalysisCase uses the captured reference, NOT the live global. Same-realm code that later replaces the global with a forged builder cannot mint authoritative case+session pairs. Browser runtime confirms: after attacker installs PWNED_CASE/evil_sess builder on the global, loadDemoAnalysisCase still registers the LEGITIMATE demo_case_001; the forged lap 'X' does NOT appear in lap candidates." },
+          { "id": "C8-CB-RN-20", "title": "Section 11 does not execute its claimed negative security cases", "triage": "ACCEPT", "fixCommit": "round-5", "fixSummary": "Section 11 rewritten: (a) call loadDemoAnalysisCase FIRST to seed authority; (b) preflight asserts authority is non-null; (c) openCase against fake id MUST null _r3cC8LatestAuthorityRecord synchronously even though ensureStore throws; (d) token bump verified even after ensureStore failure; (e) lap candidates verified to drop to zero. New Section 12 adds the demo-builder replacement attack runtime proof: install forged builder on global, call loadDemoAnalysisCase, assert authority is LEGITIMATE caseId and forged caseId/session NOT registered." }
+        ]
+      },
+      {
         "round": 3,
         "reviewedSha": "a768306ae59731bdbc57df88b0c615652c850150",
         "verdict": "BLOCK",
@@ -173,7 +184,7 @@
         ]
       }
     ],
-    "tierDisclosure": "Codex C-B (the final R3.0C phase gate). Tier 1 raw stdout persisted for all rounds at governance/r3.0c/codex-checkpoint-evidence/C-B/. Round 1: round-1-0caa8c8.md (sha256 3efd8de2ffd2414583479883270e69a4399b09ea2f9328cb6c465eece5f3c411). Round 2: round-2-49ab0d5.md (sha256 f02fe253a6c1cdc891456cbde853bbe5fc26d403c10e27b6b4d89978aee58f7e). Round 3: round-3-a768306.md (sha256 9bf71ec705b756960ca8ff2a7d44be54ef3ea03b04a194e07172c85803b2c6ff). Round 4 runs against the post-fix SHA; raw stdout to be persisted at round-4-<sha>.md."
+    "tierDisclosure": "Codex C-B (the final R3.0C phase gate). Tier 1 raw stdout persisted for all rounds at governance/r3.0c/codex-checkpoint-evidence/C-B/. Round 1: round-1-0caa8c8.md (sha256 3efd8de2ffd2414583479883270e69a4399b09ea2f9328cb6c465eece5f3c411). Round 2: round-2-49ab0d5.md (sha256 f02fe253a6c1cdc891456cbde853bbe5fc26d403c10e27b6b4d89978aee58f7e). Round 3: round-3-a768306.md (sha256 9bf71ec705b756960ca8ff2a7d44be54ef3ea03b04a194e07172c85803b2c6ff). Round 4: round-4-09345c4.md (sha256 072aa725adf0b36cebb60bfacf32b81fde174c08babbee04407a4253d1d1e4f0). Round 5 runs against the post-fix SHA; raw stdout to be persisted at round-5-<sha>.md."
   },
 
   "scopeBoundary": {
@@ -221,6 +232,7 @@
     "governance/r3.0c/codex-checkpoint-evidence/C-B/round-1-0caa8c8.md",
     "governance/r3.0c/codex-checkpoint-evidence/C-B/round-2-49ab0d5.md",
     "governance/r3.0c/codex-checkpoint-evidence/C-B/round-3-a768306.md",
+    "governance/r3.0c/codex-checkpoint-evidence/C-B/round-4-09345c4.md",
     "governance/r3.0/train.json",
     ".github/workflows/ci.yml",
     "package.json"
