@@ -106,6 +106,12 @@
    * invariant.
    */
   function computeDeltaMetrics(request) {
+    // Codex C7-R5-01 cascade closure: the C5 public boundary takes a caller-controlled `request`
+    // and reads request.identity / request.requestedMetrics / request.pairing / request.referenceLap
+    // / request.comparisonLap via plain property access. A hostile Proxy whose `get` trap throws
+    // would escape the boundary. Wrap the entire body in try/catch so any throw past the existing
+    // descriptor checks results in a structured blocked result.
+    try {
     var shape = DM.evaluateDeltaMetricsRequestShape(request);
     if (!shape.eligible) return _blocked(shape.reasonCodes.slice(), shape.detail);
 
@@ -180,6 +186,10 @@
     });
     _registerAuthentic(result);
     return result;
+    } catch (e) {
+      // Codex C7-R5-01 cascade closure: hostile-input throw → structured blocked.
+      return _blocked([CODES.INTERNAL_CONTRACT_VIOLATION], 'computeDeltaMetrics threw — fail-closed');
+    }
   }
 
   // C6 authenticity gate (formal Codex C6 finding F-C6-A1 round 1 + round 2): C6 export must

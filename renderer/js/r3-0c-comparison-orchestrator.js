@@ -185,7 +185,17 @@
      * Returns one of the response shapes documented at module top.
      */
     function requestComparison(input) {
-      var token = _nextToken();
+      // Codex C7-R5-01 cascade: the public requestComparison boundary is a sister-site of
+      // exportComparison. Caller-controlled `input` is read via plain property access for
+      // caseRecord / association / eligibilityInput / deltaMetricsRequest / framing — a
+      // hostile Proxy whose `get` trap throws would escape the boundary. Wrap the entire
+      // body in try/catch returning a structured blocked response so the public surface
+      // never throws on hostile input.
+      var token;
+      try {
+        token = _nextToken();
+      } catch (e) { return Object.freeze({ status: 'blocked', reasonCodes: Object.freeze([CODES.INTERNAL_CONTRACT_VIOLATION]), limitations: Object.freeze([]), framing: null, exportGate: false, detail: 'requestComparison token failed — fail-closed', generationToken: 0 }); }
+      try {
       if (!caps.framingSourceStructuredContractEnabled || !caps.viewmodelStateTransitionContractEnabled) {
         return _blockedResponse([CODES.INTERNAL_CONTRACT_VIOLATION], 'framing or viewmodel-state-transition capability disabled', null, token);
       }
@@ -256,6 +266,11 @@
         generationToken: token,
         limitations: Object.freeze(phaseMetricRequested ? [CODES.PHASE_BOUNDARY_CONTRACT_UNAUTHORISED] : []),
       });
+      } catch (e) {
+        // Codex C7-R5-01 cascade: any hostile-input throw past the descriptor checks results in
+        // a structured blocked outcome — no exception escapes requestComparison's public boundary.
+        return _blockedResponse([CODES.INTERNAL_CONTRACT_VIOLATION], 'requestComparison threw — fail-closed', null, token);
+      }
     }
 
     function _buildFraming(dmResult, phaseMetricRequested, callerFraming) {
