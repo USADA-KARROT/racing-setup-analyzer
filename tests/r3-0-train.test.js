@@ -77,13 +77,22 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
   chk('PASS all 4 phases summarized', r.artifact && r.artifact.phases && Object.keys(r.artifact.phases).length === 4);
 }
 
-// ── 2a. D current=D2 but R3.0C still at C0 → CROSS_PHASE_PREMATURE_ADVANCE ──
+// ── 2a. D current=D2 but R3.0C still at C7_UI (pre-C8) → CROSS_PHASE_PREMATURE_ADVANCE ──
+// Note: the real-repo governance is at C8_ACTIVATION after activation; the fixture must roll the
+// R3.0C copy back to a pre-C8 checkpoint to recreate the "D advancing before C8 reached" premise.
 {
   const dir = buildFixture();
+  const cs = readJson(path.join(dir, 'governance', 'r3.0c', 'state.json'));
+  cs.currentCheckpoint = 'C7_UI'; cs.featureRegistryActivationAllowed = false;
+  cs.enabledCapabilities = (cs.enabledCapabilities || []).filter(c => c !== 'feature_registry_active');
+  cs.authorizedProductionPaths = (cs.authorizedProductionPaths || []).filter(e => !(e && e.capability === 'feature_registry_active'));
+  writeJson(path.join(dir, 'governance', 'r3.0c', 'state.json'), cs);
   const ds = readJson(path.join(dir, 'governance', 'r3.0d', 'state.json'));
   ds.currentCheckpoint = 'D2_HYPOTHESIS_ENGINE'; ds.authorizedProductionPaths = []; ds.enabledCapabilities = [];
   writeJson(path.join(dir, 'governance', 'r3.0d', 'state.json'), ds);
   const ts = readJson(path.join(dir, 'governance', 'r3.0', 'train.json'));
+  ts.phaseStates['R3.0C'].currentCheckpoint = 'C7_UI'; ts.phaseStates['R3.0C'].finalActivationReached = false;
+  ts.currentPhaseCheckpoint = 'C7_UI';
   ts.phaseStates['R3.0D'].currentCheckpoint = 'D2_HYPOTHESIS_ENGINE';
   writeJson(path.join(dir, 'governance', 'r3.0', 'train.json'), ts);
   const r = runValidator(dir);

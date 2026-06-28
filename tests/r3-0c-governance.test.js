@@ -111,12 +111,12 @@ function writeFixture(opts) {
   const r = runValidator(null);
   chk('A1 real-repo validator exits 0', r.status === 0, r.stderr);
   chk('A2 real-repo ok===true', !!(r.artifact && r.artifact.ok === true), r.artifact && r.artifact.violations);
-  chk('A3 real-repo checkpoint=C7_UI', !!(r.artifact && r.artifact.currentCheckpoint === 'C7_UI'));
-  chk('A4 real-repo authPathCount=14 (C1..C6 + 4 C7 paths: orchestrator, viewmodel, i18n-comparisons, contracts-bundle)', !!(r.artifact && r.artifact.authorizedProductionPathCount === 14));
-  chk('A5 real-repo enabledCapCount=12 (C1..C6 capabilities + ui_present + 2 C7 governance capabilities)', !!(r.artifact && r.artifact.enabledCapabilityCount === 12));
+  chk('A3 real-repo checkpoint=C8_ACTIVATION', !!(r.artifact && r.artifact.currentCheckpoint === 'C8_ACTIVATION'));
+  chk('A4 real-repo authPathCount=15 (C1..C6 + 4 C7 paths + 1 C8 path: feature-registry.js)', !!(r.artifact && r.artifact.authorizedProductionPathCount === 15));
+  chk('A5 real-repo enabledCapCount=13 (C1..C6 + ui_present + 2 C7 governance caps + feature_registry_active)', !!(r.artifact && r.artifact.enabledCapabilityCount === 13));
   chk('A6 real-repo runtimeConsumers=true (C1 floor)', r.artifact && r.artifact.runtimeConsumersAllowed === true);
   chk('A7 real-repo uiAllowed=true (C7 reached)', r.artifact && r.artifact.uiAllowed === true);
-  chk('A8 real-repo featureActivationAllowed=false (C8 floor)', r.artifact && r.artifact.featureRegistryActivationAllowed === false);
+  chk('A8 real-repo featureActivationAllowed=true (C8 reached)', r.artifact && r.artifact.featureRegistryActivationAllowed === true);
   chk('A9 real-repo algorithmsAllowed=true (C2 is algorithmCheckpoint per schema)', r.artifact && r.artifact.algorithmsAllowed === true);
 })();
 

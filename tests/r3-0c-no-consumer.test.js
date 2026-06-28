@@ -85,9 +85,13 @@ function deferredOk() {
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-comparison-orchestrator.js')
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-comparison-viewmodel.js')
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/i18n-comparisons.js')));
-  chk('A3e real-repo currentCheckpoint===C7_UI', !!(r.artifact && r.artifact.currentCheckpoint === 'C7_UI'));
+  chk('A3e real-repo currentCheckpoint===C8_ACTIVATION', !!(r.artifact && r.artifact.currentCheckpoint === 'C8_ACTIVATION'));
   chk('A3f real-repo runtimeConsumersAllowed===true', !!(r.artifact && r.artifact.runtimeConsumersAllowed === true));
-  chk('A4 real-repo deferredStillDeferred===true', !!(r.artifact && r.artifact.deferredStillDeferred === true));
+  // R3.0C C8_ACTIVATION (state-aware): the deferredStillDeferred artifact flag now reports whether the
+  // governance-current R3.0C registry CONTRACT holds — which is the active contract once
+  // featureRegistryActivationAllowed=true, or the deferred contract while it is still false. Both
+  // surface true on the same flag for downstream artifact consumers.
+  chk('A4 real-repo R3.0C registry contract holds', !!(r.artifact && r.artifact.deferredStillDeferred === true));
 })();
 
 // ── B. fixture renderer/js file requires contracts/r3.0c ──

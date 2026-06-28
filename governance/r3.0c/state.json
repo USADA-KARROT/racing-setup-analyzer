@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "program": "R3.0C",
-  "currentCheckpoint": "C7_UI",
+  "currentCheckpoint": "C8_ACTIVATION",
   "authorizedProductionPaths": [
     { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
     { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
@@ -16,13 +16,14 @@
     { "path": "renderer/js/r3-0c-comparison-orchestrator.js", "capability": "ui_present" },
     { "path": "renderer/js/r3-0c-comparison-viewmodel.js", "capability": "ui_present" },
     { "path": "renderer/js/i18n-comparisons.js", "capability": "ui_present" },
-    { "path": "renderer/js/r3-0c-contracts-bundle.js", "capability": "ui_present" }
+    { "path": "renderer/js/r3-0c-contracts-bundle.js", "capability": "ui_present" },
+    { "path": "renderer/js/feature-registry.js", "capability": "feature_registry_active" }
   ],
-  "enabledCapabilities": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present", "comparison_export_present", "ui_present", "viewmodel_state_transition_contract", "framing_source_structured_contract"],
+  "enabledCapabilities": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present", "comparison_export_present", "ui_present", "viewmodel_state_transition_contract", "framing_source_structured_contract", "feature_registry_active"],
   "declaredButDisabledGovernanceCapabilities": ["phase_boundary_contract"],
   "runtimeConsumersAllowed": true,
   "uiAllowed": true,
-  "featureRegistryActivationAllowed": false,
+  "featureRegistryActivationAllowed": true,
   "algorithmsAllowed": true,
-  "note": "R3.0C C7_UI state. Adds the Comparison Workspace UI: three new authorized renderer/js paths (r3-0c-comparison-orchestrator.js, r3-0c-comparison-viewmodel.js, i18n-comparisons.js) all bound to the new ui_present capability. The orchestrator owns request-token issuance + framing emission (composes C5 delta-metrics + C6 export); the viewmodel is the pure state machine consuming orchestrator output, implementing the 7 transition triggers + stale-token drop per contracts/r3.0c/viewmodel-state-transition-contract.js. The framing-source contract (contracts/r3.0c/framing-i18n-key-registry.js) is enabled: every framing entry the orchestrator emits is validated against a closed allowlist of i18nKeys before reaching the viewmodel; the viewmodel re-validates as defense in depth. uiAllowed flips true: the Comparison Workspace pane replaces the deferred placeholder in renderer/index.html. featureRegistryActivationAllowed remains false: the three R3.0C feature IDs (case_comparison, reference_lap, corner_delta) remain availability='deferred' with NO rendererAdapter until C8 authorizes activation — C7 ships the UI surface without activating the routes. phase_boundary_contract remains the only declared-but-disabled governance capability: phase metrics (entry/mid/exit_delta) are reported metricAvailability:false in both viewmodel and export until a future checkpoint authorizes a deterministic phase-boundary contract."
+  "note": "R3.0C C8_ACTIVATION state. Adds the activation capability feature_registry_active: the three R3.0C feature IDs (case_comparison, reference_lap, corner_delta) flip from availability='deferred' to 'available' and attach rendererAdapter={paneId:'comparisons',focusTarget:null}; NAV_NODES.comparisons drops its deferredReason. Newly authorized production path: renderer/js/feature-registry.js (the renderer-side single source of truth that performs the activation). featureRegistryActivationAllowed flips true. The activation does NOT widen comparison scope: same-Analysis-Case / same-session-only / explicit reference selection (no auto-fastest / median / composite) / delta=comparison-reference all remain enforced by the orchestrator + viewmodel + contract layer that shipped at C1–C7. The renderer wires case-store open into the renderer-private WeakSet so the orchestrator's authenticityPredicate accepts case records minted by the storage boundary; imported_summary records are refused (fail-closed). phase_boundary_contract remains disabled — phase metrics (entry/mid/exit_delta) continue to be reported metricAvailability:false in viewmodel + export. No frozen R3.0B module is touched; no R3.0D scope is introduced; no preset / cars / physics constant changes."
 }

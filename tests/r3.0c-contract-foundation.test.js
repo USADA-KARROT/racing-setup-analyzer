@@ -510,8 +510,21 @@ contractFiles.forEach(f => {
   ALGO_TOKENS.forEach(t => chk('no algorithm token "' + t + '" in code of ' + f, code.indexOf(t) === -1));
 });
 
-// ── P. the three R3.0C feature ids remain deferred with no renderer adapter (CP1 enables no UI) ──
-['case_comparison', 'reference_lap', 'corner_delta'].forEach(id => { const fdef = Registry.FEATURES[id]; chk('feature ' + id + ' still deferred, no adapter', !!fdef && fdef.availability === 'deferred' && fdef.deferredReason === 'R3.0C' && !fdef.rendererAdapter); });
+// ── P. the three R3.0C feature ids stay in their governance-declared shape.
+//      CP1 ships no UI: at that time the IDs were deferred with no rendererAdapter. C8_ACTIVATION
+//      flips them to availability='available' with rendererAdapter.paneId='comparisons' once
+//      governance/r3.0c/state.json.featureRegistryActivationAllowed=true. This assertion now reads
+//      state.json (fail-closed default = deferred) so the CP1 contract continues to hold pre-C8
+//      while the C8 activation can land without falsely tripping a CP1 invariant.
+const _r30cActAllowed = (function () { try { return JSON.parse(fs.readFileSync(path.join(REPO, 'governance', 'r3.0c', 'state.json'), 'utf8')).featureRegistryActivationAllowed === true; } catch (_) { return false; } })();
+['case_comparison', 'reference_lap', 'corner_delta'].forEach(id => {
+  const fdef = Registry.FEATURES[id];
+  if (_r30cActAllowed) {
+    chk('feature ' + id + ' activated (C8): available + rendererAdapter→comparisons', !!fdef && fdef.availability === 'available' && !!fdef.rendererAdapter && fdef.rendererAdapter.paneId === 'comparisons' && fdef.deferredReason === undefined);
+  } else {
+    chk('feature ' + id + ' still deferred, no adapter', !!fdef && fdef.availability === 'deferred' && fdef.deferredReason === 'R3.0C' && !fdef.rendererAdapter);
+  }
+});
 
 // ── N/O. the R3.0C scope guard + frozen boundary still pass with this change present ──
 function runScript(rel, artifactName) {

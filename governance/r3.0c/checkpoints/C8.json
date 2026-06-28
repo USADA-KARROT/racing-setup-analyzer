@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0C",
+  "checkpoint": "C8_ACTIVATION",
+  "baseSha": "2acf089e8b34abcac20fde8bd8450678b57a49be",
+  "headSha": null,
+  "previousCheckpoint": "C7_UI",
+
+  "shaSeparation": {
+    "note": "Per SKYLINE 2026-06-28 Continuous Delivery Master Directive §22 the C8 manifest preserves the three-way SHA separation. reviewedCandidateSha is the exact SHA Codex C-B was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD. Substituting one for another is a tier violation.",
+    "reviewedCandidateSha": null,
+    "reviewedCandidateNote": "Filled by a follow-up evidence-anchoring commit after Codex C-B issues PASS against the exact candidate SHA on feat/r3.0c-c8-activation.",
+    "manifestCommitSha": null,
+    "manifestCommitNote": "Filled by the same follow-up evidence-anchoring commit; mirrors C5R / C6 / C7 convention.",
+    "integrationSha": null,
+    "integrationNote": "Filled only after the C8 branch-to-branch PR merges into feat/r3.0-integrated-delivery AND the Train target-context trusted-verification PASSes at that integration HEAD."
+  },
+
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
+    { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-track-identity.js", "capability": "track_identity_authoritative" },
+    { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-normalized-distance.js", "capability": "normalized_distance_present" },
+    { "path": "renderer/js/r3-0c-reference-selection.js", "capability": "reference_selection_present" },
+    { "path": "renderer/js/r3-0c-corner-segmentation.js", "capability": "corner_segmentation_present" },
+    { "path": "renderer/js/r3-0c-corner-pairing.js", "capability": "corner_pairing_present" },
+    { "path": "renderer/js/r3-0c-delta-metrics.js", "capability": "delta_metrics_present" },
+    { "path": "renderer/js/r3-0c-comparison-export.js", "capability": "comparison_export_present" },
+    { "path": "renderer/js/r3-0c-comparison-orchestrator.js", "capability": "ui_present" },
+    { "path": "renderer/js/r3-0c-comparison-viewmodel.js", "capability": "ui_present" },
+    { "path": "renderer/js/i18n-comparisons.js", "capability": "ui_present" },
+    { "path": "renderer/js/r3-0c-contracts-bundle.js", "capability": "ui_present" },
+    { "path": "renderer/js/feature-registry.js", "capability": "feature_registry_active" }
+  ],
+
+  "newlyAuthorizedPath": "renderer/js/feature-registry.js",
+  "newlyEnabledCapability": "feature_registry_active",
+
+  "enabledCapabilitiesBefore": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present", "comparison_export_present", "ui_present", "viewmodel_state_transition_contract", "framing_source_structured_contract"],
+  "enabledCapabilitiesAfter": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present", "comparison_export_present", "ui_present", "viewmodel_state_transition_contract", "framing_source_structured_contract", "feature_registry_active"],
+  "forbiddenCapabilities": [],
+
+  "activationContract": {
+    "featureRegistryActivationAllowed": true,
+    "finalActivationReached": true,
+    "activatedFeatureIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "activatedFeatureShape": {
+      "availability": "available",
+      "rendererAdapter": { "paneId": "comparisons", "focusTarget": null },
+      "deferredReason": "absent"
+    },
+    "navNodeComparisonsAvailability": "available",
+    "comparisonScope": {
+      "sameAnalysisCaseOnly": true,
+      "sameSessionOnly": true,
+      "crossSessionForbidden": true,
+      "crossCaseForbidden": true,
+      "explicitReferenceSelectionOnly": true,
+      "autoFastestForbidden": true,
+      "medianForbidden": true,
+      "bestSectorCompositeForbidden": true
+    },
+    "deltaSignFormula": "comparison_minus_reference",
+    "authorityFlow": {
+      "boundary": "renderer/index.html app().openCase + loadDemoAnalysisCase",
+      "canonicalRecord": "app()._r3cC8BuildAuthoritativeRecord(caseId, associations) returns frozen { caseId, associations } with string-only field normalization",
+      "weakSet": "app()._r3cC7AuthenticCaseRecords (renderer-private; populated only by case-store-open boundary and demo-case boundary)",
+      "predicate": "createOrchestrator({authenticityPredicate}) closure over the WeakSet; the WeakSet is NOT exposed on orchestrator or viewmodel public APIs",
+      "rejectImportedSummary": "RegisterAuthoritativeFromCaseStore short-circuits when o.degraded === true — imported_summary records are never authoritative",
+      "failClosedDefault": "When the WeakSet is empty or the candidate caseRecord prototype is not Object.prototype, the predicate returns false → requestComparison emits INTERNAL_CONTRACT_VIOLATION"
+    },
+    "phaseBoundaryContractEnabled": false,
+    "phaseMetricStatus": "entry_delta / mid_delta / exit_delta REMAIN metricAvailability:false in viewmodel + export (phase_boundary_contract still disabled; UI displays the structurally-unavailable card)"
+  },
+
+  "stateAwareGuardMigration": {
+    "note": "Four pre-C8 hardcoded deferred-invariant guards converted to state-aware checks that read governance/r3.0c/state.json.featureRegistryActivationAllowed:",
+    "scripts/check-feature-registry.js": "deferredIntact → r30cContractIntact (active shape when flag true; deferred shape when flag false; legacy keys kept for downstream artifact consumers)",
+    "scripts/check-r3-0c-guard.js": "deferredStillDeferred + activatedShapeIntact (both must hold against the current state)",
+    "scripts/check-r3-0c-no-consumer.js": "checkFeatureRegistryStillDeferred → checkFeatureRegistryContract (state-aware branch); index.html R3.0C feature-name script ban now gated by state.uiAllowed (already true since C7)",
+    "tests/feature-registry.test.js": "C0–C7 deferred assertions kept; C8+ active assertions added behind ACTIVATION_ALLOWED branch read from state.json (fail-closed default = deferred)",
+    "tests/feature-router.test.js": "case_comparison route assertion split into deferred (C0–C7) / active (C8+) branches",
+    "failClosedReadingPolicy": "Every state-aware check reads governance/r3.0c/state.json via fs.readFileSync inside try/catch; any IO / JSON failure leaves activation=false so the deferred expectation continues to hold (a malicious state.json deletion CANNOT relax the deferred contract while it is still in force)."
+  },
+
+  "rendererWiring": {
+    "newAppHelpers": [
+      "_r3cC8LatestAuthorityRecord",
+      "_r3cC8BuildAuthoritativeRecord(caseId, associations)",
+      "_r3cC8RegisterAuthoritativeFromCaseStore(o)",
+      "_r3cC8RegisterAuthoritativeFromDemoCase(demoCase)"
+    ],
+    "openCaseHook": "renderer/index.html app().openCase() — after successful caseStore.open, calls _r3cC8RegisterAuthoritativeFromCaseStore(o). The helper SHORT-CIRCUITS on o.degraded === true (imported_summary) so an imported case cannot become an authoritative comparison case.",
+    "loadDemoAnalysisCaseHook": "renderer/index.html app().loadDemoAnalysisCase() — calls _r3cC8RegisterAuthoritativeFromDemoCase(demo.analysisCase) so the demo case is comparison-authoritative without a case-store round trip.",
+    "noPublicRegistrationApi": "Neither _r3cC8RegisterAuthoritativeFromCaseStore nor _r3cC8RegisterAuthoritativeFromDemoCase is called from any UI handler / event / template — they are renderer-internal boundaries reachable only through case-store-open or demo-case-build. The WeakSet remains caller-inaccessible; the orchestrator's authenticityPredicate is the only reader."
+  },
+
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3-0c-activation.test.js",
+    "newSuiteAssertions": null,
+    "stateAwareSuites": ["tests/feature-registry.test.js", "tests/feature-router.test.js"],
+    "evidenceTier": "TIER 3 — Claude-verified on C8 branch HEAD; CI re-run on integrationSha is the authority for the Train target context. Browser runtime verification at the HTTP-served renderer/ layer additionally confirmed: comparisons mainNav entry is no longer deferred; navigateToFeature('case_comparison') resolves to shellSection='comparisons' / currentTab='comparisons' with deferred=false; the Comparison Workspace pane is reachable via the comparisons section; loadDemoAnalysisCase + openCase both populate _r3cC8LatestAuthorityRecord and add the canonical record to the renderer-private WeakSet."
+  },
+
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+
+  "codexVerdict": {
+    "verdict": "PENDING",
+    "rounds": [],
+    "tierDisclosure": "Codex C-B (the final R3.0C phase gate) will be invoked against the C8 branch candidate SHA. Tier 1 raw stdout MUST be captured and persisted under governance/r3.0c/codex-checkpoint-evidence/C-B/round-N-<sha>.md for every round (BLOCK and PASS)."
+  },
+
+  "scopeBoundary": {
+    "frozenFilesUntouched": true,
+    "r30bPersistenceUntouched": true,
+    "featureRegistryUnchangedExceptR3_0C_ActivationSurface": true,
+    "deferredFeatureIdsActivated": ["case_comparison", "reference_lap", "corner_delta"],
+    "phaseBoundaryContractEnabled": false,
+    "r3_0d_scope_introduced": false
+  },
+
+  "frozenDiff": 0,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedAvailableIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "expectedRendererAdapter": true,
+    "expectedRendererAdapterPaneId": "comparisons"
+  },
+
+  "packageVersion": "1.4.0",
+  "createdAt": "2026-06-28T00:00:00Z",
+  "status": "candidate",
+  "governanceChanged": true,
+  "changedFiles": [
+    "renderer/js/feature-registry.js",
+    "renderer/index.html",
+    "scripts/check-feature-registry.js",
+    "scripts/check-r3-0c-guard.js",
+    "scripts/check-r3-0c-no-consumer.js",
+    "tests/feature-registry.test.js",
+    "tests/feature-router.test.js",
+    "tests/r3-0c-activation.test.js",
+    "governance/r3.0c/state.json",
+    "governance/r3.0c/capabilities.json",
+    "governance/r3.0c/checkpoints/C8.json",
+    "governance/r3.0/train.json",
+    "package.json"
+  ],
+
+  "note": "C8_ACTIVATION — the final R3.0C checkpoint. Adds ONE production capability (feature_registry_active) backed by the existing renderer/js/feature-registry.js (now a newly-authorized R3.0C production path). The three R3.0C feature IDs (case_comparison / reference_lap / corner_delta) flip from availability='deferred' (no rendererAdapter) to availability='available' with rendererAdapter={paneId:'comparisons',focusTarget:null}; NAV_NODES.comparisons drops its deferredReason. The orchestrator's authenticityPredicate now has a real authority source: app().openCase + loadDemoAnalysisCase build a canonical frozen { caseId, associations } record and register it with the renderer-private WeakSet — imported_summary case-store records (o.degraded=true) are REFUSED inside the helper so an imported case cannot become an authoritative comparison case. Comparison scope (same-Analysis-Case / same-session-only / explicit reference selection / delta=comparison-reference) and phase-metric disability (phase_boundary_contract.enabled=false) are unchanged from C7. Four pre-C8 hardcoded deferred-invariant guards are converted to state-aware checks that read featureRegistryActivationAllowed (fail-closed default = deferred). C8 introduces no frozen R3.0B module change, no preset / car / physics constant change, and no R3.0D scope. C-B Codex review runs against the exact C8 candidate SHA; tier-1 raw stdout to be persisted under governance/r3.0c/codex-checkpoint-evidence/C-B/."
+}

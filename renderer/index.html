@@ -3314,6 +3314,57 @@ function app(){return{
     if (caseRecord === null || typeof caseRecord !== 'object') return false;
     try { this._r3cC7AuthenticCaseRecords.add(caseRecord); return true; } catch (e) { return false; }
   },
+  // R3.0C C8_ACTIVATION — renderer-private latest-authority cache. The case-store-open / demo-case
+  // boundaries below build a CANONICAL plain authoritative record (caseId + associations only — never
+  // analysisResults / shellEvidence / telemetry) and register it with the WeakSet AND keep the same
+  // reference here so a future setAssociation call passes through orchestrator.authenticityPredicate.
+  // Reassignment overwrites the previous reference; the WeakSet still holds it until JS GC reclaims it.
+  // imported_summary case-store records (degraded=true) are NEVER registered — fail-closed activation.
+  _r3cC8LatestAuthorityRecord: null,
+  _r3cC8BuildAuthoritativeRecord(caseId, associations){
+    // Build a plain-prototype object containing ONLY the fields the comparison-eligibility contract
+    // reads on caseRecord (caseId, associations.{trackId,layoutId,positionBasis,positionDirection,
+    // telemetrySessionId, vehicleProfileId}). String fields are normalized to typeof==='string' or
+    // null — preventing a hostile case-store row whose associations.trackId is a getter from
+    // escaping through this boundary. The returned object is FROZEN so a later caller cannot mutate
+    // it after WeakSet registration.
+    if (typeof caseId !== 'string' || caseId.length === 0) return null;
+    var a = (associations && typeof associations === 'object' && !Array.isArray(associations)) ? associations : {};
+    function s(v){ return typeof v === 'string' && v.length > 0 ? v : null; }
+    var rec = { caseId: caseId, associations: Object.freeze({
+      trackId: s(a.trackId),
+      layoutId: s(a.layoutId),
+      positionBasis: s(a.positionBasis),
+      positionDirection: s(a.positionDirection),
+      telemetrySessionId: s(a.telemetrySessionId),
+      vehicleProfileId: s(a.vehicleProfileId),
+    }) };
+    return Object.freeze(rec);
+  },
+  _r3cC8RegisterAuthoritativeFromCaseStore(o){
+    // Called only from openCase() after caseStore.open succeeds AND o.degraded is false. Fail-closed
+    // on any structural anomaly (missing assoc / non-string caseId / WeakSet absent).
+    if (!this._r3cC7AuthenticCaseRecords || typeof this._r3cC7RegisterAuthenticCaseRecord !== 'function') return null;
+    if (!o || o.ok !== true || o.degraded === true) return null;
+    var rec = this._r3cC8BuildAuthoritativeRecord(o.caseId, o.associations);
+    if (!rec) return null;
+    if (!this._r3cC7RegisterAuthenticCaseRecord(rec)) return null;
+    this._r3cC8LatestAuthorityRecord = rec;
+    return rec;
+  },
+  _r3cC8RegisterAuthoritativeFromDemoCase(demoCase){
+    // The demo case is built in-process by DemoAnalysisCase.buildDemoAnalysisCase(); since the demo
+    // bypasses the case-store open boundary entirely we treat the call site itself (loadDemoAnalysisCase)
+    // as authoritative — the helper accepts the demo record but rebuilds it through the same canonical
+    // BuildAuthoritativeRecord normalizer so no demo-side hostile getter / prototype trick can escape.
+    if (!this._r3cC7AuthenticCaseRecords || typeof this._r3cC7RegisterAuthenticCaseRecord !== 'function') return null;
+    if (!demoCase || typeof demoCase !== 'object') return null;
+    var rec = this._r3cC8BuildAuthoritativeRecord(demoCase.caseId, demoCase.associations);
+    if (!rec) return null;
+    if (!this._r3cC7RegisterAuthenticCaseRecord(rec)) return null;
+    this._r3cC8LatestAuthorityRecord = rec;
+    return rec;
+  },
   comparisonVMState(){
     if (this._r3cC7InitFailure) {
       // Structured unavailable state — distinct from placeholder.idle. Export gated off; no
@@ -3334,6 +3385,8 @@ function app(){return{
       caseDataHolder.lastCase = demo.analysisCase; caseDataHolder.lastSession = demo.telemetrySession; caseDataHolder.lastWindow = demo.window; caseDataHolder.lastVmOpts = { suspensionNormalizationView: demo.suspensionNormalizationView }; this._persistSession(demo.telemetrySession);
       this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, { suspensionNormalizationView: demo.suspensionNormalizationView }); this._shellEvidence=this._mkShellEvidence(ws,'demo_case');
       this.analysisError = null;
+      // R3.0C C8_ACTIVATION — make this demo case authoritative for comparison.
+      try { this._r3cC8RegisterAuthoritativeFromDemoCase(demo.analysisCase); } catch(_) {}
     } catch(e){ this.analysisError = String((e&&e.message)||e); this.analysisView=null; this._shellEvidence=null; }
   },
   // R2.3 import workflow — UI calls services only; no physics recompute, no UI-side capability derivation
@@ -3802,7 +3855,12 @@ function app(){return{
   saveCurrentCase(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='cannot_overwrite_imported'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.save(self._saveInput(false)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.storageError=null; self.refreshLibrary(); } else { self.storageError=r.code; } }); },
   autosaveCurrentCase(){ var self=this; if(!this.autosaveEnabled || !this.currentCaseId || this.importedSummaryOpen || !this.analysisView || !caseDataHolder.caseStore) return; try{ if(caseDataHolder.autosaveTimer) clearTimeout(caseDataHolder.autosaveTimer); caseDataHolder.autosaveTimer=setTimeout(function(){ caseDataHolder.autosaveTimer=0; if(self.autosaveEnabled && self.currentCaseId && !self.importedSummaryOpen && self.analysisView) self.saveCurrentCase(); }, 1500); }catch(e){} },
   saveCurrentCaseAsNew(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='cannot_promote_imported'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.create(self._saveInput(true)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.refreshLibrary(); } else self.storageError=r.code; }); },
-  openCase(id){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.open(id).then(function(o){ if(!o.ok){ self.storageError=o.code; return; } self.analysisView=o.analysisResults; self._shellEvidence={ capability:(o.shellEvidence&&o.shellEvidence.capability)||{}, observation:(o.shellEvidence&&o.shellEvidence.observation)||{blockedReasons:[]}, source:(o.shellEvidence&&o.shellEvidence.source)||null }; self.currentCaseId=id; self.importedSummaryOpen=!!o.degraded; ++caseDataHolder.sessionOpToken; caseDataHolder.lastSessionId=(o.associations&&o.associations.telemetrySessionId)||null; caseDataHolder.sessionPersistPromise=Promise.resolve(); self.caseSubview='overview'; self.shellSection='cases'; self.currentTab='analysis'; }); },
+  openCase(id){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.open(id).then(function(o){ if(!o.ok){ self.storageError=o.code; return; } self.analysisView=o.analysisResults; self._shellEvidence={ capability:(o.shellEvidence&&o.shellEvidence.capability)||{}, observation:(o.shellEvidence&&o.shellEvidence.observation)||{blockedReasons:[]}, source:(o.shellEvidence&&o.shellEvidence.source)||null }; self.currentCaseId=id; self.importedSummaryOpen=!!o.degraded; ++caseDataHolder.sessionOpToken; caseDataHolder.lastSessionId=(o.associations&&o.associations.telemetrySessionId)||null; caseDataHolder.sessionPersistPromise=Promise.resolve();
+    // R3.0C C8_ACTIVATION — register the case-store-open record as authoritative for comparison.
+    // imported_summary (o.degraded=true) is REFUSED inside the helper — that case-store record can
+    // never be promoted to an authoritative comparison case via this open boundary.
+    try { self._r3cC8RegisterAuthoritativeFromCaseStore(o); } catch(_) {}
+    self.caseSubview='overview'; self.shellSection='cases'; self.currentTab='analysis'; }); },
   duplicateCase(id){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.duplicate(id).then(function(r){ if(r.ok) self.refreshLibrary(); else self.storageError=r.code; }); },
   archiveCase(id,arch){ var self=this; if(!this.ensureStore()) return; (arch?caseDataHolder.caseStore.archive(id):caseDataHolder.caseStore.unarchive(id)).then(function(){ self.refreshLibrary(); }); },
   deleteCase(id){ var self=this; if(!this.ensureStore()) return; if(typeof confirm==='function' && !confirm(this.t('ui.case.deleteConfirm'))) return; caseDataHolder.caseStore.remove(id,{confirm:true}).then(function(r){ if(r.ok){ if(self.currentCaseId===id) self.currentCaseId=null; self.refreshLibrary(); } else self.storageError=r.code; }); },
