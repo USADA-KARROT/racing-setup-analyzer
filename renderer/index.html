@@ -3300,10 +3300,6 @@ const COLORS=['#38bdf8','#f472b6','#34d399','#facc15','#a78bfa','#fb923c','#22d3
 const telemetryDataHolder = { session: null, importToken: 0, ro: null, lastW: null,
   layout: null, timeValues: null, timeIndex: null, laneReaders: null, cursorTime: null, selection: null,
   dragging: false, dragStartPx: null, dragCurrPx: null, pointerInside: false, raf: 0 };
-// R3.0B: analysis working state incl. RAW telemetry (session/imported bundle) lives HERE, OUTSIDE Alpine's
-// reactive proxy — Alpine holds only ids + small summaries. (No raw sample arrays in the reactive tree.)
-const caseDataHolder = { lastCase: null, lastSession: null, lastSessionId: null, lastWindow: null, lastVmOpts: null, importedBundle: null, caseStore: null, sessionStore: null, sessionOpToken: 0, sessionPersistPromise: null, autosaveTimer: 0 };
-
 // R3.0C C8_ACTIVATION + Codex C-B Round 2 hardening (Finding C8-CB-RN-09) — wrap `r3cC8Authority` AND
 // `function app()` in a closure-private outer IIFE so neither r3cC8Authority nor app() leak to the
 // realm's lexical environment. The ONLY thing this IIFE exposes is `root.app = app` for Alpine's
@@ -3314,6 +3310,41 @@ const caseDataHolder = { lastCase: null, lastSession: null, lastSessionId: null,
 // environment — Finding C8-CB-RN-09. Wrapping the whole script-section closes that escape.)
 ;(function (root) {
   'use strict';
+
+// R3.0B + Round 3 (Findings C8-CB-RN-15 / 16) — analysis working state INCLUDING RAW telemetry was
+// originally at script top-level as `const caseDataHolder`. Round 2 closed lexical access to
+// r3cC8Authority but left caseDataHolder at script top-level; Round 3 found that same-realm code
+// could redefine caseDataHolder.lastSession's setter to throw (breaking _r3cBeginCaseTransition's
+// invariants) AND directly assign caseDataHolder.lastSession to a forged session whose sessionId
+// matched the authoritative record, bypassing the lap gate by string equality alone. Moving
+// caseDataHolder INSIDE the IIFE makes it closure-private — neither setters nor the binding name
+// itself are reachable from any other script, eval, or developer-tools expression in the same
+// realm. (telemetryDataHolder stays at script top-level — it carries no authority and the
+// telemetry CSV viewer's RAW arrays remain outside Alpine's reactive proxy by design.)
+const caseDataHolder = { lastCase: null, lastSession: null, lastSessionId: null, lastWindow: null, lastVmOpts: null, importedBundle: null, caseStore: null, sessionStore: null, sessionOpToken: 0, sessionPersistPromise: null, autosaveTimer: 0 };
+
+// R3.0C C8 Round 3 (Finding C8-CB-RN-16) — unforgeable session-identity registry. The lap-candidate
+// gate previously trusted any session whose sessionId string matched the authoritative record's
+// telemetrySessionId; attacker-supplied or cross-case sessions with the matching string would pass.
+// r3cC8SessionAuthority is a closure-private WeakSet that the trusted load paths (loadDemoAnalysisCase
+// + runImportedAnalysis + any future session-store load) populate at session-load time. The lap-
+// candidate gate now ALSO requires r3cC8SessionAuthority.isAuthentic(loadedSession) — defense-in-depth
+// on top of the sessionId match. Forged sessions (not in the WeakSet) fail closed.
+const r3cC8SessionAuthority = (function () {
+  var _weak = (typeof WeakSet === 'function') ? new WeakSet() : null;
+  return {
+    register: function (session) {
+      if (!_weak) return false;
+      if (session === null || typeof session !== 'object') return false;
+      try { _weak.add(session); return true; } catch (e) { return false; }
+    },
+    isAuthentic: function (session) {
+      if (!_weak) return false;
+      if (session === null || typeof session !== 'object') return false;
+      try { return _weak.has(session); } catch (e) { return false; }
+    },
+  };
+})();
 
 // R3.0C C8_ACTIVATION + Codex C-B Round 1 hardening (findings C8-CB-RN-01 / 02 / 05) — renderer-private
 // authority controller. The WeakSet and the only registration entry points live in THIS IIFE-scope closure
@@ -3411,11 +3442,16 @@ function app(){return{
   // Returns the new token value so the caller can capture it before await and test `tok !== current`
   // at the promise commit point.
   _r3cBeginCaseTransition(){
+    // R3.0C C8 + Codex C-B Round 3 Finding C8-CB-RN-15 — each invariant is cleared in its own
+    // try/catch so a hostile setter throw on one field cannot prevent the others from being cleared.
+    // (caseDataHolder is now IIFE-private per Finding C8-CB-RN-16, so this is defense-in-depth: same-
+    // realm code cannot reach the binding to install a hostile setter in the first place.)
     var tok = ++this._r3cC8OpenToken;
     this._r3cC8LatestAuthorityRecord = null;
-    try { caseDataHolder.lastSession = null; caseDataHolder.lastSessionId = null; } catch(_) {}
+    try { caseDataHolder.lastSession = null; } catch (_) {}
+    try { caseDataHolder.lastSessionId = null; } catch (_) {}
     if (this._r3cC7VM && typeof this._r3cC7VM.notifyCaseReopen === 'function') {
-      try { this._r3cC7VM.notifyCaseReopen(); } catch(_) {}
+      try { this._r3cC7VM.notifyCaseReopen(); } catch (_) {}
     }
     return tok;
   },
@@ -3478,6 +3514,12 @@ function app(){return{
     if (!sid) return null;
     var s = caseDataHolder.lastSession;
     if (!s || typeof s !== 'object') return null;
+    // R3.0C C8 Codex C-B Round 3 Finding C8-CB-RN-16 — unforgeable session-identity gate.
+    // String sessionId equality alone is forgeable (an attacker who can write caseDataHolder.lastSession
+    // could supply a forged session whose sessionId matches the authoritative record). The session MUST
+    // also be a member of r3cC8SessionAuthority's closure-private WeakSet — only the trusted load paths
+    // (loadDemoAnalysisCase / runImportedAnalysis / future session-store load) register sessions into it.
+    if (!r3cC8SessionAuthority.isAuthentic(s)) return null;
     // The session can identify itself via sessionId or via the persisted lastSessionId pairing.
     var loadedId = (typeof s.sessionId === 'string' && s.sessionId.length > 0) ? s.sessionId : caseDataHolder.lastSessionId;
     if (loadedId !== sid) return null;
@@ -3562,6 +3604,10 @@ function app(){return{
       const demo = DemoAnalysisCase.buildDemoAnalysisCase();
       const ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, demo.telemetrySession, demo.window, {}); // global Tier1BasicBalance as the model runner
       caseDataHolder.lastCase = demo.analysisCase; caseDataHolder.lastSession = demo.telemetrySession; caseDataHolder.lastWindow = demo.window; caseDataHolder.lastVmOpts = { suspensionNormalizationView: demo.suspensionNormalizationView }; this._persistSession(demo.telemetrySession);
+      // R3.0C C8 Round 3 Finding C8-CB-RN-16 — register the trusted demo telemetry session in the
+      // closure-private session WeakSet so r3cC8AuthoritativeSession()'s unforgeable-identity gate
+      // recognises it. Forged sessions with matching string sessionId will not be accepted.
+      try { r3cC8SessionAuthority.register(demo.telemetrySession); } catch (_) {}
       this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, { suspensionNormalizationView: demo.suspensionNormalizationView }); this._shellEvidence=this._mkShellEvidence(ws,'demo_case');
       this.analysisError = null;
       // R3.0C C8_ACTIVATION + Codex C-B Findings C8-CB-RN-01 / 06 — register via the renderer-private
@@ -3645,6 +3691,13 @@ function app(){return{
       var demo = DemoAnalysisCase.buildDemoAnalysisCase(); // vehicle/setup binding; imported telemetry session
       var ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, session, null, {});
       caseDataHolder.lastCase = demo.analysisCase; caseDataHolder.lastSession = session; caseDataHolder.lastWindow = null; caseDataHolder.lastVmOpts = {}; this._persistSession(session);
+      // R3.0C C8 Round 3 Finding C8-CB-RN-16 — register the trusted imported telemetry session in
+      // the closure-private session WeakSet so the lap-candidate gate's unforgeable identity check
+      // recognises it. (The CSV import path still does NOT register an authoritative case via
+      // r3cC8Authority — no case-store boundary — so the workspace stays idle/selecting; this only
+      // makes the session itself trusted, future product steps can pair it with an authoritative
+      // case at which point the lap-candidate gate accepts both halves.)
+      try { r3cC8SessionAuthority.register(session); } catch (_) {}
       this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, {}); this._shellEvidence=this._mkShellEvidence(ws,'imported_csv');
     } catch(e){ this.importError=String((e&&e.message)||e); this.analysisView=null; this._shellEvidence=null; }
   },
@@ -4047,14 +4100,14 @@ function app(){return{
   saveCurrentCase(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='cannot_overwrite_imported'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.save(self._saveInput(false)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.storageError=null; self.refreshLibrary(); } else { self.storageError=r.code; } }); },
   autosaveCurrentCase(){ var self=this; if(!this.autosaveEnabled || !this.currentCaseId || this.importedSummaryOpen || !this.analysisView || !caseDataHolder.caseStore) return; try{ if(caseDataHolder.autosaveTimer) clearTimeout(caseDataHolder.autosaveTimer); caseDataHolder.autosaveTimer=setTimeout(function(){ caseDataHolder.autosaveTimer=0; if(self.autosaveEnabled && self.currentCaseId && !self.importedSummaryOpen && self.analysisView) self.saveCurrentCase(); }, 1500); }catch(e){} },
   saveCurrentCaseAsNew(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='cannot_promote_imported'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.create(self._saveInput(true)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.refreshLibrary(); } else self.storageError=r.code; }); },
-  openCase(id){ var self=this; if(!this.ensureStore()) return;
-    // R3.0C C8 + Codex C-B Round 1 (Findings C8-CB-RN-03 / C8-CB-RN-04) + Round 2 (Findings C8-CB-RN-10 /
-    // C8-CB-RN-11) — centralized invalidation via _r3cBeginCaseTransition. The same helper runs from
-    // loadDemoAnalysisCase, so the demo → openCase race (slow openCase commits after demo) and the
-    // openCase → demo race (slow demo registers after openCase) are both closed by the SAME monotonic
-    // token. The helper also clears caseDataHolder.lastSession so prior-case laps cannot leak into the
-    // new selectors before the new session loads.
+  openCase(id){
+    // R3.0C C8 + Codex C-B Round 3 Finding C8-CB-RN-14 — the case-context transition MUST run BEFORE
+    // ensureStore() so that an ensureStore failure (or throw) cannot leave prior authority + session +
+    // viewmodel state stale. _r3cBeginCaseTransition is now the very first executable statement; the
+    // ensureStore guard runs immediately after with all prior state already cleared.
+    var self = this;
     var tok = this._r3cBeginCaseTransition();
+    if (!this.ensureStore()) return;
     caseDataHolder.caseStore.open(id).then(function(o){
       if (tok !== self._r3cC8OpenToken) return; // stale completion — a newer openCase already raced past us
       if(!o.ok){ self.storageError=o.code; return; }
