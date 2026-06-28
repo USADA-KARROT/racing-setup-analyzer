@@ -92,7 +92,7 @@
   "tests": {
     "command": "npm test",
     "newSuiteForThisCheckpoint": "tests/r3.0d-evidence-graph.test.js",
-    "newSuiteAssertions": 112,
+    "newSuiteAssertions": 121,
     "stateAwareRefactor": "tests/r3.0d-contract-foundation.test.js Section I + J were refactored to be state-aware (D1 invariants when currentCheckpoint === D1_CONTRACT_FOUNDATION; D2 invariants when currentCheckpoint === D2_EVIDENCE_GRAPH). No D1-era assertion was deleted; the D1 branch is preserved and an additional D2 branch added.",
     "evidenceTier": "TIER 3 — Claude-verified on D2 branch HEAD; CI re-run on integrationSha is the authority for the Train target context."
   },
@@ -134,9 +134,18 @@
         "closed": ["RN-02", "RN-04", "RN-05", "RN-07", "RN-08", "RN-12"],
         "stillOpen": ["RN-01", "RN-03", "RN-06", "RN-09", "RN-10", "RN-11"],
         "evidence": "governance/r3.0d/codex-checkpoint-evidence/D2/round-2-ad6474a.raw.txt"
+      },
+      {
+        "round": 3,
+        "reviewedSha": "63ecf69d1e7f79d75f5d545741cf1d21f44f209d",
+        "verdict": "BLOCK",
+        "closed": ["RN-01", "RN-03", "RN-06", "RN-10", "RN-11"],
+        "stillOpen": ["RN-09"],
+        "newFindings": ["RN-13", "RN-14"],
+        "evidence": "governance/r3.0d/codex-checkpoint-evidence/D2/round-3-63ecf69.raw.txt"
       }
     ],
-    "tierDisclosure": "Codex D2 Round 1 BLOCK on 10766c0 surfaced 12 distinct findings (RN-01..RN-12); Round 2 BLOCK on ad6474a closed 6 (RN-02/04/05/07/08/12) and left 6 STILL-OPEN (RN-01 clock-can-mutate-rawEvidence, RN-03 confidence.state missing from canonical sort key, RN-06 clock-before-snapshot, RN-09 param-key byte cap + envelope cap evaluation order, RN-10 capability whitespace/floor/enabled, RN-11 template-literal phase-require). Round 3 candidate addresses every STILL-OPEN finding atomically (defer clock to LAST + add confidence.state to canonical key + PARAM_KEY_BYTE_CAP + early byte estimate + schema-aware capability validation + template-literal fragment heuristic). Tier 1 raw stdout persisted at round-1-10766c0.raw.txt + round-2-ad6474a.raw.txt."
+    "tierDisclosure": "Codex D2 Round 1 BLOCK on 10766c0 surfaced 12 findings (RN-01..RN-12); Round 2 BLOCK on ad6474a closed 6 (RN-02/04/05/07/08/12) and left 6; Round 3 BLOCK on 63ecf69 closed 5 of those 6 (RN-01/03/06/10/11) and surfaced RN-13 (hostile clock can replace Object.assign / Object.freeze before _materializeGraph) + RN-14 (rough estimator over-rejected compact valid graphs via fixed 4096-byte per-node overcharge), plus partial RN-09 (UTF-16 vs UTF-8 byte counting). Round 4 candidate atomically closes RN-09 (replace UTF-16 code-unit counting with _utf8len helper using captured TextEncoder/Buffer.byteLength) + RN-13 (capture Object.freeze / Object.assign / Object.keys / Object.getOwnPropertyDescriptor / Array.isArray / JSON.stringify intrinsics at module init; _materializeGraph uses only captured refs) + RN-14 (replace ROUGH_NODE_BYTES_ESTIMATE with _estimateNodeUtf8Bytes that actually sums UTF-8 byte width over sanitized fields). Tier 1 raw stdout at round-1-10766c0.raw.txt + round-2-ad6474a.raw.txt + round-3-63ecf69.raw.txt."
   },
 
   "scopeBoundary": {

@@ -99,6 +99,22 @@
   var EN = Contracts.evidenceNode;
   var CODES = RC.REASON_CODES;
 
+  // Codex D2 Round 3 RN-13 closure: capture safe intrinsic references at module-init time so a
+  // caller-supplied opts.clock injector cannot tamper with Object.freeze / Object.assign /
+  // Object.keys / Object.create / JSON.stringify / Array.isArray / TextEncoder during the build.
+  // Every subsequent operation that depends on these intrinsics uses the captured ref.
+  var _ObjectFreeze = Object.freeze;
+  var _ObjectAssign = Object.assign;
+  var _ObjectKeys = Object.keys;
+  var _ObjectCreate = Object.create;
+  var _ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+  var _ObjectGetPrototypeOf = Object.getPrototypeOf;
+  var _ObjectPrototypeHasOwnProperty = Object.prototype.hasOwnProperty;
+  var _ArrayIsArray = Array.isArray;
+  var _JSONStringify = JSON.stringify;
+  var _TextEncoder = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;
+  var _BufferByteLength = (typeof Buffer !== 'undefined' && Buffer.byteLength) ? Buffer.byteLength : null;
+
   var SERVICE_VERSION = 1;
   var GRAPH_SCHEMA_VERSION = 1;
 
@@ -116,8 +132,7 @@
   var INPUT_RAW_EVIDENCE_CAP = 512;   // pre-validation cap on caller array length
   var PARAMS_KEYS_CAP = 32;            // per-observation params object cap (RN-09)
   var PARAM_KEY_BYTE_CAP = 64;         // per-observation params KEY byte cap (RN-09 round-2 follow-up)
-  var ENVELOPE_BYTE_CAP = 256 * 1024;  // 256 KiB post-sanitization JSON.stringify cap (RN-09)
-  var ROUGH_NODE_BYTES_ESTIMATE = 4096; // pre-canonicalization estimate per sanitized node to short-circuit memory amplification
+  var ENVELOPE_BYTE_CAP = 256 * 1024;  // 256 KiB post-sanitization JSON.stringify cap (RN-09 / RN-14)
 
   // Allowed evidence sourceId values for which credibility may climb to 'measured'. 'imported_summary'
   // is the canonical example of a source that MUST stay capped at 'derived' (R3.0E future imports).
@@ -147,6 +162,62 @@
     return true;
   }
   function _strcmp(a, b) { if (a === b) return 0; return a < b ? -1 : 1; }
+
+  // UTF-8 byte-length helper. Uses TextEncoder when available, Buffer.byteLength otherwise.
+  // Codex D2 Round 3 RN-09 closure: distinguishes UTF-16 code units (string.length) from real
+  // on-wire UTF-8 byte size. A Unicode-heavy payload no longer slips through the rough estimator
+  // because string.length undercount.
+  function _utf8len(s) {
+    if (typeof s !== 'string') return 0;
+    if (_TextEncoder) {
+      try { return new _TextEncoder().encode(s).length; } catch (e) { /* fall through */ }
+    }
+    if (_BufferByteLength) {
+      try { return _BufferByteLength(s, 'utf8'); } catch (e) { /* fall through */ }
+    }
+    return s.length * 4; // worst-case bound when neither API is present
+  }
+
+  // Codex D2 Round 3 RN-14 closure: replace the fixed ROUGH_NODE_BYTES_ESTIMATE per-node overhead
+  // with an actual UTF-8 byte sum over the sanitized fields. Eliminates the false positives where
+  // 64 compact valid nodes (~30 KB JSON) were rejected because 64 * 4096 > 256 KiB.
+  function _estimateNodeUtf8Bytes(node) {
+    var n = 64; // small fixed overhead per node (JSON object brackets + commas + key wrappers)
+    n += _utf8len(node.nodeId);
+    n += _utf8len(node.category);
+    n += _utf8len(node.credibility);
+    n += _utf8len(node.provenance);
+    n += _utf8len(node.availability);
+    if (node.confidence && node.confidence.state) n += _utf8len(node.confidence.state);
+    if (node.identity) {
+      n += _utf8len(node.identity.caseId || '');
+      n += _utf8len(node.identity.sessionId || '');
+      n += _utf8len(node.identity.lapId || '');
+      n += _utf8len(node.identity.sourceId || '');
+      n += _utf8len(node.identity.sourceVersion || '');
+      n += _utf8len(node.identity.freshness || '');
+    }
+    if (node.observation) {
+      n += _utf8len(node.observation.kind || '');
+      n += _utf8len(node.observation.channel || '');
+      n += _utf8len(node.observation.i18nKey || '');
+      if (node.observation.params) {
+        var pk;
+        try { pk = _ObjectKeys(node.observation.params); } catch (e) { pk = []; }
+        for (var i = 0; i < pk.length; i++) {
+          var k = pk[i];
+          n += _utf8len(k) + 6; // key + JSON quoting + colon
+          var v = node.observation.params[k];
+          if (typeof v === 'string') n += _utf8len(v) + 4; // value + quotes + comma
+          else n += 16; // number/bool/null overhead estimate
+        }
+      }
+    }
+    if (node.supportingEdges) for (var si = 0; si < node.supportingEdges.length; si++) n += _utf8len(node.supportingEdges[si]) + 4;
+    if (node.contradictingEdges) for (var ci = 0; ci < node.contradictingEdges.length; ci++) n += _utf8len(node.contradictingEdges[ci]) + 4;
+    if (node.limitations) for (var li = 0; li < node.limitations.length; li++) n += _utf8len(node.limitations[li]) + 4;
+    return n;
+  }
 
   // Stable canonical JSON serialiser — sorted keys at every depth; arrays preserved in order. Used
   // for semantic dedup keys + graphId hashing. The caller is expected to pass D1-sanitized values
@@ -400,54 +471,67 @@
   }
 
   // Materialise the final closed-shape sanitized graph (deep freeze every nested array/object).
+  // Materialise the final closed-shape sanitized graph. Codex D2 Round 3 RN-13 closure: every
+  // intrinsic call (Object.freeze / Object.assign) goes through captured module-init refs so a
+  // caller-supplied opts.clock that tampers with Object.* AFTER capture cannot corrupt the output.
   function _materializeGraph(o) {
-    // Deep freeze correlationGroups (RN-05): freeze memberNodeIds BEFORE the enclosing group.
     var cgFrozen = o.correlationGroups.map(function (g) {
-      return Object.freeze({
+      return _ObjectFreeze({
         correlationGroupId: g.correlationGroupId,
-        memberNodeIds: Object.freeze(g.memberNodeIds.slice()),
+        memberNodeIds: _ObjectFreeze(g.memberNodeIds.slice()),
         independenceWeight: g.independenceWeight,
       });
     });
-    var dedupSummaryFrozen = Object.freeze({
-      rejectedDuplicateIds: Object.freeze(o.dedup.rejectedDuplicateIds.slice()),
-      rejectedSemanticDuplicates: Object.freeze(o.dedup.rejectedSemanticDuplicates.map(function (r) {
-        return Object.freeze({
-          fingerprint: r.fingerprint,
-          keptNodeId: r.keptNodeId,
-          droppedNodeId: r.droppedNodeId,
-        });
-      })),
-      rejectedSourceReplays: Object.freeze(o.dedup.rejectedSourceReplays.map(function (r) { return Object.freeze(Object.assign({}, r)); })),
+    var rejSemFrozen = o.dedup.rejectedSemanticDuplicates.map(function (r) {
+      return _ObjectFreeze({
+        fingerprint: r.fingerprint,
+        keptNodeId: r.keptNodeId,
+        droppedNodeId: r.droppedNodeId,
+      });
     });
+    var rejReplaysFrozen = o.dedup.rejectedSourceReplays.map(function (r) {
+      var copy = {};
+      var kk; try { kk = _ObjectKeys(r); } catch (e) { kk = []; }
+      for (var i = 0; i < kk.length; i++) copy[kk[i]] = r[kk[i]];
+      return _ObjectFreeze(copy);
+    });
+    var dedupSummaryFrozen = _ObjectFreeze({
+      rejectedDuplicateIds: _ObjectFreeze(o.dedup.rejectedDuplicateIds.slice()),
+      rejectedSemanticDuplicates: _ObjectFreeze(rejSemFrozen),
+      rejectedSourceReplays: _ObjectFreeze(rejReplaysFrozen),
+    });
+    // provenance.rejectedReasonsSummary — shallow copy via _ObjectKeys + assignment (avoids _ObjectAssign tampering).
+    var rrsCopy = {};
+    var rrsKeys; try { rrsKeys = _ObjectKeys(o.provenance.rejectedReasonsSummary); } catch (e) { rrsKeys = []; }
+    for (var ri = 0; ri < rrsKeys.length; ri++) rrsCopy[rrsKeys[ri]] = o.provenance.rejectedReasonsSummary[rrsKeys[ri]];
     var graph = {
       schemaVersion: GRAPH_SCHEMA_VERSION,
       graphId: o.graphId,
-      caseAssociation: Object.freeze({
+      caseAssociation: _ObjectFreeze({
         caseId: o.caseAssociation.caseId,
         sessionId: o.caseAssociation.sessionId,
         lapId: o.caseAssociation.lapId == null ? null : o.caseAssociation.lapId,
       }),
-      sessionAssociation: Object.freeze({ sessionId: o.caseAssociation.sessionId }),
-      nodes: Object.freeze(o.nodes.slice()),
-      edges: Object.freeze(o.edges.slice()),
-      topologicalOrder: Object.freeze(o.topologicalOrder.slice()),
+      sessionAssociation: _ObjectFreeze({ sessionId: o.caseAssociation.sessionId }),
+      nodes: _ObjectFreeze(o.nodes.slice()),
+      edges: _ObjectFreeze(o.edges.slice()),
+      topologicalOrder: _ObjectFreeze(o.topologicalOrder.slice()),
       deduplicationSummary: dedupSummaryFrozen,
-      correlationGroups: Object.freeze(cgFrozen),
-      limitations: Object.freeze(o.limitations.slice()),
-      cannotConclude: Object.freeze(o.cannotConclude.slice()),
-      provenance: Object.freeze({
+      correlationGroups: _ObjectFreeze(cgFrozen),
+      limitations: _ObjectFreeze(o.limitations.slice()),
+      cannotConclude: _ObjectFreeze(o.cannotConclude.slice()),
+      provenance: _ObjectFreeze({
         builderVersion: SERVICE_VERSION,
         inputCount: o.provenance.inputCount,
         sanitizedCount: o.provenance.sanitizedCount,
         rejectedCount: o.provenance.rejectedCount,
-        rejectedReasonsSummary: Object.freeze(Object.assign({}, o.provenance.rejectedReasonsSummary)),
+        rejectedReasonsSummary: _ObjectFreeze(rrsCopy),
       }),
       createdAt: o.createdAt,
       generationToken: o.generationToken,
       contextVersion: o.contextVersion,
     };
-    return Object.freeze(graph);
+    return _ObjectFreeze(graph);
   }
 
   /**
@@ -494,19 +578,15 @@
           continue;
         }
         var san = check.sanitized;
-        // RN-09 — per-observation params key count cap + per-key BYTE cap (round-2 follow-up).
-        // D1's BYTE_CAP_EXCEEDED rule covers params VALUES but NOT params KEYS, so a hostile
-        // node can carry a key like 'longkey_x4000_chars' that survives D1 and inflates the
-        // canonical serialization. D2 caps both count + per-key bytes here.
+        // RN-09 — per-observation params key count cap + per-key UTF-8 BYTE cap (round-3 fix
+        // uses _utf8len helper for actual UTF-8 byte width, not UTF-16 code units).
         if (san.observation && san.observation.params && typeof san.observation.params === 'object') {
           try {
-            var paramKeys = Object.keys(san.observation.params);
+            var paramKeys = _ObjectKeys(san.observation.params);
             if (paramKeys.length > PARAMS_KEYS_CAP) { rejectedCount++; tally(CODES.ARRAY_CAP_EXCEEDED); continue; }
             var anyOversizeKey = false;
             for (var pki = 0; pki < paramKeys.length; pki++) {
-              var keyStr = paramKeys[pki];
-              var keyBytes = (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(keyStr).length : Buffer.byteLength(keyStr, 'utf8');
-              if (keyBytes > PARAM_KEY_BYTE_CAP) { anyOversizeKey = true; break; }
+              if (_utf8len(paramKeys[pki]) > PARAM_KEY_BYTE_CAP) { anyOversizeKey = true; break; }
             }
             if (anyOversizeKey) { rejectedCount++; tally(CODES.BYTE_CAP_EXCEEDED); continue; }
           } catch (e) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
@@ -529,26 +609,14 @@
         return RC.buildBlockedResult([CODES.GRAPH_CAP_EXCEEDED], { detail: 'sanitized node count ' + sanitized.length + ' exceeds NODES_CAP=' + NODES_CAP });
       }
 
-      // Step 4.5 — RN-09 round-2 follow-up: rough byte budget BEFORE canonical serialization. Per
-      // sanitized node, count the byte size of observation.params (where the bulk lives) and bail
-      // if the total would exceed ENVELOPE_BYTE_CAP. This short-circuits memory amplification before
-      // _stableStringify runs across the whole array.
+      // Step 4.5 — RN-09 round-3 + RN-14 closure: accurate UTF-8 byte estimate BEFORE canonical
+      // serialization. Uses _estimateNodeUtf8Bytes() which actually sums UTF-8 byte widths over
+      // sanitized fields (no fixed 4096-byte per-node overhead). Bails before _stableStringify
+      // runs across the whole array if the running total would exceed ENVELOPE_BYTE_CAP.
       var roughTotal = 0;
       for (var rb = 0; rb < sanitized.length; rb++) {
-        try {
-          var p = sanitized[rb].observation && sanitized[rb].observation.params;
-          if (p && typeof p === 'object') {
-            var pkk = Object.keys(p);
-            for (var pkii = 0; pkii < pkk.length; pkii++) {
-              var k = pkk[pkii];
-              roughTotal += k.length + 16; // ~16 byte overhead per key/value pair
-              var vv = p[k];
-              if (typeof vv === 'string') roughTotal += vv.length;
-              else roughTotal += 16;
-            }
-          }
-          roughTotal += ROUGH_NODE_BYTES_ESTIMATE;
-        } catch (e) { /* defensive: ignore */ }
+        try { roughTotal += _estimateNodeUtf8Bytes(sanitized[rb]); }
+        catch (e) { /* defensive: ignore individual estimate errors */ }
         if (roughTotal > ENVELOPE_BYTE_CAP) {
           return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'pre-canonicalization byte estimate exceeded ENVELOPE_BYTE_CAP=' + ENVELOPE_BYTE_CAP });
         }
@@ -760,13 +828,13 @@
       };
       var graphId = 'graph_' + _hash64('graphid|v' + GRAPH_SCHEMA_VERSION + '|' + _stableStringify(idPayload));
 
-      // Step 17 — RN-09 closure: post-sanitization JSON byte cap. Safe to JSON.stringify because every
-      // sanitized value is a plain frozen primitive (no accessors, no Proxies, no class instances).
+      // Step 17 — RN-09 closure: post-sanitization JSON byte cap. Safe to _JSONStringify because
+      // every sanitized value is a plain frozen primitive (no accessors, Proxies, class instances).
+      // Uses captured _JSONStringify + _utf8len (Codex Round 3 RN-13 closure) so an opts.clock that
+      // replaces JSON.stringify / TextEncoder after import cannot influence the byte check.
       var envBytes;
-      try {
-        var s = JSON.stringify(idPayload);
-        envBytes = (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s).length : Buffer.byteLength(s, 'utf8');
-      } catch (e) { envBytes = Infinity; }
+      try { envBytes = _utf8len(_JSONStringify(idPayload)); }
+      catch (e) { envBytes = Infinity; }
       if (envBytes > ENVELOPE_BYTE_CAP) {
         return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'post-sanitization JSON size ' + envBytes + ' exceeds ENVELOPE_BYTE_CAP=' + ENVELOPE_BYTE_CAP });
       }
@@ -802,7 +870,7 @@
         contextVersion: contextVersion,
       });
 
-      return Object.freeze({ valid: true, graph: graph });
+      return _ObjectFreeze({ valid: true, graph: graph });
     } catch (e) {
       return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'buildEvidenceGraph threw on hostile input' });
     }

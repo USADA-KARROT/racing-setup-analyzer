@@ -744,16 +744,81 @@ function freshInput(over) {
   const n = freshNode({ observation: obs });
   const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: [n] }), { clock: CLOCK });
   chk('RN-09 r2: oversized param KEY → BYTE_CAP_EXCEEDED counted per node', r.valid === true && r.graph.provenance.rejectedReasonsSummary[CODES.BYTE_CAP_EXCEEDED] === 1);
-  // ENVELOPE_BYTE_CAP rough pre-canonicalization estimate fires when too many large nodes.
+  // ENVELOPE_BYTE_CAP pre-canonicalization estimate fires when actual UTF-8 bytes exceed cap.
+  // 80 nodes × 30 keys × 250-byte values ≈ 600 KB → well above 256 KB cap (round-3 RN-14 closure
+  // uses accurate UTF-8 byte counting, not 4096-byte per-node overestimate).
   const arrBig = [];
-  for (let i = 0; i < 32; i++) {
+  for (let i = 0; i < 80; i++) {
     const ob = { kind: 'metric_value', i18nKey: 'r3_0d.x', params: {}, channel: 'rpm_' + i };
-    for (let k = 0; k < 30; k++) ob.params['k' + i + '_' + k] = 'val_' + ('z'.repeat(200));  // ~200B value each
+    for (let k = 0; k < 30; k++) ob.params['k' + i + '_' + k] = 'val_' + ('z'.repeat(250));
     arrBig.push(freshNode({ nodeId: 'ev_big_' + i, observation: ob }));
   }
   const rBig = EG.buildEvidenceGraph(freshInput({ rawEvidence: arrBig }), { clock: CLOCK });
-  // Either ENVELOPE_BYTE_CAP fires (pre-canon estimate) OR per-value byte cap kicks in at D1.
-  chk('RN-09 r2: oversized envelope content rejected', rBig.eligible === false || (rBig.valid === true && (rBig.graph.provenance.rejectedReasonsSummary[CODES.BYTE_CAP_EXCEEDED] || 0) > 0));
+  chk('RN-09 r2: oversized envelope content rejected', rBig.eligible === false && rBig.reasonCodes.indexOf(CODES.BYTE_CAP_EXCEEDED) !== -1);
+})();
+
+// ── Section O — Codex D2 Round 3 finding closures (RN-09 UTF-8 / RN-13 intrinsic / RN-14 estimator) ──
+(function sectionO_RN09_round3() {
+  // RN-09 round-3: param KEY byte cap uses real UTF-8 width, not UTF-16 code units. A 4-byte
+  // UTF-8 character (e.g. emoji-like 🎯 = 4 bytes in UTF-8 but 2 UTF-16 code units) must be
+  // counted as 4 bytes.
+  // PARAM_KEY_BYTE_CAP = 64 bytes. 17 × 4-byte UTF-8 chars = 68 bytes > cap → reject.
+  const emoji = '\u{1F3AF}'; // 4-byte UTF-8 sequence
+  let longKey = '';
+  for (let i = 0; i < 17; i++) longKey += emoji;
+  const obs = { kind: 'metric_value', i18nKey: 'r3_0d.x', params: { [longKey]: 1 }, channel: 'rpm' };
+  const n = freshNode({ observation: obs });
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: [n] }), { clock: CLOCK });
+  chk('RN-09 r3: UTF-8 byte counting for param keys (4-byte chars)', r.valid === true && (r.graph.provenance.rejectedReasonsSummary[CODES.BYTE_CAP_EXCEEDED] || 0) === 1);
+})();
+
+(function sectionO_RN13() {
+  // RN-13 round-3: a hostile clock that replaces Object.freeze / Object.assign at runtime cannot
+  // corrupt _materializeGraph because every materialize-time intrinsic call goes through captured
+  // module-init refs.
+  const originalAssign = Object.assign;
+  const originalFreeze = Object.freeze;
+  let invoked = false;
+  const hostileClock = () => {
+    invoked = true;
+    // attempt tampering — should be harmless because the builder uses captured refs
+    Object.assign = function () { return { tampered: true }; };
+    Object.freeze = function (o) { return o; }; // no-op so caller could mutate downstream
+    return NOW;
+  };
+  let r;
+  try { r = EG.buildEvidenceGraph(freshInput(), { clock: hostileClock }); }
+  finally {
+    Object.assign = originalAssign;
+    Object.freeze = originalFreeze;
+  }
+  chk('RN-13: hostile clock invoked', invoked === true);
+  chk('RN-13: graph nevertheless valid', r.valid === true);
+  chk('RN-13: graph deep-frozen (caller cannot push to nodes)', (function () {
+    let threw = false;
+    try { r.graph.nodes.push({ malicious: true }); } catch (e) { threw = true; }
+    return threw || r.graph.nodes.length === 1;
+  })());
+  chk('RN-13: graph.provenance frozen (caller cannot inject keys)', Object.isFrozen(r.graph.provenance));
+  chk('RN-13: graph.provenance.rejectedReasonsSummary frozen', Object.isFrozen(r.graph.provenance.rejectedReasonsSummary));
+  chk('RN-13: no tampered marker key in rejectedReasonsSummary', !Object.prototype.hasOwnProperty.call(r.graph.provenance.rejectedReasonsSummary, 'tampered'));
+  chk('RN-13: no tampered marker key in graph', !Object.prototype.hasOwnProperty.call(r.graph, 'tampered'));
+})();
+
+(function sectionO_RN14() {
+  // RN-14 round-3: rough estimator no longer charges 4096 bytes per node; 64 compact valid nodes
+  // (~14 KB actual) must build successfully. Each node uses a distinct sourceId so the
+  // correlated_with pair count stays at 0 (avoids tripping EDGES_CAP_TOTAL via 64-way correlation).
+  const arr = [];
+  for (let i = 0; i < 64; i++) {
+    arr.push(freshNode({
+      nodeId: 'ev_compact_' + i,
+      identity: freshId({ sourceId: 'src_compact_' + i }),
+      observation: { kind: 'metric_value', i18nKey: 'r3_0d.x', params: { v: i }, channel: 'ch_' + i },
+    }));
+  }
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
+  chk('RN-14: 64 compact valid nodes build successfully (no fixed-overhead over-reject)', r.valid === true && r.graph.nodes.length === 64);
 })();
 
 console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
