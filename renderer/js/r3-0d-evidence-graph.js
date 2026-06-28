@@ -154,9 +154,13 @@
   var _StringPrototypeCharCodeAt = String.prototype.charCodeAt;
   var _NumberPrototypeToString = Number.prototype.toString;
   var _String = String;
+  var _FunctionPrototypeCall = Function.prototype.call;
+  var _FunctionPrototypeApply = Function.prototype.apply;
+  var _FunctionPrototypeBind = Function.prototype.bind;
   var _ReflectApply = (typeof Reflect !== 'undefined' && Reflect.apply) ? Reflect.apply : null;
   var _ReflectOwnKeys = (typeof Reflect !== 'undefined' && Reflect.ownKeys) ? Reflect.ownKeys : null;
   var _JSONStringify = JSON.stringify;
+  var _GlobalThis = (typeof globalThis !== 'undefined') ? globalThis : (typeof root !== 'undefined' ? root : (typeof window !== 'undefined' ? window : null));
 
   // Codex D2 Round 10 RN-21..RN-25 closure: intrinsic integrity guard. At the entry of
   // buildEvidenceGraph (and again immediately after _resolveClock fires) verify that every
@@ -168,32 +172,95 @@
   // correlation key), RN-23 (ambient Object.getOwnPropertyDescriptor in Step 3), RN-24 (ambient
   // global String() function), RN-25 (Number.prototype.toString / String.prototype.charAt in
   // hash digests) — and any future intrinsic-rebinding attack on the same surface.
+  // Codex D2 Round 11 RN-21 closure: descriptor-based intrinsic integrity check. The previous
+  // implementation used direct property access (`Object.freeze === _ObjectFreeze`), which is
+  // accessor-TOCTOU vulnerable: an attacker installing `Object.defineProperty(Reflect, "ownKeys",
+  // { get: function() { Array.prototype.push = noop; return origOwnKeys; } })` would let the
+  // guard pass push (intact), then the Reflect.ownKeys getter fires LATER in the chain, rebinds
+  // push (after it was already checked), returns the original ref (passing the Reflect.ownKeys
+  // check), and the rest of the build runs with hostile push. Round 12 fix: read every intrinsic
+  // via captured `_ObjectGetOwnPropertyDescriptor`, which returns a structural snapshot of the
+  // descriptor WITHOUT invoking any installed accessor. If the descriptor is an accessor (no
+  // `value` field), fail-closed — the very presence of an accessor on a global primitive method
+  // is an attack signal. RN-26 closure: add Function.prototype.call / .apply / .bind to the
+  // captured set so a clock-installed FPC/FPA/FPB rebind also trips the post-clock guard.
+  var _INTRINSIC_SENTINEL = {};
+  function _readDescVal(obj, key) {
+    try {
+      var d = _ObjectGetOwnPropertyDescriptor(obj, key);
+      if (!d) return _INTRINSIC_SENTINEL;
+      if (!('value' in d)) return _INTRINSIC_SENTINEL; // accessor descriptor → tamper signal
+      return d.value;
+    } catch (e) { return _INTRINSIC_SENTINEL; }
+  }
   function _intrinsicsIntact() {
     try {
-      return Object.freeze === _ObjectFreeze
-        && Object.assign === _ObjectAssign
-        && Object.keys === _ObjectKeys
-        && Object.create === _ObjectCreate
-        && Object.defineProperty === _ObjectDefineProperty
-        && Object.getOwnPropertyDescriptor === _ObjectGetOwnPropertyDescriptor
-        && Object.getPrototypeOf === _ObjectGetPrototypeOf
-        && Object.prototype.hasOwnProperty === _ObjectPrototypeHasOwnProperty
-        && Array.isArray === _ArrayIsArray
-        && Array.prototype.slice === _ArrayPrototypeSlice
-        && Array.prototype.map === _ArrayPrototypeMap
-        && Array.prototype.push === _ArrayPrototypePush
-        && Array.prototype.sort === _ArrayPrototypeSort
-        && Array.prototype.concat === _ArrayPrototypeConcat
-        && Array.prototype.join === _ArrayPrototypeJoin
-        && Array.prototype.indexOf === _ArrayPrototypeIndexOf
-        && String === _String
-        && String.prototype.slice === _StringPrototypeSlice
-        && String.prototype.charAt === _StringPrototypeCharAt
-        && String.prototype.charCodeAt === _StringPrototypeCharCodeAt
-        && Number.prototype.toString === _NumberPrototypeToString
-        && JSON.stringify === _JSONStringify
-        && (_ReflectApply === null || (typeof Reflect !== 'undefined' && Reflect.apply === _ReflectApply))
-        && (_ReflectOwnKeys === null || (typeof Reflect !== 'undefined' && Reflect.ownKeys === _ReflectOwnKeys));
+      // Phase 1 — snapshot every intrinsic via structural descriptor read. No accessor on any of
+      // these targets can fire because _ObjectGetOwnPropertyDescriptor returns the descriptor
+      // record itself, not the value via [[Get]]. The sentinel marker is returned for missing
+      // own properties OR accessor descriptors OR exception cases (e.g. proxy-trapped objects).
+      var s = {
+        objFreeze: _readDescVal(Object, 'freeze'),
+        objAssign: _readDescVal(Object, 'assign'),
+        objKeys: _readDescVal(Object, 'keys'),
+        objCreate: _readDescVal(Object, 'create'),
+        objDefineProperty: _readDescVal(Object, 'defineProperty'),
+        objGetOwnPropertyDescriptor: _readDescVal(Object, 'getOwnPropertyDescriptor'),
+        objGetPrototypeOf: _readDescVal(Object, 'getPrototypeOf'),
+        objProtoHasOwn: _readDescVal(_ObjectGetPrototypeOf({}), 'hasOwnProperty'),
+        arrIsArray: _readDescVal(Array, 'isArray'),
+        arrProtoSlice: _readDescVal(_ObjectGetPrototypeOf([]), 'slice'),
+        arrProtoMap: _readDescVal(_ObjectGetPrototypeOf([]), 'map'),
+        arrProtoPush: _readDescVal(_ObjectGetPrototypeOf([]), 'push'),
+        arrProtoSort: _readDescVal(_ObjectGetPrototypeOf([]), 'sort'),
+        arrProtoConcat: _readDescVal(_ObjectGetPrototypeOf([]), 'concat'),
+        arrProtoJoin: _readDescVal(_ObjectGetPrototypeOf([]), 'join'),
+        arrProtoIndexOf: _readDescVal(_ObjectGetPrototypeOf([]), 'indexOf'),
+        globalString: _GlobalThis ? _readDescVal(_GlobalThis, 'String') : _INTRINSIC_SENTINEL,
+        strProtoSlice: _readDescVal(_ObjectGetPrototypeOf(''), 'slice'),
+        strProtoCharAt: _readDescVal(_ObjectGetPrototypeOf(''), 'charAt'),
+        strProtoCharCodeAt: _readDescVal(_ObjectGetPrototypeOf(''), 'charCodeAt'),
+        numProtoToString: _readDescVal(_ObjectGetPrototypeOf(0), 'toString'),
+        jsonStringify: _readDescVal(JSON, 'stringify'),
+        // Codex D2 Round 11 RN-26 closure: Function.prototype.call / .apply / .bind are critical
+        // because contract validators (_normCodes uses .forEach.call, validateEvidenceNodeShape
+        // uses .apply) and _stableStringify fallbacks route through them. Capture + verify.
+        funcProtoCall: _readDescVal(_ObjectGetPrototypeOf(function () {}), 'call'),
+        funcProtoApply: _readDescVal(_ObjectGetPrototypeOf(function () {}), 'apply'),
+        funcProtoBind: _readDescVal(_ObjectGetPrototypeOf(function () {}), 'bind'),
+        reflectApply: _ReflectApply === null ? null : (typeof Reflect === 'undefined' ? _INTRINSIC_SENTINEL : _readDescVal(Reflect, 'apply')),
+        reflectOwnKeys: _ReflectOwnKeys === null ? null : (typeof Reflect === 'undefined' ? _INTRINSIC_SENTINEL : _readDescVal(Reflect, 'ownKeys')),
+      };
+      // Phase 2 — strict equality compare every snapshot value against its module-init capture.
+      // This phase performs no property access on any global; it only compares values already
+      // snapshotted in Phase 1.
+      return s.objFreeze === _ObjectFreeze
+        && s.objAssign === _ObjectAssign
+        && s.objKeys === _ObjectKeys
+        && s.objCreate === _ObjectCreate
+        && s.objDefineProperty === _ObjectDefineProperty
+        && s.objGetOwnPropertyDescriptor === _ObjectGetOwnPropertyDescriptor
+        && s.objGetPrototypeOf === _ObjectGetPrototypeOf
+        && s.objProtoHasOwn === _ObjectPrototypeHasOwnProperty
+        && s.arrIsArray === _ArrayIsArray
+        && s.arrProtoSlice === _ArrayPrototypeSlice
+        && s.arrProtoMap === _ArrayPrototypeMap
+        && s.arrProtoPush === _ArrayPrototypePush
+        && s.arrProtoSort === _ArrayPrototypeSort
+        && s.arrProtoConcat === _ArrayPrototypeConcat
+        && s.arrProtoJoin === _ArrayPrototypeJoin
+        && s.arrProtoIndexOf === _ArrayPrototypeIndexOf
+        && s.globalString === _String
+        && s.strProtoSlice === _StringPrototypeSlice
+        && s.strProtoCharAt === _StringPrototypeCharAt
+        && s.strProtoCharCodeAt === _StringPrototypeCharCodeAt
+        && s.numProtoToString === _NumberPrototypeToString
+        && s.jsonStringify === _JSONStringify
+        && s.funcProtoCall === _FunctionPrototypeCall
+        && s.funcProtoApply === _FunctionPrototypeApply
+        && s.funcProtoBind === _FunctionPrototypeBind
+        && s.reflectApply === _ReflectApply
+        && s.reflectOwnKeys === _ReflectOwnKeys;
     } catch (e) { return false; }
   }
   var _TextEncoder = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;

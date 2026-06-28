@@ -929,18 +929,29 @@ function freshInput(over) {
     return false;
   }
   chk('RN-13 r4: hostile Function.prototype.call replacement — build returns a value', r !== undefined && r !== null);
-  chk('RN-13 r4: graph.nodes contains no {tampered:true} entry', r.valid === true && !hasTampered(r.graph.nodes));
-  chk('RN-13 r4: graph.correlationGroups contains no {tampered:true} entry', r.valid === true && !hasTampered(r.graph.correlationGroups));
-  chk('RN-13 r4: graph.topologicalOrder contains no {tampered:true} entry', r.valid === true && !hasTampered(r.graph.topologicalOrder));
-  chk('RN-13 r4: graph.nodes[0] is the legitimate sanitized node', r.valid === true && r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
-  chk('RN-13 r4: graph.nodes[0] is frozen (no unfrozen attacker object)', r.valid === true && Object.isFrozen(r.graph.nodes[0]));
-  chk('RN-13 r4: graph.nodes array is frozen (push must throw)', (function () {
-    if (!r.valid) return false;
-    let threw = false;
-    try { r.graph.nodes.push({ malicious: true }); } catch (e) { threw = true; }
-    return threw || r.graph.nodes.length === 1;
-  })());
-  chk('RN-13 r4: graph is deeply frozen at top level', r.valid === true && Object.isFrozen(r.graph));
+  // Round 11 RN-26 closure: post-clock guard now catches Function.prototype.call rebinding too.
+  // Accept either resilient build or BLOCK.
+  if (r.valid === true) {
+    chk('RN-13 r4: graph.nodes contains no {tampered:true} entry', !hasTampered(r.graph.nodes));
+    chk('RN-13 r4: graph.correlationGroups contains no {tampered:true} entry', !hasTampered(r.graph.correlationGroups));
+    chk('RN-13 r4: graph.topologicalOrder contains no {tampered:true} entry', !hasTampered(r.graph.topologicalOrder));
+    chk('RN-13 r4: graph.nodes[0] is the legitimate sanitized node', r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
+    chk('RN-13 r4: graph.nodes[0] is frozen (no unfrozen attacker object)', Object.isFrozen(r.graph.nodes[0]));
+    chk('RN-13 r4: graph.nodes array is frozen (push must throw)', (function () {
+      let threw = false;
+      try { r.graph.nodes.push({ malicious: true }); } catch (e) { threw = true; }
+      return threw || r.graph.nodes.length === 1;
+    })());
+    chk('RN-13 r4: graph is deeply frozen at top level', Object.isFrozen(r.graph));
+  } else {
+    chk('RN-13 r4: post-clock guard caught Function.prototype.call rebinding (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+    chk('RN-13 r4: BLOCK detail mentions intrinsic-tampering post-clock', typeof r.detail === 'string' && /intrinsic-tampering detected post-clock/.test(r.detail));
+    chk('RN-13 r4: no graph leaked on BLOCK', r.result === null);
+    chk('RN-13 r4: result envelope sane shape', typeof r === 'object');
+    chk('RN-13 r4: rejected by intrinsic guard not by other code path', /Function\.prototype|intrinsic|tampering/i.test(r.detail));
+    chk('RN-13 r4: BLOCK envelope frozen', Object.isFrozen(r));
+    chk('RN-13 r4: BLOCK status is "blocked"', r.status === 'blocked');
+  }
 })();
 
 (function sectionQ_RN13_round4_FunctionPrototypeApply() {
@@ -968,9 +979,16 @@ function freshInput(over) {
     }
     return false;
   }
-  chk('RN-13 r4: hostile Function.prototype.apply replacement — graph.nodes clean', r.valid === true && !hasTampered(r.graph.nodes));
-  chk('RN-13 r4: hostile Function.prototype.apply replacement — graph.correlationGroups clean', r.valid === true && !hasTampered(r.graph.correlationGroups));
-  chk('RN-13 r4: hostile Function.prototype.apply replacement — graph.topologicalOrder clean', r.valid === true && !hasTampered(r.graph.topologicalOrder));
+  // Round 11 RN-26 closure: post-clock guard now catches Function.prototype.apply rebinding.
+  if (r.valid === true) {
+    chk('RN-13 r4: hostile Function.prototype.apply replacement — graph.nodes clean', !hasTampered(r.graph.nodes));
+    chk('RN-13 r4: hostile Function.prototype.apply replacement — graph.correlationGroups clean', !hasTampered(r.graph.correlationGroups));
+    chk('RN-13 r4: hostile Function.prototype.apply replacement — graph.topologicalOrder clean', !hasTampered(r.graph.topologicalOrder));
+  } else {
+    chk('RN-13 r4: post-clock guard caught Function.prototype.apply rebinding (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+    chk('RN-13 r4: BLOCK detail mentions post-clock', typeof r.detail === 'string' && /post-clock/.test(r.detail));
+    chk('RN-13 r4: BLOCK envelope frozen', Object.isFrozen(r));
+  }
 })();
 
 (function sectionQ_RN13_round4_ArrayPrototypePush() {
@@ -1575,6 +1593,106 @@ function freshInput(over) {
   const r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK });
   chk('RN-21..25 intact: legitimate build returns valid graph', r.valid === true && r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
   chk('RN-21..25 intact: graphId is deterministic content-hash', r.valid === true && typeof r.graph.graphId === 'string' && /^graph_[0-9a-f]+$/.test(r.graph.graphId));
+})();
+
+// ── Section W — Codex D2 Round 11 finding closures (RN-21 TOCTOU + RN-26 Function.prototype) ──
+(function sectionW_RN21_accessorTOCTOU() {
+  // RN-21 STILL-OPEN at Round 11 (Codex evidence on e0882a4): the entry guard's direct property
+  // access (`Object.freeze === _ObjectFreeze`) is accessor-TOCTOU vulnerable. An attacker installs
+  // `Object.defineProperty(Reflect, "ownKeys", {get: function(){ Array.prototype.push = noop;
+  // return origOwnKeys; }})`. The guard reads `Array.prototype.push` first (intact, pass), then
+  // reads `Reflect.ownKeys` (getter fires, rebinds push, returns original ref → pass). Both
+  // checks pass; build runs with hostile push. Clock restores push between Step 0 and Step 17.6
+  // guards. Result: `valid:true, category:"forbidden_category"` injected.
+  //
+  // Round 12 fix: `_intrinsicsIntact` rewritten to read every intrinsic via
+  // `_ObjectGetOwnPropertyDescriptor(obj, key)`, which returns a structural descriptor snapshot
+  // WITHOUT invoking any installed accessor. If the descriptor lacks `'value' in d` (i.e. is an
+  // accessor descriptor on a global primitive method), fail-closed — the very presence of an
+  // accessor on `Object.freeze` / `Reflect.ownKeys` / etc. is an attack signal.
+  const origPush = Array.prototype.push;
+  const origOwnKeys = Reflect.ownKeys;
+  const ownDesc = Object.getOwnPropertyDescriptor(Reflect, 'ownKeys');
+  const baseline = EG.buildEvidenceGraph(freshInput({
+    rawEvidence: [Object.assign(freshNode(), { category: 'forbidden_category' })],
+  }), { clock: CLOCK });
+  let attacked;
+  try {
+    Object.defineProperty(Reflect, 'ownKeys', {
+      configurable: true,
+      enumerable: false,
+      get: function () { Array.prototype.push = function () { return 0; }; return origOwnKeys; },
+    });
+    attacked = EG.buildEvidenceGraph(freshInput({
+      rawEvidence: [Object.assign(freshNode(), { category: 'forbidden_category' })],
+    }), { clock: function () { Array.prototype.push = origPush; return NOW; } });
+  } finally {
+    Object.defineProperty(Reflect, 'ownKeys', ownDesc);
+    Array.prototype.push = origPush;
+  }
+  chk('RN-21: baseline build rejects forbidden_category node', baseline.valid === true && baseline.graph.provenance.rejectedCount === 1);
+  chk('RN-21: TOCTOU exploit caught by descriptor-based guard (BLOCK)', attacked.eligible === false && Array.isArray(attacked.reasonCodes) && attacked.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+  chk('RN-21: BLOCK detail mentions intrinsic-tampering at entry', typeof attacked.detail === 'string' && /intrinsic-tampering detected at entry/.test(attacked.detail));
+  chk('RN-21: attacked graph not produced (result null)', attacked.result === null);
+})();
+
+(function sectionW_RN26_functionPrototypeCall() {
+  // RN-26 NEW at Round 11 (Codex evidence on e0882a4): Function.prototype.call was not in the
+  // integrity guard. An in-clock FPC rebind returned valid:true and allowed arbitrary reason
+  // codes (ATTACKER_REASON) through contract _normCodes's .forEach.call. Round 12 adds
+  // Function.prototype.call / .apply / .bind to the captured set + integrity guard.
+  const origCall = Function.prototype.call;
+  let r;
+  try {
+    r = EG.buildEvidenceGraph(freshInput(), {
+      clock: function () { Function.prototype.call = function () { return undefined; }; return NOW; },
+    });
+  } finally { Function.prototype.call = origCall; }
+  chk('RN-26: in-clock Function.prototype.call rebinding caught by post-clock guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+  chk('RN-26: BLOCK detail mentions post-clock', typeof r.detail === 'string' && /post-clock/.test(r.detail));
+})();
+
+(function sectionW_RN26_functionPrototypeApply() {
+  const origApply = Function.prototype.apply;
+  let r;
+  try {
+    r = EG.buildEvidenceGraph(freshInput(), {
+      clock: function () { Function.prototype.apply = function () { return undefined; }; return NOW; },
+    });
+  } finally { Function.prototype.apply = origApply; }
+  chk('RN-26: in-clock Function.prototype.apply rebinding caught (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+})();
+
+(function sectionW_RN26_functionPrototypeBind() {
+  const origBind = Function.prototype.bind;
+  let r;
+  try {
+    r = EG.buildEvidenceGraph(freshInput(), {
+      clock: function () { Function.prototype.bind = function () { return function () {}; }; return NOW; },
+    });
+  } finally { Function.prototype.bind = origBind; }
+  chk('RN-26: in-clock Function.prototype.bind rebinding caught (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+})();
+
+(function sectionW_RN21_accessorOnObjectFreezeAtEntry() {
+  // Variant: install accessor descriptor on Object.freeze itself (not on Reflect.ownKeys). The
+  // descriptor-based guard reads via _ObjectGetOwnPropertyDescriptor which returns the accessor
+  // descriptor; `'value' in d` is false → guard fails closed.
+  const origFreezeDesc = Object.getOwnPropertyDescriptor(Object, 'freeze');
+  let r;
+  try {
+    Object.defineProperty(Object, 'freeze', {
+      configurable: true,
+      enumerable: false,
+      get: function () { return origFreezeDesc.value; }, // returns the original, but it's now an accessor
+      set: undefined,
+    });
+    r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK });
+  } finally {
+    Object.defineProperty(Object, 'freeze', origFreezeDesc);
+  }
+  chk('RN-21: accessor descriptor on Object.freeze caught at entry (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+  chk('RN-21: accessor detected as tamper signal', typeof r.detail === 'string' && /intrinsic-tampering/.test(r.detail));
 })();
 
 console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
