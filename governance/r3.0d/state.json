@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
   "program": "R3.0D",
-  "currentCheckpoint": "D0_BOOTSTRAP",
+  "currentCheckpoint": "D1_CONTRACT_FOUNDATION",
   "authorizedProductionPaths": [],
-  "enabledCapabilities": [],
+  "enabledCapabilities": ["contract_foundation_present"],
   "runtimeConsumersAllowed": false,
   "uiAllowed": false,
   "featureRegistryActivationAllowed": false,
   "algorithmsAllowed": false,
-  "note": "R3.0D Integrated Delivery Governance state. D0 BOOTSTRAP fixes every production switch OFF. authorizedProductionPaths is intentionally empty; enabledCapabilities is intentionally empty. The four *Allowed flags are intentionally false. R3.0D introduces NO Feature Registry IDs at D0 — feature IDs (decision_engine / hypothesis / engineer_brief) are reserved for D5_ACTIVATION and are deliberately absent from renderer/js/feature-registry.js. Mutating any field above the D0 baseline requires a separately-authorized Integrated Delivery Train checkpoint AND requires R3.0C state.currentCheckpoint === 'C8_ACTIVATION' per cross-phase rule."
+  "note": "R3.0D D1_CONTRACT_FOUNDATION state. contract_foundation_present is the only enabled capability — a governance/contract kind that requires NO authorizedProductionPath (mirrors R3.0C CP1 pattern). The four production switches (runtimeConsumers / ui / featureRegistryActivation / algorithms) remain false; D1 introduces NO production code, NO runtime consumer, NO algorithm, NO UI surface. The R3.0D feature IDs (decision_engine / hypothesis / engineer_brief — names to be finalized at D5) are intentionally absent from renderer/js/feature-registry.js. Mutating any production switch above D1 requires a separately-authorized Integrated Delivery Train checkpoint (D2 algorithms / D2 runtime consumers / D4 UI / D5 activation) AND requires R3.0C state.currentCheckpoint === 'C8_ACTIVATION' per cross-phase rule."
 }
