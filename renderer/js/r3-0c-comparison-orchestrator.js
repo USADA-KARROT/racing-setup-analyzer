@@ -299,31 +299,74 @@
       return _validateFramingOrFallback(built);
     }
 
+    // Codex C7-R5-01 closure: descriptor-safe read for top-level fields on caller-supplied
+    // eligibleResponse / extraInputs. A Proxy whose `get` trap throws (or returns side-effecting
+    // values) on `framing` / `result` / `generationToken` / ... can escape the public export
+    // boundary if we use plain `o.k` access. _readOwnExport returns tri-state matching the
+    // framing-i18n-key-registry pattern: ABSENT (no own key) / VALUE (data descriptor) / THREW
+    // (accessor descriptor OR descriptor lookup throws). Both ABSENT and THREW are surfaced as
+    // a NULL value by the caller-side helper below.
+    function _readOwnExport(o, k) {
+      var desc;
+      try { desc = Object.getOwnPropertyDescriptor(o, k); }
+      catch (e) { return { state: 'THREW' }; }
+      if (!desc) return { state: 'ABSENT' };
+      if (typeof desc.get === 'function' || typeof desc.set === 'function') return { state: 'THREW' };
+      return { state: 'VALUE', value: desc.value };
+    }
+    function _exportValueOrNull(o, k) {
+      var r = _readOwnExport(o, k);
+      return r.state === 'VALUE' ? r.value : null;
+    }
+    function _exportBlocked(detail) {
+      return Object.freeze({ eligible: false, status: 'blocked', reasonCodes: Object.freeze([CODES.INTERNAL_CONTRACT_VIOLATION]), detail: detail });
+    }
+
     /**
      * exportComparison(eligibleResponse, extraInputs) — delegates to the C6 export service.
-     * The orchestrator does NOT bypass C6's own authenticity / closed-allowlist checks.
+     * The orchestrator does NOT bypass C6's own authenticity / closed-allowlist checks. The
+     * public boundary is wrapped in a try/catch + descriptor-safe reads so hostile caller-
+     * controlled accessors return a structured blocked result instead of throwing out of the
+     * boundary (Codex C7-R5-01 closure).
      */
     function exportComparison(eligibleResponse, extraInputs) {
-      if (!ex || typeof ex.buildComparisonExport !== 'function') {
-        return { eligible: false, status: 'blocked', reasonCodes: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'export service unavailable' };
+      try {
+        if (!ex || typeof ex.buildComparisonExport !== 'function') {
+          return _exportBlocked('export service unavailable');
+        }
+        if (!_isPlain(eligibleResponse)) return _exportBlocked('eligibleResponse not a plain object');
+        var statusRead = _readOwnExport(eligibleResponse, 'status');
+        var gateRead = _readOwnExport(eligibleResponse, 'exportGate');
+        if (statusRead.state !== 'VALUE' || statusRead.value !== 'eligible') return _exportBlocked('export gate closed (status)');
+        if (gateRead.state !== 'VALUE' || gateRead.value !== true) return _exportBlocked('export gate closed (gate)');
+        if (!_isPlain(extraInputs)) extraInputs = {};
+        var resultVal = _exportValueOrNull(eligibleResponse, 'result');
+        var tokenVal = _exportValueOrNull(eligibleResponse, 'generationToken');
+        var framingVal = _exportValueOrNull(eligibleResponse, 'framing');
+        // framingVal MUST be the orchestrator's own previously-built sanitized framing object —
+        // it was returned from requestComparison via Object.freeze. If a caller has hand-built
+        // an eligibleResponse with a Proxy / accessor for framing we treat it as absent.
+        var cannotConcludeVal = framingVal && _isPlain(framingVal) ? _exportValueOrNull(framingVal, 'cannotDistinguish') : null;
+        var nextActionVal = framingVal && _isPlain(framingVal) ? _exportValueOrNull(framingVal, 'nextValidationAction') : null;
+        return ex.buildComparisonExport({
+          result: resultVal,
+          association: _exportValueOrNull(extraInputs, 'association'),
+          credibilityMetadata: _exportValueOrNull(extraInputs, 'credibilityMetadata'),
+          generationToken: 'orch-' + (tokenVal != null ? tokenVal : ''),
+          referenceLap: _exportValueOrNull(extraInputs, 'referenceLap'),
+          comparisonLap: _exportValueOrNull(extraInputs, 'comparisonLap'),
+          framing: {
+            cannotConclude: Array.isArray(cannotConcludeVal) ? cannotConcludeVal : [],
+            alternativeExplanations: [],
+            nextValidationAction: nextActionVal || null,
+          },
+        });
+      } catch (e) {
+        // Defense in depth — any unexpected throw past the descriptor-safe reads results in a
+        // structured blocked outcome rather than escaping the boundary. Detail is bounded and
+        // never carries stack / private paths.
+        return _exportBlocked('exportComparison threw — fail-closed');
       }
-      if (!_isPlain(eligibleResponse) || eligibleResponse.status !== 'eligible' || eligibleResponse.exportGate !== true) {
-        return { eligible: false, status: 'blocked', reasonCodes: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'export gate closed' };
-      }
-      if (!_isPlain(extraInputs)) extraInputs = {};
-      return ex.buildComparisonExport({
-        result: eligibleResponse.result,
-        association: extraInputs.association,
-        credibilityMetadata: extraInputs.credibilityMetadata,
-        generationToken: 'orch-' + eligibleResponse.generationToken,
-        referenceLap: extraInputs.referenceLap,
-        comparisonLap: extraInputs.comparisonLap,
-        framing: {
-          cannotConclude: eligibleResponse.framing && eligibleResponse.framing.cannotDistinguish || [],
-          alternativeExplanations: [],
-          nextValidationAction: eligibleResponse.framing && eligibleResponse.framing.nextValidationAction || null,
-        },
-      });
     }
 
     // Codex C7-R2-A-01 closure: registerAuthenticCaseRecord + isAuthenticCaseRecord are NO LONGER

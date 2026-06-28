@@ -336,6 +336,28 @@ function deltaMetricsRequest() {
   chk('G3b orchestrator public API does NOT expose registerAuthenticCaseRecord', typeof orch.registerAuthenticCaseRecord === 'undefined');
   chk('G3c orchestrator public API does NOT expose isAuthenticCaseRecord', typeof orch.isAuthenticCaseRecord === 'undefined');
 })();
+// G4. Codex C7-R5-01: orchestrator.exportComparison MUST NOT let a hostile accessor on caller-
+// supplied eligibleResponse escape the boundary. The previous candidate did `o.framing` plain
+// reads, so a Proxy / Object.defineProperty getter that throws on 'framing' threw out of
+// exportComparison instead of returning a structured blocked result.
+(() => {
+  const orch = authOrch(allCapsOn);
+  // hostile eligibleResponse — minimal shape pretending to be an orchestrator output.
+  const hostile = { status: 'eligible', exportGate: true, result: {}, generationToken: 1 };
+  Object.defineProperty(hostile, 'framing', { configurable: true, enumerable: true, get() { throw new Error('framing accessor fired'); } });
+  let threw = false; let out = null;
+  try { out = orch.exportComparison(hostile, {}); } catch (e) { threw = true; }
+  chk('G4 exportComparison does NOT throw on hostile framing accessor', threw === false);
+  chk('G4b exportComparison returns structured blocked on hostile input', out && out.eligible === false && out.status === 'blocked');
+  // also exercise extraInputs hostile getter
+  const hostile2 = { status: 'eligible', exportGate: true, result: {}, generationToken: 1, framing: { cannotDistinguish: [], nextValidationAction: null } };
+  const hostileExtras = {};
+  Object.defineProperty(hostileExtras, 'association', { configurable: true, enumerable: true, get() { throw new Error('association accessor fired'); } });
+  let threw2 = false; let out2 = null;
+  try { out2 = orch.exportComparison(hostile2, hostileExtras); } catch (e) { threw2 = true; }
+  chk('G4c exportComparison does NOT throw on hostile extraInputs accessor', threw2 === false);
+  chk('G4d exportComparison handles hostile extras as null (no crash)', out2 !== null);
+})();
 // H. Orchestrator — phase metric requested without capability → filtered out + limitation
 (() => {
   const orch = authOrch(allCapsOn);
