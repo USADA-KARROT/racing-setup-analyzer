@@ -117,6 +117,7 @@
   function validateEvidenceNodeShape(nIn) {
     // Outer try/catch + Codex D1 R2 RN-06 Proxy-rejection input clone.
     try {
+    if (!RC.isOriginalPlainObject(nIn)) return RC.buildBlockedResult([CODES.EVIDENCE_NODE_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'node prototype is not Object.prototype or null (class instance / Proxy / non-plain rejected pre-clone)' });
     if (RC.hasHiddenOwnKey(nIn)) return RC.buildBlockedResult([CODES.EVIDENCE_NODE_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'node carries Symbol-keyed or non-enumerable own property' });
     var n = RC.toCleanCopy(nIn);
     if (!_isPlain(n)) return RC.buildBlockedResult([CODES.EVIDENCE_NODE_INVALID], { detail: 'node not a plain object (or proxy/non-cloneable rejected)' });

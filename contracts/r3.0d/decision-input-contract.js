@@ -67,6 +67,7 @@
   function validateDecisionInputShape(inputIn) {
     // Codex D1 R2 RN-06 Proxy-rejection input clone.
     try {
+    if (!RC.isOriginalPlainObject(inputIn)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'decision-input prototype is not Object.prototype or null' });
     if (RC.hasHiddenOwnKey(inputIn)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION, CODES.UNKNOWN_OWN_KEY], { detail: 'decision-input carries Symbol-keyed or non-enumerable own property' });
     var input = RC.toCleanCopy(inputIn);
     if (!_isPlain(input)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'decision-input not plain object (or proxy/non-cloneable rejected)' });

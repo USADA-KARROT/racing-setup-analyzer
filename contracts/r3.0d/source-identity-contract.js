@@ -77,6 +77,7 @@
     // is reduced to its disclosed surface, then the clone is itself a plain object whose own-property
     // set is fully enumerable. structuredClone DataCloneError → fail-closed.
     try {
+    if (!RC.isOriginalPlainObject(idIn)) return RC.buildBlockedResult([CODES.SOURCE_IDENTITY_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'identity prototype is not Object.prototype or null (class instance / Proxy / non-plain rejected pre-clone)' });
     if (RC.hasHiddenOwnKey(idIn)) return RC.buildBlockedResult([CODES.SOURCE_IDENTITY_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'identity carries Symbol-keyed or non-enumerable own property' });
     var id = RC.toCleanCopy(idIn);
     if (!_isPlain(id)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'identity not a plain object (or proxy/non-cloneable rejected)' });

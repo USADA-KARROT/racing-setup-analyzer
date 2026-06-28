@@ -126,6 +126,7 @@
   function validateRecommendationShape(rIn) {
     // Codex D1 R2 RN-06 Proxy-rejection input clone.
     try {
+    if (!RC.isOriginalPlainObject(rIn)) return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'recommendation prototype is not Object.prototype or null' });
     if (RC.hasHiddenOwnKey(rIn)) return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'recommendation carries Symbol-keyed or non-enumerable own property' });
     var r = RC.toCleanCopy(rIn);
     if (!_isPlain(r)) return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID], { detail: 'recommendation not plain object (or proxy/non-cloneable rejected)' });

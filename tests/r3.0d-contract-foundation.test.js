@@ -435,22 +435,52 @@ chk('BRIEF future schema rejected', EB.validateEngineerBriefShape(validBrief({ s
 })();
 
 // RN-11 — toCleanCopy must not silently transform class instances via inherited toJSON()
+// AND populated class instances with valid own fields must be rejected at the prototype check.
 (function () {
-  // A class with a toJSON method that forges a clean identity. If _toCleanCopy fell back to
-  // JSON.stringify, the toJSON method would be invoked and the validator would receive a forged
-  // plain object. With the R3 fix (structuredClone required; no JSON fallback) the class instance
-  // is rejected — structuredClone DataCloneError on class instances → toCleanCopy returns null →
-  // validator rejects.
-  function HostileClass() {}
-  HostileClass.prototype.toJSON = function () { return { caseId: 'forged_case', sessionId: 'forged_sess', sourceId: 'forged', sourceVersion: 'v1', freshness: NOW }; };
-  var hostile = new HostileClass();
-  chk('RN-11: SI rejects class instance with inherited toJSON', SI.validateSourceIdentity(hostile).valid === undefined);
-  // Symbol values inside an otherwise-plain object — structuredClone preserves nothing useful for
-  // Symbol values; an inherited toJSON would have dropped them silently. RC.toCleanCopy uses
-  // structuredClone which throws on Symbol VALUES (not keys) → rejected.
-  var hostile2 = { caseId: 'x', sessionId: 'y', sourceId: 'z', sourceVersion: 'v', freshness: NOW, symValue: Symbol('hostile') };
-  // The extra own key 'symValue' is rejected at the closed-key allowlist anyway — confirms layered defense.
-  chk('RN-11: SI rejects object with Symbol VALUE in extra key', SI.validateSourceIdentity(hostile2).valid === undefined);
+  // Populated class instance — own fields look valid; structuredClone would copy them into a plain
+  // object; the R4 prototype check on the ORIGINAL input rejects pre-clone. With the R4 fix:
+  // RC.isOriginalPlainObject(in) returns false for class instances → validator rejects with
+  // PROTOTYPE_POLLUTION_REJECTED before structuredClone is even called.
+  function PopulatedHostile() {
+    this.caseId = 'forged_case';
+    this.sessionId = 'forged_sess';
+    this.sourceId = 'forged';
+    this.sourceVersion = 'v1';
+    this.freshness = NOW;
+  }
+  PopulatedHostile.prototype.toJSON = function () { return { caseId: 'X', sessionId: 'X', sourceId: 'X', sourceVersion: 'X', freshness: NOW }; };
+  var populated = new PopulatedHostile();
+  var r = SI.validateSourceIdentity(populated);
+  chk('RN-11: SI rejects populated class instance pre-clone', r.valid === undefined);
+  chk('RN-11: SI rejection reason includes PROTOTYPE_POLLUTION_REJECTED', r.reasonCodes && r.reasonCodes.indexOf(CODES.PROTOTYPE_POLLUTION_REJECTED) !== -1);
+  // Empty class instance (no own fields) is also rejected
+  function EmptyHostile() {}
+  EmptyHostile.prototype.toJSON = function () { return { caseId: 'forged', sessionId: 'forged', sourceId: 'X', sourceVersion: 'X', freshness: NOW }; };
+  var empty = new EmptyHostile();
+  chk('RN-11: SI rejects empty class instance with inherited toJSON', SI.validateSourceIdentity(empty).valid === undefined);
+  // Populated class instance fails the EvidenceNode validator too
+  function HostileNode() {
+    this.schemaVersion = 1;
+    this.nodeId = 'ev_001';
+    this.category = 'data_quality';
+    this.identity = validId();
+    this.credibility = 'measured';
+    this.provenance = 'real';
+    this.availability = 'available';
+    this.confidence = { state: 'unresolved' };
+    this.observation = { kind: 'channel_missing', i18nKey: 'k', params: null, channel: null };
+    this.limitations = [];
+    this.supportingEdges = [];
+    this.contradictingEdges = [];
+  }
+  var hn = new HostileNode();
+  var rNode = EN.validateEvidenceNodeShape(hn);
+  chk('RN-11: EN rejects populated class instance pre-clone', rNode.valid === undefined);
+  chk('RN-11: EN rejection includes PROTOTYPE_POLLUTION_REJECTED', rNode.reasonCodes && rNode.reasonCodes.indexOf(CODES.PROTOTYPE_POLLUTION_REJECTED) !== -1);
+  // Null-prototype plain objects ARE accepted (legitimate use case)
+  var nullProto = Object.create(null);
+  nullProto.caseId = 'case_demo'; nullProto.sessionId = 'sess_demo'; nullProto.sourceId = 'lap_authority'; nullProto.sourceVersion = 'v1'; nullProto.freshness = NOW;
+  chk('RN-11: SI accepts null-prototype plain object', SI.validateSourceIdentity(nullProto).valid === true);
 })();
 
 // RN-05 — ID-array elements enforce byte cap + id grammar

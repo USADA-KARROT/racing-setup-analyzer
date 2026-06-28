@@ -192,6 +192,20 @@
     } catch (e) { return true; }
     return false;
   }
+  /**
+   * _isOriginalPlainObject(v) — Codex D1 R4 Finding RN-11 closure: prototype check on the ORIGINAL
+   * input BEFORE structuredClone runs. structuredClone happily converts an ordinary class instance
+   * into a plain object copy (DataCloneError only on a narrower set: functions, Symbol values,
+   * SharedArrayBuffer with shared:true, etc.), which means a class instance with valid own fields
+   * + an inherited toJSON method could otherwise pass _isPlain AFTER cloning even though the
+   * ORIGINAL was a class instance. Calling this check BEFORE toCleanCopy in each main validator
+   * makes class instances fail-closed at the boundary regardless of their own-field shape.
+   */
+  function _isOriginalPlainObject(v) {
+    if (v === null || typeof v !== 'object' || Array.isArray(v)) return false;
+    try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; }
+    catch (e) { return false; }
+  }
 
   var api = {
     REASON_CODES: REASON_CODES,
@@ -202,6 +216,7 @@
     buildBlockedResult: buildBlockedResult,
     toCleanCopy: _toCleanCopy,
     hasHiddenOwnKey: _hasHiddenOwnKey,
+    isOriginalPlainObject: _isOriginalPlainObject,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.R3_0D_ReasonCodes = api;
