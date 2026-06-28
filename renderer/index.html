@@ -3304,6 +3304,17 @@ const telemetryDataHolder = { session: null, importToken: 0, ro: null, lastW: nu
 // reactive proxy — Alpine holds only ids + small summaries. (No raw sample arrays in the reactive tree.)
 const caseDataHolder = { lastCase: null, lastSession: null, lastSessionId: null, lastWindow: null, lastVmOpts: null, importedBundle: null, caseStore: null, sessionStore: null, sessionOpToken: 0, sessionPersistPromise: null, autosaveTimer: 0 };
 
+// R3.0C C8_ACTIVATION + Codex C-B Round 2 hardening (Finding C8-CB-RN-09) — wrap `r3cC8Authority` AND
+// `function app()` in a closure-private outer IIFE so neither r3cC8Authority nor app() leak to the
+// realm's lexical environment. The ONLY thing this IIFE exposes is `root.app = app` for Alpine's
+// `x-data="app()"` lookup; r3cC8Authority is unreachable from any other script, any eval, or any
+// developer-tools expression in the same realm. (Round 1's earlier IIFE only enclosed the
+// _r3cC8Authority literal; the surrounding `const r3cC8Authority = ...` declaration itself was still
+// at script top-level, making the binding name resolvable from elsewhere in the same lexical
+// environment — Finding C8-CB-RN-09. Wrapping the whole script-section closes that escape.)
+;(function (root) {
+  'use strict';
+
 // R3.0C C8_ACTIVATION + Codex C-B Round 1 hardening (findings C8-CB-RN-01 / 02 / 05) — renderer-private
 // authority controller. The WeakSet and the only registration entry points live in THIS IIFE-scope closure
 // (not on the Alpine `app()` instance) so neither Alpine templates, eval, nor any caller of `app()` can
@@ -3385,9 +3396,29 @@ function app(){return{
   // _r3cC8LatestAuthorityRecord caches the FROZEN canonical record so a setAssociation call can pass
   // the same reference back through the predicate (WeakSet membership is identity-based).
   _r3cC8LatestAuthorityRecord: null,
-  // Codex C-B Finding C8-CB-RN-04 — concurrent openCase race protection. Each openCase invocation
-  // bumps the token; promise commits whose token is no longer current are dropped.
+  // Codex C-B Findings C8-CB-RN-04 / C8-CB-RN-10 — monotonic token guarding every case-context
+  // transition (openCase + loadDemoAnalysisCase). Promise commits whose token is no longer current
+  // are dropped at their `if (tok !== self._r3cC8OpenToken)` gate.
   _r3cC8OpenToken: 0,
+  // Codex C-B Round 2 (Findings C8-CB-RN-03 / 10 / 11) — single shared case-context invalidation
+  // helper called SYNCHRONOUSLY at the entry of every case transition (openCase + loadDemoAnalysisCase).
+  // The helper:
+  //   (1) increments _r3cC8OpenToken so any in-flight promise commit becomes stale
+  //   (2) nulls _r3cC8LatestAuthorityRecord so a stale read of authority cannot survive the transition
+  //   (3) nulls caseDataHolder.lastSession + lastSessionId so prior-case laps cannot bleed into the
+  //       new selectors via r3cC8LapCandidates / _r3cC8LapFor
+  //   (4) notifies the viewmodel of case_reopen so its in-flight commit is dropped at stale-token check
+  // Returns the new token value so the caller can capture it before await and test `tok !== current`
+  // at the promise commit point.
+  _r3cBeginCaseTransition(){
+    var tok = ++this._r3cC8OpenToken;
+    this._r3cC8LatestAuthorityRecord = null;
+    try { caseDataHolder.lastSession = null; caseDataHolder.lastSessionId = null; } catch(_) {}
+    if (this._r3cC7VM && typeof this._r3cC7VM.notifyCaseReopen === 'function') {
+      try { this._r3cC7VM.notifyCaseReopen(); } catch(_) {}
+    }
+    return tok;
+  },
   comparisonVMState(){
     if (this._r3cC7InitFailure) {
       // Structured unavailable state — distinct from placeholder.idle. Export gated off; no
@@ -3429,8 +3460,31 @@ function app(){return{
   // r3cC8LapCandidates returns an empty array and the dropdowns render as empty (the viewmodel stays
   // in SELECTING since reference + comparison remain null). Importing a session with a populated
   // session.laps[] (R3.0C C8+ future product work) will surface them here without further wiring.
-  r3cC8LapCandidates(){
+  //
+  // R3.0C C8 Codex C-B Round 2 (Finding C8-CB-RN-11) — cross-session lap leak protection: the
+  // candidate list is only non-empty when caseDataHolder.lastSession EXISTS, its sessionId matches
+  // the authoritative case's telemetrySessionId, AND the latest authority record points at the
+  // currently-loaded case. If any of these conditions fail (transition in progress, stale session
+  // from prior case, no authoritative case yet) the selectors render empty. _r3cC8LapFor applies the
+  // same gate so a stale lapId cannot resolve a descriptor across the session boundary.
+  _r3cC8AuthoritativeSessionId(){
+    var rec = this._r3cC8LatestAuthorityRecord;
+    if (!rec || typeof rec !== 'object' || !rec.associations || typeof rec.associations !== 'object') return null;
+    var sid = rec.associations.telemetrySessionId;
+    return typeof sid === 'string' && sid.length > 0 ? sid : null;
+  },
+  _r3cC8AuthoritativeSession(){
+    var sid = this._r3cC8AuthoritativeSessionId();
+    if (!sid) return null;
     var s = caseDataHolder.lastSession;
+    if (!s || typeof s !== 'object') return null;
+    // The session can identify itself via sessionId or via the persisted lastSessionId pairing.
+    var loadedId = (typeof s.sessionId === 'string' && s.sessionId.length > 0) ? s.sessionId : caseDataHolder.lastSessionId;
+    if (loadedId !== sid) return null;
+    return s;
+  },
+  r3cC8LapCandidates(){
+    var s = this._r3cC8AuthoritativeSession();
     var laps = s && Array.isArray(s.laps) ? s.laps : [];
     return laps.filter(function(l){ return l && typeof l.lapId === 'string' && l.lapId.length > 0; }).map(function(l){
       return {
@@ -3441,7 +3495,7 @@ function app(){return{
     });
   },
   _r3cC8LapFor(lapId){
-    var s = caseDataHolder.lastSession;
+    var s = this._r3cC8AuthoritativeSession();
     var laps = s && Array.isArray(s.laps) ? s.laps : [];
     for (var i = 0; i < laps.length; i++) { if (laps[i] && laps[i].lapId === lapId) return laps[i]; }
     return null;
@@ -3494,14 +3548,15 @@ function app(){return{
   analysisView: null,
   analysisError: null,
   loadDemoAnalysisCase(){
-    // R3.0C C8 + Codex C-B Finding C8-CB-RN-03 — clear stale authority + notifyCaseReopen BEFORE
-    // doing work so that an in-flight prior comparison cannot commit a stale result over the new
-    // demo case state. We unconditionally null the latest-authority pointer here; it only gets
-    // repopulated below after the demo register succeeds.
-    this._r3cC8LatestAuthorityRecord = null;
-    if (this._r3cC7VM && typeof this._r3cC7VM.notifyCaseReopen === 'function') {
-      try { this._r3cC7VM.notifyCaseReopen(); } catch(_) {}
-    }
+    // R3.0C C8 + Codex C-B Findings C8-CB-RN-03 / C8-CB-RN-10 — single shared invalidation helper used
+    // by every case-context transition. Round 1 only invalidated inside openCase; Round 2 found that a
+    // pending openCase could STILL race past a subsequent loadDemoAnalysisCase because the demo path
+    // never bumped the token. _r3cBeginCaseTransition() centralizes the invariants: bump the open
+    // token (drops any in-flight openCase commit at its `if (tok !== self._r3cC8OpenToken)` gate),
+    // null the latest authority pointer, clear caseDataHolder.lastSession (Finding C8-CB-RN-11 —
+    // prior-case laps must not bleed into the new case's lap selectors), and notify the viewmodel
+    // so its in-flight comparison commit is dropped at the next stale-token check.
+    this._r3cBeginCaseTransition();
     try {
       if (typeof DemoAnalysisCase==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof AnalysisWorkspaceViewModel==='undefined'){ this.analysisError='modules_not_loaded'; this.analysisView=null; this._shellEvidence=null; return; }
       const demo = DemoAnalysisCase.buildDemoAnalysisCase();
@@ -3563,6 +3618,13 @@ function app(){return{
     } catch(e){ this.importError=String((e&&e.message)||e); }
   },
   runImportedAnalysis(){
+    // R3.0C C8 + Codex C-B Round 2 Finding C8-CB-RN-10/11 — CSV import is a case-context transition.
+    // Begin transition (bumps token, nulls authority, clears prior session, notifies viewmodel) so a
+    // pending demo / openCase comparison cannot commit on top of the imported session, and prior-case
+    // laps cannot survive into the new selectors. The CSV import path does NOT register an authoritative
+    // case via r3cC8Authority (no case-store boundary), so the workspace remains in idle/selecting until
+    // a future product step authorizes import-derived authority.
+    this._r3cBeginCaseTransition();
     try {
       this.importError=null;
       if (typeof CanonicalTelemetrySession==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof DemoAnalysisCase==='undefined'){ this.importError='modules_not_loaded'; return; }
@@ -3986,15 +4048,13 @@ function app(){return{
   autosaveCurrentCase(){ var self=this; if(!this.autosaveEnabled || !this.currentCaseId || this.importedSummaryOpen || !this.analysisView || !caseDataHolder.caseStore) return; try{ if(caseDataHolder.autosaveTimer) clearTimeout(caseDataHolder.autosaveTimer); caseDataHolder.autosaveTimer=setTimeout(function(){ caseDataHolder.autosaveTimer=0; if(self.autosaveEnabled && self.currentCaseId && !self.importedSummaryOpen && self.analysisView) self.saveCurrentCase(); }, 1500); }catch(e){} },
   saveCurrentCaseAsNew(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='cannot_promote_imported'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.create(self._saveInput(true)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.refreshLibrary(); } else self.storageError=r.code; }); },
   openCase(id){ var self=this; if(!this.ensureStore()) return;
-    // R3.0C C8 + Codex C-B Findings C8-CB-RN-03 + C8-CB-RN-04 — clear stale authority + notifyCaseReopen
-    // SYNCHRONOUSLY at open initiation (before awaiting the promise) so a slow prior comparison can't
-    // commit on top of the new case. The monotonic _r3cC8OpenToken guards against the inverse race:
-    // a slower first openCase call resolving after a newer one MUST NOT overwrite current state.
-    this._r3cC8LatestAuthorityRecord = null;
-    if (this._r3cC7VM && typeof this._r3cC7VM.notifyCaseReopen === 'function') {
-      try { this._r3cC7VM.notifyCaseReopen(); } catch(_) {}
-    }
-    var tok = ++this._r3cC8OpenToken;
+    // R3.0C C8 + Codex C-B Round 1 (Findings C8-CB-RN-03 / C8-CB-RN-04) + Round 2 (Findings C8-CB-RN-10 /
+    // C8-CB-RN-11) — centralized invalidation via _r3cBeginCaseTransition. The same helper runs from
+    // loadDemoAnalysisCase, so the demo → openCase race (slow openCase commits after demo) and the
+    // openCase → demo race (slow demo registers after openCase) are both closed by the SAME monotonic
+    // token. The helper also clears caseDataHolder.lastSession so prior-case laps cannot leak into the
+    // new selectors before the new session loads.
+    var tok = this._r3cBeginCaseTransition();
     caseDataHolder.caseStore.open(id).then(function(o){
       if (tok !== self._r3cC8OpenToken) return; // stale completion — a newer openCase already raced past us
       if(!o.ok){ self.storageError=o.code; return; }
@@ -5076,6 +5136,13 @@ function app(){return{
     this.tirePressChartObj=new Chart(ctx,{type:'scatter',data:{datasets:[{label:'Grip vs Pressure',data:pts,borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,.1)',fill:true,pointRadius:0,tension:.4}]},options:{responsive:true,showLine:true,plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:this.t('ui.chart.pressureBar'),color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8'}},y:{title:{display:true,text:this.t('ui.chart.gripAxis'),color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8'},min:80,max:110}}}});
   },
 }}
+
+// R3.0C C8 Codex C-B Round 2 finding C8-CB-RN-09 closure: only `app` is exposed on globalThis. The
+// IIFE traps r3cC8Authority + function app() in a closure that is unreachable from any other script
+// or from preview_eval. Alpine looks up `app` via globalThis.app for its x-data="app()" binding;
+// nothing else from this section is exposed.
+root.app = app;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
 </script>
 </body>
 </html>

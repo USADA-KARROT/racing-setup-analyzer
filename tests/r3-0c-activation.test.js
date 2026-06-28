@@ -376,14 +376,21 @@ function _wellFormedInput(caseRecord) {
   chk('app() no longer holds _r3cC7AuthenticCaseRecords WeakSet field', !/_r3cC7AuthenticCaseRecords:\s*\(typeof WeakSet/.test(html));
   // Codex C-B Finding C8-CB-RN-05 closure — STRICT degraded rejection (=== false, not !== true).
   chk('authority closure requires o.degraded === false strict', /deg !== false/.test(html));
-  // Codex C-B Finding C8-CB-RN-03 closure — openCase + loadDemoAnalysisCase clear authority + notifyCaseReopen.
-  chk('openCase clears _r3cC8LatestAuthorityRecord at start', /openCase\(id\)\{[\s\S]{0,1500}this\._r3cC8LatestAuthorityRecord = null;/.test(html));
-  chk('openCase invokes notifyCaseReopen at start', /openCase\(id\)\{[\s\S]{0,800}_r3cC7VM[\s\S]{0,200}notifyCaseReopen/.test(html));
-  chk('loadDemoAnalysisCase clears _r3cC8LatestAuthorityRecord at start', /loadDemoAnalysisCase\(\)\{[\s\S]{0,400}this\._r3cC8LatestAuthorityRecord = null;/.test(html));
-  chk('loadDemoAnalysisCase invokes notifyCaseReopen at start', /loadDemoAnalysisCase\(\)\{[\s\S]{0,800}_r3cC7VM[\s\S]{0,200}notifyCaseReopen/.test(html));
-  // Codex C-B Finding C8-CB-RN-04 closure — openCase uses a monotonic token to drop stale completions.
+  // Codex C-B Round 1 Findings C8-CB-RN-03 / 04 + Round 2 Finding C8-CB-RN-10 closure — every case-context
+  // transition (openCase, loadDemoAnalysisCase, runImportedAnalysis) routes through ONE shared helper
+  // _r3cBeginCaseTransition() that synchronously bumps the open token, nulls the authority pointer,
+  // clears caseDataHolder.lastSession (Round 2 Finding C8-CB-RN-11), and notifies the viewmodel.
+  chk('app() declares _r3cBeginCaseTransition helper', /_r3cBeginCaseTransition\(\)\{/.test(html));
+  chk('_r3cBeginCaseTransition bumps _r3cC8OpenToken', /_r3cBeginCaseTransition\(\)\{[\s\S]{0,200}var tok = \+\+this\._r3cC8OpenToken;/.test(html));
+  chk('_r3cBeginCaseTransition nulls _r3cC8LatestAuthorityRecord', /_r3cBeginCaseTransition\(\)\{[\s\S]{0,400}this\._r3cC8LatestAuthorityRecord = null;/.test(html));
+  chk('_r3cBeginCaseTransition clears caseDataHolder.lastSession', /_r3cBeginCaseTransition\(\)\{[\s\S]{0,400}caseDataHolder\.lastSession = null/.test(html));
+  chk('_r3cBeginCaseTransition invokes notifyCaseReopen', /_r3cBeginCaseTransition\(\)\{[\s\S]{0,500}notifyCaseReopen/.test(html));
+  chk('openCase calls _r3cBeginCaseTransition', /openCase\(id\)\{[\s\S]{0,1500}this\._r3cBeginCaseTransition\(\)/.test(html));
+  chk('loadDemoAnalysisCase calls _r3cBeginCaseTransition', /loadDemoAnalysisCase\(\)\{[\s\S]{0,1500}this\._r3cBeginCaseTransition\(\)/.test(html));
+  chk('runImportedAnalysis calls _r3cBeginCaseTransition', /runImportedAnalysis\(\)\{[\s\S]{0,1500}this\._r3cBeginCaseTransition\(\)/.test(html));
+  // Codex C-B Round 1 Finding C8-CB-RN-04 — token guard at promise commit.
   chk('openCase declares _r3cC8OpenToken state field', /_r3cC8OpenToken:\s*0/.test(html));
-  chk('openCase bumps token + drops stale completion', /var tok = \+\+this\._r3cC8OpenToken[\s\S]{0,800}if \(tok !== self\._r3cC8OpenToken\) return;/.test(html));
+  chk('openCase promise commit checks token freshness', /if \(tok !== self\._r3cC8OpenToken\) return;/.test(html));
   // Codex C-B Finding C8-CB-RN-06 closure — selectors + export button have @-handlers wired through vm.
   chk('reference selector has @change handler', /reference-selector"[\s\S]{0,200}@change="r3cC8OnReferenceSelected/.test(html));
   chk('comparison selector has @change handler', /comparison-selector"[\s\S]{0,200}@change="r3cC8OnComparisonSelected/.test(html));
@@ -396,6 +403,18 @@ function _wellFormedInput(caseRecord) {
   chk('app() declares _r3cC8SyncAssociationFromCase', /_r3cC8SyncAssociationFromCase\(rec, caseSource\)\{/.test(html));
   // Comparison Workspace pane wiring from C7 remains
   chk('index.html keeps Comparison Workspace pane', html.indexOf('data-r3c-c7-pane="comparison-workspace"') !== -1);
+  // Codex C-B Round 2 Finding C8-CB-RN-09 closure — both r3cC8Authority and function app() live inside an
+  // outer IIFE; only `root.app = app;` is exposed to globalThis. The IIFE wrapper opens just before the
+  // r3cC8Authority declaration and closes after the function app() block, with an explicit `root.app = app;`
+  // exposure line that Alpine's x-data="app()" resolves through globalThis.
+  chk('renderer wraps r3cC8Authority + app() in outer IIFE', /;\(function \(root\) \{[\s\S]{0,200}'use strict';[\s\S]{0,1500}const r3cC8Authority = \(function/.test(html));
+  chk('renderer outer IIFE closes after app() with root.app exposure', /\}\}\s*[\s\S]{0,800}root\.app = app;[\s\S]{0,200}\}\)\(typeof globalThis/.test(html));
+  // Codex C-B Round 2 Finding C8-CB-RN-11 closure — lap candidates are gated by session-id match.
+  chk('renderer declares _r3cC8AuthoritativeSessionId helper', /_r3cC8AuthoritativeSessionId\(\)\{/.test(html));
+  chk('renderer declares _r3cC8AuthoritativeSession helper', /_r3cC8AuthoritativeSession\(\)\{/.test(html));
+  chk('r3cC8LapCandidates reads gated session, not raw lastSession', /r3cC8LapCandidates\(\)\{[\s\S]{0,300}this\._r3cC8AuthoritativeSession\(\)/.test(html));
+  chk('_r3cC8LapFor reads gated session, not raw lastSession', /_r3cC8LapFor\(lapId\)\{[\s\S]{0,200}this\._r3cC8AuthoritativeSession\(\)/.test(html));
+  chk('_r3cC8AuthoritativeSession requires sessionId match with authority record', /_r3cC8AuthoritativeSession\(\)\{[\s\S]{0,800}if \(loadedId !== sid\) return null;/.test(html));
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -443,6 +462,78 @@ function _wellFormedInput(caseRecord) {
   vm3.setReference({ lapId: 'lap_R', lapTimeMs: 90000 });
   vm3.setComparison({ lapId: 'lap_C', lapTimeMs: 90100 });
   chk('vm rejects hostile-Proxy caseRecord (caseRecord becomes null)', captured3 && captured3.caseRecord === null);
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section 10 — Runtime IIFE-closure proof (Codex C-B Round 2 Finding C8-CB-RN-09)
+// ─────────────────────────────────────────────────────────────────────────────
+// Execute the renderer's `<script>` block in an isolated Node vm context and prove:
+//   1. `app` is exposed on the realm's globalThis (Alpine binding works)
+//   2. `r3cC8Authority` is NOT exposed on globalThis AND is not lexically resolvable from
+//      any eval inside the same realm AFTER the script block returns — confirming the IIFE
+//      truly traps the closure (the very claim Codex C-B Round 2 demanded a runtime proof of).
+// We extract the script block from index.html via regex (the single <script>…</script> that
+// contains `function app(`) and inject minimal stubs for the UMD globals the block depends on.
+(function () {
+  const vm = require('vm');
+  const html = fs.readFileSync(path.join(REPO, 'renderer', 'index.html'), 'utf8');
+  const scriptMatches = html.match(/<script>([\s\S]*?)<\/script>/g) || [];
+  const appBlock = scriptMatches.find(s => /function app\(/.test(s));
+  if (!appBlock) { chk('found app() script block', false); return; }
+  const code = appBlock.replace(/^<script>/, '').replace(/<\/script>$/, '');
+  // Stub the modules the block touches at top-level (UMD globals from other <script src> tags).
+  const stubFn = function () { return null; };
+  const realm = {
+    console, Date, Math, JSON, Array, Object, Number, String, Boolean, Symbol, Promise, WeakSet, WeakMap, Map, Set, RegExp, Error,
+    setTimeout: (typeof setTimeout !== 'undefined') ? setTimeout : function () { return 0; }, clearTimeout: (typeof clearTimeout !== 'undefined') ? clearTimeout : function () {},
+    document: { addEventListener: stubFn, getElementById: stubFn, body: { __x: null }, documentElement: { lang: '' } },
+    window: {}, location: { hostname: '' },
+    Chart: function () { return { destroy: stubFn }; },
+    api: { getTires: function () { return []; }, getPresets: function () { return []; }, estimateTireSpring: stubFn, suggestRimSizes: function () { return []; }, compare: function () { return {}; } },
+    FeatureRegistry: { FEATURES: {}, NAV_NODES: {}, deriveMainNav: function () { return []; }, getFeature: stubFn, isFeatureReachable: stubFn, deriveCaseSubviewIds: function () { return []; }, deriveSetupLibraryPaneIds: function () { return []; } },
+    FeatureRouter: { navigateToFeature: stubFn, applyRoute: function (r, ns) { return Object.assign({}, ns); } },
+    StorageBackend: { IndexedDBBackend: function () { return {}; } },
+    CaseStore: { createCaseStore: function () { return { list: function () { return Promise.resolve([]); }, open: function () { return Promise.resolve({ ok: false }); } }; } },
+    SessionStore: { createSessionStore: function () { return { put: function () { return Promise.resolve({ ok: false }); } }; } },
+    CaseLibraryViewModel: { buildCaseLibraryView: function () { return {}; } },
+    AnalysisWorkspace: { runAnalysisWorkspace: function () { return {}; } },
+    AnalysisWorkspaceViewModel: { buildAnalysisWorkspaceViewModel: function () { return {}; } },
+    DemoAnalysisCase: { buildDemoAnalysisCase: function () { return { analysisCase: { caseId: 'demo' }, telemetrySession: {} }; }, buildDemoTelemetryCsv: function () { return ''; }, buildDemoCornerTelemetryCsv: function () { return ''; } },
+    R3_0C_ComparisonOrchestrator: { createOrchestrator: function () { return { requestComparison: stubFn, exportComparison: stubFn, currentToken: function () { return 0; } }; } },
+    R3_0C_ComparisonViewModel: { createComparisonViewModel: function () { return { setReference: stubFn, setComparison: stubFn, setAssociation: stubFn, setChannelMapping: stubFn, notifyCaseReopen: stubFn, notifyAuthorityRevoked: stubFn, notifyEligibilityRevoked: stubFn, getState: function () { return {}; } }; } },
+    CanonicalTelemetrySession: { buildCanonicalSession: function () { return {}; } },
+    ChannelMapping: { buildChannelMapping: function () { return { suggestions: [], mappingEntries: [] }; }, projectionSignature: stubFn },
+    CalibrationRegistry: { CALIBRATION_TYPE: { STEERING_SIGN: 'ss', STEERING_ZERO: 'sz', STEERING_RATIO: 'sr' } },
+    Tier1BasicBalance: {},
+    requestAnimationFrame: function () { return 0; }, cancelAnimationFrame: stubFn,
+    ResizeObserver: function () { return { observe: stubFn, disconnect: stubFn }; },
+  };
+  // Self-globalThis aliases so the IIFE's `root.app = app` lands somewhere we can read.
+  realm.globalThis = realm;
+  const ctx = vm.createContext(realm);
+  // Provide reduced typeof helpers — the script body references `globalThis`, `WeakSet`, etc. (`typeof` checks).
+  let runOk = false;
+  try { vm.runInContext(code, ctx, { filename: 'renderer/index.html (extracted script block)', timeout: 5000 }); runOk = true; } catch (e) { chk('renderer script executes in vm context', false, String(e).slice(0, 200)); }
+  if (!runOk) return;
+  chk('renderer exposes app on globalThis after IIFE', typeof realm.app === 'function');
+  chk('renderer does NOT expose r3cC8Authority on globalThis', typeof realm.r3cC8Authority === 'undefined');
+  // Final defence: an eval inside the SAME realm AFTER the script has returned cannot resolve
+  // r3cC8Authority by name (lexical reference fails — ReferenceError).
+  // Errors thrown inside vm.runInContext live in the vm realm; instanceof Error from the parent realm
+  // does not cross. Use the message text + constructor name instead — both reliably identify ReferenceError.
+  function _isReferenceError(e, ident) {
+    if (!e) return false;
+    const msg = typeof e.message === 'string' ? e.message : String(e);
+    return /is not defined/.test(msg) && (ident == null || new RegExp('^' + ident + ' ').test(msg));
+  }
+  let refErr = null;
+  try { vm.runInContext('void r3cC8Authority;', ctx); } catch (e) { refErr = e; }
+  chk('eval cannot lexically resolve r3cC8Authority after IIFE', _isReferenceError(refErr, 'r3cC8Authority'), refErr && refErr.message);
+  // Same proof for the registration functions — neither forCaseStore nor forDemo is reachable by name.
+  let refErrForCS = null; try { vm.runInContext('void forCaseStore;', ctx); } catch (e) { refErrForCS = e; }
+  chk('eval cannot resolve forCaseStore by name', _isReferenceError(refErrForCS, 'forCaseStore'), refErrForCS && refErrForCS.message);
+  let refErrForDemo = null; try { vm.runInContext('void forDemo;', ctx); } catch (e) { refErrForDemo = e; }
+  chk('eval cannot resolve forDemo by name', _isReferenceError(refErrForDemo, 'forDemo'), refErrForDemo && refErrForDemo.message);
 })();
 
 console.log('r3-0c-activation: ' + pass + ' passed, ' + fail + ' failed');
