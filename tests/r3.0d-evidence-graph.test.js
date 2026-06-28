@@ -821,5 +821,51 @@ function freshInput(over) {
   chk('RN-14: 64 compact valid nodes build successfully (no fixed-overhead over-reject)', r.valid === true && r.graph.nodes.length === 64);
 })();
 
+// ── Section P — Codex D2 Round 4 finding closures (RN-13 round-3 + RN-15) ──────
+(function sectionP_RN13_round3() {
+  // RN-13 round-3: hostile clock that reassigns Array.prototype.slice / Array.prototype.map
+  // must NOT corrupt _materializeGraph output (which now uses _safeSlice / _safeMap via captured
+  // Array.prototype.* refs).
+  const originalSlice = Array.prototype.slice;
+  const originalMap = Array.prototype.map;
+  let r;
+  try {
+    r = EG.buildEvidenceGraph(freshInput(), {
+      clock: () => {
+        // After clock fires, the builder is about to call _materializeGraph. Replace
+        // Array.prototype.slice / map to inject a malicious shape if the materializer
+        // dynamically resolves them.
+        Array.prototype.slice = function () { return [{ tampered: true }]; };
+        Array.prototype.map = function () { return [{ tampered: true }]; };
+        return NOW;
+      },
+    });
+  } finally {
+    Array.prototype.slice = originalSlice;
+    Array.prototype.map = originalMap;
+  }
+  chk('RN-13 r3: hostile Array.prototype.slice/map does not inject into graph.nodes', r.valid === true && r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
+  chk('RN-13 r3: hostile slice/map does not corrupt edges', r.valid === true && Array.isArray(r.graph.edges));
+  chk('RN-13 r3: hostile slice/map does not corrupt topologicalOrder', r.valid === true && r.graph.topologicalOrder.indexOf('ev_001') !== -1);
+  chk('RN-13 r3: no tampered marker key in graph.nodes', r.valid === true && r.graph.nodes.every(n => !Object.prototype.hasOwnProperty.call(n, 'tampered')));
+})();
+
+(function sectionP_RN15() {
+  // RN-15: estimator must account for JSON escape expansion. NUL (1 UTF-8 byte) →   (6 JSON
+  // bytes). 80 nodes × 30 keys × 70 NULs per value would be ~168 KB UTF-8 but ~ 1 MB JSON-encoded.
+  // The accurate JSON-aware estimator must reject pre-canonicalization.
+  const arr = [];
+  const nulChar = ' ';
+  let nulValue = '';
+  for (let n = 0; n < 70; n++) nulValue += nulChar;
+  for (let i = 0; i < 80; i++) {
+    const ob = { kind: 'metric_value', i18nKey: 'r3_0d.x', params: {}, channel: 'rpm_' + i };
+    for (let k = 0; k < 30; k++) ob.params['k' + i + '_' + k] = nulValue;
+    arr.push(freshNode({ nodeId: 'ev_nul_' + i, identity: freshId({ sourceId: 'src_nul_' + i }), observation: ob }));
+  }
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
+  chk('RN-15: NUL-heavy payload rejected pre-canonical (JSON escape expansion accounted for)', r.eligible === false && r.reasonCodes.indexOf(CODES.BYTE_CAP_EXCEEDED) !== -1);
+})();
+
 console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
 if (fail > 0) process.exit(1);

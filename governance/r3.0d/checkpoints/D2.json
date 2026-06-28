@@ -92,7 +92,7 @@
   "tests": {
     "command": "npm test",
     "newSuiteForThisCheckpoint": "tests/r3.0d-evidence-graph.test.js",
-    "newSuiteAssertions": 121,
+    "newSuiteAssertions": 126,
     "stateAwareRefactor": "tests/r3.0d-contract-foundation.test.js Section I + J were refactored to be state-aware (D1 invariants when currentCheckpoint === D1_CONTRACT_FOUNDATION; D2 invariants when currentCheckpoint === D2_EVIDENCE_GRAPH). No D1-era assertion was deleted; the D1 branch is preserved and an additional D2 branch added.",
     "evidenceTier": "TIER 3 — Claude-verified on D2 branch HEAD; CI re-run on integrationSha is the authority for the Train target context."
   },
@@ -143,9 +143,18 @@
         "stillOpen": ["RN-09"],
         "newFindings": ["RN-13", "RN-14"],
         "evidence": "governance/r3.0d/codex-checkpoint-evidence/D2/round-3-63ecf69.raw.txt"
+      },
+      {
+        "round": 4,
+        "reviewedSha": "e84d22c743e2ab064afa1a246fdf6c52e5a38d3d",
+        "verdict": "BLOCK",
+        "closed": ["RN-09", "RN-14"],
+        "stillOpen": ["RN-13"],
+        "newFindings": ["RN-15"],
+        "evidence": "governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt"
       }
     ],
-    "tierDisclosure": "Codex D2 Round 1 BLOCK on 10766c0 surfaced 12 findings (RN-01..RN-12); Round 2 BLOCK on ad6474a closed 6 (RN-02/04/05/07/08/12) and left 6; Round 3 BLOCK on 63ecf69 closed 5 of those 6 (RN-01/03/06/10/11) and surfaced RN-13 (hostile clock can replace Object.assign / Object.freeze before _materializeGraph) + RN-14 (rough estimator over-rejected compact valid graphs via fixed 4096-byte per-node overcharge), plus partial RN-09 (UTF-16 vs UTF-8 byte counting). Round 4 candidate atomically closes RN-09 (replace UTF-16 code-unit counting with _utf8len helper using captured TextEncoder/Buffer.byteLength) + RN-13 (capture Object.freeze / Object.assign / Object.keys / Object.getOwnPropertyDescriptor / Array.isArray / JSON.stringify intrinsics at module init; _materializeGraph uses only captured refs) + RN-14 (replace ROUGH_NODE_BYTES_ESTIMATE with _estimateNodeUtf8Bytes that actually sums UTF-8 byte width over sanitized fields). Tier 1 raw stdout at round-1-10766c0.raw.txt + round-2-ad6474a.raw.txt + round-3-63ecf69.raw.txt."
+    "tierDisclosure": "Codex D2 Round 1 BLOCK on 10766c0 (12 findings); Round 2 BLOCK on ad6474a (closed 6 / 6 still-open); Round 3 BLOCK on 63ecf69 (closed 5 + RN-13/RN-14 NEW + RN-09 partial); Round 4 BLOCK on e84d22c (closed RN-09 + RN-14 + RN-15 NEW + RN-13 still partial — Array.prototype.slice/map were not yet captured). Round 5 candidate captures Array.prototype.slice / map / push at module init and routes _materializeGraph through _safeSlice / _safeMap (closes RN-13 round-3); adds _jsonStringWidth() helper that counts JSON-encoded byte width including escape expansion (control chars → \\uXXXX = 6 bytes) — _estimateNodeUtf8Bytes routes every embedded string through _jsonStringWidth so a NUL-heavy payload is rejected pre-canonical (closes RN-15). Tier 1 raw stdout at round-1-10766c0.raw.txt + round-2-ad6474a.raw.txt + round-3-63ecf69.raw.txt + round-4-e84d22c.raw.txt."
   },
 
   "scopeBoundary": {

@@ -111,6 +111,9 @@
   var _ObjectGetPrototypeOf = Object.getPrototypeOf;
   var _ObjectPrototypeHasOwnProperty = Object.prototype.hasOwnProperty;
   var _ArrayIsArray = Array.isArray;
+  var _ArrayPrototypeSlice = Array.prototype.slice;
+  var _ArrayPrototypeMap = Array.prototype.map;
+  var _ArrayPrototypePush = Array.prototype.push;
   var _JSONStringify = JSON.stringify;
   var _TextEncoder = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;
   var _BufferByteLength = (typeof Buffer !== 'undefined' && Buffer.byteLength) ? Buffer.byteLength : null;
@@ -178,44 +181,79 @@
     return s.length * 4; // worst-case bound when neither API is present
   }
 
-  // Codex D2 Round 3 RN-14 closure: replace the fixed ROUGH_NODE_BYTES_ESTIMATE per-node overhead
-  // with an actual UTF-8 byte sum over the sanitized fields. Eliminates the false positives where
-  // 64 compact valid nodes (~30 KB JSON) were rejected because 64 * 4096 > 256 KiB.
+  // Codex D2 Round 4 RN-15 closure: JSON canonical width estimator. Counts the actual byte width
+  // a string occupies when serialized to canonical JSON, accounting for:
+  //   - " and \ → 2 bytes each (escaped)
+  //   - control chars 0x00..0x1F and DEL → 6 bytes (\uXXXX form)
+  //   - ASCII 0x20..0x7E (minus " and \) → 1 byte
+  //   - UTF-8 multi-byte sequences (2/3/4-byte) → exact width via TextEncoder if available, else
+  //     a conservative per-code-unit upper bound. Surrogate pairs are counted as a single 4-byte
+  //     UTF-8 sequence (not 6 + 6 \uXXXX). Always overestimates rather than underestimates so the
+  //     pre-canonical estimator never lets through a payload that exceeds the cap.
+  // Includes the surrounding "..." quotes (+2). This is the conservative pre-canonicalization
+  // estimate the rough estimator should use for params keys/values (RN-15 round-4 closure).
+  function _jsonStringWidth(s) {
+    if (typeof s !== 'string') return 4; // typical "null" / unknown wrapper
+    var n = 2; // surrounding quotes
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (c === 0x22 || c === 0x5C) { n += 2; continue; }                  // " or \  → escaped
+      if (c < 0x20 || c === 0x7F) { n += 6; continue; }                    // control → \uXXXX
+      if (c < 0x80) { n += 1; continue; }                                  // ASCII printable
+      if (c < 0x800) { n += 2; continue; }                                 // UTF-8 2-byte
+      if (c >= 0xD800 && c <= 0xDBFF) { n += 4; i++; continue; }           // high surrogate → 4-byte UTF-8 + skip low
+      n += 3;                                                              // UTF-8 3-byte BMP
+    }
+    return n;
+  }
+
+  // Captured Array.prototype.slice / map invocation helpers (RN-13 round-4 closure). Using the
+  // captured prototype methods via .call() prevents an attacker-supplied opts.clock that
+  // reassigns Array.prototype.slice / map from corrupting _materializeGraph output. Build-time
+  // arrays remain plain Arrays so .slice() / .map() at module-init time still uses the standard
+  // methods we captured.
+  function _safeSlice(arr) { return _ArrayPrototypeSlice.call(arr); }
+  function _safeMap(arr, fn) { return _ArrayPrototypeMap.call(arr, fn); }
+
+  // Codex D2 Round 3 RN-14 + Round 4 RN-15 closure: per-node canonical-JSON byte width estimate.
+  // Uses _jsonStringWidth() for every string that will be embedded in the canonical JSON output
+  // (params keys + string values especially), so control-character escape expansion (NUL →  
+  // = 6 bytes) is counted accurately. Numbers/bool/null pay a small fixed overhead estimate.
   function _estimateNodeUtf8Bytes(node) {
     var n = 64; // small fixed overhead per node (JSON object brackets + commas + key wrappers)
-    n += _utf8len(node.nodeId);
-    n += _utf8len(node.category);
-    n += _utf8len(node.credibility);
-    n += _utf8len(node.provenance);
-    n += _utf8len(node.availability);
-    if (node.confidence && node.confidence.state) n += _utf8len(node.confidence.state);
+    n += _jsonStringWidth(node.nodeId);
+    n += _jsonStringWidth(node.category);
+    n += _jsonStringWidth(node.credibility);
+    n += _jsonStringWidth(node.provenance);
+    n += _jsonStringWidth(node.availability);
+    if (node.confidence && node.confidence.state) n += _jsonStringWidth(node.confidence.state);
     if (node.identity) {
-      n += _utf8len(node.identity.caseId || '');
-      n += _utf8len(node.identity.sessionId || '');
-      n += _utf8len(node.identity.lapId || '');
-      n += _utf8len(node.identity.sourceId || '');
-      n += _utf8len(node.identity.sourceVersion || '');
-      n += _utf8len(node.identity.freshness || '');
+      n += _jsonStringWidth(node.identity.caseId || '');
+      n += _jsonStringWidth(node.identity.sessionId || '');
+      n += _jsonStringWidth(node.identity.lapId || '');
+      n += _jsonStringWidth(node.identity.sourceId || '');
+      n += _jsonStringWidth(node.identity.sourceVersion || '');
+      n += _jsonStringWidth(node.identity.freshness || '');
     }
     if (node.observation) {
-      n += _utf8len(node.observation.kind || '');
-      n += _utf8len(node.observation.channel || '');
-      n += _utf8len(node.observation.i18nKey || '');
+      n += _jsonStringWidth(node.observation.kind || '');
+      n += _jsonStringWidth(node.observation.channel || '');
+      n += _jsonStringWidth(node.observation.i18nKey || '');
       if (node.observation.params) {
         var pk;
         try { pk = _ObjectKeys(node.observation.params); } catch (e) { pk = []; }
         for (var i = 0; i < pk.length; i++) {
           var k = pk[i];
-          n += _utf8len(k) + 6; // key + JSON quoting + colon
+          n += _jsonStringWidth(k) + 2; // key + colon + comma JSON syntax
           var v = node.observation.params[k];
-          if (typeof v === 'string') n += _utf8len(v) + 4; // value + quotes + comma
+          if (typeof v === 'string') n += _jsonStringWidth(v);
           else n += 16; // number/bool/null overhead estimate
         }
       }
     }
-    if (node.supportingEdges) for (var si = 0; si < node.supportingEdges.length; si++) n += _utf8len(node.supportingEdges[si]) + 4;
-    if (node.contradictingEdges) for (var ci = 0; ci < node.contradictingEdges.length; ci++) n += _utf8len(node.contradictingEdges[ci]) + 4;
-    if (node.limitations) for (var li = 0; li < node.limitations.length; li++) n += _utf8len(node.limitations[li]) + 4;
+    if (node.supportingEdges) for (var si = 0; si < node.supportingEdges.length; si++) n += _jsonStringWidth(node.supportingEdges[si]) + 2;
+    if (node.contradictingEdges) for (var ci = 0; ci < node.contradictingEdges.length; ci++) n += _jsonStringWidth(node.contradictingEdges[ci]) + 2;
+    if (node.limitations) for (var li = 0; li < node.limitations.length; li++) n += _jsonStringWidth(node.limitations[li]) + 2;
     return n;
   }
 
@@ -471,36 +509,39 @@
   }
 
   // Materialise the final closed-shape sanitized graph (deep freeze every nested array/object).
-  // Materialise the final closed-shape sanitized graph. Codex D2 Round 3 RN-13 closure: every
-  // intrinsic call (Object.freeze / Object.assign) goes through captured module-init refs so a
-  // caller-supplied opts.clock that tampers with Object.* AFTER capture cannot corrupt the output.
+  // Materialise the final closed-shape sanitized graph. Codex D2 Round 3 RN-13 + Round 4 RN-13
+  // round-3 closure: every intrinsic call goes through module-init captured refs. This includes
+  // Array.prototype.map / slice (via _safeMap / _safeSlice), Object.freeze (via _ObjectFreeze),
+  // and Object.keys (via _ObjectKeys). _ObjectAssign is intentionally NOT used (replaced with a
+  // manual _ObjectKeys + indexed copy loop) so a clock that tampers with Object.assign cannot
+  // inject keys, and so a clock that tampers with Array.prototype.* cannot poison the slice/map
+  // shape of any graph-owned container.
   function _materializeGraph(o) {
-    var cgFrozen = o.correlationGroups.map(function (g) {
+    var cgFrozen = _safeMap(o.correlationGroups, function (g) {
       return _ObjectFreeze({
         correlationGroupId: g.correlationGroupId,
-        memberNodeIds: _ObjectFreeze(g.memberNodeIds.slice()),
+        memberNodeIds: _ObjectFreeze(_safeSlice(g.memberNodeIds)),
         independenceWeight: g.independenceWeight,
       });
     });
-    var rejSemFrozen = o.dedup.rejectedSemanticDuplicates.map(function (r) {
+    var rejSemFrozen = _safeMap(o.dedup.rejectedSemanticDuplicates, function (r) {
       return _ObjectFreeze({
         fingerprint: r.fingerprint,
         keptNodeId: r.keptNodeId,
         droppedNodeId: r.droppedNodeId,
       });
     });
-    var rejReplaysFrozen = o.dedup.rejectedSourceReplays.map(function (r) {
+    var rejReplaysFrozen = _safeMap(o.dedup.rejectedSourceReplays, function (r) {
       var copy = {};
       var kk; try { kk = _ObjectKeys(r); } catch (e) { kk = []; }
       for (var i = 0; i < kk.length; i++) copy[kk[i]] = r[kk[i]];
       return _ObjectFreeze(copy);
     });
     var dedupSummaryFrozen = _ObjectFreeze({
-      rejectedDuplicateIds: _ObjectFreeze(o.dedup.rejectedDuplicateIds.slice()),
+      rejectedDuplicateIds: _ObjectFreeze(_safeSlice(o.dedup.rejectedDuplicateIds)),
       rejectedSemanticDuplicates: _ObjectFreeze(rejSemFrozen),
       rejectedSourceReplays: _ObjectFreeze(rejReplaysFrozen),
     });
-    // provenance.rejectedReasonsSummary — shallow copy via _ObjectKeys + assignment (avoids _ObjectAssign tampering).
     var rrsCopy = {};
     var rrsKeys; try { rrsKeys = _ObjectKeys(o.provenance.rejectedReasonsSummary); } catch (e) { rrsKeys = []; }
     for (var ri = 0; ri < rrsKeys.length; ri++) rrsCopy[rrsKeys[ri]] = o.provenance.rejectedReasonsSummary[rrsKeys[ri]];
@@ -513,13 +554,13 @@
         lapId: o.caseAssociation.lapId == null ? null : o.caseAssociation.lapId,
       }),
       sessionAssociation: _ObjectFreeze({ sessionId: o.caseAssociation.sessionId }),
-      nodes: _ObjectFreeze(o.nodes.slice()),
-      edges: _ObjectFreeze(o.edges.slice()),
-      topologicalOrder: _ObjectFreeze(o.topologicalOrder.slice()),
+      nodes: _ObjectFreeze(_safeSlice(o.nodes)),
+      edges: _ObjectFreeze(_safeSlice(o.edges)),
+      topologicalOrder: _ObjectFreeze(_safeSlice(o.topologicalOrder)),
       deduplicationSummary: dedupSummaryFrozen,
       correlationGroups: _ObjectFreeze(cgFrozen),
-      limitations: _ObjectFreeze(o.limitations.slice()),
-      cannotConclude: _ObjectFreeze(o.cannotConclude.slice()),
+      limitations: _ObjectFreeze(_safeSlice(o.limitations)),
+      cannotConclude: _ObjectFreeze(_safeSlice(o.cannotConclude)),
       provenance: _ObjectFreeze({
         builderVersion: SERVICE_VERSION,
         inputCount: o.provenance.inputCount,
