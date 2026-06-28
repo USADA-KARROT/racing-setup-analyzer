@@ -11,6 +11,7 @@
 'use strict';
 const Service = require('../renderer/js/r3-0c-comparison-export.js');
 const Adapter = require('../renderer/js/r3-0c-comparison-adapter.js');
+const DeltaMetricsService = require('../renderer/js/r3-0c-delta-metrics.js');
 const Contracts = require('../contracts/r3.0c/index.js');
 const CODES = Contracts.reasonCodes.REASON_CODES;
 const EX = Contracts.comparisonExport;
@@ -22,39 +23,37 @@ const hasCode = (r, c) => !!(r && Array.isArray(r.reasonCodes) && r.reasonCodes.
 
 function freezeResult(o) { return Object.freeze(o); }
 
-function eligibleResultFixture() {
-  // mirrors the shape r3-0c-delta-metrics emits for eligible:true.
-  return freezeResult({
-    eligible: true,
-    status: 'delta_metrics_computed',
-    sign: 'comparison_minus_reference',
-    identity: Object.freeze({ caseId: 'caseA', sessionId: 'sess1' }),
-    metrics: Object.freeze({
-      lap_time: { scope: 'lap', value: -500 },
-      delta_cumulative: { scope: 'lap', value: -500 },
-      sector_delta: { scope: 'corner', partial: false, perCorner: Object.freeze([
-        Object.freeze({ cornerId: 'C1', value: -100, available: true }),
-        Object.freeze({ cornerId: 'C2', value: -200, available: true }),
-        Object.freeze({ cornerId: 'C3', value: -200, available: true }),
-      ])},
-      entry_delta: { scope: 'phase', partial: false, perCorner: Object.freeze([]) },
-      mid_delta: { scope: 'phase', partial: false, perCorner: Object.freeze([]) },
-      exit_delta: { scope: 'phase', partial: false, perCorner: Object.freeze([]) },
-    }),
-    evidence: Object.freeze({ sign: 'comparison_minus_reference', pairCount: 3, requestedMetrics: ['lap_time'], limitations: [] }),
-    reasonCodes: Object.freeze([]),
-    result: null,
+// Authentic eligible C5 result — driven through the real production service so the C6
+// authenticity gate accepts it (formal Codex C6 finding F-C6-A1 closure).
+function eligibleResultFixture(overrides) {
+  overrides = overrides || {};
+  return DeltaMetricsService.computeDeltaMetrics({
+    identity: overrides.identity || { caseId: 'caseA', sessionId: 'sess1' },
+    referenceLap: overrides.referenceLap || { lapTimeMs: 90000 },
+    comparisonLap: overrides.comparisonLap || { lapTimeMs: 89500 },
+    pairing: overrides.pairing || { pairs: [
+      { referenceCorner: { id: 'C1', fullTimeMs: 10000, entryTimeMs: 3000, midTimeMs: 4000, exitTimeMs: 3000 },
+        comparisonCorner: { id: 'C1', fullTimeMs: 9900, entryTimeMs: 2950, midTimeMs: 4000, exitTimeMs: 2950 } },
+      { referenceCorner: { id: 'C2', fullTimeMs: 15000, entryTimeMs: 5000, midTimeMs: 5000, exitTimeMs: 5000 },
+        comparisonCorner: { id: 'C2', fullTimeMs: 14800, entryTimeMs: 4900, midTimeMs: 5000, exitTimeMs: 4900 } },
+      { referenceCorner: { id: 'C3', fullTimeMs: 12000, entryTimeMs: 4000, midTimeMs: 4000, exitTimeMs: 4000 },
+        comparisonCorner: { id: 'C3', fullTimeMs: 11800, entryTimeMs: 3900, midTimeMs: 4000, exitTimeMs: 3900 } },
+    ] },
+    requestedMetrics: overrides.requestedMetrics || ['lap_time', 'delta_cumulative', 'sector_delta'],
+    policy: { deltaSign: 'comparison_minus_reference' },
   });
 }
 
+// Authentic blocked C5 result — produced by the real service so authenticity passes.
 function blockedResultFixture() {
-  return freezeResult({
-    eligible: false,
-    status: 'blocked',
-    reasonCodes: Object.freeze([CODES.METRIC_REQUIRED_CHANNEL_UNAVAILABLE]),
-    explanationKeys: Object.freeze(['r3_0c.reason.metric_required_channel_unavailable']),
-    detail: null,
-    metrics: null,
+  // Make the request shape gate fail by omitting requestedMetrics so the service returns _blocked.
+  return DeltaMetricsService.computeDeltaMetrics({
+    identity: { caseId: 'caseA', sessionId: 'sess1' },
+    referenceLap: { lapTimeMs: 90000 },
+    comparisonLap: { lapTimeMs: 89500 },
+    pairing: { pairs: [] },
+    requestedMetrics: [],
+    policy: { deltaSign: 'comparison_minus_reference' },
   });
 }
 
@@ -128,18 +127,18 @@ chk('A5 BLOCKED_PAYLOAD_KEYS frozen + 6 keys', Object.isFrozen(Service.BLOCKED_P
   chk('D7 no metricAvailability in blocked payload', out.envelope.payload.metricAvailability === undefined);
 })();
 
-// E. authority bypass: caller spreads a "fake eligible" result
+// E. authority bypass: caller spreads a literal fake result (authenticity gate catches this first
+// — formal Codex C6 finding F-C6-A1 closure). The downstream shape checks remain in code as
+// defense-in-depth but caller-driven probes are blocked by authenticity, NOT by them.
 (() => {
-  // wrong status (claims eligible but status is something else)
   const r = req(); r.result = freezeResult({ eligible: true, status: 'totally_fake_status', sign: 'comparison_minus_reference', identity: { caseId: 'caseA', sessionId: 'sess1' }, metrics: {} });
   const out = Service.buildComparisonExport(r);
-  chk('E1 eligible with wrong status → blocked', out.eligible === false && hasCode(out, CODES.INTERNAL_CONTRACT_VIOLATION));
+  chk('E1 forged result (wrong status) → blocked by authenticity', out.eligible === false && hasCode(out, CODES.INTERNAL_CONTRACT_VIOLATION));
 })();
 (() => {
-  // wrong sign convention
   const r = req(); r.result = freezeResult({ eligible: true, status: 'delta_metrics_computed', sign: 'reference_minus_comparison', identity: { caseId: 'caseA', sessionId: 'sess1' }, metrics: {} });
   const out = Service.buildComparisonExport(r);
-  chk('E2 eligible with reversed sign → DELTA_METRIC_SIGN_FORBIDDEN', out.eligible === false && hasCode(out, CODES.DELTA_METRIC_SIGN_FORBIDDEN));
+  chk('E2 forged result (reversed sign) → blocked by authenticity', out.eligible === false && hasCode(out, CODES.INTERNAL_CONTRACT_VIOLATION));
 })();
 (() => {
   // missing generationToken
@@ -183,15 +182,13 @@ chk('A5 BLOCKED_PAYLOAD_KEYS frozen + 6 keys', Object.isFrozen(Service.BLOCKED_P
 
 // I. adversarial payload contents
 (() => {
-  // non-finite cumulative delta in result.metrics
+  // Caller mutates a copy of the C5 result (now non-authentic) → blocked by authenticity.
   const r = req();
   const result = JSON.parse(JSON.stringify(r.result));
   result.metrics.delta_cumulative.value = NaN;
-  // restore shape (JSON.parse strips functions but we want fresh plain object)
-  r.result = freezeResult(Object.assign(result, { identity: r.result.identity, metrics: Object.assign(result.metrics, { sector_delta: r.result.metrics.sector_delta, entry_delta: r.result.metrics.entry_delta, mid_delta: r.result.metrics.mid_delta, exit_delta: r.result.metrics.exit_delta }) }));
+  r.result = freezeResult(result);
   const out = Service.buildComparisonExport(r);
-  // The builder should mark cumulativeDelta as unavailable rather than leaking NaN.
-  chk('I1 non-finite cumulative delta → marked unavailable in payload', out.eligible === true && out.envelope.payload.cumulativeDelta.available === false);
+  chk('I1 mutated C5 result (NaN injected) → blocked by authenticity', out.eligible === false);
 })();
 (() => {
   // unknown reason code in credibility.limitations → blocked
@@ -228,30 +225,25 @@ chk('A5 BLOCKED_PAYLOAD_KEYS frozen + 6 keys', Object.isFrozen(Service.BLOCKED_P
   chk('I6 framing params with Date → blocked', out.eligible === false);
 })();
 
-// J. authority bypass via corner injection
+// J. authority bypass via corner injection — all caller mutations to result land on a
+// non-authentic object and fail-closed at the authenticity gate.
 (() => {
-  // sector_delta perCorner array length exceeds bound
   const r = req();
   const overSized = new Array(EX.MAX_BOUNDED_ARRAY + 1).fill(null).map((_, i) => Object.freeze({ cornerId: 'C' + i, value: 0, available: true }));
   r.result = freezeResult(Object.assign({}, r.result, { metrics: Object.assign({}, r.result.metrics, { sector_delta: Object.freeze({ scope: 'corner', partial: false, perCorner: Object.freeze(overSized) }) }) }));
-  const out = Service.buildComparisonExport(r);
-  chk('J1 oversized corners array → blocked', out.eligible === false);
+  chk('J1 mutated result (oversized corners) → blocked', Service.buildComparisonExport(r).eligible === false);
 })();
 (() => {
-  // corner entry with non-finite value (claims available) → blocked
   const r = req();
   const bad = [Object.freeze({ cornerId: 'C1', value: Infinity, available: true })];
   r.result = freezeResult(Object.assign({}, r.result, { metrics: Object.assign({}, r.result.metrics, { sector_delta: Object.freeze({ scope: 'corner', partial: false, perCorner: Object.freeze(bad) }) }) }));
-  const out = Service.buildComparisonExport(r);
-  chk('J2 corner value Infinity → blocked', out.eligible === false);
+  chk('J2 mutated result (corner Infinity) → blocked', Service.buildComparisonExport(r).eligible === false);
 })();
 (() => {
-  // corner entry with missing cornerId → blocked
   const r = req();
   const bad = [Object.freeze({ value: -100, available: true })];
   r.result = freezeResult(Object.assign({}, r.result, { metrics: Object.assign({}, r.result.metrics, { sector_delta: Object.freeze({ scope: 'corner', partial: false, perCorner: Object.freeze(bad) }) }) }));
-  const out = Service.buildComparisonExport(r);
-  chk('J3 corner missing cornerId → blocked', out.eligible === false);
+  chk('J3 mutated result (no cornerId) → blocked', Service.buildComparisonExport(r).eligible === false);
 })();
 
 // K. allowlist closure: caller cannot smuggle extra keys via reference lap summary
@@ -299,6 +291,154 @@ chk('N6 adapter.comparisonExportEnvelopeKeys frozen 4 fields', Object.isFrozen(A
   const r = Service.buildComparisonExport(bad);
   chk('O.malformed-' + i + ' → blocked', r.eligible === false);
 });
+
+// P. Codex C6 finding F-C6-A1: caller-forged result blocked by authenticity gate
+chk('P0 DeltaMetricsService.isAuthenticResult exposed', typeof DeltaMetricsService.isAuthenticResult === 'function');
+(() => {
+  // A literal-built object that mirrors a C5 result shape but was NEVER produced by
+  // computeDeltaMetrics → not authentic → export refused.
+  const literalForgery = freezeResult({
+    eligible: true,
+    status: 'delta_metrics_computed',
+    sign: 'comparison_minus_reference',
+    identity: Object.freeze({ caseId: 'caseA', sessionId: 'sess1' }),
+    metrics: Object.freeze({
+      lap_time: { blocked: false, scope: 'lap', value: -500 },
+      delta_cumulative: { blocked: false, scope: 'lap', value: -500, partial: false, reasonCodes: [] },
+      sector_delta: { blocked: false, scope: 'corner', perCorner: Object.freeze([
+        Object.freeze({ pairIndex: 0, value: -100, referenceCornerId: 'C1', comparisonCornerId: 'C1' }),
+      ]), partial: false, reasonCodes: [] },
+      entry_delta: { blocked: false, scope: 'corner', perCorner: Object.freeze([]), partial: false, reasonCodes: [] },
+      mid_delta: { blocked: false, scope: 'corner', perCorner: Object.freeze([]), partial: false, reasonCodes: [] },
+      exit_delta: { blocked: false, scope: 'corner', perCorner: Object.freeze([]), partial: false, reasonCodes: [] },
+    }),
+    evidence: Object.freeze({ sign: 'comparison_minus_reference' }),
+    reasonCodes: Object.freeze([]),
+    result: null,
+  });
+  chk('P1 literal-forged result not authentic', DeltaMetricsService.isAuthenticResult(literalForgery) === false);
+  const out = Service.buildComparisonExport({
+    result: literalForgery,
+    association: association(),
+    credibilityMetadata: credibility(),
+    generationToken: 'gen-token-001',
+    referenceLap: { sessionId: 'sess1', lapId: 'lap_ref', lapTimeMs: 90000 },
+    comparisonLap: { sessionId: 'sess1', lapId: 'lap_cmp', lapTimeMs: 89500 },
+    framing: { cannotConclude: [], alternativeExplanations: [], nextValidationAction: null },
+  });
+  chk('P1 literal-forged result → blocked by authenticity gate', out.eligible === false && hasCode(out, CODES.INTERNAL_CONTRACT_VIOLATION));
+})();
+(() => {
+  // The real C5 service is the only authentic source. Drive it end-to-end.
+  const PHASE_BOUNDARY_TEST_FIXTURE = { contractRef: 'r3.0c/phase-boundary-test-fixture', serviceOwned: true, deterministic: true };
+  const realResult = DeltaMetricsService.computeDeltaMetrics({
+    identity: { caseId: 'caseA', sessionId: 'sess1' },
+    referenceLap: { lapTimeMs: 90000 },
+    comparisonLap: { lapTimeMs: 89500 },
+    pairing: { pairs: [
+      { referenceCorner: { id: 'C1', fullTimeMs: 10000, entryTimeMs: 3000, midTimeMs: 4000, exitTimeMs: 3000 },
+        comparisonCorner: { id: 'C1c', fullTimeMs: 9800, entryTimeMs: 2900, midTimeMs: 4000, exitTimeMs: 2900 } },
+    ] },
+    requestedMetrics: ['lap_time', 'delta_cumulative', 'sector_delta'],
+    policy: { deltaSign: 'comparison_minus_reference' },
+  });
+  chk('P2 real C5 result authentic', DeltaMetricsService.isAuthenticResult(realResult) === true);
+  // The real C5 result has cornerId 'C1c' which IS bounded-id. But its sector_delta perCorner uses
+  // cornerId NOT 'C1' — let me verify by checking the result.metrics.sector_delta.perCorner[0].cornerId.
+  // Service uses the COMPARISON cornerId for perCorner[i].cornerId per its own implementation.
+  const out = Service.buildComparisonExport({
+    result: realResult,
+    association: { caseId: 'caseA', sessionId: 'sess1', trackId: 'silverstone', layoutId: 'gp',
+                   positionBasis: 'lap_distance', positionDirection: 'increasing' },
+    credibilityMetadata: credibility(),
+    generationToken: 'gen-token-002',
+    referenceLap: { sessionId: 'sess1', lapId: 'lap_ref', lapTimeMs: 90000 },
+    comparisonLap: { sessionId: 'sess1', lapId: 'lap_cmp', lapTimeMs: 89500 },
+    framing: { cannotConclude: [], alternativeExplanations: [], nextValidationAction: null },
+  });
+  chk('P2 authentic C5 result + valid request → export built', out.eligible === true);
+})();
+
+// Q. Codex C6 finding F-C6-A2: Proxy / accessor traps fail closed without crash
+(() => {
+  const trapProxy = new Proxy({}, { getPrototypeOf() { throw new Error('trap'); } });
+  // Use the proxy as a request (the _isPlain at the top should fail-closed without throwing).
+  const out = Service.buildComparisonExport(trapProxy);
+  chk('Q1 throwing Proxy as request → blocked, no crash', out.eligible === false);
+})();
+(() => {
+  // Proxy as framing.params
+  const PHASE_BOUNDARY_TEST_FIXTURE = { contractRef: 'r3.0c/phase-boundary-test-fixture', serviceOwned: true, deterministic: true };
+  const realResult = DeltaMetricsService.computeDeltaMetrics({
+    identity: { caseId: 'caseA', sessionId: 'sess1' },
+    referenceLap: { lapTimeMs: 90000 },
+    comparisonLap: { lapTimeMs: 89500 },
+    pairing: { pairs: [{ referenceCorner: { id: 'C1', fullTimeMs: 10000, entryTimeMs: 3000, midTimeMs: 4000, exitTimeMs: 3000 }, comparisonCorner: { id: 'C1c', fullTimeMs: 9800, entryTimeMs: 2900, midTimeMs: 4000, exitTimeMs: 2900 } }] },
+    requestedMetrics: ['lap_time'],
+    policy: { deltaSign: 'comparison_minus_reference' },
+  });
+  const proxyParams = new Proxy({}, { ownKeys() { throw new Error('trap'); } });
+  const out = Service.buildComparisonExport({
+    result: realResult,
+    association: { caseId: 'caseA', sessionId: 'sess1', trackId: 'silverstone', layoutId: 'gp',
+                   positionBasis: 'lap_distance', positionDirection: 'increasing' },
+    credibilityMetadata: credibility(),
+    generationToken: 'gen-token-003',
+    referenceLap: { sessionId: 'sess1', lapId: 'lap_ref', lapTimeMs: 90000 },
+    comparisonLap: { sessionId: 'sess1', lapId: 'lap_cmp', lapTimeMs: 89500 },
+    framing: { cannotConclude: [{ reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.cannot_distinguish', params: proxyParams }] },
+  });
+  chk('Q2 Proxy params with throwing ownKeys → blocked, no crash', out.eligible === false);
+})();
+
+// R. Codex C6 finding F-C6-A3: path-/URI-/filename-shaped IDs blocked by ID_GRAMMAR
+(() => {
+  const PHASE_BOUNDARY_TEST_FIXTURE = { contractRef: 'r3.0c/phase-boundary-test-fixture', serviceOwned: true, deterministic: true };
+  const realResult = DeltaMetricsService.computeDeltaMetrics({
+    identity: { caseId: 'caseA', sessionId: 'sess1' },
+    referenceLap: { lapTimeMs: 90000 },
+    comparisonLap: { lapTimeMs: 89500 },
+    pairing: { pairs: [{ referenceCorner: { id: 'C1', fullTimeMs: 10000, entryTimeMs: 3000, midTimeMs: 4000, exitTimeMs: 3000 }, comparisonCorner: { id: 'C1c', fullTimeMs: 9800, entryTimeMs: 2900, midTimeMs: 4000, exitTimeMs: 2900 } }] },
+    requestedMetrics: ['lap_time'],
+    policy: { deltaSign: 'comparison_minus_reference' },
+  });
+  ['/private/var/mobile/telemetry/session.sqlite', 'file:///etc/passwd', 'C:\\Users\\bob\\telemetry.db', 'lap with spaces', '../../../etc'].forEach((evil, i) => {
+    const out = Service.buildComparisonExport({
+      result: realResult,
+      association: { caseId: 'caseA', sessionId: 'sess1', trackId: 'silverstone', layoutId: 'gp', positionBasis: 'lap_distance', positionDirection: 'increasing' },
+      credibilityMetadata: credibility(),
+      generationToken: 'gen-token-R' + i,
+      referenceLap: { sessionId: 'sess1', lapId: evil, lapTimeMs: 90000 },
+      comparisonLap: { sessionId: 'sess1', lapId: 'lap_cmp', lapTimeMs: 89500 },
+      framing: { cannotConclude: [], alternativeExplanations: [], nextValidationAction: null },
+    });
+    chk('R' + i + ' path-shaped lapId blocked (' + evil.slice(0, 20) + ')', out.eligible === false);
+  });
+})();
+(() => {
+  // Bounded-id valid lapIds still pass.
+  const PHASE_BOUNDARY_TEST_FIXTURE = { contractRef: 'r3.0c/phase-boundary-test-fixture', serviceOwned: true, deterministic: true };
+  const realResult = DeltaMetricsService.computeDeltaMetrics({
+    identity: { caseId: 'caseA', sessionId: 'sess1' },
+    referenceLap: { lapTimeMs: 90000 },
+    comparisonLap: { lapTimeMs: 89500 },
+    pairing: { pairs: [{ referenceCorner: { id: 'C1', fullTimeMs: 10000, entryTimeMs: 3000, midTimeMs: 4000, exitTimeMs: 3000 }, comparisonCorner: { id: 'C1c', fullTimeMs: 9800, entryTimeMs: 2900, midTimeMs: 4000, exitTimeMs: 2900 } }] },
+    requestedMetrics: ['lap_time'],
+    policy: { deltaSign: 'comparison_minus_reference' },
+  });
+  ['lap_03', 'lap-abc', 'lap.42', 'sess:foo', 'L1'].forEach((good, i) => {
+    const out = Service.buildComparisonExport({
+      result: realResult,
+      association: { caseId: 'caseA', sessionId: 'sess1', trackId: 'silverstone', layoutId: 'gp', positionBasis: 'lap_distance', positionDirection: 'increasing' },
+      credibilityMetadata: credibility(),
+      generationToken: 'gen-token-RG' + i,
+      referenceLap: { sessionId: 'sess1', lapId: good, lapTimeMs: 90000 },
+      comparisonLap: { sessionId: 'sess1', lapId: 'lap_cmp', lapTimeMs: 89500 },
+      framing: { cannotConclude: [], alternativeExplanations: [], nextValidationAction: null },
+    });
+    chk('R bounded-id lapId accepted (' + good + ')', out.eligible === true);
+  });
+})();
 
 console.log('r3-0c-comparison-export: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

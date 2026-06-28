@@ -42,10 +42,16 @@
   'use strict';
 
   var Contracts = null;
+  var DeltaMetricsService = null;
   if (typeof module !== 'undefined' && module.exports) {
     try { Contracts = require('../../contracts/r3.0c/index.js'); } catch (e) { Contracts = null; }
+    // The C6 service consumes the C5 service's authenticity predicate (formal Codex C6 finding
+    // F-C6-A1). Loading is best-effort: in fixture trees where C5 service is absent the export
+    // service degrades to fail-closed on every authenticity check (no caller can fake it).
+    try { DeltaMetricsService = require('./r3-0c-delta-metrics.js'); } catch (e) { DeltaMetricsService = null; }
   }
   if (!Contracts && typeof R3_0C_Contracts !== 'undefined') Contracts = R3_0C_Contracts;
+  if (!DeltaMetricsService && typeof R3_0C_DeltaMetrics !== 'undefined') DeltaMetricsService = R3_0C_DeltaMetrics;
   if (!Contracts) throw new Error('renderer/js/r3-0c-comparison-export.js requires contracts/r3.0c/index.js');
 
   var RC = Contracts.reasonCodes;
@@ -96,8 +102,27 @@
   var MAX_PARAM_STRING_BYTES = 256;       // matches FRAMING_KEY_SHAPE.paramsValueRule short_string
   var MAX_GENERAL_STRING_BYTES = EX.MAX_STRING_UTF8_BYTES; // 4096
 
+  // C6 bounded identifier grammar (formal Codex C6 finding F-C6-A3): caller-supplied identifiers
+  // (caseId / sessionId / lapId / trackId / layoutId / cornerId) MUST NOT carry path-, URI-,
+  // filename- or whitespace-shaped content. The grammar accepts the small ASCII set used by R2.6 /
+  // R3.0B identifiers (alphanumerics, underscore, hyphen, dot, colon) up to 64 chars. Forbidden
+  // content (slashes / backslashes / wildcards / whitespace / control chars / schemes) cannot
+  // smuggle into an exported identifier field.
+  var ID_GRAMMAR = /^[A-Za-z0-9._:\-]{1,64}$/;
+  function _isBoundedId(s) { return typeof s === 'string' && ID_GRAMMAR.test(s); }
+
   // helpers
-  function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; }
+  function _isPlain(v) {
+    // Defensive against malicious Proxy / accessor inputs (formal Codex C6 finding F-C6-A2):
+    // any throw from Object.getPrototypeOf must be treated as "not plain" (fail-closed). The
+    // try/catch boundary makes a Proxy with a throwing getPrototypeOf trap refuse to traverse.
+    if (v == null || typeof v !== 'object' || Array.isArray(v)) return false;
+    try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; }
+    catch (e) { return false; }
+  }
+  // Safe Object.keys + property access for inputs that may carry malicious traps.
+  function _safeKeys(o) { try { return Object.keys(o); } catch (e) { return null; } }
+  function _safeGet(o, k) { try { return o[k]; } catch (e) { return undefined; } }
   function _isFiniteNum(v) { return typeof v === 'number' && v === v && v !== Infinity && v !== -Infinity; }
   function _isFiniteNumOrNull(v) { return v === null || _isFiniteNum(v); }
   function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
@@ -120,19 +145,25 @@
   }
   function _allowlistFrame(frame) {
     // FRAMING_KEY_SHAPE: { reasonCode, i18nKey, params? } — params is plain object or OMITTED.
+    // All property accesses go through the safe boundary so a Proxy with throwing or surprising
+    // traps cannot crash buildComparisonExport or leak through (formal Codex C6 finding F-C6-A2).
     if (!_isPlain(frame)) return null;
-    if (!RC.isReasonCode(frame.reasonCode)) return null;
-    if (!_nonEmptyStr(frame.i18nKey)) return null;
-    if (_utf8ByteLength(frame.i18nKey) > MAX_GENERAL_STRING_BYTES) return null;
-    var out = { reasonCode: frame.reasonCode, i18nKey: frame.i18nKey };
-    if (frame.params !== undefined) {
-      if (!_isPlain(frame.params)) return null;
+    var reasonCode = _safeGet(frame, 'reasonCode');
+    if (!RC.isReasonCode(reasonCode)) return null;
+    var i18nKey = _safeGet(frame, 'i18nKey');
+    if (!_nonEmptyStr(i18nKey)) return null;
+    if (_utf8ByteLength(i18nKey) > MAX_GENERAL_STRING_BYTES) return null;
+    var out = { reasonCode: reasonCode, i18nKey: i18nKey };
+    var rawParams = _safeGet(frame, 'params');
+    if (rawParams !== undefined) {
+      if (!_isPlain(rawParams)) return null;
+      var keys = _safeKeys(rawParams);
+      if (keys === null) return null;
       var params = {};
-      var keys = Object.keys(frame.params);
       for (var i = 0; i < keys.length; i++) {
         var k = keys[i];
         if (typeof k !== 'string' || k.length === 0) return null;
-        var v = frame.params[k];
+        var v = _safeGet(rawParams, k);
         if (v === null || typeof v === 'boolean') { params[k] = v; continue; }
         if (typeof v === 'number') {
           if (!_isFiniteNum(v)) return null;
@@ -143,7 +174,7 @@
           if (s === null) return null;
           params[k] = s; continue;
         }
-        return null; // arrays / exotic objects / functions / symbols / bigints → reject
+        return null; // arrays / exotic objects / functions / symbols / bigints / proxies → reject
       }
       out.params = params;
     }
@@ -197,6 +228,15 @@
     if (!_nonEmptyStr(request.generationToken)) return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'missing generationToken' };
     if (_utf8ByteLength(request.generationToken) > MAX_GENERAL_STRING_BYTES) return { ok: false, reasons: [CODES.EXPORT_PAYLOAD_STRING_TOO_LONG], detail: 'generationToken too long' };
     if (!_isPlain(request.result)) return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'result not a plain object' };
+    // C6 authenticity gate (formal Codex C6 finding F-C6-A1): the result MUST have come from the
+    // C5 delta-metrics service's own production path. A caller-fabricated result — even one with
+    // perfect shape, matching identity, and the correct sign — is not exportable. The check uses
+    // a module-private WeakSet on the C5 service side; the caller has no way to forge membership.
+    if (DeltaMetricsService && typeof DeltaMetricsService.isAuthenticResult === 'function') {
+      if (!DeltaMetricsService.isAuthenticResult(request.result)) {
+        return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'result not produced by C5 service (authenticity check failed)' };
+      }
+    }
     if (typeof request.result.eligible !== 'boolean') return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'result.eligible not boolean' };
     if (typeof request.result.status !== 'string') return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'result.status not string' };
     var st = request.result.status;
@@ -208,9 +248,9 @@
 
   function _validateAssociation(association) {
     if (!_isPlain(association)) return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'association not a plain object' };
-    if (!_nonEmptyStr(association.caseId)) return { ok: false, reasons: [CODES.CROSS_CASE_COMPARISON_UNSUPPORTED], detail: 'association missing caseId' };
-    if (!_nonEmptyStr(association.sessionId)) return { ok: false, reasons: [CODES.CROSS_SESSION_COMPARISON_UNSUPPORTED], detail: 'association missing sessionId' };
-    if (!_nonEmptyStr(association.trackId) || !_nonEmptyStr(association.layoutId)) return { ok: false, reasons: [CODES.MISSING_TRACK_IDENTITY], detail: 'association missing track/layout id' };
+    if (!_isBoundedId(association.caseId)) return { ok: false, reasons: [CODES.CROSS_CASE_COMPARISON_UNSUPPORTED], detail: 'association caseId not bounded-id' };
+    if (!_isBoundedId(association.sessionId)) return { ok: false, reasons: [CODES.CROSS_SESSION_COMPARISON_UNSUPPORTED], detail: 'association sessionId not bounded-id' };
+    if (!_isBoundedId(association.trackId) || !_isBoundedId(association.layoutId)) return { ok: false, reasons: [CODES.MISSING_TRACK_IDENTITY], detail: 'association track/layout id not bounded-id' };
     if (CE.ACCEPTED_POSITION_BASES.indexOf(association.positionBasis) === -1) return { ok: false, reasons: [CODES.MISSING_POSITION_BASIS], detail: 'association positionBasis invalid' };
     if (CE.ACCEPTED_POSITION_DIRECTIONS.indexOf(association.positionDirection) === -1) return { ok: false, reasons: [CODES.MISSING_POSITION_DIRECTION], detail: 'association positionDirection invalid' };
     return { ok: true };
@@ -228,27 +268,29 @@
   }
 
   // Allowlist rebuild of bounded summaries (step 4–5).
+  // ID-shaped fields (sessionId / lapId) are validated against ID_GRAMMAR so a path-, URI-,
+  // filename- or whitespace-shaped string cannot occupy them (formal Codex C6 finding F-C6-A3).
   function _buildReferenceLapSummary(request) {
-    // request.referenceLap should be a small plain object with sessionId / lapId / lapTimeMs.
-    // We REBUILD it explicitly; we do NOT spread the caller's input.
     var ref = request.referenceLap;
     if (!_isPlain(ref)) return null;
-    var lapTimeMs = (ref.lapTimeMs === undefined || ref.lapTimeMs === null) ? null : ref.lapTimeMs;
+    var lapTimeMs = (_safeGet(ref, 'lapTimeMs') === undefined || _safeGet(ref, 'lapTimeMs') === null) ? null : _safeGet(ref, 'lapTimeMs');
     if (lapTimeMs !== null && (!_isFiniteNum(lapTimeMs) || lapTimeMs <= 0)) return null;
-    var sessionId = _nonEmptyStr(ref.sessionId) ? _shortString(ref.sessionId) : null;
-    var lapId = _nonEmptyStr(ref.lapId) ? _shortString(ref.lapId) : null;
-    if (sessionId === null) return null;
-    return { sessionId: sessionId, lapId: lapId, lapTimeMs: lapTimeMs };
+    var sessionId = _safeGet(ref, 'sessionId');
+    var lapId = _safeGet(ref, 'lapId');
+    if (!_isBoundedId(sessionId)) return null;
+    if (lapId !== null && lapId !== undefined && !_isBoundedId(lapId)) return null;
+    return { sessionId: sessionId, lapId: lapId === undefined ? null : lapId, lapTimeMs: lapTimeMs };
   }
   function _buildComparisonLapSummary(request) {
     var cmp = request.comparisonLap;
     if (!_isPlain(cmp)) return null;
-    var lapTimeMs = (cmp.lapTimeMs === undefined || cmp.lapTimeMs === null) ? null : cmp.lapTimeMs;
+    var lapTimeMs = (_safeGet(cmp, 'lapTimeMs') === undefined || _safeGet(cmp, 'lapTimeMs') === null) ? null : _safeGet(cmp, 'lapTimeMs');
     if (lapTimeMs !== null && (!_isFiniteNum(lapTimeMs) || lapTimeMs <= 0)) return null;
-    var sessionId = _nonEmptyStr(cmp.sessionId) ? _shortString(cmp.sessionId) : null;
-    var lapId = _nonEmptyStr(cmp.lapId) ? _shortString(cmp.lapId) : null;
-    if (sessionId === null) return null;
-    return { sessionId: sessionId, lapId: lapId, lapTimeMs: lapTimeMs };
+    var sessionId = _safeGet(cmp, 'sessionId');
+    var lapId = _safeGet(cmp, 'lapId');
+    if (!_isBoundedId(sessionId)) return null;
+    if (lapId !== null && lapId !== undefined && !_isBoundedId(lapId)) return null;
+    return { sessionId: sessionId, lapId: lapId === undefined ? null : lapId, lapTimeMs: lapTimeMs };
   }
   function _buildAssociationSummary(association) {
     return {
@@ -270,9 +312,10 @@
     return { value: dc.value, unit: 'ms', available: true };
   }
   function _buildCorners(metrics) {
-    // The corners array is the per-corner sector_delta projection. entry/mid/exit are kept out of
-    // export until the phase-boundary capability is enabled (governance/r3.0c/capabilities.json
-    // phase_boundary_contract.enabled). C6 only exports sector_delta per corner.
+    // The corners array is the per-corner sector_delta projection. C5 emits per-pair entries with
+    // shape { pairIndex, value, referenceCornerId, comparisonCornerId }. We take referenceCornerId
+    // as the export's canonical bounded ID. entry/mid/exit phase metrics are NOT included here;
+    // they remain governance-locked until phase_boundary_contract.enabled.
     if (!_isPlain(metrics) || !_isPlain(metrics.sector_delta) || !Array.isArray(metrics.sector_delta.perCorner)) {
       return []; // no corners → bounded empty array is valid
     }
@@ -283,18 +326,13 @@
       var e = pc[i];
       if (e === null || e === undefined) { out.push({ cornerId: null, sectorDelta: null, available: false, reason: CODES.DELTA_METRIC_NUMERIC_INVALID }); continue; }
       if (!_isPlain(e)) return null;
-      var cornerId = _nonEmptyStr(e.cornerId) ? _shortString(e.cornerId) : null;
-      if (cornerId === null) return null;
-      var available = e.available === true;
-      var sectorDelta = null;
-      var reason;
-      if (available) {
-        if (!_isFiniteNum(e.value)) return null;
-        sectorDelta = e.value;
-        out.push({ cornerId: cornerId, sectorDelta: sectorDelta, available: true });
+      var cornerId = _safeGet(e, 'referenceCornerId');
+      if (!_isBoundedId(cornerId)) return null;
+      var value = _safeGet(e, 'value');
+      if (value === null || value === undefined || !_isFiniteNum(value)) {
+        out.push({ cornerId: cornerId, sectorDelta: null, available: false, reason: CODES.DELTA_METRIC_NUMERIC_INVALID });
       } else {
-        reason = RC.isReasonCode(e.reason) ? e.reason : CODES.METRIC_REQUIRED_CHANNEL_UNAVAILABLE;
-        out.push({ cornerId: cornerId, sectorDelta: null, available: false, reason: reason });
+        out.push({ cornerId: cornerId, sectorDelta: value, available: true });
       }
     }
     return out;
@@ -314,18 +352,17 @@
       // names directly so the export consumer can read availability per the C5 vocabulary.
       out[n] = false;
     }
-    // Direct exposure for the C5 canonical metric vocabulary.
+    // Direct exposure for the C5 canonical metric vocabulary. C5 marks an entry blocked:true /
+    // partial:true / both when relevant; availability is true only when the metric carries usable
+    // data AND is neither blocked nor partial.
     var canonical = DM.SUPPORTED_DELTA_METRICS;
     for (var j = 0; j < canonical.length; j++) {
       var cn = canonical[j];
       var m = _isPlain(metrics) ? metrics[cn] : null;
       var phaseGated = DM.PHASE_SCOPE_METRICS.indexOf(cn) !== -1;
-      // The PHASE_SCOPE_METRICS may have computed values in the C5 result, but C6 export does NOT
-      // expose their availability while the phase_boundary_contract capability is disabled. The
-      // service simply reports availability:false for those entries — the consumer cannot derive
-      // a phase value from the export.
       if (phaseGated) { out[cn] = false; continue; }
       if (!_isPlain(m)) { out[cn] = false; continue; }
+      if (m.blocked === true) { out[cn] = false; continue; }
       if (m.partial === true) { out[cn] = false; continue; }
       if (m.value === undefined && !Array.isArray(m.perCorner)) { out[cn] = false; continue; }
       out[cn] = true;

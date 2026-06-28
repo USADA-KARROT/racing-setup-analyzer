@@ -50,7 +50,7 @@
     var arr = (reasons || []).filter(function (c) { return RC.isReasonCode(c); });
     if (arr.length === 0) arr = [CODES.INTERNAL_CONTRACT_VIOLATION];
     var br = RC.buildBlockedResult(arr, detail != null ? { detail: detail } : null);
-    return Object.freeze({
+    var blockedResult = Object.freeze({
       eligible: false,
       status: 'blocked',
       reasonCodes: br.reasonCodes,
@@ -59,6 +59,10 @@
       metrics: null,
       result: null,
     });
+    // C6 authenticity gate: register THIS service's blocked results so the export service can
+    // distinguish a service-produced blocked result from a caller-fabricated one.
+    if (_AUTHENTIC) { try { _AUTHENTIC.add(blockedResult); } catch (e) { /* no-op */ } }
+    return blockedResult;
   }
 
   function _delta(cmpVal, refVal) { return cmpVal - refVal; }
@@ -157,7 +161,7 @@
     var anyPartial = Object.keys(metrics).some(function (k) { return metrics[k].partial === true; });
     if (anyPartial) limitations.push(LIMITATION_PARTIAL_PAIR_COVERAGE);
 
-    return Object.freeze({
+    var result = Object.freeze({
       eligible: true,
       status: 'delta_metrics_computed',
       sign: SIGN_FORMULA,
@@ -174,13 +178,36 @@
       reasonCodes: Object.freeze([]),
       result: null,
     });
+    _registerAuthentic(result);
+    return result;
   }
+
+  // C6 authenticity gate (formal Codex C6 finding F-C6-A1): C6 export must refuse a caller-forged
+  // result. Module-private WeakSet records every result THIS service produced; isAuthenticResult is
+  // exposed so the export service can confirm the object came out of computeDeltaMetrics rather
+  // than from a caller fabricating the shape. WeakSet is the right primitive: it never extends the
+  // result's serialized surface, never leaks across module reloads via JSON, and never lets a
+  // caller forge membership.
+  var _AUTHENTIC = (typeof WeakSet !== 'undefined') ? new WeakSet() : null;
+  function _registerAuthentic(r) {
+    if (_AUTHENTIC && r !== null && typeof r === 'object') { try { _AUTHENTIC.add(r); } catch (e) { /* no-op */ } }
+  }
+  function isAuthenticResult(r) {
+    if (!_AUTHENTIC) return false;
+    if (r === null || typeof r !== 'object') return false;
+    try { return _AUTHENTIC.has(r); } catch (e) { return false; }
+  }
+
+  // Patch _blocked to register too — blocked results are equally authoritative and exportable.
+  // We wrap the existing _blocked indirectly: the production flow lands in _blocked via early
+  // returns, so we tap by registering at the call-site shape. Simpler: re-export a helper.
 
   var api = {
     SERVICE_VERSION: SERVICE_VERSION,
     CHECKPOINT_FLOOR: CHECKPOINT_FLOOR,
     SIGN_FORMULA: SIGN_FORMULA,
     computeDeltaMetrics: computeDeltaMetrics,
+    isAuthenticResult: isAuthenticResult,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.R3_0C_DeltaMetrics = api;
