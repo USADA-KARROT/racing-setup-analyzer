@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0D",
+  "checkpoint": "D1_CONTRACT_FOUNDATION",
+  "baseSha": "f731887009445681b029a918ec0778dd0eb4ad8a",
+  "headSha": null,
+  "previousCheckpoint": "D0_BOOTSTRAP",
+
+  "shaSeparation": {
+    "note": "Per SKYLINE 2026-06-28 R3.0 Final Continuous Execution Directive §7, every checkpoint manifest preserves the three-way SHA separation. reviewedCandidateSha is the exact SHA Codex D1 review was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD. Substituting one for another is a tier violation.",
+    "reviewedCandidateSha": null,
+    "reviewedCandidateNote": "Filled by a follow-up evidence-anchoring commit after Codex D1 issues PASS against the exact candidate SHA on feat/r3.0d-d1-evidence-decision-contracts.",
+    "manifestCommitSha": null,
+    "manifestCommitNote": "Filled by the same follow-up evidence-anchoring commit; mirrors C5R / C6 / C7 / C8 convention.",
+    "integrationSha": null,
+    "integrationNote": "Filled only after the D1 branch-to-branch PR merges into feat/r3.0-integrated-delivery AND the Train target-context trusted-verification PASSes at that integration HEAD."
+  },
+
+  "authorizedPaths": [],
+  "newlyAuthorizedPath": null,
+  "newlyEnabledCapability": "contract_foundation_present",
+
+  "enabledCapabilitiesBefore": [],
+  "enabledCapabilitiesAfter": ["contract_foundation_present"],
+  "forbiddenCapabilities": [
+    "hypothesis_engine_present",
+    "priority_engine_present",
+    "engineer_brief_present",
+    "feature_registry_active"
+  ],
+
+  "contractSurface": {
+    "directory": "contracts/r3.0d/",
+    "modules": [
+      "reason-codes.js",
+      "credibility-contract.js",
+      "source-identity-contract.js",
+      "evidence-node-contract.js",
+      "hypothesis-contract.js",
+      "recommendation-contract.js",
+      "decision-input-contract.js",
+      "engineer-brief-contract.js",
+      "index.js"
+    ],
+    "reasonCodeCount": 71,
+    "evidenceCategories": ["data_quality", "mapping_calibration", "driver_behaviour", "vehicle_response", "setup_model", "unknown"],
+    "evidenceCredibility": ["measured", "derived", "heuristic", "synthetic"],
+    "conclusionCredibility": ["Physics", "Model", "Measured", "Derived", "Heuristic", "Unavailable"],
+    "provenance": ["synthetic", "real", "unverified"],
+    "confidenceStates": ["unresolved", "not_computed"],
+    "priorityLadder": [
+      { "rank": 1, "key": "data_quality" },
+      { "rank": 2, "key": "mapping_calibration" },
+      { "rank": 3, "key": "controlled_repeat_lap" },
+      { "rank": 4, "key": "driver_experiment" },
+      { "rank": 5, "key": "setup_experiment" }
+    ],
+    "validationActionKinds": [
+      "fix_data_quality",
+      "recalibrate_channel",
+      "controlled_repeat_lap",
+      "driver_experiment",
+      "setup_experiment",
+      "collect_additional_session",
+      "collect_additional_lap",
+      "no_action_required"
+    ],
+    "applyModeAllowed": ["driver_action", "user_initiated"],
+    "applyModeForbidden": ["auto_tuning", "auto_setup", "auto_calibration", "auto_preset"]
+  },
+
+  "contractEnforcements": {
+    "closedKeySet": "Every contract module rejects any extra own key (UNKNOWN_OWN_KEY).",
+    "plainObjectOnly": "Object.getPrototypeOf must be Object.prototype or null; Proxy / class instance fails closed.",
+    "noProxyEscape": "Every validator wraps the descriptor reads in an outer try/catch; hostile getter / accessor throws collapse to a structured INTERNAL_CONTRACT_VIOLATION or specific *_INVALID code.",
+    "noSymbolKeys": "Object.keys + closed-allowlist enumeration ignore Symbol-keyed properties; non-enumerable extras are caught by descriptor checks.",
+    "noClassInstance": "Validators reject non-plain-prototype objects.",
+    "noDateMapSetTypedArray": "Validators reject non-plain-prototype objects.",
+    "noCycles": "evidence-node-contract self-reference check at D1; D2 graph builder will add deep-cycle detection.",
+    "noNaNInfinity": "Every numeric field passes _isFiniteNum (NUMERIC_INVALID).",
+    "stringByteCaps": "Per-field UTF-8 byte cap (STRING_BYTE_CAP=512; PARAMS_VALUE_BYTE_CAP=256).",
+    "arrayCaps": "Per-field array cap (EDGES_ARRAY_CAP=64; LIMITATIONS_ARRAY_CAP=32; ID_ARRAY_CAP=64; ALTERNATIVE_ARRAY_CAP=16).",
+    "graphCaps": "Decision input: NODES_CAP=256; HYPOTHESES_CAP=64; ALTERNATIVES_CAP=128; VALIDATION_ACTIONS_CAP=128; RECOMMENDATIONS_CAP=32.",
+    "envelopeCap": "Decision input total ENVELOPE_BYTE_CAP=256 KiB; Engineer Brief ENVELOPE_BYTE_CAP=64 KiB.",
+    "futureSchemaReject": "schemaVersion > SUPPORTED_SCHEMA_VERSION → UNSUPPORTED_FUTURE_SCHEMA.",
+    "prototypePollutionReject": "Plain-prototype check excludes objects whose prototype was manipulated.",
+    "causalOverclaimReject": "Hypothesis / Recommendation / Engineer Brief i18nKey + string params are lexically scanned for ['exact_cause', 'driver_fault', 'setup_caused', 'guaranteed_fix', 'professional_diagnosis', 'fastest_setup', 'theoretical_best']; any match → HYPOTHESIS_CAUSAL_OVERCLAIM. D1 enforces the lexical surface; D3 / Codex enforce the semantic.",
+    "confidenceForbidden": "Caller-supplied confidence at D1 MUST be { state: 'unresolved' | 'not_computed' } with no other own key. Any numeric `value` / `score` / `probability` → HYPOTHESIS_CONFIDENCE_FORBIDDEN. Numeric confidence is produced ONLY by D3 PRIORITY_ENGINE.",
+    "autoTuningForbidden": "Recommendation applyMode MUST be 'driver_action' or 'user_initiated'. Any auto_* value → matching RECOMMENDATION_AUTO_*_FORBIDDEN.",
+    "syntheticHonesty": "provenance='synthetic' MUST declare LIMITATION_SYNTHETIC_ONLY in node.limitations.",
+    "heuristicHonesty": "EVIDENCE credibility='heuristic' OR CONCLUSION credibility='Heuristic' MUST declare LIMITATION_HEURISTIC_ONLY in node/hypothesis.limitations.",
+    "briefMandatoryPresence": "Engineer Brief MUST carry the keys { contradictions, alternativeExplanations, cannotConcludeReasonCodes, limitations } even if empty arrays; omission triggers BRIEF_CONTRADICTION_HIDDEN / BRIEF_CANNOT_CONCLUDE_HIDDEN / BRIEF_LIMITATION_HIDDEN. Hidden contradictions is a contract-level violation, not a UI preference."
+  },
+
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3.0d-contract-foundation.test.js",
+    "newSuiteAssertions": 115,
+    "evidenceTier": "TIER 3 — Claude-verified on D1 branch HEAD; CI re-run on integrationSha is the authority for the Train target context."
+  },
+
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+
+  "codexVerdict": {
+    "verdict": "PENDING",
+    "rounds": [],
+    "tierDisclosure": "Codex D1 (the first R3.0D phase gate) will be invoked against the D1 branch candidate SHA. Tier 1 raw stdout MUST be captured and persisted under governance/r3.0d/codex-checkpoint-evidence/D1/round-N-<sha>.md for every round (BLOCK and PASS)."
+  },
+
+  "scopeBoundary": {
+    "frozenFilesUntouched": true,
+    "r30bPersistenceUntouched": true,
+    "r30cContractsUntouched": true,
+    "r30cProductionUntouched": true,
+    "featureRegistryUnchanged": true,
+    "noRendererJsRequiresContractsR30d": true,
+    "noIndexHtmlScriptSrcLoadsContractsR30d": true,
+    "runtimeConsumerCount": 0,
+    "productionPathCount": 0,
+    "algorithmCount": 0,
+    "uiSurfaceCount": 0
+  },
+
+  "frozenDiff": 0,
+  "productionDiff": null,
+  "runtimeConsumerCount": 0,
+  "featureRegistryState": {
+    "expectedDeferredIds": [],
+    "expectedRendererAdapter": false,
+    "note": "D1 is a contracts-only checkpoint. No R3.0D feature IDs are introduced into renderer/js/feature-registry.js. The D5 ACTIVATION checkpoint is the only authorised point to add R3.0D feature IDs (decision_engine / hypothesis / engineer_brief — names finalised at D5). Until then the feature registry remains R3.0A/B/C-only."
+  },
+  "crossPhaseGate": {
+    "r3cCheckpoint": "C8_ACTIVATION",
+    "requiredFor": "D1_CONTRACT_FOUNDATION",
+    "satisfied": true,
+    "note": "R3.0D D1 is a non-bootstrap checkpoint. Per governance/r3.0/train.schema.json crossPhaseAdvanceRequires.R3.0D = 'R3.0C:C8_ACTIVATION', the precondition is that governance/r3.0c/state.json.currentCheckpoint === 'C8_ACTIVATION'. This is satisfied: R3.0C completed via PR #20 merge on 2026-06-28; Train HEAD = f731887 (the D1 baseSha). See [[project-r3-0c]] for the R3.0C completion record."
+  },
+
+  "packageVersion": "1.4.0",
+  "createdAt": "2026-06-28T00:00:00Z",
+  "status": "candidate",
+  "governanceChanged": true,
+  "changedFiles": [
+    "contracts/r3.0d/reason-codes.js",
+    "contracts/r3.0d/credibility-contract.js",
+    "contracts/r3.0d/source-identity-contract.js",
+    "contracts/r3.0d/evidence-node-contract.js",
+    "contracts/r3.0d/hypothesis-contract.js",
+    "contracts/r3.0d/recommendation-contract.js",
+    "contracts/r3.0d/decision-input-contract.js",
+    "contracts/r3.0d/engineer-brief-contract.js",
+    "contracts/r3.0d/index.js",
+    "tests/r3.0d-contract-foundation.test.js",
+    "governance/r3.0d/state.json",
+    "governance/r3.0d/checkpoints/D1.json",
+    "governance/r3.0/train.json",
+    "package.json"
+  ],
+
+  "note": "D1_CONTRACT_FOUNDATION — the first non-bootstrap R3.0D checkpoint. Lifts ONE governance/contract capability (contract_foundation_present); enables NO production capability. NO authorizedProductionPath is added. NO renderer/js file requires contracts/r3.0d. NO index.html script src loads contracts/r3.0d. The eight contract modules under contracts/r3.0d/ define the closed-schema universe (EvidenceNode + Observation + Hypothesis + Contradiction + AlternativeExplanation + ValidationAction + Recommendation + Priority + Engineer Brief + SourceIdentity + Credibility + Confidence + Availability) that D2 EVIDENCE_GRAPH, D3 PRIORITY_ENGINE, D4 ENGINEER_BRIEF will produce/consume. D1 enforces: closed key sets, plain objects only, no Proxy escape, no numeric confidence at the caller layer, no auto_tuning, no causal-overclaim lexical wording, synthetic+heuristic limitation honesty, bounded string/array/envelope caps, fail-closed default. C-B Codex review runs against the exact D1 candidate SHA; tier-1 raw stdout to be persisted under governance/r3.0d/codex-checkpoint-evidence/D1/."
+}

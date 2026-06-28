@@ -119,14 +119,18 @@ R30C_IDS.forEach(function (id) {
 })();
 
 (function () {
+  // R3.0C-specific assertions on the train state. After R3.0D D1 advances the train, train.currentPhase
+  // moves to R3.0D and train.currentPhaseCheckpoint becomes the active R3.0D checkpoint. R3.0C state
+  // however remains pinned at C8_ACTIVATION / finalActivationReached=true (R3.0C is complete). The
+  // tests below assert what is INVARIANT — R3.0C is done — without false-failing when R3.0D advances.
   const train = JSON.parse(fs.readFileSync(path.join(REPO, 'governance', 'r3.0', 'train.json'), 'utf8'));
-  chk('train.currentPhaseCheckpoint=C8_ACTIVATION', train.currentPhaseCheckpoint === 'C8_ACTIVATION');
   const r3c = train.phaseStates && train.phaseStates['R3.0C'];
   chk('train.phaseStates.R3.0C.currentCheckpoint=C8_ACTIVATION', r3c && r3c.currentCheckpoint === 'C8_ACTIVATION');
   chk('train.phaseStates.R3.0C.finalActivationReached=true', r3c && r3c.finalActivationReached === true);
   chk('train.phaseStates.R3.0C.finalActivationCheckpoint=C8_ACTIVATION', r3c && r3c.finalActivationCheckpoint === 'C8_ACTIVATION');
-  // R3.0D / R3.0E / R3.0F MUST still be NOT started.
-  ['R3.0D', 'R3.0E', 'R3.0F'].forEach(function (p) {
+  chk('train.currentPhase=R3.0C OR train has advanced to a later phase', train.currentPhase === 'R3.0C' || ['R3.0D', 'R3.0E', 'R3.0F'].indexOf(train.currentPhase) !== -1);
+  // R3.0E / R3.0F MUST still be NOT started (only R3.0D may have started after R3.0C).
+  ['R3.0E', 'R3.0F'].forEach(function (p) {
     const s = train.phaseStates && train.phaseStates[p];
     chk('train.phaseStates.' + p + '.started=false', s && s.started === false);
     chk('train.phaseStates.' + p + '.finalActivationReached=false', s && s.finalActivationReached === false);

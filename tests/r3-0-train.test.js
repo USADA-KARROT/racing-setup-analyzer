@@ -69,7 +69,7 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
   chk('PASS real repo rc=0', r.status === 0, { violations: r.artifact && r.artifact.violations });
   chk('PASS artifact ok=true', r.artifact && r.artifact.ok === true);
   chk('PASS trainStatus=IN_PROGRESS', r.artifact && r.artifact.trainStatus === 'IN_PROGRESS');
-  chk('PASS currentPhase=R3.0C', r.artifact && r.artifact.currentPhase === 'R3.0C');
+  chk('PASS currentPhase is a valid R3.0 phase', r.artifact && ['R3.0C', 'R3.0D', 'R3.0E', 'R3.0F'].indexOf(r.artifact.currentPhase) !== -1);
   chk('PASS targetVersion=2.0.0', r.artifact && r.artifact.targetVersion === '2.0.0');
   chk('PASS targetTag=v2.0.0', r.artifact && r.artifact.targetTag === 'v2.0.0');
   chk('PASS intermediateReleaseAllowed=false', r.artifact && r.artifact.intermediateReleaseAllowed === false);
