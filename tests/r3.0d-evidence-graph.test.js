@@ -1879,5 +1879,98 @@ function freshInput(over) {
   chk('RN-27 post-clock: in-clock Math.floor rebind caught by Step 17.6', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
 })();
 
+// ── Section Z — Codex D2 Round 14 finding closures (self-restoring trap + Object.getOwnPropertyNames) ──
+(function sectionZ_RN21_selfRestoringTrap() {
+  // RN-21 STILL-OPEN at Round 14 (Codex evidence on 092f262): a Proxy on rawEvidence with a
+  // `getOwnPropertyDescriptor` trap on key "0" installs a one-shot hostile
+  // `Array.prototype.push` and SELF-RESTORES on the next trap fire (e.g. when iteration reads
+  // index "1" descriptor). Between install and restore, contract validation uses the hostile
+  // push (suppressing EVIDENCE_CATEGORY_UNKNOWN). Both Step 3.5 and Step 17.6 see clean state.
+  //
+  // Round 15 fix: per-iteration integrity check INSIDE the loop, after each per-rawEvidence
+  // descriptor read + contract validation. Runs while the rebind is still in effect (BEFORE
+  // the next iteration's trap fire restores it). Catches self-restoring tampering at the
+  // narrowest possible window.
+  function bad() {
+    return Object.assign(freshNode(), { category: 'forbidden_category' });
+  }
+  const origPush = Array.prototype.push;
+  const target = [bad()];
+  const p = new Proxy(target, {
+    getOwnPropertyDescriptor(t, k) {
+      if (k === '0') {
+        Array.prototype.push = function () { return 0; }; // hostile install
+        const d = Object.getOwnPropertyDescriptor(t, k);
+        return d;
+      }
+      return Object.getOwnPropertyDescriptor(t, k);
+    },
+  });
+  let attacked;
+  try {
+    attacked = EG.buildEvidenceGraph(freshInput({ rawEvidence: p }), {
+      clock: function () { Array.prototype.push = origPush; return NOW; },
+    });
+  } finally { Array.prototype.push = origPush; }
+  chk('RN-21 self-restoring: per-iteration guard catches mid-iter rebind (BLOCK)', attacked.eligible === false && Array.isArray(attacked.reasonCodes) && attacked.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+  chk('RN-21 self-restoring: detail mentions mid-iteration', typeof attacked.detail === 'string' && /mid-iteration/.test(attacked.detail));
+  chk('RN-21 self-restoring: no graph leaked', attacked.result === null);
+})();
+
+(function sectionZ_RN27_selfRestoringNumberIsInteger() {
+  const origIsInt = Number.isInteger;
+  const target = [Object.assign(freshNode(), { schemaVersion: NaN })];
+  const p = new Proxy(target, {
+    getOwnPropertyDescriptor(t, k) {
+      if (k === '0') {
+        Number.isInteger = function () { return true; };
+        return Object.getOwnPropertyDescriptor(t, k);
+      }
+      return Object.getOwnPropertyDescriptor(t, k);
+    },
+  });
+  let attacked;
+  try {
+    attacked = EG.buildEvidenceGraph(freshInput({ rawEvidence: p }), {
+      clock: function () { Number.isInteger = origIsInt; return NOW; },
+    });
+  } finally { Number.isInteger = origIsInt; }
+  chk('RN-27 self-restoring: Number.isInteger mid-iter rebind caught (BLOCK)', attacked.eligible === false && Array.isArray(attacked.reasonCodes) && attacked.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+})();
+
+(function sectionZ_RN28_selfRestoringTextEncoder() {
+  const origTE = globalThis.TextEncoder;
+  const target = [Object.assign(freshNode(), { observation: { kind: 'metric_value', i18nKey: 'x'.repeat(513), params: null, channel: 'speed' } })];
+  const p = new Proxy(target, {
+    getOwnPropertyDescriptor(t, k) {
+      if (k === '0') {
+        globalThis.TextEncoder = function () { return { encode(s) { return { length: 0 }; } }; };
+        return Object.getOwnPropertyDescriptor(t, k);
+      }
+      return Object.getOwnPropertyDescriptor(t, k);
+    },
+  });
+  let attacked;
+  try {
+    attacked = EG.buildEvidenceGraph(freshInput({ rawEvidence: p }), {
+      clock: function () { globalThis.TextEncoder = origTE; return NOW; },
+    });
+  } finally { globalThis.TextEncoder = origTE; }
+  chk('RN-28 self-restoring: TextEncoder mid-iter rebind caught (BLOCK)', attacked.eligible === false && Array.isArray(attacked.reasonCodes) && attacked.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+})();
+
+(function sectionZ_RN30_objectGetOwnPropertyNames() {
+  // RN-30 NEW at Round 14: Object.getOwnPropertyNames used by contract for hidden-key
+  // detection. Rebinding to Object.keys (which skips non-enumerable) bypasses hidden-key
+  // rejection. Round 15 closure: add to integrity guard.
+  const origGOPN = Object.getOwnPropertyNames;
+  let r;
+  try {
+    Object.getOwnPropertyNames = Object.keys;
+    r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK });
+  } finally { Object.getOwnPropertyNames = origGOPN; }
+  chk('RN-30: Object.getOwnPropertyNames rebinding caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+})();
+
 console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
 if (fail > 0) process.exit(1);

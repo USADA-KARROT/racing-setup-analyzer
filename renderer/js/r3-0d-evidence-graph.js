@@ -135,6 +135,7 @@
   var _ObjectCreate = Object.create;
   var _ObjectDefineProperty = Object.defineProperty;
   var _ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+  var _ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
   var _ObjectGetPrototypeOf = Object.getPrototypeOf;
   var _ObjectPrototypeHasOwnProperty = Object.prototype.hasOwnProperty;
   var _ArrayIsArray = Array.isArray;
@@ -240,6 +241,7 @@
         objCreate: _readDescVal(_Object, 'create'),
         objDefineProperty: _readDescVal(_Object, 'defineProperty'),
         objGetOwnPropertyDescriptor: _readDescVal(_Object, 'getOwnPropertyDescriptor'),
+        objGetOwnPropertyNames: _readDescVal(_Object, 'getOwnPropertyNames'),
         objGetPrototypeOf: _readDescVal(_Object, 'getPrototypeOf'),
         objProtoHasOwn: _readDescVal(_ObjectGetPrototypeOf({}), 'hasOwnProperty'),
         arrIsArray: _readDescVal(_Array, 'isArray'),
@@ -299,6 +301,7 @@
         && s.objCreate === _ObjectCreate
         && s.objDefineProperty === _ObjectDefineProperty
         && s.objGetOwnPropertyDescriptor === _ObjectGetOwnPropertyDescriptor
+        && s.objGetOwnPropertyNames === _ObjectGetOwnPropertyNames
         && s.objGetPrototypeOf === _ObjectGetPrototypeOf
         && s.objProtoHasOwn === _ObjectPrototypeHasOwnProperty
         && s.arrIsArray === _ArrayIsArray
@@ -1119,6 +1122,32 @@
           rejectedCount++; tally(CODES.EVIDENCE_IMPORTED_SUMMARY_ELEVATION_FORBIDDEN); continue;
         }
         _arrPush(sanitized, san);
+        // Codex D2 Round 14 RN-21/27/28/29 (self-restoring trap) closure: re-check intrinsic
+        // integrity AFTER each per-rawEvidence iteration. A Proxy trap (e.g.
+        // [[GetOwnProperty]] on rawEvidence[i]) can install a hostile binding, let contract
+        // validation use it during this iteration, and SELF-RESTORE on the NEXT iteration's
+        // trap fire — making both the loop-exit (Step 3.5) and post-clock (Step 17.6) guards
+        // see a clean state. The per-iteration check runs WHILE the rebind is still in effect
+        // (before the next trap fires the restoration), so any self-restoring tampering is
+        // caught immediately and fails-closed BLOCK. This is necessarily more expensive than
+        // a single loop-exit check but is the only correct defence for the self-restoring
+        // attack class identified in Codex Round 14.
+        if (!_intrinsicsIntact()) {
+          var perIterReasonCodes = [];
+          _ObjectDefineProperty(perIterReasonCodes, 0, { value: CODES.INTERNAL_CONTRACT_VIOLATION, writable: true, enumerable: true, configurable: true });
+          _ObjectFreeze(perIterReasonCodes);
+          var perIterExplanationKeys = [];
+          _ObjectDefineProperty(perIterExplanationKeys, 0, { value: 'r3_0d.reason.internal_contract_violation', writable: true, enumerable: true, configurable: true });
+          _ObjectFreeze(perIterExplanationKeys);
+          return _ObjectFreeze({
+            eligible: false,
+            status: 'blocked',
+            reasonCodes: perIterReasonCodes,
+            explanationKeys: perIterExplanationKeys,
+            detail: 'intrinsic-tampering detected mid-iteration: a Proxy/getter trap rebound a captured global primitive method during per-node validation at index ' + i,
+            result: null,
+          });
+        }
       }
 
       // Step 3.5 — Codex D2 Round 13 RN-21/27 closure: re-check intrinsic integrity AFTER all
