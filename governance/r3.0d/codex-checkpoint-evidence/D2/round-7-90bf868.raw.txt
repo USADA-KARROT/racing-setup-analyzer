@@ -1,0 +1,1925 @@
+Reading prompt from stdin...
+OpenAI Codex v0.141.0
+--------
+workdir: /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 019f0ee9-708c-7861-af26-403bab3118fc
+--------
+user
+# Codex D2 Checkpoint Adversarial Review — Round 7
+
+Round history:
+- Round 1 (10766c0) → BLOCK 12 findings (RN-01..RN-12)
+- Round 2 (ad6474a) → BLOCK 6 closed + 6 still-open
+- Round 3 (63ecf69) → BLOCK 5 closed + RN-09 still-open + RN-13/14 NEW
+- Round 4 (e84d22c) → BLOCK RN-09 + RN-14 closed + RN-13 round-3 still-open + RN-15 NEW
+- Round 5 (ec00b88) → BLOCK RN-13 round-4 STILL-OPEN + RN-15 round-4 STILL-OPEN, no new
+- Round 6 (d7c045f) → BLOCK RN-15 round-4 CLOSED + RN-13 round-4 STILL-OPEN + RN-16/RN-17 NEW
+
+## Round 7 target
+
+- Round 7 candidate SHA: **`90bf8684bc69647587c43262bc99e8ff0bb11a7f`**
+- Train base: `feat/r3.0-integrated-delivery` HEAD = `f8a598b84c19517fe55b77877b91462e295f27ed`
+
+Single new commit on top of Round 6: `90bf868 cp6r(d2): close Codex D2 Round 6 — RN-13 round-4 final (defineProperty) + RN-16 (estimator) + RN-17 (DEL)`.
+
+Round 6 evidence is persisted at `governance/r3.0d/codex-checkpoint-evidence/D2/round-6-d7c045f.raw.txt` (Tier 1).
+
+## Round 7 closures
+
+**RN-13 round-4 (3rd carry-over; final defense via [[DefineOwnProperty]])**
+
+Round 6 evidence:
+```
+Object.defineProperty(Array.prototype, "0", {
+  configurable: true,
+  set: function () {
+    Object.defineProperty(this, "0", { value: {tampered:true}, ... });
+  },
+  get: function () { return undefined; }
+});
+```
+installed inside the clock callback. `out[i] = arr[i]` on freshly-created `out = []` walks the prototype chain (no own descriptor at 0), invokes the setter on `out` as receiver, which installs its own data descriptor with `{tampered:true}`. Round 6 result: `nodes/correlationGroups/topology = [{tampered:true}]`, entries unfrozen.
+
+Round 7 fix in `renderer/js/r3-0d-evidence-graph.js`:
+1. Capture `_ObjectDefineProperty = Object.defineProperty` at module init (alongside the existing _ObjectFreeze / _ObjectAssign / _ObjectKeys / _ObjectCreate / _ObjectGetOwnPropertyDescriptor / etc captures).
+2. `_safeSlice` and `_safeMap` use `_ObjectDefineProperty(out, i, { value, writable: true, enumerable: true, configurable: true })` for indexed assignment. Per ES spec §10.1.6 [[DefineOwnProperty]] directly installs an own data descriptor without invoking the [[Set]] protocol or any prototype-chain accessor.
+3. `_materializeGraph`'s two programmatic keyed assignments (the `copy[kk[i]] = r[kk[i]]` loop for `rejectedSourceReplays` and the `rrsCopy[rrsKeys[ri]] = ...` loop for `rejectedReasonsSummary`) also use `_ObjectDefineProperty`. The two `{}` targets are moved to `Object.create(null)` so Object.prototype is not in their chain at all.
+
+Verify the Array.prototype["0"] setter exploit AND symmetric Object.prototype[<reasonCode>] setter exploit can no longer corrupt the materialized graph.
+
+**RN-16 NEW (estimator structural undercount)**
+
+Round 6 evidence: 35 nodes × 30 ASCII params × 225 chars passes Step 4.5 (~256 KB estimated) and fails Step 17 (post-canonical) at 265,511 bytes. The previous `_estimateNodeUtf8Bytes` approximation summed `_jsonStringWidth` across SELECTED fields and missed structural overhead: top-level keys (`"nodeId":`, `"category":`, etc.), nested object braces, inter-field commas — combined ~300 bytes per node undercount × 35 = ~10 KB undercount.
+
+Round 7 fix:
+1. `_estimateNodeUtf8Bytes(node)` replaced with `_utf8len(_JSONStringify(_perNodeIdPayloadShape(node)))`. Both intrinsics are captured at module init.
+2. `_perNodeIdPayloadShape(n)` builds the SAME shape that Step 16's idPayload mapping constructs per node (mirrored field-for-field). This means the per-node JSON size estimate is EXACT for the bytes that node will contribute to Step 17's `_JSONStringify(idPayload)` envelope.
+3. Step 4.5's running total now starts at `WRAPPER_FIXED_BYTES = 256` (caseAssociation + outer envelope JSON syntax) and adds +1 per inter-node comma. Step 17 remains the authoritative post-canonical envelope check.
+
+Verify a 35×30×225 ASCII payload now trips Step 4.5 (BYTE_CAP_EXCEEDED, "pre-canonicalization byte estimate exceeded") instead of reaching Step 17.
+
+**RN-17 NEW (DEL over-rejection)**
+
+Round 6 evidence: 35 × 30 × 70 DEL (U+007F) chars rejected pre-canonicalization. Actual JSON of the input is only 101,214 bytes (well under 256 KB cap). Per ES §25.5.2.2 Quote(value), only U+0000..U+001F (plus `"` and `\`) MUST be escaped; DEL passes through as 1 byte (no escape).
+
+Round 7 fix: remove `|| c === 0x7F` from `_jsonStringWidth`'s control-char branch. DEL now falls into the ASCII printable branch (`c < 0x80 → n += 1`).
+
+Verify a DEL-heavy 101 KB payload now BUILDS successfully (35 nodes, valid graph).
+
+## Adversarial sweep — your task
+
+For each round-6 finding:
+```
+D2-RN-NN: CLOSED | STILL-OPEN
+  evidence: <one-line proof or surviving attack vector>
+```
+
+Plus, do a fresh adversarial sweep on the round-7 changes:
+
+1. RN-13 (defineProperty defense): Are there ANY remaining indexed or keyed assignments in the post-clock code path that go through OrdinarySet rather than [[DefineOwnProperty]]?
+   - Inner `_safeMap` callbacks: `_ObjectFreeze({correlationGroupId, memberNodeIds, independenceWeight})` etc. — these are OBJECT LITERALS, which use [[CreateDataPropertyOrThrow]] which IS [[DefineOwnProperty]]. Safe by spec, but verify.
+   - `addEdge` (Step 9): `adjacencyCausal[from].push(to)` — uses Array.prototype.push. Is this in the post-clock path? (Edges are built in Step 9, BEFORE clock fires in Step 17.5. So safe.)
+   - Any prototype-chain access via `Object.prototype.hasOwnProperty.call(...)` — could a hostile clock replace Object.prototype.hasOwnProperty? (The helper is called BEFORE clock fires; but if called AFTER, the captured `_ObjectPrototypeHasOwnProperty` ref must be used.)
+   - Cross-check: are `Object.defineProperty(Array.prototype, "length", ...)`, `Object.defineProperty(Array.prototype, <integer>, ...)`, or `Object.defineProperty(Object.prototype, <key>, ...)` all neutralized by the defineProperty bypass?
+
+2. RN-16 (exact estimator): Does `_perNodeIdPayloadShape` exactly mirror the Step 16 idPayload shape? Are there any fields included in Step 16 but missing from `_perNodeIdPayloadShape` (which would let an attacker inflate Step 17 bytes via that field without being counted in Step 4.5)? Conversely, any extra field in `_perNodeIdPayloadShape` not in Step 16 (which would over-reject)? Is the WRAPPER_FIXED_BYTES = 256 enough to cover the caseAssociation + outer envelope + edges/correlationGroups arrays?
+
+3. RN-17 (DEL): Are there any other characters that the estimator now MIS-counts? Specifically:
+   - U+007F (DEL) — now 1 byte ✓
+   - U+0080..U+009F (C1 control range) — JSON.stringify does NOT escape these; they encode as 2-byte UTF-8 → my estimator returns `n += 2` (UTF-8 2-byte branch). ✓
+   - U+200E / U+200F (LRM/RLM) — non-control, valid BMP → `n += 3`. Are they actually 3 UTF-8 bytes? Yes (in 0x800..0xFFFF range).
+   - Other PUA / private-use code points?
+
+4. Are there any new intrinsic poisoning vectors? `_perNodeIdPayloadShape` runs BEFORE clock (Step 4.5 is before Step 17.5). `_estimateNodeUtf8Bytes` invokes `_JSONStringify` and `_utf8len` — both captured. Safe.
+
+5. Does the change preserve determinism (graphId)? The graphId derivation at Step 16 is unchanged. Only the estimator at Step 4.5 changed.
+
+6. Are there any DoS vectors? `_JSONStringify(perNode)` is O(node-size); summed across nodes is O(total-input-size). Same complexity as the previous estimator. No new pathological case.
+
+## Output format
+
+```
+FINAL VERDICT: PASS | BLOCK
+
+<For each round-6 finding (RN-13 round-4 / RN-16 / RN-17):>
+D2-RN-NN: CLOSED | STILL-OPEN
+  evidence: ...
+
+<For each NEW finding (if any):>
+Finding D2-RN-NN (NEW): ...
+```
+
+`FINAL VERDICT: PASS` only if every round-6 finding is CLOSED and no NEW finding is introduced.
+
+codex
+I’m using the GitHub triage skill to inspect the candidate commit and its exact diff against Round 6, then I’ll run focused exploit and boundary tests locally.
+exec
+/bin/bash -lc "sed -n '1,240p' '/Users/SKYLINE/.codex/plugins/cache/openai-curated-remote/github/0.1.5/skills/github/SKILL.md'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+---
+name: github
+description: Triage and orient GitHub repository, pull request, and issue work through the connected GitHub app. Use when the user asks for general GitHub help, wants PR or issue summaries, or needs repository context before choosing a more specific GitHub workflow.
+---
+
+# GitHub
+
+## Overview
+
+Use this skill as the umbrella entrypoint for general GitHub work in this plugin. It should decide whether the task stays in repo and PR triage or should be handed off to a more specific review, CI, or publish workflow.
+
+This plugin is intentionally hybrid:
+
+- Prefer the GitHub app from this plugin for repository, issue, pull request, comment, label, reaction, and PR creation workflows.
+- Use local `git` and `gh` only when the connector does not cover the job well, especially for current-branch PR discovery, branch creation, commit and push, `gh auth status`, and GitHub Actions log inspection.
+- Keep connector state and local checkout context aligned. If the request is about the current branch, resolve the local repo and branch before acting.
+
+Once the intent is clear, route to the specialist skill immediately and do not keep broad GitHub triage in scope longer than needed.
+
+## Connector-First Responsibilities
+
+Handle these directly in this skill when the request does not need a narrower specialist workflow:
+
+- repository orientation once the repo, PR, issue, or local checkout is identified
+- recent PR or issue triage
+- PR metadata summaries
+- PR patch inspection
+- PR comments, labels, and reactions
+- issue lookup and summarization
+- PR creation after a branch is already pushed
+
+Prefer the GitHub app from this plugin for those flows because it provides structured PR, issue, and review-adjacent data without depending on a local checkout. If the repository is not already identifiable from the user request or local git context, ask for the repo instead of pretending there is a repo-search flow that may not exist.
+
+## Routing Rules
+
+1. Resolve the operating context first:
+   - If the user provides a repository, PR number, issue number, or URL, use that.
+   - If the request is about "this branch" or "the current PR", resolve local git context and use `gh` only as needed to discover the branch PR.
+   - If the repository is still ambiguous after local inspection, ask for the repo identifier.
+2. Classify the request before taking action:
+   - `repo or PR triage`: summarize PRs, issues, patches, comments, labels, reactions, or repository state
+   - `review follow-up`: unresolved review threads, requested changes, or inline review feedback
+   - `CI debugging`: failing checks, Actions logs, or CI root-cause analysis
+   - `publish changes`: create or switch branches, stage changes, commit, push, and open a draft PR
+3. Route to the specialist skill as soon as the category is clear:
+   - Review comments and requested changes: `../gh-address-comments/SKILL.md`
+   - Failing GitHub Actions checks: `../gh-fix-ci/SKILL.md`
+   - Commit, push, and open PR: `../yeet/SKILL.md`
+4. Keep the hybrid model consistent after routing:
+   - connector first for PR and issue data
+   - local `git` and `gh` only for the specific gaps the connector does not cover
+
+## Default Workflow
+
+1. Resolve repository and item scope.
+2. Gather structured PR or issue context through the GitHub app from this plugin.
+3. Decide whether the task stays in connector-backed triage or needs a specialist skill.
+4. Route immediately when the work becomes review follow-up, CI debugging, or publish workflow.
+5. End with a clear summary of what was inspected, what changed, and what remains.
+
+## Output Expectations
+
+- For triage requests, return a concise summary of the repository, PR, or issue state and the next likely action.
+- For mixed requests, tell the user which specialist path you are taking and why.
+- For connector-backed write actions, restate the exact PR, issue, label, or reaction target before applying the change.
+- Never imply that GitHub Actions logs are available through the connector alone. That remains a `gh` workflow.
+
+## Examples
+
+- "Use GitHub to summarize the open PRs in this repo and tell me what needs attention."
+- "Help with this PR."
+- "Review the latest comments on PR 482 and tell me what is actionable."
+- "Debug the failing checks on this branch."
+- "Commit these changes, push them, and open a draft PR."
+
+exec
+/bin/bash -lc 'git status --short && git rev-parse HEAD && git show --stat --oneline --decorate --no-renames 90bf8684bc69647587c43262bc99e8ff0bb11a7f && git diff --no-ext-diff --unified=80 d7c045f..90bf8684bc69647587c43262bc99e8ff0bb11a7f -- renderer/js/r3-0d-evidence-graph.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-VEciqjIl' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-H7Liovfw' (errno=Operation not permitted)
+?? governance/r3.0d/codex-checkpoint-evidence/D2/round-7-90bf868.raw.txt
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-grYORdDN' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-ETtPKtJp' (errno=Operation not permitted)
+90bf8684bc69647587c43262bc99e8ff0bb11a7f
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-Xzrl6Zev' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-zoUrJQ3E' (errno=Operation not permitted)
+90bf868 (HEAD -> feat/r3.0d-d2-evidence-graph, origin/feat/r3.0d-d2-evidence-graph) cp6r(d2): close Codex D2 Round 6 — RN-13 round-4 final (defineProperty) + RN-16 (estimator) + RN-17 (DEL)
+ governance/r3.0d/checkpoints/D2.json               |   22 +-
+ .../D2/round-6-d7c045f.raw.txt                     | 2599 ++++++++++++++++++++
+ renderer/js/r3-0d-evidence-graph.js                |  223 +-
+ tests/r3.0d-evidence-graph.test.js                 |  146 ++
+ 4 files changed, 2904 insertions(+), 86 deletions(-)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-wF1D7mvi' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-uS8XDKZA' (errno=Operation not permitted)
+diff --git a/renderer/js/r3-0d-evidence-graph.js b/renderer/js/r3-0d-evidence-graph.js
+index 5982cc5..7249682 100644
+--- a/renderer/js/r3-0d-evidence-graph.js
++++ b/renderer/js/r3-0d-evidence-graph.js
+@@ -1,389 +1,431 @@
+ /**
+  * renderer/js/r3-0d-evidence-graph.js — R3.0D D2 · Evidence Graph Service.
+  *
+  * Builds the Evidence Graph from caller-supplied raw evidence-node candidates. Every node enters
+  * the graph ONLY via the D1 evidence-node contract's structural validator
+  * (R3_0D_EvidenceNodeContract.validateEvidenceNodeShape) — the builder NEVER trusts a caller
+  * object directly. The graph output is a deep-frozen immutable structure whose downstream
+  * consumers (D3 hypothesis engine, D4 priority engine, D5 engineer brief) can rely on for
+  * deterministic semantics.
+  *
+  * Hard rules (R3.0D D2 EVIDENCE GRAPH):
+  *   • Dedup is by both nodeId AND a SEMANTIC CANONICAL STRING (not just a 64-bit hash) — the
+  *     full canonical serialization of (source identity + observation + category + nodeId) is the
+  *     dedup key, so two distinct observations cannot collide under the dedup map even if their
+  *     hash matches.
+  *   • A renamed-id source replay (same canonical content under different nodeId) is rejected as
+  *     EVIDENCE_GRAPH_DUPLICATED_SOURCE_DOUBLECOUNT.
+  *   • Correlation grouping: nodes sharing the same (caseId, sessionId, lapId, sourceId) are placed
+  *     in a single correlation group; independenceWeight = 1 / groupSize so a 4-derived-metrics
+  *     source does not present as four independent supports.
+  *   • Edge kinds are a closed enum {supports, contradicts, derived_from, correlated_with,
+  *     invalidates}. supports/contradicts come from per-node supportingEdges/contradictingEdges (D1
+  *     sanitized fields); correlated_with is emitted SINGLE canonical-direction (from = smaller
+  *     nodeId, to = larger) so symmetric correlation does NOT trip cycle detection on its own.
+  *     derived_from + invalidates are reserved for future inputs (D2 emits NONE today).
+  *   • Orphan edges (supportingEdges / contradictingEdges referencing an unknown nodeId) → fail-
+  *     closed EVIDENCE_GRAPH_ORPHAN.
+  *   • Self-edges are already caught at D1 (EVIDENCE_GRAPH_SELF_REFERENCE); the builder additionally
+  *     re-checks after dedup so a renamed-id source replay cannot smuggle a self-edge through.
+  *   • Cycle detection: over CAUSAL edges only (supports + contradicts); a directed cycle → fail-
+  *     closed EVIDENCE_GRAPH_CYCLE. correlated_with is excluded (symmetric / non-causal).
+  *   • Association binding: every sanitized node's identity.caseId / sessionId MUST equal the
+  *     envelope's caseAssociation; per-node rejection on mismatch.
+  *   • Imported-summary elevation: an evidence node with sourceId === 'imported_summary' MUST NOT
+  *     present credibility > 'derived' — sanitized.credibility === 'measured' for that source is
+  *     rejected as EVIDENCE_IMPORTED_SUMMARY_ELEVATION_FORBIDDEN.
+  *   • Determinism: independent of caller permutation of rawEvidence. The post-validation sanitized
+  *     array is sorted by canonical content BEFORE dedup; the dedup winner is therefore the same
+  *     regardless of input order. Same sanitized input → same graphId / node order / edge order /
+  *     topological order / correlation order / dedup summary. The clock is INJECTABLE
+  *     (opts.clock()); createdAt reflects the injected value; graphId is INDEPENDENT of the clock.
+  *   • Deep freeze: the entire returned graph (including every nested array / object, including
+  *     correlationGroup.memberNodeIds) is frozen so a caller holding the result cannot mutate
+  *     downstream consumer input.
+  *
+  * Codex D2 Round 1 closures embedded (RN-01..RN-12):
+  *   RN-01: envelope is snapshot ONCE via descriptor-safe per-field reads + RC.toCleanCopy on
+  *          caseAssociation BEFORE any subsequent property read; no TOCTOU window.
+  *   RN-02: each rawEvidence array index descriptor is inspected without invoking accessors; an
+  *          accessor / sparse / inherited slot is rejected as ONE node (PROTOTYPE_POLLUTION_REJECTED),
+  *          not as a whole-build INTERNAL_CONTRACT_VIOLATION.
+  *   RN-03: sanitized candidates are sorted by canonical content BEFORE dedup; caller permutation
+  *          cannot change which duplicate wins or whether a real cycle is detected.
+  *   RN-04: dedup map keys are FULL canonical serialization strings, not 64-bit hashes; distinct
+  *          observations cannot collide.
+  *   RN-05: correlationGroup.memberNodeIds is Object.freeze'd before its enclosing group object.
+  *   RN-06: opts.clock() is invoked AFTER input envelope validation succeeds, via a descriptor-safe
+  *          read on opts.clock; a throwing opts getter → createdAt = null (fail-soft on clock only).
+  *   RN-07: helper functions _stableStringify / _semanticCanonical / _correlationGroupKey are NO
+  *          LONGER exported — production surface is buildEvidenceGraph + constants only.
+  *   RN-08: every node-indexed map uses Object.create(null) (or a Map) so a valid nodeId like
+  *          'constructor' cannot collide with Object.prototype keys.
+  *   RN-09: ENVELOPE_BYTE_CAP (256 KiB) is implemented and enforced post-sanitization (safe to
+  *          JSON.stringify because sanitized values are guaranteed plain frozen primitives). A
+  *          per-observation parameter-key cap (PARAMS_KEYS_CAP = 32) is enforced at the per-node
+  *          step BEFORE the byte cap, so an attacker cannot inflate the params map indefinitely.
+  *   RN-10: closure on commit `51155b3` script behaviour — addressed in
+  *          scripts/check-r3-phase-no-consumer.js (strict entry-shape validation + path grammar +
+  *          duplicate detection; any malformed entry → fail-closed).
+  *   RN-11: closure on commit `51155b3` script behaviour — addressed in the script via a secondary
+  *          string-concatenation-near-require detector that flags
+  *          PROD_SUSPECTED_DYNAMIC_PHASE_REQUIRE for any production file containing both a non-
+  *          literal require/import callsite AND a literal `r3.0d` / `r3.0e` / `r3.0f` substring.
+  *   RN-12: D2 manifest changedFiles now lists every file in the baseSha → reviewedCandidateSha
+  *          diff (including the separate guard-enhancement commit and the cross-phase rename
+  *          commit), populated in governance/r3.0d/checkpoints/D2.json.
+  *
+- * Codex D2 Round 5 closures embedded (RN-13 round-4 + RN-15 round-4):
+- *   RN-13 round-4 (round-5 closure): `_safeSlice` / `_safeMap` no longer go through
+- *          `Function.prototype.call`. A hostile opts.clock cannot inject `{tampered:true}`
+- *          entries into nodes / correlationGroups / topologicalOrder by reassigning
+- *          `Function.prototype.call`. The helpers use direct indexed reads/writes only.
+- *   RN-15 round-4 (round-5 closure): `_jsonStringWidth` now accounts for lone surrogates
+- *          (high or low) as 6 bytes each (`\uXXXX` JSON escape). The previous implementation
+- *          undercount lone low surrogates as 3 bytes (BMP 3-byte UTF-8). The Round 5 exploit
+- *          (35×30×70 lone low surrogate values) is rejected at Step 4.5 (per-node running
+- *          total) instead of slipping through to Step 17 (post-canonical envelope cap).
++ * Codex D2 Round 6 closures embedded (RN-13 round-4 final / RN-16 NEW / RN-17 NEW):
++ *   RN-13 round-4 (Round 6 / Round 7 final closure): `_safeSlice` / `_safeMap` plus the two
++ *          `_materializeGraph` programmatic keyed assignments (`copy[k] = r[k]` for
++ *          rejectedSourceReplays + `rrsCopy[k] = ...` for rejectedReasonsSummary) now use
++ *          captured `_ObjectDefineProperty` to install own data descriptors via
++ *          [[DefineOwnProperty]]. A hostile clock installing
++ *          `Object.defineProperty(Array.prototype, "0", { set: ... })` (or any prototype-chain
++ *          accessor on Array.prototype / Object.prototype) cannot intercept the assignment
++ *          because [[DefineOwnProperty]] bypasses the [[Set]] protocol entirely.
++ *   RN-15 round-4 (Round 5 closure): `_jsonStringWidth` accounts for lone surrogates (high or
++ *          low) as 6 bytes each (`\uXXXX` JSON escape).
++ *   RN-16 NEW (Round 7 closure): `_estimateNodeUtf8Bytes` replaced with exact
++ *          `_utf8len(_JSONStringify(perNodeIdPayloadShape))` using captured intrinsics. The
++ *          previous approximation missed top-level structural keys and nested braces, allowing
++ *          a 35×30×225 ASCII payload (~265 KB actual) to bypass Step 4.5 (~256 KB estimated).
++ *          Step 4.5 now also adds WRAPPER_FIXED_BYTES + inter-node commas for envelope overhead.
++ *   RN-17 NEW (Round 7 closure): `_jsonStringWidth` no longer treats DEL (U+007F) as a 6-byte
++ *          JSON escape. Per ES §25.5.2.2 Quote(value), only U+0000..U+001F (plus " and \) MUST
++ *          be escaped; DEL passes through as 1 byte. A DEL-heavy payload that fits the envelope
++ *          (~101 KB actual) is no longer over-rejected at Step 4.5.
+  *
+  * Defence-in-depth surface (mirrors R3.0D D1 RN-01..RN-11 closures, extended by the D2 closures
+  * listed above): every external entry validates the original input prototype, hidden own keys,
+  * nested-non-plain objects pre-clone (R3_0D_ReasonCodes helpers); the builder wraps the whole work
+  * in an outer try/catch; any internal throw collapses to INTERNAL_CONTRACT_VIOLATION (never
+  * bubbles to the caller); every node passes through D1 validateEvidenceNodeShape — sanitized is
+  * the only object that enters the graph.
+  *
+  * UMD: Node require / Electron renderer global (R3_0D_EvidenceGraph).
+  */
+ (function (root) {
+   'use strict';
+ 
+   var Contracts = null;
+   if (typeof module !== 'undefined' && module.exports) {
+     try { Contracts = require('../../contracts/r3.0d/index.js'); } catch (e) { Contracts = null; }
+   }
+   if (!Contracts && typeof R3_0D_Contracts !== 'undefined') Contracts = R3_0D_Contracts;
+   if (!Contracts) throw new Error('renderer/js/r3-0d-evidence-graph.js requires contracts/r3.0d/index.js');
+ 
+   var RC = Contracts.reasonCodes;
+   var SI = Contracts.sourceIdentity;
+   var EN = Contracts.evidenceNode;
+   var CODES = RC.REASON_CODES;
+ 
+   // Codex D2 Round 3 RN-13 closure: capture safe intrinsic references at module-init time so a
+   // caller-supplied opts.clock injector cannot tamper with Object.freeze / Object.assign /
+   // Object.keys / Object.create / JSON.stringify / Array.isArray / TextEncoder during the build.
+   // Every subsequent operation that depends on these intrinsics uses the captured ref.
+   var _ObjectFreeze = Object.freeze;
+   var _ObjectAssign = Object.assign;
+   var _ObjectKeys = Object.keys;
+   var _ObjectCreate = Object.create;
++  var _ObjectDefineProperty = Object.defineProperty;
+   var _ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+   var _ObjectGetPrototypeOf = Object.getPrototypeOf;
+   var _ObjectPrototypeHasOwnProperty = Object.prototype.hasOwnProperty;
+   var _ArrayIsArray = Array.isArray;
+   var _ArrayPrototypeSlice = Array.prototype.slice;
+   var _ArrayPrototypeMap = Array.prototype.map;
+   var _ArrayPrototypePush = Array.prototype.push;
+   var _JSONStringify = JSON.stringify;
+   var _TextEncoder = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;
+   var _BufferByteLength = (typeof Buffer !== 'undefined' && Buffer.byteLength) ? Buffer.byteLength : null;
+ 
+   var SERVICE_VERSION = 1;
+   var GRAPH_SCHEMA_VERSION = 1;
+ 
+   // Closed enum — directive §8 Edge closed enum. derived_from + invalidates are reserved (D2 emits
+   // none; later D-phase or test-fixture inputs may introduce them via dedicated APIs).
+   var EDGE_KIND_ALLOWED = Object.freeze(['supports', 'contradicts', 'derived_from', 'correlated_with', 'invalidates']);
+   var EDGE_KIND_CAUSAL = Object.freeze({ supports: true, contradicts: true });
+ 
+   // Caps. Mirror D1 envelope language so the contract surface is consistent.
+   var NODES_CAP = 256;
+   var EDGES_CAP_TOTAL = 1024;
+   var CORRELATION_GROUPS_CAP = 64;
+   var CANNOT_CONCLUDE_CAP = 64;
+   var LIMITATIONS_CAP = 64;
+   var INPUT_RAW_EVIDENCE_CAP = 512;   // pre-validation cap on caller array length
+   var PARAMS_KEYS_CAP = 32;            // per-observation params object cap (RN-09)
+   var PARAM_KEY_BYTE_CAP = 64;         // per-observation params KEY byte cap (RN-09 round-2 follow-up)
+   var ENVELOPE_BYTE_CAP = 256 * 1024;  // 256 KiB post-sanitization JSON.stringify cap (RN-09 / RN-14)
+ 
+   // Allowed evidence sourceId values for which credibility may climb to 'measured'. 'imported_summary'
+   // is the canonical example of a source that MUST stay capped at 'derived' (R3.0E future imports).
+   // The builder enforces a SINGLE deny rule today (imported_summary). Future allowlist expansion is a
+   // separate D-checkpoint review.
+   var IMPORTED_SUMMARY_SOURCE_ID = 'imported_summary';
+   var IMPORTED_SUMMARY_MAX_CREDIBILITY = 'derived'; // 'measured' is denied
+ 
+   // Input envelope closed key set.
+   var INPUT_KEYS = Object.freeze(['caseAssociation', 'rawEvidence', 'generationToken', 'contextVersion']);
+   var CASE_ASSOCIATION_KEYS = Object.freeze(['caseId', 'sessionId', 'lapId']);
+   var CASE_ASSOCIATION_REQUIRED = Object.freeze(['caseId', 'sessionId']);
+   var OPTS_KEYS = Object.freeze(['clock']);
+ 
+   // ─── Defence-in-depth helpers ────────────────────────────────────────────────
+   function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
+   function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
+   function _isFiniteNum(v) { return typeof v === 'number' && v === v && v !== Infinity && v !== -Infinity; }
+   function _isIsoTimestamp(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(s); }
+   function _hasOnlyAllowedKeys(o, allowed) {
+     var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; }
+     for (var i = 0; i < keys.length; i++) {
+       var k = keys[i];
+       if (typeof k === 'symbol') return false;
+       if (allowed.indexOf(k) === -1) return false;
+     }
+     return true;
+   }
+   function _strcmp(a, b) { if (a === b) return 0; return a < b ? -1 : 1; }
+ 
+   // UTF-8 byte-length helper. Uses TextEncoder when available, Buffer.byteLength otherwise.
+   // Codex D2 Round 3 RN-09 closure: distinguishes UTF-16 code units (string.length) from real
+   // on-wire UTF-8 byte size. A Unicode-heavy payload no longer slips through the rough estimator
+   // because string.length undercount.
+   function _utf8len(s) {
+     if (typeof s !== 'string') return 0;
+     if (_TextEncoder) {
+       try { return new _TextEncoder().encode(s).length; } catch (e) { /* fall through */ }
+     }
+     if (_BufferByteLength) {
+       try { return _BufferByteLength(s, 'utf8'); } catch (e) { /* fall through */ }
+     }
+     return s.length * 4; // worst-case bound when neither API is present
+   }
+ 
+-  // Codex D2 Round 4 RN-15 + Round 5 RN-15 round-4 closure: JSON canonical width estimator. Counts
+-  // the actual byte width a string occupies when serialised to canonical JSON, accounting for:
+-  //   - " and \ → 2 bytes each (escaped)
+-  //   - control chars 0x00..0x1F and DEL → 6 bytes (\uXXXX form)
+-  //   - ASCII 0x20..0x7E (minus " and \) → 1 byte
++  // Codex D2 Round 4 RN-15 + Round 5 RN-15 round-4 + Round 6 RN-17 closure: JSON canonical width
++  // estimator. Counts the actual byte width a string occupies when serialised to canonical JSON
++  // per ES spec §25.5.2.2 Quote(value):
++  //   - " and \ → 2 bytes each (escaped as `\"` / `\\`)
++  //   - control chars U+0000..U+001F → 6 bytes (`\uXXXX` form) — only this range MUST be escaped
++  //   - ASCII printable (U+0020..U+007E) + DEL (U+007F) → 1 byte (DEL is NOT escaped per spec)
+   //   - UTF-8 multi-byte sequences (2 / 3 / 4-byte) → exact width
+   //   - VALID surrogate pair (high 0xD800-0xDBFF immediately followed by low 0xDC00-0xDFFF) →
+   //     4-byte UTF-8 (the supplementary-plane codepoint)
+   //   - LONE high surrogate (0xD800-0xDBFF without a following low) → 6 bytes (`\uXXXX`)
+   //   - LONE low surrogate (0xDC00-0xDFFF anywhere) → 6 bytes (`\uXXXX`)
+   //
++  // Round 6 RN-17 closure: a previous version treated DEL (U+007F) as a 6-byte JSON escape.
++  // `JSON.stringify` does NOT escape DEL — Quote(value) only escapes U+0000-U+001F (plus " and \).
++  // A DEL-heavy payload that actually fits within the post-canonical envelope cap was being
++  // over-rejected at Step 4.5 (101,214 actual bytes incorrectly estimated as ~471 KB).
++  //
+   // Round 5 closure: the previous implementation skipped the surrogate-pair check by always
+   // assuming a high surrogate had a paired low, AND let lone LOW surrogates fall through to the
+   // default `n += 3` (BMP 3-byte UTF-8). Per the ES spec since 2019, `JSON.stringify` MUST escape
+   // lone surrogates as `\uXXXX` — so a 70-char `\udc00` value JSON-encodes to ~420 chars, not 210.
+-  // The Round 5 exploit (35×30×70 lone low surrogates) bypassed the per-node estimator (estimated
+-  // ~245 KB, actual ~471 KB) and was only caught by the post-canonical envelope check. After this
+-  // fix the per-node running total (Step 4.5) trips BYTE_CAP_EXCEEDED before any single canonical
+-  // serialisation runs.
+   //
+-  // Always overestimates rather than underestimates: the pre-canonical estimator never lets
+-  // through a payload that exceeds the cap. Includes the surrounding "..." quotes (+2).
++  // Always overestimates rather than underestimates for the legitimately-escaped range: the pre-
++  // canonical estimator never lets through a payload that exceeds the cap. Includes the
++  // surrounding "..." quotes (+2).
+   function _jsonStringWidth(s) {
+     if (typeof s !== 'string') return 4; // typical "null" / unknown wrapper
+     var n = 2; // surrounding quotes
+     var len = s.length;
+     for (var i = 0; i < len; i++) {
+       var c = s.charCodeAt(i);
+       if (c === 0x22 || c === 0x5C) { n += 2; continue; }                  // " or \  → escaped
+-      if (c < 0x20 || c === 0x7F) { n += 6; continue; }                    // control → \uXXXX
+-      if (c < 0x80) { n += 1; continue; }                                  // ASCII printable
++      if (c < 0x20) { n += 6; continue; }                                  // control U+0000..U+001F → \uXXXX
++      if (c < 0x80) { n += 1; continue; }                                  // ASCII printable + DEL (no escape)
+       if (c < 0x800) { n += 2; continue; }                                 // UTF-8 2-byte
+       if (c >= 0xDC00 && c <= 0xDFFF) { n += 6; continue; }                // LONE low surrogate → \uXXXX
+       if (c >= 0xD800 && c <= 0xDBFF) {                                    // high surrogate — check pairing
+         if (i + 1 < len) {
+           var c2 = s.charCodeAt(i + 1);
+           if (c2 >= 0xDC00 && c2 <= 0xDFFF) { n += 4; i++; continue; }     // valid pair → 4-byte UTF-8
+         }
+         n += 6; continue;                                                  // LONE high surrogate → \uXXXX
+       }
+       n += 3;                                                              // UTF-8 3-byte BMP
+     }
+     return n;
+   }
+ 
+-  // Codex D2 Round 5 RN-13 round-4 closure: direct-loop array copy / map helpers. The previous
+-  // implementation invoked `_ArrayPrototypeSlice.call(arr)` / `_ArrayPrototypeMap.call(arr, fn)`,
+-  // which routes through `Function.prototype.call` — a global a hostile opts.clock can replace
+-  // (clock fires before _materializeGraph runs). The Round 5 exploit demonstrated:
+-  //     Function.prototype.call = function(){ if (this===origSlice||this===origMap) return [{tampered:true}]; ... };
+-  // injecting `{tampered:true}` into nodes / correlationGroups / topologicalOrder (with `frozen:false`
+-  // because the unfrozen attacker object slipped past the outer Object.freeze of the array).
+-  // Direct indexed-property reads + writes never traverse Function.prototype.call, Array.prototype.push,
+-  // or any other monkey-patchable hop. Sanitized inputs are plain frozen primitives, so `arr.length`
+-  // and `arr[i]` reads cannot trigger accessor descriptors.
++  // Codex D2 Round 5 RN-13 round-4 closure (Round 7 final): array copy / map helpers safe against
++  // both Function.prototype.call replacement AND Array.prototype indexed setter installation.
++  //
++  // Round 5 BLOCK: `_ArrayPrototypeSlice.call(arr)` / `_ArrayPrototypeMap.call(arr, fn)` routed
++  // through `Function.prototype.call`, which a hostile opts.clock could replace to return
++  // `[{tampered:true}]`. Round 6 fix moved to direct-loop `out[i] = arr[i]`.
++  //
++  // Round 6 BLOCK: a hostile clock could install `Object.defineProperty(Array.prototype, "0",
++  // { set: function(v) { Object.defineProperty(this, "0", { value: {tampered:true}, ... }); } })`.
++  // Then `out[i] = ...` on a freshly-created `out = []` would use OrdinarySet → check own
++  // descriptor (none) → traverse prototype chain → find the setter on Array.prototype → invoke it
++  // on `out` as the receiver. The setter then installs its OWN data descriptor on `out[0]` with
++  // the attacker shape, so `out[0]` thereafter returns `{tampered:true}`. Codex Round 6 evidence
++  // reproduced this with `nodes/groups/topology = [{tampered:true}]`, entries unfrozen.
++  //
++  // Round 7 closure: indexed assignment uses captured `_ObjectDefineProperty` with a full data
++  // descriptor — `_ObjectDefineProperty(out, i, { value, writable: true, enumerable: true,
++  // configurable: true })`. Per ES spec §10.1.6 [[DefineOwnProperty]] directly installs an own
++  // data descriptor without invoking the [[Set]] protocol or any prototype-chain accessor.
++  // Subsequent `out[i]` reads return the own value because own properties shadow the prototype.
++  // The captured `_ObjectDefineProperty` reference is taken at module-init time so a clock that
++  // overwrites `Object.defineProperty` later cannot tamper with this helper.
+   function _safeSlice(arr) {
+     var out = [];
+     var len;
+     try { len = (arr == null) ? 0 : arr.length; } catch (e) { return out; }
+     if (typeof len !== 'number' || len !== len || len < 0) return out;
+     len = len | 0;
+-    for (var i = 0; i < len; i++) out[i] = arr[i];
++    for (var i = 0; i < len; i++) {
++      _ObjectDefineProperty(out, i, { value: arr[i], writable: true, enumerable: true, configurable: true });
++    }
+     return out;
+   }
+   function _safeMap(arr, fn) {
+     var out = [];
+     var len;
+     try { len = (arr == null) ? 0 : arr.length; } catch (e) { return out; }
+     if (typeof len !== 'number' || len !== len || len < 0) return out;
+     len = len | 0;
+-    for (var i = 0; i < len; i++) out[i] = fn(arr[i], i);
++    for (var i = 0; i < len; i++) {
++      _ObjectDefineProperty(out, i, { value: fn(arr[i], i), writable: true, enumerable: true, configurable: true });
++    }
+     return out;
+   }
+ 
+-  // Codex D2 Round 3 RN-14 + Round 4 RN-15 closure: per-node canonical-JSON byte width estimate.
+-  // Uses _jsonStringWidth() for every string that will be embedded in the canonical JSON output
+-  // (params keys + string values especially), so control-character escape expansion (NUL →  
+-  // = 6 bytes) is counted accurately. Numbers/bool/null pay a small fixed overhead estimate.
++  // Codex D2 Round 6 RN-16 closure: exact per-node byte measurement via captured _JSONStringify +
++  // _utf8len. The previous approximation summed _jsonStringWidth across SELECTED fields and
++  // missed top-level structural keys ("nodeId":, "category":, etc.), nested object braces, and
++  // inter-field commas — combined undercount of ~300+ bytes per node. Codex Round 6 exploit (35
++  // x 30 x 225 ASCII chars = ~265 KB actual) bypassed Step 4.5 (~256 KB estimated) and was only
++  // caught by post-canonical Step 17.
++  //
++  // Round 7 fix: build the SAME per-node idPayload shape that Step 16 constructs (mirroring the
++  // mapping at the graphId derivation site exactly), run captured _JSONStringify on it, and use
++  // _utf8len for UTF-8-byte-accurate width. The result is EXACT for each sanitized node (no
++  // approximation). The outer envelope adds a small fixed wrapper constant accounted for at
++  // Step 4.5's running-total starting value (WRAPPER_FIXED_BYTES).
++  //
++  // Sanitized inputs are plain frozen primitives (D1 contract guarantee), so JSON.stringify never
++  // encounters accessor descriptors, Proxies, or throwing getters. Captured _JSONStringify means
++  // a hostile clock that replaces JSON.stringify after import cannot tamper with this measurement.
++  function _perNodeIdPayloadShape(n) {
++    return {
++      nodeId: n.nodeId,
++      category: n.category,
++      credibility: n.credibility,
++      provenance: n.provenance,
++      availability: n.availability,
++      confidence: { state: (n.confidence && n.confidence.state) ? n.confidence.state : null },
++      identity: {
++        caseId: n.identity.caseId,
++        sessionId: n.identity.sessionId,
++        lapId: n.identity.lapId,
++        sourceId: n.identity.sourceId,
++        sourceVersion: n.identity.sourceVersion,
++      },
++      observation: {
++        kind: n.observation.kind,
++        channel: n.observation.channel,
++        i18nKey: n.observation.i18nKey,
++        params: n.observation.params,
++      },
++      limitations: n.limitations,
++      supportingEdges: n.supportingEdges,
++      contradictingEdges: n.contradictingEdges,
++    };
++  }
+   function _estimateNodeUtf8Bytes(node) {
+-    var n = 64; // small fixed overhead per node (JSON object brackets + commas + key wrappers)
+-    n += _jsonStringWidth(node.nodeId);
+-    n += _jsonStringWidth(node.category);
+-    n += _jsonStringWidth(node.credibility);
+-    n += _jsonStringWidth(node.provenance);
+-    n += _jsonStringWidth(node.availability);
+-    if (node.confidence && node.confidence.state) n += _jsonStringWidth(node.confidence.state);
+-    if (node.identity) {
+-      n += _jsonStringWidth(node.identity.caseId || '');
+-      n += _jsonStringWidth(node.identity.sessionId || '');
+-      n += _jsonStringWidth(node.identity.lapId || '');
+-      n += _jsonStringWidth(node.identity.sourceId || '');
+-      n += _jsonStringWidth(node.identity.sourceVersion || '');
+-      n += _jsonStringWidth(node.identity.freshness || '');
+-    }
+-    if (node.observation) {
+-      n += _jsonStringWidth(node.observation.kind || '');
+-      n += _jsonStringWidth(node.observation.channel || '');
+-      n += _jsonStringWidth(node.observation.i18nKey || '');
+-      if (node.observation.params) {
+-        var pk;
+-        try { pk = _ObjectKeys(node.observation.params); } catch (e) { pk = []; }
+-        for (var i = 0; i < pk.length; i++) {
+-          var k = pk[i];
+-          n += _jsonStringWidth(k) + 2; // key + colon + comma JSON syntax
+-          var v = node.observation.params[k];
+-          if (typeof v === 'string') n += _jsonStringWidth(v);
+-          else n += 16; // number/bool/null overhead estimate
+-        }
+-      }
+-    }
+-    if (node.supportingEdges) for (var si = 0; si < node.supportingEdges.length; si++) n += _jsonStringWidth(node.supportingEdges[si]) + 2;
+-    if (node.contradictingEdges) for (var ci = 0; ci < node.contradictingEdges.length; ci++) n += _jsonStringWidth(node.contradictingEdges[ci]) + 2;
+-    if (node.limitations) for (var li = 0; li < node.limitations.length; li++) n += _jsonStringWidth(node.limitations[li]) + 2;
+-    return n;
++    try { return _utf8len(_JSONStringify(_perNodeIdPayloadShape(node))); }
++    catch (e) { return ENVELOPE_BYTE_CAP + 1; } // pessimistic fail-closed on stringify failure
+   }
++  // Wrapper byte allowance covering the post-canonical idPayload outer structure:
++  //   {"caseAssociation":{caseId,sessionId,lapId},"nodes":[<NODES>],"edges":[<EDGES>],"correlationGroups":[<GROUPS>]}
++  // Sized to cover the caseAssociation object + outer braces + 5 JSON keys + 4 commas + array
++  // bracket pairs, plus inter-node commas (n-1 added per Step 4.5 running total). Edges and
++  // correlationGroups arrays are bounded separately by EDGES_CAP_TOTAL / CORRELATION_GROUPS_CAP
++  // checks, and any envelope overflow they cause is the authoritative Step 17 check's job.
++  var WRAPPER_FIXED_BYTES = 256;
+ 
+   // Stable canonical JSON serialiser — sorted keys at every depth; arrays preserved in order. Used
+   // for semantic dedup keys + graphId hashing. The caller is expected to pass D1-sanitized values
+   // (frozen plain primitives only); the implementation is descriptor-safe and never invokes a
+   // caller getter (no accessor descriptors are reachable on a D1 sanitized output).
+   function _stableStringify(value) {
+     if (value === null) return 'null';
+     var t = typeof value;
+     if (t === 'string') return JSON.stringify(value);
+     if (t === 'number') {
+       if (!_isFiniteNum(value)) return 'null';
+       return String(value);
+     }
+     if (t === 'boolean') return value ? 'true' : 'false';
+     if (t === 'undefined') return 'null';
+     if (Array.isArray(value)) {
+       var parts = [];
+       for (var i = 0; i < value.length; i++) parts.push(_stableStringify(value[i]));
+       return '[' + parts.join(',') + ']';
+     }
+     if (t === 'object') {
+       var keys = Object.keys(value).sort();
+       var pp = [];
+       for (var j = 0; j < keys.length; j++) {
+         var k = keys[j];
+         pp.push(JSON.stringify(k) + ':' + _stableStringify(value[k]));
+       }
+       return '{' + pp.join(',') + '}';
+     }
+     return 'null';
+   }
+ 
+   // FNV-1a 32-bit hash → lowercase hex. Used ONLY as a diagnostic identifier (graphId / correlationGroupId);
+   // the actual dedup decisions use the FULL canonical string, not the hash, so a collision in the hash
+   // CANNOT cause silent data loss (RN-04 closure). Double-pass widening for nicer-looking ids.
+   function _hash32(s) {
+     var h = 0x811c9dc5;
+     for (var i = 0; i < s.length; i++) {
+       h ^= s.charCodeAt(i);
+       h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+     }
+     return ('00000000' + h.toString(16)).slice(-8);
+   }
+   function _hash64(s) { return _hash32(s) + _hash32(s + '|' + s.length); }
+ 
+   // Semantic canonical string — used as the DEDUP MAP KEY (not a hash). Excludes nodeId so a
+   // renamed-id replay collides; excludes freshness so a re-issue at a later timestamp still
+   // collides; excludes credibility / provenance / availability (downstream attributes, not the
+   // fact). Includes case + session + lap + source identity + category + observation kind/channel/
+   // i18nKey/params (sorted JSON). The string IS the key; collisions are impossible by definition.
+   function _semanticCanonicalString(node) {
+     var id = node.identity;
+     var ob = node.observation;
+     var payload = {
+       caseId: id.caseId,
+       sessionId: id.sessionId,
+       lapId: id.lapId == null ? null : id.lapId,
+       sourceId: id.sourceId,
+       sourceVersion: id.sourceVersion,
+       category: node.category,
+       observation: {
+         kind: ob.kind,
+         channel: ob.channel == null ? null : ob.channel,
+         i18nKey: ob.i18nKey,
+         params: ob.params == null ? null : ob.params,
+       },
+     };
+     return _stableStringify(payload);
+   }
+ 
+   // Full canonical string — INCLUDES nodeId so two duplicate-nodeId candidates can still be
+   // compared as different "candidates" when sorting. Used to canonically sort the sanitized array
+   // BEFORE dedup (RN-03 closure) so caller permutation cannot change the dedup winner. Round 2
+   // closure: also includes confidence.state so two same-nodeId candidates differing only by
+   // unresolved/not_computed sort deterministically (round 2 RN-03 evidence).
+   function _fullCanonicalString(node) {
+     return JSON.stringify(node.nodeId) + '|' + _semanticCanonicalString(node) + '|cred:' + node.credibility + '|prov:' + node.provenance + '|avl:' + node.availability + '|conf:' + (node.confidence && node.confidence.state ? node.confidence.state : 'null') + '|fresh:' + node.identity.freshness + '|supE:' + _stableStringify(node.supportingEdges) + '|conE:' + _stableStringify(node.contradictingEdges) + '|lims:' + _stableStringify(node.limitations);
+   }
+ 
+   // Correlation group key — nodes sharing this key are correlated (same source observing the same
+@@ -506,286 +548,301 @@
+       for (var k = 0; k < nbrs.length; k++) {
+         var v = nbrs[k];
+         if (color[v] === GREY) return v;
+         if (color[v] === WHITE) {
+           var c = visit(v);
+           if (c !== null) return c;
+         }
+       }
+       color[u] = BLACK;
+       return null;
+     }
+     for (var j = 0; j < nodeIds.length; j++) {
+       var n = nodeIds[j];
+       if (color[n] === WHITE) {
+         var hit = visit(n);
+         if (hit !== null) return hit;
+       }
+     }
+     return null;
+   }
+ 
+   // Kahn's algorithm — deterministic by tie-breaking on sorted nodeId. Assumes no cycle. Uses
+   // proto-null in-degree map (RN-08).
+   function _topologicalOrder(nodeIds, adjacencyCausal) {
+     var inDegree = Object.create(null);
+     var i;
+     for (i = 0; i < nodeIds.length; i++) inDegree[nodeIds[i]] = 0;
+     for (i = 0; i < nodeIds.length; i++) {
+       var nbrs = adjacencyCausal[nodeIds[i]] || [];
+       for (var k = 0; k < nbrs.length; k++) {
+         if (Object.prototype.hasOwnProperty.call(inDegree, nbrs[k])) inDegree[nbrs[k]]++;
+       }
+     }
+     var queue = [];
+     for (i = 0; i < nodeIds.length; i++) if (inDegree[nodeIds[i]] === 0) queue.push(nodeIds[i]);
+     queue.sort(_strcmp);
+     var out = [];
+     while (queue.length > 0) {
+       var u = queue.shift();
+       out.push(u);
+       var nbrs2 = (adjacencyCausal[u] || []).slice().sort(_strcmp);
+       for (var m = 0; m < nbrs2.length; m++) {
+         var v = nbrs2[m];
+         if (Object.prototype.hasOwnProperty.call(inDegree, v)) {
+           inDegree[v]--;
+           if (inDegree[v] === 0) {
+             var lo = 0, hi = queue.length;
+             while (lo < hi) { var mid = (lo + hi) >>> 1; if (queue[mid] < v) lo = mid + 1; else hi = mid; }
+             queue.splice(lo, 0, v);
+           }
+         }
+       }
+     }
+     return out;
+   }
+ 
+   // Materialise the final closed-shape sanitized graph (deep freeze every nested array/object).
+   // Materialise the final closed-shape sanitized graph. Codex D2 Round 3 RN-13 + Round 4 RN-13
+   // round-3 closure: every intrinsic call goes through module-init captured refs. This includes
+   // Array.prototype.map / slice (via _safeMap / _safeSlice), Object.freeze (via _ObjectFreeze),
+   // and Object.keys (via _ObjectKeys). _ObjectAssign is intentionally NOT used (replaced with a
+   // manual _ObjectKeys + indexed copy loop) so a clock that tampers with Object.assign cannot
+   // inject keys, and so a clock that tampers with Array.prototype.* cannot poison the slice/map
+   // shape of any graph-owned container.
+   function _materializeGraph(o) {
+     var cgFrozen = _safeMap(o.correlationGroups, function (g) {
+       return _ObjectFreeze({
+         correlationGroupId: g.correlationGroupId,
+         memberNodeIds: _ObjectFreeze(_safeSlice(g.memberNodeIds)),
+         independenceWeight: g.independenceWeight,
+       });
+     });
+     var rejSemFrozen = _safeMap(o.dedup.rejectedSemanticDuplicates, function (r) {
+       return _ObjectFreeze({
+         fingerprint: r.fingerprint,
+         keptNodeId: r.keptNodeId,
+         droppedNodeId: r.droppedNodeId,
+       });
+     });
+     var rejReplaysFrozen = _safeMap(o.dedup.rejectedSourceReplays, function (r) {
+-      var copy = {};
++      // Codex D2 Round 6 RN-13 round-4 closure: use _ObjectDefineProperty so a hostile clock-
++      // installed setter on Object.prototype[<key>] cannot intercept the keyed assignment and
++      // inject a `{tampered:true}` value into the materialised graph.
++      var copy = _ObjectCreate(null);
+       var kk; try { kk = _ObjectKeys(r); } catch (e) { kk = []; }
+-      for (var i = 0; i < kk.length; i++) copy[kk[i]] = r[kk[i]];
++      for (var i = 0; i < kk.length; i++) {
++        _ObjectDefineProperty(copy, kk[i], { value: r[kk[i]], writable: true, enumerable: true, configurable: true });
++      }
+       return _ObjectFreeze(copy);
+     });
+     var dedupSummaryFrozen = _ObjectFreeze({
+       rejectedDuplicateIds: _ObjectFreeze(_safeSlice(o.dedup.rejectedDuplicateIds)),
+       rejectedSemanticDuplicates: _ObjectFreeze(rejSemFrozen),
+       rejectedSourceReplays: _ObjectFreeze(rejReplaysFrozen),
+     });
+-    var rrsCopy = {};
++    // Codex D2 Round 6 RN-13 round-4 closure: Object.create(null) + defineProperty so a hostile
++    // clock-installed setter on Object.prototype[<reasonCode>] cannot intercept the keyed
++    // assignment and inject a `{tampered:true}` count into rejectedReasonsSummary.
++    var rrsCopy = _ObjectCreate(null);
+     var rrsKeys; try { rrsKeys = _ObjectKeys(o.provenance.rejectedReasonsSummary); } catch (e) { rrsKeys = []; }
+-    for (var ri = 0; ri < rrsKeys.length; ri++) rrsCopy[rrsKeys[ri]] = o.provenance.rejectedReasonsSummary[rrsKeys[ri]];
++    for (var ri = 0; ri < rrsKeys.length; ri++) {
++      _ObjectDefineProperty(rrsCopy, rrsKeys[ri], { value: o.provenance.rejectedReasonsSummary[rrsKeys[ri]], writable: true, enumerable: true, configurable: true });
++    }
+     var graph = {
+       schemaVersion: GRAPH_SCHEMA_VERSION,
+       graphId: o.graphId,
+       caseAssociation: _ObjectFreeze({
+         caseId: o.caseAssociation.caseId,
+         sessionId: o.caseAssociation.sessionId,
+         lapId: o.caseAssociation.lapId == null ? null : o.caseAssociation.lapId,
+       }),
+       sessionAssociation: _ObjectFreeze({ sessionId: o.caseAssociation.sessionId }),
+       nodes: _ObjectFreeze(_safeSlice(o.nodes)),
+       edges: _ObjectFreeze(_safeSlice(o.edges)),
+       topologicalOrder: _ObjectFreeze(_safeSlice(o.topologicalOrder)),
+       deduplicationSummary: dedupSummaryFrozen,
+       correlationGroups: _ObjectFreeze(cgFrozen),
+       limitations: _ObjectFreeze(_safeSlice(o.limitations)),
+       cannotConclude: _ObjectFreeze(_safeSlice(o.cannotConclude)),
+       provenance: _ObjectFreeze({
+         builderVersion: SERVICE_VERSION,
+         inputCount: o.provenance.inputCount,
+         sanitizedCount: o.provenance.sanitizedCount,
+         rejectedCount: o.provenance.rejectedCount,
+         rejectedReasonsSummary: _ObjectFreeze(rrsCopy),
+       }),
+       createdAt: o.createdAt,
+       generationToken: o.generationToken,
+       contextVersion: o.contextVersion,
+     };
+     return _ObjectFreeze(graph);
+   }
+ 
+   /**
+    * buildEvidenceGraph(input, opts) — primary entry. See module header for the contract.
+    */
+   function buildEvidenceGraph(inputIn, optsIn) {
+     try {
+       // Step 1 — input envelope structural gate + TRUSTED SNAPSHOT (RN-01 closure).
+       var env = _validateInputEnvelope(inputIn);
+       if (!env.ok) return env;
+       var caseAssociation = env.snapshot.caseAssociation;
+       var generationToken = env.snapshot.generationToken;
+       var contextVersion = env.snapshot.contextVersion;
+       var rawEvidenceRef = env.snapshot.rawEvidenceRef;
+       var inputCount = env.snapshot.rawEvidenceLength;
+ 
+       // Step 2 — Round 2 RN-01 + RN-06 closure: defer clock invocation until ALL input-touching
+       // work is complete. The clock function CANNOT mutate rawEvidence under us because it never
+       // runs while we are reading the array. createdAt is assigned at the very end of the build.
+ 
+       // Step 3 — per-node validation. Each rawEvidence[i] is read via descriptor (RN-02 closure):
+       // accessor / sparse / inherited slots become ONE rejected node, never a whole-build throw.
+       var sanitized = [];
+       var rejectedCount = 0;
+       var rejectedReasons = Object.create(null);
+       function tally(code) { rejectedReasons[code] = (rejectedReasons[code] || 0) + 1; }
+ 
+       for (var i = 0; i < inputCount; i++) {
+         var desc;
+         try { desc = Object.getOwnPropertyDescriptor(rawEvidenceRef, i); }
+         catch (e) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
+         if (!desc) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
+         if (!('value' in desc)) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
+         var raw = desc.value;
+         // outer defence — refuse non-plain prototype BEFORE invoking D1 validator.
+         if (!RC.isOriginalPlainObject(raw)) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
+         if (RC.hasHiddenOwnKey(raw)) { rejectedCount++; tally(CODES.UNKNOWN_OWN_KEY); continue; }
+         if (RC.hasNonPlainNestedObject(raw)) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
+         var check = EN.validateEvidenceNodeShape(raw);
+         if (check.valid !== true) {
+           rejectedCount++;
+           var codes = Array.isArray(check.reasonCodes) ? check.reasonCodes : [CODES.EVIDENCE_NODE_INVALID];
+           for (var rci = 0; rci < codes.length; rci++) tally(codes[rci]);
+           continue;
+         }
+         var san = check.sanitized;
+         // RN-09 — per-observation params key count cap + per-key UTF-8 BYTE cap (round-3 fix
+         // uses _utf8len helper for actual UTF-8 byte width, not UTF-16 code units).
+         if (san.observation && san.observation.params && typeof san.observation.params === 'object') {
+           try {
+             var paramKeys = _ObjectKeys(san.observation.params);
+             if (paramKeys.length > PARAMS_KEYS_CAP) { rejectedCount++; tally(CODES.ARRAY_CAP_EXCEEDED); continue; }
+             var anyOversizeKey = false;
+             for (var pki = 0; pki < paramKeys.length; pki++) {
+               if (_utf8len(paramKeys[pki]) > PARAM_KEY_BYTE_CAP) { anyOversizeKey = true; break; }
+             }
+             if (anyOversizeKey) { rejectedCount++; tally(CODES.BYTE_CAP_EXCEEDED); continue; }
+           } catch (e) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
+         }
+         // Association binding — caseId / sessionId MUST equal envelope.caseAssociation.
+         if (san.identity.caseId !== caseAssociation.caseId) { rejectedCount++; tally(CODES.SOURCE_IDENTITY_CASE_MISMATCH); continue; }
+         if (san.identity.sessionId !== caseAssociation.sessionId) { rejectedCount++; tally(CODES.SOURCE_IDENTITY_SESSION_MISMATCH); continue; }
+         if (caseAssociation.lapId !== null && san.identity.lapId !== null && san.identity.lapId !== caseAssociation.lapId) {
+           rejectedCount++; tally(CODES.SOURCE_IDENTITY_LAP_MISMATCH); continue;
+         }
+         // Imported-summary elevation guard.
+         if (san.identity.sourceId === IMPORTED_SUMMARY_SOURCE_ID && san.credibility === 'measured') {
+           rejectedCount++; tally(CODES.EVIDENCE_IMPORTED_SUMMARY_ELEVATION_FORBIDDEN); continue;
+         }
+         sanitized.push(san);
+       }
+ 
+       // Step 4 — cap on accepted nodes.
+       if (sanitized.length > NODES_CAP) {
+         return RC.buildBlockedResult([CODES.GRAPH_CAP_EXCEEDED], { detail: 'sanitized node count ' + sanitized.length + ' exceeds NODES_CAP=' + NODES_CAP });
+       }
+ 
+-      // Step 4.5 — RN-09 round-3 + RN-14 closure: accurate UTF-8 byte estimate BEFORE canonical
+-      // serialization. Uses _estimateNodeUtf8Bytes() which actually sums UTF-8 byte widths over
+-      // sanitized fields (no fixed 4096-byte per-node overhead). Bails before _stableStringify
+-      // runs across the whole array if the running total would exceed ENVELOPE_BYTE_CAP.
+-      var roughTotal = 0;
++      // Step 4.5 — RN-09 round-3 + RN-14 + Round 6 RN-16 closure: exact UTF-8 byte estimate
++      // BEFORE canonical serialisation. Uses _estimateNodeUtf8Bytes() which runs captured
++      // _JSONStringify on the SAME per-node idPayload shape that Step 16 constructs, then captured
++      // _utf8len for actual UTF-8 width. Adds WRAPPER_FIXED_BYTES for the outer envelope
++      // (caseAssociation + nodes/edges/correlationGroups array brackets + 4 JSON keys), and +1
++      // per node for inter-node commas inside the "nodes":[...] array. Bails on the first node
++      // whose accumulated running total would exceed ENVELOPE_BYTE_CAP — Step 17 remains the
++      // authoritative post-canonical check.
++      var roughTotal = WRAPPER_FIXED_BYTES;
+       for (var rb = 0; rb < sanitized.length; rb++) {
+         try { roughTotal += _estimateNodeUtf8Bytes(sanitized[rb]); }
+         catch (e) { /* defensive: ignore individual estimate errors */ }
++        if (rb > 0) roughTotal += 1; // inter-node comma
+         if (roughTotal > ENVELOPE_BYTE_CAP) {
+           return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'pre-canonicalization byte estimate exceeded ENVELOPE_BYTE_CAP=' + ENVELOPE_BYTE_CAP });
+         }
+       }
+ 
+       // Step 5 — RN-03 closure: sort sanitized by full canonical content BEFORE any dedup so caller
+       // permutation cannot influence which duplicate wins. Tie-breaker on a deterministic field.
+       sanitized.sort(function (a, b) { return _strcmp(_fullCanonicalString(a), _fullCanonicalString(b)); });
+ 
+       // Step 6 — duplicate-ID dedup (Object.create(null) map — RN-08 closure). First by sort order
+       // (deterministic) is kept; subsequent rejected.
+       var byId = Object.create(null);
+       var keptById = [];
+       var rejectedDuplicateIds = [];
+       for (var d = 0; d < sanitized.length; d++) {
+         var n = sanitized[d];
+         if (Object.prototype.hasOwnProperty.call(byId, n.nodeId)) {
+           rejectedDuplicateIds.push(n.nodeId);
+           tally(CODES.EVIDENCE_DUPLICATE_ID);
+           rejectedCount++;
+           continue;
+         }
+         byId[n.nodeId] = n;
+         keptById.push(n);
+       }
+       rejectedDuplicateIds.sort(_strcmp);
+ 
+       // Step 7 — semantic CANONICAL STRING dedup (RN-04 closure). The map KEY is the full canonical
+       // string itself, not a hash. Collisions are impossible by definition.
+       var semSeen = Object.create(null);
+       var keptAfterSemantic = [];
+       var rejectedSemanticDuplicates = [];
+       for (var s = 0; s < keptById.length; s++) {
+         var nn = keptById[s];
+         var canon = _semanticCanonicalString(nn);
+         if (Object.prototype.hasOwnProperty.call(semSeen, canon)) {
+           rejectedSemanticDuplicates.push({ fingerprint: _hash64('sem|' + canon), keptNodeId: semSeen[canon], droppedNodeId: nn.nodeId });
+           tally(CODES.EVIDENCE_GRAPH_DUPLICATED_SOURCE_DOUBLECOUNT);
+           rejectedCount++;
+           delete byId[nn.nodeId];
+           continue;
+         }
+         semSeen[canon] = nn.nodeId;
+         keptAfterSemantic.push(nn);
+       }
+       rejectedSemanticDuplicates.sort(function (a, b) { return _strcmp(a.droppedNodeId, b.droppedNodeId); });
+ 
+       // Step 8 — orphan edge detection. Any supportingEdges / contradictingEdges target nodeId that
+       // is not in the surviving graph triggers EVIDENCE_GRAPH_ORPHAN.
+       var orphanDetected = false;
+       var orphanDetail = null;
+       for (var e = 0; e < keptAfterSemantic.length; e++) {
+         var nx = keptAfterSemantic[e];
+         var allEdges = nx.supportingEdges.concat(nx.contradictingEdges);
+         for (var ek = 0; ek < allEdges.length; ek++) {
+           var tgt = allEdges[ek];
+           if (!Object.prototype.hasOwnProperty.call(byId, tgt)) {
+             orphanDetected = true;
+             orphanDetail = 'node ' + nx.nodeId + ' references unknown nodeId ' + tgt;
+             break;
+           }
+         }
+         if (orphanDetected) break;
+       }
+       if (orphanDetected) {
+         return RC.buildBlockedResult([CODES.EVIDENCE_GRAPH_ORPHAN], { detail: orphanDetail });
+       }
+ 
+       // Step 9 — build edges + causal adjacency (RN-08: proto-null map).
+       var edges = [];
+       var adjacencyCausal = Object.create(null);
+       function addEdge(from, to, kind) {
+         if (EDGE_KIND_ALLOWED.indexOf(kind) === -1) return false;
+         edges.push({ from: from, to: to, kind: kind });
+         if (EDGE_KIND_CAUSAL[kind]) {
+           if (!adjacencyCausal[from]) adjacencyCausal[from] = [];
+           adjacencyCausal[from].push(to);
+         }
+         return true;
+       }
+
+exec
+/bin/bash -lc "rg -n \"WRAPPER_FIXED|perNodeIdPayload|estimateNode|clock|materializeGraph|\\[["'^]]+'"\\]\\s*=|\\.push\\(|hasOwnProperty\\.call|_safeSlice|_safeMap\" renderer/js/r3-0d-evidence-graph.js && sed -n '150,330p' renderer/js/r3-0d-evidence-graph.js && sed -n '780,1060p' renderer/js/r3-0d-evidence-graph.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+40: *     topological order / correlation order / dedup summary. The clock is INJECTABLE
+41: *     (opts.clock()); createdAt reflects the injected value; graphId is INDEPENDENT of the clock.
+57: *   RN-06: opts.clock() is invoked AFTER input envelope validation succeeds, via a descriptor-safe
+58: *          read on opts.clock; a throwing opts getter → createdAt = null (fail-soft on clock only).
+79: *   RN-13 round-4 (Round 6 / Round 7 final closure): `_safeSlice` / `_safeMap` plus the two
+80: *          `_materializeGraph` programmatic keyed assignments (`copy[k] = r[k]` for
+81: *          rejectedSourceReplays + `rrsCopy[k] = ...` for rejectedReasonsSummary) now use
+83: *          [[DefineOwnProperty]]. A hostile clock installing
+89: *   RN-16 NEW (Round 7 closure): `_estimateNodeUtf8Bytes` replaced with exact
+90: *          `_utf8len(_JSONStringify(perNodeIdPayloadShape))` using captured intrinsics. The
+93: *          Step 4.5 now also adds WRAPPER_FIXED_BYTES + inter-node commas for envelope overhead.
+124:  // caller-supplied opts.clock injector cannot tamper with Object.freeze / Object.assign /
+173:  var OPTS_KEYS = Object.freeze(['clock']);
+258:  // through `Function.prototype.call`, which a hostile opts.clock could replace to return
+259:  // `[{tampered:true}]`. Round 6 fix moved to direct-loop `out[i] = arr[i]`.
+261:  // Round 6 BLOCK: a hostile clock could install `Object.defineProperty(Array.prototype, "0",
+263:  // Then `out[i] = ...` on a freshly-created `out = []` would use OrdinarySet → check own
+274:  // The captured `_ObjectDefineProperty` reference is taken at module-init time so a clock that
+276:  function _safeSlice(arr) {
+287:  function _safeMap(arr, fn) {
+310:  // Step 4.5's running-total starting value (WRAPPER_FIXED_BYTES).
+314:  // a hostile clock that replaces JSON.stringify after import cannot tamper with this measurement.
+315:  function _perNodeIdPayloadShape(n) {
+341:  function _estimateNodeUtf8Bytes(node) {
+342:    try { return _utf8len(_JSONStringify(_perNodeIdPayloadShape(node))); }
+351:  var WRAPPER_FIXED_BYTES = 256;
+369:      for (var i = 0; i < value.length; i++) parts.push(_stableStringify(value[i]));
+377:        pp.push(JSON.stringify(k) + ':' + _stableStringify(value[k]));
+518:  // RN-06 closure: resolve opts.clock AFTER envelope validation; descriptor-safe; throwing getter
+519:  // collapses to createdAt = null (clock is best-effort; never blocks the build).
+526:    try { desc = Object.getOwnPropertyDescriptor(opts, 'clock'); }
+530:    var clock = desc.value;
+531:    if (typeof clock !== 'function') return null;
+533:      var v = clock();
+546:      color[u] = GREY;
+550:        if (color[v] === GREY) return v;
+551:        if (color[v] === WHITE) {
+556:      color[u] = BLACK;
+561:      if (color[n] === WHITE) {
+578:        if (Object.prototype.hasOwnProperty.call(inDegree, nbrs[k])) inDegree[nbrs[k]]++;
+582:    for (i = 0; i < nodeIds.length; i++) if (inDegree[nodeIds[i]] === 0) queue.push(nodeIds[i]);
+587:      out.push(u);
+591:        if (Object.prototype.hasOwnProperty.call(inDegree, v)) {
+593:          if (inDegree[v] === 0) {
+607:  // Array.prototype.map / slice (via _safeMap / _safeSlice), Object.freeze (via _ObjectFreeze),
+609:  // manual _ObjectKeys + indexed copy loop) so a clock that tampers with Object.assign cannot
+610:  // inject keys, and so a clock that tampers with Array.prototype.* cannot poison the slice/map
+612:  function _materializeGraph(o) {
+613:    var cgFrozen = _safeMap(o.correlationGroups, function (g) {
+616:        memberNodeIds: _ObjectFreeze(_safeSlice(g.memberNodeIds)),
+620:    var rejSemFrozen = _safeMap(o.dedup.rejectedSemanticDuplicates, function (r) {
+627:    var rejReplaysFrozen = _safeMap(o.dedup.rejectedSourceReplays, function (r) {
+628:      // Codex D2 Round 6 RN-13 round-4 closure: use _ObjectDefineProperty so a hostile clock-
+639:      rejectedDuplicateIds: _ObjectFreeze(_safeSlice(o.dedup.rejectedDuplicateIds)),
+644:    // clock-installed setter on Object.prototype[<reasonCode>] cannot intercept the keyed
+660:      nodes: _ObjectFreeze(_safeSlice(o.nodes)),
+661:      edges: _ObjectFreeze(_safeSlice(o.edges)),
+662:      topologicalOrder: _ObjectFreeze(_safeSlice(o.topologicalOrder)),
+665:      limitations: _ObjectFreeze(_safeSlice(o.limitations)),
+666:      cannotConclude: _ObjectFreeze(_safeSlice(o.cannotConclude)),
+695:      // Step 2 — Round 2 RN-01 + RN-06 closure: defer clock invocation until ALL input-touching
+696:      // work is complete. The clock function CANNOT mutate rawEvidence under us because it never
+704:      function tally(code) { rejectedReasons[code] = (rejectedReasons[code] || 0) + 1; }
+748:        sanitized.push(san);
+757:      // BEFORE canonical serialisation. Uses _estimateNodeUtf8Bytes() which runs captured
+759:      // _utf8len for actual UTF-8 width. Adds WRAPPER_FIXED_BYTES for the outer envelope
+764:      var roughTotal = WRAPPER_FIXED_BYTES;
+766:        try { roughTotal += _estimateNodeUtf8Bytes(sanitized[rb]); }
+785:        if (Object.prototype.hasOwnProperty.call(byId, n.nodeId)) {
+786:          rejectedDuplicateIds.push(n.nodeId);
+791:        byId[n.nodeId] = n;
+792:        keptById.push(n);
+804:        if (Object.prototype.hasOwnProperty.call(semSeen, canon)) {
+805:          rejectedSemanticDuplicates.push({ fingerprint: _hash64('sem|' + canon), keptNodeId: semSeen[canon], droppedNodeId: nn.nodeId });
+811:        semSeen[canon] = nn.nodeId;
+812:        keptAfterSemantic.push(nn);
+825:          if (!Object.prototype.hasOwnProperty.call(byId, tgt)) {
+842:        edges.push({ from: from, to: to, kind: kind });
+844:          if (!adjacencyCausal[from]) adjacencyCausal[from] = [];
+845:          adjacencyCausal[from].push(to);
+852:          if (nf.supportingEdges[sf] === nf.nodeId) {
+858:          if (nf.contradictingEdges[cf] === nf.nodeId) {
+870:        if (!groupBucket[gk]) groupBucket[gk] = [];
+871:        groupBucket[gk].push(ng.nodeId);
+879:        correlationGroups.push({
+930:          if (!limSeen[lims[lj]]) { limSeen[lims[lj]] = true; limitations.push(lims[lj]); }
+934:        if (cannotConclude.indexOf(CODES.INSUFFICIENT_EVIDENCE) === -1) cannotConclude.push(CODES.INSUFFICIENT_EVIDENCE);
+937:        if (cannotConclude.indexOf(CODES.CANNOT_CONCLUDE) === -1) cannotConclude.push(CODES.CANNOT_CONCLUDE);
+944:      // Step 16 — derive graphId (content-only; clock-independent). Round 2 RN-03 closure: include
+982:      // Uses captured _JSONStringify + _utf8len (Codex Round 3 RN-13 closure) so an opts.clock that
+991:      // Step 17.5 — Round 2 RN-01 + RN-06 closure: invoke clock LAST, after every input-touching
+992:      // operation has completed. The clock injector cannot mutate rawEvidence under us because
+997:      var graph = _materializeGraph({
+
+  // Caps. Mirror D1 envelope language so the contract surface is consistent.
+  var NODES_CAP = 256;
+  var EDGES_CAP_TOTAL = 1024;
+  var CORRELATION_GROUPS_CAP = 64;
+  var CANNOT_CONCLUDE_CAP = 64;
+  var LIMITATIONS_CAP = 64;
+  var INPUT_RAW_EVIDENCE_CAP = 512;   // pre-validation cap on caller array length
+  var PARAMS_KEYS_CAP = 32;            // per-observation params object cap (RN-09)
+  var PARAM_KEY_BYTE_CAP = 64;         // per-observation params KEY byte cap (RN-09 round-2 follow-up)
+  var ENVELOPE_BYTE_CAP = 256 * 1024;  // 256 KiB post-sanitization JSON.stringify cap (RN-09 / RN-14)
+
+  // Allowed evidence sourceId values for which credibility may climb to 'measured'. 'imported_summary'
+  // is the canonical example of a source that MUST stay capped at 'derived' (R3.0E future imports).
+  // The builder enforces a SINGLE deny rule today (imported_summary). Future allowlist expansion is a
+  // separate D-checkpoint review.
+  var IMPORTED_SUMMARY_SOURCE_ID = 'imported_summary';
+  var IMPORTED_SUMMARY_MAX_CREDIBILITY = 'derived'; // 'measured' is denied
+
+  // Input envelope closed key set.
+  var INPUT_KEYS = Object.freeze(['caseAssociation', 'rawEvidence', 'generationToken', 'contextVersion']);
+  var CASE_ASSOCIATION_KEYS = Object.freeze(['caseId', 'sessionId', 'lapId']);
+  var CASE_ASSOCIATION_REQUIRED = Object.freeze(['caseId', 'sessionId']);
+  var OPTS_KEYS = Object.freeze(['clock']);
+
+  // ─── Defence-in-depth helpers ────────────────────────────────────────────────
+  function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
+  function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
+  function _isFiniteNum(v) { return typeof v === 'number' && v === v && v !== Infinity && v !== -Infinity; }
+  function _isIsoTimestamp(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(s); }
+  function _hasOnlyAllowedKeys(o, allowed) {
+    var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; }
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (typeof k === 'symbol') return false;
+      if (allowed.indexOf(k) === -1) return false;
+    }
+    return true;
+  }
+  function _strcmp(a, b) { if (a === b) return 0; return a < b ? -1 : 1; }
+
+  // UTF-8 byte-length helper. Uses TextEncoder when available, Buffer.byteLength otherwise.
+  // Codex D2 Round 3 RN-09 closure: distinguishes UTF-16 code units (string.length) from real
+  // on-wire UTF-8 byte size. A Unicode-heavy payload no longer slips through the rough estimator
+  // because string.length undercount.
+  function _utf8len(s) {
+    if (typeof s !== 'string') return 0;
+    if (_TextEncoder) {
+      try { return new _TextEncoder().encode(s).length; } catch (e) { /* fall through */ }
+    }
+    if (_BufferByteLength) {
+      try { return _BufferByteLength(s, 'utf8'); } catch (e) { /* fall through */ }
+    }
+    return s.length * 4; // worst-case bound when neither API is present
+  }
+
+  // Codex D2 Round 4 RN-15 + Round 5 RN-15 round-4 + Round 6 RN-17 closure: JSON canonical width
+  // estimator. Counts the actual byte width a string occupies when serialised to canonical JSON
+  // per ES spec §25.5.2.2 Quote(value):
+  //   - " and \ → 2 bytes each (escaped as `\"` / `\\`)
+  //   - control chars U+0000..U+001F → 6 bytes (`\uXXXX` form) — only this range MUST be escaped
+  //   - ASCII printable (U+0020..U+007E) + DEL (U+007F) → 1 byte (DEL is NOT escaped per spec)
+  //   - UTF-8 multi-byte sequences (2 / 3 / 4-byte) → exact width
+  //   - VALID surrogate pair (high 0xD800-0xDBFF immediately followed by low 0xDC00-0xDFFF) →
+  //     4-byte UTF-8 (the supplementary-plane codepoint)
+  //   - LONE high surrogate (0xD800-0xDBFF without a following low) → 6 bytes (`\uXXXX`)
+  //   - LONE low surrogate (0xDC00-0xDFFF anywhere) → 6 bytes (`\uXXXX`)
+  //
+  // Round 6 RN-17 closure: a previous version treated DEL (U+007F) as a 6-byte JSON escape.
+  // `JSON.stringify` does NOT escape DEL — Quote(value) only escapes U+0000-U+001F (plus " and \).
+  // A DEL-heavy payload that actually fits within the post-canonical envelope cap was being
+  // over-rejected at Step 4.5 (101,214 actual bytes incorrectly estimated as ~471 KB).
+  //
+  // Round 5 closure: the previous implementation skipped the surrogate-pair check by always
+  // assuming a high surrogate had a paired low, AND let lone LOW surrogates fall through to the
+  // default `n += 3` (BMP 3-byte UTF-8). Per the ES spec since 2019, `JSON.stringify` MUST escape
+  // lone surrogates as `\uXXXX` — so a 70-char `\udc00` value JSON-encodes to ~420 chars, not 210.
+  //
+  // Always overestimates rather than underestimates for the legitimately-escaped range: the pre-
+  // canonical estimator never lets through a payload that exceeds the cap. Includes the
+  // surrounding "..." quotes (+2).
+  function _jsonStringWidth(s) {
+    if (typeof s !== 'string') return 4; // typical "null" / unknown wrapper
+    var n = 2; // surrounding quotes
+    var len = s.length;
+    for (var i = 0; i < len; i++) {
+      var c = s.charCodeAt(i);
+      if (c === 0x22 || c === 0x5C) { n += 2; continue; }                  // " or \  → escaped
+      if (c < 0x20) { n += 6; continue; }                                  // control U+0000..U+001F → \uXXXX
+      if (c < 0x80) { n += 1; continue; }                                  // ASCII printable + DEL (no escape)
+      if (c < 0x800) { n += 2; continue; }                                 // UTF-8 2-byte
+      if (c >= 0xDC00 && c <= 0xDFFF) { n += 6; continue; }                // LONE low surrogate → \uXXXX
+      if (c >= 0xD800 && c <= 0xDBFF) {                                    // high surrogate — check pairing
+        if (i + 1 < len) {
+          var c2 = s.charCodeAt(i + 1);
+          if (c2 >= 0xDC00 && c2 <= 0xDFFF) { n += 4; i++; continue; }     // valid pair → 4-byte UTF-8
+        }
+        n += 6; continue;                                                  // LONE high surrogate → \uXXXX
+      }
+      n += 3;                                                              // UTF-8 3-byte BMP
+    }
+    return n;
+  }
+
+  // Codex D2 Round 5 RN-13 round-4 closure (Round 7 final): array copy / map helpers safe against
+  // both Function.prototype.call replacement AND Array.prototype indexed setter installation.
+  //
+  // Round 5 BLOCK: `_ArrayPrototypeSlice.call(arr)` / `_ArrayPrototypeMap.call(arr, fn)` routed
+  // through `Function.prototype.call`, which a hostile opts.clock could replace to return
+  // `[{tampered:true}]`. Round 6 fix moved to direct-loop `out[i] = arr[i]`.
+  //
+  // Round 6 BLOCK: a hostile clock could install `Object.defineProperty(Array.prototype, "0",
+  // { set: function(v) { Object.defineProperty(this, "0", { value: {tampered:true}, ... }); } })`.
+  // Then `out[i] = ...` on a freshly-created `out = []` would use OrdinarySet → check own
+  // descriptor (none) → traverse prototype chain → find the setter on Array.prototype → invoke it
+  // on `out` as the receiver. The setter then installs its OWN data descriptor on `out[0]` with
+  // the attacker shape, so `out[0]` thereafter returns `{tampered:true}`. Codex Round 6 evidence
+  // reproduced this with `nodes/groups/topology = [{tampered:true}]`, entries unfrozen.
+  //
+  // Round 7 closure: indexed assignment uses captured `_ObjectDefineProperty` with a full data
+  // descriptor — `_ObjectDefineProperty(out, i, { value, writable: true, enumerable: true,
+  // configurable: true })`. Per ES spec §10.1.6 [[DefineOwnProperty]] directly installs an own
+  // data descriptor without invoking the [[Set]] protocol or any prototype-chain accessor.
+  // Subsequent `out[i]` reads return the own value because own properties shadow the prototype.
+  // The captured `_ObjectDefineProperty` reference is taken at module-init time so a clock that
+  // overwrites `Object.defineProperty` later cannot tamper with this helper.
+  function _safeSlice(arr) {
+    var out = [];
+    var len;
+    try { len = (arr == null) ? 0 : arr.length; } catch (e) { return out; }
+    if (typeof len !== 'number' || len !== len || len < 0) return out;
+    len = len | 0;
+    for (var i = 0; i < len; i++) {
+      _ObjectDefineProperty(out, i, { value: arr[i], writable: true, enumerable: true, configurable: true });
+    }
+    return out;
+  }
+  function _safeMap(arr, fn) {
+    var out = [];
+    var len;
+    try { len = (arr == null) ? 0 : arr.length; } catch (e) { return out; }
+    if (typeof len !== 'number' || len !== len || len < 0) return out;
+    len = len | 0;
+    for (var i = 0; i < len; i++) {
+      _ObjectDefineProperty(out, i, { value: fn(arr[i], i), writable: true, enumerable: true, configurable: true });
+    }
+    return out;
+  }
+
+  // Codex D2 Round 6 RN-16 closure: exact per-node byte measurement via captured _JSONStringify +
+  // _utf8len. The previous approximation summed _jsonStringWidth across SELECTED fields and
+  // missed top-level structural keys ("nodeId":, "category":, etc.), nested object braces, and
+  // inter-field commas — combined undercount of ~300+ bytes per node. Codex Round 6 exploit (35
+  // x 30 x 225 ASCII chars = ~265 KB actual) bypassed Step 4.5 (~256 KB estimated) and was only
+  // caught by post-canonical Step 17.
+  //
+  // Round 7 fix: build the SAME per-node idPayload shape that Step 16 constructs (mirroring the
+  // mapping at the graphId derivation site exactly), run captured _JSONStringify on it, and use
+  // _utf8len for UTF-8-byte-accurate width. The result is EXACT for each sanitized node (no
+  // approximation). The outer envelope adds a small fixed wrapper constant accounted for at
+  // Step 4.5's running-total starting value (WRAPPER_FIXED_BYTES).
+  //
+  // Sanitized inputs are plain frozen primitives (D1 contract guarantee), so JSON.stringify never
+  // encounters accessor descriptors, Proxies, or throwing getters. Captured _JSONStringify means
+  // a hostile clock that replaces JSON.stringify after import cannot tamper with this measurement.
+  function _perNodeIdPayloadShape(n) {
+    return {
+      nodeId: n.nodeId,
+      category: n.category,
+      credibility: n.credibility,
+      provenance: n.provenance,
+      availability: n.availability,
+      confidence: { state: (n.confidence && n.confidence.state) ? n.confidence.state : null },
+      identity: {
+        caseId: n.identity.caseId,
+        sessionId: n.identity.sessionId,
+        lapId: n.identity.lapId,
+        sourceId: n.identity.sourceId,
+        sourceVersion: n.identity.sourceVersion,
+      },
+      observation: {
+      var byId = Object.create(null);
+      var keptById = [];
+      var rejectedDuplicateIds = [];
+      for (var d = 0; d < sanitized.length; d++) {
+        var n = sanitized[d];
+        if (Object.prototype.hasOwnProperty.call(byId, n.nodeId)) {
+          rejectedDuplicateIds.push(n.nodeId);
+          tally(CODES.EVIDENCE_DUPLICATE_ID);
+          rejectedCount++;
+          continue;
+        }
+        byId[n.nodeId] = n;
+        keptById.push(n);
+      }
+      rejectedDuplicateIds.sort(_strcmp);
+
+      // Step 7 — semantic CANONICAL STRING dedup (RN-04 closure). The map KEY is the full canonical
+      // string itself, not a hash. Collisions are impossible by definition.
+      var semSeen = Object.create(null);
+      var keptAfterSemantic = [];
+      var rejectedSemanticDuplicates = [];
+      for (var s = 0; s < keptById.length; s++) {
+        var nn = keptById[s];
+        var canon = _semanticCanonicalString(nn);
+        if (Object.prototype.hasOwnProperty.call(semSeen, canon)) {
+          rejectedSemanticDuplicates.push({ fingerprint: _hash64('sem|' + canon), keptNodeId: semSeen[canon], droppedNodeId: nn.nodeId });
+          tally(CODES.EVIDENCE_GRAPH_DUPLICATED_SOURCE_DOUBLECOUNT);
+          rejectedCount++;
+          delete byId[nn.nodeId];
+          continue;
+        }
+        semSeen[canon] = nn.nodeId;
+        keptAfterSemantic.push(nn);
+      }
+      rejectedSemanticDuplicates.sort(function (a, b) { return _strcmp(a.droppedNodeId, b.droppedNodeId); });
+
+      // Step 8 — orphan edge detection. Any supportingEdges / contradictingEdges target nodeId that
+      // is not in the surviving graph triggers EVIDENCE_GRAPH_ORPHAN.
+      var orphanDetected = false;
+      var orphanDetail = null;
+      for (var e = 0; e < keptAfterSemantic.length; e++) {
+        var nx = keptAfterSemantic[e];
+        var allEdges = nx.supportingEdges.concat(nx.contradictingEdges);
+        for (var ek = 0; ek < allEdges.length; ek++) {
+          var tgt = allEdges[ek];
+          if (!Object.prototype.hasOwnProperty.call(byId, tgt)) {
+            orphanDetected = true;
+            orphanDetail = 'node ' + nx.nodeId + ' references unknown nodeId ' + tgt;
+            break;
+          }
+        }
+        if (orphanDetected) break;
+      }
+      if (orphanDetected) {
+        return RC.buildBlockedResult([CODES.EVIDENCE_GRAPH_ORPHAN], { detail: orphanDetail });
+      }
+
+      // Step 9 — build edges + causal adjacency (RN-08: proto-null map).
+      var edges = [];
+      var adjacencyCausal = Object.create(null);
+      function addEdge(from, to, kind) {
+        if (EDGE_KIND_ALLOWED.indexOf(kind) === -1) return false;
+        edges.push({ from: from, to: to, kind: kind });
+        if (EDGE_KIND_CAUSAL[kind]) {
+          if (!adjacencyCausal[from]) adjacencyCausal[from] = [];
+          adjacencyCausal[from].push(to);
+        }
+        return true;
+      }
+      for (var f = 0; f < keptAfterSemantic.length; f++) {
+        var nf = keptAfterSemantic[f];
+        for (var sf = 0; sf < nf.supportingEdges.length; sf++) {
+          if (nf.supportingEdges[sf] === nf.nodeId) {
+            return RC.buildBlockedResult([CODES.EVIDENCE_GRAPH_SELF_REFERENCE], { detail: nf.nodeId + ' supportingEdges self-reference' });
+          }
+          addEdge(nf.nodeId, nf.supportingEdges[sf], 'supports');
+        }
+        for (var cf = 0; cf < nf.contradictingEdges.length; cf++) {
+          if (nf.contradictingEdges[cf] === nf.nodeId) {
+            return RC.buildBlockedResult([CODES.EVIDENCE_GRAPH_SELF_REFERENCE], { detail: nf.nodeId + ' contradictingEdges self-reference' });
+          }
+          addEdge(nf.nodeId, nf.contradictingEdges[cf], 'contradicts');
+        }
+      }
+
+      // Step 10 — correlation groups. Same canonical (caseId|sessionId|lapId|sourceId) → one group.
+      var groupBucket = Object.create(null);
+      for (var g = 0; g < keptAfterSemantic.length; g++) {
+        var ng = keptAfterSemantic[g];
+        var gk = _correlationGroupCanonical(ng);
+        if (!groupBucket[gk]) groupBucket[gk] = [];
+        groupBucket[gk].push(ng.nodeId);
+      }
+      var groupKeysSorted = Object.keys(groupBucket).sort(_strcmp);
+      var correlationGroups = [];
+      for (var gi = 0; gi < groupKeysSorted.length; gi++) {
+        var gk2 = groupKeysSorted[gi];
+        var members = groupBucket[gk2].slice().sort(_strcmp);
+        var iw = members.length > 0 ? 1 / members.length : 0;
+        correlationGroups.push({
+          correlationGroupId: _correlationGroupId(gk2),
+          memberNodeIds: members,
+          independenceWeight: iw,
+        });
+        if (members.length >= 2) {
+          for (var mi = 0; mi < members.length; mi++) {
+            for (var mj = mi + 1; mj < members.length; mj++) {
+              var from = members[mi] < members[mj] ? members[mi] : members[mj];
+              var to = members[mi] < members[mj] ? members[mj] : members[mi];
+              addEdge(from, to, 'correlated_with');
+            }
+          }
+        }
+      }
+      if (correlationGroups.length > CORRELATION_GROUPS_CAP) {
+        return RC.buildBlockedResult([CODES.GRAPH_CAP_EXCEEDED], { detail: 'correlation groups ' + correlationGroups.length + ' exceeds CORRELATION_GROUPS_CAP=' + CORRELATION_GROUPS_CAP });
+      }
+
+      // Step 11 — edge cap.
+      if (edges.length > EDGES_CAP_TOTAL) {
+        return RC.buildBlockedResult([CODES.GRAPH_CAP_EXCEEDED], { detail: 'edges ' + edges.length + ' exceeds EDGES_CAP_TOTAL=' + EDGES_CAP_TOTAL });
+      }
+
+      // Step 12 — cycle detection over CAUSAL edges only.
+      var sortedNodeIds = keptAfterSemantic.map(function (x) { return x.nodeId; }).slice().sort(_strcmp);
+      var cycleHit = _findCycle(sortedNodeIds, adjacencyCausal);
+      if (cycleHit !== null) {
+        return RC.buildBlockedResult([CODES.EVIDENCE_GRAPH_CYCLE], { detail: 'cycle involves nodeId ' + cycleHit });
+      }
+
+      // Step 13 — topological order over the acyclic causal subgraph.
+      var topo = _topologicalOrder(sortedNodeIds, adjacencyCausal);
+
+      // Step 14 — sort nodes deterministically; sort edges by (from, to, kind).
+      var nodesOut = keptAfterSemantic.slice().sort(function (a, b) { return _strcmp(a.nodeId, b.nodeId); });
+      var edgesOut = edges.slice().sort(function (a, b) {
+        var c = _strcmp(a.from, b.from); if (c !== 0) return c;
+        c = _strcmp(a.to, b.to); if (c !== 0) return c;
+        return _strcmp(a.kind, b.kind);
+      });
+      for (var ni = 0; ni < nodesOut.length; ni++) Object.freeze(nodesOut[ni]);
+      for (var ei = 0; ei < edgesOut.length; ei++) Object.freeze(edgesOut[ei]);
+
+      // Step 15 — limitations / cannotConclude derivation.
+      var limitations = [];
+      var cannotConclude = [];
+      var limSeen = Object.create(null);
+      for (var li = 0; li < nodesOut.length; li++) {
+        var lims = nodesOut[li].limitations;
+        for (var lj = 0; lj < lims.length; lj++) {
+          if (!limSeen[lims[lj]]) { limSeen[lims[lj]] = true; limitations.push(lims[lj]); }
+        }
+      }
+      if (nodesOut.length === 0) {
+        if (cannotConclude.indexOf(CODES.INSUFFICIENT_EVIDENCE) === -1) cannotConclude.push(CODES.INSUFFICIENT_EVIDENCE);
+      }
+      if (rejectedCount > 0) {
+        if (cannotConclude.indexOf(CODES.CANNOT_CONCLUDE) === -1) cannotConclude.push(CODES.CANNOT_CONCLUDE);
+      }
+      limitations.sort(_strcmp);
+      cannotConclude.sort(_strcmp);
+      if (limitations.length > LIMITATIONS_CAP) limitations = limitations.slice(0, LIMITATIONS_CAP);
+      if (cannotConclude.length > CANNOT_CONCLUDE_CAP) cannotConclude = cannotConclude.slice(0, CANNOT_CONCLUDE_CAP);
+
+      // Step 16 — derive graphId (content-only; clock-independent). Round 2 RN-03 closure: include
+      // confidence.state so two same-nodeId candidates differing only by unresolved/not_computed
+      // are distinguishable by graphId (and dedup outcome).
+      var idPayload = {
+        caseAssociation: caseAssociation,
+        nodes: nodesOut.map(function (n) {
+          return {
+            nodeId: n.nodeId,
+            category: n.category,
+            credibility: n.credibility,
+            provenance: n.provenance,
+            availability: n.availability,
+            confidence: { state: (n.confidence && n.confidence.state) ? n.confidence.state : null },
+            identity: {
+              caseId: n.identity.caseId,
+              sessionId: n.identity.sessionId,
+              lapId: n.identity.lapId,
+              sourceId: n.identity.sourceId,
+              sourceVersion: n.identity.sourceVersion,
+            },
+            observation: {
+              kind: n.observation.kind,
+              channel: n.observation.channel,
+              i18nKey: n.observation.i18nKey,
+              params: n.observation.params,
+            },
+            limitations: n.limitations,
+            supportingEdges: n.supportingEdges,
+            contradictingEdges: n.contradictingEdges,
+          };
+        }),
+        edges: edgesOut,
+        correlationGroups: correlationGroups.map(function (g) { return { correlationGroupId: g.correlationGroupId, memberNodeIds: g.memberNodeIds, independenceWeight: g.independenceWeight }; }),
+      };
+      var graphId = 'graph_' + _hash64('graphid|v' + GRAPH_SCHEMA_VERSION + '|' + _stableStringify(idPayload));
+
+      // Step 17 — RN-09 closure: post-sanitization JSON byte cap. Safe to _JSONStringify because
+      // every sanitized value is a plain frozen primitive (no accessors, Proxies, class instances).
+      // Uses captured _JSONStringify + _utf8len (Codex Round 3 RN-13 closure) so an opts.clock that
+      // replaces JSON.stringify / TextEncoder after import cannot influence the byte check.
+      var envBytes;
+      try { envBytes = _utf8len(_JSONStringify(idPayload)); }
+      catch (e) { envBytes = Infinity; }
+      if (envBytes > ENVELOPE_BYTE_CAP) {
+        return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'post-sanitization JSON size ' + envBytes + ' exceeds ENVELOPE_BYTE_CAP=' + ENVELOPE_BYTE_CAP });
+      }
+
+      // Step 17.5 — Round 2 RN-01 + RN-06 closure: invoke clock LAST, after every input-touching
+      // operation has completed. The clock injector cannot mutate rawEvidence under us because
+      // the per-node loop has already finished.
+      var createdAt = _resolveClock(optsIn);
+
+      // Step 18 — final materialisation
+      var graph = _materializeGraph({
+        graphId: graphId,
+        caseAssociation: caseAssociation,
+        nodes: nodesOut,
+        edges: edgesOut,
+        topologicalOrder: topo,
+        dedup: {
+          rejectedDuplicateIds: rejectedDuplicateIds,
+          rejectedSemanticDuplicates: rejectedSemanticDuplicates,
+          rejectedSourceReplays: [],
+        },
+        correlationGroups: correlationGroups,
+        limitations: limitations,
+        cannotConclude: cannotConclude,
+        provenance: {
+          inputCount: inputCount,
+          sanitizedCount: nodesOut.length,
+          rejectedCount: rejectedCount,
+          rejectedReasonsSummary: rejectedReasons,
+        },
+        createdAt: createdAt,
+        generationToken: generationToken,
+        contextVersion: contextVersion,
+      });
+
+      return _ObjectFreeze({ valid: true, graph: graph });
+    } catch (e) {
+      return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'buildEvidenceGraph threw on hostile input' });
+    }
+  }
+
+  // Public API surface — RN-07 closure: internal helpers (_stableStringify, _semanticCanonicalString,
+  // _correlationGroupCanonical) are NOT exported. The only public entry is buildEvidenceGraph plus
+  // documented constants. Tests must drive the contract via buildEvidenceGraph only.
+  var api = {
+    SERVICE_VERSION: SERVICE_VERSION,
+    GRAPH_SCHEMA_VERSION: GRAPH_SCHEMA_VERSION,
+    EDGE_KIND_ALLOWED: EDGE_KIND_ALLOWED,
+    NODES_CAP: NODES_CAP,
+    EDGES_CAP_TOTAL: EDGES_CAP_TOTAL,
+    CORRELATION_GROUPS_CAP: CORRELATION_GROUPS_CAP,
+    INPUT_RAW_EVIDENCE_CAP: INPUT_RAW_EVIDENCE_CAP,
+    PARAMS_KEYS_CAP: PARAMS_KEYS_CAP,
+    PARAM_KEY_BYTE_CAP: PARAM_KEY_BYTE_CAP,
+    ENVELOPE_BYTE_CAP: ENVELOPE_BYTE_CAP,
+    IMPORTED_SUMMARY_SOURCE_ID: IMPORTED_SUMMARY_SOURCE_ID,
+    IMPORTED_SUMMARY_MAX_CREDIBILITY: IMPORTED_SUMMARY_MAX_CREDIBILITY,
+    buildEvidenceGraph: buildEvidenceGraph,
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (root) root.R3_0D_EvidenceGraph = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+codex
+The field mirror is exact, but the claimed envelope estimate is not: Step 4.5 counts nodes only. I’m testing whether correlated edges—created after that check and absent from the fixed 256-byte allowance—still reproduce RN-16’s “pre-check passes, Step 17 rejects” failure mode.
+exec
+/bin/bash -lc "node - <<'NODE'
+const EG=require('./renderer/js/r3-0d-evidence-graph.js');
+const NOW='2026-06-28T06:00:00Z';
+function mk(i,L){const p={};for(let k=0;k<30;k++)p['k'+i+'_'+k]='x'.repeat(L);return {schemaVersion:1,nodeId:'ev_'+String(i).padStart(2,'0'),category:'data_quality',identity:{caseId:'c',sessionId:'s',lapId:'L1',sourceId:'shared_source',sourceVersion:'v1',freshness:NOW},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'metric_value',i18nKey:'r3.x',params:p,channel:'rpm_'+i},limitations:[],supportingEdges:[],contradictingEdges:[]}}
+for(const L of [180,185,190,195,200,205,210,215,220,225]){const rawEvidence=Array.from({length:35},(_,i)=>mk(i,L));const r=EG.buildEvidenceGraph({caseAssociation:{caseId:'c',sessionId:'s',lapId:'L1'},rawEvidence});console.log(L, r.valid, r.reasonCodes, r.detail, r.graph && [r.graph.nodes.length,r.graph.edges.length,r.graph.correlationGroups.length]);}
+NODE
+node --test tests/r3.0d-evidence-graph.test.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 120ms:
+R3.0D D2 evidence-graph suite: 157 pass, 0 fail
+✔ tests/r3.0d-evidence-graph.test.js (88.3285ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 92.639375
+
+exec
+/bin/bash -lc "node -e \"const EG=require('./renderer/js/r3-0d-evidence-graph.js'),NOW='2026-06-28T06:00:00Z';function mk(i,L){const p={};for(let k=0;k<30;k++)p['k'+i+'_'+k]='x'.repeat(L);return {schemaVersion:1,nodeId:'ev_'+String(i).padStart(2,'0'),category:'data_quality',identity:{caseId:'c',sessionId:'s',lapId:'L1',sourceId:'shared_source',sourceVersion:'v1',freshness:NOW},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'metric_value',i18nKey:'r3.x',params:p,channel:'rpm_'+i},limitations:[],supportingEdges:[],contradictingEdges:[]}};for(const L of [180,185,190,195,200,205,210,215,220,225]){const rawEvidence=Array.from({length:35},(_,i)=>mk(i,L)),r=EG.buildEvidenceGraph({caseAssociation:{caseId:'c',sessionId:'s',lapId:'L1'},rawEvidence});console.log(L,r.valid,r.reasonCodes,r.detail,r.graph&&[r.graph.nodes.length,r.graph.edges.length,r.graph.correlationGroups.length])}\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+180 true undefined undefined [ 35, 595, 1 ]
+185 true undefined undefined [ 35, 595, 1 ]
+190 true undefined undefined [ 35, 595, 1 ]
+195 undefined [ 'BYTE_CAP_EXCEEDED' ] post-sanitization JSON size 264011 exceeds ENVELOPE_BYTE_CAP=262144 undefined
+200 undefined [ 'BYTE_CAP_EXCEEDED' ] post-sanitization JSON size 269261 exceeds ENVELOPE_BYTE_CAP=262144 undefined
+205 undefined [ 'BYTE_CAP_EXCEEDED' ] post-sanitization JSON size 274511 exceeds ENVELOPE_BYTE_CAP=262144 undefined
+210 undefined [ 'BYTE_CAP_EXCEEDED' ] post-sanitization JSON size 279761 exceeds ENVELOPE_BYTE_CAP=262144 undefined
+215 undefined [ 'BYTE_CAP_EXCEEDED' ] post-sanitization JSON size 285011 exceeds ENVELOPE_BYTE_CAP=262144 undefined
+220 undefined [ 'BYTE_CAP_EXCEEDED' ] post-sanitization JSON size 290261 exceeds ENVELOPE_BYTE_CAP=262144 undefined
+225 undefined [ 'BYTE_CAP_EXCEEDED' ] pre-canonicalization byte estimate exceeded ENVELOPE_BYTE_CAP=262144 undefined
+
+exec
+/bin/bash -lc "sed -n '2430,2590p' tests/r3.0d-evidence-graph.test.js 2>/dev/null || tail -n 220 tests/r3.0d-evidence-graph.test.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+exec
+/bin/bash -lc 'wc -l tests/r3.0d-evidence-graph.test.js && tail -n 240 tests/r3.0d-evidence-graph.test.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+    1178 tests/r3.0d-evidence-graph.test.js
+  function hasTampered(arr) {
+    if (!Array.isArray(arr)) return false;
+    for (let i = 0; i < arr.length; i++) {
+      const v = arr[i];
+      if (v && typeof v === 'object' && Object.prototype.hasOwnProperty.call(v, 'tampered')) return true;
+    }
+    return false;
+  }
+  chk('RN-13 r4: hostile Function.prototype.apply replacement — graph.nodes clean', r.valid === true && !hasTampered(r.graph.nodes));
+  chk('RN-13 r4: hostile Function.prototype.apply replacement — graph.correlationGroups clean', r.valid === true && !hasTampered(r.graph.correlationGroups));
+  chk('RN-13 r4: hostile Function.prototype.apply replacement — graph.topologicalOrder clean', r.valid === true && !hasTampered(r.graph.topologicalOrder));
+})();
+
+(function sectionQ_RN13_round4_ArrayPrototypePush() {
+  // Belt-and-suspenders: replace `Array.prototype.push` from inside the clock. The direct-loop
+  // helpers must not depend on .push (they use indexed assignment `out[i] = x`). The legitimate
+  // node must still appear, frozen, untampered.
+  const origPush = Array.prototype.push;
+  let r;
+  try {
+    r = EG.buildEvidenceGraph(freshInput(), {
+      clock: function () {
+        // eslint-disable-next-line no-extend-native
+        Array.prototype.push = function () { return 0; }; // no-op push (would silently drop entries)
+        return NOW;
+      },
+    });
+  } finally {
+    // eslint-disable-next-line no-extend-native
+    Array.prototype.push = origPush;
+  }
+  chk('RN-13 r4: hostile Array.prototype.push (no-op) — graph still contains legitimate node', r.valid === true && r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
+  chk('RN-13 r4: hostile Array.prototype.push — graph.nodes[0] frozen', r.valid === true && Object.isFrozen(r.graph.nodes[0]));
+})();
+
+(function sectionQ_RN15_round4_loneLowSurrogate() {
+  // RN-15 round-4 (Round 5 evidence): lone LOW surrogate values must be counted as 6 bytes each
+  // (\uXXXX JSON escape), not 3. The Round 5 candidate undercount let 35×30×70 = 73,500 lone
+  // surrogates slip past the per-node running total (~245 KB estimated vs ~471 KB actual). After
+  // the Round 6 fix the per-node estimator (Step 4.5 in the builder) must trip
+  // BYTE_CAP_EXCEEDED before any post-canonical work runs.
+  const bad = '\udc00'.repeat(70);
+  const arr = [];
+  for (let i = 0; i < 35; i++) {
+    const p = {};
+    for (let k = 0; k < 30; k++) p['k' + i + '_' + k] = bad;
+    arr.push(freshNode({
+      nodeId: 'ev_sur_' + i,
+      identity: freshId({ sourceId: 'src_sur_' + i }),
+      observation: { kind: 'metric_value', i18nKey: 'r3_0d.x', params: p, channel: 'rpm_' + i },
+    }));
+  }
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
+  chk('RN-15 r4: lone low surrogate payload rejected (BYTE_CAP_EXCEEDED)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.BYTE_CAP_EXCEEDED) !== -1);
+  chk('RN-15 r4: lone low surrogate payload tripped at PRE-canonical stage (not post)', r.eligible === false && typeof r.detail === 'string' && /pre-canonicalization/.test(r.detail));
+})();
+
+(function sectionQ_RN15_round4_loneHighSurrogate() {
+  // Symmetric coverage: lone HIGH surrogate (0xD800-0xDBFF without a following low) also escapes
+  // to 6 chars. The previous estimator wrongly assumed every high surrogate had a paired low and
+  // skipped the next char (i++) regardless, undercount AND mis-stepping.
+  const bad = '\ud83d'.repeat(70); // lone high surrogate, no following low
+  const arr = [];
+  for (let i = 0; i < 35; i++) {
+    const p = {};
+    for (let k = 0; k < 30; k++) p['k' + i + '_' + k] = bad;
+    arr.push(freshNode({
+      nodeId: 'ev_hi_' + i,
+      identity: freshId({ sourceId: 'src_hi_' + i }),
+      observation: { kind: 'metric_value', i18nKey: 'r3_0d.x', params: p, channel: 'rpm_' + i },
+    }));
+  }
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
+  chk('RN-15 r4: lone high surrogate payload rejected (BYTE_CAP_EXCEEDED)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.BYTE_CAP_EXCEEDED) !== -1);
+  chk('RN-15 r4: lone high surrogate payload tripped at PRE-canonical stage', r.eligible === false && typeof r.detail === 'string' && /pre-canonicalization/.test(r.detail));
+})();
+
+(function sectionQ_RN15_round4_validSurrogatePair_stillBuildsCompactGraphs() {
+  // Negative control: a SHORT payload using valid surrogate pairs (e.g. 🚀 = 🚀 = 4
+  // UTF-8 bytes per pair) must NOT trip the cap; the estimator should still count valid pairs as
+  // 4 bytes (not 12) so legitimate compact graphs with emoji are not over-rejected.
+  const emoji = '🚀'.repeat(10); // 10 rockets per value (20 code units, 4 bytes UTF-8 each pair = 40 bytes)
+  const p = {};
+  for (let k = 0; k < 5; k++) p['k_' + k] = emoji;
+  const r = EG.buildEvidenceGraph(freshInput({
+    rawEvidence: [freshNode({
+      observation: { kind: 'metric_value', i18nKey: 'r3_0d.x', params: p, channel: 'rpm' },
+    })],
+  }), { clock: CLOCK });
+  chk('RN-15 r4: valid surrogate pair (emoji) compact graph builds successfully', r.valid === true && r.graph.nodes.length === 1);
+})();
+
+// ── Section R — Codex D2 Round 6 finding closures (RN-13 round-4 setter / RN-16 / RN-17) ──────
+(function sectionR_RN13_round4_ArrayPrototypeSetter() {
+  // RN-13 round-4 (Round 6 evidence): a hostile clock installs
+  // `Object.defineProperty(Array.prototype, "0", { set: ... })` so that `out[i] = ...` on a
+  // freshly-created `out = []` invokes the prototype setter, which installs its own
+  // `{tampered:true}` data descriptor on out[0]. The Round 6 candidate `ec00b88` had direct-loop
+  // `out[i] = arr[i]` and was still vulnerable. The Round 7 fix uses captured
+  // `Object.defineProperty` to install the assignment via [[DefineOwnProperty]], which bypasses
+  // the [[Set]] protocol and any prototype-chain accessor.
+  const origDefineProperty = Object.defineProperty;
+  let r;
+  try {
+    r = EG.buildEvidenceGraph(freshInput(), {
+      clock: function () {
+        origDefineProperty(Array.prototype, '0', {
+          configurable: true,
+          set: function () {
+            origDefineProperty(this, '0', { value: { tampered: true }, writable: true, enumerable: true, configurable: true });
+          },
+          get: function () { return undefined; },
+        });
+        return NOW;
+      },
+    });
+  } finally {
+    delete Array.prototype[0];
+  }
+  function hasTampered(arr) {
+    if (!Array.isArray(arr)) return false;
+    for (let i = 0; i < arr.length; i++) {
+      const v = arr[i];
+      if (v && typeof v === 'object' && Object.prototype.hasOwnProperty.call(v, 'tampered')) return true;
+    }
+    return false;
+  }
+  chk('RN-13 r4-setter: hostile Array.prototype[0] setter — graph.nodes contains no tampered entry', r.valid === true && !hasTampered(r.graph.nodes));
+  chk('RN-13 r4-setter: graph.correlationGroups clean', r.valid === true && !hasTampered(r.graph.correlationGroups));
+  chk('RN-13 r4-setter: graph.topologicalOrder clean', r.valid === true && !hasTampered(r.graph.topologicalOrder));
+  chk('RN-13 r4-setter: graph.nodes[0] is the legitimate node', r.valid === true && r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
+  chk('RN-13 r4-setter: graph.nodes[0] frozen', r.valid === true && Object.isFrozen(r.graph.nodes[0]));
+})();
+
+(function sectionR_RN13_round4_ObjectPrototypeSetter() {
+  // Symmetric coverage on _materializeGraph's keyed-assignment sites (rejectedSourceReplays copy +
+  // rejectedReasonsSummary copy). Install an Object.prototype setter at a likely reason-code key
+  // and verify no tampered count appears in the graph's provenance summary. The Round 7 fix
+  // routes both assignment sites through _ObjectDefineProperty against Object.create(null)
+  // targets, so neither prototype-chain lookup nor proto-pollution can interfere.
+  const origDefineProperty = Object.defineProperty;
+  let r;
+  try {
+    r = EG.buildEvidenceGraph(freshInput({
+      rawEvidence: [freshNode(), freshNode({ nodeId: 'ev_001' })], // duplicate id triggers a reason tally
+    }), {
+      clock: function () {
+        origDefineProperty(Object.prototype, 'EVIDENCE_DUPLICATE_ID', {
+          configurable: true,
+          set: function () {
+            origDefineProperty(this, 'EVIDENCE_DUPLICATE_ID', { value: 'tampered', writable: true, enumerable: true, configurable: true });
+          },
+          get: function () { return undefined; },
+        });
+        return NOW;
+      },
+    });
+  } finally {
+    delete Object.prototype.EVIDENCE_DUPLICATE_ID;
+  }
+  // The legitimate count for EVIDENCE_DUPLICATE_ID should be a number (1), not the string 'tampered'.
+  const summary = r.valid && r.graph && r.graph.provenance && r.graph.provenance.rejectedReasonsSummary;
+  chk('RN-13 r4-objsetter: provenance.rejectedReasonsSummary.EVIDENCE_DUPLICATE_ID is numeric (not tampered)', r.valid === true && summary && typeof summary['EVIDENCE_DUPLICATE_ID'] === 'number' && summary['EVIDENCE_DUPLICATE_ID'] === 1);
+})();
+
+(function sectionR_RN16_asciiHeavyPayload() {
+  // RN-16 (Round 6 evidence): 35 nodes × 30 ASCII params × 225 chars passes the previous
+  // approximation (~256 KB estimated) and fails Step 17 (post-canonical) at 265,511 bytes.
+  // The Round 7 fix uses exact per-node JSON.stringify + WRAPPER_FIXED_BYTES, so the payload
+  // is rejected at Step 4.5 (pre-canonicalization).
+  const arr = [];
+  const ascii = 'x'.repeat(225);
+  for (let i = 0; i < 35; i++) {
+    const p = {};
+    for (let k = 0; k < 30; k++) p['k' + i + '_' + k] = ascii;
+    arr.push(freshNode({
+      nodeId: 'ev_ascii_' + i,
+      identity: freshId({ sourceId: 'src_ascii_' + i }),
+      observation: { kind: 'metric_value', i18nKey: 'r3.x', params: p, channel: 'rpm_' + i },
+    }));
+  }
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
+  chk('RN-16: 35×30×225 ASCII payload rejected (BYTE_CAP_EXCEEDED)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.BYTE_CAP_EXCEEDED) !== -1);
+  chk('RN-16: ASCII payload tripped at PRE-canonical stage', r.eligible === false && typeof r.detail === 'string' && /pre-canonicalization/.test(r.detail));
+})();
+
+(function sectionR_RN17_delIsNotEscaped() {
+  // RN-17 (Round 6 evidence): DEL (U+007F) is NOT escaped by JSON.stringify per ES §25.5.2.2.
+  // The Round 6 candidate treated DEL as 6 bytes (\uXXXX), over-rejecting a payload of
+  // 35 × 30 × 70 DEL chars whose actual JSON is only 101,214 bytes (well under 256 KB cap).
+  // The Round 7 fix removes DEL from the escape branch; the payload must now BUILD successfully.
+  const arr = [];
+  const dels = '\x7f'.repeat(70);
+  for (let i = 0; i < 35; i++) {
+    const p = {};
+    for (let k = 0; k < 30; k++) p['k' + i + '_' + k] = dels;
+    arr.push(freshNode({
+      nodeId: 'ev_del_' + i,
+      identity: freshId({ sourceId: 'src_del_' + i }),
+      observation: { kind: 'metric_value', i18nKey: 'r3.x', params: p, channel: 'rpm_' + i },
+    }));
+  }
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
+  chk('RN-17: DEL-heavy payload (~101 KB actual) NOT over-rejected', r.valid === true);
+  chk('RN-17: DEL-heavy payload builds 35 nodes', r.valid === true && r.graph.nodes.length === 35);
+})();
+
+(function sectionR_jsonStringWidth_table() {
+  // Direct table verification of _jsonStringWidth widths per Codex Round 6 expectation
+  // (2/3/8/8/6/12 for empty / ASCII / lone-low / lone-high / pair / mixed). We exercise the
+  // estimator indirectly via single-param graphs: a node whose only variable content is a single
+  // param value, the per-node JSON size delta corresponds to jsonStringWidth(value).
+  function nodeWithValue(v) {
+    return freshNode({
+      nodeId: 'ev_widthcheck',
+      observation: { kind: 'metric_value', i18nKey: 'r3.x', params: { v: v }, channel: 'rpm' },
+    });
+  }
+  function bytesFor(v) {
+    const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: [nodeWithValue(v)] }), { clock: CLOCK });
+    if (!r.valid) return -1;
+    // Re-measure post-canonical via the same idPayload shape Step 17 sees; cheaper to count from
+    // graph.nodes[0] via stable canonicalization. The width relationship is monotonic so a
+    // 6-byte-per-char value should produce a strictly larger JSON than a 1-byte one.
+    return JSON.stringify({ v }).length;
+  }
+  // Sanity: empty value JSON-encoded is `{"v":""}` = 8 chars; ASCII "x" = `{"v":"x"}` = 9 chars.
+  chk('jsonStringWidth: empty string ASCII baseline produces smaller JSON than ASCII char', bytesFor('') < bytesFor('x'));
+  // Valid surrogate pair (🚀) JSON-encodes to 4 UTF-8 bytes via UTF-8 escaping (each pair = 4
+  // bytes), shorter than two lone surrogates which JSON.stringify must escape as \uXXXX (12
+  // bytes total). Compare a pair against a deliberately-broken pair (the high surrogate followed
+  // by an ASCII char, leaving the high orphaned).
+  chk('jsonStringWidth: valid surrogate pair JSON shorter than orphaned high + ASCII', JSON.stringify({ v: '🚀' }).length < JSON.stringify({ v: '\ud83d' + 'x' }).length);
+  // Lone low surrogate escapes to \uXXXX = 6 chars; ASCII 'x' is 1 char in JSON. So lone-low
+  // JSON is longer than ASCII for the same character count.
+  chk('jsonStringWidth: lone low surrogate JSON longer than ASCII for same char count', JSON.stringify({ v: '\udc00'.repeat(10) }).length > JSON.stringify({ v: 'x'.repeat(10) }).length);
+})();
+
+console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
+if (fail > 0) process.exit(1);
+
+exec
+/bin/bash -lc "node -e \"for(const s of ['\\x7f','\\u0080','\\u009f','\\u200e','\\u200f','\\ue000','\\uf8ff','\\u{f0000}','\\ud800','\\udc00','🚀'])console.log([...s].map(c=>'U+'+c.codePointAt(0).toString(16)),Buffer.byteLength(JSON.stringify(s),'utf8'),JSON.stringify(s))\" && node -e \"const EG=require('./renderer/js/r3-0d-evidence-graph.js'),NOW='2026-06-28T06:00:00Z';function mk(i){let p={};for(let k=0;k<30;k++)p['k'+i+'_'+k]='\\x7f'.repeat(70);return {schemaVersion:1,nodeId:'ev_'+i,category:'data_quality',identity:{caseId:'c',sessionId:'s',lapId:'L1',sourceId:'src_'+i,sourceVersion:'v1',freshness:NOW},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'metric_value',i18nKey:'r3.x',params:p,channel:'rpm_'+i},limitations:[],supportingEdges:[],contradictingEdges:[]}};let a=Array.from({length:35},(_,i)=>mk(i)),r=EG.buildEvidenceGraph({caseAssociation:{caseId:'c',sessionId:'s',lapId:'L1'},rawEvidence:a});console.log({valid:r.valid,nodes:r.graph&&r.graph.nodes.length,inputBytes:Buffer.byteLength(JSON.stringify({caseAssociation:{caseId:'c',sessionId:'s',lapId:'L1'},rawEvidence:a}),'utf8')})\" && sed -n '/\"scripts\"/,/},/p' package.json" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+[ 'U+7f' ] 3 ""
+[ 'U+80' ] 4 ""
+[ 'U+9f' ] 4 ""
+[ 'U+200e' ] 5 "‎"
+[ 'U+200f' ] 5 "‏"
+[ 'U+e000' ] 5 ""
+[ 'U+f8ff' ] 5 ""
+[ 'U+f0000' ] 6 "󰀀"
+[ 'U+d800' ] 8 "\ud800"
+[ 'U+dc00' ] 8 "\udc00"
+[ 'U+1f680' ] 6 "🚀"
+{ valid: true, nodes: 35, inputBytes: 101214 }
+  "scripts": {
+    "start": "electron .",
+    "test": "node tests/verify-dynamics.js && node tests/telemetry-core.test.js && node tests/telemetry-view.test.js && node tests/telemetry-plot.test.js && node tests/telemetry-interact.test.js && node tests/telemetry-yaw.test.js && node tests/canonical-parameters.test.js && node tests/parameter-conversions.test.js && node tests/vehicle-profile-f312.test.js && node tests/setup-snapshot.test.js && node tests/analysis-case.test.js && node tests/analysis-case-adversarial.test.js && node tests/suspension-input-normalizer.test.js && node tests/suspension-input-equivalence.test.js && node tests/suspension-input-adversarial.test.js && node tests/canonical-model-input.test.js && node tests/analysis-execution.test.js && node tests/telemetry-observation.test.js && node tests/model-telemetry-comparison.test.js && node tests/race-engineer-insight.test.js && node tests/driver-coach-insight.test.js && node tests/analysis-workspace.test.js && node tests/analysis-workspace-viewmodel.test.js && node tests/analysis-workspace-integration.test.js && node tests/analysis-workspace-ui.test.js && node tests/telemetry-import-adapter.test.js && node tests/channel-mapping.test.js && node tests/calibration-registry.test.js && node tests/analysis-window.test.js && node tests/canonical-telemetry-session.test.js && node tests/analysis-case-export.test.js && node tests/r2.3-real-telemetry-integration.test.js && node tests/r2.3-import-ui.test.js && node tests/measured-metrics.test.js && node tests/r2.4-measured-metrics-integration.test.js && node tests/r2.4-ui.test.js && node tests/setup-ab.test.js && node tests/quantitative-setup-recommendation.test.js && node tests/r2.5-setup-ab-quantitative-integration.test.js && node tests/r2.5-ui.test.js && node tests/track-intelligence.test.js && node tests/r2.6-track-intelligence-integration.test.js && node tests/r2.6-ui.test.js && node tests/case-shell.test.js && node tests/r3.0a-ui.test.js && node tests/storage-backend.test.js && node tests/schema-migration.test.js && node tests/case-record-schema.test.js && node tests/case-store.test.js && node tests/session-store.test.js && node tests/case-library-viewmodel.test.js && node tests/r3.0b-ui.test.js && node tests/r3.0b-persistence-integration.test.js && node tests/feature-registry.test.js && node tests/feature-router.test.js && node tests/vehicle-preset-pipeline.test.js && node tests/i18n-parity.test.js && node tests/r3.0c-contract-foundation.test.js && node tests/r3-0c-comparison-adapter.test.js && node tests/r3-0c-lap-authority.test.js && node tests/r3-0c-track-identity.test.js && node tests/r3-0c-distance-authority.test.js && node tests/r3-0c-normalized-distance.test.js && node tests/r3-0c-reference-selection.test.js && node tests/r3-0c-corner-segmentation.test.js && node tests/r3-0c-corner-pairing.test.js && node tests/r3-0c-delta-metrics.test.js && node tests/r3-0c-comparison-export.test.js && node tests/r3-0c-comparison-workspace.test.js && node tests/r3-0c-contracts-bundle-equivalence.test.js && node tests/r3-0c-activation.test.js && node tests/r3.0d-contract-foundation.test.js && node tests/r3.0d-evidence-graph.test.js && node tests/r3-0c-governance.test.js && node tests/r3-0c-no-consumer.test.js && node tests/r3-0c-governance-integrity.test.js && node tests/r3-0-phase-governance.test.js && node tests/r3-0-phase-no-consumer.test.js && node tests/r3-0-phase-governance-integrity.test.js && node tests/r3-0-train.test.js && node tools/validate-against-telemetry.js --selftest",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:all": "electron-builder --mac --win"
+  },
+
+codex
+FINAL VERDICT: BLOCK
+
+D2-RN-13 round-4: CLOSED
+  evidence: Array/Object prototype setter attacks cannot intercept captured `defineProperty`; targeted suite passes 157/157.
+
+D2-RN-16: STILL-OPEN
+  evidence: 35 same-source nodes with 30×195-byte parameters generate 595 correlated edges; Step 4.5 passes because edges/groups are uncounted, then Step 17 rejects at 264,011 bytes.
+
+D2-RN-17: CLOSED
+  evidence: DEL-heavy 101,214-byte payload builds successfully with 35 nodes; C1, LRM/RLM, PUA, supplementary characters, and lone surrogates have correct JSON UTF-8 widths.
+tokens used
+73,425
+FINAL VERDICT: BLOCK
+
+D2-RN-13 round-4: CLOSED
+  evidence: Array/Object prototype setter attacks cannot intercept captured `defineProperty`; targeted suite passes 157/157.
+
+D2-RN-16: STILL-OPEN
+  evidence: 35 same-source nodes with 30×195-byte parameters generate 595 correlated edges; Step 4.5 passes because edges/groups are uncounted, then Step 17 rejects at 264,011 bytes.
+
+D2-RN-17: CLOSED
+  evidence: DEL-heavy 101,214-byte payload builds successfully with 35 nodes; C1, LRM/RLM, PUA, supplementary characters, and lone surrogates have correct JSON UTF-8 widths.

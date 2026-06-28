@@ -1174,5 +1174,50 @@ function freshInput(over) {
   chk('jsonStringWidth: lone low surrogate JSON longer than ASCII for same char count', JSON.stringify({ v: '\udc00'.repeat(10) }).length > JSON.stringify({ v: 'x'.repeat(10) }).length);
 })();
 
+// ── Section S — Codex D2 Round 7 finding closure (RN-16 same-source correlation explosion) ──
+(function sectionS_RN16_sameSourceCorrelationExplosion() {
+  // RN-16 STILL-OPEN at Round 7 (Codex evidence on 90bf868): 35 same-source nodes share one
+  // sourceId, so they all bucket into a single correlation group. The graph builder synthesises
+  // a correlated_with edge between every pair → 35 × 34 / 2 = 595 edges, ~71 KB extra in the
+  // top-level edges array. The previous Step 4.5 estimate counted only per-node bytes (~211 KB),
+  // PASSED, then Step 17 caught the actual canonical at 264,011 bytes. The Round 8 fix adds
+  // Step 11.5 (between edge cap check and cycle detection) which builds an EXACT preview
+  // idPayload using captured intrinsics and runs _utf8len(_JSONStringify(preview)) for the
+  // authoritative pre-canonicalisation envelope check, so the rejection happens before cycle
+  // DFS / topological sort / per-element freeze / graphId derivation.
+  const arr = [];
+  const ascii = 'x'.repeat(195);
+  for (let i = 0; i < 35; i++) {
+    const p = {};
+    for (let k = 0; k < 30; k++) p['k' + i + '_' + k] = ascii;
+    arr.push(freshNode({
+      nodeId: 'ev_corr_' + i,
+      identity: freshId({ sourceId: 'single_corr_src' }), // SAME sourceId → 1 group of 35 → 595 edges
+      observation: { kind: 'metric_value', i18nKey: 'r3.x', params: p, channel: 'rpm_' + i },
+    }));
+  }
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
+  chk('RN-16 r7: same-source 595-edge payload rejected (BYTE_CAP_EXCEEDED)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.BYTE_CAP_EXCEEDED) !== -1);
+  chk('RN-16 r7: rejection happens at PRE-materialization (Step 11.5), not post-canonical (Step 17)', r.eligible === false && typeof r.detail === 'string' && /pre-materialization/.test(r.detail));
+  chk('RN-16 r7: detail includes the actual envelope byte count for diagnostics', r.eligible === false && typeof r.detail === 'string' && /\d+\s+exceeds\s+ENVELOPE_BYTE_CAP=/.test(r.detail));
+})();
+
+(function sectionS_RN16_largeButValid() {
+  // Negative control: a real-world graph with many distinct sources (so correlation groups are
+  // tiny, no edge explosion) and per-node content well within budget must still BUILD. This
+  // guards against the Step 11.5 check accidentally over-rejecting legitimate large graphs.
+  const arr = [];
+  for (let i = 0; i < 35; i++) {
+    arr.push(freshNode({
+      nodeId: 'ev_legit_' + i,
+      identity: freshId({ sourceId: 'src_legit_' + i }), // DISTINCT sources → 35 groups of 1 → 0 edges
+      observation: { kind: 'metric_value', i18nKey: 'r3.x', params: { k: 'v' }, channel: 'rpm_' + i },
+    }));
+  }
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
+  chk('RN-16 r7-control: 35 distinct-source compact nodes build successfully', r.valid === true && r.graph.nodes.length === 35);
+  chk('RN-16 r7-control: zero correlated_with edges (each source group has 1 member)', r.valid === true && r.graph.edges.every(e => e.kind !== 'correlated_with'));
+})();
+
 console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
 if (fail > 0) process.exit(1);

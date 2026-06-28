@@ -92,7 +92,7 @@
   "tests": {
     "command": "npm test",
     "newSuiteForThisCheckpoint": "tests/r3.0d-evidence-graph.test.js",
-    "newSuiteAssertions": 157,
+    "newSuiteAssertions": 162,
     "stateAwareRefactor": "tests/r3.0d-contract-foundation.test.js Section I + J were refactored to be state-aware (D1 invariants when currentCheckpoint === D1_CONTRACT_FOUNDATION; D2 invariants when currentCheckpoint === D2_EVIDENCE_GRAPH). No D1-era assertion was deleted; the D1 branch is preserved and an additional D2 branch added.",
     "evidenceTier": "TIER 3 — Claude-verified on D2 branch HEAD; CI re-run on integrationSha is the authority for the Train target context."
   },
@@ -180,9 +180,23 @@
           "RN-17": "NEW. DEL (U+007F) was incorrectly treated as a 6-byte JSON escape. Per ES §25.5.2.2 Quote(value), only U+0000..U+001F (plus \" and \\) MUST be escaped — DEL passes through as 1 byte. A 35 × 30 × 70 DEL payload whose actual JSON is only 101,214 bytes (well under 256 KB cap) was over-rejected at Step 4.5."
         },
         "evidence": "governance/r3.0d/codex-checkpoint-evidence/D2/round-6-d7c045f.raw.txt"
+      },
+      {
+        "round": 7,
+        "reviewedSha": "90bf8684bc69647587c43262bc99e8ff0bb11a7f",
+        "verdict": "BLOCK",
+        "closed": ["RN-13 round-4", "RN-17"],
+        "stillOpen": ["RN-16"],
+        "newFindings": [],
+        "findingDetail": {
+          "RN-13 round-4": "CLOSED. captured _ObjectDefineProperty bypass via [[DefineOwnProperty]] confirmed against Array.prototype['0'] setter + Object.prototype[reasonCode] setter. Codex targeted suite 157/157.",
+          "RN-16": "STILL-OPEN via NEW attack angle. 35 same-source nodes with 30 × 195-byte params generate 35*34/2 = 595 correlated_with edges (~71 KB extra). Per-node sum at Step 4.5 ~211 KB passes; total post-canonical 264,011 bytes only caught at Step 17. Step 4.5 still does not count the edges + correlationGroups envelope contributions.",
+          "RN-17": "CLOSED. DEL (101 KB actual) builds successfully; full char-class table verified (C1, LRM/RLM, PUA, supplementary, lone surrogates all encode correctly)."
+        },
+        "evidence": "governance/r3.0d/codex-checkpoint-evidence/D2/round-7-90bf868.raw.txt"
       }
     ],
-    "tierDisclosure": "Codex D2 Round 1 BLOCK on 10766c0 (12 findings); Round 2 BLOCK on ad6474a (closed 6 / 6 still-open); Round 3 BLOCK on 63ecf69 (closed 5 + RN-13/RN-14 NEW + RN-09 partial); Round 4 BLOCK on e84d22c (closed RN-09 + RN-14 + RN-15 NEW + RN-13 still partial); Round 5 BLOCK on ec00b88 (RN-13 round-4 STILL-OPEN, FPC replacement; RN-15 round-4 STILL-OPEN, lone surrogates); Round 6 BLOCK on d7c045f (RN-15 round-4 CLOSED via Round 6 lone-surrogate branches; RN-13 round-4 STILL-OPEN, Array.prototype['0'] setter from clock intercepts out[i]=x on fresh out=[]; RN-16 NEW, estimator misses structural JSON keys/braces → 35×30×225 ASCII slips past Step 4.5; RN-17 NEW, DEL incorrectly counted as 6-byte JSON escape, over-rejecting 101 KB payload). Round 7 candidate: (a) RN-13 final — _safeSlice/_safeMap + _materializeGraph's two programmatic keyed assignments all use captured _ObjectDefineProperty with full data descriptors via [[DefineOwnProperty]], bypassing the [[Set]] protocol and any prototype-chain accessor (rejectedSourceReplays copy + rrsCopy also moved to Object.create(null) base); (b) RN-16 — _estimateNodeUtf8Bytes replaced with exact _utf8len(_JSONStringify(_perNodeIdPayloadShape)) using captured intrinsics, Step 4.5 adds WRAPPER_FIXED_BYTES + inter-node commas; (c) RN-17 — _jsonStringWidth no longer treats DEL as 6-byte escape (per ES §25.5.2.2 only U+0000..U+001F + \" + \\ escape; DEL passes through as 1 byte). Adversarial regressions added in Section R (Array.prototype[0] setter / Object.prototype[reasonCode] setter / 35×30×225 ASCII at Step 4.5 / DEL-heavy 101 KB builds successfully / jsonStringWidth table). Tier 1 raw stdout for all six rounds at round-{1..6}-<sha>.raw.txt."
+    "tierDisclosure": "Codex D2 Round 1 BLOCK on 10766c0 (12 findings); Round 2 BLOCK on ad6474a (closed 6 / 6 still-open); Round 3 BLOCK on 63ecf69 (closed 5 + RN-13/RN-14 NEW + RN-09 partial); Round 4 BLOCK on e84d22c (closed RN-09 + RN-14 + RN-15 NEW + RN-13 still partial); Round 5 BLOCK on ec00b88 (RN-13 round-4 STILL-OPEN, FPC replacement; RN-15 round-4 STILL-OPEN, lone surrogates); Round 6 BLOCK on d7c045f (RN-15 round-4 CLOSED; RN-13 round-4 STILL-OPEN, Array.prototype['0'] setter; RN-16 + RN-17 NEW); Round 7 BLOCK on 90bf868 (RN-13 round-4 CLOSED via captured _ObjectDefineProperty bypass through [[DefineOwnProperty]]; RN-17 CLOSED with full char-class table verified; RN-16 STILL-OPEN via NEW angle — 35 same-source nodes synthesise 595 correlated_with edges (~71 KB) which Step 4.5 per-node estimate doesn't count, slipping past to Step 17 at 264,011 bytes). Round 8 candidate adds Step 11.5: after edges + correlationGroups are built (Steps 9-10) and the edge count cap is verified (Step 11), build the EXACT preview idPayload (same shape as Step 16's canonicalisation source) using captured intrinsics and run _utf8len(_JSONStringify(preview)) for the authoritative pre-canonicalisation envelope check — failing closed with BYTE_CAP_EXCEEDED and a 'pre-materialization envelope byte estimate X exceeds ENVELOPE_BYTE_CAP=...' detail BEFORE cycle DFS / topological sort / per-element freeze / graphId derivation. Step 4.5 remains as a cheap per-node early-reject; Step 17 stays as belt-and-suspenders on the actual idPayload. Adversarial regressions added in Section S (35 same-source 595-edge attack rejected at pre-materialization; negative control: 35 distinct-source compact nodes still build with 0 correlated_with edges). Tier 1 raw stdout for all seven rounds at round-{1..7}-<sha>.raw.txt."
   },
 
   "scopeBoundary": {
@@ -231,6 +245,7 @@
     "governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt",
     "governance/r3.0d/codex-checkpoint-evidence/D2/round-5-ec00b88.raw.txt",
     "governance/r3.0d/codex-checkpoint-evidence/D2/round-6-d7c045f.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D2/round-7-90bf868.raw.txt",
     "governance/r3.0d/schema.json",
     "governance/r3.0d/state.json",
     "governance/r3.0e/checkpoint-manifest.schema.json",
@@ -246,7 +261,7 @@
     "tests/r3.0d-contract-foundation.test.js",
     "tests/r3.0d-evidence-graph.test.js"
   ],
-  "changedFilesNote": "Computed from the exact baseSha (f8a598b) → Round 7 candidate HEAD diff. Includes the cross-phase rename commit (governance/r3.0e files + docs/r3-0-train-governance.md), the state-aware guard-enhancement commit (scripts/check-r3-phase-no-consumer.js + tests/r3-0-phase-no-consumer.test.js), every Codex evidence file from Round 1 through Round 6 (so the candidate carries its own evidence lineage), plus all D2 production / test / governance artifacts. RN-12 closure.",
+  "changedFilesNote": "Computed from the exact baseSha (f8a598b) → Round 8 candidate HEAD diff. Includes the cross-phase rename commit (governance/r3.0e files + docs/r3-0-train-governance.md), the state-aware guard-enhancement commit (scripts/check-r3-phase-no-consumer.js + tests/r3-0-phase-no-consumer.test.js), every Codex evidence file from Round 1 through Round 7 (so the candidate carries its own evidence lineage), plus all D2 production / test / governance artifacts. RN-12 closure.",
 
   "note": "D2_EVIDENCE_GRAPH — the first non-bootstrap R3.0D PRODUCTION checkpoint. Lifts ONE production capability (evidence_graph_present); enables runtimeConsumersAllowed=true + algorithmsAllowed=true; introduces renderer/js/r3-0d-evidence-graph.js as the single new authorized production path; keeps uiAllowed=false + featureRegistryActivationAllowed=false (D5 only). The 5-phase D-flow is renamed atomically alongside this checkpoint per the directive; the rename is recorded in governanceRename above with full lineage. C-B Codex review runs against the exact D2 candidate SHA; tier-1 raw stdout to be persisted under governance/r3.0d/codex-checkpoint-evidence/D2/."
 }

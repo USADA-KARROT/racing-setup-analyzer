@@ -86,11 +86,16 @@
  *          because [[DefineOwnProperty]] bypasses the [[Set]] protocol entirely.
  *   RN-15 round-4 (Round 5 closure): `_jsonStringWidth` accounts for lone surrogates (high or
  *          low) as 6 bytes each (`\uXXXX` JSON escape).
- *   RN-16 NEW (Round 7 closure): `_estimateNodeUtf8Bytes` replaced with exact
- *          `_utf8len(_JSONStringify(perNodeIdPayloadShape))` using captured intrinsics. The
- *          previous approximation missed top-level structural keys and nested braces, allowing
- *          a 35×30×225 ASCII payload (~265 KB actual) to bypass Step 4.5 (~256 KB estimated).
- *          Step 4.5 now also adds WRAPPER_FIXED_BYTES + inter-node commas for envelope overhead.
+ *   RN-16 NEW (Round 7 / Round 8 final closure): `_estimateNodeUtf8Bytes` rewritten to use exact
+ *          `_utf8len(_JSONStringify(perNodeIdPayloadShape))` (Round 7) — sufficient for per-node
+ *          attacks. Codex Round 7 surfaced a follow-on attack: 35 same-source nodes generate
+ *          O(N²) correlated_with edges (~71 KB) which Step 4.5 didn't account for, slipping past
+ *          to Step 17. Round 8 closure: new Step 11.5 builds the SAME idPayload preview that
+ *          Step 16 materialises (using captured intrinsics) and runs `_utf8len(_JSONStringify(...))`
+ *          as an EXACT pre-canonicalisation envelope check, after edges + correlationGroups are
+ *          built but before any per-element freezing or graphId derivation. Step 4.5 remains as a
+ *          cheap per-node early-reject; Step 17 remains as belt-and-suspenders on the final
+ *          idPayload.
  *   RN-17 NEW (Round 7 closure): `_jsonStringWidth` no longer treats DEL (U+007F) as a 6-byte
  *          JSON escape. Per ES §25.5.2.2 Quote(value), only U+0000..U+001F (plus " and \) MUST
  *          be escaped; DEL passes through as 1 byte. A DEL-heavy payload that fits the envelope
@@ -898,6 +903,29 @@
       // Step 11 — edge cap.
       if (edges.length > EDGES_CAP_TOTAL) {
         return RC.buildBlockedResult([CODES.GRAPH_CAP_EXCEEDED], { detail: 'edges ' + edges.length + ' exceeds EDGES_CAP_TOTAL=' + EDGES_CAP_TOTAL });
+      }
+
+      // Step 11.5 — Codex D2 Round 7 RN-16 final closure: exact envelope byte cap check on the
+      // SAME idPayload structure Step 16 will canonicalise, built once edges + correlationGroups
+      // exist. Codex Round 7 exposed a same-source correlation-explosion attack (35 nodes sharing
+      // one sourceId emit 35*34/2=595 correlated_with edges, ~71 KB), which slipped past the
+      // per-node-only Step 4.5 estimate (~211 KB pre-canonical sum, under cap) and was only
+      // caught by post-canonical Step 17 at 264,011 bytes. Step 11.5 now builds the preview
+      // idPayload using captured intrinsics and runs the EXACT envelope check before Step 12's
+      // cycle DFS / Step 13's topological sort / Step 14's per-element freezes — failing closed
+      // with the same BYTE_CAP_EXCEEDED code but a "pre-materialization" detail (Step 17 stays
+      // as belt-and-suspenders on the actual idPayload).
+      var previewIdPayload = {
+        caseAssociation: caseAssociation,
+        nodes: keptAfterSemantic.map(function (n) { return _perNodeIdPayloadShape(n); }),
+        edges: edges,
+        correlationGroups: correlationGroups.map(function (g) { return { correlationGroupId: g.correlationGroupId, memberNodeIds: g.memberNodeIds, independenceWeight: g.independenceWeight }; }),
+      };
+      var previewBytes;
+      try { previewBytes = _utf8len(_JSONStringify(previewIdPayload)); }
+      catch (e) { previewBytes = Infinity; }
+      if (previewBytes > ENVELOPE_BYTE_CAP) {
+        return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'pre-materialization envelope byte estimate ' + previewBytes + ' exceeds ENVELOPE_BYTE_CAP=' + ENVELOPE_BYTE_CAP });
       }
 
       // Step 12 — cycle detection over CAUSAL edges only.
