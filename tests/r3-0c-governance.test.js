@@ -112,7 +112,7 @@ function writeFixture(opts) {
   chk('A1 real-repo validator exits 0', r.status === 0, r.stderr);
   chk('A2 real-repo ok===true', !!(r.artifact && r.artifact.ok === true), r.artifact && r.artifact.violations);
   chk('A3 real-repo checkpoint=C7_UI', !!(r.artifact && r.artifact.currentCheckpoint === 'C7_UI'));
-  chk('A4 real-repo authPathCount=13 (C1..C6 + 3 C7 paths: orchestrator, viewmodel, i18n-comparisons)', !!(r.artifact && r.artifact.authorizedProductionPathCount === 13));
+  chk('A4 real-repo authPathCount=14 (C1..C6 + 4 C7 paths: orchestrator, viewmodel, i18n-comparisons, contracts-bundle)', !!(r.artifact && r.artifact.authorizedProductionPathCount === 14));
   chk('A5 real-repo enabledCapCount=12 (C1..C6 capabilities + ui_present + 2 C7 governance capabilities)', !!(r.artifact && r.artifact.enabledCapabilityCount === 12));
   chk('A6 real-repo runtimeConsumers=true (C1 floor)', r.artifact && r.artifact.runtimeConsumersAllowed === true);
   chk('A7 real-repo uiAllowed=true (C7 reached)', r.artifact && r.artifact.uiAllowed === true);

@@ -15,7 +15,8 @@
     { "path": "renderer/js/r3-0c-comparison-export.js", "capability": "comparison_export_present" },
     { "path": "renderer/js/r3-0c-comparison-orchestrator.js", "capability": "ui_present" },
     { "path": "renderer/js/r3-0c-comparison-viewmodel.js", "capability": "ui_present" },
-    { "path": "renderer/js/i18n-comparisons.js", "capability": "ui_present" }
+    { "path": "renderer/js/i18n-comparisons.js", "capability": "ui_present" },
+    { "path": "renderer/js/r3-0c-contracts-bundle.js", "capability": "ui_present" }
   ],
   "enabledCapabilities": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present", "comparison_export_present", "ui_present", "viewmodel_state_transition_contract", "framing_source_structured_contract"],
   "declaredButDisabledGovernanceCapabilities": ["phase_boundary_contract"],

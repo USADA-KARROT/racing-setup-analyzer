@@ -153,6 +153,59 @@ chk('A7 cannotDistinguishFallback returns valid entry', FIR.validateFramingEntry
     // existing orchestrator output (`params: v.params ? ... : undefined`) keeps working.
     const e24 = { reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.cannot_distinguish', params: undefined };
     chk('B24 params explicit-undefined → valid (back-compat)', FIR.validateFramingEntry(e24).valid === true);
+
+    // Codex C7-R3-C-01 closure: Proxy descriptor TOCTOU. A Proxy can lie via
+    // getOwnPropertyDescriptor (returning a benign data descriptor while the real get-trap
+    // throws or returns side-effecting values). The validator must (a) detect this via a
+    // sanitized snapshot return contract that callers consume INSTEAD of the raw entry, OR
+    // (b) reject the entry outright. Both stances are tested.
+    const target25 = { reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.cannot_distinguish' };
+    Object.defineProperty(target25, 'params', {
+      configurable: true,
+      enumerable: true,
+      get() { throw new Error('ACCESSOR EXECUTED ON GET'); },
+    });
+    const attack25 = new Proxy(target25, {
+      getOwnPropertyDescriptor(t, k) {
+        if (k === 'params') return { configurable: true, enumerable: true, writable: true, value: undefined };
+        return Reflect.getOwnPropertyDescriptor(t, k);
+      },
+    });
+    const res25 = FIR.validateFramingEntry(attack25);
+    // Either the validator rejects (sufficient) OR the sanitized snapshot is the safe
+    // surface and re-reading the raw entry would still throw — in which case downstream
+    // consumers must use sanitized. We require sanitized to be present AND to be free of
+    // the accessor side-effect.
+    chk('B25 Proxy lying getOwnPropertyDescriptor + accessor get → sanitized snapshot is the only safe surface', (() => {
+      if (res25.valid !== true) return true; // reject is acceptable
+      if (!res25.sanitized) return false; // valid without sanitized is unsafe
+      // sanitized must NOT have params (the get-trap throws on the real entry)
+      try { var p = res25.sanitized.params; return p === undefined; } catch (_) { return false; }
+    })());
+
+    // B26 Sanitized snapshot is frozen — caller cannot mutate it back to an unsafe shape.
+    const ok26 = FIR.validateFramingEntry({ reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.observed_delta.faster_overall', params: { ms: -123 } });
+    chk('B26 valid result carries a sanitized snapshot', ok26.valid === true && ok26.sanitized && typeof ok26.sanitized === 'object');
+    chk('B26b sanitized snapshot is frozen', ok26.sanitized && Object.isFrozen(ok26.sanitized));
+    chk('B26c sanitized.params is frozen', ok26.sanitized && ok26.sanitized.params && Object.isFrozen(ok26.sanitized.params));
+    chk('B26d sanitized values equal validated descriptor values', ok26.sanitized.reasonCode === CODES.CANNOT_DISTINGUISH && ok26.sanitized.i18nKey === 'r3_0c.framing.observed_delta.faster_overall' && ok26.sanitized.params.ms === -123);
+
+    // B27 Inner params Proxy descriptor TOCTOU.
+    const innerTarget27 = {};
+    Object.defineProperty(innerTarget27, 'ms', { configurable: true, enumerable: true, get() { throw new Error('INNER ACCESSOR'); } });
+    const innerAttack27 = new Proxy(innerTarget27, {
+      getOwnPropertyDescriptor(t, k) {
+        if (k === 'ms') return { configurable: true, enumerable: true, writable: true, value: 999 };
+        return Reflect.getOwnPropertyDescriptor(t, k);
+      },
+    });
+    const e27 = { reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.cannot_distinguish', params: innerAttack27 };
+    const res27 = FIR.validateFramingEntry(e27);
+    chk('B27 inner params Proxy lying descriptor → sanitized snapshot captures only validated value (or reject)', (() => {
+      if (res27.valid !== true) return true; // reject is acceptable
+      if (!res27.sanitized) return false;
+      try { var ms = res27.sanitized.params && res27.sanitized.params.ms; return ms === 999 || ms === undefined; } catch (_) { return false; }
+    })());
   })();
 })();
 

@@ -136,6 +136,10 @@
     }
 
     function _validateFramingOrFallback(framing) {
+      // Codex C7-R3-C-01 closure: NEVER re-read `framing[k]` / `v.reasonCode` / `v.i18nKey` /
+      // `v.params` after validation. A Proxy can return a different value on each access; the
+      // validator's `sanitized` snapshot (frozen, built from descriptor-read values only) is the
+      // ONLY safe surface to consume downstream. Same TOCTOU applies to cannotDistinguish entries.
       var fallback = FIR.cannotDistinguishFallback();
       var out = {
         observedDelta: fallback,
@@ -149,7 +153,7 @@
         var v = framing[k];
         if (v === null || v === undefined) return; // keep fallback
         var vr = FIR.validateFramingEntry(v);
-        if (vr.valid) out[k] = Object.freeze({ reasonCode: v.reasonCode, i18nKey: v.i18nKey, params: v.params ? Object.freeze(Object.assign({}, v.params)) : undefined });
+        if (vr.valid && vr.sanitized) out[k] = vr.sanitized;
         // else: leave fallback in place (defense in depth — orchestrator emit should have caught)
       });
       if (Array.isArray(framing.cannotDistinguish)) {
@@ -157,7 +161,7 @@
         for (var i = 0; i < framing.cannotDistinguish.length && i < 64; i++) {
           var e = framing.cannotDistinguish[i];
           var er = FIR.validateFramingEntry(e);
-          if (er.valid) cd.push(Object.freeze({ reasonCode: e.reasonCode, i18nKey: e.i18nKey, params: e.params ? Object.freeze(Object.assign({}, e.params)) : undefined }));
+          if (er.valid && er.sanitized) cd.push(er.sanitized);
         }
         out.cannotDistinguish = Object.freeze(cd);
       } else {
@@ -275,14 +279,20 @@
         nextValidationAction: null,
       };
       if (_isPlain(callerFraming)) {
-        // caller may suggest framing — we validate every entry and replace only valid ones.
+        // Codex C7-R3-C-01 closure: assign vr.sanitized, NOT the raw `v`. The TOCTOU bypass via
+        // Proxy.getOwnPropertyDescriptor lying about descriptors would otherwise let an accepted
+        // entry yield different values on later access.
         ['observedDelta', 'likelyDriverBehaviourDifference', 'possibleVehicleResponseDifference', 'nextValidationAction'].forEach(function (k) {
           var v = callerFraming[k];
-          if (v && FIR.validateFramingEntry(v).valid) built[k] = v;
+          if (!v) return;
+          var vr = FIR.validateFramingEntry(v);
+          if (vr.valid && vr.sanitized) built[k] = vr.sanitized;
         });
         if (Array.isArray(callerFraming.cannotDistinguish)) {
           callerFraming.cannotDistinguish.forEach(function (e) {
-            if (e && FIR.validateFramingEntry(e).valid && built.cannotDistinguish.length < 64) built.cannotDistinguish.push(e);
+            if (!e) return;
+            var er = FIR.validateFramingEntry(e);
+            if (er.valid && er.sanitized && built.cannotDistinguish.length < 64) built.cannotDistinguish.push(er.sanitized);
           });
         }
       }

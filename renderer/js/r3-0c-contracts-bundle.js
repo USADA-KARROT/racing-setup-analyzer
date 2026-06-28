@@ -1616,11 +1616,20 @@
       if (!isRegisteredFramingI18nKey(keyRead.value)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing i18nKey not in registry' };
       var paramsRead = _readOwn(entry, 'params');
       if (paramsRead.state === 'THREW') return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params is accessor descriptor or descriptor lookup threw — fail-closed' };
+      // Codex C7-R3-C-01 closure: build a sanitized canonical snapshot from the validated
+      // descriptor values, not the original entry. A Proxy can lie via getOwnPropertyDescriptor
+      // (returning a benign data descriptor while the real get-trap throws or mutates); after
+      // validation accepted that lie, any downstream re-read via plain `v.foo` would see the
+      // accessor side again. The orchestrator MUST consume the sanitized snapshot — never the
+      // raw entry — for the validation result to be honoured. The snapshot is frozen so callers
+      // cannot mutate it back into an unsafe shape post-validation.
+      var sanitizedParams;
       if (paramsRead.state === 'VALUE' && paramsRead.value !== undefined) {
         var paramsRaw = paramsRead.value;
         if (!_isPlain(paramsRaw)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params not a plain object' };
         var pks = _safeOwnKeys(paramsRaw);
         if (pks === null) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params own-key enumeration threw (Proxy)' };
+        sanitizedParams = {};
         for (var j = 0; j < pks.length; j++) {
           var k = pks[j];
           if (typeof k !== 'string' || k.length === 0) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has empty / non-string (e.g. Symbol) key' };
@@ -1629,13 +1638,17 @@
           var inner = _readOwn(paramsRaw, k);
           if (inner.state !== 'VALUE') return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: inner.state === 'THREW' ? 'framing params value is accessor descriptor or descriptor lookup threw — fail-closed' : 'framing params value missing for own key' };
           var v = inner.value;
-          if (v === null || typeof v === 'boolean') continue;
-          if (typeof v === 'number') { if (!_isFiniteNum(v)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has non-finite number' }; continue; }
-          if (typeof v === 'string') { if (_utf8ByteLength(v) > MAX_PARAM_STRING_BYTES) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has oversized string' }; continue; }
+          if (v === null || typeof v === 'boolean') { sanitizedParams[k] = v; continue; }
+          if (typeof v === 'number') { if (!_isFiniteNum(v)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has non-finite number' }; sanitizedParams[k] = v; continue; }
+          if (typeof v === 'string') { if (_utf8ByteLength(v) > MAX_PARAM_STRING_BYTES) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has oversized string' }; sanitizedParams[k] = v; continue; }
           return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has unsupported value type' };
         }
+        sanitizedParams = Object.freeze(sanitizedParams);
       }
-      return { valid: true };
+      var sanitized = sanitizedParams !== undefined
+        ? Object.freeze({ reasonCode: rcRead.value, i18nKey: keyRead.value, params: sanitizedParams })
+        : Object.freeze({ reasonCode: rcRead.value, i18nKey: keyRead.value });
+      return { valid: true, sanitized: sanitized };
     } catch (e) {
       // Codex C7 finding C7-B1 closure: any throw from a Proxy / accessor / inherited trap
       // results in fail-closed at this top-level boundary.
