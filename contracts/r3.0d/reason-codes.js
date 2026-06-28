@@ -206,6 +206,39 @@
     try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; }
     catch (e) { return false; }
   }
+  /**
+   * _hasNonPlainNestedObject(v, depth) — Codex D1 R5 Finding RN-11 (nested-level) closure:
+   * recursively walks the ORIGINAL input pre-clone and returns true if ANY nested object (at any
+   * depth, including inside arrays) has a prototype that is not Object.prototype / null / Array.
+   * Catches class instances embedded as identity / confidence / observation / nested entry values.
+   * Also rejects accessor descriptors at any level — a hostile getter at depth would otherwise be
+   * invoked by structuredClone's [[Get]] semantics. Symbol keys are silently skipped here (the
+   * top-level hasHiddenOwnKey already rejects them at the boundary; descending into Symbol-keyed
+   * subtrees would itself invoke their getters). Depth cap 32 prevents pathological recursion.
+   */
+  function _hasNonPlainNestedObject(v, depth) {
+    if (depth == null) depth = 0;
+    if (depth > 32) return true;
+    if (v === null || typeof v !== 'object') return false;
+    var isArr = Array.isArray(v);
+    if (!isArr) {
+      try { var p = Object.getPrototypeOf(v); if (!(p === Object.prototype || p === null)) return true; }
+      catch (e) { return true; }
+    }
+    try {
+      var keys = Reflect.ownKeys(v);
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        if (typeof k === 'symbol') return true; // any nested symbol key — fail closed
+        var d;
+        try { d = Object.getOwnPropertyDescriptor(v, k); } catch (e) { return true; }
+        if (!d) continue;
+        if (typeof d.get === 'function' || typeof d.set === 'function') return true; // accessor descriptor
+        if (_hasNonPlainNestedObject(d.value, depth + 1)) return true;
+      }
+    } catch (e) { return true; }
+    return false;
+  }
 
   var api = {
     REASON_CODES: REASON_CODES,
@@ -217,6 +250,7 @@
     toCleanCopy: _toCleanCopy,
     hasHiddenOwnKey: _hasHiddenOwnKey,
     isOriginalPlainObject: _isOriginalPlainObject,
+    hasNonPlainNestedObject: _hasNonPlainNestedObject,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.R3_0D_ReasonCodes = api;

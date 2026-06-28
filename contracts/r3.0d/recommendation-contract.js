@@ -128,6 +128,7 @@
     try {
     if (!RC.isOriginalPlainObject(rIn)) return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'recommendation prototype is not Object.prototype or null' });
     if (RC.hasHiddenOwnKey(rIn)) return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'recommendation carries Symbol-keyed or non-enumerable own property' });
+    if (RC.hasNonPlainNestedObject(rIn)) return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'recommendation contains a nested non-plain object' });
     var r = RC.toCleanCopy(rIn);
     if (!_isPlain(r)) return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID], { detail: 'recommendation not plain object (or proxy/non-cloneable rejected)' });
     if (!_hasOnlyAllowedKeys(r, RECOMMENDATION_KEYS)) return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID, CODES.UNKNOWN_OWN_KEY]);

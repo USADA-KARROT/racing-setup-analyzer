@@ -69,6 +69,7 @@
     try {
     if (!RC.isOriginalPlainObject(inputIn)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'decision-input prototype is not Object.prototype or null' });
     if (RC.hasHiddenOwnKey(inputIn)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION, CODES.UNKNOWN_OWN_KEY], { detail: 'decision-input carries Symbol-keyed or non-enumerable own property' });
+    if (RC.hasNonPlainNestedObject(inputIn)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'decision-input contains a nested non-plain object' });
     var input = RC.toCleanCopy(inputIn);
     if (!_isPlain(input)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'decision-input not plain object (or proxy/non-cloneable rejected)' });
     if (!_hasOnlyAllowedKeys(input, DECISION_INPUT_KEYS)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION, CODES.UNKNOWN_OWN_KEY]);

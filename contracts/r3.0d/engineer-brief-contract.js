@@ -88,6 +88,7 @@
     try {
     if (!RC.isOriginalPlainObject(bIn)) return RC.buildBlockedResult([CODES.BRIEF_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'brief prototype is not Object.prototype or null' });
     if (RC.hasHiddenOwnKey(bIn)) return RC.buildBlockedResult([CODES.BRIEF_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'brief carries Symbol-keyed or non-enumerable own property' });
+    if (RC.hasNonPlainNestedObject(bIn)) return RC.buildBlockedResult([CODES.BRIEF_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'brief contains a nested non-plain object' });
     var b = RC.toCleanCopy(bIn);
     if (!_isPlain(b)) return RC.buildBlockedResult([CODES.BRIEF_INVALID], { detail: 'brief not plain object (or proxy/non-cloneable rejected)' });
     if (!_hasOnlyAllowedKeys(b, BRIEF_KEYS)) return RC.buildBlockedResult([CODES.BRIEF_INVALID, CODES.UNKNOWN_OWN_KEY]);

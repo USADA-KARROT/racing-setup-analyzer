@@ -119,6 +119,7 @@
     try {
     if (!RC.isOriginalPlainObject(nIn)) return RC.buildBlockedResult([CODES.EVIDENCE_NODE_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'node prototype is not Object.prototype or null (class instance / Proxy / non-plain rejected pre-clone)' });
     if (RC.hasHiddenOwnKey(nIn)) return RC.buildBlockedResult([CODES.EVIDENCE_NODE_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'node carries Symbol-keyed or non-enumerable own property' });
+    if (RC.hasNonPlainNestedObject(nIn)) return RC.buildBlockedResult([CODES.EVIDENCE_NODE_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'node contains a nested non-plain object (class instance laundered through identity / confidence / observation)' });
     var n = RC.toCleanCopy(nIn);
     if (!_isPlain(n)) return RC.buildBlockedResult([CODES.EVIDENCE_NODE_INVALID], { detail: 'node not a plain object (or proxy/non-cloneable rejected)' });
     if (!_hasOnlyAllowedKeys(n, EVIDENCE_NODE_KEYS)) return RC.buildBlockedResult([CODES.EVIDENCE_NODE_INVALID, CODES.UNKNOWN_OWN_KEY]);

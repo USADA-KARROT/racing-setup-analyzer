@@ -481,6 +481,25 @@ chk('BRIEF future schema rejected', EB.validateEngineerBriefShape(validBrief({ s
   var nullProto = Object.create(null);
   nullProto.caseId = 'case_demo'; nullProto.sessionId = 'sess_demo'; nullProto.sourceId = 'lap_authority'; nullProto.sourceVersion = 'v1'; nullProto.freshness = NOW;
   chk('RN-11: SI accepts null-prototype plain object', SI.validateSourceIdentity(nullProto).valid === true);
+  // R5-nested attack: a populated plain EvidenceNode whose `identity` field is a class instance
+  // (laundered through structuredClone into a plain object pre-clone). Recursive check on the
+  // ORIGINAL must reject before clone runs.
+  function HostileNestedId() { this.caseId = 'case_demo'; this.sessionId = 'sess_demo'; this.sourceId = 'lap_authority'; this.sourceVersion = 'v1'; this.freshness = NOW; }
+  var nestedHostileNode = validEvidenceNode({ identity: new HostileNestedId() });
+  var rNest = EN.validateEvidenceNodeShape(nestedHostileNode);
+  chk('RN-11 (nested): EN rejects plain node with class-instance identity', rNest.valid === undefined);
+  chk('RN-11 (nested): rejection includes PROTOTYPE_POLLUTION_REJECTED', rNest.reasonCodes && rNest.reasonCodes.indexOf(CODES.PROTOTYPE_POLLUTION_REJECTED) !== -1);
+  // R5-nested: class-instance confidence field
+  function HostileConf() { this.state = 'unresolved'; }
+  chk('RN-11 (nested): EN rejects class-instance confidence', EN.validateEvidenceNodeShape(validEvidenceNode({ confidence: new HostileConf() })).valid === undefined);
+  // R5-nested: class-instance observation field
+  function HostileObs() { this.kind = 'channel_missing'; this.i18nKey = 'k'; this.params = null; this.channel = null; }
+  chk('RN-11 (nested): EN rejects class-instance observation', EN.validateEvidenceNodeShape(validEvidenceNode({ observation: new HostileObs() })).valid === undefined);
+  // R5-nested: hostile accessor descriptor at any depth (getter) — recursive check returns true
+  var withAccessor = validEvidenceNode();
+  var ident = Object.assign({}, withAccessor.identity);
+  Object.defineProperty(ident, 'caseId', { get: function () { return 'forged'; }, enumerable: true, configurable: true });
+  chk('RN-11 (nested): EN rejects nested accessor descriptor', EN.validateEvidenceNodeShape(Object.assign({}, withAccessor, { identity: ident })).valid === undefined);
 })();
 
 // RN-05 — ID-array elements enforce byte cap + id grammar

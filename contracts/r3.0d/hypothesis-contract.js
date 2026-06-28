@@ -235,6 +235,7 @@
     try {
     if (!RC.isOriginalPlainObject(hIn)) return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'hypothesis prototype is not Object.prototype or null' });
     if (RC.hasHiddenOwnKey(hIn)) return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'hypothesis carries Symbol-keyed or non-enumerable own property' });
+    if (RC.hasNonPlainNestedObject(hIn)) return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'hypothesis contains a nested non-plain object (class instance laundered through identity / confidence / nested entries)' });
     var h = RC.toCleanCopy(hIn);
     if (!_isPlain(h)) return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'hypothesis not plain object (or proxy/non-cloneable rejected)' });
     if (!_hasOnlyAllowedKeys(h, HYPOTHESIS_KEYS)) return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY]);
