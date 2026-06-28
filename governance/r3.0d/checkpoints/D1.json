@@ -104,9 +104,20 @@
   "artifactBoundSha": null,
 
   "codexVerdict": {
-    "verdict": "PENDING",
-    "rounds": [],
-    "tierDisclosure": "Codex D1 (the first R3.0D phase gate) will be invoked against the D1 branch candidate SHA. Tier 1 raw stdout MUST be captured and persisted under governance/r3.0d/codex-checkpoint-evidence/D1/round-N-<sha>.md for every round (BLOCK and PASS)."
+    "verdict": "PASS",
+    "verdictRound": 7,
+    "reviewedCandidateSha": "870e75787a2af0c62809e8b536f9b241a1f0dbdc",
+    "verdictEvidenceFile": "governance/r3.0d/codex-checkpoint-evidence/D1/round-7-870e757.md",
+    "rounds": [
+      { "round": 1, "reviewedSha": "b820fc333d716dda8e7faac8dbe26e6a5723710d", "verdict": "BLOCK", "findings": ["RN-01..RN-05"], "evidence": "governance/r3.0d/codex-checkpoint-evidence/D1/round-1-b820fc3.md" },
+      { "round": 2, "reviewedSha": "afac7969035e8ba7cad356058d34e06cbafe4216", "verdict": "BLOCK", "findings": ["RN-06..RN-10"], "evidence": "governance/r3.0d/codex-checkpoint-evidence/D1/round-2-afac796.md" },
+      { "round": 3, "reviewedSha": "8c5cb29c0b039676604306dbd21e64907f9ecc38", "verdict": "BLOCK", "findings": ["RN-11 (JSON fallback)"], "evidence": "governance/r3.0d/codex-checkpoint-evidence/D1/round-3-8c5cb29.md" },
+      { "round": 4, "reviewedSha": "bdd09b39516f4ca2158ee85cd385d7b3d9141809", "verdict": "BLOCK", "findings": ["RN-11 (populated class instance)"], "evidence": "governance/r3.0d/codex-checkpoint-evidence/D1/round-4-bdd09b3.md" },
+      { "round": 5, "reviewedSha": "b7717f5f67c3faf7bd0af496a6c307aca9308b71", "verdict": "BLOCK", "findings": ["RN-11 (nested class instance)"], "evidence": "governance/r3.0d/codex-checkpoint-evidence/D1/round-5-b7717f5.md" },
+      { "round": 6, "reviewedSha": "b8fc10fbb712701eec1adc74f1bd0fdc8a746db2", "verdict": "BLOCK", "findings": ["RN-11 (Array subclass / mutated proto)"], "evidence": "governance/r3.0d/codex-checkpoint-evidence/D1/round-6-b8fc10f.md" },
+      { "round": 7, "reviewedSha": "870e75787a2af0c62809e8b536f9b241a1f0dbdc", "verdict": "PASS", "findings": [], "evidence": "governance/r3.0d/codex-checkpoint-evidence/D1/round-7-870e757.md" }
+    ],
+    "tierDisclosure": "Codex D1 closed 11 distinct findings (RN-01..RN-11) over 7 rounds. RN-11 specifically required 5 successive iterations (R3-R7) before structural class-instance laundering through structuredClone was fully defended at every depth. Tier 1 raw stdout persisted for all 7 rounds at governance/r3.0d/codex-checkpoint-evidence/D1/round-{1..7}-<sha>.md."
   },
 
   "scopeBoundary": {
