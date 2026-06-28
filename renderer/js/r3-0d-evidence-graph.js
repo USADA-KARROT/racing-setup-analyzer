@@ -147,10 +147,55 @@
   // (which a hostile clock or pre-call attacker could replace per RN-13 round-4).
   var _ArrayPrototypeSort = Array.prototype.sort;
   var _ArrayPrototypeConcat = Array.prototype.concat;
+  var _ArrayPrototypeJoin = Array.prototype.join;
+  var _ArrayPrototypeIndexOf = Array.prototype.indexOf;
   var _StringPrototypeSlice = String.prototype.slice;
+  var _StringPrototypeCharAt = String.prototype.charAt;
+  var _StringPrototypeCharCodeAt = String.prototype.charCodeAt;
+  var _NumberPrototypeToString = Number.prototype.toString;
+  var _String = String;
   var _ReflectApply = (typeof Reflect !== 'undefined' && Reflect.apply) ? Reflect.apply : null;
   var _ReflectOwnKeys = (typeof Reflect !== 'undefined' && Reflect.ownKeys) ? Reflect.ownKeys : null;
   var _JSONStringify = JSON.stringify;
+
+  // Codex D2 Round 10 RN-21..RN-25 closure: intrinsic integrity guard. At the entry of
+  // buildEvidenceGraph (and again immediately after _resolveClock fires) verify that every
+  // global primitive method we depend on still === its captured module-init reference. JS is
+  // single-threaded; a passing guard means no global rebinding can happen between the check and
+  // our use of that global within the same synchronous build. If ANY mismatch is detected,
+  // fail-closed with INTERNAL_CONTRACT_VIOLATION + intrinsic-tampering detail. This closes
+  // RN-21 (ambient .push/.indexOf in contract validators), RN-22 (ambient JSON.stringify in
+  // correlation key), RN-23 (ambient Object.getOwnPropertyDescriptor in Step 3), RN-24 (ambient
+  // global String() function), RN-25 (Number.prototype.toString / String.prototype.charAt in
+  // hash digests) — and any future intrinsic-rebinding attack on the same surface.
+  function _intrinsicsIntact() {
+    try {
+      return Object.freeze === _ObjectFreeze
+        && Object.assign === _ObjectAssign
+        && Object.keys === _ObjectKeys
+        && Object.create === _ObjectCreate
+        && Object.defineProperty === _ObjectDefineProperty
+        && Object.getOwnPropertyDescriptor === _ObjectGetOwnPropertyDescriptor
+        && Object.getPrototypeOf === _ObjectGetPrototypeOf
+        && Object.prototype.hasOwnProperty === _ObjectPrototypeHasOwnProperty
+        && Array.isArray === _ArrayIsArray
+        && Array.prototype.slice === _ArrayPrototypeSlice
+        && Array.prototype.map === _ArrayPrototypeMap
+        && Array.prototype.push === _ArrayPrototypePush
+        && Array.prototype.sort === _ArrayPrototypeSort
+        && Array.prototype.concat === _ArrayPrototypeConcat
+        && Array.prototype.join === _ArrayPrototypeJoin
+        && Array.prototype.indexOf === _ArrayPrototypeIndexOf
+        && String === _String
+        && String.prototype.slice === _StringPrototypeSlice
+        && String.prototype.charAt === _StringPrototypeCharAt
+        && String.prototype.charCodeAt === _StringPrototypeCharCodeAt
+        && Number.prototype.toString === _NumberPrototypeToString
+        && JSON.stringify === _JSONStringify
+        && (_ReflectApply === null || (typeof Reflect !== 'undefined' && Reflect.apply === _ReflectApply))
+        && (_ReflectOwnKeys === null || (typeof Reflect !== 'undefined' && Reflect.ownKeys === _ReflectOwnKeys));
+    } catch (e) { return false; }
+  }
   var _TextEncoder = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;
   var _BufferByteLength = (typeof Buffer !== 'undefined' && Buffer.byteLength) ? Buffer.byteLength : null;
 
@@ -360,7 +405,7 @@
     var len = s.length;
     var start = len > n ? len - n : 0;
     var out = '';
-    for (var i = start; i < len; i++) out += s.charAt(i);
+    for (var i = start; i < len; i++) out += s[i];
     return out;
   }
   // Direct-loop indexOf — bypasses Array.prototype.indexOf rebinding.
@@ -471,7 +516,7 @@
     if (t === 'string') return _JSONStringify(value);
     if (t === 'number') {
       if (!_isFiniteNum(value)) return 'null';
-      return String(value);
+      return _String(value);
     }
     if (t === 'boolean') return value ? 'true' : 'false';
     if (t === 'undefined') return 'null';
@@ -516,7 +561,7 @@
       h ^= s.charCodeAt(i);
       h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
     }
-    return _strLastN('00000000' + h.toString(16), 8);
+    return _strLastN('00000000' + (_ReflectApply ? _ReflectApply(_NumberPrototypeToString, h, [16]) : h.toString(16)), 8);
   }
   function _hash64(s) { return _hash32(s) + _hash32(s + '|' + s.length); }
 
@@ -551,7 +596,7 @@
   // closure: also includes confidence.state so two same-nodeId candidates differing only by
   // unresolved/not_computed sort deterministically (round 2 RN-03 evidence).
   function _fullCanonicalString(node) {
-    return JSON.stringify(node.nodeId) + '|' + _semanticCanonicalString(node) + '|cred:' + node.credibility + '|prov:' + node.provenance + '|avl:' + node.availability + '|conf:' + (node.confidence && node.confidence.state ? node.confidence.state : 'null') + '|fresh:' + node.identity.freshness + '|supE:' + _stableStringify(node.supportingEdges) + '|conE:' + _stableStringify(node.contradictingEdges) + '|lims:' + _stableStringify(node.limitations);
+    return _JSONStringify(node.nodeId) + '|' + _semanticCanonicalString(node) + '|cred:' + node.credibility + '|prov:' + node.provenance + '|avl:' + node.availability + '|conf:' + (node.confidence && node.confidence.state ? node.confidence.state : 'null') + '|fresh:' + node.identity.freshness + '|supE:' + _stableStringify(node.supportingEdges) + '|conE:' + _stableStringify(node.contradictingEdges) + '|lims:' + _stableStringify(node.limitations);
   }
 
   // Correlation group key — nodes sharing this key are correlated (same source observing the same
@@ -560,7 +605,7 @@
   // _ObjectCreate(null) map).
   function _correlationGroupCanonical(node) {
     var id = node.identity;
-    return JSON.stringify(id.caseId) + '|' + JSON.stringify(id.sessionId) + '|' + JSON.stringify(id.lapId == null ? null : id.lapId) + '|' + JSON.stringify(id.sourceId);
+    return _JSONStringify(id.caseId) + '|' + _JSONStringify(id.sessionId) + '|' + _JSONStringify(id.lapId == null ? null : id.lapId) + '|' + _JSONStringify(id.sourceId);
   }
   function _correlationGroupId(canonical) { return 'corr_' + _hash64('corr|' + canonical); }
 
@@ -572,7 +617,7 @@
     if (RC.hasHiddenOwnKey(input)) return RC.buildBlockedResult([CODES.UNKNOWN_OWN_KEY], { detail: 'input envelope carries Symbol-keyed or non-enumerable own property' });
     if (!_hasOnlyAllowedKeys(input, INPUT_KEYS)) return RC.buildBlockedResult([CODES.UNKNOWN_OWN_KEY], { detail: 'input envelope carries forbidden own key' });
     // caseAssociation — read via descriptor (RN-01: no caller getter), then deep-validate the clone.
-    var caDesc; try { caDesc = Object.getOwnPropertyDescriptor(input, 'caseAssociation'); }
+    var caDesc; try { caDesc = _ObjectGetOwnPropertyDescriptor(input, 'caseAssociation'); }
     catch (e) { return RC.buildBlockedResult([CODES.EVIDENCE_ASSOCIATION_MISMATCH], { detail: 'caseAssociation descriptor read threw' }); }
     if (!caDesc || !('value' in caDesc)) return RC.buildBlockedResult([CODES.EVIDENCE_ASSOCIATION_MISMATCH], { detail: 'caseAssociation must be a data property' });
     var ca = caDesc.value;
@@ -588,7 +633,7 @@
     }
     if ('lapId' in caClone && caClone.lapId !== null && !_nonEmptyStr(caClone.lapId)) return RC.buildBlockedResult([CODES.EVIDENCE_ASSOCIATION_MISMATCH], { detail: 'caseAssociation.lapId must be null or non-empty string' });
     // rawEvidence — array gate ONLY (per-node body validates contents independently via per-index descriptor).
-    var reDesc; try { reDesc = Object.getOwnPropertyDescriptor(input, 'rawEvidence'); }
+    var reDesc; try { reDesc = _ObjectGetOwnPropertyDescriptor(input, 'rawEvidence'); }
     catch (e) { return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence descriptor read threw' }); }
     if (!reDesc || !('value' in reDesc)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence must be a data property' });
     var re = reDesc.value;
@@ -602,7 +647,7 @@
     // optional generationToken — descriptor-safe read
     var gt = null;
     try {
-      var gtDesc = Object.getOwnPropertyDescriptor(input, 'generationToken');
+      var gtDesc = _ObjectGetOwnPropertyDescriptor(input, 'generationToken');
       if (gtDesc) {
         if (!('value' in gtDesc)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'generationToken must be a data property' });
         var gtv = gtDesc.value;
@@ -615,7 +660,7 @@
     // optional contextVersion — descriptor-safe read
     var cv = null;
     try {
-      var cvDesc = Object.getOwnPropertyDescriptor(input, 'contextVersion');
+      var cvDesc = _ObjectGetOwnPropertyDescriptor(input, 'contextVersion');
       if (cvDesc) {
         if (!('value' in cvDesc)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'contextVersion must be a data property' });
         var cvv = cvDesc.value;
@@ -649,7 +694,7 @@
     if (RC.hasHiddenOwnKey(opts)) return null;
     if (!_hasOnlyAllowedKeys(opts, OPTS_KEYS)) return null;
     var desc;
-    try { desc = Object.getOwnPropertyDescriptor(opts, 'clock'); }
+    try { desc = _ObjectGetOwnPropertyDescriptor(opts, 'clock'); }
     catch (e) { return null; }
     if (!desc) return null;
     if (!('value' in desc)) return null;       // accessor descriptor — fail-soft
@@ -807,6 +852,31 @@
    */
   function buildEvidenceGraph(inputIn, optsIn) {
     try {
+      // Step 0 — Codex D2 Round 10 RN-21..RN-25 closure: intrinsic integrity gate. Any global
+      // primitive method we rely on that has been rebound between module init and this call
+      // (Array.prototype.push, Object.freeze, Object.getOwnPropertyDescriptor, JSON.stringify,
+      // String, Number.prototype.toString, String.prototype.charAt, etc.) → fail-closed BLOCK
+      // before any caller-controlled code can run. JS is single-threaded so a passing guard
+      // means no further global rebinding can occur until our build returns.
+      // Construct the BLOCK envelope directly without calling RC.buildBlockedResult — the
+      // contract module's _normCodes uses ambient Array.prototype.push / .forEach which would be
+      // corrupted by the same rebinding.
+      if (!_intrinsicsIntact()) {
+        var entryReasonCodes = [];
+        _ObjectDefineProperty(entryReasonCodes, 0, { value: CODES.INTERNAL_CONTRACT_VIOLATION, writable: true, enumerable: true, configurable: true });
+        _ObjectFreeze(entryReasonCodes);
+        var entryExplanationKeys = [];
+        _ObjectDefineProperty(entryExplanationKeys, 0, { value: 'r3_0d.reason.internal_contract_violation', writable: true, enumerable: true, configurable: true });
+        _ObjectFreeze(entryExplanationKeys);
+        return _ObjectFreeze({
+          eligible: false,
+          status: 'blocked',
+          reasonCodes: entryReasonCodes,
+          explanationKeys: entryExplanationKeys,
+          detail: 'intrinsic-tampering detected at entry: a captured global primitive method has been rebound since module init',
+          result: null,
+        });
+      }
       // Step 1 — input envelope structural gate + TRUSTED SNAPSHOT (RN-01 closure).
       var env = _validateInputEnvelope(inputIn);
       if (!env.ok) return env;
@@ -829,7 +899,7 @@
 
       for (var i = 0; i < inputCount; i++) {
         var desc;
-        try { desc = Object.getOwnPropertyDescriptor(rawEvidenceRef, i); }
+        try { desc = _ObjectGetOwnPropertyDescriptor(rawEvidenceRef, i); }
         catch (e) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
         if (!desc) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
         if (!('value' in desc)) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
@@ -1157,6 +1227,32 @@
       // operation has completed. The clock injector cannot mutate rawEvidence under us because
       // the per-node loop has already finished.
       var createdAt = _resolveClock(optsIn);
+
+      // Step 17.6 — Codex D2 Round 10 RN-21..RN-25 closure: re-check intrinsic integrity AFTER
+      // the clock fires. A hostile clock callback can rebind globals (Object.freeze,
+      // Function.prototype.call, etc.) during its execution. If the post-clock state has been
+      // tampered, fail-closed BEFORE _materializeGraph runs WITHOUT going through
+      // RC.buildBlockedResult — the contract module's internal _normCodes / Array.prototype.push /
+      // Array.prototype.forEach calls are themselves vulnerable to the same rebinding (a no-op
+      // .push would silently empty the reasonCodes array). Construct the BLOCK envelope directly
+      // using captured intrinsics so the result envelope is byte-identical to what the contract
+      // would have produced under intact intrinsics.
+      if (!_intrinsicsIntact()) {
+        var blockReasonCodes = [];
+        _ObjectDefineProperty(blockReasonCodes, 0, { value: CODES.INTERNAL_CONTRACT_VIOLATION, writable: true, enumerable: true, configurable: true });
+        _ObjectFreeze(blockReasonCodes);
+        var blockExplanationKeys = [];
+        _ObjectDefineProperty(blockExplanationKeys, 0, { value: 'r3_0d.reason.internal_contract_violation', writable: true, enumerable: true, configurable: true });
+        _ObjectFreeze(blockExplanationKeys);
+        return _ObjectFreeze({
+          eligible: false,
+          status: 'blocked',
+          reasonCodes: blockReasonCodes,
+          explanationKeys: blockExplanationKeys,
+          detail: 'intrinsic-tampering detected post-clock: a captured global primitive method has been rebound during clock invocation',
+          result: null,
+        });
+      }
 
       // Step 18 — final materialisation
       var graph = _materializeGraph({

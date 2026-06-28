@@ -793,16 +793,30 @@ function freshInput(over) {
     Object.freeze = originalFreeze;
   }
   chk('RN-13: hostile clock invoked', invoked === true);
-  chk('RN-13: graph nevertheless valid', r.valid === true);
-  chk('RN-13: graph deep-frozen (caller cannot push to nodes)', (function () {
-    let threw = false;
-    try { r.graph.nodes.push({ malicious: true }); } catch (e) { threw = true; }
-    return threw || r.graph.nodes.length === 1;
-  })());
-  chk('RN-13: graph.provenance frozen (caller cannot inject keys)', Object.isFrozen(r.graph.provenance));
-  chk('RN-13: graph.provenance.rejectedReasonsSummary frozen', Object.isFrozen(r.graph.provenance.rejectedReasonsSummary));
-  chk('RN-13: no tampered marker key in rejectedReasonsSummary', !Object.prototype.hasOwnProperty.call(r.graph.provenance.rejectedReasonsSummary, 'tampered'));
-  chk('RN-13: no tampered marker key in graph', !Object.prototype.hasOwnProperty.call(r.graph, 'tampered'));
+  // Round 10 RN-21..RN-25 closure changed the security policy: the Step 17.6 post-clock intrinsic
+  // integrity guard now detects ANY rebinding of Object.freeze / Object.assign during the clock
+  // callback and fails closed with INTERNAL_CONTRACT_VIOLATION. The original RN-13 round-3 closure
+  // (captured refs make the build resilient) is preserved — the post-clock guard is a strictly
+  // stronger defence on top. Either outcome is acceptable for this RN-13 assertion: (a) build
+  // succeeded with no tampered data via captured refs, or (b) build failed-closed via integrity
+  // guard. Both prove the attacker cannot inject tampered content into a valid graph.
+  if (r.valid === true) {
+    chk('RN-13: graph deep-frozen (caller cannot push to nodes)', (function () {
+      let threw = false;
+      try { r.graph.nodes.push({ malicious: true }); } catch (e) { threw = true; }
+      return threw || r.graph.nodes.length === 1;
+    })());
+    chk('RN-13: graph.provenance frozen (caller cannot inject keys)', Object.isFrozen(r.graph.provenance));
+    chk('RN-13: graph.provenance.rejectedReasonsSummary frozen', Object.isFrozen(r.graph.provenance.rejectedReasonsSummary));
+    chk('RN-13: no tampered marker key in rejectedReasonsSummary', !Object.prototype.hasOwnProperty.call(r.graph.provenance.rejectedReasonsSummary, 'tampered'));
+    chk('RN-13: no tampered marker key in graph', !Object.prototype.hasOwnProperty.call(r.graph, 'tampered'));
+  } else {
+    chk('RN-13: integrity guard caught hostile clock tampering (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+    chk('RN-13: BLOCK detail mentions intrinsic-tampering', typeof r.detail === 'string' && /intrinsic-tampering/.test(r.detail));
+    chk('RN-13: no graph returned on BLOCK', r.graph === undefined || r.graph === null || r.result === null);
+    chk('RN-13: result envelope sane shape', typeof r === 'object' && r !== null);
+    chk('RN-13: BLOCK is post-clock (Step 17.6)', /post-clock/.test(r.detail || ''));
+  }
 })();
 
 (function sectionO_RN14() {
@@ -844,10 +858,20 @@ function freshInput(over) {
     Array.prototype.slice = originalSlice;
     Array.prototype.map = originalMap;
   }
-  chk('RN-13 r3: hostile Array.prototype.slice/map does not inject into graph.nodes', r.valid === true && r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
-  chk('RN-13 r3: hostile slice/map does not corrupt edges', r.valid === true && Array.isArray(r.graph.edges));
-  chk('RN-13 r3: hostile slice/map does not corrupt topologicalOrder', r.valid === true && r.graph.topologicalOrder.indexOf('ev_001') !== -1);
-  chk('RN-13 r3: no tampered marker key in graph.nodes', r.valid === true && r.graph.nodes.every(n => !Object.prototype.hasOwnProperty.call(n, 'tampered')));
+  // Round 10 RN-21..RN-25 closure: post-clock integrity guard catches any in-clock rebinding of
+  // Array.prototype.slice / .map. Test now accepts EITHER outcome — (a) build succeeded via
+  // captured refs with no tampered output, or (b) build BLOCKed with intrinsic-tampering detail.
+  if (r.valid === true) {
+    chk('RN-13 r3: hostile Array.prototype.slice/map does not inject into graph.nodes', r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
+    chk('RN-13 r3: hostile slice/map does not corrupt edges', Array.isArray(r.graph.edges));
+    chk('RN-13 r3: hostile slice/map does not corrupt topologicalOrder', r.graph.topologicalOrder.indexOf('ev_001') !== -1);
+    chk('RN-13 r3: no tampered marker key in graph.nodes', r.graph.nodes.every(n => !Object.prototype.hasOwnProperty.call(n, 'tampered')));
+  } else {
+    chk('RN-13 r3: integrity guard caught hostile slice/map rebinding (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+    chk('RN-13 r3: BLOCK detail mentions intrinsic-tampering', typeof r.detail === 'string' && /intrinsic-tampering/.test(r.detail));
+    chk('RN-13 r3: BLOCK happens post-clock', typeof r.detail === 'string' && /post-clock/.test(r.detail));
+    chk('RN-13 r3: no graph leaked on BLOCK', r.result === null);
+  }
 })();
 
 (function sectionP_RN15() {
@@ -967,8 +991,15 @@ function freshInput(over) {
     // eslint-disable-next-line no-extend-native
     Array.prototype.push = origPush;
   }
-  chk('RN-13 r4: hostile Array.prototype.push (no-op) — graph still contains legitimate node', r.valid === true && r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
-  chk('RN-13 r4: hostile Array.prototype.push — graph.nodes[0] frozen', r.valid === true && Object.isFrozen(r.graph.nodes[0]));
+  // Round 10 RN-21..RN-25 closure: post-clock integrity guard catches the .push rebind. Accept
+  // either resilient build or BLOCK.
+  if (r.valid === true) {
+    chk('RN-13 r4: hostile Array.prototype.push (no-op) — graph still contains legitimate node', r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
+    chk('RN-13 r4: hostile Array.prototype.push — graph.nodes[0] frozen', Object.isFrozen(r.graph.nodes[0]));
+  } else {
+    chk('RN-13 r4: integrity guard caught hostile Array.prototype.push rebinding (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+    chk('RN-13 r4: BLOCK detail mentions intrinsic-tampering', typeof r.detail === 'string' && /intrinsic-tampering/.test(r.detail));
+  }
 })();
 
 (function sectionQ_RN15_round4_loneLowSurrogate() {
@@ -1364,7 +1395,11 @@ function freshInput(over) {
   finally { Array.prototype.join = origJoin; }
   chk('RN-19: baseline build rejects via BYTE_CAP_EXCEEDED', baseline.eligible === false && Array.isArray(baseline.reasonCodes) && baseline.reasonCodes.indexOf(CODES.BYTE_CAP_EXCEEDED) !== -1);
   chk('RN-19: hostile Array.prototype.join NEVER fires inside _stableStringify', hits === 0);
-  chk('RN-19: attacked build still rejects with the same BYTE_CAP_EXCEEDED verdict (cap not falsified)', attacked.eligible === false && Array.isArray(attacked.reasonCodes) && attacked.reasonCodes.indexOf(CODES.BYTE_CAP_EXCEEDED) !== -1);
+  // Round 10 entry-guard closure: attacker rebound Array.prototype.join BEFORE build call →
+  // _intrinsicsIntact() at Step 0 catches it and returns INTERNAL_CONTRACT_VIOLATION immediately.
+  // Either outcome (BYTE_CAP_EXCEEDED via captured-ref defence, or INTERNAL_CONTRACT_VIOLATION
+  // via entry guard) prevents the attacker from producing a valid:true graph.
+  chk('RN-19: attacked build fails-closed (cap not falsified) — either BYTE_CAP_EXCEEDED or INTRINSIC_TAMPERING', attacked.eligible === false && Array.isArray(attacked.reasonCodes) && (attacked.reasonCodes.indexOf(CODES.BYTE_CAP_EXCEEDED) !== -1 || attacked.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1));
 })();
 
 (function sectionU_RN20_objectFreezeRebind() {
@@ -1389,9 +1424,17 @@ function freshInput(over) {
   let r;
   try { r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK }); }
   finally { Object.freeze = origFreeze; }
-  const invalidEdges = r.valid && r.graph.edges.filter(e => e.kind === 'invalid_kind');
-  chk('RN-20: hostile Object.freeze rebinding does NOT inject invalid_kind into edges', r.valid === true && invalidEdges.length === 0);
-  chk('RN-20: all 3 same-source correlated edges retain legitimate kind', r.valid === true && r.graph.edges.length === 3 && r.graph.edges.every(e => e.kind === 'correlated_with'));
+  // Round 10 entry-guard closure: attacker rebound Object.freeze BEFORE build call → entry
+  // guard catches with INTERNAL_CONTRACT_VIOLATION immediately. Either outcome (resilient via
+  // captured _ObjectFreeze, or BLOCK via guard) prevents invalid_kind injection.
+  if (r.valid === true) {
+    const invalidEdges = r.graph.edges.filter(e => e.kind === 'invalid_kind');
+    chk('RN-20: hostile Object.freeze rebinding does NOT inject invalid_kind into edges', invalidEdges.length === 0);
+    chk('RN-20: all 3 same-source correlated edges retain legitimate kind', r.graph.edges.length === 3 && r.graph.edges.every(e => e.kind === 'correlated_with'));
+  } else {
+    chk('RN-20: entry guard caught Object.freeze rebinding (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+    chk('RN-20: BLOCK detail mentions intrinsic-tampering', typeof r.detail === 'string' && /intrinsic-tampering/.test(r.detail));
+  }
 })();
 
 (function sectionU_RN19_arrayPrototypeSortRebind() {
@@ -1410,9 +1453,13 @@ function freshInput(over) {
     ];
     r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
   } finally { Array.prototype.sort = origSort; }
-  // Sort rebinding must not break the deterministic ordering of nodes (Codex round-7 verified
-  // sorted-by-nodeId output is the determinism anchor for graphId).
-  chk('RN-19: hostile Array.prototype.sort does not falsify deterministic node ordering', r.valid === true && r.graph.nodes[0].nodeId === 'ev_a' && r.graph.nodes[1].nodeId === 'ev_b' && r.graph.nodes[2].nodeId === 'ev_c');
+  // Sort rebinding must not falsify deterministic ordering. Either guard catches the rebinding
+  // (BLOCK) or _arrSort routes through captured Reflect.apply (resilient).
+  if (r.valid === true) {
+    chk('RN-19: hostile Array.prototype.sort does not falsify deterministic node ordering', r.graph.nodes[0].nodeId === 'ev_a' && r.graph.nodes[1].nodeId === 'ev_b' && r.graph.nodes[2].nodeId === 'ev_c');
+  } else {
+    chk('RN-19: entry guard caught Array.prototype.sort rebinding (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+  }
 })();
 
 (function sectionU_RN19_arrayPrototypePushRebind() {
@@ -1423,7 +1470,111 @@ function freshInput(over) {
   let r;
   try { r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK }); }
   finally { Array.prototype.push = origPush; }
-  chk('RN-19: hostile Array.prototype.push (no-op) does not drop legitimate sanitized node', r.valid === true && r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
+  // Push rebinding: either guard catches (BLOCK) or _arrPush via defineProperty (resilient).
+  if (r.valid === true) {
+    chk('RN-19: hostile Array.prototype.push (no-op) does not drop legitimate sanitized node', r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
+  } else {
+    chk('RN-19: entry guard caught Array.prototype.push rebinding (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+  }
+})();
+
+// ── Section V — Codex D2 Round 10 finding closures (RN-21..RN-25 via intrinsic guard) ──────
+(function sectionV_entryGuardBlocksIntrinsicRebinding() {
+  // RN-21..RN-25 closure: the Step 0 intrinsic integrity guard at the entry of
+  // buildEvidenceGraph fails-closed when ANY captured global primitive method has been rebound
+  // between module init and the build call. Replaces the previous defence-in-depth-per-callsite
+  // approach with a single architectural choke point.
+  function attack(name, mutate, restore) {
+    let r;
+    try { mutate(); r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK }); }
+    finally { restore(); }
+    chk('RN-21..25: ' + name + ' caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+    chk('RN-21..25: ' + name + ' detail mentions intrinsic-tampering at entry', typeof r.detail === 'string' && /intrinsic-tampering detected at entry/.test(r.detail));
+    chk('RN-21..25: ' + name + ' result is null', r.result === null);
+  }
+  // RN-21: contract-side ambient .push / .indexOf vector (Array.prototype.push rebind)
+  const origPush = Array.prototype.push;
+  attack(
+    'Array.prototype.push rebound (RN-21 contract.push)',
+    () => { Array.prototype.push = function () { return 0; }; },
+    () => { Array.prototype.push = origPush; }
+  );
+  // RN-22: _correlationGroupCanonical previously called ambient JSON.stringify
+  const origJsonStringify = JSON.stringify;
+  attack(
+    'JSON.stringify rebound (RN-22 correlation canonical)',
+    () => { JSON.stringify = function () { return '"constant"'; }; },
+    () => { JSON.stringify = origJsonStringify; }
+  );
+  // RN-23: Step 3 ambient Object.getOwnPropertyDescriptor
+  const origGOPD = Object.getOwnPropertyDescriptor;
+  attack(
+    'Object.getOwnPropertyDescriptor rebound (RN-23 raw-node substitution)',
+    () => { Object.getOwnPropertyDescriptor = function () { return { value: { schemaVersion: 1, nodeId: 'attacker' } }; }; },
+    () => { Object.getOwnPropertyDescriptor = origGOPD; }
+  );
+  // RN-24: ambient global String() function
+  const origString = String;
+  attack(
+    'global String rebound (RN-24 canonical numeric collapse)',
+    () => { globalThis.String = function () { return 'constant'; }; },
+    () => { globalThis.String = origString; }
+  );
+  // RN-25: Number.prototype.toString + String.prototype.charAt for hash digests
+  const origNumberToString = Number.prototype.toString;
+  attack(
+    'Number.prototype.toString rebound (RN-25 hash digest collapse)',
+    () => { Number.prototype.toString = function () { return '0'; }; },
+    () => { Number.prototype.toString = origNumberToString; }
+  );
+  const origStringCharAt = String.prototype.charAt;
+  attack(
+    'String.prototype.charAt rebound (RN-25 strLastN collapse)',
+    () => { String.prototype.charAt = function () { return ''; }; },
+    () => { String.prototype.charAt = origStringCharAt; }
+  );
+  // Belt-and-suspenders: Object.freeze rebound BEFORE build call (entry guard catches)
+  const origFreeze = Object.freeze;
+  attack(
+    'Object.freeze rebound before build (RN-20 redux at entry)',
+    () => { Object.freeze = function (o) { return o; }; },
+    () => { Object.freeze = origFreeze; }
+  );
+  // Belt-and-suspenders: Array.isArray rebound (used in envelope validation Step 1)
+  const origIsArray = Array.isArray;
+  attack(
+    'Array.isArray rebound (envelope validation)',
+    () => { Array.isArray = function () { return false; }; },
+    () => { Array.isArray = origIsArray; }
+  );
+})();
+
+(function sectionV_postClockGuardBlocksInClockRebinding() {
+  // The Step 17.6 post-clock guard catches rebinding that happens INSIDE the clock callback
+  // (which executes between input sanitization and graph materialisation, so the entry guard
+  // alone cannot catch it).
+  const origFreeze = Object.freeze;
+  let r;
+  try {
+    r = EG.buildEvidenceGraph(freshInput(), {
+      clock: function () {
+        Object.freeze = function (o) { return o; }; // hostile rebind during clock
+        return NOW;
+      },
+    });
+  } finally {
+    Object.freeze = origFreeze;
+  }
+  chk('RN-21..25 post-clock: in-clock Object.freeze rebinding caught by Step 17.6 guard', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+  chk('RN-21..25 post-clock: detail mentions intrinsic-tampering post-clock', typeof r.detail === 'string' && /intrinsic-tampering detected post-clock/.test(r.detail));
+})();
+
+(function sectionV_intactIntrinsicsPassesGuard() {
+  // Negative control: with all intrinsics intact, the entry guard and post-clock guard both
+  // pass, the legitimate build runs to completion, and a normal valid graph is produced.
+  const r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK });
+  chk('RN-21..25 intact: legitimate build returns valid graph', r.valid === true && r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
+  chk('RN-21..25 intact: graphId is deterministic content-hash', r.valid === true && typeof r.graph.graphId === 'string' && /^graph_[0-9a-f]+$/.test(r.graph.graphId));
 })();
 
 console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
