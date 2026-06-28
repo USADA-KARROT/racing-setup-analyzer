@@ -117,17 +117,32 @@
     }
     return true;
   }
-  // Codex D1 R1 Finding RN-03 closure: normalize hyphens / dashes / whitespace runs to a single
-  // underscore before scanning. Catches DRIVER-FAULT, driver—fault (em-dash), 'guaranteed-fix-recommended',
-  // 'driver_FAULT_now', etc. The CAUSAL_OVERCLAIM_TERMS canonical list uses underscores.
+  // Codex D1 R2 Finding RN-08 closure: centralized normalization covering ALL Unicode dash characters.
+  // Previous regex only covered U+2010–U+2015 (en-dash family) but missed U+2212 MINUS SIGN, U+FF0D
+  // FULLWIDTH HYPHEN-MINUS, and the general \p{Pd} Dash_Punctuation category. _normalizeForOverclaim
+  // is exported on the api so recommendation-contract + engineer-brief-contract use the SAME canonical
+  // normalizer — no duplicated regex.
+  // Dash character class: U+002D (-) ASCII hyphen-minus, U+2010–U+2015 (hyphen / non-breaking hyphen /
+  // figure dash / en dash / em dash / horizontal bar), U+2212 (minus sign), U+FE58 (small em dash),
+  // U+FE63 (small hyphen-minus), U+FF0D (fullwidth hyphen-minus), U+058A (Armenian hyphen),
+  // U+05BE (Hebrew maqaf), U+1806 (Mongolian todo soft hyphen), U+1400 (Canadian hyphen), U+2E17
+  // (double oblique hyphen), U+2E1A (hyphen with diaeresis), U+2E3A/B (two/three-em dash), U+2E40
+  // (double hyphen), U+30A0 (Katakana-Hiragana double hyphen).
+  // Explicit Unicode escapes to remove any ambiguity in the regex parser. Includes ASCII hyphen-minus
+  // (U+002D), the U+2010..U+2015 dash family (HYPHEN / NON-BREAKING / FIGURE / EN / EM / HORIZONTAL),
+  // U+2212 MINUS SIGN, U+FF0D FULLWIDTH HYPHEN-MINUS, U+FE58/63 SMALL EM/HYPHEN, U+058A Armenian,
+  // U+05BE Hebrew MAQAF, U+1806 Mongolian SOFT HYPHEN, U+1400 Canadian, U+2E17 DOUBLE OBLIQUE,
+  // U+2E1A HYPHEN-DIAERESIS, U+2E3A/B TWO/THREE EM DASH, U+2E40 DOUBLE HYPHEN, U+30A0 Kana double.
+  var DASH_OR_WS_RE = /[\s-‐‑‒–—―−－﹘﹣֊־᠆᐀⸗⸚⸺⸻⹀゠]+/g;
+  function _normalizeForOverclaim(s) {
+    if (typeof s !== 'string') return '';
+    return s.toLowerCase().replace(DASH_OR_WS_RE, '_');
+  }
   function _hasCausalOverclaim(s) {
     if (typeof s !== 'string') return false;
-    var normalized = s.toLowerCase().replace(/[\s‐-―\-]+/g, '_');
+    var normalized = _normalizeForOverclaim(s);
     for (var i = 0; i < CAUSAL_OVERCLAIM_TERMS.length; i++) {
-      // Compare against the underscore form of each canonical term (the term list contains both
-      // forms already; we additionally normalize the input so hyphen / space variants collapse to
-      // the underscore form).
-      var t = CAUSAL_OVERCLAIM_TERMS[i].toLowerCase().replace(/[\s‐-―\-]+/g, '_');
+      var t = _normalizeForOverclaim(CAUSAL_OVERCLAIM_TERMS[i]);
       if (normalized.indexOf(t) !== -1) return true;
     }
     return false;
@@ -215,9 +230,12 @@
    * validateHypothesisShape(h) — D1 STRUCTURAL gate. Composes credibility, source-identity, params,
    * alternative-explanation, validation-action validators. Returns { valid:true } or buildBlockedResult.
    */
-  function validateHypothesisShape(h) {
+  function validateHypothesisShape(hIn) {
+    // Codex D1 R2 RN-06 Proxy-rejection input clone.
     try {
-    if (!_isPlain(h)) return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'hypothesis not plain object' });
+    if (RC.hasHiddenOwnKey(hIn)) return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'hypothesis carries Symbol-keyed or non-enumerable own property' });
+    var h = RC.toCleanCopy(hIn);
+    if (!_isPlain(h)) return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'hypothesis not plain object (or proxy/non-cloneable rejected)' });
     if (!_hasOnlyAllowedKeys(h, HYPOTHESIS_KEYS)) return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY]);
     var reasons = [];
 
@@ -254,8 +272,9 @@
     // reasoning output requires all six slots — omission is itself a hypothesis-structure violation.
     if (!_isIdArray(h.supportingEvidenceIds, ID_ARRAY_CAP)) reasons.push(CODES.HYPOTHESIS_EVIDENCE_LINK_INVALID);
     if (!_isIdArray(h.contradictingEvidenceIds, ID_ARRAY_CAP)) reasons.push(CODES.HYPOTHESIS_CONTRADICTION_INVALID);
-    if (!Array.isArray(h.alternativeExplanationIds) || h.alternativeExplanationIds.length > ALTERNATIVE_ARRAY_CAP) reasons.push(CODES.HYPOTHESIS_ALTERNATIVE_INVALID);
-    else for (var ai = 0; ai < h.alternativeExplanationIds.length; ai++) if (typeof h.alternativeExplanationIds[ai] !== 'string' || h.alternativeExplanationIds[ai].length === 0) { reasons.push(CODES.HYPOTHESIS_ALTERNATIVE_INVALID); break; }
+    // Codex D1 R2 Finding RN-09 closure: alternativeExplanationIds was the one remaining id-array that
+    // bypassed _isIdArray's grammar + byte-cap check. Route through _isIdArray with ALTERNATIVE_ARRAY_CAP.
+    if (!_isIdArray(h.alternativeExplanationIds, ALTERNATIVE_ARRAY_CAP)) reasons.push(CODES.HYPOTHESIS_ALTERNATIVE_INVALID);
     if (!Array.isArray(h.cannotConcludeReasonCodes) || h.cannotConcludeReasonCodes.length > ID_ARRAY_CAP) reasons.push(CODES.HYPOTHESIS_INVALID);
     else for (var ci = 0; ci < h.cannotConcludeReasonCodes.length; ci++) if (!RC.isReasonCode(h.cannotConcludeReasonCodes[ci])) { reasons.push(CODES.HYPOTHESIS_INVALID); break; }
     if (!Array.isArray(h.limitations) || h.limitations.length > LIMITATION_ARRAY_CAP) reasons.push(CODES.ARRAY_CAP_EXCEEDED);
@@ -296,6 +315,10 @@
     validateAlternativeExplanationShape: validateAlternativeExplanationShape,
     validateValidationActionShape: validateValidationActionShape,
     validateHypothesisShape: validateHypothesisShape,
+    // Codex D1 R2 RN-08 closure exports — recommendation-contract + engineer-brief-contract import
+    // these so all three modules share the SAME canonical overclaim scanner. No module re-implements.
+    hasCausalOverclaim: _hasCausalOverclaim,
+    normalizeForOverclaim: _normalizeForOverclaim,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.R3_0D_HypothesisContract = api;

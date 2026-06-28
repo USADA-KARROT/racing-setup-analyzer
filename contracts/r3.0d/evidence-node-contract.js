@@ -89,9 +89,12 @@
     if ('channel' in o && o.channel !== null && !_nonEmptyStr(o.channel)) return RC.buildBlockedResult([CODES.EVIDENCE_OBSERVATION_INVALID]);
     if ('params' in o && o.params !== null && o.params !== undefined) {
       if (!_isPlain(o.params)) return RC.buildBlockedResult([CODES.EVIDENCE_OBSERVATION_INVALID]);
-      var pk; try { pk = Object.keys(o.params); } catch (e) { return RC.buildBlockedResult([CODES.EVIDENCE_OBSERVATION_INVALID]); }
+      // Codex D1 R2 Finding RN-07 closure: Reflect.ownKeys + Symbol rejection mirrors validateParamsShape.
+      var pk; try { pk = Reflect.ownKeys(o.params); } catch (e) { return RC.buildBlockedResult([CODES.EVIDENCE_OBSERVATION_INVALID]); }
       for (var i = 0; i < pk.length; i++) {
-        var v = o.params[pk[i]];
+        var k = pk[i];
+        if (typeof k === 'symbol') return RC.buildBlockedResult([CODES.EVIDENCE_OBSERVATION_INVALID, CODES.UNKNOWN_OWN_KEY]);
+        var v = o.params[k];
         if (v === null || typeof v === 'boolean') continue;
         if (typeof v === 'number') { if (!_isFiniteNum(v)) return RC.buildBlockedResult([CODES.NUMERIC_INVALID]); continue; }
         if (typeof v === 'string') { if (_utf8Bytes(v) > PARAMS_VALUE_BYTE_CAP) return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED]); continue; }
@@ -111,12 +114,12 @@
    * D1 does NOT validate the graph relations (cycles, orphans, double-counting) — that is the D2
    * EVIDENCE_GRAPH service's job. D1 ONLY proves a single node's STRUCTURE.
    */
-  function validateEvidenceNodeShape(n) {
-    // Outer try/catch — any hostile getter / accessor throw anywhere in the field reads below collapses
-    // to a structured EVIDENCE_NODE_INVALID instead of escaping the boundary. The contract layer mirrors
-    // the C7 orchestrator's hostile-Proxy defence posture.
+  function validateEvidenceNodeShape(nIn) {
+    // Outer try/catch + Codex D1 R2 RN-06 Proxy-rejection input clone.
     try {
-    if (!_isPlain(n)) return RC.buildBlockedResult([CODES.EVIDENCE_NODE_INVALID], { detail: 'node not a plain object' });
+    if (RC.hasHiddenOwnKey(nIn)) return RC.buildBlockedResult([CODES.EVIDENCE_NODE_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'node carries Symbol-keyed or non-enumerable own property' });
+    var n = RC.toCleanCopy(nIn);
+    if (!_isPlain(n)) return RC.buildBlockedResult([CODES.EVIDENCE_NODE_INVALID], { detail: 'node not a plain object (or proxy/non-cloneable rejected)' });
     if (!_hasOnlyAllowedKeys(n, EVIDENCE_NODE_KEYS)) return RC.buildBlockedResult([CODES.EVIDENCE_NODE_INVALID, CODES.UNKNOWN_OWN_KEY]);
     var reasons = [];
 

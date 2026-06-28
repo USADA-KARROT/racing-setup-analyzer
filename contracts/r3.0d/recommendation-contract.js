@@ -123,9 +123,12 @@
    * least 'Derived' credibility (the contract layer does NOT have hypothesis lookups — it only
    * checks the SHAPE; the engine layer at D4 performs the credibility join).
    */
-  function validateRecommendationShape(r) {
+  function validateRecommendationShape(rIn) {
+    // Codex D1 R2 RN-06 Proxy-rejection input clone.
     try {
-    if (!_isPlain(r)) return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID], { detail: 'recommendation not plain object' });
+    if (RC.hasHiddenOwnKey(rIn)) return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'recommendation carries Symbol-keyed or non-enumerable own property' });
+    var r = RC.toCleanCopy(rIn);
+    if (!_isPlain(r)) return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID], { detail: 'recommendation not plain object (or proxy/non-cloneable rejected)' });
     if (!_hasOnlyAllowedKeys(r, RECOMMENDATION_KEYS)) return RC.buildBlockedResult([CODES.RECOMMENDATION_INVALID, CODES.UNKNOWN_OWN_KEY]);
     var reasons = [];
 
@@ -148,8 +151,10 @@
       var v = r[k];
       if (!_nonEmptyStr(v)) { reasons.push(CODES.RECOMMENDATION_INVALID); return; }
       if (_utf8Bytes(v) > STRING_BYTE_CAP) reasons.push(CODES.BYTE_CAP_EXCEEDED);
-      // Reuse hypothesis-contract's causal-overclaim guard (same posture: no free-form authority).
-      if (HC.CAUSAL_OVERCLAIM_TERMS.some(function (t) { return v.toLowerCase().indexOf(t) !== -1; })) reasons.push(CODES.HYPOTHESIS_CAUSAL_OVERCLAIM);
+      // Codex D1 R2 RN-08 closure: use HC.hasCausalOverclaim (centralized normalizing scanner that
+      // collapses ALL Unicode dash characters + whitespace runs to underscore). Catches DRIVER-FAULT,
+      // guaranteed-fix-recommended, exact−cause (U+2212), exact—cause (em-dash), GUARANTEED FIX.
+      if (HC.hasCausalOverclaim(v)) reasons.push(CODES.HYPOTHESIS_CAUSAL_OVERCLAIM);
     });
 
     if ('params' in r) {

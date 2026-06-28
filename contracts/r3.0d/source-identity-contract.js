@@ -71,11 +71,15 @@
    *                                    → BYTE_CAP_EXCEEDED
    *   • freshness not ISO-8601 shape   → SOURCE_IDENTITY_INVALID
    */
-  function validateSourceIdentity(id) {
-    // Codex D1 Round 1 Finding RN-02 closure: outer try/catch so any hostile getter throw collapses
-    // to a structured SOURCE_IDENTITY_INVALID + INTERNAL_CONTRACT_VIOLATION instead of escaping.
+  function validateSourceIdentity(idIn) {
+    // Codex D1 R1 Finding RN-02 + R2 Finding RN-06 closure: outer try/catch AND Proxy-rejection input
+    // clone. The validator operates on the cleaned clone, not the original — a Proxy that hides keys
+    // is reduced to its disclosed surface, then the clone is itself a plain object whose own-property
+    // set is fully enumerable. structuredClone DataCloneError → fail-closed.
     try {
-    if (!_isPlain(id)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'identity not a plain object' });
+    if (RC.hasHiddenOwnKey(idIn)) return RC.buildBlockedResult([CODES.SOURCE_IDENTITY_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'identity carries Symbol-keyed or non-enumerable own property' });
+    var id = RC.toCleanCopy(idIn);
+    if (!_isPlain(id)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'identity not a plain object (or proxy/non-cloneable rejected)' });
     if (!_hasOnlyAllowedKeys(id, SOURCE_IDENTITY_KEYS)) return RC.buildBlockedResult([CODES.SOURCE_IDENTITY_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'identity carries forbidden own key' });
     var reasons = [];
     SOURCE_IDENTITY_REQUIRED_KEYS.forEach(function (k) {

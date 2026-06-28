@@ -152,6 +152,46 @@
     });
   }
 
+  // Codex D1 R2 Finding RN-06 closure: shared Proxy-rejection input cleanser. Every main validator
+  // (validateSourceIdentity / validateEvidenceNodeShape / validateHypothesisShape /
+  // validateRecommendationShape / validateEngineerBriefShape / validateDecisionInputShape) calls
+  // _toCleanCopy AT ENTRY. The result is a plain-prototype deep clone — a Proxy whose ownKeys/get
+  // traps lie about hidden state CANNOT survive: structuredClone enumerates via the engine's internal
+  // [[OwnPropertyKeys]] + [[GetOwnProperty]] traps (same surface), but the resulting clone is a
+  // PLAIN OBJECT whose own-property set is exactly what the Proxy reported. Downstream validators
+  // operating on the clone therefore see EXACTLY what they validate — no parallel-universe hidden
+  // properties remain reachable via direct property access on the original. structuredClone throw
+  // (DataCloneError on functions / symbols-as-values / shared array buffers / etc.) → fail-closed.
+  // JSON round-trip fallback when structuredClone unavailable: same posture but cannot preserve
+  // certain shapes; fail-closed on any throw.
+  function _toCleanCopy(v) {
+    if (v === null || v === undefined) return v;
+    if (typeof v !== 'object') return v;
+    try {
+      if (typeof structuredClone === 'function') return structuredClone(v);
+      return JSON.parse(JSON.stringify(v));
+    } catch (e) {
+      return null; // caller sees null → treats as "not a plain object" → fail closed
+    }
+  }
+  /**
+   * _hasHiddenOwnKey(v) — detects Symbol-keyed OR non-enumerable own properties on the TOP-LEVEL
+   * of v. structuredClone silently drops both, so without this check a value like { caseId: 'x',
+   * [hostileSym]: payload } would clone to { caseId: 'x' } and pass validation. The pre-clone check
+   * rejects such inputs at the boundary so the failure surface mirrors the Codex D1 R1 RN-01
+   * recommended behaviour exactly. Throws (Proxy traps lying) → treat as hidden (fail closed).
+   */
+  function _hasHiddenOwnKey(v) {
+    if (v === null || typeof v !== 'object') return false;
+    try {
+      if (typeof Object.getOwnPropertySymbols === 'function' && Object.getOwnPropertySymbols(v).length > 0) return true;
+      var allKeys = Object.getOwnPropertyNames(v);
+      var enumKeys = Object.keys(v);
+      if (allKeys.length !== enumKeys.length) return true;
+    } catch (e) { return true; }
+    return false;
+  }
+
   var api = {
     REASON_CODES: REASON_CODES,
     ALL_REASON_CODES: ALL_REASON_CODES,
@@ -159,6 +199,8 @@
     isReasonCode: isReasonCode,
     explanationKeyFor: explanationKeyFor,
     buildBlockedResult: buildBlockedResult,
+    toCleanCopy: _toCleanCopy,
+    hasHiddenOwnKey: _hasHiddenOwnKey,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.R3_0D_ReasonCodes = api;

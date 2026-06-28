@@ -72,7 +72,8 @@
   // Codex D1 R1 Finding RN-01 closure.
   function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (typeof k === 'symbol') return false; if (allowed.indexOf(k) === -1) return false; } return true; }
   function _utf8Bytes(s) { try { return (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s).length : Buffer.byteLength(s, 'utf8'); } catch (e) { return (typeof s === 'string') ? s.length * 4 : 0; } }
-  function _hasCausalOverclaim(s) { if (typeof s !== 'string') return false; var lower = s.toLowerCase(); for (var i = 0; i < HC.CAUSAL_OVERCLAIM_TERMS.length; i++) if (lower.indexOf(HC.CAUSAL_OVERCLAIM_TERMS[i]) !== -1) return true; return false; }
+  // Codex D1 R2 Finding RN-08 closure: use HC.hasCausalOverclaim (centralized normalizing scanner).
+  function _hasCausalOverclaim(s) { return HC.hasCausalOverclaim(s); }
   function _checkI18nKey(v, reasons) {
     if (!_nonEmptyStr(v)) { reasons.push(CODES.BRIEF_INVALID); return; }
     if (_utf8Bytes(v) > STRING_BYTE_CAP) reasons.push(CODES.BYTE_CAP_EXCEEDED);
@@ -82,9 +83,12 @@
   /**
    * validateEngineerBriefShape(b) — D1 STRUCTURAL gate.
    */
-  function validateEngineerBriefShape(b) {
+  function validateEngineerBriefShape(bIn) {
+    // Codex D1 R2 RN-06 Proxy-rejection input clone.
     try {
-    if (!_isPlain(b)) return RC.buildBlockedResult([CODES.BRIEF_INVALID], { detail: 'brief not plain object' });
+    if (RC.hasHiddenOwnKey(bIn)) return RC.buildBlockedResult([CODES.BRIEF_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'brief carries Symbol-keyed or non-enumerable own property' });
+    var b = RC.toCleanCopy(bIn);
+    if (!_isPlain(b)) return RC.buildBlockedResult([CODES.BRIEF_INVALID], { detail: 'brief not plain object (or proxy/non-cloneable rejected)' });
     if (!_hasOnlyAllowedKeys(b, BRIEF_KEYS)) return RC.buildBlockedResult([CODES.BRIEF_INVALID, CODES.UNKNOWN_OWN_KEY]);
     var reasons = [];
 
@@ -148,7 +152,13 @@
         if (!_checkBriefIdArray(entry.contradictingEvidenceIds, ARRAY_CAP)) reasons.push(CODES.BRIEF_CONTRADICTION_HIDDEN);
       }
     }
-    if (Array.isArray(b.evidenceSummary)) for (var ei = 0; ei < b.evidenceSummary.length; ei++) _checkEntry(b.evidenceSummary[ei], EVIDENCE_SUMMARY_KEYS, 'nodeId', CODES.BRIEF_INVALID, false);
+    // Codex D1 R2 Finding RN-10 closure: every entry-collection MUST be an array with bounded length
+    // BEFORE entry iteration runs. A non-array evidenceSummary previously skipped entry validation
+    // entirely; now it triggers BRIEF_INVALID. contradictions / alternativeExplanations are mandatory-
+    // presence keys already caught above; evidenceSummary is also enforced here.
+    if (!Array.isArray(b.evidenceSummary)) reasons.push(CODES.BRIEF_INVALID);
+    else if (b.evidenceSummary.length > ARRAY_CAP) reasons.push(CODES.ARRAY_CAP_EXCEEDED);
+    else for (var ei = 0; ei < b.evidenceSummary.length; ei++) _checkEntry(b.evidenceSummary[ei], EVIDENCE_SUMMARY_KEYS, 'nodeId', CODES.BRIEF_INVALID, false);
     if (Array.isArray(b.contradictions)) for (var coi = 0; coi < b.contradictions.length; coi++) _checkEntry(b.contradictions[coi], CONTRADICTION_KEYS, 'hypothesisId', CODES.BRIEF_CONTRADICTION_HIDDEN, true);
     if (Array.isArray(b.alternativeExplanations)) for (var ali = 0; ali < b.alternativeExplanations.length; ali++) _checkEntry(b.alternativeExplanations[ali], ALT_ENTRY_KEYS, 'alternativeId', CODES.BRIEF_INVALID, false);
 
