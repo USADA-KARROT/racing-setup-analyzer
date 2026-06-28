@@ -65,13 +65,27 @@
    * createOrchestrator(deps) — factory. deps may supply alternative service implementations
    * (used by tests). Default to the production module-loaded services.
    *
-   * deps = { deltaMetricsService?, exportService?, capabilities }
+   * deps = { deltaMetricsService?, exportService?, capabilities, authenticityPredicate }
    *   capabilities — a frozen snapshot of governance/r3.0c/capabilities.json relevant flags:
    *     { phaseBoundaryContractEnabled:bool, viewmodelStateTransitionContractEnabled:bool,
    *       framingSourceStructuredContractEnabled:bool }
+   *   authenticityPredicate — REQUIRED. A function (caseRecord) → boolean that returns true ONLY
+   *     for case records minted by an authoritative source (R3.0B case-store open boundary). The
+   *     orchestrator NEVER exposes a way to add to this authority; the predicate is opaque to the
+   *     viewmodel and to any caller of requestComparison. A throw inside the predicate is treated
+   *     as false (fail-closed). The previous candidate exposed registerAuthenticCaseRecord on the
+   *     orchestrator's public API + had the viewmodel auto-register caller-controlled records on
+   *     setAssociation — Codex C7-R2-A-01 broke that with a literal-built forged caseRecord
+   *     escalating through setAssociation. Predicate injection makes the WeakSet (or whatever
+   *     authority the integration uses) renderer-side and viewmodel-inaccessible.
    *
    * The capabilities snapshot is REQUIRED. The orchestrator refuses to run when
    * framingSourceStructuredContractEnabled is false (the C7 contract is gated by capability).
+   *
+   * Default authenticityPredicate (when not provided) is FAIL-CLOSED (returns false for every
+   * caseRecord). This means a default-constructed orchestrator will reject every requestComparison
+   * call with INTERNAL_CONTRACT_VIOLATION — exactly the property D1 needs to ship a test that
+   * proves "forged record routed through setAssociation is refused without registration helpers".
    */
   function createOrchestrator(deps) {
     deps = _isPlain(deps) ? deps : {};
@@ -82,33 +96,18 @@
     if (!dm || typeof dm.computeDeltaMetrics !== 'function') throw new Error('createOrchestrator requires delta-metrics service');
     // ex is OPTIONAL — only required when the viewmodel actually calls exportComparison.
 
+    // Codex C7-R2-A-01 closure: predicate-based authenticity check. The predicate is invoked once
+    // per requestComparison; throw = false (fail-closed). NO registration API is exposed.
+    var _externalAuthPredicate = typeof deps.authenticityPredicate === 'function' ? deps.authenticityPredicate : null;
+    function _isAuthenticCaseRecord(caseRecord) {
+      if (!_externalAuthPredicate) return false;
+      if (!_isPlain(caseRecord)) return false;
+      try { return _externalAuthPredicate(caseRecord) === true; } catch (e) { return false; }
+    }
+
     var _generationCounter = 0;
     function _nextToken() { _generationCounter = _generationCounter + 1; return _generationCounter; }
     function currentToken() { return _generationCounter; }
-
-    // Codex C7 finding C7-D1 closure: case binding required a caller-controlled caseRecord
-    // matched against caller-controlled association — self-consistent forgery passed. The fix is
-    // an orchestrator-private WeakSet of case records that have been REGISTERED via an
-    // authoritative path. The expected caller is the R3.0B case-store integration (a follow-up
-    // task); for unit tests + manual integration, the explicit registerAuthenticCaseRecord
-    // entrypoint registers a freshly-loaded caseRecord. Any caseRecord that did NOT pass through
-    // this entry point is refused at requestComparison time.
-    var _authenticCaseRecords = (typeof WeakSet !== 'undefined') ? new WeakSet() : null;
-    function registerAuthenticCaseRecord(caseRecord) {
-      if (!_isPlain(caseRecord)) return false;
-      // Defensive freeze so the registered object cannot be mutated post-registration to swap
-      // associations under the orchestrator. Shallow freeze is sufficient because the
-      // associations sub-object is also frozen by the case-store boundary (R3.0B convention).
-      try { if (!Object.isFrozen(caseRecord)) Object.freeze(caseRecord); } catch (e) { /* no-op */ }
-      try { if (_isPlain(caseRecord.associations) && !Object.isFrozen(caseRecord.associations)) Object.freeze(caseRecord.associations); } catch (e) { /* no-op */ }
-      if (_authenticCaseRecords) { try { _authenticCaseRecords.add(caseRecord); } catch (e) { return false; } }
-      return true;
-    }
-    function isAuthenticCaseRecord(caseRecord) {
-      if (!_authenticCaseRecords) return false;
-      if (!_isPlain(caseRecord)) return false;
-      try { return _authenticCaseRecords.has(caseRecord); } catch (e) { return false; }
-    }
 
     function _blockedResponse(reasonCodes, detail, framing, token) {
       var arr = (reasonCodes || []).filter(function (c) { return RC.isReasonCode(c); });
@@ -188,12 +187,13 @@
       }
       if (!_isPlain(input)) return _blockedResponse([CODES.INTERNAL_CONTRACT_VIOLATION], 'input not a plain object', null, token);
 
-      // 1. case authenticity (Codex C7 finding C7-D1): the caseRecord MUST have been registered
-      //    via the authoritative entrypoint. A literal-built caseRecord (even one whose
+      // 1. case authenticity (Codex C7-R2-A-01 closure): the caseRecord MUST be vouched for by
+      //    the injected authenticityPredicate. A literal-built caseRecord (even one whose
       //    associations consistently match the caller-supplied association + eligibility
-      //    identities) fails closed here.
-      if (!isAuthenticCaseRecord(input.caseRecord)) {
-        return _blockedResponse([CODES.INTERNAL_CONTRACT_VIOLATION], 'caseRecord not registered via registerAuthenticCaseRecord — caller-controlled case authority refused', null, token);
+      //    identities) fails closed here. The predicate is opaque to the viewmodel — there is no
+      //    public API to add anything to it.
+      if (!_isAuthenticCaseRecord(input.caseRecord)) {
+        return _blockedResponse([CODES.INTERNAL_CONTRACT_VIOLATION], 'caseRecord not vouched for by authenticityPredicate — caller-controlled case authority refused', null, token);
       }
 
       // 2. case ↔ context binding (F4)
@@ -316,13 +316,15 @@
       });
     }
 
+    // Codex C7-R2-A-01 closure: registerAuthenticCaseRecord + isAuthenticCaseRecord are NO LONGER
+    // exposed on the orchestrator's public API. Authenticity is supplied at construction via the
+    // injected predicate. Tests provide their own predicate; production callers (R3.0B case-store
+    // integration) inject a predicate backed by their own WeakSet / token / store-lineage check.
     return Object.freeze({
       SERVICE_VERSION: SERVICE_VERSION,
       CHECKPOINT_FLOOR: CHECKPOINT_FLOOR,
       SIGN_FORMULA: SIGN_FORMULA,
       currentToken: currentToken,
-      registerAuthenticCaseRecord: registerAuthenticCaseRecord,
-      isAuthenticCaseRecord: isAuthenticCaseRecord,
       requestComparison: requestComparison,
       exportComparison: exportComparison,
     });

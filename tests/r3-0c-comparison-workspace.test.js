@@ -68,6 +68,92 @@ chk('A7 cannotDistinguishFallback returns valid entry', FIR.validateFramingEntry
   chk('B10 params with oversized string → invalid', FIR.validateFramingEntry({ reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.cannot_distinguish', params: { s: 'x'.repeat(300) } }).valid === false);
   // invalid: params as null sentinel (round-3 F12 rule — must be plain object when supplied)
   chk('B11 params:null → invalid', FIR.validateFramingEntry({ reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.cannot_distinguish', params: null }).valid === false);
+
+  // Codex C7-R2-C-01 closure: tri-state ABSENT / VALUE / THREW + accessor descriptor rejection.
+  // The previous _safeGet swallowed throws into `undefined`, which the params branch treated as
+  // "optional field absent" — letting a Proxy / accessor getter slip through. Each test below
+  // probes one channel the directive enumerates.
+  (() => {
+    const validBase = { reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.cannot_distinguish' };
+
+    // B12 ABSENT: genuinely absent optional params → accept (regression guard).
+    chk('B12 absent params → valid', FIR.validateFramingEntry({ reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.cannot_distinguish' }).valid === true);
+
+    // B13 THREW: getter on `params` throws → reject (the primary regression Codex flagged).
+    const e13 = Object.assign({}, validBase);
+    Object.defineProperty(e13, 'params', { enumerable: true, configurable: true, get() { throw new Error('boom'); } });
+    chk('B13 params getter throws → invalid', FIR.validateFramingEntry(e13).valid === false);
+
+    // B14 THREW: getter on `reasonCode` throws → reject.
+    const e14 = { i18nKey: 'r3_0c.framing.cannot_distinguish' };
+    Object.defineProperty(e14, 'reasonCode', { enumerable: true, configurable: true, get() { throw new Error('boom'); } });
+    chk('B14 reasonCode getter throws → invalid', FIR.validateFramingEntry(e14).valid === false);
+
+    // B15 THREW: getter on `i18nKey` throws → reject.
+    const e15 = { reasonCode: CODES.CANNOT_DISTINGUISH };
+    Object.defineProperty(e15, 'i18nKey', { enumerable: true, configurable: true, get() { throw new Error('boom'); } });
+    chk('B15 i18nKey getter throws → invalid', FIR.validateFramingEntry(e15).valid === false);
+
+    // B16 accessor returning a benign value is still rejected. Plain data is the contract.
+    const e16 = Object.assign({}, validBase);
+    Object.defineProperty(e16, 'params', { enumerable: true, configurable: true, get() { return { ms: 1 }; } });
+    chk('B16 params accessor (no throw, benign value) → invalid', FIR.validateFramingEntry(e16).valid === false);
+
+    // B17 inherited getter: define on prototype, not own → entry's own getOwnPropertyDescriptor
+    // returns undefined → treated as ABSENT for optional `params` → accept (the entry is
+    // structurally plain at the own-property level; inheritance via Object.prototype is the only
+    // chain accepted by _isPlain).
+    const inheritedProto = Object.create(Object.prototype);
+    Object.defineProperty(inheritedProto, 'params', { enumerable: true, configurable: true, get() { return { ms: 1 }; } });
+    // Note: setting __proto__ to inheritedProto means _isPlain would reject (proto !== Object.prototype).
+    // The realistic threat is a plain entry that someone tried to mutate to gain a getter — already
+    // covered by B13/B16. Document the chain via comment only.
+
+    // B18 Proxy on the entry itself with throwing get trap on ownKeys-listed key.
+    const target = { reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.cannot_distinguish' };
+    const proxy18 = new Proxy(target, {
+      getOwnPropertyDescriptor(t, k) {
+        if (k === 'params') return { enumerable: true, configurable: true, get() { throw new Error('proxy-boom'); } };
+        return Object.getOwnPropertyDescriptor(t, k);
+      },
+      ownKeys() { return ['reasonCode', 'i18nKey', 'params']; },
+    });
+    chk('B18 Proxy advertises params via accessor descriptor → invalid', FIR.validateFramingEntry(proxy18).valid === false);
+
+    // B19 Proxy with throwing ownKeys trap → invalid (already covered by Round 1 B1; regression
+    // guard at this layer).
+    const proxy19 = new Proxy({}, { ownKeys() { throw new Error('boom'); } });
+    chk('B19 Proxy ownKeys throws → invalid', FIR.validateFramingEntry(proxy19).valid === false);
+
+    // B20 inner-param getter: params is a plain object whose key has an accessor descriptor →
+    // inner _readOwn must also reject. The previous validator used plain o[k] in the inner loop;
+    // for a getter that throws, the outer try/catch would still catch — but a getter that returns
+    // a benign value would have slipped silently into the accepted path.
+    const e20 = { reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.cannot_distinguish', params: {} };
+    Object.defineProperty(e20.params, 'ms', { enumerable: true, configurable: true, get() { return 42; } });
+    chk('B20 inner params value via accessor → invalid', FIR.validateFramingEntry(e20).valid === false);
+
+    // B21 inner-param getter that throws.
+    const e21 = { reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.cannot_distinguish', params: {} };
+    Object.defineProperty(e21.params, 'ms', { enumerable: true, configurable: true, get() { throw new Error('boom'); } });
+    chk('B21 inner params value getter throws → invalid', FIR.validateFramingEntry(e21).valid === false);
+
+    // B22 non-enumerable own key on entry (Reflect.ownKeys still surfaces it; ALLOWED check rejects).
+    const e22 = Object.assign({}, validBase);
+    Object.defineProperty(e22, 'secret', { enumerable: false, configurable: true, value: 'x' });
+    chk('B22 non-enumerable extra own-key → invalid', FIR.validateFramingEntry(e22).valid === false);
+
+    // B23 Symbol-keyed entry (Reflect.ownKeys surfaces Symbols; non-string check rejects).
+    const e23 = Object.assign({}, validBase);
+    e23[Symbol.for('r3.0c.attack')] = 'x';
+    chk('B23 Symbol-keyed extra → invalid', FIR.validateFramingEntry(e23).valid === false);
+
+    // B24 ABSENT vs explicit-undefined sanity: an entry with params explicitly set to undefined
+    // (data descriptor with value undefined) should still be accepted as "absent semantics" so
+    // existing orchestrator output (`params: v.params ? ... : undefined`) keeps working.
+    const e24 = { reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.cannot_distinguish', params: undefined };
+    chk('B24 params explicit-undefined → valid (back-compat)', FIR.validateFramingEntry(e24).valid === true);
+  })();
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -114,14 +200,18 @@ chk('C18 placeholderForTrigger unknown → BLOCKED (fail-closed)', VST.placehold
 
 // F. Orchestrator — full eligible path (drives real C5)
 function caseRecord() { return { caseId: 'case_A', associations: { trackId: 'silverstone', layoutId: 'gp', positionBasis: 'lap_distance', positionDirection: 'increasing' } }; }
-// helper: build an orchestrator AND register the caseRecord so requestComparison can pass the
-// authenticity gate (Codex C7 finding C7-D1 closure). Tests that want to probe the unauth path
-// skip this helper and supply a literal caseRecord.
+// Codex C7-R2-A-01 closure: the orchestrator no longer exposes registerAuthenticCaseRecord; the
+// authoritative authenticityPredicate is injected at construction. A test-side WeakSet stands in
+// for the production R3.0B case-store boundary — production wiring (in renderer/index.html
+// app().init()) supplies a predicate backed by its own renderer-private WeakSet that is
+// populated only via the case-store-open path. The viewmodel cannot reach either WeakSet, so a
+// caller routing a forged caseRecord through setAssociation reaches the orchestrator and is
+// refused by the predicate.
+const TEST_AUTH_SET = new WeakSet();
 function authOrch(caps) {
-  const o = OrchService.createOrchestrator({ capabilities: caps });
-  return o;
+  return OrchService.createOrchestrator({ capabilities: caps, authenticityPredicate: function (cr) { return TEST_AUTH_SET.has(cr); } });
 }
-function regCase(orch, cr) { orch.registerAuthenticCaseRecord(cr); return cr; }
+function regCase(_orch, cr) { TEST_AUTH_SET.add(cr); return cr; }
 function association() { return { caseId: 'case_A', sessionId: 'sess_1', trackId: 'silverstone', layoutId: 'gp', positionBasis: 'lap_distance', positionDirection: 'increasing', analysisCaseId: 'case_A', credibilityMetadata: { credibility: 'Heuristic', provenance: 'real', confidence: 'low', limitations: [], blockedReasons: [] } }; }
 function eligibilityInput() {
   return {
@@ -144,8 +234,8 @@ function deltaMetricsRequest() {
   };
 }
 (() => {
-  const orch = OrchService.createOrchestrator({ capabilities: allCapsOn });
-  const cr = caseRecord(); orch.registerAuthenticCaseRecord(cr);
+  const orch = authOrch(allCapsOn);
+  const cr = caseRecord(); regCase(orch, cr);
   const r = orch.requestComparison({ caseRecord: cr, association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: deltaMetricsRequest() });
   chk('F1 eligible end-to-end', r.status === 'eligible');
   chk('F2 framing is structured (not prose)', r.framing && typeof r.framing.observedDelta === 'object');
@@ -155,22 +245,48 @@ function deltaMetricsRequest() {
 })();
 // G. Orchestrator — case binding mismatch
 (() => {
-  const orch = OrchService.createOrchestrator({ capabilities: allCapsOn });
+  const orch = authOrch(allCapsOn);
   const caseRec = { caseId: 'case_A', associations: { trackId: 'imola', layoutId: 'gp', positionBasis: 'lap_distance', positionDirection: 'increasing' } };
-  orch.registerAuthenticCaseRecord(caseRec);
+  regCase(orch, caseRec);
   const r = orch.requestComparison({ caseRecord: caseRec, association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: deltaMetricsRequest() });
   chk('G1 case associations trackId mismatch → blocked', r.status === 'blocked' && hasCode(r, CODES.TRACK_IDENTITY_MISMATCH));
 })();
-// G2. Orchestrator — caseRecord NOT registered → blocked by authenticity (Codex C7-D1 closure)
+// G2. Codex C7-R2-A-01: orchestrator constructed with proper authenticityPredicate but caller
+// supplies a freshly-built caseRecord NOT in the authoritative set → blocked at authenticity gate.
+// This proves the predicate is the only authority check; no registration helper is reachable.
 (() => {
-  const orch = OrchService.createOrchestrator({ capabilities: allCapsOn });
+  const orch = authOrch(allCapsOn);
   const r = orch.requestComparison({ caseRecord: caseRecord(), association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: deltaMetricsRequest() });
-  chk('G2 caller-forged caseRecord (not registered) → blocked', r.status === 'blocked' && hasCode(r, CODES.INTERNAL_CONTRACT_VIOLATION));
+  chk('G2 caller-forged caseRecord (not in auth set) → blocked', r.status === 'blocked' && hasCode(r, CODES.INTERNAL_CONTRACT_VIOLATION));
+})();
+// G3. Codex C7-R2-A-01: the previous candidate had viewmodel.setAssociation auto-register the
+// caller-supplied caseRecord via a public orchestrator API — a literal-built forged record
+// passed end-to-end. This test drives the FULL setAssociation → requestComparison escalation
+// path against an orchestrator constructed with an authenticityPredicate that ONLY trusts the
+// pre-registered record. The forged record is constructed locally and NEVER touched by any
+// helper — there is no public registration API to abuse. setAssociation must NOT bestow
+// authority. The eligible-path result rendered by the viewmodel must remain blocked /
+// not-ready, NOT ready.
+(() => {
+  const orch = authOrch(allCapsOn);
+  const vm = VMService.createComparisonViewModel({ orchestrator: orch, capabilities: allCapsOn });
+  const forgedRecord = { caseId: 'case_A', associations: { trackId: 'silverstone', layoutId: 'gp', positionBasis: 'lap_distance', positionDirection: 'increasing' } };
+  // ABSOLUTELY DO NOT call regCase(orch, forgedRecord) — the threat model is exactly the absence
+  // of any caller-reachable registration helper.
+  const assoc = Object.assign({}, association(), { caseRecord: forgedRecord });
+  vm.setAssociation(assoc);
+  vm.setChannelMapping({ pairing: deltaMetricsRequest().pairing });
+  vm.setReference({ lapId: 'lap_3', lapTimeMs: 90000, lapAuthority: { lapIdentity: { satisfied: true }, completeness: { satisfied: true }, timingValidity: { satisfied: true }, trackIdentity: { satisfied: true }, sampleContinuity: { satisfied: true } }, normalizationAuthority: { basis: 'lap_distance', distanceAuthority: { satisfied: true }, positionUnit: 'm' } });
+  vm.setComparison({ lapId: 'lap_5', lapTimeMs: 89500, lapAuthority: { lapIdentity: { satisfied: true }, completeness: { satisfied: true }, timingValidity: { satisfied: true }, trackIdentity: { satisfied: true }, sampleContinuity: { satisfied: true } }, normalizationAuthority: { basis: 'lap_distance', distanceAuthority: { satisfied: true }, positionUnit: 'm' } });
+  const s = vm.getState();
+  chk('G3 setAssociation cannot bestow authority — forged escalation blocked at viewmodel state', s.placeholder !== VST.PLACEHOLDER_STATES.READY && s.result === null && s.exportGate === false);
+  chk('G3b orchestrator public API does NOT expose registerAuthenticCaseRecord', typeof orch.registerAuthenticCaseRecord === 'undefined');
+  chk('G3c orchestrator public API does NOT expose isAuthenticCaseRecord', typeof orch.isAuthenticCaseRecord === 'undefined');
 })();
 // H. Orchestrator — phase metric requested without capability → filtered out + limitation
 (() => {
-  const orch = OrchService.createOrchestrator({ capabilities: allCapsOn });
-  const cr = caseRecord(); orch.registerAuthenticCaseRecord(cr);
+  const orch = authOrch(allCapsOn);
+  const cr = caseRecord(); regCase(orch, cr);
   const dm = deltaMetricsRequest();
   dm.requestedMetrics = ['lap_time', 'delta_cumulative', 'entry_delta'];
   const r = orch.requestComparison({ caseRecord: cr, association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: dm });
@@ -180,15 +296,15 @@ function deltaMetricsRequest() {
 })();
 // I. Orchestrator — caller smuggled prose framing → fall back to validated/fallback
 (() => {
-  const orch = OrchService.createOrchestrator({ capabilities: allCapsOn });
-  const cr = caseRecord(); orch.registerAuthenticCaseRecord(cr);
+  const orch = authOrch(allCapsOn);
+  const cr = caseRecord(); regCase(orch, cr);
   const r = orch.requestComparison({ caseRecord: cr, association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: deltaMetricsRequest(), framing: { observedDelta: 'driver was late on brakes' } });
   chk('I1 caller-smuggled prose dropped (observedDelta is structured)', r.status === 'eligible' && typeof r.framing.observedDelta === 'object' && r.framing.observedDelta.i18nKey !== undefined);
 })();
 // J. Orchestrator — caller-smuggled unregistered i18nKey → dropped
 (() => {
-  const orch = OrchService.createOrchestrator({ capabilities: allCapsOn });
-  const cr = caseRecord(); orch.registerAuthenticCaseRecord(cr);
+  const orch = authOrch(allCapsOn);
+  const cr = caseRecord(); regCase(orch, cr);
   const r = orch.requestComparison({ caseRecord: cr, association: association(), eligibilityInput: eligibilityInput(), deltaMetricsRequest: deltaMetricsRequest(), framing: { nextValidationAction: { reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.evil_made_up_key' } } });
   chk('J1 unregistered i18nKey in nextValidationAction → not committed', r.framing.nextValidationAction === null);
 })();

@@ -69,6 +69,9 @@ const COMPARISONS_I18N = {
     "r3_0c.framing.next_validation.confirm_track_identity": "Confirm the track and layout identity for both laps",
     "r3_0c.framing.next_validation.select_different_reference": "Try selecting a different reference lap",
     "r3_0c.framing.next_validation.repeat_lap_under_controlled_conditions": "Repeat the lap under controlled conditions",
+    // C7-R2-D-01 closure — structured init-failure wording. The renderer surfaces this as a
+    // blocked reason when the C7 UMD globals fail to load or a factory throws during init.
+    "ui.blocker.UI_INITIALIZATION_FAILED": "Comparison workspace failed to initialize. Reload the page; if the problem persists the build is missing the C7 modules.",
   },
   zh: {
     "ui.comp.title": "比較工作區",
@@ -122,6 +125,7 @@ const COMPARISONS_I18N = {
     "r3_0c.framing.next_validation.confirm_track_identity": "確認兩圈的賽道與配置識別",
     "r3_0c.framing.next_validation.select_different_reference": "嘗試選擇不同的參考圈",
     "r3_0c.framing.next_validation.repeat_lap_under_controlled_conditions": "在受控條件下重跑該圈",
+    "ui.blocker.UI_INITIALIZATION_FAILED": "比較工作區初始化失敗。請重新載入頁面；若問題持續，表示此版本缺少 C7 模組。",
   },
   ja: {
     "ui.comp.title": "比較ワークスペース",
@@ -175,6 +179,7 @@ const COMPARISONS_I18N = {
     "r3_0c.framing.next_validation.confirm_track_identity": "両ラップのトラック / レイアウト識別を確認",
     "r3_0c.framing.next_validation.select_different_reference": "別の参照ラップを選択してみる",
     "r3_0c.framing.next_validation.repeat_lap_under_controlled_conditions": "制御された条件下でラップを再走",
+    "ui.blocker.UI_INITIALIZATION_FAILED": "比較ワークスペースの初期化に失敗しました。ページを再読み込みしてください；問題が続く場合、このビルドに C7 モジュールが含まれていません。",
   },
 };
 if (typeof I18N !== 'undefined') { Object.assign(I18N.en, COMPARISONS_I18N.en); Object.assign(I18N.zh, COMPARISONS_I18N.zh); Object.assign(I18N.ja, COMPARISONS_I18N.ja); }

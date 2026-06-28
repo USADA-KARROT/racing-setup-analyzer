@@ -215,16 +215,17 @@
       _clearAndPlaceholder('case_association_changed');
       _state.association = _isPlain(assoc) ? Object.freeze(Object.assign({}, assoc)) : null;
       if (_isPlain(assoc) && _isPlain(assoc.caseRecord)) {
+        // Codex C7-R2-A-01 closure: the viewmodel NO LONGER registers the caseRecord with the
+        // orchestrator. The viewmodel is renderer-accessible (any caller can invoke
+        // setAssociation with a forged caseRecord); treating that path as an authoritative
+        // boundary was the D1 vulnerability. We still hold a private reference to the record so
+        // requestComparison can pass it to the orchestrator, but the orchestrator's
+        // authenticityPredicate (injected at construction) is what grants authority — NOT this
+        // viewmodel. A forged caller-built caseRecord routed through setAssociation will reach
+        // the orchestrator and be refused by the predicate.
         var cr = Object.assign({}, assoc.caseRecord);
         if (_isPlain(assoc.caseRecord.associations)) cr.associations = Object.assign({}, assoc.caseRecord.associations);
         _state.caseRecord = cr;
-        // Codex C7 finding C7-D1: the viewmodel registers the caseRecord with the orchestrator
-        // before any request can fire. The orchestrator's WeakSet only accepts records that
-        // pass through THIS authoritative path; a caller bypassing setAssociation cannot get a
-        // forged caseRecord into the orchestrator.
-        if (typeof orch.registerAuthenticCaseRecord === 'function') {
-          try { orch.registerAuthenticCaseRecord(_state.caseRecord); } catch (e) { /* no-op */ }
-        }
       } else {
         _state.caseRecord = null;
       }

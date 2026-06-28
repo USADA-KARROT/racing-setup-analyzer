@@ -75,7 +75,27 @@
   function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
   function _isFiniteNum(v) { return typeof v === 'number' && v === v && v !== Infinity && v !== -Infinity; }
   function _safeOwnKeys(o) { try { return Reflect && typeof Reflect.ownKeys === 'function' ? Reflect.ownKeys(o) : Object.keys(o); } catch (e) { return null; } }
-  function _safeGet(o, k) { try { return o[k]; } catch (e) { return undefined; } }
+
+  // Codex C7-R2-C-01 closure: tri-state own-property read. Distinguishes ABSENT (no own key) from
+  // VALUE (own data descriptor) from THREW (Proxy/accessor/descriptor lookup throws OR descriptor
+  // is an accessor descriptor — accessors violate the plain-object framing contract regardless of
+  // whether they happen to throw on this particular read). Callers MUST treat THREW as
+  // fail-closed; the previous _safeGet swallowed throws into `undefined` which was laundered as
+  // "optional field absent" further down.
+  var READ_ABSENT = Object.freeze({ state: 'ABSENT' });
+  var READ_THREW = Object.freeze({ state: 'THREW' });
+  function _readOwn(o, k) {
+    var desc;
+    try { desc = Object.getOwnPropertyDescriptor(o, k); }
+    catch (e) { return READ_THREW; }
+    if (!desc) return READ_ABSENT;
+    // accessor descriptor (get/set) — reject. Even a getter that returns a benign value can have
+    // side effects, can throw on any future read, can return different values on each call. The
+    // framing contract requires plain data; accessors are out of band.
+    if (typeof desc.get === 'function' || typeof desc.set === 'function') return READ_THREW;
+    // data descriptor — value already resolved, no observable side-effect read needed.
+    return { state: 'VALUE', value: desc.value };
+  }
   function _utf8ByteLength(s) {
     if (typeof Buffer !== 'undefined' && typeof Buffer.byteLength === 'function') return Buffer.byteLength(s, 'utf8');
     if (typeof TextEncoder !== 'undefined') { try { return new TextEncoder().encode(s).length; } catch (e) { /* fall through */ } }
@@ -120,19 +140,31 @@
         if (typeof key !== 'string') return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing entry has non-string (e.g. Symbol) own-key' };
         if (!ALLOWED[key]) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing entry has unknown key: ' + String(key).slice(0, 60) };
       }
-      var reasonCode = _safeGet(entry, 'reasonCode');
-      if (!RC.isReasonCode(reasonCode)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing reasonCode unregistered' };
-      var i18nKey = _safeGet(entry, 'i18nKey');
-      if (!isRegisteredFramingI18nKey(i18nKey)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing i18nKey not in registry' };
-      var paramsRaw = _safeGet(entry, 'params');
-      if (paramsRaw !== undefined) {
+      // Codex C7-R2-C-01 closure: tri-state read on every own property. THREW = accessor descriptor
+      // OR descriptor lookup throws — both fail-closed. The previous _safeGet swallowed throws and
+      // returned undefined, which the params branch below treated as "optional field absent" — an
+      // input with `Object.defineProperty(entry, 'params', { get(){throw} })` slipped through.
+      var rcRead = _readOwn(entry, 'reasonCode');
+      if (rcRead.state !== 'VALUE') return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: rcRead.state === 'THREW' ? 'framing reasonCode is accessor descriptor or descriptor lookup threw — fail-closed' : 'framing reasonCode missing' };
+      if (!RC.isReasonCode(rcRead.value)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing reasonCode unregistered' };
+      var keyRead = _readOwn(entry, 'i18nKey');
+      if (keyRead.state !== 'VALUE') return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: keyRead.state === 'THREW' ? 'framing i18nKey is accessor descriptor or descriptor lookup threw — fail-closed' : 'framing i18nKey missing' };
+      if (!isRegisteredFramingI18nKey(keyRead.value)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing i18nKey not in registry' };
+      var paramsRead = _readOwn(entry, 'params');
+      if (paramsRead.state === 'THREW') return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params is accessor descriptor or descriptor lookup threw — fail-closed' };
+      if (paramsRead.state === 'VALUE' && paramsRead.value !== undefined) {
+        var paramsRaw = paramsRead.value;
         if (!_isPlain(paramsRaw)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params not a plain object' };
         var pks = _safeOwnKeys(paramsRaw);
         if (pks === null) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params own-key enumeration threw (Proxy)' };
         for (var j = 0; j < pks.length; j++) {
           var k = pks[j];
           if (typeof k !== 'string' || k.length === 0) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has empty / non-string (e.g. Symbol) key' };
-          var v = _safeGet(paramsRaw, k);
+          // Inner-level tri-state read so a param-value accessor / Proxy is also rejected, not
+          // laundered via plain o[k] access.
+          var inner = _readOwn(paramsRaw, k);
+          if (inner.state !== 'VALUE') return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: inner.state === 'THREW' ? 'framing params value is accessor descriptor or descriptor lookup threw — fail-closed' : 'framing params value missing for own key' };
+          var v = inner.value;
           if (v === null || typeof v === 'boolean') continue;
           if (typeof v === 'number') { if (!_isFiniteNum(v)) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has non-finite number' }; continue; }
           if (typeof v === 'string') { if (_utf8ByteLength(v) > MAX_PARAM_STRING_BYTES) return { valid: false, reasonCode: CODES.INTERNAL_CONTRACT_VIOLATION, detail: 'framing params has oversized string' }; continue; }

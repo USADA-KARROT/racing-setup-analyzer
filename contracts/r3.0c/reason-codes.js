@@ -134,6 +134,16 @@
     // framing-source contract would document an internally-impossible state — formal Codex
     // round-2 F12 finding.
     CANNOT_DISTINGUISH: 'CANNOT_DISTINGUISH',
+    // Codex C7-R2-D-01 closure (R3.0C C7 UI). The renderer-side initialization of the C7
+    // Comparison Workspace can fail in two structurally-indistinguishable ways: (a) the C7 UMD
+    // globals (R3_0C_ComparisonOrchestrator / R3_0C_ComparisonViewModel) are not loaded into the
+    // page, or (b) one of the factories throws during construction. The prior C7 candidate
+    // catch-and-null'd both branches into a placeholder.idle state that looked identical to a
+    // successfully-initialized empty workspace. This reason code names the structural unavailable
+    // state surfaced to the user so the workspace is visibly unavailable, export is gated off,
+    // and no stale result is rendered. The i18n key (r3_0c.reason.ui_initialization_failed) is
+    // bound in renderer/js/i18n-comparisons.js across en/zh/ja.
+    UI_INITIALIZATION_FAILED: 'UI_INITIALIZATION_FAILED',
   });
 
   var ALL_REASON_CODES = Object.freeze(Object.keys(REASON_CODES).map(function (k) { return REASON_CODES[k]; }));
