@@ -74,10 +74,14 @@ chk('svShow method present', /svShow\(name\)\{/.test(html));
 });
 chk('Setup Analyzer (predict) is reachable as Setup & Model', /caseSubview==='setup_model'\) return id==='predict'/.test(html.replace(/\s+/g, ' ')) || /setup_model[\s\S]{0,40}predict/.test(html));
 
-// honest deferral (§5.4): Comparisons is an explicit deferred info panel, NOT a fake control.
-// Copy is now i18n'd → assert the pane references the deferral keys AND every locale keeps the honest meaning.
-chk('comparisons pane is deferred', /t\('ui\.comparisons\.deferred'\)/.test(html) && /Deferred to R3\.0C/.test(SHELL.en['ui.comparisons.deferred']));
-chk('comparisons states nothing fabricated', /t\('ui\.comparisons\.deferredBody'\)/.test(html) && /fabricated/i.test(SHELL.en['ui.comparisons.deferredBody']) && /捏造/.test(SHELL.zh['ui.comparisons.deferredBody']) && /捏造/.test(SHELL.ja['ui.comparisons.deferredBody']));
+// R3.0C C7: the Comparisons pane is now the real Comparison Workspace pane. The deferred
+// placeholder copy remains in the i18n shell dictionary for governance-honest cross-references,
+// but the pane HTML no longer renders it — instead it renders the workspace with viewmodel
+// state. The three R3.0C feature IDs (case_comparison / reference_lap / corner_delta) remain
+// availability='deferred' until C8_ACTIVATION wires the rendererAdapter.
+chk('C7 comparison workspace pane present', /data-r3c-c7-pane="comparison-workspace"/.test(html));
+chk('C7 placeholder accessor wired', /comparisonVMState\(\)/.test(html));
+chk('C7 deferred copy still in shell dictionary', /Deferred to R3\.0C/.test(SHELL.en['ui.comparisons.deferred']));
 chk('deferred marker on nav item (registry-derived)', (REG.deriveMainNav().find(function (n) { return n.id === 'comparisons'; }) || {}).deferred === 'R3.0C' && /x-text="item\.deferred"/.test(html));
 chk('R3.0C deferred features are stable deferred IDs, not fake controls', ['case_comparison', 'reference_lap', 'corner_delta'].every(function (id) { var f = REG.getFeature(id); return !!f && f.availability === 'deferred' && f.deferredReason === 'R3.0C' && (!f.allowedActions || f.allowedActions.length === 0) && !f.rendererAdapter; }));
 

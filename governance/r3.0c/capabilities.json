@@ -78,14 +78,18 @@
     "viewmodel_state_transition_contract": {
       "kind": "contract",
       "unlockFloor": "C5R_CP1_RETROFIT",
-      "enabled": false,
-      "description": "CP1 round-2 retrofit (cp1-retrofit-matrix.md F11). Viewmodel state-transition contract: on every input change (reference, comparison, case association, channel mapping) the viewmodel MUST clear the prior result + render a loading state; the orchestrator MUST commit results only under a request token, dropping stale-token results. Disabled at C5R because no viewmodel exists yet; C7_UI cannot ship without this capability being enabled with a registered contract document."
+      "enabled": true,
+      "enabledAt": "C7_UI",
+      "registeredContractFile": "contracts/r3.0c/viewmodel-state-transition-contract.js",
+      "description": "CP1 round-2 retrofit (cp1-retrofit-matrix.md F11). Viewmodel state-transition contract: on every input change (reference, comparison, case association, channel mapping, case reopen, orchestrator eligibility revoked, user-confirmed authority revoked) the viewmodel MUST clear the prior result + render a placeholder state; the orchestrator MUST issue a monotonic generation token per request; stale-token results are dropped silently. Enabled at C7_UI with the registered contract module above."
     },
     "framing_source_structured_contract": {
       "kind": "contract",
       "unlockFloor": "C5R_CP1_RETROFIT",
-      "enabled": false,
-      "description": "CP1 round-2 retrofit (cp1-retrofit-matrix.md F12). Framing-source contract: every framing entry the orchestrator emits MUST be a plain object { reasonCode, i18nKey, params? } — never free-form prose. The renderer maps i18nKey to a frozen wording table; the source layer never authors UI prose. Disabled at C5R because no orchestrator exists yet; C7_UI cannot ship without this capability being enabled with a registered framing key registry."
+      "enabled": true,
+      "enabledAt": "C7_UI",
+      "registeredContractFile": "contracts/r3.0c/framing-i18n-key-registry.js",
+      "description": "CP1 round-2 retrofit (cp1-retrofit-matrix.md F12). Framing-source contract: every framing entry the orchestrator emits MUST be a plain object { reasonCode, i18nKey, params? } where reasonCode ∈ REASON_CODES and i18nKey ∈ FRAMING_I18N_KEY_REGISTRY. The renderer maps i18nKey to a frozen wording table in renderer/js/i18n-comparisons.js; the source layer never authors UI prose. Enabled at C7_UI with the registered registry above."
     }
   }
 }

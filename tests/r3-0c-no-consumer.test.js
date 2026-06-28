@@ -68,8 +68,8 @@ function deferredOk() {
   const r = runValidator();
   chk('A1 real-repo exits 0', r.status === 0, r.stderr);
   chk('A2 real-repo ok===true', !!(r.artifact && r.artifact.ok === true), r.artifact && r.artifact.violations);
-  chk('A3 real-repo runtimeConsumerCount===10 (C1..C5 + C6 comparison-export)', !!(r.artifact && r.artifact.runtimeConsumerCount === 10));
-  chk('A3b real-repo authorizedConsumerCount===10', !!(r.artifact && r.artifact.authorizedConsumerCount === 10));
+  chk('A3 real-repo runtimeConsumerCount===12 (C1..C6 + C7 orchestrator/viewmodel; i18n-comparisons declared but no contract require)', !!(r.artifact && r.artifact.runtimeConsumerCount === 12));
+  chk('A3b real-repo authorizedConsumerCount===12', !!(r.artifact && r.artifact.authorizedConsumerCount === 12));
   chk('A3c real-repo unauthorizedRendererConsumerCount===0', !!(r.artifact && r.artifact.unauthorizedRendererConsumerCount === 0));
   chk('A3d real-repo authorized paths include C1 adapter, three C2 services, C3 normalize-distance, three C4 services, C5 delta-metrics, and C6 comparison-export', !!(r.artifact && Array.isArray(r.artifact.authorizedConsumerPaths)
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-comparison-adapter.js')
@@ -81,8 +81,11 @@ function deferredOk() {
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-corner-segmentation.js')
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-corner-pairing.js')
     && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-delta-metrics.js')
-    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-comparison-export.js')));
-  chk('A3e real-repo currentCheckpoint===C6_EXPORT', !!(r.artifact && r.artifact.currentCheckpoint === 'C6_EXPORT'));
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-comparison-export.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-comparison-orchestrator.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-comparison-viewmodel.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/i18n-comparisons.js')));
+  chk('A3e real-repo currentCheckpoint===C7_UI', !!(r.artifact && r.artifact.currentCheckpoint === 'C7_UI'));
   chk('A3f real-repo runtimeConsumersAllowed===true', !!(r.artifact && r.artifact.runtimeConsumersAllowed === true));
   chk('A4 real-repo deferredStillDeferred===true', !!(r.artifact && r.artifact.deferredStillDeferred === true));
 })();

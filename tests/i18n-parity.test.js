@@ -26,7 +26,18 @@ require('../renderer/js/i18n-csv.js');
 require('../renderer/js/i18n-advisor.js');
 require('../renderer/js/i18n-shell.js');
 require('../renderer/js/i18n-workspace.js');
+require('../renderer/js/i18n-comparisons.js');
 const { en, zh, ja } = global.I18N;
+
+// Codex C7 finding C7-H1 closure: every key in contracts/r3.0c/framing-i18n-key-registry.js
+// FRAMING_I18N_KEY_REGISTRY MUST have en + zh + ja entries (locale parity alone wouldn't catch
+// a registry entry that was omitted from all three locales).
+const FRAMING_REGISTRY = require('../contracts/r3.0c/framing-i18n-key-registry.js').FRAMING_I18N_KEY_REGISTRY;
+FRAMING_REGISTRY.forEach(k => {
+  chk('framing registry key in en: ' + k, Object.prototype.hasOwnProperty.call(en, k));
+  chk('framing registry key in zh: ' + k, Object.prototype.hasOwnProperty.call(zh, k));
+  chk('framing registry key in ja: ' + k, Object.prototype.hasOwnProperty.call(ja, k));
+});
 const ek = Object.keys(en), zk = Object.keys(zh), jk = Object.keys(ja);
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 

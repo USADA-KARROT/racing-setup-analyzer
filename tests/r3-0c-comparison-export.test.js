@@ -573,5 +573,70 @@ chk('P0 DeltaMetricsService.isAuthenticResult exposed', typeof DeltaMetricsServi
   }
 })();
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Codex C7-R4-* closure — Proxy descriptor / get-trap TOCTOU on C6 framing entries.
+// Round 4 attack: a Proxy whose `get` trap returns an unregistered i18nKey while the underlying
+// object's own descriptors look valid; the previous _allowlistFrame re-read `frame.i18nKey` via
+// plain property access AFTER its own validation (which only checked non-empty string, NOT
+// registry membership) and exported the attacker-controlled string. The fix delegates to
+// FIR.validateFramingEntry (which is registry-strict + uses descriptor reads + emits a frozen
+// sanitized snapshot) and consumes ONLY vr.sanitized. No raw frame fields are re-read.
+(() => {
+  const r = req();
+  // (1) Unregistered i18nKey at the descriptor level: the entry's own property IS the unregistered
+  //     string. validator rejects → _allowlistFrame returns null → that framing entry is dropped.
+  //     The export envelope should NOT contain the attacker-controlled string.
+  const raw1 = { reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'ATTACK.UNREGISTERED' };
+  const r1 = req(); r1.framing = { cannotConclude: [raw1], alternativeExplanations: [], nextValidationAction: null };
+  const out1 = Service.buildComparisonExport(r1);
+  chk('Z1 (C7-R4 closure) unregistered i18nKey at descriptor → blocked', out1.status === 'blocked' || (out1.envelope && out1.envelope.payload && (!out1.envelope.payload.cannotConclude || out1.envelope.payload.cannotConclude.length === 0)));
+  // (2) Proxy lying via `get` trap: the underlying object has a registered i18nKey, but the get
+  //     trap returns an unregistered string. _allowlistFrame must consume sanitized (built from
+  //     descriptor-read values), not the lied-about `get` return.
+  const raw2 = { reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.cannot_distinguish' };
+  const attack2 = new Proxy(raw2, { get(t, k, r) {
+    if (k === 'i18nKey') return 'ATTACK.UNREGISTERED';
+    return Reflect.get(t, k, r);
+  }});
+  const r2 = req(); r2.framing = { cannotConclude: [attack2], alternativeExplanations: [], nextValidationAction: null };
+  const out2 = Service.buildComparisonExport(r2);
+  // exported payload, if any cannotConclude entry survives, must carry the sanitized (registered)
+  // i18nKey — NOT the attacker-controlled get-trap return.
+  const exported2 = out2.envelope && out2.envelope.payload && out2.envelope.payload.cannotConclude;
+  const anyAttackKey = Array.isArray(exported2) && exported2.some(e => e && e.i18nKey === 'ATTACK.UNREGISTERED');
+  chk('Z2 (C7-R4 closure) Proxy get-trap lying about i18nKey → ATTACK.UNREGISTERED NOT in export', anyAttackKey === false);
+  // (3) Proxy lying via `getOwnPropertyDescriptor` trap: the validator's _readOwn reads via
+  //     descriptor. If the trap returns a data descriptor with the lied-about value, the
+  //     validator's strict registry check rejects. The export drops the entry.
+  const raw3 = { reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.cannot_distinguish' };
+  const attack3 = new Proxy(raw3, {
+    getOwnPropertyDescriptor(t, k) {
+      if (k === 'i18nKey') return { configurable: true, enumerable: true, writable: true, value: 'ATTACK.UNREGISTERED' };
+      return Reflect.getOwnPropertyDescriptor(t, k);
+    },
+  });
+  const r3 = req(); r3.framing = { cannotConclude: [attack3], alternativeExplanations: [], nextValidationAction: null };
+  const out3 = Service.buildComparisonExport(r3);
+  const exported3 = out3.envelope && out3.envelope.payload && out3.envelope.payload.cannotConclude;
+  const anyAttackKey3 = Array.isArray(exported3) && exported3.some(e => e && e.i18nKey === 'ATTACK.UNREGISTERED');
+  chk('Z3 (C7-R4 closure) Proxy descriptor lying about i18nKey → registry-strict rejection', anyAttackKey3 === false);
+  // (4) Proxy with throwing real accessor + lying descriptor → sanitized never reads via get,
+  //     so the accessor never executes. Exported payload uses sanitized (which has params omitted
+  //     since the lying descriptor said value=undefined).
+  const raw4 = { reasonCode: CODES.CANNOT_DISTINGUISH, i18nKey: 'r3_0c.framing.cannot_distinguish' };
+  Object.defineProperty(raw4, 'params', { configurable: true, enumerable: true, get() { throw new Error('ACCESSOR EXECUTED'); } });
+  const attack4 = new Proxy(raw4, {
+    getOwnPropertyDescriptor(t, k) {
+      if (k === 'params') return { configurable: true, enumerable: true, writable: true, value: undefined };
+      return Reflect.getOwnPropertyDescriptor(t, k);
+    },
+  });
+  let threw4 = false;
+  let out4;
+  try { const r4 = req(); r4.framing = { cannotConclude: [attack4], alternativeExplanations: [], nextValidationAction: null }; out4 = Service.buildComparisonExport(r4); }
+  catch (e) { threw4 = true; }
+  chk('Z4 (C7-R4 closure) Proxy lying descriptor + throwing accessor → buildComparisonExport does NOT trigger accessor', threw4 === false && out4 !== undefined);
+})();
+
 console.log('r3-0c-comparison-export: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

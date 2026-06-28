@@ -62,7 +62,7 @@ function fullComparisonInput(over) {
 // codes (F1/F2/F3), 1 phase-boundary gate (F6). Formal Codex round-2 F12 adds 1 more
 // (CANNOT_DISTINGUISH) so the framing-source contract is internally satisfiable.
 // Total = 55 + 9 + 1 = 65.
-chk('65 reason codes total (16 mandated + 3 scope/metric + 16 normalized-distance + 16 reference-and-corner + 4 delta-metrics + 9 CP1R retrofit + 1 F12 framing extensions)', RC.ALL_REASON_CODES.length === 65, RC.ALL_REASON_CODES.length);
+chk('66 reason codes total (16 mandated + 3 scope/metric + 16 normalized-distance + 16 reference-and-corner + 4 delta-metrics + 9 CP1R retrofit + 1 F12 framing + 1 C7 UI extensions)', RC.ALL_REASON_CODES.length === 66, RC.ALL_REASON_CODES.length);
 chk('reason codes unique', new Set(RC.ALL_REASON_CODES).size === RC.ALL_REASON_CODES.length);
 chk('reason codes are UPPER_SNAKE', RC.ALL_REASON_CODES.every(c => /^[A-Z][A-Z0-9_]*$/.test(c)));
 chk('REASON_CODES keyed by own value (stable)', Object.keys(RC.REASON_CODES).every(k => RC.REASON_CODES[k] === k));
@@ -496,7 +496,7 @@ chk('index identity constant', IDX.COMPARISON_EXPORT_IDENTITY === 'racing-analyz
 
 // ── K/L. contracts have NO renderer dependency and NO algorithm (static scan) ──
 const contractFiles = fs.readdirSync(CONTRACT_DIR).filter(f => f.endsWith('.js'));
-chk('8 contract modules + index', contractFiles.length === 9, contractFiles);
+chk('10 contract modules + index (C7 adds framing + viewmodel-state-transition)', contractFiles.length === 11, contractFiles);
 // strip whole-line comments so the algorithm scan inspects CODE, not the prose that describes what the
 // contract deliberately does NOT do (a JSDoc line may legitimately say "no interpolation").
 function stripComments(s) { return s.split('\n').map(line => { const t = line.trim(); return (t.indexOf('*') === 0 || t.indexOf('/*') === 0 || t.indexOf('*/') === 0 || t.indexOf('//') === 0) ? '' : line; }).join('\n'); }

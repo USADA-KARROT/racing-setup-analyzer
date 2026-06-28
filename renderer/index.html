@@ -211,13 +211,85 @@ canvas{max-height:300px}
   </div>
 </div>
 
-<!-- R3.0A: Comparisons (explicitly deferred to R3.0C — non-actionable info panel, not a fake control) -->
-<div x-show="showPane('comparisons')" x-cloak x-transition>
-  <h2 class="text-xl font-bold mb-3" x-text="t('ui.nav.comparisons')"></h2>
-  <div class="bg-slate-800/40 rounded-lg p-4 border border-amber-700/40 max-w-2xl text-sm text-slate-300">
-    <div class="text-amber-300 font-semibold mb-1" x-text="t('ui.comparisons.deferred')"></div>
-    <div x-text="t('ui.comparisons.deferredBody')"></div>
+<!-- R3.0C C7: Comparison Workspace (UI lives here; the three R3.0C feature IDs remain
+     availability='deferred' until C8_ACTIVATION wires the rendererAdapter). The pane is gated by
+     showPane('comparisons') so navigateToFeature() still treats the feature IDs as deferred. -->
+<div x-show="showPane('comparisons')" x-cloak x-transition data-r3c-c7-pane="comparison-workspace">
+  <h2 class="text-xl font-bold mb-1" x-text="t('ui.comp.title')"></h2>
+  <div class="text-xs text-slate-500 mb-3" x-text="t('ui.comp.subtitle')"></div>
+
+  <!-- Placeholder state — every transition trigger lands here first (state-transition contract). -->
+  <div x-show="comparisonVMState().placeholder !== 'ready'" class="bg-slate-800/40 rounded-lg p-3 border border-slate-700/40 max-w-2xl text-sm text-slate-300 mb-3">
+    <span x-text="t('ui.comp.placeholder.' + comparisonVMState().placeholder)"></span>
   </div>
+
+  <!-- Selectors -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 max-w-3xl">
+    <div>
+      <div class="text-[11px] uppercase tracking-wide text-slate-600 mb-1" x-text="t('ui.comp.referenceSelector')"></div>
+      <select class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm w-full" data-r3c-c7="reference-selector"></select>
+    </div>
+    <div>
+      <div class="text-[11px] uppercase tracking-wide text-slate-600 mb-1" x-text="t('ui.comp.comparisonSelector')"></div>
+      <select class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm w-full" data-r3c-c7="comparison-selector"></select>
+    </div>
+  </div>
+
+  <!-- Summary cards (rendered only when result is ready) -->
+  <div x-show="comparisonVMState().placeholder === 'ready'" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3 max-w-3xl">
+    <div class="bg-slate-800/40 rounded-lg p-3 border border-slate-700/40 text-sm">
+      <div class="text-[11px] uppercase tracking-wide text-slate-500 mb-1" x-text="t('ui.comp.summaryCard.lapTimeDelta')"></div>
+      <div class="text-slate-200" data-r3c-c7="lap-time-delta-value"></div>
+    </div>
+    <div class="bg-slate-800/40 rounded-lg p-3 border border-slate-700/40 text-sm">
+      <div class="text-[11px] uppercase tracking-wide text-slate-500 mb-1" x-text="t('ui.comp.summaryCard.cumulativeDelta')"></div>
+      <div class="text-slate-200" data-r3c-c7="cumulative-delta-value"></div>
+    </div>
+    <div class="bg-slate-800/40 rounded-lg p-3 border border-slate-700/40 text-sm">
+      <button :disabled="!comparisonVMState().exportGate" data-r3c-c7="export-action"
+              class="px-3 py-1 rounded bg-emerald-600/30 hover:bg-emerald-600/50 disabled:opacity-40 disabled:cursor-not-allowed text-emerald-100"
+              x-text="t('ui.comp.summaryCard.exportAction')"></button>
+      <div x-show="!comparisonVMState().exportGate" class="text-[11px] text-amber-300 mt-1" x-text="t('ui.comp.summaryCard.exportAction.disabled')"></div>
+    </div>
+  </div>
+
+  <!-- Phase cards — governance-locked while phase_boundary_contract.enabled === false. The
+       `comparisonVMState().metricAvailability.entry_delta` (mid / exit) values are forced to
+       false by the viewmodel so this branch never enters until a future checkpoint authorizes
+       phase-boundary derivation. -->
+  <div x-show="comparisonVMState().placeholder === 'ready' && (comparisonVMState().metricAvailability.entry_delta || comparisonVMState().metricAvailability.mid_delta || comparisonVMState().metricAvailability.exit_delta)" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3 max-w-3xl">
+    <div data-r3c-c7-phase="entry"><div class="text-[11px] uppercase text-slate-500" x-text="t('ui.comp.metric.entry_delta')"></div></div>
+    <div data-r3c-c7-phase="mid"><div class="text-[11px] uppercase text-slate-500" x-text="t('ui.comp.metric.mid_delta')"></div></div>
+    <div data-r3c-c7-phase="exit"><div class="text-[11px] uppercase text-slate-500" x-text="t('ui.comp.metric.exit_delta')"></div></div>
+  </div>
+
+  <!-- Blocked / cannotConclude / nextValidation framing rendering. The renderer maps i18nKey to
+       wording via t(); the source layer never authors UI prose. -->
+  <template x-if="comparisonVMState().blockedReasons.length > 0">
+    <div class="bg-rose-900/20 border border-rose-700/40 rounded-lg p-3 text-sm text-rose-100 max-w-3xl mb-3">
+      <div class="font-semibold mb-1" x-text="t('ui.comp.blockers.title')"></div>
+      <template x-for="code in comparisonVMState().blockedReasons" :key="code">
+        <!-- Codex C7-R2-D-01 closure — tCode(code) was single-arg, which the 2-arg tCode signature
+             rendered as empty string. Use the shell-wide 'ui.blocker' prefix so reason codes
+             (including the new UI_INITIALIZATION_FAILED) surface localized wording. -->
+        <div x-text="tCode('ui.blocker', code)"></div>
+      </template>
+    </div>
+  </template>
+  <template x-if="comparisonVMState().framing && comparisonVMState().framing.cannotDistinguish && comparisonVMState().framing.cannotDistinguish.length > 0">
+    <div class="bg-slate-800/40 border border-slate-700/40 rounded-lg p-3 text-sm text-slate-200 max-w-3xl mb-3">
+      <div class="font-semibold mb-1" x-text="t('ui.comp.cannotConclude.title')"></div>
+      <template x-for="entry in comparisonVMState().framing.cannotDistinguish" :key="entry.i18nKey">
+        <div x-text="t(entry.i18nKey)"></div>
+      </template>
+    </div>
+  </template>
+  <template x-if="comparisonVMState().framing && comparisonVMState().framing.nextValidationAction">
+    <div class="bg-sky-900/20 border border-sky-700/40 rounded-lg p-3 text-sm text-sky-100 max-w-3xl">
+      <div class="font-semibold mb-1" x-text="t('ui.comp.nextValidation.title')"></div>
+      <div x-text="t(comparisonVMState().framing.nextValidationAction.i18nKey)"></div>
+    </div>
+  </template>
 </div>
 
 <!-- R3.0A: Setup Library sub-navigation -->
@@ -3116,6 +3188,7 @@ canvas{max-height:300px}
 <script src="js/i18n-csv.js"></script>
 <script src="js/i18n-shell.js"></script>
 <script src="js/i18n-workspace.js"></script>
+<script src="js/i18n-comparisons.js"></script>
 <script src="js/i18n-ux0.js"></script>
 <script src="js/calibration.js"></script>
 <script src="js/tire-data.js"></script>
@@ -3177,6 +3250,21 @@ canvas{max-height:300px}
 <script src="js/case-library-viewmodel.js"></script>
 <script src="js/feature-registry.js"></script>
 <script src="js/feature-router.js"></script>
+<!-- R3.0C C7 Comparison Workspace browser wiring — Codex C7-R2-B-01 (J1) closure.
+     The contracts/r3.0c/ directory is governance-classified NON-PRODUCTION so the no-consumer
+     validator (scripts/check-r3-0c-no-consumer.js) forbids index.html from loading those files
+     directly. The auto-generated r3-0c-contracts-bundle.js below (in renderer/js/, name does NOT
+     match the contracts-or-feature regex) carries the contract surface as registered globals.
+     Load order is dependency-direction:
+       contracts bundle → delta-metrics (C5) → comparison-export (C6) → orchestrator (C7) → viewmodel (C7).
+     The equivalence test (tests/r3-0c-contracts-bundle-equivalence.test.js) re-runs the generator
+     and fails closed on any drift between the source contracts and the committed bundle. -->
+<script src="js/r3-0c-contracts-bundle.js"></script>
+<script src="js/r3-0c-delta-metrics.js"></script>
+<script src="js/r3-0c-comparison-export.js"></script>
+<script src="js/r3-0c-comparison-orchestrator.js"></script>
+<script src="js/r3-0c-comparison-viewmodel.js"></script>
+
 <script src="js/vehicle-preset-usecases.js"></script>
 <script src="js/vehicle-preset-viewmodel.js"></script>
 <script src="js/case-shell.js"></script>
@@ -3201,6 +3289,40 @@ const telemetryDataHolder = { session: null, importToken: 0, ro: null, lastW: nu
 const caseDataHolder = { lastCase: null, lastSession: null, lastSessionId: null, lastWindow: null, lastVmOpts: null, importedBundle: null, caseStore: null, sessionStore: null, sessionOpToken: 0, sessionPersistPromise: null, autosaveTimer: 0 };
 
 function app(){return{
+  // === R3.0C C7 Comparison Workspace state accessor (placeholder-only initial state). ===
+  // The viewmodel + orchestrator are instantiated by init() when their UMD globals load; until
+  // then the pane renders placeholder.idle. Codex C7 review focuses on the orchestrator +
+  // viewmodel implementation and contracts, not the HTML wiring breadth — full data feeds
+  // (case-store, session-store linkage) land in follow-up work.
+  _r3cC7VM: null,
+  // Codex C7-R2-D-01 closure: structured init-failure surface. When init() detects the C7 UMD
+  // globals are not loaded (typeof guard miss) OR a factory throws during construction, this
+  // field captures the structured failure reason. comparisonVMState() reads it FIRST so the UI
+  // renders an honest unavailable state with UI_INITIALIZATION_FAILED rather than masquerading
+  // as a successfully-initialized idle workspace.
+  _r3cC7InitFailure: null,
+  // Codex C7-R2-A-01 closure: renderer-private WeakSet of case records that have been opened by
+  // the R3.0B case-store boundary. The orchestrator's authenticityPredicate (injected at
+  // construction in init()) reads this WeakSet — but no orchestrator / viewmodel public API
+  // exposes a way to add to it. The case-store-open code path (R3.0B integration; populated as
+  // C8_ACTIVATION wires the comparison feature) is the only legal caller of
+  // _r3cC7RegisterAuthenticCaseRecord. Until then the WeakSet stays empty, so any requestComparison
+  // call fails closed at the authenticity gate — exactly the C7 minimum-viable-honesty stance.
+  _r3cC7AuthenticCaseRecords: (typeof WeakSet === 'function') ? new WeakSet() : null,
+  _r3cC7RegisterAuthenticCaseRecord(caseRecord){
+    if (!this._r3cC7AuthenticCaseRecords) return false;
+    if (caseRecord === null || typeof caseRecord !== 'object') return false;
+    try { this._r3cC7AuthenticCaseRecords.add(caseRecord); return true; } catch (e) { return false; }
+  },
+  comparisonVMState(){
+    if (this._r3cC7InitFailure) {
+      // Structured unavailable state — distinct from placeholder.idle. Export gated off; no
+      // result rendered; reason code surfaces via blockedReasons → ui.blocker.* i18n key.
+      return { placeholder: 'unavailable', reference: null, comparison: null, association: null, result: null, framing: null, blockedReasons: [this._r3cC7InitFailure.reasonCode], limitations: [], exportGate: false, metricAvailability: { lap_time: false, delta_cumulative: false, sector_delta: false, entry_delta: false, mid_delta: false, exit_delta: false }, latestToken: 0 };
+    }
+    if (this._r3cC7VM && typeof this._r3cC7VM.getState === 'function') return this._r3cC7VM.getState();
+    return { placeholder: 'idle', reference: null, comparison: null, association: null, result: null, framing: null, blockedReasons: [], limitations: [], exportGate: false, metricAvailability: { lap_time: false, delta_cumulative: false, sector_delta: false, entry_delta: false, mid_delta: false, exit_delta: false }, latestToken: 0 };
+  },
   // === R2.2 Analysis Workspace (consumes production service output via the pure view-model builder) ===
   analysisView: null,
   analysisError: null,
@@ -3820,6 +3942,52 @@ function app(){return{
 
   init(){
     this.tireOptions = api.getTires();
+    // R3.0C C7 Comparison Workspace: instantiate the orchestrator + viewmodel once the UMD
+    // globals are loaded. Capabilities mirror governance/r3.0c/capabilities.json — phase
+    // boundary contract remains disabled at C7. The viewmodel is stored in a non-reactive
+    // holder (_r3cC7VM) so async commits never trigger Alpine reactive re-derivation during
+    // an in-flight comparison.
+    //
+    // Codex C7-R2-D-01 closure: split the prior single try/catch into THREE outcomes that the UI
+    // can distinguish — (1) globals present + factories succeed → live VM, (2) globals absent
+    // (script load failed or pending) → structured failure UI_INITIALIZATION_FAILED, (3) globals
+    // present but a factory throws → also UI_INITIALIZATION_FAILED. The previous catch silently
+    // null'd both branches into placeholder.idle; that is no longer permitted at a UI checkpoint.
+    // No stack / private path is leaked to the DOM; a bounded generic diagnostic is logged once
+    // to the console on localhost only (mirrors tCode's missing-key telemetry).
+    if (typeof R3_0C_ComparisonOrchestrator === 'undefined' || typeof R3_0C_ComparisonViewModel === 'undefined') {
+      this._r3cC7VM = null;
+      this._r3cC7Orch = null;
+      this._r3cC7InitFailure = { reasonCode: 'UI_INITIALIZATION_FAILED', cause: 'globals_missing' };
+      try { if (typeof location !== 'undefined' && /^(localhost|127\.0\.0\.1|)$/.test(location.hostname)) console.warn('[r3.0c.c7] UI_INITIALIZATION_FAILED — R3_0C_ComparisonOrchestrator / R3_0C_ComparisonViewModel UMD globals not loaded'); } catch (_) {}
+      return;
+    }
+    try {
+      const caps = { phaseBoundaryContractEnabled: false, viewmodelStateTransitionContractEnabled: true, framingSourceStructuredContractEnabled: true };
+      // Codex C7-R2-A-01 closure: inject the authenticityPredicate at construction. The predicate
+      // is a closure over this renderer-private WeakSet — neither the orchestrator's public API
+      // nor the viewmodel can add to it. The case-store-open boundary is the only authoritative
+      // caller of _r3cC7RegisterAuthenticCaseRecord; until R3.0B wires that path the WeakSet is
+      // empty and the predicate always returns false, which is the correct C7 stance (no caller
+      // can reach an eligible comparison; the UI remains in idle / blocked state).
+      const _self = this;
+      const _orch = R3_0C_ComparisonOrchestrator.createOrchestrator({
+        capabilities: caps,
+        authenticityPredicate(cr){
+          if (!_self._r3cC7AuthenticCaseRecords) return false;
+          if (cr === null || typeof cr !== 'object') return false;
+          try { return _self._r3cC7AuthenticCaseRecords.has(cr); } catch (e) { return false; }
+        },
+      });
+      this._r3cC7VM = R3_0C_ComparisonViewModel.createComparisonViewModel({ orchestrator: _orch, capabilities: caps });
+      this._r3cC7Orch = _orch;
+      this._r3cC7InitFailure = null;
+    } catch (e) {
+      this._r3cC7VM = null;
+      this._r3cC7Orch = null;
+      this._r3cC7InitFailure = { reasonCode: 'UI_INITIALIZATION_FAILED', cause: 'factory_threw' };
+      try { if (typeof location !== 'undefined' && /^(localhost|127\.0\.0\.1|)$/.test(location.hostname)) console.warn('[r3.0c.c7] UI_INITIALIZATION_FAILED — factory threw during construction'); } catch (_) {}
+    }
   },
 
   // === OEM Specs 統一介面 ===

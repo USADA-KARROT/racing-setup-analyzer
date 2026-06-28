@@ -60,6 +60,11 @@
   var CE = Contracts.comparisonEligibility;
   var CR = Contracts.credibility;
   var DM = Contracts.deltaMetrics;
+  // Codex C7-R4-* closure: C6 framing entries are now validated through the framing-i18n-key
+  // registry and consumed via the sanitized snapshot (TOCTOU defeat). FIR may be absent in
+  // fixture trees where the contract aggregator is stubbed; _allowlistFrame fails closed when
+  // FIR is missing.
+  var FIR = Contracts.framingI18nKeyRegistry;
 
   var SERVICE_VERSION = 1;
   var CHECKPOINT_FLOOR = 'C6_EXPORT';
@@ -151,37 +156,41 @@
     return _utf8ByteLength(s) <= (cap || MAX_GENERAL_STRING_BYTES) ? s : null;
   }
   function _allowlistFrame(frame) {
-    // FRAMING_KEY_SHAPE: { reasonCode, i18nKey, params? } — params is plain object or OMITTED.
-    // All property accesses go through the safe boundary so a Proxy with throwing or surprising
-    // traps cannot crash buildComparisonExport or leak through (formal Codex C6 finding F-C6-A2).
+    // Codex C7-R4-* closure (Proxy descriptor TOCTOU cascaded to C6). FRAMING_KEY_SHAPE
+    // ({ reasonCode, i18nKey, params? }) is the framing-i18n-key-registry's domain. The previous
+    // _allowlistFrame implementation re-read frame.reasonCode / frame.i18nKey / frame.params via
+    // plain o[k] access AFTER (or instead of) validation — a Proxy can return different values
+    // on each access, and the C6 caller-supplied framing field had NO i18nKey-registry check at
+    // all. Both holes are now closed by delegating to FIR.validateFramingEntry, which returns a
+    // deep-frozen sanitized snapshot built from descriptor-read values, AND by consuming ONLY
+    // that snapshot.
+    //
+    // C6 also enforces stricter byte caps on i18nKey (MAX_GENERAL_STRING_BYTES) than the framing
+    // registry's per-param cap (MAX_PARAM_STRING_BYTES). We re-validate the sanitized i18nKey's
+    // byte length here — but the sanitized snapshot is the source of the bytes (frozen), so the
+    // value cannot drift between the cap-check and the eventual use.
     if (!_isPlain(frame)) return null;
-    var reasonCode = _safeGet(frame, 'reasonCode');
-    if (!RC.isReasonCode(reasonCode)) return null;
-    var i18nKey = _safeGet(frame, 'i18nKey');
+    if (!FIR || typeof FIR.validateFramingEntry !== 'function') return null;
+    var vr = FIR.validateFramingEntry(frame);
+    if (!vr || vr.valid !== true || !vr.sanitized) return null;
+    var sanitized = vr.sanitized;
+    var i18nKey = sanitized.i18nKey;
     if (!_nonEmptyStr(i18nKey)) return null;
     if (_utf8ByteLength(i18nKey) > MAX_GENERAL_STRING_BYTES) return null;
-    var out = { reasonCode: reasonCode, i18nKey: i18nKey };
-    var rawParams = _safeGet(frame, 'params');
-    if (rawParams !== undefined) {
-      if (!_isPlain(rawParams)) return null;
-      var keys = _safeKeys(rawParams);
-      if (keys === null) return null;
+    var out = { reasonCode: sanitized.reasonCode, i18nKey: i18nKey };
+    var sanitizedParams = sanitized.params;
+    if (sanitizedParams !== undefined) {
+      // sanitized.params is a frozen plain object with only number / boolean / null / string
+      // values whose individual byte size has already been bounded by MAX_PARAM_STRING_BYTES
+      // (framing-i18n-key-registry.js). Copy into a fresh plain object to avoid pinning the
+      // frozen ancestor in the export envelope (which has its own deep-freeze at the envelope
+      // boundary). No raw frame.params access here — sanitized is the only surface.
       var params = {};
-      for (var i = 0; i < keys.length; i++) {
-        var k = keys[i];
+      var pks = Object.keys(sanitizedParams);
+      for (var i = 0; i < pks.length; i++) {
+        var k = pks[i];
         if (typeof k !== 'string' || k.length === 0) return null;
-        var v = _safeGet(rawParams, k);
-        if (v === null || typeof v === 'boolean') { params[k] = v; continue; }
-        if (typeof v === 'number') {
-          if (!_isFiniteNum(v)) return null;
-          params[k] = v; continue;
-        }
-        if (typeof v === 'string') {
-          var s = _shortString(v, MAX_PARAM_STRING_BYTES);
-          if (s === null) return null;
-          params[k] = s; continue;
-        }
-        return null; // arrays / exotic objects / functions / symbols / bigints / proxies → reject
+        params[k] = sanitizedParams[k];
       }
       out.params = params;
     }
