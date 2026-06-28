@@ -45,6 +45,7 @@
   var CornerSegmentation = null;
   var CornerPairing = null;
   var DeltaMetrics = null;
+  var ComparisonExport = null;
   if (typeof module !== 'undefined' && module.exports) {
     try { Contracts = require('../../contracts/r3.0c/index.js'); }
     catch (e) { Contracts = null; }
@@ -67,6 +68,8 @@
     catch (e) { CornerPairing = null; }
     try { DeltaMetrics = require('./r3-0c-delta-metrics.js'); }
     catch (e) { DeltaMetrics = null; }
+    try { ComparisonExport = require('./r3-0c-comparison-export.js'); }
+    catch (e) { ComparisonExport = null; }
   }
   if (!Contracts && typeof R3_0C_Contracts !== 'undefined') Contracts = R3_0C_Contracts;
   if (!LapAuthority && typeof R3_0C_LapAuthority !== 'undefined') LapAuthority = R3_0C_LapAuthority;
@@ -77,6 +80,7 @@
   if (!CornerSegmentation && typeof R3_0C_CornerSegmentation !== 'undefined') CornerSegmentation = R3_0C_CornerSegmentation;
   if (!CornerPairing && typeof R3_0C_CornerPairing !== 'undefined') CornerPairing = R3_0C_CornerPairing;
   if (!DeltaMetrics && typeof R3_0C_DeltaMetrics !== 'undefined') DeltaMetrics = R3_0C_DeltaMetrics;
+  if (!ComparisonExport && typeof R3_0C_ComparisonExport !== 'undefined') ComparisonExport = R3_0C_ComparisonExport;
   if (!Contracts) {
     throw new Error('renderer/js/r3-0c-comparison-adapter.js requires contracts/r3.0c/index.js (Node require or R3_0C_Contracts global)');
   }
@@ -205,6 +209,24 @@
     return Contracts.deltaMetrics.DELTA_SIGN_FORMULA;
   }
 
+  // ── C6 delegation — pure passthrough to the comparison-export service. ──
+  // The adapter holds NO export logic itself; this is a single-call delegation that lets the
+  // viewmodel / orchestrator call buildComparisonExport without importing the export service
+  // directly. The export service is the closed-allowlist gateway and round-trip authority — the
+  // adapter must not bypass it.
+  function buildComparisonExport(request) {
+    return _requireService(ComparisonExport, 'comparison-export').buildComparisonExport(request);
+  }
+  function comparisonExportIdentity() {
+    return Contracts.comparisonExport.COMPARISON_EXPORT_IDENTITY;
+  }
+  function comparisonExportSchemaVersion() {
+    return Contracts.comparisonExport.COMPARISON_EXPORT_SCHEMA_VERSION;
+  }
+  function comparisonExportEnvelopeKeys() {
+    return Contracts.comparisonExport.ENVELOPE_KEYS;
+  }
+
   // Capability inventory — grows with each checkpoint. activeCheckpoint() reports the LATEST
   // checkpoint whose surface this adapter exposes; exposes() lists capability ids derived from
   // which service modules loaded successfully.
@@ -218,12 +240,14 @@
     if (CornerSegmentation) caps.push('corner_segmentation_present');
     if (CornerPairing) caps.push('corner_pairing_present');
     if (DeltaMetrics) caps.push('delta_metrics_present');
+    if (ComparisonExport) caps.push('comparison_export_present');
     // dedupe while preserving order
     var seen = {}, out = [];
     caps.forEach(function (c) { if (!seen[c]) { seen[c] = true; out.push(c); } });
     return Object.freeze(out);
   }
   function activeCheckpoint() {
+    if (ComparisonExport) return 'C6_EXPORT';
     if (DeltaMetrics) return 'C5_DELTA_METRICS';
     if (ReferenceSelection || CornerSegmentation || CornerPairing) return 'C4_REFERENCE_AND_CORNER';
     if (NormalizedDistance) return 'C3_NORMALIZED_DISTANCE';
@@ -274,6 +298,11 @@
     computeDeltaMetrics: computeDeltaMetrics,
     supportedDeltaMetrics: supportedDeltaMetrics,
     deltaMetricsSignFormula: deltaMetricsSignFormula,
+    // C6 surface
+    buildComparisonExport: buildComparisonExport,
+    comparisonExportIdentity: comparisonExportIdentity,
+    comparisonExportSchemaVersion: comparisonExportSchemaVersion,
+    comparisonExportEnvelopeKeys: comparisonExportEnvelopeKeys,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -1,0 +1,7 @@
+# sha256 of each formal Codex C6 verdict block (TIER 2 relayed-structured).
+# Verification recipe is identical to governance/r3.0c/codex-ca-gate-evidence/verdict-hashes.txt.
+
+50bdb9b2d0150ec92440c3eb1ff22f115e58cbd71271ea33bbafff270d363f07  round-1-eff0d41.md             (BLOCK)
+2d4f7c97d4cffc4459180b45bb4908b0bb200e49a624bc13579f2144cbf392cd  round-2-2b6e568.md             (BLOCK)
+65189ff8bcb1c2d9804e9b72de9d9b5757e51050b0a3f35f3edb4dbd95078706  round-3-a87c7d5.md             (BLOCK)
+1ee819413f5ad1a8cfe8ab76968510febbdc52d3ca399591bff3e35b3308c962  round-4-48be2c0-PASS.md        (PASS · authoritative)
