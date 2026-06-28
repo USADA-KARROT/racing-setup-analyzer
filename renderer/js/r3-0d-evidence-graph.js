@@ -161,6 +161,28 @@
   var _ReflectOwnKeys = (typeof Reflect !== 'undefined' && Reflect.ownKeys) ? Reflect.ownKeys : null;
   var _JSONStringify = JSON.stringify;
   var _GlobalThis = (typeof globalThis !== 'undefined') ? globalThis : (typeof root !== 'undefined' ? root : (typeof window !== 'undefined' ? window : null));
+  // Codex D2 Round 12 RN-21 (container) closure: capture the CONTAINER GLOBALS themselves so
+  // ambient globalThis-level accessor descriptors (e.g. `Object.defineProperty(globalThis,
+  // 'Reflect', { get: function () { Array.prototype.push = noop; return origReflect; } })`)
+  // cannot fire during integrity-guard reads. Capturing the references at module-init time
+  // freezes our view of the constructor objects; subsequent global rebinding is invisible to us.
+  var _Object = Object;
+  var _Array = Array;
+  var _String_ctor = String;
+  var _Number = Number;
+  var _Function = Function;
+  var _JSON = JSON;
+  var _Reflect = (typeof Reflect !== 'undefined') ? Reflect : null;
+  var _Math = Math;
+  var _RegExp = RegExp;
+  // Codex D2 Round 12 RN-27 closure: additional method captures (Math.floor for integer-check
+  // arithmetic, Number.isInteger for shape validation, RegExp.prototype.test for ISO timestamp
+  // regex matching). All three are reachable from the build path and were previously unguarded.
+  var _MathFloor = Math.floor;
+  var _NumberIsInteger = Number.isInteger;
+  var _NumberIsFinite = Number.isFinite;
+  var _NumberIsNaN = Number.isNaN;
+  var _RegExpPrototypeTest = RegExp.prototype.test;
 
   // Codex D2 Round 10 RN-21..RN-25 closure: intrinsic integrity guard. At the entry of
   // buildEvidenceGraph (and again immediately after _resolveClock fires) verify that every
@@ -199,16 +221,21 @@
       // these targets can fire because _ObjectGetOwnPropertyDescriptor returns the descriptor
       // record itself, not the value via [[Get]]. The sentinel marker is returned for missing
       // own properties OR accessor descriptors OR exception cases (e.g. proxy-trapped objects).
+      // Codex D2 Round 12 RN-21 (container) closure: use captured container references (_Object,
+      // _Array, _JSON, _Reflect, etc.) so a hostile globalThis-level accessor on the container
+      // global (e.g. globalThis.Reflect getter) cannot fire — we never re-resolve the container
+      // through ambient global lookup. _ObjectGetPrototypeOf(<instance>) is also safe because the
+      // captured intrinsic reads the [[Prototype]] internal slot directly.
       var s = {
-        objFreeze: _readDescVal(Object, 'freeze'),
-        objAssign: _readDescVal(Object, 'assign'),
-        objKeys: _readDescVal(Object, 'keys'),
-        objCreate: _readDescVal(Object, 'create'),
-        objDefineProperty: _readDescVal(Object, 'defineProperty'),
-        objGetOwnPropertyDescriptor: _readDescVal(Object, 'getOwnPropertyDescriptor'),
-        objGetPrototypeOf: _readDescVal(Object, 'getPrototypeOf'),
+        objFreeze: _readDescVal(_Object, 'freeze'),
+        objAssign: _readDescVal(_Object, 'assign'),
+        objKeys: _readDescVal(_Object, 'keys'),
+        objCreate: _readDescVal(_Object, 'create'),
+        objDefineProperty: _readDescVal(_Object, 'defineProperty'),
+        objGetOwnPropertyDescriptor: _readDescVal(_Object, 'getOwnPropertyDescriptor'),
+        objGetPrototypeOf: _readDescVal(_Object, 'getPrototypeOf'),
         objProtoHasOwn: _readDescVal(_ObjectGetPrototypeOf({}), 'hasOwnProperty'),
-        arrIsArray: _readDescVal(Array, 'isArray'),
+        arrIsArray: _readDescVal(_Array, 'isArray'),
         arrProtoSlice: _readDescVal(_ObjectGetPrototypeOf([]), 'slice'),
         arrProtoMap: _readDescVal(_ObjectGetPrototypeOf([]), 'map'),
         arrProtoPush: _readDescVal(_ObjectGetPrototypeOf([]), 'push'),
@@ -221,15 +248,35 @@
         strProtoCharAt: _readDescVal(_ObjectGetPrototypeOf(''), 'charAt'),
         strProtoCharCodeAt: _readDescVal(_ObjectGetPrototypeOf(''), 'charCodeAt'),
         numProtoToString: _readDescVal(_ObjectGetPrototypeOf(0), 'toString'),
-        jsonStringify: _readDescVal(JSON, 'stringify'),
+        jsonStringify: _readDescVal(_JSON, 'stringify'),
         // Codex D2 Round 11 RN-26 closure: Function.prototype.call / .apply / .bind are critical
         // because contract validators (_normCodes uses .forEach.call, validateEvidenceNodeShape
         // uses .apply) and _stableStringify fallbacks route through them. Capture + verify.
         funcProtoCall: _readDescVal(_ObjectGetPrototypeOf(function () {}), 'call'),
         funcProtoApply: _readDescVal(_ObjectGetPrototypeOf(function () {}), 'apply'),
         funcProtoBind: _readDescVal(_ObjectGetPrototypeOf(function () {}), 'bind'),
-        reflectApply: _ReflectApply === null ? null : (typeof Reflect === 'undefined' ? _INTRINSIC_SENTINEL : _readDescVal(Reflect, 'apply')),
-        reflectOwnKeys: _ReflectOwnKeys === null ? null : (typeof Reflect === 'undefined' ? _INTRINSIC_SENTINEL : _readDescVal(Reflect, 'ownKeys')),
+        reflectApply: _ReflectApply === null ? null : (_Reflect === null ? _INTRINSIC_SENTINEL : _readDescVal(_Reflect, 'apply')),
+        reflectOwnKeys: _ReflectOwnKeys === null ? null : (_Reflect === null ? _INTRINSIC_SENTINEL : _readDescVal(_Reflect, 'ownKeys')),
+        // Codex D2 Round 12 RN-27 closure: Math.floor (envelope length-integer check), Number
+        // is-integer / is-finite (contract validator), RegExp.prototype.test (_isIsoTimestamp).
+        // The container globals (_Math, _Number, _RegExp) are also captured at module init.
+        mathFloor: _readDescVal(_Math, 'floor'),
+        numIsInteger: _readDescVal(_Number, 'isInteger'),
+        numIsFinite: _readDescVal(_Number, 'isFinite'),
+        numIsNaN: _readDescVal(_Number, 'isNaN'),
+        regexpProtoTest: _readDescVal(_ObjectGetPrototypeOf(/x/), 'test'),
+        // Also verify the container globals themselves were not re-bound at globalThis level
+        // since we hold captured references — if globalThis.Object is now an accessor, our
+        // _Object reference is still the original constructor (captured at module init), but a
+        // mismatch here signals an attacker is trying to redirect ambient global lookups.
+        globalObject: _GlobalThis ? _readDescVal(_GlobalThis, 'Object') : _INTRINSIC_SENTINEL,
+        globalArray: _GlobalThis ? _readDescVal(_GlobalThis, 'Array') : _INTRINSIC_SENTINEL,
+        globalReflect: _GlobalThis ? _readDescVal(_GlobalThis, 'Reflect') : _INTRINSIC_SENTINEL,
+        globalJSON: _GlobalThis ? _readDescVal(_GlobalThis, 'JSON') : _INTRINSIC_SENTINEL,
+        globalMath: _GlobalThis ? _readDescVal(_GlobalThis, 'Math') : _INTRINSIC_SENTINEL,
+        globalNumber: _GlobalThis ? _readDescVal(_GlobalThis, 'Number') : _INTRINSIC_SENTINEL,
+        globalRegExp: _GlobalThis ? _readDescVal(_GlobalThis, 'RegExp') : _INTRINSIC_SENTINEL,
+        globalFunction: _GlobalThis ? _readDescVal(_GlobalThis, 'Function') : _INTRINSIC_SENTINEL,
       };
       // Phase 2 — strict equality compare every snapshot value against its module-init capture.
       // This phase performs no property access on any global; it only compares values already
@@ -260,7 +307,24 @@
         && s.funcProtoApply === _FunctionPrototypeApply
         && s.funcProtoBind === _FunctionPrototypeBind
         && s.reflectApply === _ReflectApply
-        && s.reflectOwnKeys === _ReflectOwnKeys;
+        && s.reflectOwnKeys === _ReflectOwnKeys
+        && s.mathFloor === _MathFloor
+        && s.numIsInteger === _NumberIsInteger
+        && s.numIsFinite === _NumberIsFinite
+        && s.numIsNaN === _NumberIsNaN
+        && s.regexpProtoTest === _RegExpPrototypeTest
+        // Container global checks (Codex Round 12 RN-21 container variant): verify globalThis
+        // bindings still point to the same containers we captured. A mismatch indicates an
+        // accessor descriptor was installed on globalThis.<Container> (the attack vector that
+        // bypassed the property-level guard by rebinding push during ambient global resolution).
+        && s.globalObject === _Object
+        && s.globalArray === _Array
+        && s.globalReflect === _Reflect
+        && s.globalJSON === _JSON
+        && s.globalMath === _Math
+        && s.globalNumber === _Number
+        && s.globalRegExp === _RegExp
+        && s.globalFunction === _Function;
     } catch (e) { return false; }
   }
   var _TextEncoder = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;

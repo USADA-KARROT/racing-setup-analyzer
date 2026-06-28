@@ -1695,5 +1695,99 @@ function freshInput(over) {
   chk('RN-21: accessor detected as tamper signal', typeof r.detail === 'string' && /intrinsic-tampering/.test(r.detail));
 })();
 
+// ── Section X — Codex D2 Round 12 finding closures (RN-21 container + RN-27 Math/Number/RegExp) ──
+(function sectionX_RN21_globalThisReflectAccessor() {
+  // RN-21 STILL-OPEN at Round 12 (container variant): the property-level accessor on
+  // Reflect.ownKeys was caught by Round 11, but the attacker can install an accessor on
+  // globalThis.Reflect itself. When the guard accessed `Reflect` as a global, the globalThis-
+  // level getter fired, rebinding Array.prototype.push and returning the original Reflect.
+  // Round 13 fix: capture _Reflect (and all container globals) at module init so Phase 1 reads
+  // never re-resolve containers through ambient global lookup.
+  const origPush = Array.prototype.push;
+  const origReflect = Reflect;
+  const reflectDesc = Object.getOwnPropertyDescriptor(globalThis, 'Reflect');
+  let r;
+  try {
+    Object.defineProperty(globalThis, 'Reflect', {
+      configurable: true, enumerable: false,
+      get: function () { Array.prototype.push = function () { return 0; }; return origReflect; },
+    });
+    r = EG.buildEvidenceGraph(freshInput({
+      rawEvidence: [Object.assign(freshNode(), { category: 'forbidden_category' })],
+    }), { clock: function () { Array.prototype.push = origPush; return NOW; } });
+  } finally {
+    Object.defineProperty(globalThis, 'Reflect', reflectDesc);
+    Array.prototype.push = origPush;
+  }
+  chk('RN-21 container: globalThis.Reflect accessor caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+  chk('RN-21 container: BLOCK detail mentions intrinsic-tampering', typeof r.detail === 'string' && /intrinsic-tampering/.test(r.detail));
+})();
+
+(function sectionX_RN21_globalThisJSONAccessor() {
+  const origPush = Array.prototype.push;
+  const origJSON = JSON;
+  const jsonDesc = Object.getOwnPropertyDescriptor(globalThis, 'JSON');
+  let r;
+  try {
+    Object.defineProperty(globalThis, 'JSON', {
+      configurable: true, enumerable: false,
+      get: function () { Array.prototype.push = function () { return 0; }; return origJSON; },
+    });
+    r = EG.buildEvidenceGraph(freshInput(), { clock: function () { Array.prototype.push = origPush; return NOW; } });
+  } finally {
+    Object.defineProperty(globalThis, 'JSON', jsonDesc);
+    Array.prototype.push = origPush;
+  }
+  chk('RN-21 container: globalThis.JSON accessor caught (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+})();
+
+(function sectionX_RN21_globalThisObjectAccessor() {
+  const origObject = Object;
+  const objectDesc = Object.getOwnPropertyDescriptor(globalThis, 'Object');
+  let r;
+  try {
+    Object.defineProperty(globalThis, 'Object', {
+      configurable: true, enumerable: false,
+      get: function () { return origObject; }, // stateful but neutral
+    });
+    r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK });
+  } finally {
+    Object.defineProperty(globalThis, 'Object', objectDesc);
+  }
+  chk('RN-21 container: globalThis.Object accessor caught (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+})();
+
+(function sectionX_RN27_mathFloor() {
+  // RN-27: Math.floor (line 711) used in envelope length-integer check. Rebinding admits malformed lengths.
+  const origFloor = Math.floor;
+  let r;
+  try {
+    Math.floor = function (n) { return n; }; // identity, defeats integer-check
+    r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK });
+  } finally { Math.floor = origFloor; }
+  chk('RN-27: Math.floor rebinding caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+})();
+
+(function sectionX_RN27_numberIsInteger() {
+  const origIsInteger = Number.isInteger;
+  let r;
+  try {
+    Number.isInteger = function () { return true; }; // defeats contract integer check
+    r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK });
+  } finally { Number.isInteger = origIsInteger; }
+  chk('RN-27: Number.isInteger rebinding caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+})();
+
+(function sectionX_RN27_regexpProtoTest() {
+  // RN-27: RegExp.prototype.test (line 305) used by _isIsoTimestamp. Rebinding admits non-ISO createdAt.
+  const origTest = RegExp.prototype.test;
+  let r;
+  try {
+    RegExp.prototype.test = function () { return true; };
+    r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK });
+  } finally { RegExp.prototype.test = origTest; }
+  chk('RN-27: RegExp.prototype.test rebinding caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+})();
+
 console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
 if (fail > 0) process.exit(1);
