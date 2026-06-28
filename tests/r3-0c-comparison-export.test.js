@@ -529,5 +529,49 @@ chk('P0 DeltaMetricsService.isAuthenticResult exposed', typeof DeltaMetricsServi
   });
 })();
 
+
+// V. Codex C6 round 3 — authenticity gate fail-closed when C5 predicate absent (F-C6-A4 closure).
+//    The gate now refuses the request when DeltaMetricsService or isAuthenticResult is missing
+//    rather than skipping (the round-1/2 implementation had an implicit fail-open branch). Probe
+//    this by loading the export service in a fresh module-cache so we can stub the predicate.
+(() => {
+  // We re-evaluate the comparison-export module source with a shimmed delta-metrics dependency
+  // that exposes NO isAuthenticResult. The shim lives in OS tmp (NOT under renderer/js) so the
+  // no-consumer validator never sees it.
+  const fs = require('fs');
+  const os = require('os');
+  const Module = require('module');
+  const path = require('path');
+  const exportSource = fs.readFileSync(path.resolve(__dirname, '..', 'renderer', 'js', 'r3-0c-comparison-export.js'), 'utf8');
+  const tmpdir = fs.mkdtempSync(path.join(os.tmpdir(), 'c6-shim-'));
+  const stubPath = path.join(tmpdir, 'stub-delta-metrics-no-authpred.js');
+  fs.writeFileSync(stubPath, "module.exports = { SERVICE_VERSION: 1, CHECKPOINT_FLOOR: 'C5_DELTA_METRICS', SIGN_FORMULA: 'comparison_minus_reference', computeDeltaMetrics: function () { return null; } };\n");
+  const m = new Module('r3-0c-comparison-export-shim');
+  m.filename = path.resolve(__dirname, '..', 'renderer', 'js', 'r3-0c-comparison-export.js');
+  m.paths = Module._nodeModulePaths(path.dirname(m.filename));
+  const originalResolve = Module._resolveFilename;
+  Module._resolveFilename = function (req, parent, ...rest) {
+    if (parent === m && req === './r3-0c-delta-metrics.js') return stubPath;
+    return originalResolve.call(this, req, parent, ...rest);
+  };
+  try {
+    m._compile(exportSource, m.filename);
+    const ShimmedService = m.exports;
+    const out = ShimmedService.buildComparisonExport({
+      result: { eligible: true, status: 'delta_metrics_computed', sign: 'comparison_minus_reference', identity: { caseId: 'caseA', sessionId: 'sess1' }, metrics: {} },
+      association: { caseId: 'caseA', sessionId: 'sess1', trackId: 'silverstone', layoutId: 'gp', positionBasis: 'lap_distance', positionDirection: 'increasing' },
+      credibilityMetadata: credibility(),
+      generationToken: 'gen-token-V',
+      referenceLap: { sessionId: 'sess1', lapId: 'lap_ref', lapTimeMs: 90000 },
+      comparisonLap: { sessionId: 'sess1', lapId: 'lap_cmp', lapTimeMs: 89500 },
+      framing: { cannotConclude: [], alternativeExplanations: [], nextValidationAction: null },
+    });
+    chk('V1 absent C5 isAuthenticResult → blocked (fail-closed)', out.eligible === false && hasCode(out, CODES.INTERNAL_CONTRACT_VIOLATION));
+  } finally {
+    Module._resolveFilename = originalResolve;
+    try { fs.unlinkSync(stubPath); fs.rmdirSync(tmpdir); } catch (e) { /* no-op */ }
+  }
+})();
+
 console.log('r3-0c-comparison-export: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

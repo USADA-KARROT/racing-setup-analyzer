@@ -239,15 +239,17 @@
     if (_utf8ByteLength(token) > MAX_GENERAL_STRING_BYTES) return { ok: false, reasons: [CODES.EXPORT_PAYLOAD_STRING_TOO_LONG], detail: 'generationToken too long' };
     var result = _safeGet(request, 'result');
     if (!_isPlain(result)) return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'result not a plain object' };
-    // C6 authenticity gate (formal Codex C6 finding F-C6-A1 round 1 + round 2): the result MUST
-    // have come from the C5 delta-metrics service's own production path AND every node in the
-    // result graph must be authentic-and-frozen. The C5 service's _deepFreezeAndRegister walks
-    // every leaf; a post-registration mutation either throws (strict) or no-ops (non-strict) but
-    // never changes the value the C6 export reads.
-    if (DeltaMetricsService && typeof DeltaMetricsService.isAuthenticResult === 'function') {
-      if (!DeltaMetricsService.isAuthenticResult(result)) {
-        return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'result not produced by C5 service (authenticity check failed)' };
-      }
+    // C6 authenticity gate (formal Codex C6 finding F-C6-A1 round 1 + round 2 + round 3 closure):
+    // the result MUST have come from the C5 delta-metrics service's own production path AND every
+    // node in the result graph must be authentic-and-frozen. Round 3 closure: the gate is now
+    // FAIL-CLOSED even when the C5 service is unavailable (browser UMD environment where
+    // R3_0C_DeltaMetrics is absent) — without the authenticity predicate we cannot verify
+    // authority, so we MUST refuse the request rather than skip the check.
+    if (!DeltaMetricsService || typeof DeltaMetricsService.isAuthenticResult !== 'function') {
+      return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'C5 authenticity predicate unavailable — fail-closed' };
+    }
+    if (!DeltaMetricsService.isAuthenticResult(result)) {
+      return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'result not produced by C5 service (authenticity check failed)' };
     }
     var eligibleFlag = _safeGet(result, 'eligible');
     if (typeof eligibleFlag !== 'boolean') return { ok: false, reasons: [CODES.INTERNAL_CONTRACT_VIOLATION], detail: 'result.eligible not boolean' };
