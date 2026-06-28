@@ -116,23 +116,36 @@ function runWithSyntheticState(phase, stateJson, sceneSrc) {
 
 (function rn10Tests() {
   const consumerSrc = 'var c = require("../../contracts/r3.0d/index.js");\nmodule.exports = c;\n';
+  const goodEnabled = ['contract_foundation_present', 'evidence_graph_present'];
   // missing capability
-  const r1 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/maybe-consumer.js' }], enabledCapabilities: [], runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
+  const r1 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/maybe-consumer.js' }], enabledCapabilities: goodEnabled, runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
   chk('RN-10 missing capability key → fail closed', r1.status !== 0 && r1.artifact && r1.artifact.violations.some(v => v.code === 'STATE_AUTHORIZED_PATH_ENTRY_INVALID'));
   // extra key
-  const r2 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/maybe-consumer.js', capability: 'evidence_graph_present', extra: 1 }], enabledCapabilities: [], runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
+  const r2 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/maybe-consumer.js', capability: 'evidence_graph_present', extra: 1 }], enabledCapabilities: goodEnabled, runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
   chk('RN-10 extra own key → fail closed', r2.status !== 0 && r2.artifact && r2.artifact.violations.some(v => v.code === 'STATE_AUTHORIZED_PATH_ENTRY_INVALID'));
   // forbidden .. path
-  const r3 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: '../renderer/js/x.js', capability: 'evidence_graph_present' }], enabledCapabilities: [], runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
+  const r3 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: '../renderer/js/x.js', capability: 'evidence_graph_present' }], enabledCapabilities: goodEnabled, runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
   chk('RN-10 .. in path → fail closed', r3.status !== 0 && r3.artifact && r3.artifact.violations.some(v => v.code === 'STATE_AUTHORIZED_PATH_GRAMMAR_INVALID'));
   // glob char
-  const r4 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/*.js', capability: 'evidence_graph_present' }], enabledCapabilities: [], runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
+  const r4 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/*.js', capability: 'evidence_graph_present' }], enabledCapabilities: goodEnabled, runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
   chk('RN-10 glob char in path → fail closed', r4.status !== 0 && r4.artifact && r4.artifact.violations.some(v => v.code === 'STATE_AUTHORIZED_PATH_GRAMMAR_INVALID'));
   // duplicate entries
-  const r5 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/x.js', capability: 'evidence_graph_present' }, { path: 'renderer/js/x.js', capability: 'evidence_graph_present' }], enabledCapabilities: [], runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, '// clean\n');
+  const r5 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/x.js', capability: 'evidence_graph_present' }, { path: 'renderer/js/x.js', capability: 'evidence_graph_present' }], enabledCapabilities: goodEnabled, runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, '// clean\n');
   chk('RN-10 duplicate entry → fail closed', r5.status !== 0 && r5.artifact && r5.artifact.violations.some(v => v.code === 'STATE_AUTHORIZED_PATH_DUPLICATE'));
   // any malformed entry forces the allow set to empty (defence-in-depth)
   chk('RN-10 malformed allow set is empty (defence in depth)', r1.artifact && r1.artifact.authorizedPathCount === 0);
+  // Round 2 follow-up: capability whitespace → fail closed
+  const r6 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/r3-0d-evidence-graph.js', capability: ' evidence_graph_present' }], enabledCapabilities: goodEnabled, runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, '// clean\n');
+  chk('RN-10 r2: capability with leading whitespace → fail closed', r6.status !== 0 && r6.artifact && r6.artifact.violations.some(v => v.code === 'STATE_AUTHORIZED_CAPABILITY_GRAMMAR_INVALID'));
+  // unknown capability
+  const r7 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/r3-0d-evidence-graph.js', capability: 'not_a_real_cap' }], enabledCapabilities: goodEnabled, runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, '// clean\n');
+  chk('RN-10 r2: unknown capability → fail closed', r7.status !== 0 && r7.artifact && r7.artifact.violations.some(v => v.code === 'STATE_AUTHORIZED_CAPABILITY_UNKNOWN'));
+  // capability not enabled
+  const r8 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/r3-0d-evidence-graph.js', capability: 'evidence_graph_present' }], enabledCapabilities: ['contract_foundation_present'], runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, '// clean\n');
+  chk('RN-10 r2: capability not enabled → fail closed', r8.status !== 0 && r8.artifact && r8.artifact.violations.some(v => v.code === 'STATE_AUTHORIZED_CAPABILITY_NOT_ENABLED'));
+  // capability below floor
+  const r9 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D1_CONTRACT_FOUNDATION', authorizedProductionPaths: [{ path: 'renderer/js/r3-0d-evidence-graph.js', capability: 'evidence_graph_present' }], enabledCapabilities: ['contract_foundation_present', 'evidence_graph_present'], runtimeConsumersAllowed: false, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: false }, '// clean\n');
+  chk('RN-10 r2: capability below floor → fail closed', r9.status !== 0 && r9.artifact && r9.artifact.violations.some(v => v.code === 'STATE_AUTHORIZED_CAPABILITY_BELOW_FLOOR'));
 })();
 
 // ── Codex D2 Round 1 RN-11 closure — suspected dynamic phase require detector ──
@@ -149,6 +162,23 @@ function runWithSyntheticState(phase, stateJson, sceneSrc) {
     fs.writeFileSync(path.join(tmpScan, 'preload.js'), '// no consumer\n');
     const r = runValidator(phase, tmpScan);
     chk(phase + ' RN-11 string-concat dynamic phase require flagged', r.artifact && r.artifact.violations.some(v => v.code === 'PROD_SUSPECTED_DYNAMIC_PHASE_REQUIRE'));
+  }
+})();
+
+// ── Codex D2 Round 2 RN-11 follow-up — broader template-literal + fragment heuristic ──
+(function rn11Round2Tests() {
+  for (const phase of PHASES) {
+    const phaseTail = CONTRACT_PREFIX[phase].split('/').pop().slice(-2); // '0d' | '0e' | '0f'
+    // Template literal split: `${"r3"}.0d` — round 1 detector missed this; round 2 must catch.
+    const sceneSrc = "var p = '../../contracts/' + `${\"r3\"}.` + '" + phaseTail + "/index.js';\nvar c = require(p);\nmodule.exports = c;\n";
+    const tmpScan = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-noc-scan-tmpl-'));
+    fs.mkdirSync(path.join(tmpScan, 'renderer', 'js'), { recursive: true });
+    fs.writeFileSync(path.join(tmpScan, 'renderer', 'js', 'tmpl-sneaky.js'), sceneSrc);
+    fs.writeFileSync(path.join(tmpScan, 'renderer', 'index.html'), '<!doctype html><html><body></body></html>');
+    fs.writeFileSync(path.join(tmpScan, 'main.js'), '// no consumer\n');
+    fs.writeFileSync(path.join(tmpScan, 'preload.js'), '// no consumer\n');
+    const r = runValidator(phase, tmpScan);
+    chk(phase + ' RN-11 r2: template-literal split require flagged', r.artifact && r.artifact.violations.some(v => v.code === 'PROD_SUSPECTED_DYNAMIC_PHASE_REQUIRE'));
   }
 })();
 

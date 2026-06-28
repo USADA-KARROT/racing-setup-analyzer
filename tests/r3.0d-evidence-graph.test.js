@@ -692,5 +692,69 @@ function freshInput(over) {
   chk('RN-09 per-observation params key cap enforced', r.valid === true && r.graph.provenance.rejectedReasonsSummary[CODES.ARRAY_CAP_EXCEEDED] === 1);
 })();
 
+// ── Section N — Codex D2 Round 2 finding closures (RN-01 / RN-03 / RN-06 / RN-09) ──
+(function sectionN_RN01_round2() {
+  // RN-01 round-2: clock mutates rawEvidence array AFTER envelope validation. With clock deferred
+  // to LAST, the per-node loop has already read all descriptors before clock fires.
+  const a = freshNode({ nodeId: 'ev_a' });
+  const arr = [a];
+  const out = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), {
+    clock: () => {
+      // Hostile clock — try to replace the slot. The per-node loop is already done by this point.
+      arr[0] = freshNode({ nodeId: 'ev_mutated' });
+      return NOW;
+    },
+  });
+  chk('RN-01 r2: hostile clock cannot replace already-read rawEvidence slots', out.valid === true && out.graph.nodes.length === 1 && out.graph.nodes[0].nodeId === 'ev_a');
+})();
+
+(function sectionN_RN03_round2() {
+  // RN-03 round-2: two same-nodeId candidates differing only by confidence.state must sort
+  // deterministically and produce a deterministic dedup outcome.
+  const a_unresolved = freshNode({ nodeId: 'a', identity: freshId({ sourceId: 'src_a' }), confidence: { state: 'unresolved' } });
+  const a_notcomputed = freshNode({ nodeId: 'a', identity: freshId({ sourceId: 'src_a' }), confidence: { state: 'not_computed' } });
+  const r1 = EG.buildEvidenceGraph(freshInput({ rawEvidence: [a_unresolved, a_notcomputed] }), { clock: CLOCK });
+  const r2 = EG.buildEvidenceGraph(freshInput({ rawEvidence: [a_notcomputed, a_unresolved] }), { clock: CLOCK });
+  chk('RN-03 r2: same dedup outcome regardless of permutation (confidence-distinct)', r1.valid === true && r2.valid === true && r1.graph.nodes[0].confidence.state === r2.graph.nodes[0].confidence.state);
+  chk('RN-03 r2: same graphId regardless of permutation', r1.valid === true && r2.valid === true && r1.graph.graphId === r2.graph.graphId);
+  // Different confidence.state → different graphId (confidence is part of graphId payload).
+  const onlyUnresolved = EG.buildEvidenceGraph(freshInput({ rawEvidence: [a_unresolved] }), { clock: CLOCK });
+  const onlyNotComputed = EG.buildEvidenceGraph(freshInput({ rawEvidence: [a_notcomputed] }), { clock: CLOCK });
+  chk('RN-03 r2: confidence-distinct singletons produce distinct graphId', onlyUnresolved.graph.graphId !== onlyNotComputed.graph.graphId);
+})();
+
+(function sectionN_RN06_round2() {
+  // RN-06 round-2: clock invoked LAST. Bad envelope -> clock never runs.
+  let clockCalled = false;
+  const badInp = { rawEvidence: [] };  // missing caseAssociation
+  const r = EG.buildEvidenceGraph(badInp, { clock: () => { clockCalled = true; return NOW; } });
+  chk('RN-06 r2: envelope failure never invokes clock', r.eligible === false && clockCalled === false);
+  // Per-node validation runs without clock; clock invoked only after sanitization
+  let order = [];
+  const goodInp = freshInput();
+  const r2 = EG.buildEvidenceGraph(goodInp, { clock: () => { order.push('clock'); return NOW; } });
+  chk('RN-06 r2: valid build still produces createdAt from clock', r2.valid === true && r2.graph.createdAt === NOW);
+  chk('RN-06 r2: clock invoked exactly once', order.length === 1);
+})();
+
+(function sectionN_RN09_round2() {
+  // RN-09 round-2: PARAM_KEY_BYTE_CAP enforced — a single param KEY exceeding 64 bytes → rejected.
+  const longKey = 'k'.repeat(EG.PARAM_KEY_BYTE_CAP + 1);
+  const obs = { kind: 'metric_value', i18nKey: 'r3_0d.x', params: { [longKey]: 1 }, channel: 'rpm' };
+  const n = freshNode({ observation: obs });
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: [n] }), { clock: CLOCK });
+  chk('RN-09 r2: oversized param KEY → BYTE_CAP_EXCEEDED counted per node', r.valid === true && r.graph.provenance.rejectedReasonsSummary[CODES.BYTE_CAP_EXCEEDED] === 1);
+  // ENVELOPE_BYTE_CAP rough pre-canonicalization estimate fires when too many large nodes.
+  const arrBig = [];
+  for (let i = 0; i < 32; i++) {
+    const ob = { kind: 'metric_value', i18nKey: 'r3_0d.x', params: {}, channel: 'rpm_' + i };
+    for (let k = 0; k < 30; k++) ob.params['k' + i + '_' + k] = 'val_' + ('z'.repeat(200));  // ~200B value each
+    arrBig.push(freshNode({ nodeId: 'ev_big_' + i, observation: ob }));
+  }
+  const rBig = EG.buildEvidenceGraph(freshInput({ rawEvidence: arrBig }), { clock: CLOCK });
+  // Either ENVELOPE_BYTE_CAP fires (pre-canon estimate) OR per-value byte cap kicks in at D1.
+  chk('RN-09 r2: oversized envelope content rejected', rBig.eligible === false || (rBig.valid === true && (rBig.graph.provenance.rejectedReasonsSummary[CODES.BYTE_CAP_EXCEEDED] || 0) > 0));
+})();
+
 console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
 if (fail > 0) process.exit(1);

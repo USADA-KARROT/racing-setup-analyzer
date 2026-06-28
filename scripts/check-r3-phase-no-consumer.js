@@ -42,6 +42,10 @@ const PHASE_CONFIG = {
   'R3.0F': { contractPrefix: 'contracts/r3.0f', artifact: 'r3-0f-no-consumer.json', label: 'R3.0F-NOCONSUMER', stateDir: 'governance/r3.0f' },
 };
 
+// Codex D2 Round 2 RN-10 follow-up: strict capability grammar — lowercase alpha-snake only, length
+// bounded, no whitespace. Mirrors the schema's actual capability names.
+const CAPABILITY_GRAMMAR_RE = /^[a-z][a-z0-9_]{0,63}$/;
+
 const PHASE_PROGRAM = String(process.env.R3_PHASE_PROGRAM || '').trim();
 const PHASE = PHASE_CONFIG[PHASE_PROGRAM];
 
@@ -153,6 +157,24 @@ function _validatePathString(p) {
   return null;
 }
 const AUTHORIZED_ENTRY_KEYS = new Set(['path', 'capability']);
+
+// Load the phase schema + enabledCapabilities so the loadAuthorizedSet check can verify each entry's
+// capability against the authoritative schema (RN-10 round-2 closure). Returns null if the schema
+// is unreadable (caller treats as failure).
+function _loadPhaseSchemaContext() {
+  if (!PHASE) return null;
+  const schemaPath = path.join(REPO, PHASE.stateDir, 'schema.json');
+  let schema;
+  try { schema = JSON.parse(fs.readFileSync(schemaPath, 'utf8')); }
+  catch (_) { return null; }
+  if (!schema || typeof schema !== 'object' || !Array.isArray(schema.capabilities) || !schema.capabilityUnlockFloor || !Array.isArray(schema.checkpointOrder)) return null;
+  return {
+    capabilities: new Set(schema.capabilities),
+    capabilityUnlockFloor: schema.capabilityUnlockFloor,
+    checkpointOrder: schema.checkpointOrder,
+  };
+}
+
 function loadAuthorizedSet() {
   if (!PHASE) return { set: new Set(), violations: [] };
   const stateOverride = process.env.R3_PHASE_STATE_FILE_OVERRIDE ? path.resolve(process.env.R3_PHASE_STATE_FILE_OVERRIDE) : null;
@@ -165,6 +187,13 @@ function loadAuthorizedSet() {
   catch (e) { return { set: new Set(), violations: [{ code: 'STATE_PARSE_ERROR', message: statePath + ': ' + e.message }] }; }
   if (!st || typeof st !== 'object' || Array.isArray(st)) return { set: new Set(), violations: [{ code: 'STATE_AUTHORIZED_PATHS_MALFORMED', message: 'state.json root is not a plain object' }] };
   if (!Array.isArray(st.authorizedProductionPaths)) return { set: new Set(), violations: [{ code: 'STATE_AUTHORIZED_PATHS_MALFORMED', message: 'authorizedProductionPaths missing or not an array' }] };
+  // Round 2 RN-10 closure: load schema context for capability cross-validation. If the schema is
+  // unreadable, the allow set fails closed (empty + violation).
+  const schemaCtx = _loadPhaseSchemaContext();
+  if (!schemaCtx) return { set: new Set(), violations: [{ code: 'STATE_SCHEMA_UNREADABLE', message: 'governance/' + PHASE.stateDir.split('/').pop() + '/schema.json is missing or malformed' }] };
+  const enabledCaps = new Set(Array.isArray(st.enabledCapabilities) ? st.enabledCapabilities : []);
+  const currentCheckpointIdx = schemaCtx.checkpointOrder.indexOf(st.currentCheckpoint);
+  if (currentCheckpointIdx < 0) return { set: new Set(), violations: [{ code: 'STATE_CURRENT_CHECKPOINT_UNKNOWN', message: 'state.currentCheckpoint=' + JSON.stringify(st.currentCheckpoint) + ' not in schema.checkpointOrder' }] };
   const set = new Set();
   const violations = [];
   const seenPaths = new Set();
@@ -174,7 +203,6 @@ function loadAuthorizedSet() {
       violations.push({ code: 'STATE_AUTHORIZED_PATH_ENTRY_INVALID', index: i, reason: 'not-a-plain-object' });
       continue;
     }
-    // Exact closed key set: must have BOTH path AND capability; no extra keys (RN-10 closure).
     let extraKey = null;
     for (const k of Object.keys(entry)) if (!AUTHORIZED_ENTRY_KEYS.has(k)) { extraKey = k; break; }
     if (extraKey) {
@@ -193,6 +221,8 @@ function loadAuthorizedSet() {
       violations.push({ code: 'STATE_AUTHORIZED_PATH_ENTRY_INVALID', index: i, path: entry.path, reason: 'capability-not-string' });
       continue;
     }
+    // Path-side checks first (cheap, state-independent) so a path grammar error is reported as
+    // such even if the capability would also fail downstream.
     const pathReason = _validatePathString(entry.path);
     if (pathReason) {
       violations.push({ code: 'STATE_AUTHORIZED_PATH_GRAMMAR_INVALID', index: i, path: entry.path, reason: pathReason });
@@ -202,25 +232,58 @@ function loadAuthorizedSet() {
       violations.push({ code: 'STATE_AUTHORIZED_PATH_DUPLICATE', index: i, path: entry.path });
       continue;
     }
+    // Round 2 RN-10 closure: capability grammar (lowercase alpha-snake) + trim + length bound.
+    if (entry.capability !== entry.capability.trim() || !CAPABILITY_GRAMMAR_RE.test(entry.capability)) {
+      violations.push({ code: 'STATE_AUTHORIZED_CAPABILITY_GRAMMAR_INVALID', index: i, path: entry.path, capability: entry.capability });
+      continue;
+    }
+    // Round 2 RN-10 closure: capability must exist in schema.capabilities.
+    if (!schemaCtx.capabilities.has(entry.capability)) {
+      violations.push({ code: 'STATE_AUTHORIZED_CAPABILITY_UNKNOWN', index: i, path: entry.path, capability: entry.capability });
+      continue;
+    }
+    // Round 2 RN-10 closure: capability's unlockFloor must be <= state.currentCheckpoint.
+    const floor = schemaCtx.capabilityUnlockFloor[entry.capability];
+    const floorIdx = schemaCtx.checkpointOrder.indexOf(floor);
+    if (floorIdx < 0) {
+      violations.push({ code: 'STATE_AUTHORIZED_CAPABILITY_NO_FLOOR', index: i, path: entry.path, capability: entry.capability });
+      continue;
+    }
+    if (floorIdx > currentCheckpointIdx) {
+      violations.push({ code: 'STATE_AUTHORIZED_CAPABILITY_BELOW_FLOOR', index: i, path: entry.path, capability: entry.capability, floor: floor, currentCheckpoint: st.currentCheckpoint });
+      continue;
+    }
+    // Round 2 RN-10 closure: capability must be in state.enabledCapabilities.
+    if (!enabledCaps.has(entry.capability)) {
+      violations.push({ code: 'STATE_AUTHORIZED_CAPABILITY_NOT_ENABLED', index: i, path: entry.path, capability: entry.capability });
+      continue;
+    }
     seenPaths.add(entry.path);
     set.add(entry.path);
   }
-  // RN-10 closure: if ANY entry-level violation occurred, the allow set is treated as EMPTY so a
-  // partially-malformed state cannot smuggle through a single good entry that authorizes anything.
   if (violations.length > 0) return { set: new Set(), violations };
   return { set, violations: [] };
 }
 
-// Codex D2 Round 1 RN-11 closure: detect string-concatenation-near-require shapes that would
-// resolve to a phase contract path. Heuristic: a require/import call with a non-literal first
-// argument AND the file contains a literal `r3.0d` / `r3.0e` / `r3.0f` substring. Flag as a
-// PROD_SUSPECTED_DYNAMIC_PHASE_REQUIRE finding. Documented limitation: AST-level constant
-// folding is out of scope; the heuristic errs on the side of caution and may produce false
-// positives that future code may need to refactor (this is the intended fail-closed posture).
+// Codex D2 Round 2 RN-11 closure: broaden the heuristic to catch template-literal and broken-up
+// quoted-fragment concatenations that resolve to a phase contract path. The detector now flags any
+// production file (NOT on the authorized list) that combines:
+//
+//   (a) a non-literal require/import callsite, AND
+//   (b) BOTH a "r3" fragment AND a "0d|0e|0f" fragment somewhere in the file source — fragments
+//       counted are: literal contiguous (e.g. `r3.0d`), quoted strings/back-ticks (e.g. `'r3'`,
+//       `"0d"`, `` `r3` ``), and the `${...}` template wrapping shape that surrounds either.
+//
+// Documented limitation (round-2 acknowledgment): AST-level constant folding is out of scope; this
+// heuristic intentionally over-flags by design (fail-closed) and is intended as a fast first line
+// of defence. A future commit should integrate acorn or @babel/parser for true constant-folding.
 const NONLITERAL_REQUIRE_RE = /(?:require|import)\s*\(\s*(?![\s'"`])/g;
-const PHASE_SUBSTR_RE = /\br3\.0[def]\b/i;
+const PHASE_FRAGMENT_R3_RE = /\br3\b|(['"`])r3\1|\$\{\s*['"`]r3['"`]\s*\}/;
+const PHASE_FRAGMENT_0DEF_RE = /\b0[def]\b|(['"`])0[def]\1|(['"`])\.0[def]\1|\$\{\s*['"`]0[def]['"`]\s*\}|\br3\.0[def]\b/i;
 function detectSuspectedDynamicPhaseRequire(src) {
-  if (!PHASE_SUBSTR_RE.test(src)) return false;
+  const hasR3 = PHASE_FRAGMENT_R3_RE.test(src);
+  const has0Def = PHASE_FRAGMENT_0DEF_RE.test(src);
+  if (!hasR3 || !has0Def) return false;
   NONLITERAL_REQUIRE_RE.lastIndex = 0;
   return NONLITERAL_REQUIRE_RE.test(src);
 }

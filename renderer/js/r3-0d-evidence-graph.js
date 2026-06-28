@@ -115,7 +115,9 @@
   var LIMITATIONS_CAP = 64;
   var INPUT_RAW_EVIDENCE_CAP = 512;   // pre-validation cap on caller array length
   var PARAMS_KEYS_CAP = 32;            // per-observation params object cap (RN-09)
+  var PARAM_KEY_BYTE_CAP = 64;         // per-observation params KEY byte cap (RN-09 round-2 follow-up)
   var ENVELOPE_BYTE_CAP = 256 * 1024;  // 256 KiB post-sanitization JSON.stringify cap (RN-09)
+  var ROUGH_NODE_BYTES_ESTIMATE = 4096; // pre-canonicalization estimate per sanitized node to short-circuit memory amplification
 
   // Allowed evidence sourceId values for which credibility may climb to 'measured'. 'imported_summary'
   // is the canonical example of a source that MUST stay capped at 'derived' (R3.0E future imports).
@@ -217,9 +219,11 @@
 
   // Full canonical string — INCLUDES nodeId so two duplicate-nodeId candidates can still be
   // compared as different "candidates" when sorting. Used to canonically sort the sanitized array
-  // BEFORE dedup (RN-03 closure) so caller permutation cannot change the dedup winner.
+  // BEFORE dedup (RN-03 closure) so caller permutation cannot change the dedup winner. Round 2
+  // closure: also includes confidence.state so two same-nodeId candidates differing only by
+  // unresolved/not_computed sort deterministically (round 2 RN-03 evidence).
   function _fullCanonicalString(node) {
-    return JSON.stringify(node.nodeId) + '|' + _semanticCanonicalString(node) + '|cred:' + node.credibility + '|prov:' + node.provenance + '|avl:' + node.availability + '|fresh:' + node.identity.freshness + '|supE:' + _stableStringify(node.supportingEdges) + '|conE:' + _stableStringify(node.contradictingEdges) + '|lims:' + _stableStringify(node.limitations);
+    return JSON.stringify(node.nodeId) + '|' + _semanticCanonicalString(node) + '|cred:' + node.credibility + '|prov:' + node.provenance + '|avl:' + node.availability + '|conf:' + (node.confidence && node.confidence.state ? node.confidence.state : 'null') + '|fresh:' + node.identity.freshness + '|supE:' + _stableStringify(node.supportingEdges) + '|conE:' + _stableStringify(node.contradictingEdges) + '|lims:' + _stableStringify(node.limitations);
   }
 
   // Correlation group key — nodes sharing this key are correlated (same source observing the same
@@ -460,8 +464,9 @@
       var rawEvidenceRef = env.snapshot.rawEvidenceRef;
       var inputCount = env.snapshot.rawEvidenceLength;
 
-      // Step 2 — resolve clock AFTER envelope validation (RN-06 closure).
-      var createdAt = _resolveClock(optsIn);
+      // Step 2 — Round 2 RN-01 + RN-06 closure: defer clock invocation until ALL input-touching
+      // work is complete. The clock function CANNOT mutate rawEvidence under us because it never
+      // runs while we are reading the array. createdAt is assigned at the very end of the build.
 
       // Step 3 — per-node validation. Each rawEvidence[i] is read via descriptor (RN-02 closure):
       // accessor / sparse / inherited slots become ONE rejected node, never a whole-build throw.
@@ -489,11 +494,21 @@
           continue;
         }
         var san = check.sanitized;
-        // RN-09 — per-observation params key count cap (defence layer above D1).
+        // RN-09 — per-observation params key count cap + per-key BYTE cap (round-2 follow-up).
+        // D1's BYTE_CAP_EXCEEDED rule covers params VALUES but NOT params KEYS, so a hostile
+        // node can carry a key like 'longkey_x4000_chars' that survives D1 and inflates the
+        // canonical serialization. D2 caps both count + per-key bytes here.
         if (san.observation && san.observation.params && typeof san.observation.params === 'object') {
           try {
-            var pkc = Object.keys(san.observation.params).length;
-            if (pkc > PARAMS_KEYS_CAP) { rejectedCount++; tally(CODES.ARRAY_CAP_EXCEEDED); continue; }
+            var paramKeys = Object.keys(san.observation.params);
+            if (paramKeys.length > PARAMS_KEYS_CAP) { rejectedCount++; tally(CODES.ARRAY_CAP_EXCEEDED); continue; }
+            var anyOversizeKey = false;
+            for (var pki = 0; pki < paramKeys.length; pki++) {
+              var keyStr = paramKeys[pki];
+              var keyBytes = (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(keyStr).length : Buffer.byteLength(keyStr, 'utf8');
+              if (keyBytes > PARAM_KEY_BYTE_CAP) { anyOversizeKey = true; break; }
+            }
+            if (anyOversizeKey) { rejectedCount++; tally(CODES.BYTE_CAP_EXCEEDED); continue; }
           } catch (e) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
         }
         // Association binding — caseId / sessionId MUST equal envelope.caseAssociation.
@@ -512,6 +527,31 @@
       // Step 4 — cap on accepted nodes.
       if (sanitized.length > NODES_CAP) {
         return RC.buildBlockedResult([CODES.GRAPH_CAP_EXCEEDED], { detail: 'sanitized node count ' + sanitized.length + ' exceeds NODES_CAP=' + NODES_CAP });
+      }
+
+      // Step 4.5 — RN-09 round-2 follow-up: rough byte budget BEFORE canonical serialization. Per
+      // sanitized node, count the byte size of observation.params (where the bulk lives) and bail
+      // if the total would exceed ENVELOPE_BYTE_CAP. This short-circuits memory amplification before
+      // _stableStringify runs across the whole array.
+      var roughTotal = 0;
+      for (var rb = 0; rb < sanitized.length; rb++) {
+        try {
+          var p = sanitized[rb].observation && sanitized[rb].observation.params;
+          if (p && typeof p === 'object') {
+            var pkk = Object.keys(p);
+            for (var pkii = 0; pkii < pkk.length; pkii++) {
+              var k = pkk[pkii];
+              roughTotal += k.length + 16; // ~16 byte overhead per key/value pair
+              var vv = p[k];
+              if (typeof vv === 'string') roughTotal += vv.length;
+              else roughTotal += 16;
+            }
+          }
+          roughTotal += ROUGH_NODE_BYTES_ESTIMATE;
+        } catch (e) { /* defensive: ignore */ }
+        if (roughTotal > ENVELOPE_BYTE_CAP) {
+          return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'pre-canonicalization byte estimate exceeded ENVELOPE_BYTE_CAP=' + ENVELOPE_BYTE_CAP });
+        }
       }
 
       // Step 5 — RN-03 closure: sort sanitized by full canonical content BEFORE any dedup so caller
@@ -684,7 +724,9 @@
       if (limitations.length > LIMITATIONS_CAP) limitations = limitations.slice(0, LIMITATIONS_CAP);
       if (cannotConclude.length > CANNOT_CONCLUDE_CAP) cannotConclude = cannotConclude.slice(0, CANNOT_CONCLUDE_CAP);
 
-      // Step 16 — derive graphId (content-only; clock-independent).
+      // Step 16 — derive graphId (content-only; clock-independent). Round 2 RN-03 closure: include
+      // confidence.state so two same-nodeId candidates differing only by unresolved/not_computed
+      // are distinguishable by graphId (and dedup outcome).
       var idPayload = {
         caseAssociation: caseAssociation,
         nodes: nodesOut.map(function (n) {
@@ -694,6 +736,7 @@
             credibility: n.credibility,
             provenance: n.provenance,
             availability: n.availability,
+            confidence: { state: (n.confidence && n.confidence.state) ? n.confidence.state : null },
             identity: {
               caseId: n.identity.caseId,
               sessionId: n.identity.sessionId,
@@ -727,6 +770,11 @@
       if (envBytes > ENVELOPE_BYTE_CAP) {
         return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'post-sanitization JSON size ' + envBytes + ' exceeds ENVELOPE_BYTE_CAP=' + ENVELOPE_BYTE_CAP });
       }
+
+      // Step 17.5 — Round 2 RN-01 + RN-06 closure: invoke clock LAST, after every input-touching
+      // operation has completed. The clock injector cannot mutate rawEvidence under us because
+      // the per-node loop has already finished.
+      var createdAt = _resolveClock(optsIn);
 
       // Step 18 — final materialisation
       var graph = _materializeGraph({
@@ -772,6 +820,7 @@
     CORRELATION_GROUPS_CAP: CORRELATION_GROUPS_CAP,
     INPUT_RAW_EVIDENCE_CAP: INPUT_RAW_EVIDENCE_CAP,
     PARAMS_KEYS_CAP: PARAMS_KEYS_CAP,
+    PARAM_KEY_BYTE_CAP: PARAM_KEY_BYTE_CAP,
     ENVELOPE_BYTE_CAP: ENVELOPE_BYTE_CAP,
     IMPORTED_SUMMARY_SOURCE_ID: IMPORTED_SUMMARY_SOURCE_ID,
     IMPORTED_SUMMARY_MAX_CREDIBILITY: IMPORTED_SUMMARY_MAX_CREDIBILITY,
