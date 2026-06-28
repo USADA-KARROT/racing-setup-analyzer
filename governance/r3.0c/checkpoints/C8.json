@@ -71,6 +71,7 @@
       "failClosedDefault": "When the WeakSet is empty or the candidate caseRecord prototype is not Object.prototype, the predicate returns false → requestComparison emits INTERNAL_CONTRACT_VIOLATION. Default-constructed orchestrator (no predicate supplied) also fails closed.",
       "identityPreservation": "Codex C-B Round 1 Finding 02 closure — renderer/js/r3-0c-comparison-viewmodel.js setAssociation no longer _safeShallowCopy's the caseRecord; it stores the reference IFF _isPlain(crSrc) && Object.isFrozen(crSrc), else null. This preserves WeakSet identity end-to-end while still refusing hostile Proxy / non-frozen inputs.",
       "caseTransitionInvariant": "Codex C-B Round 1 Findings 03/04 + Round 2 Findings 10/11 closure — _r3cBeginCaseTransition() is the single shared invalidation helper called SYNCHRONOUSLY at every case-context transition (openCase / loadDemoAnalysisCase / runImportedAnalysis). It (1) bumps _r3cC8OpenToken so any in-flight promise commit gates out at `if (tok !== self._r3cC8OpenToken)`, (2) nulls _r3cC8LatestAuthorityRecord, (3) clears caseDataHolder.lastSession + lastSessionId so prior-case laps cannot survive into the new selectors, (4) notifies the viewmodel of case_reopen so its in-flight comparison commit is dropped at stale-token check.",
+      "trustedDemoBuilderCapture": "Codex C-B Round 4 Finding 19 closure — `const _trustedDemoBuilder = (function () { ... })();` is declared INSIDE the outer IIFE at script-parse time. It captures DemoAnalysisCase.buildDemoAnalysisCase ONCE, before any other code can run. `app().loadDemoAnalysisCase` invokes the captured reference exclusively (typeof _trustedDemoBuilder !== 'function' shortcuts to modules_not_loaded; the live `DemoAnalysisCase.buildDemoAnalysisCase` global property is NEVER read on the demo authority path after the IIFE returns). Same-realm code that replaces the global DemoAnalysisCase.buildDemoAnalysisCase with a forged function after the IIFE returns CANNOT mint authoritative case+session pairs via the demo load path. The CSV-import path (app().runImportedAnalysis) still reads DemoAnalysisCase.buildDemoAnalysisCase live to obtain the vehicle/setup binding template, but its post-load registration calls ONLY r3cC8SessionAuthority.register(session) — there is no r3cC8Authority.forCaseStore / forDemo call from the import path, so the live-global lookup confers SESSION identity only (subject to its own unforgeable WeakSet) and CANNOT confer authoritative case identity. A future product step that wants to make import-derived cases authoritative would need to add its own IIFE-captured trusted builder + r3cC8Authority registration.",
       "laneCandidateGate": "Codex C-B Round 2 Finding 11 closure — _r3cC8AuthoritativeSession() gates lap-candidate resolution by requiring the loaded session's id (session.sessionId or caseDataHolder.lastSessionId) to match the authoritative record's associations.telemetrySessionId. r3cC8LapCandidates / _r3cC8LapFor both read through this gate; any mismatch yields an empty list and a null descriptor."
     },
     "phaseBoundaryContractEnabled": false,
@@ -88,7 +89,10 @@
   },
 
   "rendererWiring": {
-    "outerIifeBoundary": "renderer/index.html — `;(function(root){'use strict'; const r3cC8Authority = ...; function app() {...}; root.app = app; })(typeof globalThis !== 'undefined' ? globalThis : this);` wraps both r3cC8Authority and function app() in one private IIFE; only `app` is exposed on globalThis. Codex C-B Round 2 Finding 09 closure — neither r3cC8Authority nor its forCaseStore/forDemo/predicate are lexically resolvable by name from any other script or from eval in the same realm.",
+    "outerIifeBoundary": "renderer/index.html — `;(function(root){'use strict'; const caseDataHolder = ...; const _trustedDemoBuilder = ...; const r3cC8SessionAuthority = ...; const r3cC8Authority = ...; function app() {...}; root.app = app; })(typeof globalThis !== 'undefined' ? globalThis : this);` wraps caseDataHolder + _trustedDemoBuilder + r3cC8SessionAuthority + r3cC8Authority + function app() in one private IIFE; only `app` is exposed on globalThis. Codex C-B Round 2 Finding 09 closure — none of caseDataHolder / _trustedDemoBuilder / r3cC8SessionAuthority / r3cC8Authority are lexically resolvable by name from any other script or from eval in the same realm.",
+    "iifeCapturedReferences": [
+      "_trustedDemoBuilder (Codex C-B Round 4 Finding 19 closure) — IIFE captures DemoAnalysisCase.buildDemoAnalysisCase at parse-time; loadDemoAnalysisCase invokes EXCLUSIVELY this captured reference; the live global property is never re-read for the authority path. CSV-import (runImportedAnalysis) still uses the live global for vehicle/setup template but registers SESSION identity only (no case authority)."
+    ],
     "appHelpers": [
       "_r3cC8LatestAuthorityRecord (state — null until a successful authoritative register)",
       "_r3cC8OpenToken (monotonic open-token, bumped by _r3cBeginCaseTransition)",
@@ -104,9 +108,9 @@
       "r3cC8OnExportClick() — export button @click handler → orchestrator.exportComparison → _downloadJson"
     ],
     "transitionCallSites": [
-      "openCase(id) → this._r3cBeginCaseTransition() at synchronous entry; promise commit drops stale token at `if (tok !== self._r3cC8OpenToken) return;`; on success non-degraded, r3cC8Authority.forCaseStore(o) registers + _r3cC8SyncAssociationFromCase wires association",
-      "loadDemoAnalysisCase() → this._r3cBeginCaseTransition() at synchronous entry; on success, r3cC8Authority.forDemo(demo.analysisCase) registers + _r3cC8SyncAssociationFromCase wires association",
-      "runImportedAnalysis() → this._r3cBeginCaseTransition() at synchronous entry; CSV import does NOT register an authoritative case (no case-store boundary), so the workspace remains idle/selecting until a future product step authorizes import-derived authority"
+      "openCase(id) → this._r3cBeginCaseTransition() at synchronous entry (Round 3 Finding 14: MUST be the first executable statement, BEFORE ensureStore()); promise commit drops stale token at `if (tok !== self._r3cC8OpenToken) return;`; on success non-degraded, r3cC8Authority.forCaseStore(o) registers + _r3cC8SyncAssociationFromCase wires association",
+      "loadDemoAnalysisCase() → this._r3cBeginCaseTransition() at synchronous entry; demo data sourced from _trustedDemoBuilder() (the IIFE-captured reference — NOT the live DemoAnalysisCase global); on success, r3cC8Authority.forDemo(demo.analysisCase) registers + _r3cC8SyncAssociationFromCase wires association; r3cC8SessionAuthority.register(demo.telemetrySession) marks the session unforgeable",
+      "runImportedAnalysis() → this._r3cBeginCaseTransition() at synchronous entry; CSV import does NOT register an authoritative case (no case-store boundary, no _trustedDemoBuilder analog), so the workspace remains idle/selecting until a future product step authorizes import-derived authority. Session identity IS registered via r3cC8SessionAuthority.register(session) — a future product step that pairs this session with an authoritative case will pass the lap-candidate gate"
     ],
     "noPublicRegistrationApi": "No method on the Alpine app() component exposes a way to add to the WeakSet. The closure-private r3cC8Authority is unreachable from any caller in the same realm. The orchestrator's authenticityPredicate is the only reader.",
     "selectorWiring": "Reference + comparison <select> elements gain @change=\"r3cC8OnReferenceSelected/Comparison($event.target.value || null)\"; the option list comes from r3cC8LapCandidates() (gated by the authoritative-session check). Export <button> gains @click=\"r3cC8OnExportClick()\". The selectors render empty placeholders when no authoritative session is loaded (Codex C-B Round 2 Finding 11 — prior-session laps cannot leak through)."
@@ -127,6 +131,16 @@
   "codexVerdict": {
     "verdict": "PENDING",
     "rounds": [
+      {
+        "round": 5,
+        "reviewedSha": "d317c1f646eb951f382d434943ba035c1ad1904a",
+        "verdict": "BLOCK",
+        "evidence": "governance/r3.0c/codex-checkpoint-evidence/C-B/round-5-d317c1f.md",
+        "evidenceSha256": "fc43f70b7e8b0446ed44236cef4a4012fba471cd64540a057e056efdcd14585e",
+        "findings": [
+          { "id": "C8-CB-RN-21", "title": "Manifest omits the trusted demo-builder capture mechanism", "triage": "ACCEPT", "fixCommit": "round-6", "fixSummary": "Add explicit trustedDemoBuilderCapture entry under authorityFlow + iifeCapturedReferences under rendererWiring documenting (a) _trustedDemoBuilder is captured at IIFE init, (b) loadDemoAnalysisCase invokes the captured reference exclusively, (c) the CSV-import (runImportedAnalysis) still uses the live DemoAnalysisCase global for its vehicle/setup template but registers SESSION identity only — no case authority — so a forged DemoAnalysisCase replacement cannot mint authoritative case identity via either path." }
+        ]
+      },
       {
         "round": 4,
         "reviewedSha": "09345c40ad7df2d71e25a05f8e097921836ba9d5",
@@ -184,7 +198,7 @@
         ]
       }
     ],
-    "tierDisclosure": "Codex C-B (the final R3.0C phase gate). Tier 1 raw stdout persisted for all rounds at governance/r3.0c/codex-checkpoint-evidence/C-B/. Round 1: round-1-0caa8c8.md (sha256 3efd8de2ffd2414583479883270e69a4399b09ea2f9328cb6c465eece5f3c411). Round 2: round-2-49ab0d5.md (sha256 f02fe253a6c1cdc891456cbde853bbe5fc26d403c10e27b6b4d89978aee58f7e). Round 3: round-3-a768306.md (sha256 9bf71ec705b756960ca8ff2a7d44be54ef3ea03b04a194e07172c85803b2c6ff). Round 4: round-4-09345c4.md (sha256 072aa725adf0b36cebb60bfacf32b81fde174c08babbee04407a4253d1d1e4f0). Round 5 runs against the post-fix SHA; raw stdout to be persisted at round-5-<sha>.md."
+    "tierDisclosure": "Codex C-B (the final R3.0C phase gate). Tier 1 raw stdout persisted for all rounds at governance/r3.0c/codex-checkpoint-evidence/C-B/. Round 1: round-1-0caa8c8.md (sha256 3efd8de2ffd2414583479883270e69a4399b09ea2f9328cb6c465eece5f3c411). Round 2: round-2-49ab0d5.md (sha256 f02fe253a6c1cdc891456cbde853bbe5fc26d403c10e27b6b4d89978aee58f7e). Round 3: round-3-a768306.md (sha256 9bf71ec705b756960ca8ff2a7d44be54ef3ea03b04a194e07172c85803b2c6ff). Round 4: round-4-09345c4.md (sha256 072aa725adf0b36cebb60bfacf32b81fde174c08babbee04407a4253d1d1e4f0). Round 5: round-5-d317c1f.md (sha256 fc43f70b7e8b0446ed44236cef4a4012fba471cd64540a057e056efdcd14585e). Round 6 runs against the post-fix SHA; raw stdout to be persisted at round-6-<sha>.md."
   },
 
   "scopeBoundary": {
@@ -233,6 +247,7 @@
     "governance/r3.0c/codex-checkpoint-evidence/C-B/round-2-49ab0d5.md",
     "governance/r3.0c/codex-checkpoint-evidence/C-B/round-3-a768306.md",
     "governance/r3.0c/codex-checkpoint-evidence/C-B/round-4-09345c4.md",
+    "governance/r3.0c/codex-checkpoint-evidence/C-B/round-5-d317c1f.md",
     "governance/r3.0/train.json",
     ".github/workflows/ci.yml",
     "package.json"
