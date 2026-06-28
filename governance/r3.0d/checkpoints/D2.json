@@ -84,7 +84,7 @@
     "importedSummaryElevationGuard": "An evidence node with identity.sourceId === 'imported_summary' MUST NOT carry credibility === 'measured'. Rejected as EVIDENCE_IMPORTED_SUMMARY_ELEVATION_FORBIDDEN.",
     "envelopeDefenceShallow": "Envelope validation is shallow on rawEvidence (Array.prototype + length cap) so a single caller-supplied hostile evidence node fails THAT node only (counted in rejectedReasonsSummary) and does not poison the whole envelope. Per-node validation runs the full RC.isOriginalPlainObject + hasHiddenOwnKey + hasNonPlainNestedObject defence + D1 validateEvidenceNodeShape sanitization.",
     "outerTryCatch": "buildEvidenceGraph is wrapped in an outer try/catch. Any internal throw collapses to INTERNAL_CONTRACT_VIOLATION via RC.buildBlockedResult; never bubbles to the caller.",
-    "caps": "NODES_CAP=256 (post-validation), INPUT_RAW_EVIDENCE_CAP=512 (envelope), EDGES_CAP_TOTAL=1024, CORRELATION_GROUPS_CAP=64, CANNOT_CONCLUDE_CAP=64, LIMITATIONS_CAP=64. generationToken ≤ 256 chars; contextVersion ≤ 64 chars.",
+    "caps": "NODES_CAP=256 (post-validation), INPUT_RAW_EVIDENCE_CAP=512 (envelope), EDGES_CAP_TOTAL=1024, CORRELATION_GROUPS_CAP=64, CANNOT_CONCLUDE_CAP=64, LIMITATIONS_CAP=64, PARAMS_KEYS_CAP=32 (per-observation; RN-09 closure), ENVELOPE_BYTE_CAP=256 KiB (post-sanitization JSON.stringify; RN-09 closure). generationToken ≤ 256 chars; contextVersion ≤ 64 chars.",
     "noLLM": "No LLM call. Deterministic JavaScript only.",
     "noUI": "No DOM mutation, no Alpine binding, no index.html script src. UI is exclusively D5_ENGINEER_BRIEF_ACTIVATION."
   },
@@ -92,7 +92,7 @@
   "tests": {
     "command": "npm test",
     "newSuiteForThisCheckpoint": "tests/r3.0d-evidence-graph.test.js",
-    "newSuiteAssertions": 88,
+    "newSuiteAssertions": 103,
     "stateAwareRefactor": "tests/r3.0d-contract-foundation.test.js Section I + J were refactored to be state-aware (D1 invariants when currentCheckpoint === D1_CONTRACT_FOUNDATION; D2 invariants when currentCheckpoint === D2_EVIDENCE_GRAPH). No D1-era assertion was deleted; the D1 branch is preserved and an additional D2 branch added.",
     "evidenceTier": "TIER 3 — Claude-verified on D2 branch HEAD; CI re-run on integrationSha is the authority for the Train target context."
   },
@@ -106,8 +106,29 @@
     "verdictRound": 0,
     "reviewedCandidateSha": null,
     "verdictEvidenceFile": null,
-    "rounds": [],
-    "tierDisclosure": "Codex D2 review pending. Will run via `codex exec -s read-only --skip-git-repo-check` against the exact candidate SHA on feat/r3.0d-d2-evidence-graph; Tier 1 raw stdout will be persisted under governance/r3.0d/codex-checkpoint-evidence/D2/round-N-<sha>.md."
+    "rounds": [
+      {
+        "round": 1,
+        "reviewedSha": "10766c02681f980fd42c590e941d26e8b236d6e4",
+        "verdict": "BLOCK",
+        "findings": [
+          "RN-01 envelope accessor TOCTOU",
+          "RN-02 raw-evidence accessor poisons whole build",
+          "RN-03 dedup permutation-dependent",
+          "RN-04 semantic fingerprint hash collisions",
+          "RN-05 correlation memberNodeIds not frozen",
+          "RN-06 clock executes before input validation",
+          "RN-07 exported _stableStringify / helpers can throw",
+          "RN-08 nodeId='constructor' collides with Object.prototype",
+          "RN-09 advertised ENVELOPE_BYTE_CAP not implemented",
+          "RN-10 malformed authorization entries pass",
+          "RN-11 string-concat dynamic require bypass",
+          "RN-12 D2 manifest changedFiles incomplete"
+        ],
+        "evidence": "governance/r3.0d/codex-checkpoint-evidence/D2/round-1-10766c0.raw.txt"
+      }
+    ],
+    "tierDisclosure": "Codex D2 Round 1 BLOCK on 10766c0 surfaced 12 distinct findings (RN-01..RN-12) over a single round; full Tier 1 raw stdout persisted at governance/r3.0d/codex-checkpoint-evidence/D2/round-1-10766c0.raw.txt. Round 2 candidate addresses every finding atomically (production hardening + governance script tightening + manifest completeness)."
   },
 
   "scopeBoundary": {
@@ -144,20 +165,29 @@
   "status": "candidate",
   "governanceChanged": true,
   "changedFiles": [
-    "renderer/js/r3-0d-evidence-graph.js",
-    "tests/r3.0d-evidence-graph.test.js",
-    "tests/r3.0d-contract-foundation.test.js",
-    "tests/r3-0-train.test.js",
-    "tests/r3-0-phase-governance.test.js",
     "contracts/r3.0d/credibility-contract.js",
-    "governance/r3.0d/schema.json",
-    "governance/r3.0d/capabilities.json",
-    "governance/r3.0d/state.json",
-    "governance/r3.0d/checkpoints/D2.json",
+    "docs/r3-0-train-governance.md",
     "governance/r3.0/train.json",
     "governance/r3.0/train.schema.json",
-    "package.json"
+    "governance/r3.0d/capabilities.json",
+    "governance/r3.0d/checkpoints/D2.json",
+    "governance/r3.0d/codex-checkpoint-evidence/D2/round-1-10766c0.raw.txt",
+    "governance/r3.0d/schema.json",
+    "governance/r3.0d/state.json",
+    "governance/r3.0e/checkpoint-manifest.schema.json",
+    "governance/r3.0e/checkpoints/E0.json",
+    "governance/r3.0e/schema.json",
+    "governance/r3.0e/state.json",
+    "package.json",
+    "renderer/js/r3-0d-evidence-graph.js",
+    "scripts/check-r3-phase-no-consumer.js",
+    "tests/r3-0-phase-governance.test.js",
+    "tests/r3-0-phase-no-consumer.test.js",
+    "tests/r3-0-train.test.js",
+    "tests/r3.0d-contract-foundation.test.js",
+    "tests/r3.0d-evidence-graph.test.js"
   ],
+  "changedFilesNote": "Computed from the exact baseSha (f8a598b) → reviewedCandidateSha diff at the moment of the Round 2 candidate commit; includes both the separate state-aware guard-enhancement commit (51155b3 → scripts/check-r3-phase-no-consumer.js + tests/r3-0-phase-no-consumer.test.js) and the cross-phase rename commit (10766c0 → docs/r3-0-train-governance.md + four governance/r3.0e files). The Round 1 codex evidence file is included as it ships in the same Round 2 candidate. RN-12 closure.",
 
   "note": "D2_EVIDENCE_GRAPH — the first non-bootstrap R3.0D PRODUCTION checkpoint. Lifts ONE production capability (evidence_graph_present); enables runtimeConsumersAllowed=true + algorithmsAllowed=true; introduces renderer/js/r3-0d-evidence-graph.js as the single new authorized production path; keeps uiAllowed=false + featureRegistryActivationAllowed=false (D5 only). The 5-phase D-flow is renamed atomically alongside this checkpoint per the directive; the rename is recorded in governanceRename above with full lineage. C-B Codex review runs against the exact D2 candidate SHA; tier-1 raw stdout to be persisted under governance/r3.0d/codex-checkpoint-evidence/D2/."
 }

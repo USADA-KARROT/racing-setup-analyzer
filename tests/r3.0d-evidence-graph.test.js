@@ -523,26 +523,18 @@ function freshInput(over) {
   })());
 })();
 
-// ── Section J — helpers (stableStringify, semanticFingerprint, correlationGroupKey) ─
+// ── Section J — RN-07 closure: internal helpers are no longer exported ─────────
+// Tests drive the contract via buildEvidenceGraph only. The previous tests that called
+// EG._stableStringify / EG._semanticFingerprint / EG._correlationGroupKey are intentionally
+// removed (those identifiers are no longer in the public api per Codex D2 Round 1 RN-07).
 (function sectionJ() {
-  chk('J1 stableStringify sorts keys', EG._stableStringify({ b: 1, a: 2 }) === '{"a":2,"b":1}');
-  chk('J2 stableStringify rejects NaN to null', EG._stableStringify(NaN) === 'null');
-  chk('J3 stableStringify rejects Infinity to null', EG._stableStringify(Infinity) === 'null');
-  chk('J4 semanticFingerprint deterministic', (function () {
-    const a = EN.validateEvidenceNodeShape(freshNode({ nodeId: 'ev_a' })).sanitized;
-    const b = EN.validateEvidenceNodeShape(freshNode({ nodeId: 'ev_b' })).sanitized;
-    return EG._semanticFingerprint(a) === EG._semanticFingerprint(b);
-  })());
-  chk('J5 correlationGroupKey deterministic for same identity', (function () {
-    const a = EN.validateEvidenceNodeShape(freshNode({ nodeId: 'ev_a' })).sanitized;
-    const b = EN.validateEvidenceNodeShape(freshNode({ nodeId: 'ev_b' })).sanitized;
-    return EG._correlationGroupKey(a) === EG._correlationGroupKey(b);
-  })());
-  chk('J6 correlationGroupKey differs for different sourceId', (function () {
-    const a = EN.validateEvidenceNodeShape(freshNode({ nodeId: 'ev_a', identity: freshId({ sourceId: 'x' }) })).sanitized;
-    const b = EN.validateEvidenceNodeShape(freshNode({ nodeId: 'ev_b', identity: freshId({ sourceId: 'y' }) })).sanitized;
-    return EG._correlationGroupKey(a) !== EG._correlationGroupKey(b);
-  })());
+  chk('J1 _stableStringify not exported (RN-07)', typeof EG._stableStringify === 'undefined');
+  chk('J2 _semanticCanonicalString not exported (RN-07)', typeof EG._semanticCanonicalString === 'undefined');
+  chk('J3 _correlationGroupKey not exported (RN-07)', typeof EG._correlationGroupKey === 'undefined');
+  chk('J4 _semanticFingerprint not exported (RN-07)', typeof EG._semanticFingerprint === 'undefined');
+  // ENVELOPE_BYTE_CAP + PARAMS_KEYS_CAP now exposed for diagnostics (RN-09 closure).
+  chk('J5 ENVELOPE_BYTE_CAP exposed', typeof EG.ENVELOPE_BYTE_CAP === 'number' && EG.ENVELOPE_BYTE_CAP === 256 * 1024);
+  chk('J6 PARAMS_KEYS_CAP exposed', typeof EG.PARAMS_KEYS_CAP === 'number' && EG.PARAMS_KEYS_CAP === 32);
 })();
 
 // ── Section K — limitations + cannotConclude derivation ─────────────────────────
@@ -579,6 +571,125 @@ function freshInput(over) {
     const set = new Set(EG.EDGE_KIND_ALLOWED);
     return r.valid === true && r.graph.edges.every(e => set.has(e.kind));
   })());
+})();
+
+// ── Section M — Codex D2 Round 1 finding closures (RN-01 .. RN-09) ──────────
+(function sectionM_RN01() {
+  // RN-01 — envelope caseAssociation accessor TOCTOU: getter returns valid value during validation,
+  // hostile value during build. The hardened envelope snapshot reads ca via descriptor + clone, so
+  // there is no path to read the hostile value AFTER validation passes.
+  const safeCA = { caseId: 'case_demo', sessionId: 'sess_demo', lapId: 'L1' };
+  const hostileCA = { caseId: '', sessionId: '', lapId: 17 };
+  let toggle = 0;
+  const inp = { rawEvidence: [freshNode()] };
+  Object.defineProperty(inp, 'caseAssociation', {
+    enumerable: true,
+    configurable: false,
+    get() { return (toggle++ === 0) ? safeCA : hostileCA; },
+  });
+  const r = EG.buildEvidenceGraph(inp, { clock: CLOCK });
+  // Accessor descriptor on envelope top-level is forbidden -> envelope validation rejects.
+  chk('RN-01 envelope accessor on caseAssociation rejected', r.eligible === false);
+})();
+
+(function sectionM_RN02() {
+  // RN-02 — array index accessor throws; per-index defence treats as ONE rejected node, not whole build.
+  const arr = [freshNode({ nodeId: 'ev_ok' })];
+  const trapped = [];
+  Object.defineProperty(trapped, '0', { enumerable: true, configurable: true, get() { throw new Error('boom'); } });
+  trapped.length = 1;
+  // Append a clean node alongside (index 1 holds a valid node via descriptor)
+  Object.defineProperty(trapped, '1', { enumerable: true, configurable: true, value: freshNode({ nodeId: 'ev_clean' }) });
+  trapped.length = 2;
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: trapped }), { clock: CLOCK });
+  chk('RN-02 hostile array slot does not poison whole build', r.valid === true);
+  chk('RN-02 hostile slot counted as 1 rejection', r.valid === true && r.graph.provenance.rejectedReasonsSummary[CODES.PROTOTYPE_POLLUTION_REJECTED] === 1);
+  chk('RN-02 clean slot kept', r.valid === true && r.graph.nodes.some(n => n.nodeId === 'ev_clean'));
+})();
+
+(function sectionM_RN03() {
+  // RN-03 — duplicate nodeId outcome must NOT depend on caller order. Two nodeId='a' candidates:
+  //   variant X — no edges
+  //   variant Y — supportingEdges:['b'] (creates a→b)
+  // and b with supportingEdges:['a'] (b→a, closes a cycle if Y wins).
+  // Whichever variant the canonical sort picks must be the SAME regardless of caller input order.
+  const a_x = freshNode({ nodeId: 'a', identity: freshId({ sourceId: 'src_a' }) });
+  const a_y = freshNode({ nodeId: 'a', identity: freshId({ sourceId: 'src_a' }), supportingEdges: ['b'] });
+  const b = freshNode({ nodeId: 'b', identity: freshId({ sourceId: 'src_b' }), supportingEdges: ['a'] });
+  const r1 = EG.buildEvidenceGraph(freshInput({ rawEvidence: [a_x, a_y, b] }), { clock: CLOCK });
+  const r2 = EG.buildEvidenceGraph(freshInput({ rawEvidence: [a_y, a_x, b] }), { clock: CLOCK });
+  // Same outcome regardless of permutation
+  const sameOutcome = (r1.eligible === r2.eligible) && (r1.valid === r2.valid);
+  chk('RN-03 dedup outcome independent of caller permutation', sameOutcome);
+  if (r1.valid === true && r2.valid === true) {
+    chk('RN-03 same graphId across permutations', r1.graph.graphId === r2.graph.graphId);
+  }
+})();
+
+(function sectionM_RN04() {
+  // RN-04 — semantic dedup map keyed by full canonical string, not hash. Two completely different
+  // params values cannot collide (the dedup map key IS the canonical string).
+  const a = freshNode({ nodeId: 'ev_a', observation: { kind: 'metric_value', i18nKey: 'r3_0d.x', params: { v: 'zatgbu54' }, channel: 'rpm' } });
+  const b = freshNode({ nodeId: 'ev_b', observation: { kind: 'metric_value', i18nKey: 'r3_0d.x', params: { v: 'rq5kja9k' }, channel: 'rpm' } });
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: [a, b] }), { clock: CLOCK });
+  chk('RN-04 distinct param values both kept (no hash collision data loss)', r.valid === true && r.graph.nodes.length === 2);
+})();
+
+(function sectionM_RN05() {
+  // RN-05 — correlationGroup.memberNodeIds must be frozen.
+  const a = freshNode({ nodeId: 'ev_a' });
+  const b = freshNode({ nodeId: 'ev_b', observation: { kind: 'metric_value', i18nKey: 'r3_0d.x', params: { v: 1 }, channel: 'rpm' } });
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: [a, b] }), { clock: CLOCK });
+  chk('RN-05 group object frozen', r.valid === true && Object.isFrozen(r.graph.correlationGroups[0]));
+  chk('RN-05 memberNodeIds frozen', r.valid === true && Object.isFrozen(r.graph.correlationGroups[0].memberNodeIds));
+  let threw = false;
+  try { r.graph.correlationGroups[0].memberNodeIds.push('FORGED'); } catch (e) { threw = true; }
+  chk('RN-05 push to memberNodeIds throws or no-op', threw || r.graph.correlationGroups[0].memberNodeIds.length === 2);
+})();
+
+(function sectionM_RN06() {
+  // RN-06 — opts.clock must be invoked AFTER envelope validation, not before. A throwing opts
+  // accessor must not block the build (clock is best-effort).
+  let clockCalled = false;
+  const hostileOpts = {};
+  Object.defineProperty(hostileOpts, 'clock', { enumerable: true, configurable: false, get() { throw new Error('boom'); } });
+  const r = EG.buildEvidenceGraph(freshInput(), hostileOpts);
+  chk('RN-06 throwing opts.clock accessor -> createdAt null (build still succeeds)', r.valid === true && r.graph.createdAt === null);
+
+  // Bad envelope + bad clock -> envelope error wins (clock never called).
+  const badInp = { rawEvidence: [] };  // missing caseAssociation
+  const opts2 = { clock: () => { clockCalled = true; return NOW; } };
+  const r2 = EG.buildEvidenceGraph(badInp, opts2);
+  chk('RN-06 envelope failure blocks before clock', r2.eligible === false && clockCalled === false);
+})();
+
+(function sectionM_RN07() {
+  // RN-07 — internal helpers are not exported (asserted in section J).
+  chk('RN-07 buildEvidenceGraph remains the only public entry', typeof EG.buildEvidenceGraph === 'function');
+})();
+
+(function sectionM_RN08() {
+  // RN-08 — a nodeId like 'constructor' must not collide with Object.prototype keys when used as
+  // a map key in adjacency / colour / in-degree / byId maps.
+  const a = freshNode({ nodeId: 'constructor', identity: freshId({ sourceId: 'src_c' }) });
+  const b = freshNode({ nodeId: 'toString', identity: freshId({ sourceId: 'src_t' }), supportingEdges: ['constructor'] });
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: [a, b] }), { clock: CLOCK });
+  chk('RN-08 nodeId="constructor" + "toString" builds without prototype collision', r.valid === true && r.graph.nodes.length === 2);
+  chk('RN-08 supports edge from toString -> constructor present', r.valid === true && r.graph.edges.some(e => e.from === 'toString' && e.to === 'constructor' && e.kind === 'supports'));
+})();
+
+(function sectionM_RN09() {
+  // RN-09 — ENVELOPE_BYTE_CAP enforced post-sanitization. Build many valid nodes each with
+  // moderate payload; the per-observation params key cap (PARAMS_KEYS_CAP) protects against
+  // per-node bloat. Confirm an over-cap configuration is rejected.
+  const arr = [];
+  // each node's params has many keys -> trips PARAMS_KEYS_CAP (per-node ARRAY_CAP_EXCEEDED counted)
+  const bigParams = {};
+  for (let k = 0; k < EG.PARAMS_KEYS_CAP + 5; k++) bigParams['k' + k] = k;
+  arr.push(freshNode({ observation: { kind: 'metric_value', i18nKey: 'r3_0d.x', params: bigParams, channel: 'rpm' } }));
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
+  // Node with > PARAMS_KEYS_CAP keys is rejected as ARRAY_CAP_EXCEEDED.
+  chk('RN-09 per-observation params key cap enforced', r.valid === true && r.graph.provenance.rejectedReasonsSummary[CODES.ARRAY_CAP_EXCEEDED] === 1);
 })();
 
 console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');

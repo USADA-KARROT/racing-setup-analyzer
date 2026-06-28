@@ -108,6 +108,11 @@ function scanFile(file, violations, authorizedSet, allConsumers) {
       violations.push(v);
     }
   }
+  // RN-11 closure: secondary string-concat-near-require heuristic. ONLY emits when the file is
+  // NOT in the authorized set — an authorized consumer's UMD require is the expected case.
+  if (!authorizedSet.has(relFile) && detectSuspectedDynamicPhaseRequire(src)) {
+    violations.push({ code: 'PROD_SUSPECTED_DYNAMIC_PHASE_REQUIRE', file: relFile, phase: PHASE_PROGRAM });
+  }
 }
 
 function scanIndexHtml(violations) {
@@ -127,25 +132,97 @@ function finish(payload) {
   return Object.assign({ check: PHASE ? ('r3-' + PHASE_PROGRAM.toLowerCase().replace('.', '-') + '-no-consumer').replace('--', '-') : 'r3-phase-no-consumer', program: PHASE_PROGRAM || null }, payload);
 }
 
+// Codex D2 Round 1 RN-10 closure: strict entry-shape validation. Any malformed entry fails closed
+// (allow set becomes empty AND a STATE_AUTHORIZED_PATH_ENTRY_INVALID violation is emitted, which
+// makes the whole check fail). Validates exact key set, path grammar (repo-relative, no '..', no
+// '/' prefix, no glob chars, conservative segment regex), capability non-empty string, and rejects
+// duplicates.
+const SAFE_SEGMENT_RE = /^[A-Za-z0-9_.-]+$/;
+function _validatePathString(p) {
+  if (typeof p !== 'string' || p.length === 0) return 'empty';
+  if (p.startsWith('/')) return 'absolute';
+  if (p.includes('..')) return 'parent-segment';
+  if (p !== p.trim()) return 'whitespace';
+  if (/[\r\n\t]/.test(p)) return 'control-char';
+  if (/[*?[\]{}()|\\^$#~]/.test(p)) return 'glob-or-regex-char';
+  const segments = p.split('/');
+  for (const seg of segments) {
+    if (seg.length === 0) return 'empty-segment';
+    if (!SAFE_SEGMENT_RE.test(seg)) return 'invalid-segment-char';
+  }
+  return null;
+}
+const AUTHORIZED_ENTRY_KEYS = new Set(['path', 'capability']);
 function loadAuthorizedSet() {
-  // Read state.json :: authorizedProductionPaths. Fail-closed: if unreadable or malformed, the set
-  // is EMPTY (no consumer authorized → any consumer becomes a violation). The check itself is never
-  // skipped — the strictest posture is always applied on parse error.
-  if (!PHASE) return { set: new Set(), readError: null };
+  if (!PHASE) return { set: new Set(), violations: [] };
   const stateOverride = process.env.R3_PHASE_STATE_FILE_OVERRIDE ? path.resolve(process.env.R3_PHASE_STATE_FILE_OVERRIDE) : null;
   const statePath = stateOverride || path.join(REPO, PHASE.stateDir, 'state.json');
   let raw;
   try { raw = fs.readFileSync(statePath, 'utf8'); }
-  catch (e) { return { set: new Set(), readError: 'STATE_UNREADABLE: ' + e.message }; }
+  catch (e) { return { set: new Set(), violations: [{ code: 'STATE_UNREADABLE', message: statePath + ': ' + e.message }] }; }
   let st;
   try { st = JSON.parse(raw); }
-  catch (e) { return { set: new Set(), readError: 'STATE_PARSE_ERROR: ' + e.message }; }
-  const list = Array.isArray(st && st.authorizedProductionPaths) ? st.authorizedProductionPaths : [];
+  catch (e) { return { set: new Set(), violations: [{ code: 'STATE_PARSE_ERROR', message: statePath + ': ' + e.message }] }; }
+  if (!st || typeof st !== 'object' || Array.isArray(st)) return { set: new Set(), violations: [{ code: 'STATE_AUTHORIZED_PATHS_MALFORMED', message: 'state.json root is not a plain object' }] };
+  if (!Array.isArray(st.authorizedProductionPaths)) return { set: new Set(), violations: [{ code: 'STATE_AUTHORIZED_PATHS_MALFORMED', message: 'authorizedProductionPaths missing or not an array' }] };
   const set = new Set();
-  for (const entry of list) {
-    if (entry && typeof entry === 'object' && typeof entry.path === 'string' && entry.path.length > 0) set.add(entry.path);
+  const violations = [];
+  const seenPaths = new Set();
+  for (let i = 0; i < st.authorizedProductionPaths.length; i++) {
+    const entry = st.authorizedProductionPaths[i];
+    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
+      violations.push({ code: 'STATE_AUTHORIZED_PATH_ENTRY_INVALID', index: i, reason: 'not-a-plain-object' });
+      continue;
+    }
+    // Exact closed key set: must have BOTH path AND capability; no extra keys (RN-10 closure).
+    let extraKey = null;
+    for (const k of Object.keys(entry)) if (!AUTHORIZED_ENTRY_KEYS.has(k)) { extraKey = k; break; }
+    if (extraKey) {
+      violations.push({ code: 'STATE_AUTHORIZED_PATH_ENTRY_INVALID', index: i, reason: 'unknown-key:' + extraKey });
+      continue;
+    }
+    if (!('path' in entry) || !('capability' in entry)) {
+      violations.push({ code: 'STATE_AUTHORIZED_PATH_ENTRY_INVALID', index: i, reason: 'missing-required-key' });
+      continue;
+    }
+    if (typeof entry.path !== 'string' || entry.path.length === 0) {
+      violations.push({ code: 'STATE_AUTHORIZED_PATH_ENTRY_INVALID', index: i, reason: 'path-not-string' });
+      continue;
+    }
+    if (typeof entry.capability !== 'string' || entry.capability.length === 0) {
+      violations.push({ code: 'STATE_AUTHORIZED_PATH_ENTRY_INVALID', index: i, path: entry.path, reason: 'capability-not-string' });
+      continue;
+    }
+    const pathReason = _validatePathString(entry.path);
+    if (pathReason) {
+      violations.push({ code: 'STATE_AUTHORIZED_PATH_GRAMMAR_INVALID', index: i, path: entry.path, reason: pathReason });
+      continue;
+    }
+    if (seenPaths.has(entry.path)) {
+      violations.push({ code: 'STATE_AUTHORIZED_PATH_DUPLICATE', index: i, path: entry.path });
+      continue;
+    }
+    seenPaths.add(entry.path);
+    set.add(entry.path);
   }
-  return { set: set, readError: null };
+  // RN-10 closure: if ANY entry-level violation occurred, the allow set is treated as EMPTY so a
+  // partially-malformed state cannot smuggle through a single good entry that authorizes anything.
+  if (violations.length > 0) return { set: new Set(), violations };
+  return { set, violations: [] };
+}
+
+// Codex D2 Round 1 RN-11 closure: detect string-concatenation-near-require shapes that would
+// resolve to a phase contract path. Heuristic: a require/import call with a non-literal first
+// argument AND the file contains a literal `r3.0d` / `r3.0e` / `r3.0f` substring. Flag as a
+// PROD_SUSPECTED_DYNAMIC_PHASE_REQUIRE finding. Documented limitation: AST-level constant
+// folding is out of scope; the heuristic errs on the side of caution and may produce false
+// positives that future code may need to refactor (this is the intended fail-closed posture).
+const NONLITERAL_REQUIRE_RE = /(?:require|import)\s*\(\s*(?![\s'"`])/g;
+const PHASE_SUBSTR_RE = /\br3\.0[def]\b/i;
+function detectSuspectedDynamicPhaseRequire(src) {
+  if (!PHASE_SUBSTR_RE.test(src)) return false;
+  NONLITERAL_REQUIRE_RE.lastIndex = 0;
+  return NONLITERAL_REQUIRE_RE.test(src);
 }
 
 function run() {
@@ -155,8 +232,8 @@ function run() {
 
   const violations = [];
   const allConsumers = [];
-  const { set: authorizedSet, readError } = loadAuthorizedSet();
-  if (readError) violations.push({ code: 'STATE_AUTHORIZED_PATHS_READ_ERROR', message: readError });
+  const { set: authorizedSet, violations: stateViolations } = loadAuthorizedSet();
+  for (const v of stateViolations) violations.push(v);
 
   const rendererJs = listJsFiles(path.join(SCAN_BASE, 'renderer', 'js'));
   for (const f of rendererJs) scanFile(f, violations, authorizedSet, allConsumers);

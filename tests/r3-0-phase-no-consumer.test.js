@@ -95,5 +95,62 @@ for (const phase of PHASES) {
   chk(phase + ' FAIL index.html loads phase contracts', r.artifact && r.artifact.violations.some(v => v.code === 'INDEX_HTML_SCRIPT_LOADS_CONTRACTS'));
 }
 
+// ── Codex D2 Round 1 RN-10 closure — malformed state.json entries fail closed ──
+// Build a synthetic state.json with each shape defect and confirm the script fails.
+function runWithSyntheticState(phase, stateJson, sceneSrc) {
+  const tmpArt = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-noc-art-'));
+  const tmpScan = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-noc-scan-'));
+  const tmpState = path.join(tmpArt, 'state.json');
+  fs.mkdirSync(path.join(tmpScan, 'renderer', 'js'), { recursive: true });
+  fs.writeFileSync(path.join(tmpScan, 'renderer', 'js', 'maybe-consumer.js'), sceneSrc || '// clean\n');
+  fs.writeFileSync(path.join(tmpScan, 'renderer', 'index.html'), '<!doctype html><html><body></body></html>');
+  fs.writeFileSync(path.join(tmpScan, 'main.js'), '// no consumer\n');
+  fs.writeFileSync(path.join(tmpScan, 'preload.js'), '// no consumer\n');
+  fs.writeFileSync(tmpState, JSON.stringify(stateJson));
+  const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmpArt, R3_PHASE_PROGRAM: phase, R3_PHASE_NO_CONSUMER_BASE_OVERRIDE: tmpScan, R3_PHASE_STATE_FILE_OVERRIDE: tmpState });
+  const r = cp.spawnSync('node', [SCRIPT], { cwd: REPO, encoding: 'utf8', env });
+  let artifact = null;
+  try { artifact = JSON.parse(fs.readFileSync(path.join(tmpArt, ARTIFACT[phase] || 'r3-phase-no-consumer.json'), 'utf8')); } catch (_) { artifact = null; }
+  return { status: r.status, artifact };
+}
+
+(function rn10Tests() {
+  const consumerSrc = 'var c = require("../../contracts/r3.0d/index.js");\nmodule.exports = c;\n';
+  // missing capability
+  const r1 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/maybe-consumer.js' }], enabledCapabilities: [], runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
+  chk('RN-10 missing capability key → fail closed', r1.status !== 0 && r1.artifact && r1.artifact.violations.some(v => v.code === 'STATE_AUTHORIZED_PATH_ENTRY_INVALID'));
+  // extra key
+  const r2 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/maybe-consumer.js', capability: 'evidence_graph_present', extra: 1 }], enabledCapabilities: [], runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
+  chk('RN-10 extra own key → fail closed', r2.status !== 0 && r2.artifact && r2.artifact.violations.some(v => v.code === 'STATE_AUTHORIZED_PATH_ENTRY_INVALID'));
+  // forbidden .. path
+  const r3 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: '../renderer/js/x.js', capability: 'evidence_graph_present' }], enabledCapabilities: [], runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
+  chk('RN-10 .. in path → fail closed', r3.status !== 0 && r3.artifact && r3.artifact.violations.some(v => v.code === 'STATE_AUTHORIZED_PATH_GRAMMAR_INVALID'));
+  // glob char
+  const r4 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/*.js', capability: 'evidence_graph_present' }], enabledCapabilities: [], runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
+  chk('RN-10 glob char in path → fail closed', r4.status !== 0 && r4.artifact && r4.artifact.violations.some(v => v.code === 'STATE_AUTHORIZED_PATH_GRAMMAR_INVALID'));
+  // duplicate entries
+  const r5 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/x.js', capability: 'evidence_graph_present' }, { path: 'renderer/js/x.js', capability: 'evidence_graph_present' }], enabledCapabilities: [], runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, '// clean\n');
+  chk('RN-10 duplicate entry → fail closed', r5.status !== 0 && r5.artifact && r5.artifact.violations.some(v => v.code === 'STATE_AUTHORIZED_PATH_DUPLICATE'));
+  // any malformed entry forces the allow set to empty (defence-in-depth)
+  chk('RN-10 malformed allow set is empty (defence in depth)', r1.artifact && r1.artifact.authorizedPathCount === 0);
+})();
+
+// ── Codex D2 Round 1 RN-11 closure — suspected dynamic phase require detector ──
+(function rn11Tests() {
+  for (const phase of PHASES) {
+    const prefix = CONTRACT_PREFIX[phase];
+    // file contains string-concat-near-require AND r3.0d/e/f literal somewhere
+    const sceneSrc = "var prefix = '../../contracts/';\nvar phase = '" + prefix.split('/').pop() + "';\nvar p = prefix + phase + '/index.js';\nvar c = require(p);\nmodule.exports = c;\n";
+    const tmpScan = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-noc-scan-'));
+    fs.mkdirSync(path.join(tmpScan, 'renderer', 'js'), { recursive: true });
+    fs.writeFileSync(path.join(tmpScan, 'renderer', 'js', 'sneaky.js'), sceneSrc);
+    fs.writeFileSync(path.join(tmpScan, 'renderer', 'index.html'), '<!doctype html><html><body></body></html>');
+    fs.writeFileSync(path.join(tmpScan, 'main.js'), '// no consumer\n');
+    fs.writeFileSync(path.join(tmpScan, 'preload.js'), '// no consumer\n');
+    const r = runValidator(phase, tmpScan);
+    chk(phase + ' RN-11 string-concat dynamic phase require flagged', r.artifact && r.artifact.violations.some(v => v.code === 'PROD_SUSPECTED_DYNAMIC_PHASE_REQUIRE'));
+  }
+})();
+
 console.log('phase-no-consumer: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);
