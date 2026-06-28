@@ -867,5 +867,166 @@ function freshInput(over) {
   chk('RN-15: NUL-heavy payload rejected pre-canonical (JSON escape expansion accounted for)', r.eligible === false && r.reasonCodes.indexOf(CODES.BYTE_CAP_EXCEEDED) !== -1);
 })();
 
+// ── Section Q — Codex D2 Round 5 finding closures (RN-13 round-4 + RN-15 round-4) ──────
+(function sectionQ_RN13_round4_FunctionPrototypeCall() {
+  // RN-13 round-4 (Round 5 evidence): a hostile clock that replaces
+  // `Function.prototype.call` (a strictly more general intrinsic than Array.prototype.slice /
+  // Array.prototype.map themselves) MUST NOT corrupt `_materializeGraph` output. The Round 5
+  // candidate (`ec00b88`) returned `{valid:true, nodes:[{tampered:true}], frozen:false}` for the
+  // exact exploit reproduced below. After the Round 6 fix, `_safeSlice` / `_safeMap` are
+  // direct-loop helpers that do not route through Function.prototype.call — so the exploit must
+  // either succeed cleanly (no `{tampered:true}` anywhere) or fail-closed; either way the result
+  // never contains an attacker-supplied unfrozen entry.
+  const origCall = Function.prototype.call;
+  const origSlice = Array.prototype.slice;
+  const origMap = Array.prototype.map;
+  let r;
+  try {
+    r = EG.buildEvidenceGraph(freshInput(), {
+      clock: function () {
+        // eslint-disable-next-line no-extend-native
+        Function.prototype.call = function () {
+          if (this === origSlice || this === origMap) return [{ tampered: true }];
+          return Reflect.apply(origCall, this, arguments);
+        };
+        return NOW;
+      },
+    });
+  } finally {
+    // eslint-disable-next-line no-extend-native
+    Function.prototype.call = origCall;
+  }
+  function hasTampered(arr) {
+    if (!Array.isArray(arr)) return false;
+    for (let i = 0; i < arr.length; i++) {
+      const v = arr[i];
+      if (v && typeof v === 'object' && Object.prototype.hasOwnProperty.call(v, 'tampered')) return true;
+    }
+    return false;
+  }
+  chk('RN-13 r4: hostile Function.prototype.call replacement — build returns a value', r !== undefined && r !== null);
+  chk('RN-13 r4: graph.nodes contains no {tampered:true} entry', r.valid === true && !hasTampered(r.graph.nodes));
+  chk('RN-13 r4: graph.correlationGroups contains no {tampered:true} entry', r.valid === true && !hasTampered(r.graph.correlationGroups));
+  chk('RN-13 r4: graph.topologicalOrder contains no {tampered:true} entry', r.valid === true && !hasTampered(r.graph.topologicalOrder));
+  chk('RN-13 r4: graph.nodes[0] is the legitimate sanitized node', r.valid === true && r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
+  chk('RN-13 r4: graph.nodes[0] is frozen (no unfrozen attacker object)', r.valid === true && Object.isFrozen(r.graph.nodes[0]));
+  chk('RN-13 r4: graph.nodes array is frozen (push must throw)', (function () {
+    if (!r.valid) return false;
+    let threw = false;
+    try { r.graph.nodes.push({ malicious: true }); } catch (e) { threw = true; }
+    return threw || r.graph.nodes.length === 1;
+  })());
+  chk('RN-13 r4: graph is deeply frozen at top level', r.valid === true && Object.isFrozen(r.graph));
+})();
+
+(function sectionQ_RN13_round4_FunctionPrototypeApply() {
+  // Symmetric exploit: replace `Function.prototype.apply` (in case the implementation switched to
+  // .apply). Same outcome required — no `{tampered:true}` leaks.
+  const origApply = Function.prototype.apply;
+  let r;
+  try {
+    r = EG.buildEvidenceGraph(freshInput(), {
+      clock: function () {
+        // eslint-disable-next-line no-extend-native
+        Function.prototype.apply = function () { return [{ tampered: true }]; };
+        return NOW;
+      },
+    });
+  } finally {
+    // eslint-disable-next-line no-extend-native
+    Function.prototype.apply = origApply;
+  }
+  function hasTampered(arr) {
+    if (!Array.isArray(arr)) return false;
+    for (let i = 0; i < arr.length; i++) {
+      const v = arr[i];
+      if (v && typeof v === 'object' && Object.prototype.hasOwnProperty.call(v, 'tampered')) return true;
+    }
+    return false;
+  }
+  chk('RN-13 r4: hostile Function.prototype.apply replacement — graph.nodes clean', r.valid === true && !hasTampered(r.graph.nodes));
+  chk('RN-13 r4: hostile Function.prototype.apply replacement — graph.correlationGroups clean', r.valid === true && !hasTampered(r.graph.correlationGroups));
+  chk('RN-13 r4: hostile Function.prototype.apply replacement — graph.topologicalOrder clean', r.valid === true && !hasTampered(r.graph.topologicalOrder));
+})();
+
+(function sectionQ_RN13_round4_ArrayPrototypePush() {
+  // Belt-and-suspenders: replace `Array.prototype.push` from inside the clock. The direct-loop
+  // helpers must not depend on .push (they use indexed assignment `out[i] = x`). The legitimate
+  // node must still appear, frozen, untampered.
+  const origPush = Array.prototype.push;
+  let r;
+  try {
+    r = EG.buildEvidenceGraph(freshInput(), {
+      clock: function () {
+        // eslint-disable-next-line no-extend-native
+        Array.prototype.push = function () { return 0; }; // no-op push (would silently drop entries)
+        return NOW;
+      },
+    });
+  } finally {
+    // eslint-disable-next-line no-extend-native
+    Array.prototype.push = origPush;
+  }
+  chk('RN-13 r4: hostile Array.prototype.push (no-op) — graph still contains legitimate node', r.valid === true && r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
+  chk('RN-13 r4: hostile Array.prototype.push — graph.nodes[0] frozen', r.valid === true && Object.isFrozen(r.graph.nodes[0]));
+})();
+
+(function sectionQ_RN15_round4_loneLowSurrogate() {
+  // RN-15 round-4 (Round 5 evidence): lone LOW surrogate values must be counted as 6 bytes each
+  // (\uXXXX JSON escape), not 3. The Round 5 candidate undercount let 35×30×70 = 73,500 lone
+  // surrogates slip past the per-node running total (~245 KB estimated vs ~471 KB actual). After
+  // the Round 6 fix the per-node estimator (Step 4.5 in the builder) must trip
+  // BYTE_CAP_EXCEEDED before any post-canonical work runs.
+  const bad = '\udc00'.repeat(70);
+  const arr = [];
+  for (let i = 0; i < 35; i++) {
+    const p = {};
+    for (let k = 0; k < 30; k++) p['k' + i + '_' + k] = bad;
+    arr.push(freshNode({
+      nodeId: 'ev_sur_' + i,
+      identity: freshId({ sourceId: 'src_sur_' + i }),
+      observation: { kind: 'metric_value', i18nKey: 'r3_0d.x', params: p, channel: 'rpm_' + i },
+    }));
+  }
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
+  chk('RN-15 r4: lone low surrogate payload rejected (BYTE_CAP_EXCEEDED)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.BYTE_CAP_EXCEEDED) !== -1);
+  chk('RN-15 r4: lone low surrogate payload tripped at PRE-canonical stage (not post)', r.eligible === false && typeof r.detail === 'string' && /pre-canonicalization/.test(r.detail));
+})();
+
+(function sectionQ_RN15_round4_loneHighSurrogate() {
+  // Symmetric coverage: lone HIGH surrogate (0xD800-0xDBFF without a following low) also escapes
+  // to 6 chars. The previous estimator wrongly assumed every high surrogate had a paired low and
+  // skipped the next char (i++) regardless, undercount AND mis-stepping.
+  const bad = '\ud83d'.repeat(70); // lone high surrogate, no following low
+  const arr = [];
+  for (let i = 0; i < 35; i++) {
+    const p = {};
+    for (let k = 0; k < 30; k++) p['k' + i + '_' + k] = bad;
+    arr.push(freshNode({
+      nodeId: 'ev_hi_' + i,
+      identity: freshId({ sourceId: 'src_hi_' + i }),
+      observation: { kind: 'metric_value', i18nKey: 'r3_0d.x', params: p, channel: 'rpm_' + i },
+    }));
+  }
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
+  chk('RN-15 r4: lone high surrogate payload rejected (BYTE_CAP_EXCEEDED)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.BYTE_CAP_EXCEEDED) !== -1);
+  chk('RN-15 r4: lone high surrogate payload tripped at PRE-canonical stage', r.eligible === false && typeof r.detail === 'string' && /pre-canonicalization/.test(r.detail));
+})();
+
+(function sectionQ_RN15_round4_validSurrogatePair_stillBuildsCompactGraphs() {
+  // Negative control: a SHORT payload using valid surrogate pairs (e.g. 🚀 = 🚀 = 4
+  // UTF-8 bytes per pair) must NOT trip the cap; the estimator should still count valid pairs as
+  // 4 bytes (not 12) so legitimate compact graphs with emoji are not over-rejected.
+  const emoji = '🚀'.repeat(10); // 10 rockets per value (20 code units, 4 bytes UTF-8 each pair = 40 bytes)
+  const p = {};
+  for (let k = 0; k < 5; k++) p['k_' + k] = emoji;
+  const r = EG.buildEvidenceGraph(freshInput({
+    rawEvidence: [freshNode({
+      observation: { kind: 'metric_value', i18nKey: 'r3_0d.x', params: p, channel: 'rpm' },
+    })],
+  }), { clock: CLOCK });
+  chk('RN-15 r4: valid surrogate pair (emoji) compact graph builds successfully', r.valid === true && r.graph.nodes.length === 1);
+})();
+
 console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
 if (fail > 0) process.exit(1);

@@ -92,7 +92,7 @@
   "tests": {
     "command": "npm test",
     "newSuiteForThisCheckpoint": "tests/r3.0d-evidence-graph.test.js",
-    "newSuiteAssertions": 126,
+    "newSuiteAssertions": 144,
     "stateAwareRefactor": "tests/r3.0d-contract-foundation.test.js Section I + J were refactored to be state-aware (D1 invariants when currentCheckpoint === D1_CONTRACT_FOUNDATION; D2 invariants when currentCheckpoint === D2_EVIDENCE_GRAPH). No D1-era assertion was deleted; the D1 branch is preserved and an additional D2 branch added.",
     "evidenceTier": "TIER 3 — Claude-verified on D2 branch HEAD; CI re-run on integrationSha is the authority for the Train target context."
   },
@@ -152,9 +152,22 @@
         "stillOpen": ["RN-13"],
         "newFindings": ["RN-15"],
         "evidence": "governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt"
+      },
+      {
+        "round": 5,
+        "reviewedSha": "ec00b888b72763a1d7ab38730c66ba5941b84678",
+        "verdict": "BLOCK",
+        "closed": [],
+        "stillOpen": ["RN-13 round-4", "RN-15 round-4"],
+        "newFindings": [],
+        "findingDetail": {
+          "RN-13 round-4": "Hostile clock replacing Function.prototype.call corrupted _safeSlice/_safeMap, injecting unfrozen {tampered:true} entries into nodes / correlationGroups / topologicalOrder. _ArrayPrototypeSlice.call / _ArrayPrototypeMap.call still routed through Function.prototype.call which the clock could re-bind.",
+          "RN-15 round-4": "Lone surrogates were undercounted by _jsonStringWidth (lone low surrogate fell through to BMP 3-byte; lone high surrogate assumed paired low and was undercounted to 4 bytes). 35×30×70 lone-low-surrogate values bypassed per-node estimation (~245 KB estimated) and reached the post-canonical envelope check at 471,197 bytes."
+        },
+        "evidence": "governance/r3.0d/codex-checkpoint-evidence/D2/round-5-ec00b88.raw.txt"
       }
     ],
-    "tierDisclosure": "Codex D2 Round 1 BLOCK on 10766c0 (12 findings); Round 2 BLOCK on ad6474a (closed 6 / 6 still-open); Round 3 BLOCK on 63ecf69 (closed 5 + RN-13/RN-14 NEW + RN-09 partial); Round 4 BLOCK on e84d22c (closed RN-09 + RN-14 + RN-15 NEW + RN-13 still partial — Array.prototype.slice/map were not yet captured). Round 5 candidate captures Array.prototype.slice / map / push at module init and routes _materializeGraph through _safeSlice / _safeMap (closes RN-13 round-3); adds _jsonStringWidth() helper that counts JSON-encoded byte width including escape expansion (control chars → \\uXXXX = 6 bytes) — _estimateNodeUtf8Bytes routes every embedded string through _jsonStringWidth so a NUL-heavy payload is rejected pre-canonical (closes RN-15). Tier 1 raw stdout at round-1-10766c0.raw.txt + round-2-ad6474a.raw.txt + round-3-63ecf69.raw.txt + round-4-e84d22c.raw.txt."
+    "tierDisclosure": "Codex D2 Round 1 BLOCK on 10766c0 (12 findings); Round 2 BLOCK on ad6474a (closed 6 / 6 still-open); Round 3 BLOCK on 63ecf69 (closed 5 + RN-13/RN-14 NEW + RN-09 partial); Round 4 BLOCK on e84d22c (closed RN-09 + RN-14 + RN-15 NEW + RN-13 still partial — Array.prototype.slice/map were not yet captured); Round 5 BLOCK on ec00b88 (carry-over: RN-13 round-4 STILL-OPEN, hostile Function.prototype.call replacement corrupts _safeSlice/_safeMap; RN-15 round-4 STILL-OPEN, lone surrogates undercount slips ~471 KB payload past per-node estimator). Round 6 candidate replaces _safeSlice / _safeMap with direct-loop helpers that read arr[i] and write out[i]=x — no Function.prototype.call / .apply / .push hop — so a clock-replaced FPC cannot inject {tampered:true} (closes RN-13 round-4); _jsonStringWidth gains explicit branches for lone LOW surrogate (0xDC00..0xDFFF → 6 bytes) and lone HIGH surrogate (0xD800..0xDBFF without a paired low → 6 bytes) so a 35×30×70 lone-low-surrogate payload trips Step 4.5 pre-canonicalization byte cap (`detail` now reads `pre-canonicalization byte estimate exceeded ENVELOPE_BYTE_CAP=262144` instead of `post-sanitization JSON size 471197 exceeds`) (closes RN-15 round-4). Adversarial regressions added in Section Q (Function.prototype.call replacement / Function.prototype.apply replacement / Array.prototype.push no-op / lone low surrogate / lone high surrogate / valid surrogate pair negative control). Tier 1 raw stdout at round-1-10766c0.raw.txt + round-2-ad6474a.raw.txt + round-3-63ecf69.raw.txt + round-4-e84d22c.raw.txt + round-5-ec00b88.raw.txt."
   },
 
   "scopeBoundary": {
@@ -198,6 +211,10 @@
     "governance/r3.0d/capabilities.json",
     "governance/r3.0d/checkpoints/D2.json",
     "governance/r3.0d/codex-checkpoint-evidence/D2/round-1-10766c0.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D2/round-2-ad6474a.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D2/round-3-63ecf69.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D2/round-5-ec00b88.raw.txt",
     "governance/r3.0d/schema.json",
     "governance/r3.0d/state.json",
     "governance/r3.0e/checkpoint-manifest.schema.json",
@@ -213,7 +230,7 @@
     "tests/r3.0d-contract-foundation.test.js",
     "tests/r3.0d-evidence-graph.test.js"
   ],
-  "changedFilesNote": "Computed from the exact baseSha (f8a598b) → reviewedCandidateSha diff at the moment of the Round 2 candidate commit; includes both the separate state-aware guard-enhancement commit (51155b3 → scripts/check-r3-phase-no-consumer.js + tests/r3-0-phase-no-consumer.test.js) and the cross-phase rename commit (10766c0 → docs/r3-0-train-governance.md + four governance/r3.0e files). The Round 1 codex evidence file is included as it ships in the same Round 2 candidate. RN-12 closure.",
+  "changedFilesNote": "Computed from the exact baseSha (f8a598b) → Round 6 candidate HEAD diff. Includes the cross-phase rename commit (governance/r3.0e files + docs/r3-0-train-governance.md), the state-aware guard-enhancement commit (scripts/check-r3-phase-no-consumer.js + tests/r3-0-phase-no-consumer.test.js), every Codex evidence file from Round 1 through Round 5 (so the candidate carries its own evidence lineage), plus all D2 production / test / governance artifacts. RN-12 closure.",
 
   "note": "D2_EVIDENCE_GRAPH — the first non-bootstrap R3.0D PRODUCTION checkpoint. Lifts ONE production capability (evidence_graph_present); enables runtimeConsumersAllowed=true + algorithmsAllowed=true; introduces renderer/js/r3-0d-evidence-graph.js as the single new authorized production path; keeps uiAllowed=false + featureRegistryActivationAllowed=false (D5 only). The 5-phase D-flow is renamed atomically alongside this checkpoint per the directive; the rename is recorded in governanceRename above with full lineage. C-B Codex review runs against the exact D2 candidate SHA; tier-1 raw stdout to be persisted under governance/r3.0d/codex-checkpoint-evidence/D2/."
 }

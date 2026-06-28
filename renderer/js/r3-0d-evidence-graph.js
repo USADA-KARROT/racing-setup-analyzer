@@ -75,6 +75,17 @@
  *          diff (including the separate guard-enhancement commit and the cross-phase rename
  *          commit), populated in governance/r3.0d/checkpoints/D2.json.
  *
+ * Codex D2 Round 5 closures embedded (RN-13 round-4 + RN-15 round-4):
+ *   RN-13 round-4 (round-5 closure): `_safeSlice` / `_safeMap` no longer go through
+ *          `Function.prototype.call`. A hostile opts.clock cannot inject `{tampered:true}`
+ *          entries into nodes / correlationGroups / topologicalOrder by reassigning
+ *          `Function.prototype.call`. The helpers use direct indexed reads/writes only.
+ *   RN-15 round-4 (round-5 closure): `_jsonStringWidth` now accounts for lone surrogates
+ *          (high or low) as 6 bytes each (`\uXXXX` JSON escape). The previous implementation
+ *          undercount lone low surrogates as 3 bytes (BMP 3-byte UTF-8). The Round 5 exploit
+ *          (35×30×70 lone low surrogate values) is rejected at Step 4.5 (per-node running
+ *          total) instead of slipping through to Step 17 (post-canonical envelope cap).
+ *
  * Defence-in-depth surface (mirrors R3.0D D1 RN-01..RN-11 closures, extended by the D2 closures
  * listed above): every external entry validates the original input prototype, hidden own keys,
  * nested-non-plain objects pre-clone (R3_0D_ReasonCodes helpers); the builder wraps the whole work
@@ -181,39 +192,79 @@
     return s.length * 4; // worst-case bound when neither API is present
   }
 
-  // Codex D2 Round 4 RN-15 closure: JSON canonical width estimator. Counts the actual byte width
-  // a string occupies when serialized to canonical JSON, accounting for:
+  // Codex D2 Round 4 RN-15 + Round 5 RN-15 round-4 closure: JSON canonical width estimator. Counts
+  // the actual byte width a string occupies when serialised to canonical JSON, accounting for:
   //   - " and \ → 2 bytes each (escaped)
   //   - control chars 0x00..0x1F and DEL → 6 bytes (\uXXXX form)
   //   - ASCII 0x20..0x7E (minus " and \) → 1 byte
-  //   - UTF-8 multi-byte sequences (2/3/4-byte) → exact width via TextEncoder if available, else
-  //     a conservative per-code-unit upper bound. Surrogate pairs are counted as a single 4-byte
-  //     UTF-8 sequence (not 6 + 6 \uXXXX). Always overestimates rather than underestimates so the
-  //     pre-canonical estimator never lets through a payload that exceeds the cap.
-  // Includes the surrounding "..." quotes (+2). This is the conservative pre-canonicalization
-  // estimate the rough estimator should use for params keys/values (RN-15 round-4 closure).
+  //   - UTF-8 multi-byte sequences (2 / 3 / 4-byte) → exact width
+  //   - VALID surrogate pair (high 0xD800-0xDBFF immediately followed by low 0xDC00-0xDFFF) →
+  //     4-byte UTF-8 (the supplementary-plane codepoint)
+  //   - LONE high surrogate (0xD800-0xDBFF without a following low) → 6 bytes (`\uXXXX`)
+  //   - LONE low surrogate (0xDC00-0xDFFF anywhere) → 6 bytes (`\uXXXX`)
+  //
+  // Round 5 closure: the previous implementation skipped the surrogate-pair check by always
+  // assuming a high surrogate had a paired low, AND let lone LOW surrogates fall through to the
+  // default `n += 3` (BMP 3-byte UTF-8). Per the ES spec since 2019, `JSON.stringify` MUST escape
+  // lone surrogates as `\uXXXX` — so a 70-char `\udc00` value JSON-encodes to ~420 chars, not 210.
+  // The Round 5 exploit (35×30×70 lone low surrogates) bypassed the per-node estimator (estimated
+  // ~245 KB, actual ~471 KB) and was only caught by the post-canonical envelope check. After this
+  // fix the per-node running total (Step 4.5) trips BYTE_CAP_EXCEEDED before any single canonical
+  // serialisation runs.
+  //
+  // Always overestimates rather than underestimates: the pre-canonical estimator never lets
+  // through a payload that exceeds the cap. Includes the surrounding "..." quotes (+2).
   function _jsonStringWidth(s) {
     if (typeof s !== 'string') return 4; // typical "null" / unknown wrapper
     var n = 2; // surrounding quotes
-    for (var i = 0; i < s.length; i++) {
+    var len = s.length;
+    for (var i = 0; i < len; i++) {
       var c = s.charCodeAt(i);
       if (c === 0x22 || c === 0x5C) { n += 2; continue; }                  // " or \  → escaped
       if (c < 0x20 || c === 0x7F) { n += 6; continue; }                    // control → \uXXXX
       if (c < 0x80) { n += 1; continue; }                                  // ASCII printable
       if (c < 0x800) { n += 2; continue; }                                 // UTF-8 2-byte
-      if (c >= 0xD800 && c <= 0xDBFF) { n += 4; i++; continue; }           // high surrogate → 4-byte UTF-8 + skip low
+      if (c >= 0xDC00 && c <= 0xDFFF) { n += 6; continue; }                // LONE low surrogate → \uXXXX
+      if (c >= 0xD800 && c <= 0xDBFF) {                                    // high surrogate — check pairing
+        if (i + 1 < len) {
+          var c2 = s.charCodeAt(i + 1);
+          if (c2 >= 0xDC00 && c2 <= 0xDFFF) { n += 4; i++; continue; }     // valid pair → 4-byte UTF-8
+        }
+        n += 6; continue;                                                  // LONE high surrogate → \uXXXX
+      }
       n += 3;                                                              // UTF-8 3-byte BMP
     }
     return n;
   }
 
-  // Captured Array.prototype.slice / map invocation helpers (RN-13 round-4 closure). Using the
-  // captured prototype methods via .call() prevents an attacker-supplied opts.clock that
-  // reassigns Array.prototype.slice / map from corrupting _materializeGraph output. Build-time
-  // arrays remain plain Arrays so .slice() / .map() at module-init time still uses the standard
-  // methods we captured.
-  function _safeSlice(arr) { return _ArrayPrototypeSlice.call(arr); }
-  function _safeMap(arr, fn) { return _ArrayPrototypeMap.call(arr, fn); }
+  // Codex D2 Round 5 RN-13 round-4 closure: direct-loop array copy / map helpers. The previous
+  // implementation invoked `_ArrayPrototypeSlice.call(arr)` / `_ArrayPrototypeMap.call(arr, fn)`,
+  // which routes through `Function.prototype.call` — a global a hostile opts.clock can replace
+  // (clock fires before _materializeGraph runs). The Round 5 exploit demonstrated:
+  //     Function.prototype.call = function(){ if (this===origSlice||this===origMap) return [{tampered:true}]; ... };
+  // injecting `{tampered:true}` into nodes / correlationGroups / topologicalOrder (with `frozen:false`
+  // because the unfrozen attacker object slipped past the outer Object.freeze of the array).
+  // Direct indexed-property reads + writes never traverse Function.prototype.call, Array.prototype.push,
+  // or any other monkey-patchable hop. Sanitized inputs are plain frozen primitives, so `arr.length`
+  // and `arr[i]` reads cannot trigger accessor descriptors.
+  function _safeSlice(arr) {
+    var out = [];
+    var len;
+    try { len = (arr == null) ? 0 : arr.length; } catch (e) { return out; }
+    if (typeof len !== 'number' || len !== len || len < 0) return out;
+    len = len | 0;
+    for (var i = 0; i < len; i++) out[i] = arr[i];
+    return out;
+  }
+  function _safeMap(arr, fn) {
+    var out = [];
+    var len;
+    try { len = (arr == null) ? 0 : arr.length; } catch (e) { return out; }
+    if (typeof len !== 'number' || len !== len || len < 0) return out;
+    len = len | 0;
+    for (var i = 0; i < len; i++) out[i] = fn(arr[i], i);
+    return out;
+  }
 
   // Codex D2 Round 3 RN-14 + Round 4 RN-15 closure: per-node canonical-JSON byte width estimate.
   // Uses _jsonStringWidth() for every string that will be embedded in the canonical JSON output
