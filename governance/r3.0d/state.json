@@ -1,12 +1,14 @@
 {
   "schemaVersion": 1,
   "program": "R3.0D",
-  "currentCheckpoint": "D1_CONTRACT_FOUNDATION",
-  "authorizedProductionPaths": [],
-  "enabledCapabilities": ["contract_foundation_present"],
-  "runtimeConsumersAllowed": false,
+  "currentCheckpoint": "D2_EVIDENCE_GRAPH",
+  "authorizedProductionPaths": [
+    { "path": "renderer/js/r3-0d-evidence-graph.js", "capability": "evidence_graph_present" }
+  ],
+  "enabledCapabilities": ["contract_foundation_present", "evidence_graph_present"],
+  "runtimeConsumersAllowed": true,
   "uiAllowed": false,
   "featureRegistryActivationAllowed": false,
-  "algorithmsAllowed": false,
-  "note": "R3.0D D1_CONTRACT_FOUNDATION state. contract_foundation_present is the only enabled capability — a governance/contract kind that requires NO authorizedProductionPath (mirrors R3.0C CP1 pattern). The four production switches (runtimeConsumers / ui / featureRegistryActivation / algorithms) remain false; D1 introduces NO production code, NO runtime consumer, NO algorithm, NO UI surface. The R3.0D feature IDs (decision_engine / hypothesis / engineer_brief — names to be finalized at D5) are intentionally absent from renderer/js/feature-registry.js. Mutating any production switch above D1 requires a separately-authorized Integrated Delivery Train checkpoint (D2 algorithms / D2 runtime consumers / D4 UI / D5 activation) AND requires R3.0C state.currentCheckpoint === 'C8_ACTIVATION' per cross-phase rule."
+  "algorithmsAllowed": true,
+  "note": "R3.0D D2_EVIDENCE_GRAPH state. evidence_graph_present unlocks renderer/js/r3-0d-evidence-graph.js as the single new authorized production path (the Evidence Graph service module). runtimeConsumersAllowed AND algorithmsAllowed flip to true because (a) the new module requires contracts/r3.0d at runtime (first R3.0D runtime consumer) and (b) the graph dedup/correlation/cycle/topo logic is the first deterministic algorithm. uiAllowed + featureRegistryActivationAllowed remain false — UI surface and Feature Registry activation are exclusively D5_ENGINEER_BRIEF_ACTIVATION. The renderer/js/feature-registry.js is untouched (no R3.0D feature ID is registered until D5). Mutating any state field above D2 requires a separately-authorized Integrated Delivery Train checkpoint (D3 hypothesis_engine_present / D4 priority_engine_present / D5 engineer_brief_present + feature_registry_active) AND requires R3.0C state.currentCheckpoint === 'C8_ACTIVATION' per cross-phase rule."
 }

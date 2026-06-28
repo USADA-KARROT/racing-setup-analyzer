@@ -2,37 +2,42 @@
   "schemaVersion": 1,
   "program": "R3.0D",
   "title": "R3.0D Capability Ledger",
-  "note": "Defines each capability the R3.0D phase of the Integrated Delivery Train may eventually enable, its kind, and the earliest checkpoint at which it may be unlocked. A capability being DEFINED here does NOT mean it is ENABLED. Enablement is governed by governance/r3.0d/state.json (enabledCapabilities). D0 only defines the universe; no production capability is enabled at D0.",
+  "note": "Defines each capability the R3.0D phase of the Integrated Delivery Train may eventually enable, its kind, and the earliest checkpoint at which it may be unlocked. A capability being DEFINED here does NOT mean it is ENABLED. Enablement is governed by governance/r3.0d/state.json (enabledCapabilities). Per SKYLINE 2026-06-28 R3.0 Final Continuous Execution Directive §2.D, the 5-phase D-flow is: D1 Contract Foundation → D2 Evidence Graph → D3 Hypothesis Engine → D4 Priority Engine → D5 Engineer Brief + UI + Activation. D5 combines Engineer Brief, UI surface, and Feature Registry activation into one checkpoint per the directive.",
   "capabilities": {
     "contract_foundation_present": {
       "kind": "contract",
       "unlockFloor": "D1_CONTRACT_FOUNDATION",
-      "description": "R3.0D D1 contracts present under contracts/r3.0d/ (Evidence / Hypothesis / Recommendation / Engineer Brief / Hypothesis categories). NON-PRODUCTION at D1: no rendererAdapter, no runtime consumer, no algorithm."
+      "description": "R3.0D D1 contracts present under contracts/r3.0d/ (Evidence / Hypothesis / Recommendation / Engineer Brief / SourceIdentity / Credibility). NON-PRODUCTION at D1: no rendererAdapter, no runtime consumer, no algorithm."
     },
     "governance_bootstrap_present": {
       "kind": "governance",
       "unlockFloor": "D0_BOOTSTRAP",
       "description": "R3.0D Integrated Delivery Governance scaffold present: schema, state, capabilities, checkpoint-manifest schema, and integration with the train-level validators."
     },
+    "evidence_graph_present": {
+      "kind": "production",
+      "unlockFloor": "D2_EVIDENCE_GRAPH",
+      "description": "Renderer module renderer/js/r3-0d-evidence-graph.js that consumes ONLY D1 sanitized snapshots and produces the deep-frozen, deterministic Evidence Graph (dedup by nodeId + semantic fingerprint, correlation grouping with 1/N independence weight, orphan + cycle detection over causal edges, closed edge enum {supports, contradicts, derived_from, correlated_with, invalidates}). Non-LLM, deterministic, injectable clock, no UI."
+    },
     "hypothesis_engine_present": {
       "kind": "production",
-      "unlockFloor": "D2_HYPOTHESIS_ENGINE",
-      "description": "Renderer module that derives Hypothesis objects from Evidence/Observation/Comparison data. Deterministic; non-LLM; preserves the 12-category enum verbatim (no sub-categories)."
+      "unlockFloor": "D3_HYPOTHESIS_ENGINE",
+      "description": "Renderer module that derives Hypothesis objects from the D2 authoritative graph snapshot using a closed rule registry. Deterministic; contradiction-aware; correlation-aware; freshness-aware; no LLM. Preserves the 6-category enum verbatim (data_quality / mapping_calibration / driver_behaviour / vehicle_response / setup_model / unknown)."
     },
     "priority_engine_present": {
       "kind": "production",
-      "unlockFloor": "D3_PRIORITY_ENGINE",
-      "description": "Priority engine that ranks hypotheses by severity / repeatability / confidence / evidence-count / cross-lap-consistency / affected-corner-count / controllability / safety / data-quality / expected-validation-cost (frozen enum order). Outputs max 1 primary + 2 secondary, rest in backlog."
+      "unlockFloor": "D4_PRIORITY_ENGINE",
+      "description": "Priority engine that ranks hypotheses per the fixed priority ladder (data_quality → mapping/calibration → controlled_repeat_lap → driver_experiment → setup_experiment). Outputs primary + secondary + blocking prerequisites + stopCondition + rollbackCondition. Deterministic; cost / reversibility / safety / expected-information-gain aware."
     },
     "engineer_brief_present": {
       "kind": "production",
-      "unlockFloor": "D4_ENGINEER_BRIEF",
-      "description": "Engineer Brief generator producing a structured object (what / where / evidence / may-mean / does-not-prove / most-likely-category / alternatives / recommended-next-test / expected-metric-movement / stop-conditions / confidence). NEVER markdown; UI renders the structure. NEVER LLM free text."
+      "unlockFloor": "D5_ENGINEER_BRIEF_ACTIVATION",
+      "description": "Engineer Brief generator producing a structured object (primary issue / secondary issue / evidence summary / contradictions / alternative explanations / cannotConclude / recommended next validation / driver experiment / setup experiment / credibility / confidence / provenance / limitations). NEVER markdown; UI renders the structure. NEVER LLM free text. State invalidates on case/session/mapping/calibration/telemetry change."
     },
     "feature_registry_active": {
       "kind": "activation",
-      "unlockFloor": "D5_ACTIVATION",
-      "description": "Feature Registry registers the R3.0D feature IDs (decision_engine / hypothesis / engineer_brief — to be named exactly at D5 authorization time) as available, attaching their rendererAdapter. Only valid at D5."
+      "unlockFloor": "D5_ENGINEER_BRIEF_ACTIVATION",
+      "description": "Feature Registry registers the R3.0D feature IDs (decision_engine / hypothesis / engineer_brief — final names confirmed at D5 authorization time) as available, attaching their rendererAdapter and orchestrator. Combined with engineer_brief_present at D5 per the directive."
     }
   }
 }

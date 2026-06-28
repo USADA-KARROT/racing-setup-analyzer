@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0D",
+  "checkpoint": "D2_EVIDENCE_GRAPH",
+  "baseSha": "f8a598b84c19517fe55b77877b91462e295f27ed",
+  "headSha": null,
+  "previousCheckpoint": "D1_CONTRACT_FOUNDATION",
+
+  "shaSeparation": {
+    "note": "Per SKYLINE 2026-06-28 R3.0 Final Continuous Execution Directive §7, every checkpoint manifest preserves the three-way SHA separation. reviewedCandidateSha is the exact SHA Codex D2 review was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD. Substituting one for another is a tier violation.",
+    "reviewedCandidateSha": null,
+    "reviewedCandidateNote": "Filled by a follow-up evidence-anchoring commit after Codex D2 issues PASS against the exact candidate SHA on feat/r3.0d-d2-evidence-graph.",
+    "manifestCommitSha": null,
+    "manifestCommitNote": "Filled by the same follow-up evidence-anchoring commit; mirrors C5R / C6 / C7 / C8 / D1 convention.",
+    "integrationSha": null,
+    "integrationNote": "Filled only after the D2 branch-to-branch PR merges into feat/r3.0-integrated-delivery AND the Train target-context trusted-verification PASSes at that integration HEAD."
+  },
+
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0d-evidence-graph.js", "capability": "evidence_graph_present" }
+  ],
+  "newlyAuthorizedPath": "renderer/js/r3-0d-evidence-graph.js",
+  "newlyEnabledCapability": "evidence_graph_present",
+
+  "enabledCapabilitiesBefore": ["contract_foundation_present"],
+  "enabledCapabilitiesAfter": ["contract_foundation_present", "evidence_graph_present"],
+  "forbiddenCapabilities": [
+    "hypothesis_engine_present",
+    "priority_engine_present",
+    "engineer_brief_present",
+    "feature_registry_active"
+  ],
+
+  "governanceRename": {
+    "rationale": "Per SKYLINE 2026-06-28 R3.0 Final Continuous Execution Directive §2.D, the R3.0D 5-phase production sequence is Evidence Graph → Hypothesis Engine → Priority Engine → Engineer Brief + UI + Activation. The pre-existing D2..D5 checkpoint names (D2_HYPOTHESIS_ENGINE / D3_PRIORITY_ENGINE / D4_ENGINEER_BRIEF / D5_ACTIVATION) were design intent at D0_BOOTSTRAP and explicitly described in the original schema.json note as 'D1..D5 are NOT yet authorized — they describe future intent so the validator can refuse premature activation'. The directive supersedes that intent. D2 introduces the rename atomically alongside the first Evidence Graph production code; no historic checkpoint manifest (only D0.json + D1.json exist) is rewritten.",
+    "renames": {
+      "checkpoints": {
+        "D2_HYPOTHESIS_ENGINE": "D2_EVIDENCE_GRAPH",
+        "D3_PRIORITY_ENGINE": "D3_HYPOTHESIS_ENGINE",
+        "D4_ENGINEER_BRIEF": "D4_PRIORITY_ENGINE",
+        "D5_ACTIVATION": "D5_ENGINEER_BRIEF_ACTIVATION"
+      },
+      "capabilitiesAdded": ["evidence_graph_present"],
+      "capabilityFloorsAdjusted": {
+        "hypothesis_engine_present": "D2_HYPOTHESIS_ENGINE → D3_HYPOTHESIS_ENGINE",
+        "priority_engine_present": "D3_PRIORITY_ENGINE → D4_PRIORITY_ENGINE",
+        "engineer_brief_present": "D4_ENGINEER_BRIEF → D5_ENGINEER_BRIEF_ACTIVATION",
+        "feature_registry_active": "D5_ACTIVATION → D5_ENGINEER_BRIEF_ACTIVATION (semantically the same activation phase, just renamed to reflect the engineer brief + activation combination)"
+      },
+      "gateCheckpointsAdjusted": {
+        "runtimeConsumerCheckpoint": "D2_HYPOTHESIS_ENGINE → D2_EVIDENCE_GRAPH (still D2 ordinal — evidence graph is the first runtime consumer)",
+        "algorithmCheckpoint": "D3_PRIORITY_ENGINE → D2_EVIDENCE_GRAPH (the graph builder is the first deterministic algorithm; brought forward to D2)",
+        "uiCheckpoint": "D4_ENGINEER_BRIEF → D5_ENGINEER_BRIEF_ACTIVATION (UI moved to the same checkpoint as Engineer Brief + Activation per directive)",
+        "featureRegistryActivationCheckpoint": "D5_ACTIVATION → D5_ENGINEER_BRIEF_ACTIVATION (rename only — same logical phase)"
+      },
+      "touchedFiles": [
+        "governance/r3.0d/schema.json",
+        "governance/r3.0d/capabilities.json",
+        "governance/r3.0d/state.json",
+        "governance/r3.0/train.json",
+        "governance/r3.0/train.schema.json",
+        "contracts/r3.0d/credibility-contract.js (comment update D3_PRIORITY_ENGINE → D4_PRIORITY_ENGINE)",
+        "tests/r3-0-train.test.js (fixture string rename)",
+        "tests/r3-0-phase-governance.test.js (fixture string rename)",
+        "tests/r3.0d-contract-foundation.test.js (state-aware D1/D2 guard refactor)"
+      ],
+      "preservedFiles": [
+        "governance/r3.0d/checkpoints/D0.json (historic manifest — content unchanged)",
+        "governance/r3.0d/checkpoints/D1.json (historic manifest — content unchanged; legacy forbiddenCapabilities list reflects D1-merge-time vocabulary and remains accurate as a defence floor)"
+      ]
+    }
+  },
+
+  "contractEnforcements": {
+    "evidenceGraphScope": "renderer/js/r3-0d-evidence-graph.js is the SINGLE new production path authorized at D2. It consumes ONLY D1 contract-validated sanitized snapshots (R3_0D_EvidenceNodeContract.validateEvidenceNodeShape); the original caller object is never referenced after validation.",
+    "deepFreezeOutput": "The returned graph and every nested array / object is Object.freeze'd. Caller mutation post-build cannot reach into the graph.",
+    "deterministicOrdering": "Same sanitized input produces identical graphId, identical node order (sorted by nodeId), identical edge order (sorted by from/to/kind), identical topological order, identical correlation order, identical dedup summary. Clock is INJECTABLE via opts.clock(); createdAt depends on the clock; graphId is INDEPENDENT of the clock.",
+    "edgeKindClosed": "Closed enum {supports, contradicts, derived_from, correlated_with, invalidates}. D2 emits only supports / contradicts (from per-node fields) + correlated_with (single canonical direction, from < to). derived_from + invalidates are reserved for future input shapes.",
+    "cycleDetection": "DFS-based detection over CAUSAL edges only (supports + contradicts). correlated_with is INTENTIONALLY excluded because it is symmetric / non-causal; emitting it bidirectionally would auto-create cycles on every multi-metric source. Any cycle in causal edges → fail-closed EVIDENCE_GRAPH_CYCLE.",
+    "orphanEdgeRejection": "supportingEdges / contradictingEdges targeting an unknown nodeId → fail-closed EVIDENCE_GRAPH_ORPHAN. The whole build is rejected; no partial graph is returned.",
+    "duplicateAndSemanticDedup": "(a) duplicate nodeId → first kept, second rejected as EVIDENCE_DUPLICATE_ID; (b) semantic fingerprint (case + session + lap + sourceId + sourceVersion + category + observation.kind/channel/i18nKey/params, EXCLUDING nodeId and freshness and credibility/provenance/availability) → first kept, second rejected as EVIDENCE_GRAPH_DUPLICATED_SOURCE_DOUBLECOUNT.",
+    "correlationGrouping": "Nodes sharing (caseId, sessionId, lapId, sourceId) are placed in ONE correlation group with independenceWeight = 1 / groupSize. D2 marks correlation; D3 priority engine consumes it (no confidence computation at D2).",
+    "associationBinding": "Every sanitized node's identity.caseId / sessionId MUST equal envelope.caseAssociation; cross-lap pollution (lap-scoped envelope ≠ lap-scoped node) is rejected per node and counted in rejectedReasonsSummary.",
+    "importedSummaryElevationGuard": "An evidence node with identity.sourceId === 'imported_summary' MUST NOT carry credibility === 'measured'. Rejected as EVIDENCE_IMPORTED_SUMMARY_ELEVATION_FORBIDDEN.",
+    "envelopeDefenceShallow": "Envelope validation is shallow on rawEvidence (Array.prototype + length cap) so a single caller-supplied hostile evidence node fails THAT node only (counted in rejectedReasonsSummary) and does not poison the whole envelope. Per-node validation runs the full RC.isOriginalPlainObject + hasHiddenOwnKey + hasNonPlainNestedObject defence + D1 validateEvidenceNodeShape sanitization.",
+    "outerTryCatch": "buildEvidenceGraph is wrapped in an outer try/catch. Any internal throw collapses to INTERNAL_CONTRACT_VIOLATION via RC.buildBlockedResult; never bubbles to the caller.",
+    "caps": "NODES_CAP=256 (post-validation), INPUT_RAW_EVIDENCE_CAP=512 (envelope), EDGES_CAP_TOTAL=1024, CORRELATION_GROUPS_CAP=64, CANNOT_CONCLUDE_CAP=64, LIMITATIONS_CAP=64. generationToken ≤ 256 chars; contextVersion ≤ 64 chars.",
+    "noLLM": "No LLM call. Deterministic JavaScript only.",
+    "noUI": "No DOM mutation, no Alpine binding, no index.html script src. UI is exclusively D5_ENGINEER_BRIEF_ACTIVATION."
+  },
+
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3.0d-evidence-graph.test.js",
+    "newSuiteAssertions": 88,
+    "stateAwareRefactor": "tests/r3.0d-contract-foundation.test.js Section I + J were refactored to be state-aware (D1 invariants when currentCheckpoint === D1_CONTRACT_FOUNDATION; D2 invariants when currentCheckpoint === D2_EVIDENCE_GRAPH). No D1-era assertion was deleted; the D1 branch is preserved and an additional D2 branch added.",
+    "evidenceTier": "TIER 3 — Claude-verified on D2 branch HEAD; CI re-run on integrationSha is the authority for the Train target context."
+  },
+
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+
+  "codexVerdict": {
+    "verdict": "PENDING",
+    "verdictRound": 0,
+    "reviewedCandidateSha": null,
+    "verdictEvidenceFile": null,
+    "rounds": [],
+    "tierDisclosure": "Codex D2 review pending. Will run via `codex exec -s read-only --skip-git-repo-check` against the exact candidate SHA on feat/r3.0d-d2-evidence-graph; Tier 1 raw stdout will be persisted under governance/r3.0d/codex-checkpoint-evidence/D2/round-N-<sha>.md."
+  },
+
+  "scopeBoundary": {
+    "frozenFilesUntouched": true,
+    "r30bPersistenceUntouched": true,
+    "r30cContractsUntouched": true,
+    "r30cProductionUntouched": true,
+    "featureRegistryUnchanged": true,
+    "indexHtmlUnchanged": true,
+    "noR30dFeatureIdInRegistry": true,
+    "runtimeConsumerCount": 1,
+    "productionPathCount": 1,
+    "algorithmCount": 1,
+    "uiSurfaceCount": 0
+  },
+
+  "frozenDiff": 0,
+  "productionDiff": 1,
+  "runtimeConsumerCount": 1,
+  "featureRegistryState": {
+    "expectedDeferredIds": [],
+    "expectedRendererAdapter": false,
+    "note": "D2 introduces the Evidence Graph service module renderer/js/r3-0d-evidence-graph.js as a Node-pure UMD module, NOT a feature-registered surface. No R3.0D feature ID is added to renderer/js/feature-registry.js. The D5_ENGINEER_BRIEF_ACTIVATION checkpoint is the only authorised point to add R3.0D feature IDs."
+  },
+  "crossPhaseGate": {
+    "r3cCheckpoint": "C8_ACTIVATION",
+    "requiredFor": "D2_EVIDENCE_GRAPH",
+    "satisfied": true,
+    "note": "R3.0D D2 is a non-bootstrap checkpoint. Per governance/r3.0/train.schema.json crossPhaseAdvanceRequires.R3.0D = 'R3.0C:C8_ACTIVATION', the precondition is that governance/r3.0c/state.json.currentCheckpoint === 'C8_ACTIVATION'. This is satisfied: R3.0C completed via PR #20 merge on 2026-06-28; the D1 baseSha is f731887 (= R3.0C C8_ACTIVATION merge), and the D2 baseSha is f8a598b (= R3.0D D1 merge into Train). See [[project-r3-0c]] and [[project-r3-0d]] for completion records."
+  },
+
+  "packageVersion": "1.4.0",
+  "createdAt": "2026-06-28T00:00:00Z",
+  "status": "candidate",
+  "governanceChanged": true,
+  "changedFiles": [
+    "renderer/js/r3-0d-evidence-graph.js",
+    "tests/r3.0d-evidence-graph.test.js",
+    "tests/r3.0d-contract-foundation.test.js",
+    "tests/r3-0-train.test.js",
+    "tests/r3-0-phase-governance.test.js",
+    "contracts/r3.0d/credibility-contract.js",
+    "governance/r3.0d/schema.json",
+    "governance/r3.0d/capabilities.json",
+    "governance/r3.0d/state.json",
+    "governance/r3.0d/checkpoints/D2.json",
+    "governance/r3.0/train.json",
+    "governance/r3.0/train.schema.json",
+    "package.json"
+  ],
+
+  "note": "D2_EVIDENCE_GRAPH — the first non-bootstrap R3.0D PRODUCTION checkpoint. Lifts ONE production capability (evidence_graph_present); enables runtimeConsumersAllowed=true + algorithmsAllowed=true; introduces renderer/js/r3-0d-evidence-graph.js as the single new authorized production path; keeps uiAllowed=false + featureRegistryActivationAllowed=false (D5 only). The 5-phase D-flow is renamed atomically alongside this checkpoint per the directive; the rename is recorded in governanceRename above with full lineage. C-B Codex review runs against the exact D2 candidate SHA; tier-1 raw stdout to be persisted under governance/r3.0d/codex-checkpoint-evidence/D2/."
+}

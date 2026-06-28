@@ -11,7 +11,7 @@
  *   • Confidence is either:
  *     (a) UNRESOLVED — explicit `{ state: 'unresolved' }` marker, OR
  *     (b) NOT_COMPUTED — explicit `{ state: 'not_computed' }` marker.
- *   The numeric confidence value is produced ONLY by a deterministic engine at D3_PRIORITY_ENGINE.
+ *   The numeric confidence value is produced ONLY by a deterministic engine at D4_PRIORITY_ENGINE.
  *   Any D1 confidence object that carries a numeric `value` field is rejected with
  *   HYPOTHESIS_CONFIDENCE_FORBIDDEN.
  *
