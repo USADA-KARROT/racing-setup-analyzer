@@ -1327,5 +1327,104 @@ function freshInput(over) {
   chk('RN-18: throwing toJSON does not crash the build', r.valid === true && r.graph.nodes.length === 1);
 })();
 
+// ── Section U — Codex D2 Round 9 finding closures (RN-19 + RN-20) ──────
+(function sectionU_RN19_arrayPrototypeJoinRebind() {
+  // RN-19 NEW at Round 9 (Codex evidence on 6392196): the previous _stableStringify implementation
+  // used `parts.join(',')` on dynamically-built arrays. A hostile Array.prototype.join replacement
+  // (installed AFTER module load but BEFORE the build call) returned the empty string for the
+  // envelope's outermost array, making the byte cap measurement read 0 — a baseline 271,556-byte
+  // rejection was downgraded to a `valid:true` build with 35 nodes and 595 edges. The Round 10
+  // fix rewrites _stableStringify to use only captured intrinsics + direct string concatenation +
+  // manual insertion sort — no .join, .push, or .sort dependency on the dynamic arrays.
+  function buildLarge() {
+    const arr = [];
+    for (let i = 0; i < 35; i++) {
+      const p = {};
+      for (let k = 0; k < 30; k++) p['p' + k] = 'x'.repeat(205);
+      arr.push(freshNode({
+        nodeId: 'ev_jn_' + String(i).padStart(2, '0'),
+        identity: freshId({ sourceId: 'single_jn' }),
+        observation: { kind: 'metric_value', i18nKey: 'r3.x', params: p, channel: 'rpm_' + i },
+      }));
+    }
+    return EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
+  }
+  const baseline = buildLarge();
+  const origJoin = Array.prototype.join;
+  let hits = 0;
+  Array.prototype.join = function (s) {
+    if (s === ',' && this.some && this.some(x => typeof x === 'string' && x.indexOf('"caseAssociation":') === 0)) {
+      hits++;
+      return '';
+    }
+    return origJoin.call(this, s);
+  };
+  let attacked;
+  try { attacked = buildLarge(); }
+  finally { Array.prototype.join = origJoin; }
+  chk('RN-19: baseline build rejects via BYTE_CAP_EXCEEDED', baseline.eligible === false && Array.isArray(baseline.reasonCodes) && baseline.reasonCodes.indexOf(CODES.BYTE_CAP_EXCEEDED) !== -1);
+  chk('RN-19: hostile Array.prototype.join NEVER fires inside _stableStringify', hits === 0);
+  chk('RN-19: attacked build still rejects with the same BYTE_CAP_EXCEEDED verdict (cap not falsified)', attacked.eligible === false && Array.isArray(attacked.reasonCodes) && attacked.reasonCodes.indexOf(CODES.BYTE_CAP_EXCEEDED) !== -1);
+})();
+
+(function sectionU_RN20_objectFreezeRebind() {
+  // RN-20 NEW at Round 9: Step 14 previously called ambient `Object.freeze(edgesOut[ei])` inside
+  // the loop that wraps each per-element edge. A hostile pre-build replacement of Object.freeze
+  // could mutate an edge's `kind` field IMMEDIATELY BEFORE the would-be-frozen object is
+  // wrapped, producing a `valid:true` graph containing forbidden edge kinds (e.g. "invalid_kind"
+  // injected over the legitimate "correlated_with"). The Round 10 fix uses captured _ObjectFreeze.
+  const arr = [];
+  for (let i = 0; i < 3; i++) {
+    arr.push(freshNode({
+      nodeId: 'ev_fz_' + i,
+      identity: freshId({ sourceId: 'shared_fz' }),
+      observation: { kind: 'metric_value', i18nKey: 'r3.x', params: { v: 'x' }, channel: 'rpm_' + i },
+    }));
+  }
+  const origFreeze = Object.freeze;
+  Object.freeze = function (o) {
+    if (o && o.kind === 'correlated_with') o.kind = 'invalid_kind';
+    return origFreeze(o);
+  };
+  let r;
+  try { r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK }); }
+  finally { Object.freeze = origFreeze; }
+  const invalidEdges = r.valid && r.graph.edges.filter(e => e.kind === 'invalid_kind');
+  chk('RN-20: hostile Object.freeze rebinding does NOT inject invalid_kind into edges', r.valid === true && invalidEdges.length === 0);
+  chk('RN-20: all 3 same-source correlated edges retain legitimate kind', r.valid === true && r.graph.edges.length === 3 && r.graph.edges.every(e => e.kind === 'correlated_with'));
+})();
+
+(function sectionU_RN19_arrayPrototypeSortRebind() {
+  // Symmetric coverage: rebind Array.prototype.sort. _stableStringify uses manual insertion sort
+  // on keys[], and the build path uses _arrSort (which invokes _ReflectApply on captured
+  // _ArrayPrototypeSort). Both paths should be immune to sort rebinding.
+  const origSort = Array.prototype.sort;
+  let hits = 0;
+  Array.prototype.sort = function () { hits++; return this; }; // no-op (preserve insertion order)
+  let r;
+  try {
+    const arr = [
+      freshNode({ nodeId: 'ev_c', identity: freshId({ sourceId: 'src_c' }) }),
+      freshNode({ nodeId: 'ev_a', identity: freshId({ sourceId: 'src_a' }) }),
+      freshNode({ nodeId: 'ev_b', identity: freshId({ sourceId: 'src_b' }) }),
+    ];
+    r = EG.buildEvidenceGraph(freshInput({ rawEvidence: arr }), { clock: CLOCK });
+  } finally { Array.prototype.sort = origSort; }
+  // Sort rebinding must not break the deterministic ordering of nodes (Codex round-7 verified
+  // sorted-by-nodeId output is the determinism anchor for graphId).
+  chk('RN-19: hostile Array.prototype.sort does not falsify deterministic node ordering', r.valid === true && r.graph.nodes[0].nodeId === 'ev_a' && r.graph.nodes[1].nodeId === 'ev_b' && r.graph.nodes[2].nodeId === 'ev_c');
+})();
+
+(function sectionU_RN19_arrayPrototypePushRebind() {
+  // Symmetric coverage: rebind Array.prototype.push. All build-path push sites now use _arrPush
+  // which goes through captured _ObjectDefineProperty.
+  const origPush = Array.prototype.push;
+  Array.prototype.push = function () { return 0; }; // no-op push
+  let r;
+  try { r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK }); }
+  finally { Array.prototype.push = origPush; }
+  chk('RN-19: hostile Array.prototype.push (no-op) does not drop legitimate sanitized node', r.valid === true && r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
+})();
+
 console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
 if (fail > 0) process.exit(1);

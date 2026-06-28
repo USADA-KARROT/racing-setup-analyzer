@@ -58,7 +58,7 @@
  *          read on opts.clock; a throwing opts getter → createdAt = null (fail-soft on clock only).
  *   RN-07: helper functions _stableStringify / _semanticCanonical / _correlationGroupKey are NO
  *          LONGER exported — production surface is buildEvidenceGraph + constants only.
- *   RN-08: every node-indexed map uses Object.create(null) (or a Map) so a valid nodeId like
+ *   RN-08: every node-indexed map uses _ObjectCreate(null) (or a Map) so a valid nodeId like
  *          'constructor' cannot collide with Object.prototype keys.
  *   RN-09: ENVELOPE_BYTE_CAP (256 KiB) is implemented and enforced post-sanitization (safe to
  *          JSON.stringify because sanitized values are guaranteed plain frozen primitives). A
@@ -141,6 +141,15 @@
   var _ArrayPrototypeSlice = Array.prototype.slice;
   var _ArrayPrototypeMap = Array.prototype.map;
   var _ArrayPrototypePush = Array.prototype.push;
+  // Codex D2 Round 9 RN-19 closure additional captures: every Array.prototype method touched in
+  // the build path must be reachable WITHOUT going through ambient global rebinding. Reflect.apply
+  // is used because it invokes [[Call]] directly, bypassing Function.prototype.call / .apply
+  // (which a hostile clock or pre-call attacker could replace per RN-13 round-4).
+  var _ArrayPrototypeSort = Array.prototype.sort;
+  var _ArrayPrototypeConcat = Array.prototype.concat;
+  var _StringPrototypeSlice = String.prototype.slice;
+  var _ReflectApply = (typeof Reflect !== 'undefined' && Reflect.apply) ? Reflect.apply : null;
+  var _ReflectOwnKeys = (typeof Reflect !== 'undefined' && Reflect.ownKeys) ? Reflect.ownKeys : null;
   var _JSONStringify = JSON.stringify;
   var _TextEncoder = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;
   var _BufferByteLength = (typeof Buffer !== 'undefined' && Buffer.byteLength) ? Buffer.byteLength : null;
@@ -183,13 +192,23 @@
   function _isFiniteNum(v) { return typeof v === 'number' && v === v && v !== Infinity && v !== -Infinity; }
   function _isIsoTimestamp(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(s); }
   function _hasOnlyAllowedKeys(o, allowed) {
-    var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; }
+    var keys;
+    try { keys = _ReflectOwnKeys ? _ReflectOwnKeys(o) : _ObjectKeys(o); }
+    catch (e) { return false; }
     for (var i = 0; i < keys.length; i++) {
       var k = keys[i];
       if (typeof k === 'symbol') return false;
-      if (allowed.indexOf(k) === -1) return false;
+      if (_arrIndexOf(allowed, k) === -1) return false;
     }
     return true;
+  }
+  // Codex D2 Round 9 RN-20 closure helper: own-property check via captured
+  // _ObjectGetOwnPropertyDescriptor, bypassing both Object.prototype.hasOwnProperty rebinding AND
+  // Function.prototype.call rebinding. Used on _ObjectCreate(null) maps where the answer is the
+  // same as `key in obj` but more defence-in-depth.
+  function _hasOwn(obj, key) {
+    try { return _ObjectGetOwnPropertyDescriptor(obj, key) !== undefined; }
+    catch (e) { return false; }
   }
   function _strcmp(a, b) { if (a === b) return 0; return a < b ? -1 : 1; }
 
@@ -301,6 +320,85 @@
     return out;
   }
 
+  // Codex D2 Round 9 RN-19 closure helpers: safe array operations that bypass
+  // Function.prototype.call / .apply / .bind rebinding and ambient Array.prototype.* rebinding.
+  // _arrSort uses captured Reflect.apply on captured Array.prototype.sort — Reflect.apply uses
+  // [[Call]] directly per ES §28.1.1 RA(target, thisArgument, argumentsList), not the rebindable
+  // Function.prototype.call hop. _arrPush installs an own data descriptor at index `arr.length`
+  // via captured _ObjectDefineProperty (bypassing both Array.prototype.push rebinding AND any
+  // Array.prototype["N"] setter installed by the attacker).
+  function _arrSort(arr, cmp) {
+    if (_ReflectApply) {
+      try { return _ReflectApply(_ArrayPrototypeSort, arr, cmp ? [cmp] : []); }
+      catch (e) { /* fall through to in-place manual sort */ }
+    }
+    // Fallback (only reached if Reflect.apply is unavailable): manual insertion sort.
+    var len = arr.length;
+    for (var s = 1; s < len; s++) {
+      var cur = arr[s];
+      var k = s - 1;
+      while (k >= 0 && (cmp ? cmp(arr[k], cur) > 0 : arr[k] > cur)) { arr[k + 1] = arr[k]; k--; }
+      arr[k + 1] = cur;
+    }
+    return arr;
+  }
+  function _arrPush(arr, val) {
+    _ObjectDefineProperty(arr, arr.length, { value: val, writable: true, enumerable: true, configurable: true });
+  }
+  function _arrSliceN(arr, n) {
+    var out = [];
+    var len = arr.length;
+    var limit = n < len ? n : len;
+    for (var i = 0; i < limit; i++) {
+      _ObjectDefineProperty(out, i, { value: arr[i], writable: true, enumerable: true, configurable: true });
+    }
+    return out;
+  }
+  // Manual "last N chars" extraction. Used in place of String.prototype.slice(-N) so a hostile
+  // String.prototype.slice rebinding cannot tamper with hash digest formatting.
+  function _strLastN(s, n) {
+    var len = s.length;
+    var start = len > n ? len - n : 0;
+    var out = '';
+    for (var i = start; i < len; i++) out += s.charAt(i);
+    return out;
+  }
+  // Direct-loop indexOf — bypasses Array.prototype.indexOf rebinding.
+  function _arrIndexOf(arr, target) {
+    var len = arr.length;
+    for (var i = 0; i < len; i++) if (arr[i] === target) return i;
+    return -1;
+  }
+  // Direct-loop concat (two arrays only) — bypasses Array.prototype.concat rebinding.
+  function _arrConcat2(a, b) {
+    var out = [];
+    var la = a.length;
+    var lb = b.length;
+    var idx = 0;
+    for (var i = 0; i < la; i++) { _ObjectDefineProperty(out, idx, { value: a[i], writable: true, enumerable: true, configurable: true }); idx++; }
+    for (var j = 0; j < lb; j++) { _ObjectDefineProperty(out, idx, { value: b[j], writable: true, enumerable: true, configurable: true }); idx++; }
+    return out;
+  }
+  // Direct-loop shift / sortedInsert for Kahn's algorithm queue. Bypasses Array.prototype.shift +
+  // Array.prototype.splice rebinding. _arrShift removes and returns first element; _arrSortedInsert
+  // inserts a value into a pre-sorted-by-strcmp array at the correct position.
+  function _arrShift(arr) {
+    if (arr.length === 0) return undefined;
+    var first = arr[0];
+    var len = arr.length;
+    for (var i = 1; i < len; i++) _ObjectDefineProperty(arr, i - 1, { value: arr[i], writable: true, enumerable: true, configurable: true });
+    arr.length = len - 1;
+    return first;
+  }
+  function _arrSortedInsert(arr, value) {
+    var lo = 0, hi = arr.length;
+    while (lo < hi) { var mid = (lo + hi) >>> 1; if (arr[mid] < value) lo = mid + 1; else hi = mid; }
+    // Insert at `lo`: shift later elements right by one, then place value.
+    var len = arr.length;
+    for (var i = len; i > lo; i--) _ObjectDefineProperty(arr, i, { value: arr[i - 1], writable: true, enumerable: true, configurable: true });
+    _ObjectDefineProperty(arr, lo, { value: value, writable: true, enumerable: true, configurable: true });
+  }
+
   // Codex D2 Round 6 RN-16 closure: exact per-node byte measurement via captured _JSONStringify +
   // _utf8len. The previous approximation summed _jsonStringWidth across SELECTED fields and
   // missed top-level structural keys ("nodeId":, "category":, etc.), nested object braces, and
@@ -359,12 +457,14 @@
 
   // Stable canonical JSON serialiser — sorted keys at every depth; arrays preserved in order. Used
   // for semantic dedup keys + graphId hashing + Round 9 byte cap measurements. Codex D2 Round 8
-  // RN-18 closure: this serialiser walks via Object.keys + manual indexed array recursion + direct
-  // primitive encoding, so it NEVER triggers ES §25.5.2.2 SerializeJSONObject's toJSON [[Get]] hook.
-  // An attacker that installs Object.prototype.toJSON before the build call cannot intercept the
-  // canonical bytes here (whereas `JSON.stringify` would invoke the hostile toJSON on every nested
-  // object, allowing both mutation of shared arrays AND stateful size manipulation between calls).
-  // All intrinsic refs are captured at module init so a global rebind cannot tamper post-import.
+  // RN-18 + Round 9 RN-19 closure: this serialiser uses ONLY captured intrinsics + direct string
+  // concatenation + a manual insertion sort. It NEVER calls any prototype method on a dynamically
+  // built array — no `.push`, no `.join`, no `.sort` — so an attacker that rebinds
+  // `Array.prototype.push` / `Array.prototype.join` / `Array.prototype.sort` AFTER module load
+  // (or installs an inherited `toJSON` via `Object.prototype.toJSON`) cannot tamper with the
+  // canonical bytes here. Indexed reads/writes to the keys array stay within keys.length so they
+  // hit own data descriptors (Object.keys returns an array with own descriptors at every index)
+  // and cannot trigger an Array.prototype-installed setter.
   function _stableStringify(value) {
     if (value === null) return 'null';
     var t = typeof value;
@@ -376,19 +476,33 @@
     if (t === 'boolean') return value ? 'true' : 'false';
     if (t === 'undefined') return 'null';
     if (_ArrayIsArray(value)) {
-      var parts = [];
-      for (var i = 0; i < value.length; i++) parts.push(_stableStringify(value[i]));
-      return '[' + parts.join(',') + ']';
+      var result = '[';
+      var len = value.length;
+      for (var i = 0; i < len; i++) {
+        if (i > 0) result += ',';
+        result += _stableStringify(value[i]);
+      }
+      return result + ']';
     }
     if (t === 'object') {
       var keys; try { keys = _ObjectKeys(value); } catch (e) { return 'null'; }
-      keys.sort();
-      var pp = [];
-      for (var j = 0; j < keys.length; j++) {
-        var k = keys[j];
-        pp.push(_JSONStringify(k) + ':' + _stableStringify(value[k]));
+      // Manual insertion sort — no Array.prototype.sort dependency. keys is an array whose
+      // every index (0..keys.length-1) has an own data descriptor from Object.keys, so the
+      // in-place swaps below cannot trigger any Array.prototype indexed setter.
+      var sortLen = keys.length;
+      for (var s = 1; s < sortLen; s++) {
+        var cur = keys[s];
+        var k = s - 1;
+        while (k >= 0 && keys[k] > cur) { keys[k + 1] = keys[k]; k--; }
+        keys[k + 1] = cur;
       }
-      return '{' + pp.join(',') + '}';
+      var obj = '{';
+      for (var j = 0; j < sortLen; j++) {
+        if (j > 0) obj += ',';
+        var key = keys[j];
+        obj += _JSONStringify(key) + ':' + _stableStringify(value[key]);
+      }
+      return obj + '}';
     }
     return 'null';
   }
@@ -402,7 +516,7 @@
       h ^= s.charCodeAt(i);
       h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
     }
-    return ('00000000' + h.toString(16)).slice(-8);
+    return _strLastN('00000000' + h.toString(16), 8);
   }
   function _hash64(s) { return _hash32(s) + _hash32(s + '|' + s.length); }
 
@@ -443,7 +557,7 @@
   // Correlation group key — nodes sharing this key are correlated (same source observing the same
   // (case, session, lap, sourceId) origin). Uses canonical string (deterministic), then a hash of
   // it for the displayed group id (cosmetic — actual grouping uses the canonical string in a
-  // Object.create(null) map).
+  // _ObjectCreate(null) map).
   function _correlationGroupCanonical(node) {
     var id = node.identity;
     return JSON.stringify(id.caseId) + '|' + JSON.stringify(id.sessionId) + '|' + JSON.stringify(id.lapId == null ? null : id.lapId) + '|' + JSON.stringify(id.sourceId);
@@ -478,7 +592,7 @@
     catch (e) { return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence descriptor read threw' }); }
     if (!reDesc || !('value' in reDesc)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence must be a data property' });
     var re = reDesc.value;
-    if (!Array.isArray(re)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence must be an array' });
+    if (!_ArrayIsArray(re)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence must be an array' });
     try { if (Object.getPrototypeOf(re) !== Array.prototype) return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence is not a plain Array (subclass / mutated prototype rejected)' }); }
     catch (e) { return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence prototype access threw' }); }
     var reLen;
@@ -552,7 +666,7 @@
   // DFS cycle detection over the directed CAUSAL edge list. Uses a proto-null colour map (RN-08).
   function _findCycle(nodeIds, adjacencyCausal) {
     var WHITE = 0, GREY = 1, BLACK = 2;
-    var color = Object.create(null);
+    var color = _ObjectCreate(null);
     for (var i = 0; i < nodeIds.length; i++) color[nodeIds[i]] = WHITE;
     function visit(u) {
       color[u] = GREY;
@@ -581,31 +695,29 @@
   // Kahn's algorithm — deterministic by tie-breaking on sorted nodeId. Assumes no cycle. Uses
   // proto-null in-degree map (RN-08).
   function _topologicalOrder(nodeIds, adjacencyCausal) {
-    var inDegree = Object.create(null);
+    var inDegree = _ObjectCreate(null);
     var i;
     for (i = 0; i < nodeIds.length; i++) inDegree[nodeIds[i]] = 0;
     for (i = 0; i < nodeIds.length; i++) {
       var nbrs = adjacencyCausal[nodeIds[i]] || [];
       for (var k = 0; k < nbrs.length; k++) {
-        if (Object.prototype.hasOwnProperty.call(inDegree, nbrs[k])) inDegree[nbrs[k]]++;
+        if (_hasOwn(inDegree, nbrs[k])) inDegree[nbrs[k]]++;
       }
     }
     var queue = [];
-    for (i = 0; i < nodeIds.length; i++) if (inDegree[nodeIds[i]] === 0) queue.push(nodeIds[i]);
-    queue.sort(_strcmp);
+    for (i = 0; i < nodeIds.length; i++) if (inDegree[nodeIds[i]] === 0) _arrPush(queue, nodeIds[i]);
+    _arrSort(queue, _strcmp);
     var out = [];
     while (queue.length > 0) {
-      var u = queue.shift();
-      out.push(u);
-      var nbrs2 = (adjacencyCausal[u] || []).slice().sort(_strcmp);
+      var u = _arrShift(queue);
+      _arrPush(out, u);
+      var nbrs2 = _arrSort(_safeSlice(adjacencyCausal[u] || []), _strcmp);
       for (var m = 0; m < nbrs2.length; m++) {
         var v = nbrs2[m];
-        if (Object.prototype.hasOwnProperty.call(inDegree, v)) {
+        if (_hasOwn(inDegree, v)) {
           inDegree[v]--;
           if (inDegree[v] === 0) {
-            var lo = 0, hi = queue.length;
-            while (lo < hi) { var mid = (lo + hi) >>> 1; if (queue[mid] < v) lo = mid + 1; else hi = mid; }
-            queue.splice(lo, 0, v);
+            _arrSortedInsert(queue, v);
           }
         }
       }
@@ -652,7 +764,7 @@
       rejectedSemanticDuplicates: _ObjectFreeze(rejSemFrozen),
       rejectedSourceReplays: _ObjectFreeze(rejReplaysFrozen),
     });
-    // Codex D2 Round 6 RN-13 round-4 closure: Object.create(null) + defineProperty so a hostile
+    // Codex D2 Round 6 RN-13 round-4 closure: _ObjectCreate(null) + defineProperty so a hostile
     // clock-installed setter on Object.prototype[<reasonCode>] cannot intercept the keyed
     // assignment and inject a `{tampered:true}` count into rejectedReasonsSummary.
     var rrsCopy = _ObjectCreate(null);
@@ -712,7 +824,7 @@
       // accessor / sparse / inherited slots become ONE rejected node, never a whole-build throw.
       var sanitized = [];
       var rejectedCount = 0;
-      var rejectedReasons = Object.create(null);
+      var rejectedReasons = _ObjectCreate(null);
       function tally(code) { rejectedReasons[code] = (rejectedReasons[code] || 0) + 1; }
 
       for (var i = 0; i < inputCount; i++) {
@@ -729,7 +841,7 @@
         var check = EN.validateEvidenceNodeShape(raw);
         if (check.valid !== true) {
           rejectedCount++;
-          var codes = Array.isArray(check.reasonCodes) ? check.reasonCodes : [CODES.EVIDENCE_NODE_INVALID];
+          var codes = _ArrayIsArray(check.reasonCodes) ? check.reasonCodes : [CODES.EVIDENCE_NODE_INVALID];
           for (var rci = 0; rci < codes.length; rci++) tally(codes[rci]);
           continue;
         }
@@ -757,7 +869,7 @@
         if (san.identity.sourceId === IMPORTED_SUMMARY_SOURCE_ID && san.credibility === 'measured') {
           rejectedCount++; tally(CODES.EVIDENCE_IMPORTED_SUMMARY_ELEVATION_FORBIDDEN); continue;
         }
-        sanitized.push(san);
+        _arrPush(sanitized, san);
       }
 
       // Step 4 — cap on accepted nodes.
@@ -785,45 +897,45 @@
 
       // Step 5 — RN-03 closure: sort sanitized by full canonical content BEFORE any dedup so caller
       // permutation cannot influence which duplicate wins. Tie-breaker on a deterministic field.
-      sanitized.sort(function (a, b) { return _strcmp(_fullCanonicalString(a), _fullCanonicalString(b)); });
+      _arrSort(sanitized, function (a, b) { return _strcmp(_fullCanonicalString(a), _fullCanonicalString(b)); });
 
-      // Step 6 — duplicate-ID dedup (Object.create(null) map — RN-08 closure). First by sort order
+      // Step 6 — duplicate-ID dedup (_ObjectCreate(null) map — RN-08 closure). First by sort order
       // (deterministic) is kept; subsequent rejected.
-      var byId = Object.create(null);
+      var byId = _ObjectCreate(null);
       var keptById = [];
       var rejectedDuplicateIds = [];
       for (var d = 0; d < sanitized.length; d++) {
         var n = sanitized[d];
-        if (Object.prototype.hasOwnProperty.call(byId, n.nodeId)) {
-          rejectedDuplicateIds.push(n.nodeId);
+        if (_hasOwn(byId, n.nodeId)) {
+          _arrPush(rejectedDuplicateIds, n.nodeId);
           tally(CODES.EVIDENCE_DUPLICATE_ID);
           rejectedCount++;
           continue;
         }
         byId[n.nodeId] = n;
-        keptById.push(n);
+        _arrPush(keptById, n);
       }
-      rejectedDuplicateIds.sort(_strcmp);
+      _arrSort(rejectedDuplicateIds, _strcmp);
 
       // Step 7 — semantic CANONICAL STRING dedup (RN-04 closure). The map KEY is the full canonical
       // string itself, not a hash. Collisions are impossible by definition.
-      var semSeen = Object.create(null);
+      var semSeen = _ObjectCreate(null);
       var keptAfterSemantic = [];
       var rejectedSemanticDuplicates = [];
       for (var s = 0; s < keptById.length; s++) {
         var nn = keptById[s];
         var canon = _semanticCanonicalString(nn);
-        if (Object.prototype.hasOwnProperty.call(semSeen, canon)) {
-          rejectedSemanticDuplicates.push({ fingerprint: _hash64('sem|' + canon), keptNodeId: semSeen[canon], droppedNodeId: nn.nodeId });
+        if (_hasOwn(semSeen, canon)) {
+          _arrPush(rejectedSemanticDuplicates, { fingerprint: _hash64('sem|' + canon), keptNodeId: semSeen[canon], droppedNodeId: nn.nodeId });
           tally(CODES.EVIDENCE_GRAPH_DUPLICATED_SOURCE_DOUBLECOUNT);
           rejectedCount++;
           delete byId[nn.nodeId];
           continue;
         }
         semSeen[canon] = nn.nodeId;
-        keptAfterSemantic.push(nn);
+        _arrPush(keptAfterSemantic, nn);
       }
-      rejectedSemanticDuplicates.sort(function (a, b) { return _strcmp(a.droppedNodeId, b.droppedNodeId); });
+      _arrSort(rejectedSemanticDuplicates, function (a, b) { return _strcmp(a.droppedNodeId, b.droppedNodeId); });
 
       // Step 8 — orphan edge detection. Any supportingEdges / contradictingEdges target nodeId that
       // is not in the surviving graph triggers EVIDENCE_GRAPH_ORPHAN.
@@ -831,10 +943,10 @@
       var orphanDetail = null;
       for (var e = 0; e < keptAfterSemantic.length; e++) {
         var nx = keptAfterSemantic[e];
-        var allEdges = nx.supportingEdges.concat(nx.contradictingEdges);
+        var allEdges = _arrConcat2(nx.supportingEdges, nx.contradictingEdges);
         for (var ek = 0; ek < allEdges.length; ek++) {
           var tgt = allEdges[ek];
-          if (!Object.prototype.hasOwnProperty.call(byId, tgt)) {
+          if (!_hasOwn(byId, tgt)) {
             orphanDetected = true;
             orphanDetail = 'node ' + nx.nodeId + ' references unknown nodeId ' + tgt;
             break;
@@ -848,13 +960,13 @@
 
       // Step 9 — build edges + causal adjacency (RN-08: proto-null map).
       var edges = [];
-      var adjacencyCausal = Object.create(null);
+      var adjacencyCausal = _ObjectCreate(null);
       function addEdge(from, to, kind) {
-        if (EDGE_KIND_ALLOWED.indexOf(kind) === -1) return false;
-        edges.push({ from: from, to: to, kind: kind });
+        if (_arrIndexOf(EDGE_KIND_ALLOWED, kind) === -1) return false;
+        _arrPush(edges, { from: from, to: to, kind: kind });
         if (EDGE_KIND_CAUSAL[kind]) {
           if (!adjacencyCausal[from]) adjacencyCausal[from] = [];
-          adjacencyCausal[from].push(to);
+          _arrPush(adjacencyCausal[from], to);
         }
         return true;
       }
@@ -875,20 +987,20 @@
       }
 
       // Step 10 — correlation groups. Same canonical (caseId|sessionId|lapId|sourceId) → one group.
-      var groupBucket = Object.create(null);
+      var groupBucket = _ObjectCreate(null);
       for (var g = 0; g < keptAfterSemantic.length; g++) {
         var ng = keptAfterSemantic[g];
         var gk = _correlationGroupCanonical(ng);
         if (!groupBucket[gk]) groupBucket[gk] = [];
-        groupBucket[gk].push(ng.nodeId);
+        _arrPush(groupBucket[gk], ng.nodeId);
       }
-      var groupKeysSorted = Object.keys(groupBucket).sort(_strcmp);
+      var groupKeysSorted = _arrSort(_ObjectKeys(groupBucket), _strcmp);
       var correlationGroups = [];
       for (var gi = 0; gi < groupKeysSorted.length; gi++) {
         var gk2 = groupKeysSorted[gi];
-        var members = groupBucket[gk2].slice().sort(_strcmp);
+        var members = _arrSort(_safeSlice(groupBucket[gk2]), _strcmp);
         var iw = members.length > 0 ? 1 / members.length : 0;
-        correlationGroups.push({
+        _arrPush(correlationGroups, {
           correlationGroupId: _correlationGroupId(gk2),
           memberNodeIds: members,
           independenceWeight: iw,
@@ -924,9 +1036,9 @@
       // as belt-and-suspenders on the actual idPayload).
       var previewIdPayload = {
         caseAssociation: caseAssociation,
-        nodes: keptAfterSemantic.map(function (n) { return _perNodeIdPayloadShape(n); }),
+        nodes: _safeMap(keptAfterSemantic, function (n) { return _perNodeIdPayloadShape(n); }),
         edges: edges,
-        correlationGroups: correlationGroups.map(function (g) { return { correlationGroupId: g.correlationGroupId, memberNodeIds: g.memberNodeIds, independenceWeight: g.independenceWeight }; }),
+        correlationGroups: _safeMap(correlationGroups, function (g) { return { correlationGroupId: g.correlationGroupId, memberNodeIds: g.memberNodeIds, independenceWeight: g.independenceWeight }; }),
       };
       // Codex D2 Round 8 RN-18 closure: use _stableStringify (descriptor-safe, no toJSON callback)
       // instead of _JSONStringify. A hostile Object.prototype.toJSON installed before this call
@@ -944,7 +1056,7 @@
       }
 
       // Step 12 — cycle detection over CAUSAL edges only.
-      var sortedNodeIds = keptAfterSemantic.map(function (x) { return x.nodeId; }).slice().sort(_strcmp);
+      var sortedNodeIds = _arrSort(_safeMap(keptAfterSemantic, function (x) { return x.nodeId; }), _strcmp);
       var cycleHit = _findCycle(sortedNodeIds, adjacencyCausal);
       if (cycleHit !== null) {
         return RC.buildBlockedResult([CODES.EVIDENCE_GRAPH_CYCLE], { detail: 'cycle involves nodeId ' + cycleHit });
@@ -954,42 +1066,49 @@
       var topo = _topologicalOrder(sortedNodeIds, adjacencyCausal);
 
       // Step 14 — sort nodes deterministically; sort edges by (from, to, kind).
-      var nodesOut = keptAfterSemantic.slice().sort(function (a, b) { return _strcmp(a.nodeId, b.nodeId); });
-      var edgesOut = edges.slice().sort(function (a, b) {
+      var nodesOut = _arrSort(_safeSlice(keptAfterSemantic), function (a, b) { return _strcmp(a.nodeId, b.nodeId); });
+      var edgesOut = _arrSort(_safeSlice(edges), function (a, b) {
         var c = _strcmp(a.from, b.from); if (c !== 0) return c;
         c = _strcmp(a.to, b.to); if (c !== 0) return c;
         return _strcmp(a.kind, b.kind);
       });
-      for (var ni = 0; ni < nodesOut.length; ni++) Object.freeze(nodesOut[ni]);
-      for (var ei = 0; ei < edgesOut.length; ei++) Object.freeze(edgesOut[ei]);
+      // Codex D2 Round 9 RN-20 closure: use captured _ObjectFreeze instead of ambient
+      // Object.freeze. A pre-call replacement of Object.freeze (e.g. via Object.defineProperty(
+      // Object, 'freeze', { value: function(o){ for (var k in o) if (k === 'kind') o[k] =
+      // 'invalid_kind'; return o; } })) would otherwise let an attacker mutate edge kinds (or
+      // any other field) IMMEDIATELY BEFORE the would-be-frozen object is wrapped, producing a
+      // "frozen" graph that nonetheless contains forbidden edge kinds. The captured ref is
+      // taken at module-init time, before any caller has a chance to rebind Object.freeze.
+      for (var ni = 0; ni < nodesOut.length; ni++) _ObjectFreeze(nodesOut[ni]);
+      for (var ei = 0; ei < edgesOut.length; ei++) _ObjectFreeze(edgesOut[ei]);
 
       // Step 15 — limitations / cannotConclude derivation.
       var limitations = [];
       var cannotConclude = [];
-      var limSeen = Object.create(null);
+      var limSeen = _ObjectCreate(null);
       for (var li = 0; li < nodesOut.length; li++) {
         var lims = nodesOut[li].limitations;
         for (var lj = 0; lj < lims.length; lj++) {
-          if (!limSeen[lims[lj]]) { limSeen[lims[lj]] = true; limitations.push(lims[lj]); }
+          if (!limSeen[lims[lj]]) { limSeen[lims[lj]] = true; _arrPush(limitations, lims[lj]); }
         }
       }
       if (nodesOut.length === 0) {
-        if (cannotConclude.indexOf(CODES.INSUFFICIENT_EVIDENCE) === -1) cannotConclude.push(CODES.INSUFFICIENT_EVIDENCE);
+        if (_arrIndexOf(cannotConclude, CODES.INSUFFICIENT_EVIDENCE) === -1) _arrPush(cannotConclude, CODES.INSUFFICIENT_EVIDENCE);
       }
       if (rejectedCount > 0) {
-        if (cannotConclude.indexOf(CODES.CANNOT_CONCLUDE) === -1) cannotConclude.push(CODES.CANNOT_CONCLUDE);
+        if (_arrIndexOf(cannotConclude, CODES.CANNOT_CONCLUDE) === -1) _arrPush(cannotConclude, CODES.CANNOT_CONCLUDE);
       }
-      limitations.sort(_strcmp);
-      cannotConclude.sort(_strcmp);
-      if (limitations.length > LIMITATIONS_CAP) limitations = limitations.slice(0, LIMITATIONS_CAP);
-      if (cannotConclude.length > CANNOT_CONCLUDE_CAP) cannotConclude = cannotConclude.slice(0, CANNOT_CONCLUDE_CAP);
+      _arrSort(limitations, _strcmp);
+      _arrSort(cannotConclude, _strcmp);
+      if (limitations.length > LIMITATIONS_CAP) limitations = _arrSliceN(limitations, LIMITATIONS_CAP);
+      if (cannotConclude.length > CANNOT_CONCLUDE_CAP) cannotConclude = _arrSliceN(cannotConclude, CANNOT_CONCLUDE_CAP);
 
       // Step 16 — derive graphId (content-only; clock-independent). Round 2 RN-03 closure: include
       // confidence.state so two same-nodeId candidates differing only by unresolved/not_computed
       // are distinguishable by graphId (and dedup outcome).
       var idPayload = {
         caseAssociation: caseAssociation,
-        nodes: nodesOut.map(function (n) {
+        nodes: _safeMap(nodesOut, function (n) {
           return {
             nodeId: n.nodeId,
             category: n.category,
@@ -1016,7 +1135,7 @@
           };
         }),
         edges: edgesOut,
-        correlationGroups: correlationGroups.map(function (g) { return { correlationGroupId: g.correlationGroupId, memberNodeIds: g.memberNodeIds, independenceWeight: g.independenceWeight }; }),
+        correlationGroups: _safeMap(correlationGroups, function (g) { return { correlationGroupId: g.correlationGroupId, memberNodeIds: g.memberNodeIds, independenceWeight: g.independenceWeight }; }),
       };
       var graphId = 'graph_' + _hash64('graphid|v' + GRAPH_SCHEMA_VERSION + '|' + _stableStringify(idPayload));
 
