@@ -32,7 +32,7 @@
   ],
 
   "contractEnforcements": {
-    "hypothesisEngineScope": "renderer/js/r3-0d-hypothesis-engine.js is the SINGLE new production path authorized at D3. It consumes ONLY a D2-authoritative Evidence Graph snapshot. Authority is enforced via (a) Proxy-defang via HI.safeStructuredClone, (b) recomputed graphId equality with the asserted graphId field, (c) cross-case + cross-session per-node identity scope check, (d) deep-frozen requirement on the original input, (e) HI.deepOriginalShapeAudit on the clone.",
+    "hypothesisEngineScope": "renderer/js/r3-0d-hypothesis-engine.js is the SINGLE new production path authorized at D3. It consumes ONLY a D2-authoritative Evidence Graph snapshot. Authority is enforced via a layered model: (a) input + opts snapshot at engine entry via HI.safeStructuredClone + descriptor reads (Codex D3 R2 R2-05 closure: accessors/non-enumerable/symbol keys/function fields on input.graph or opts data fields are rejected; opts.clock is held by reference and invoked AT MOST ONCE); (b) deep-frozen requirement on input.graph via captured Object.isFrozen (Codex D3 R1 RN-08 closure); (c) HI.safeStructuredClone-defang of input.graph so subsequent reads use a plain non-Proxy snapshot; (d) HI.deepOriginalShapeAudit on the clone catches class-instance/Array-subclass/Symbol-key/accessor/sparse/non-finite-number smuggling; (e) recomputed graphId (FNV-1a 32-bit×2 byte-equivalent to D2) equality with asserted graphId rejects forged / opaque-Proxy / inconsistent graphs (Codex D3 R2 R2-04 closure: graph-level Proxy traps may fire during clone, but the engine only consumes the cloned values, and TOCTOU/opaque proxies fail the recompute check); (f) D2 invariant re-validation on the clone — no duplicate nodeId, every node.nodeId conforms to ID_RE (Codex D3 R2 R2-02 closure), cross-case/cross-session per-node identity scope, lap-mismatch rejection (Codex D3 R1 RN-06), imported_summary + measured rejection (Codex D3 R1 RN-04); (g) correlation partition reconstruction from node (caseId|sessionId|lapId|sourceId) tuples — D2's emitted correlationGroups must EXACTLY match the reconstructed partition with Object.is exact independenceWeight equality (Codex D3 R2 R2-01/R2-02 closure: NaN/Infinity weights and stripped groups are rejected); (h) edge endpoint validation — every edge.from/edge.to references a known nodeId; (i) mandatory freshness enforcement — opts.clock() returning ISO 8601 OR opts.referenceNowMs must be supplied (fail-closed when absent, Codex D3 R2 R2-03 closure); per-node freshness must parse via captured Date.parse, default max age = 30 days (configurable via opts.maxAgeMs).",
     "noLLM": "No LLM call. No runtime config. No filesystem. Pure deterministic transformation.",
     "noUI": "No DOM mutation, no Alpine binding, no index.html script src. UI is exclusively D5_ENGINEER_BRIEF_ACTIVATION.",
     "noRecommendation": "D3 does NOT emit Recommendation objects (auto_tuning / auto_setup / auto_calibration / auto_preset / driver_action / user_initiated APPLY modes). Recommendation generation is exclusively D4_PRIORITY_ENGINE.",
@@ -45,7 +45,7 @@
     "alternativeExplanationsRequired": "Every fired rule contributes at least one alternativeExplanation entry (closed per-rule list). Alternative IDs are content-derived (hypothesisId + altSuffix hash), deterministic, deep-frozen.",
     "cannotConcludeStructured": "When no rule fires across the whole graph, snapshotCannotConclude contains INSUFFICIENT_EVIDENCE. Graph-level cannotConclude reasons are passed through verbatim. Caller cannot inject free-text reasons; only closed reason codes from REASON_CODES are emitted.",
     "deepFreezeOutput": "The returned hypothesisSet and every nested array/object is Object.freeze'd (via HI.deepFreeze). Caller mutation post-build cannot reach into the snapshot.",
-    "hardenedIntrinsicsEnforced": "Every ambient intrinsic call goes through R3_0D_HardenedIntrinsics (HI). The validation path NEVER invokes attacker-replaced ambient intrinsics — that is the primary defence. The four integrity checkpoints (Step 0 entry, Step 3.5 per-rule, Step 7.5 post-clock, Step 9.6 post-freeze) are defence-in-depth. Hash function is byte-equivalent to D2 _hash64 (FNV-1a 32-bit twice, concatenated) so authoritative graphId recomputation matches exactly.",
+    "hardenedIntrinsicsEnforced": "Every ambient intrinsic call goes through R3_0D_HardenedIntrinsics (HI). The validation path NEVER invokes attacker-replaced ambient intrinsics — that is the primary defence. The four integrity checkpoints (Step 0 entry, Step 3.5 per-rule, Step 7.5 post-clock, Step 9.6 post-freeze) are defence-in-depth on HI surface integrity (Codex D3 R2 R2-07 closure: claim narrowed). Hash function is byte-equivalent to D2 _hash64 (FNV-1a 32-bit twice, concatenated) so authoritative graphId recomputation matches exactly. Object.isFrozen, Date.parse, and Object.is are captured at module init as supplementary primitives not in the HI surface (Codex D3 R1 RN-08 + R2 R2-02 closure).",
     "caps": "HYPOTHESIS_COUNT_CAP=64, ALT_EXPLANATION_COUNT_CAP=128, VALIDATION_ACTION_COUNT_CAP=128, CANNOT_CONCLUDE_CAP=64, LIMITATIONS_CAP=64, SUPPORT_ID_PER_HYPOTHESIS_CAP=64, CONTRADICT_ID_PER_HYPOTHESIS_CAP=64, ALT_ID_PER_HYPOTHESIS_CAP=16, REASON_CODE_PER_HYPOTHESIS_CAP=32, STRING_BYTE_CAP=512, ENVELOPE_BYTE_CAP=512 KiB, GRAPH_NODE_INPUT_CAP=8192, GRAPH_EDGE_INPUT_CAP=16384. generationToken ≤ 128 chars; contextVersion ≤ 128 chars.",
     "outerTryCatch": "buildHypothesisSet is wrapped in an outer try/catch. Any internal throw collapses to INTERNAL_CONTRACT_VIOLATION via RC.buildBlockedResult; never bubbles to the caller.",
     "privacyBoundary": "Output never contains raw telemetry samples, filesystem paths, source filenames, usernames, machine IDs, internal database handles, stack traces, or Electron private paths. Tests assert no '/Users/' substring, no 'stack' key, no UUID-shape identifier in the serialized envelope.",
@@ -55,7 +55,7 @@
   "tests": {
     "command": "npm test",
     "newSuiteForThisCheckpoint": "tests/r3.0d-hypothesis-engine.test.js",
-    "newSuiteAssertions": 87,
+    "newSuiteAssertions": 129,
     "additionalSuites": {
       "r3.0d-contract-foundation": {
         "path": "tests/r3.0d-contract-foundation.test.js",
@@ -132,7 +132,9 @@
     "governance/r3.0d/checkpoints/D3.json",
     "governance/r3.0d/state.json",
     "governance/r3.0/train.json",
-    "package.json"
+    "package.json",
+    "governance/r3.0d/codex-checkpoint-evidence/D3/round-1-7368143.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D3/round-2-388edca.raw.txt"
   ],
   "changedFilesNote": "Computed from the exact baseSha (299771a) → D3 candidate HEAD diff. Adds: (1) renderer/js/r3-0d-hypothesis-engine.js — production module (~700 lines, all HI-wrapped, 4-layer integrity guards, closed 9-rule registry, Proxy-defang via structuredClone, graphId recompute via D2-equivalent FNV-1a 32-bit×2 hash, deep-frozen output); (2) tests/r3.0d-hypothesis-engine.test.js — 87-assertion adversarial suite (functional, structural, authority, scope, confidence, limitations, validation actions + alts, security, privacy, mutation coverage on 10 HI wrappers used by D3); (3) governance/r3.0d/checkpoints/D3.json — this manifest; (4) state transitions in state.json + train.json + train phaseStates; (5) package.json adds new test entry to the scripts.test chain so the per-file manifest scanner discovers it deterministically.",
 

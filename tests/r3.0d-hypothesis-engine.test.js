@@ -39,6 +39,18 @@ function chk(msg, cond, detail) {
 
 // ---------- Fixtures -------------------------------------------------------------------------
 var BASE_CLOCK = function () { return '2026-06-29T01:00:00Z'; };
+// Default test opts always supply the clock so D3's mandatory freshness policy has a
+// reference time. Tests that need to override should construct their own opts.
+function _opts(extra) {
+  var o = { clock: BASE_CLOCK };
+  if (extra) for (var k in extra) o[k] = extra[k];
+  return o;
+}
+// Wrapper so tests get the freshness reference for free; if a test passes its own opts it
+// overrides. Use `_he(input, customOpts)` to invoke the engine via the wrapper.
+function _he(input, customOpts) {
+  return HE.buildHypothesisSet(input, customOpts === undefined ? _opts() : customOpts);
+}
 
 function _baseIdentity(overrides) {
   var base = {
@@ -84,7 +96,7 @@ console.log('Section A — functional happy paths');
 (function () {
   // A1: single channel_missing → 1 hypothesis from rule_dq_channel_missing
   var g = _buildGraph([_baseNode({})]);
-  var r = HE.buildHypothesisSet({ graph: g }, { clock: BASE_CLOCK });
+  var r = _he({ graph: g }, { clock: BASE_CLOCK });
   chk('A1: valid envelope returned for single channel_missing node', r.valid === true);
   chk('A1: exactly one hypothesis emitted', r.hypothesisSet && r.hypothesisSet.hypotheses.length === 1);
   chk('A1: hypothesis ruleId is rule_dq_channel_missing', r.hypothesisSet.hypotheses[0].ruleId === 'rule_dq_channel_missing');
@@ -115,7 +127,7 @@ console.log('Section A — functional happy paths');
     limitations: [],
   });
   var g = _buildGraph([n1, n2, n3]);
-  var r = HE.buildHypothesisSet({ graph: g }, { clock: BASE_CLOCK });
+  var r = _he({ graph: g }, { clock: BASE_CLOCK });
   chk('A2: valid envelope with multi-category input', r.valid === true);
   chk('A2: ≥2 hypotheses emitted', r.hypothesisSet.hypotheses.length >= 2);
   var cats = HI.safeArrayMap(r.hypothesisSet.hypotheses, function (h) { return h.category; });
@@ -126,8 +138,8 @@ console.log('Section A — functional happy paths');
 (function () {
   // A3: determinism — same graph, two calls → identical hsetId, identical hypothesis IDs
   var g = _buildGraph([_baseNode({})]);
-  var r1 = HE.buildHypothesisSet({ graph: g }, { clock: BASE_CLOCK });
-  var r2 = HE.buildHypothesisSet({ graph: g }, { clock: function () { return '2026-06-29T02:00:00Z'; } });
+  var r1 = _he({ graph: g }, { clock: BASE_CLOCK });
+  var r2 = _he({ graph: g }, { clock: function () { return '2026-06-29T02:00:00Z'; } });
   chk('A3: same graph → same hypothesisSetId', r1.hypothesisSet.hypothesisSetId === r2.hypothesisSet.hypothesisSetId);
   chk('A3: same graph → same hypothesis count', r1.hypothesisSet.hypotheses.length === r2.hypothesisSet.hypotheses.length);
   chk('A3: same graph → same hypothesisId of first hyp',
@@ -146,7 +158,7 @@ console.log('Section A — functional happy paths');
     limitations: ['LIMITATION_HEURISTIC_ONLY'],
   });
   var g = _buildGraph([n]);
-  var r = HE.buildHypothesisSet({ graph: g });
+  var r = _he({ graph: g });
   chk('A4: graph with non-triggering evidence still returns valid envelope', r.valid === true);
   chk('A4: no hypotheses for irrelevant evidence', r.hypothesisSet.hypotheses.length === 0);
   chk('A4: cannotConclude includes INSUFFICIENT_EVIDENCE (graph cannot conclude)',
@@ -158,7 +170,7 @@ console.log('Section A — functional happy paths');
 console.log('Section B — structural');
 (function () {
   var g = _buildGraph([_baseNode({})]);
-  var r = HE.buildHypothesisSet({ graph: g });
+  var r = _he({ graph: g });
   var hs = r.hypothesisSet;
 
   chk('B1: top-level envelope is frozen', Object.isFrozen(r) === true);
@@ -217,14 +229,14 @@ console.log('Section C — authority verification');
     generationToken: null,
     contextVersion: null,
   });
-  var r = HE.buildHypothesisSet({ graph: fabricated });
+  var r = _he({ graph: fabricated });
   chk('C1: fabricated graph (random graphId) rejected',
     r.eligible === false
       && HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.HYPOTHESIS_AUTHORITY_FORGED) !== -1);
 
   // C2: authoritative graph from D2 → accepted
   var g = _buildGraph([_baseNode({})]);
-  var ok = HE.buildHypothesisSet({ graph: g });
+  var ok = _he({ graph: g });
   chk('C2: authoritative D2 graph accepted', ok.valid === true);
 
   // C3: mutable shell — non-frozen "graph"
@@ -236,7 +248,7 @@ console.log('Section C — authority verification');
     cannotConclude: g.cannotConclude, provenance: g.provenance, createdAt: g.createdAt,
     generationToken: g.generationToken, contextVersion: g.contextVersion,
   };
-  var r3 = HE.buildHypothesisSet({ graph: nonFrozen });
+  var r3 = _he({ graph: nonFrozen });
   chk('C3: non-frozen graph shell rejected (authority forged)',
     r3.eligible === false
       && HI.safeArrayIndexOf(r3.reasonCodes, RC.REASON_CODES.HYPOTHESIS_AUTHORITY_FORGED) !== -1);
@@ -257,7 +269,7 @@ console.log('Section D — scope (case/session/schema)');
     cannotConclude: g.cannotConclude, provenance: g.provenance,
     createdAt: g.createdAt, generationToken: g.generationToken, contextVersion: g.contextVersion,
   });
-  var r = HE.buildHypothesisSet({ graph: futureClone });
+  var r = _he({ graph: futureClone });
   chk('D1: future schemaVersion (=2) rejected with UNSUPPORTED_FUTURE_SCHEMA',
     r.eligible === false
       && HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.UNSUPPORTED_FUTURE_SCHEMA) !== -1);
@@ -267,8 +279,8 @@ console.log('Section D — scope (case/session/schema)');
   // D2: hypothesisSetId is independent of caller-supplied generationToken (token IS persisted but
   // doesn't influence ID; tokens are envelope metadata not content)
   var g = _buildGraph([_baseNode({})]);
-  var rA = HE.buildHypothesisSet({ graph: g, generationToken: 'token-A' });
-  var rB = HE.buildHypothesisSet({ graph: g, generationToken: 'token-B' });
+  var rA = _he({ graph: g, generationToken: 'token-A' });
+  var rB = _he({ graph: g, generationToken: 'token-B' });
   chk('D2: hsetId is content-deterministic (independent of generationToken)',
     rA.hypothesisSet.hypothesisSetId === rB.hypothesisSet.hypothesisSetId);
   chk('D2: generationToken stored verbatim',
@@ -278,14 +290,14 @@ console.log('Section D — scope (case/session/schema)');
 (function () {
   // D3: contextVersion stored, also independent of hsetId
   var g = _buildGraph([_baseNode({})]);
-  var r = HE.buildHypothesisSet({ graph: g, contextVersion: 'ctx-1.0' });
+  var r = _he({ graph: g, contextVersion: 'ctx-1.0' });
   chk('D3: contextVersion stored verbatim', r.hypothesisSet.contextVersion === 'ctx-1.0');
 })();
 
 (function () {
   // D4: unknown input own key rejected
   var g = _buildGraph([_baseNode({})]);
-  var r = HE.buildHypothesisSet({ graph: g, fooBar: 'extra' });
+  var r = _he({ graph: g, fooBar: 'extra' });
   chk('D4: unknown input own key rejected', r.eligible === false
     && HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.UNKNOWN_OWN_KEY) !== -1);
 })();
@@ -301,7 +313,7 @@ console.log('Section E — confidence model');
   var n2 = _baseNode({ nodeId: 'n_b', identity: _baseIdentity({ sourceId: 'shared_src' }),
     observation: { kind: 'channel_missing', channel: 'brake2', i18nKey: 'k2', params: null } });
   var g = _buildGraph([n1, n2]);
-  var r = HE.buildHypothesisSet({ graph: g });
+  var r = _he({ graph: g });
   // Find the channel_missing hypothesis
   var hMiss = r.hypothesisSet.hypotheses.filter(function (h) { return h.ruleId === 'rule_dq_channel_missing'; })[0];
   chk('E1: shared-source nodes group into 1 correlation group',
@@ -318,7 +330,7 @@ console.log('Section E — confidence model');
     limitations: ['LIMITATION_HEURISTIC_ONLY'],
   });
   var g = _buildGraph([n]);
-  var r = HE.buildHypothesisSet({ graph: g });
+  var r = _he({ graph: g });
   var hVR = r.hypothesisSet.hypotheses.filter(function (h) { return h.ruleId === 'rule_vr_observed_response'; })[0];
   chk('E2: heuristic-only evidence does NOT trigger vehicle_response rule (allowedCredibility excludes heuristic)',
     !hVR);
@@ -328,7 +340,7 @@ console.log('Section E — confidence model');
   // E3: caller-supplied confidence is ignored — the engine computes its own
   // (we test by ensuring graph.nodes confidence.state is not_computed, output confidence is from engine)
   var g = _buildGraph([_baseNode({})]);
-  var r = HE.buildHypothesisSet({ graph: g });
+  var r = _he({ graph: g });
   var h = r.hypothesisSet.hypotheses[0];
   chk('E3: engine-computed confidence has score (caller cannot pre-set)',
     typeof h.confidence.score === 'number' && h.confidence.score >= 0);
@@ -342,7 +354,7 @@ console.log('Section E — confidence model');
   // Simpler: a single node WITHOUT contradiction vs a baseline; harder to construct meaningful contra.
   // For now, assert that a graph with zero contradictions produces score > 0.
   var g = _buildGraph([_baseNode({})]);
-  var r = HE.buildHypothesisSet({ graph: g });
+  var r = _he({ graph: g });
   chk('E4: no-contradiction graph produces positive confidence score',
     r.hypothesisSet.hypotheses[0].confidence.score > 0);
   chk('E4: no-contradiction graph status is supported', r.hypothesisSet.hypotheses[0].status === 'supported');
@@ -359,7 +371,7 @@ console.log('Section F — limitations & cannot_conclude');
     limitations: ['LIMITATION_MISSING_CHANNEL', 'LIMITATION_HEURISTIC_ONLY'],
   });
   var g = _buildGraph([n]);
-  var r = HE.buildHypothesisSet({ graph: g });
+  var r = _he({ graph: g });
   var h = r.hypothesisSet.hypotheses[0];
   chk('F1: heuristic hypothesis carries LIMITATION_HEURISTIC_ONLY',
     HI.safeArrayIndexOf(h.limitations, RC.REASON_CODES.LIMITATION_HEURISTIC_ONLY) !== -1);
@@ -369,7 +381,7 @@ console.log('Section F — limitations & cannot_conclude');
   // F2: snapshot limitations roll up from hypotheses + graph
   var n = _baseNode({});
   var g = _buildGraph([n]);
-  var r = HE.buildHypothesisSet({ graph: g });
+  var r = _he({ graph: g });
   chk('F2: snapshot limitations include LIMITATION_MISSING_CHANNEL',
     HI.safeArrayIndexOf(r.hypothesisSet.limitations, RC.REASON_CODES.LIMITATION_MISSING_CHANNEL) !== -1);
 })();
@@ -379,7 +391,7 @@ console.log('Section F — limitations & cannot_conclude');
   var g = _buildGraph([_baseNode({ nodeId: 'n_qual', category: 'vehicle_response', credibility: 'heuristic',
     observation: { kind: 'qualitative_marker', channel: null, i18nKey: 'k', params: null },
     limitations: ['LIMITATION_HEURISTIC_ONLY'] })]);
-  var r = HE.buildHypothesisSet({ graph: g });
+  var r = _he({ graph: g });
   chk('F3: when no rule fires (or only heuristic), cannotConclude has entries',
     r.hypothesisSet.cannotConclude.length > 0);
 })();
@@ -388,7 +400,7 @@ console.log('Section F — limitations & cannot_conclude');
 console.log('Section G — validation actions + alternative explanations');
 (function () {
   var g = _buildGraph([_baseNode({})]);
-  var r = HE.buildHypothesisSet({ graph: g });
+  var r = _he({ graph: g });
   var h = r.hypothesisSet.hypotheses[0];
   var allAlts = r.hypothesisSet.alternativeExplanations;
   var allActs = r.hypothesisSet.validationActions;
@@ -416,7 +428,7 @@ console.log('Section H — security');
   // H1: Proxy graph rejected
   var g = _buildGraph([_baseNode({})]);
   var proxy = new Proxy(g, { get: function (t, k) { return t[k]; } });
-  var r = HE.buildHypothesisSet({ graph: proxy });
+  var r = _he({ graph: proxy });
   chk('H1: Proxy-wrapped graph rejected', r.eligible === false);
 })();
 
@@ -424,7 +436,7 @@ console.log('Section H — security');
   // H2: class-instance graph rejected
   function FakeGraph() { this.schemaVersion = 1; }
   var inst = new FakeGraph();
-  var r = HE.buildHypothesisSet({ graph: inst });
+  var r = _he({ graph: inst });
   chk('H2: class instance graph rejected', r.eligible === false);
 })();
 
@@ -433,7 +445,7 @@ console.log('Section H — security');
   var SubArr = Array.from ? class extends Array {} : null;
   if (SubArr) {
     var sub = new SubArr();
-    var r = HE.buildHypothesisSet({ graph: sub });
+    var r = _he({ graph: sub });
     chk('H3: Array subclass graph rejected', r.eligible === false);
   } else {
     chk('H3: Array subclass test skipped (no class support)', true);
@@ -445,7 +457,7 @@ console.log('Section H — security');
   var g = _buildGraph([_baseNode({})]);
   var input = { graph: g };
   input[Symbol('hidden')] = 'should be rejected';
-  var r = HE.buildHypothesisSet(input);
+  var r = _he(input);
   chk('H4: Symbol-keyed input own key rejected', r.eligible === false);
 })();
 
@@ -454,7 +466,7 @@ console.log('Section H — security');
   var g = _buildGraph([_baseNode({})]);
   var input = { graph: g };
   Object.defineProperty(input, 'hidden', { value: 'x', enumerable: false, configurable: true, writable: true });
-  var r = HE.buildHypothesisSet(input);
+  var r = _he(input);
   chk('H5: non-enumerable input own key rejected', r.eligible === false);
 })();
 
@@ -469,7 +481,7 @@ console.log('Section H — security');
       Array.prototype.push = function () { /* hostile no-op */ };
       return '2026-06-29T01:01:00Z';
     };
-    var r = HE.buildHypothesisSet({ graph: g }, { clock: hostileClock });
+    var r = _he({ graph: g }, { clock: hostileClock });
     chk('H6: hostile clock did fire', hostileFired === true);
     chk('H6: engine returned a valid result OR a fail-closed block envelope',
       r.valid === true || r.eligible === false);
@@ -486,7 +498,7 @@ console.log('Section H — security');
   // H7: oversized contextVersion rejected
   var g = _buildGraph([_baseNode({})]);
   var big = 'x'; while (big.length < 200) big += big;
-  var r = HE.buildHypothesisSet({ graph: g, contextVersion: big });
+  var r = _he({ graph: g, contextVersion: big });
   chk('H7: oversized contextVersion (>128 chars) rejected', r.eligible === false);
 })();
 
@@ -502,7 +514,7 @@ console.log('Section H — security');
     provenance: g.provenance, createdAt: g.createdAt,
     generationToken: g.generationToken, contextVersion: g.contextVersion,
   });
-  var r = HE.buildHypothesisSet({ graph: tampered });
+  var r = _he({ graph: tampered });
   chk('H8: tampered graphId rejected as forged',
     r.eligible === false
       && HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.HYPOTHESIS_AUTHORITY_FORGED) !== -1);
@@ -520,7 +532,7 @@ console.log('Section H2 — Codex D3 R1 closures');
   // engine ignores the non-hashed fields and re-derives them.)
   // Take the authentic graph and assert that the snapshot output does NOT echo
   // graph.cannotConclude/limitations/provenance.sanitizedCount values.
-  var r = HE.buildHypothesisSet({ graph: g });
+  var r = _he({ graph: g });
   chk('HR01-1: snapshot.provenance.sourceGraphSanitizedCount equals graph.nodes.length (not graph.provenance.sanitizedCount which is non-hashed)',
     r.hypothesisSet.provenance.sourceGraphSanitizedCount === g.nodes.length);
   // Build a tampered shell where we mutate graph.provenance.sanitizedCount to a bogus value
@@ -536,7 +548,7 @@ console.log('Section H2 — Codex D3 R1 closures');
     provenance: Object.freeze({ builderVersion: 999, inputCount: 99999, sanitizedCount: 777777, rejectedCount: 0, rejectedReasonsSummary: Object.freeze({}) }),
     createdAt: g.createdAt, generationToken: g.generationToken, contextVersion: g.contextVersion,
   });
-  var r2 = HE.buildHypothesisSet({ graph: tamperedShell });
+  var r2 = _he({ graph: tamperedShell });
   // The tamperedShell is NOT frozen-equivalent to g (different object identity for limitations etc.)
   // but the hashed projection matches — D3 must still process it but ignore the tampered fields.
   if (r2.valid === true) {
@@ -585,7 +597,7 @@ console.log('Section H2 — Codex D3 R1 closures');
     generationToken: g.generationToken,
     contextVersion: g.contextVersion,
   });
-  var r = HE.buildHypothesisSet({ graph: dupShell });
+  var r = _he({ graph: dupShell });
   chk('HR02-1: duplicate nodeId rejected (forged OR explicit duplicate)',
     r.eligible === false);
 })();
@@ -601,7 +613,7 @@ console.log('Section H2 — Codex D3 R1 closures');
   var eg = EG.buildEvidenceGraph({ caseAssociation: { caseId: 'case_001', sessionId: 'sess_001', lapId: null }, rawEvidence: [n] }, { clock: BASE_CLOCK });
   if (eg.valid && eg.graph.nodes.length > 0) {
     // If D2 unexpectedly accepts it, D3 must reject.
-    var r = HE.buildHypothesisSet({ graph: eg.graph });
+    var r = _he({ graph: eg.graph });
     chk('HR04: imported_summary + measured rejected at D3 (D2 unexpectedly let it through)',
       r.eligible === false);
   } else {
@@ -623,13 +635,22 @@ console.log('Section H2 — Codex D3 R1 closures');
   var g = _buildGraph([n]);
   // Reference now = 2026, freshness = 2020 → age > 1 day
   var refNow = 1782259200000;  // approx 2026-06-29
-  var r = HE.buildHypothesisSet({ graph: g }, { maxAgeMs: 24 * 60 * 60 * 1000, referenceNowMs: refNow });
+  var r = _he({ graph: g }, { maxAgeMs: 24 * 60 * 60 * 1000, referenceNowMs: refNow });
   chk('HR05-1: stale evidence (older than maxAgeMs) rejected',
     r.eligible === false
       && HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.EVIDENCE_FRESHNESS_STALE) !== -1);
-  // Without opts.maxAgeMs, accept (freshness is well-formed)
-  var r2 = HE.buildHypothesisSet({ graph: g });
-  chk('HR05-2: same graph without maxAgeMs accepted (no max-age policy)', r2.valid === true);
+  // Codex D3 R2 R2-03 closure: freshness is now MANDATORY. Without opts.maxAgeMs the engine
+  // uses DEFAULT_MAX_AGE_MS = 30 days. The 2020 freshness IS stale relative to default clock
+  // (2026), so should still be rejected.
+  var r2 = _he({ graph: g });
+  chk('HR05-2: same graph without explicit maxAgeMs still rejected when default exceeded',
+    r2.eligible === false
+      && HI.safeArrayIndexOf(r2.reasonCodes, RC.REASON_CODES.EVIDENCE_FRESHNESS_STALE) !== -1);
+  // No reference time at all (no clock + no referenceNowMs) → fail-closed
+  var r3 = HE.buildHypothesisSet({ graph: g });
+  chk('HR05-3: no clock and no referenceNowMs → fail-closed HYPOTHESIS_INVALID (freshness reference required)',
+    r3.eligible === false
+      && HI.safeArrayIndexOf(r3.reasonCodes, RC.REASON_CODES.HYPOTHESIS_INVALID) !== -1);
 })();
 
 // RN-06: lap mismatch
@@ -641,7 +662,7 @@ console.log('Section H2 — Codex D3 R1 closures');
   var eg = EG.buildEvidenceGraph({ caseAssociation: { caseId: 'case_001', sessionId: 'sess_001', lapId: 'L1' }, rawEvidence: [n] }, { clock: BASE_CLOCK });
   // Either D2 builds with nodes=0 (rejected the node), or builds with nodes=1 (D3 must reject).
   if (eg.valid && eg.graph.nodes.length > 0) {
-    var r = HE.buildHypothesisSet({ graph: eg.graph });
+    var r = _he({ graph: eg.graph });
     chk('HR06: lap mismatch rejected at D3', r.eligible === false);
   } else {
     chk('HR06: lap mismatch rejected at D2 boundary (D3 defense not exercised, ok)', true);
@@ -662,10 +683,33 @@ console.log('Section H2 — Codex D3 R1 closures');
     Object.defineProperty(hostile, k, { value: g[k], enumerable: true });
   });
   Object.freeze(hostile);
-  var r = HE.buildHypothesisSet({ graph: hostile });
-  chk('HR07-1: hostile getter on input top-level field caught by pre-clone audit (rejected)', r.eligible === false);
-  chk('HR07-2: hostile getter never invoked OR audit short-circuited before it could run a second time',
-    fired === false || r.eligible === false);
+  var r = _he({ graph: hostile });
+  // Codex D3 R2 R2-04 closure: pre-clone audit was REMOVED (it itself triggered Proxy traps
+  // and gave false security claims). New posture: hostile getter MAY fire during structuredClone
+  // (the clone neutralises it for downstream use). The hostile getter that returns the
+  // authentic schemaVersion=1 produces a clone identical to the authentic graph, so D3 accepts
+  // it as authoritative — this is correct behavior because the engine sees only the cloned
+  // values, never the live getter. The security guarantee is: a TOCTOU/opaque getter
+  // (returning different values) gets caught by graphId recompute mismatch.
+  chk('HR07-1: hostile getter that returns AUTHENTIC value produces equivalent clone (accepted)',
+    r.valid === true);
+  chk('HR07-2: hostile getter fired (it ran during structuredClone, but its effect is bounded to the clone)',
+    fired === true);
+  // HR07-3: opaque graph (different graphId from what the clone's data hashes to) rejected.
+  // We construct an object whose graphId field is a plain data property with a forged value;
+  // the clone faithfully reproduces it, and the recomputed graphId on the clone's nodes/edges
+  // does NOT match.
+  var hostile2 = Object.create(null);
+  Object.defineProperty(hostile2, 'graphId', { value: 'graph_deadbeefdeadbeef', enumerable: true });
+  Object.defineProperty(hostile2, 'schemaVersion', { value: 1, enumerable: true });
+  ['caseAssociation','sessionAssociation','nodes','edges','topologicalOrder','deduplicationSummary','correlationGroups','limitations','cannotConclude','provenance','createdAt','generationToken','contextVersion'].forEach(function (k) {
+    Object.defineProperty(hostile2, k, { value: g[k], enumerable: true });
+  });
+  Object.freeze(hostile2);
+  var r2 = _he({ graph: hostile2 });
+  chk('HR07-3: forged graphId (data property) rejected by recompute mismatch',
+    r2.eligible === false
+      && HI.safeArrayIndexOf(r2.reasonCodes, RC.REASON_CODES.HYPOTHESIS_AUTHORITY_FORGED) !== -1);
 })();
 
 // RN-08: ambient Object.isFrozen rebinding does NOT defeat frozen check
@@ -684,7 +728,7 @@ console.log('Section H2 — Codex D3 R1 closures');
       createdAt: g.createdAt, generationToken: g.generationToken, contextVersion: g.contextVersion,
     };
     // mutableShell is NOT actually frozen. With captured Object.isFrozen, D3 must reject.
-    var r = HE.buildHypothesisSet({ graph: mutableShell });
+    var r = _he({ graph: mutableShell });
     chk('HR08: mutable shell rejected even with hostile Object.isFrozen rebinding (captured ref defeats it)',
       r.eligible === false);
   } finally {
@@ -696,9 +740,148 @@ console.log('Section H2 — Codex D3 R1 closures');
 (function () {
   // The simplest demonstration: confirm a normal envelope is well under cap.
   var g = _buildGraph([_baseNode({})]);
-  var r = HE.buildHypothesisSet({ graph: g });
+  var r = _he({ graph: g });
   var bytes = Buffer.byteLength(JSON.stringify(r.hypothesisSet), 'utf8');
   chk('HR11: returned envelope size < ENVELOPE_BYTE_CAP', bytes < HE.ENVELOPE_BYTE_CAP);
+})();
+
+// ---------- Section H3 — Codex D3 R2 closure tests (R2-01..08) ----------------------------------
+console.log('Section H3 — Codex D3 R2 closures');
+
+// R2-01: correlation strip detection — fabricate a graph where the correlation group has been
+// stripped (caller sets correlationGroups=[] but nodes share the same source identity).
+(function () {
+  var n1 = _baseNode({ nodeId: 'n_dq1', identity: _baseIdentity({ sourceId: 'shared_x' }),
+    observation: { kind: 'channel_missing', channel: 'a', i18nKey: 'k', params: null } });
+  var n2 = _baseNode({ nodeId: 'n_dq2', identity: _baseIdentity({ sourceId: 'shared_x' }),
+    observation: { kind: 'channel_missing', channel: 'b', i18nKey: 'k', params: null } });
+  var g = _buildGraph([n1, n2]);
+  // Authentic graph has 1 correlation group of {n_dq1, n_dq2}. Strip it.
+  var stripped = Object.freeze({
+    schemaVersion: g.schemaVersion, graphId: g.graphId,
+    caseAssociation: g.caseAssociation, sessionAssociation: g.sessionAssociation,
+    nodes: g.nodes, edges: g.edges, topologicalOrder: g.topologicalOrder,
+    deduplicationSummary: g.deduplicationSummary,
+    correlationGroups: Object.freeze([]),  // stripped
+    limitations: g.limitations, cannotConclude: g.cannotConclude,
+    provenance: g.provenance, createdAt: g.createdAt,
+    generationToken: g.generationToken, contextVersion: g.contextVersion,
+  });
+  var r = _he({ graph: stripped });
+  chk('HRR2-01: stripped correlation group rejected (D3 reconstructs partition from identities)',
+    r.eligible === false);
+})();
+
+// R2-02: forbidden nodeId grammar (`../bad`)
+(function () {
+  // Build an authentic graph with a single valid node, then construct a fabricated shell
+  // where we replace one node's nodeId with `../bad`. Since graphId is recomputed differently
+  // for the modified data, we rely on the engine catching the grammar violation first.
+  var n = _baseNode({});
+  var g = _buildGraph([n]);
+  var badNode = HI.safeStructuredClone(g.nodes[0]);
+  badNode.nodeId = '../bad';
+  Object.freeze(badNode);
+  var bad = Object.freeze({
+    schemaVersion: 1, graphId: g.graphId,
+    caseAssociation: g.caseAssociation, sessionAssociation: g.sessionAssociation,
+    nodes: Object.freeze([badNode]),
+    edges: Object.freeze([]),
+    topologicalOrder: Object.freeze([badNode.nodeId]),
+    deduplicationSummary: g.deduplicationSummary,
+    correlationGroups: Object.freeze([]),
+    limitations: g.limitations, cannotConclude: g.cannotConclude,
+    provenance: g.provenance, createdAt: g.createdAt,
+    generationToken: g.generationToken, contextVersion: g.contextVersion,
+  });
+  var r = _he({ graph: bad });
+  chk('HRR2-02-a: nodeId `../bad` rejected (ID grammar enforced)',
+    r.eligible === false);
+})();
+
+// R2-02: NaN/Infinity independenceWeight
+(function () {
+  var n1 = _baseNode({ nodeId: 'n1', identity: _baseIdentity({ sourceId: 'shared' }) });
+  var n2 = _baseNode({ nodeId: 'n2', identity: _baseIdentity({ sourceId: 'shared' }),
+    observation: { kind: 'channel_missing', channel: 'x', i18nKey: 'k', params: null } });
+  var g = _buildGraph([n1, n2]);
+  // Authentic graph has 1 correlation group with independenceWeight 0.5. Fabricate with NaN.
+  var origCG = g.correlationGroups[0];
+  var bogusCG = Object.freeze({
+    correlationGroupId: origCG.correlationGroupId,
+    memberNodeIds: origCG.memberNodeIds,
+    independenceWeight: NaN,
+  });
+  var bad = Object.freeze({
+    schemaVersion: 1, graphId: g.graphId,
+    caseAssociation: g.caseAssociation, sessionAssociation: g.sessionAssociation,
+    nodes: g.nodes, edges: g.edges, topologicalOrder: g.topologicalOrder,
+    deduplicationSummary: g.deduplicationSummary,
+    correlationGroups: Object.freeze([bogusCG]),
+    limitations: g.limitations, cannotConclude: g.cannotConclude,
+    provenance: g.provenance, createdAt: g.createdAt,
+    generationToken: g.generationToken, contextVersion: g.contextVersion,
+  });
+  var r = _he({ graph: bad });
+  chk('HRR2-02-b: NaN independenceWeight rejected (Object.is exact equality)',
+    r.eligible === false);
+})();
+
+// R2-03: D3 mandatory freshness already covered by HR05-1/2/3.
+(function () {
+  chk('HRR2-03: mandatory freshness covered by HR05-1/2/3', true);
+})();
+
+// R2-04: pre-clone audit removed; security via clone + recompute (covered by HR07-1/2/3).
+(function () {
+  chk('HRR2-04: Proxy semantics covered by HR07-* and H1', true);
+})();
+
+// R2-05: accessor on input.graph TOCTOU — input snapshot now uses descriptor reads + rejects accessors
+(function () {
+  var g = _buildGraph([_baseNode({})]);
+  var hostile = {};
+  Object.defineProperty(hostile, 'graph', { get: function () { return g; }, enumerable: true });
+  var r = _he(hostile);
+  chk('HRR2-05-a: input with accessor on `graph` rejected (descriptor read sees accessor → reject)',
+    r.eligible === false
+      && HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.HYPOTHESIS_INVALID) !== -1);
+  // Non-enumerable input own key rejected
+  var hostile2 = {};
+  Object.defineProperty(hostile2, 'graph', { value: g, enumerable: false });
+  var r2 = _he(hostile2);
+  chk('HRR2-05-b: non-enumerable input own key rejected',
+    r2.eligible === false);
+  // Accessor on opts.maxAgeMs rejected
+  var hostileOpts = { clock: BASE_CLOCK };
+  Object.defineProperty(hostileOpts, 'maxAgeMs', { get: function () { return 1e12; }, enumerable: true });
+  var r3 = _he({ graph: g }, hostileOpts);
+  chk('HRR2-05-c: accessor on opts data field rejected',
+    r3.eligible === false);
+})();
+
+// R2-06 (NIT): positive contradiction-direction test. Build a graph where node A contradicts B
+// (B is in node A's contradictingEdges array). The engine should detect a contradiction for A.
+(function () {
+  var nA = _baseNode({
+    nodeId: 'n_a',
+    identity: _baseIdentity({ sourceId: 'src_a' }),
+    observation: { kind: 'channel_missing', channel: 'a', i18nKey: 'k', params: null },
+    contradictingEdges: ['n_b'],
+  });
+  var nB = _baseNode({
+    nodeId: 'n_b',
+    identity: _baseIdentity({ sourceId: 'src_b' }),
+    observation: { kind: 'channel_missing', channel: 'b', i18nKey: 'k', params: null },
+  });
+  var g = _buildGraph([nA, nB]);
+  var r = _he({ graph: g });
+  chk('HRR2-06-a: contradiction-direction test runs (engine accepts the graph)', r.valid === true);
+  // The hypothesis for rule_dq_channel_missing should now include n_b as contradicting evidence for n_a's matched group
+  var hyps = r.hypothesisSet.hypotheses.filter(function (h) { return h.ruleId === 'rule_dq_channel_missing'; });
+  var anyHasContradiction = hyps.some(function (h) { return h.contradictingEvidenceIds.length >= 1; });
+  chk('HRR2-06-b: contradiction edge produced ≥1 contradicting evidence id in matching hypothesis',
+    anyHasContradiction === true);
 })();
 
 // ---------- Section I — Privacy ------------------------------------------------------------------
@@ -706,7 +889,7 @@ console.log('Section I — privacy');
 (function () {
   // I1: output never contains raw telemetry samples / stack traces / filesystem paths
   var g = _buildGraph([_baseNode({})]);
-  var r = HE.buildHypothesisSet({ graph: g });
+  var r = _he({ graph: g });
   var json = JSON.stringify(r);
   chk('I1: no "/Users/" in output', json.indexOf('/Users/') === -1);
   chk('I2: no "stack" key in output (no stack traces leaked)',
@@ -738,7 +921,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J1: Array.prototype.push rebind — engine builds arrays via HI.safeArrayPush
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(Array.prototype, 'push', function () { return 0; }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J1: hostile Array.prototype.push never invoked by engine', r.hits === 0);
   chk('J1: engine still produced valid result', r.result.valid === true);
@@ -747,7 +930,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J2: Array.prototype.map rebind
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(Array.prototype, 'map', function () { return []; }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J2: hostile Array.prototype.map never invoked', r.hits === 0);
   chk('J2: result still valid', r.result.valid === true);
@@ -756,7 +939,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J3: Array.prototype.sort rebind
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(Array.prototype, 'sort', function () { return this; }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J3: hostile Array.prototype.sort never invoked', r.hits === 0);
   chk('J3: result still valid', r.result.valid === true);
@@ -765,7 +948,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J4: Array.prototype.indexOf rebind
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(Array.prototype, 'indexOf', function () { return -1; }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J4: hostile Array.prototype.indexOf never invoked', r.hits === 0);
 })();
@@ -773,7 +956,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J5: Object.keys rebind — engine uses HI.safeKeys via HI captured Reflect.ownKeys
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(Object, 'keys', function () { return []; }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J5: hostile Object.keys never invoked', r.hits === 0);
 })();
@@ -781,7 +964,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J6: JSON.stringify rebind (HI.stableStringify must NOT delegate to it)
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(JSON, 'stringify', function () { return ''; }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J6: hostile JSON.stringify never invoked', r.hits === 0);
   chk('J6: result still valid', r.result.valid === true);
@@ -790,7 +973,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J7: Object.freeze rebind — engine must use captured Object.freeze
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(Object, 'freeze', function (o) { return o; }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J7: hostile Object.freeze never invoked', r.hits === 0);
   chk('J7: result is still deep-frozen', Object.isFrozen(r.result) === true && Object.isFrozen(r.result.hypothesisSet) === true);
@@ -799,7 +982,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J8: Math.floor rebind — engine uses HI.safeMathFloor
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(Math, 'floor', function () { return -999; }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J8: hostile Math.floor never invoked', r.hits === 0);
   chk('J8: score still in [0,100]',
@@ -810,7 +993,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J9: Array.isArray rebind — should not affect HI.safeIsArray
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(Array, 'isArray', function () { return false; }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J9: hostile Array.isArray never invoked (engine uses HI capture)', r.hits === 0);
 })();
@@ -818,7 +1001,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J10: String.prototype.charCodeAt rebind — engine uses HI.safeStringCharCodeAt for hashing
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(String.prototype, 'charCodeAt', function () { return 0; }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J10: hostile String.prototype.charCodeAt never invoked', r.hits === 0);
   chk('J10: hsetId still computed deterministically (matches original baseline)',
@@ -828,7 +1011,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J11: Array.prototype.forEach — engine uses HI.safeArrayForEach
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(Array.prototype, 'forEach', function () { /* no-op */ }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J11: hostile Array.prototype.forEach never invoked', r.hits === 0);
   chk('J11: result still valid', r.result.valid === true);
@@ -837,7 +1020,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J12: Array.prototype.slice — engine uses HI.safeArraySlice
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(Array.prototype, 'slice', function () { return []; }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J12: hostile Array.prototype.slice never invoked', r.hits === 0);
   chk('J12: result still valid + has nonempty hypotheses', r.result.valid === true && r.result.hypothesisSet.hypotheses.length >= 1);
@@ -846,7 +1029,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J13: Object.getOwnPropertyDescriptor — engine uses HI.safeGetOwnDescriptor
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(Object, 'getOwnPropertyDescriptor', function () { return undefined; }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J13: hostile Object.getOwnPropertyDescriptor never invoked', r.hits === 0);
   chk('J13: result still valid', r.result.valid === true);
@@ -855,7 +1038,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J14: Object.create — engine uses HI.safeObjectCreateNull (which uses captured Object.create)
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(Object, 'create', function () { return {}; }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J14: hostile Object.create never invoked', r.hits === 0);
   chk('J14: result still valid', r.result.valid === true);
@@ -868,7 +1051,7 @@ function _runRebind(container, key, hostileImpl, action) {
   var wrapped = function (o, k, d) { hits += 1; return _origReflectApply(origDefineProp, this, arguments); };
   _origObjectDefineProperty(Object, 'defineProperty', { value: wrapped, configurable: true, writable: true });
   try {
-    var result = HE.buildHypothesisSet({ graph: g });
+    var result = _he({ graph: g });
     chk('J15: hostile Object.defineProperty never invoked by engine', hits === 0);
     chk('J15: result still valid', result.valid === true);
   } finally {
@@ -879,7 +1062,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J16: RegExp.prototype.test — engine uses HI.safeRegExpTest for graphId pattern match
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(RegExp.prototype, 'test', function () { return false; }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J16: hostile RegExp.prototype.test never invoked', r.hits === 0);
   chk('J16: result still valid', r.result.valid === true);
@@ -888,7 +1071,7 @@ function _runRebind(container, key, hostileImpl, action) {
   // J17: Number.isFinite — engine uses HI.safeNumberIsFinite
   var g = _buildGraph([_baseNode({})]);
   var r = _runRebind(Number, 'isFinite', function () { return false; }, function () {
-    return HE.buildHypothesisSet({ graph: g });
+    return _he({ graph: g });
   });
   chk('J17: hostile Number.isFinite never invoked', r.hits === 0);
 })();
@@ -901,7 +1084,7 @@ function _runRebind(container, key, hostileImpl, action) {
     var wrapped = function () { hits += 1; return _origReflectApply(origSC, this, arguments); };
     _origObjectDefineProperty(globalThis, 'structuredClone', { value: wrapped, configurable: true, writable: true });
     try {
-      var result = HE.buildHypothesisSet({ graph: g });
+      var result = _he({ graph: g });
       chk('J18: hostile global structuredClone never invoked', hits === 0);
       chk('J18: result still valid', result.valid === true);
     } finally {
@@ -921,7 +1104,7 @@ function _runRebind(container, key, hostileImpl, action) {
     var wrapped = function () { hits += 1; return _origReflectApply(origEncode, this, arguments); };
     _origObjectDefineProperty(TextEncoder.prototype, 'encode', { value: wrapped, configurable: true, writable: true });
     try {
-      var result = HE.buildHypothesisSet({ graph: g });
+      var result = _he({ graph: g });
       chk('J19: hostile TextEncoder.prototype.encode never invoked', hits === 0);
       chk('J19: result still valid', result.valid === true);
     } finally {
@@ -937,7 +1120,7 @@ function _runRebind(container, key, hostileImpl, action) {
 console.log('Section K — output immutability');
 (function () {
   var g = _buildGraph([_baseNode({})]);
-  var r = HE.buildHypothesisSet({ graph: g });
+  var r = _he({ graph: g });
   var threw = false;
   try {
     'use strict';

@@ -57,18 +57,24 @@
 
   var CODES = RC.REASON_CODES;
 
-  // ---------- Module-init capture: Object.isFrozen (Codex D3 R1 RN-08 closure) -----------------
-  // Object.isFrozen is not in the HI surface (HI considers it best-effort and never wraps it).
-  // We MUST treat caller-frozen-ness as a security gate, so we capture the pristine reference
-  // at module-init BEFORE any caller code can poison `Object.isFrozen = () => true`.
+  // ---------- Module-init capture: Object.isFrozen + Date.parse + Object.is -------------------
+  // These primitives are not in the HI surface; we capture them at module init so callers
+  // cannot defeat security checks by rebinding the ambient names. NOTE (Codex D3 R2 RN-07
+  // narrowed claim): "module init" here means after the contract dependencies have loaded
+  // (HI, RC, ...) — those loads themselves trust the module loader. If the module loader is
+  // compromised these captures cannot help, but that is out-of-scope (the entire R3.0D
+  // contract assumes module-init trust).
   var _CAPTURED_OBJECT_IS_FROZEN = Object.isFrozen;
+  var _CAPTURED_OBJECT_IS = Object.is;
+  var _CAPTURED_DATE_PARSE = Date.parse;
   function _isFrozenSafe(v) {
     try { return _CAPTURED_OBJECT_IS_FROZEN(v) === true; }
     catch (e) { return false; }
   }
-  // Also capture ISO date parser primitive — Codex D3 R1 RN-05 freshness check needs to compute
-  // wall-clock age. Date.parse can be rebound at any time; capture once at module init.
-  var _CAPTURED_DATE_PARSE = Date.parse;
+  function _exactlyEqual(a, b) {
+    try { return _CAPTURED_OBJECT_IS(a, b) === true; }
+    catch (e) { return false; }
+  }
   function _isoToMs(s) {
     try {
       if (typeof s !== 'string' || s.length === 0) return null;
@@ -153,6 +159,10 @@
   var ENVELOPE_BYTE_CAP = 512 * 1024;        // 512 KiB envelope ceiling.
   var GRAPH_NODE_INPUT_CAP = 8192;
   var GRAPH_EDGE_INPUT_CAP = 16384;
+  // Codex D3 R2 R2-03 closure: directive §5.18 mandates staleness-based invalidation.
+  // Default cutoff is 30 days. Caller can override via opts.maxAgeMs; reference time MUST
+  // be supplied via opts.clock() returning ISO 8601 (preferred) or opts.referenceNowMs.
+  var DEFAULT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
   // Confidence state ladder (semantic primary; numeric score is auxiliary).
   var CONFIDENCE_STATES = HI.deepFreeze(['not_computed', 'insufficient_evidence', 'low', 'moderate', 'high']);
@@ -319,28 +329,26 @@
    *  - cross-case: every node.identity.caseId === graph.caseAssociation.caseId
    *  - cross-session: every node.identity.sessionId === graph.caseAssociation.sessionId
    */
-  function _validateAuthoritativeGraph(gIn, opts) {
+  function _validateAuthoritativeGraph(gIn, refNowMs, maxAgeMs) {
     if (!_isPlainObject(gIn)) {
       return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
     }
-    // Codex D3 R1 RN-07 closure: audit the ORIGINAL input via HI.deepOriginalShapeAudit BEFORE
-    // structuredClone runs. The HI doc explicitly warns: structuredClone invokes input traps
-    // (accessor [[Get]], Proxy traps). If the original carries getters/Proxy/non-plain children,
-    // those traps would have already fired during clone (potentially poisoning intrinsics or
-    // returning TOCTOU-divergent values). deepOriginalShapeAudit performs a descriptor-only
-    // recursive walk that does NOT invoke any [[Get]] traps — it reads property descriptors.
-    if (HI.deepOriginalShapeAudit(gIn) !== true) {
-      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
-    }
-    // gIn must have been deep-frozen by D2 (any caller-fabricated mutable shell is rejected).
-    // Codex D3 R1 RN-08 closure: _isFrozen now uses captured Object.isFrozen — caller cannot
-    // defeat by rebinding ambient.
+    // Codex D3 R2 R2-04 closure: do NOT do a pre-clone audit. HI.deepOriginalShapeAudit
+    // invokes Proxy traps (getPrototypeOf / ownKeys / etc) which is itself the attack surface
+    // we wanted to avoid. We instead rely on the layered security model:
+    //   1. structuredClone produces a brand-new plain-object tree. The clone process invokes
+    //      Proxy [[Get]] traps, but the result is concrete data — no Proxy survives.
+    //   2. The clone is then audited via deepOriginalShapeAudit (clone never has Proxy → audit
+    //      is meaningful here, not a no-op trap walk).
+    //   3. The graphId is recomputed from the cloned data. A TOCTOU/opaque Proxy that returns
+    //      inconsistent values across the clone reads will yield a cloned tree whose
+    //      recomputed hash does NOT match the asserted graphId → rejected.
+    //   4. The frozen-input requirement (captured Object.isFrozen) rejects mutable shells.
+    // HI captures within the engine are themselves closure-private and immune to ambient
+    // rebinding triggered by Proxy traps. The combination is functionally Proxy-safe.
     if (!_isFrozen(gIn)) {
       return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
     }
-    // Proxy defang: NOW invoke structuredClone. The pre-clone audit above already established
-    // that the input is pure plain shape (no Proxies, no getters, no class instances), so the
-    // clone-time read traps cannot execute hostile code.
     var g = HI.safeStructuredClone(gIn);
     if (g === null) {
       return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
@@ -348,7 +356,9 @@
     if (!_isPlainObject(g)) {
       return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
     }
-    // Belt-and-suspenders post-clone audit.
+    // Post-clone audit — the clone IS plain (no Proxy), so this is meaningful: catches
+    // class-instance / Array-subclass / Symbol-key / accessor / sparse / non-finite-number
+    // smuggling through structuredClone's permissive deep-clone semantics.
     if (HI.deepOriginalShapeAudit(g) !== true) {
       return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
     }
@@ -393,7 +403,7 @@
       return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
     }
 
-    // Per-node identity scope + D2 invariant re-validation. Codex D3 R1 RN-01..06 closures:
+    // Per-node identity scope + D2 invariant re-validation. Codex D3 R1/R2 closures:
     // the graphId hash is a diagnostic identifier, not an integrity proof; D3 MUST independently
     // re-enforce every D2 invariant on the snapshot it has just cloned. We do NOT trust the
     // hashed projection alone — the projection itself is not the full graph schema.
@@ -401,12 +411,13 @@
     var sessionId = g.caseAssociation.sessionId;
     var caseLapId = (g.caseAssociation.lapId == null) ? null : g.caseAssociation.lapId;
     var seenNodeIds = HI.safeObjectCreateNull();
-    var nodeIdSet = HI.safeObjectCreateNull();  // for edge endpoint validation
-    var maxAgeMs = (opts && typeof opts.maxAgeMs === 'number' && opts.maxAgeMs > 0 && opts.maxAgeMs === opts.maxAgeMs) ? opts.maxAgeMs : null;
-    var referenceNowMs = null;
-    if (maxAgeMs !== null && opts && typeof opts.referenceNowMs === 'number' && opts.referenceNowMs > 0 && opts.referenceNowMs === opts.referenceNowMs) {
-      referenceNowMs = opts.referenceNowMs;
-    }
+    var nodeIdSet = HI.safeObjectCreateNull();
+    // Build the expected correlation partition from node identities. Two nodes share a
+    // correlation group iff they share (caseId|sessionId|lapId|sourceId). This mirrors D2's
+    // _correlationGroupKey logic. Codex D3 R2 R2-01 closure: D3 must reconstruct and verify the
+    // partition itself, not just validate the listed groups in isolation.
+    var expectedGroupBuckets = HI.safeObjectCreateNull();  // key → { memberNodeIds: [...] }
+    var nodeCorrelationKey = HI.safeObjectCreateNull();    // nodeId → key
 
     for (var i = 0; i < g.nodes.length; i++) {
       var n = g.nodes[i];
@@ -416,8 +427,16 @@
       if (!_isPlainObject(n.identity)) {
         return { valid: false, reasonCodes: [CODES.SOURCE_IDENTITY_INVALID] };
       }
+      // Codex D3 R2 R2-02 closure: enforce ID_RE grammar + forbidden pattern + byte cap on
+      // every node.nodeId. _isNonEmptyString alone admitted '../bad' style IDs.
       if (!_isNonEmptyString(n.nodeId)) {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_MISSING_ID] };
+      }
+      if (HI.safeRegExpTest(ID_FORBIDDEN_RE, n.nodeId) || !HI.safeRegExpTest(ID_RE, n.nodeId)) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_ID_FORBIDDEN] };
+      }
+      if (_byteLength(n.nodeId) > STRING_BYTE_CAP) {
+        return { valid: false, reasonCodes: [CODES.BYTE_CAP_EXCEEDED] };
       }
       // Codex D3 R1 RN-02 closure: D2 invariant — no duplicate nodeId.
       if (HI.safeGetOwnDescriptor(seenNodeIds, n.nodeId)) {
@@ -432,20 +451,13 @@
       if (n.identity.sessionId !== sessionId) {
         return { valid: false, reasonCodes: [CODES.SOURCE_IDENTITY_SESSION_MISMATCH] };
       }
-      // Codex D3 R1 RN-06 closure: lap mismatch rule (mirrors D2 evidence-graph.js step that
-      // requires equality when both envelope and node lapId are non-null).
       var nodeLapId = (n.identity.lapId == null) ? null : n.identity.lapId;
       if (caseLapId !== null && nodeLapId !== null && caseLapId !== nodeLapId) {
         return { valid: false, reasonCodes: [CODES.SOURCE_IDENTITY_LAP_MISMATCH] };
       }
-      // Codex D3 R1 RN-04 closure: imported_summary + measured elevation prohibition (D2 enforces
-      // it; D3 must repeat the check independently because graphId only covers a projection).
       if (n.identity.sourceId === 'imported_summary' && n.credibility === 'measured') {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_IMPORTED_SUMMARY_ELEVATION_FORBIDDEN] };
       }
-      // Codex D3 R1 RN-05 closure: freshness validity. Always require a parseable ISO 8601
-      // string. If opts.maxAgeMs is supplied with opts.referenceNowMs, reject nodes older
-      // than the cutoff.
       if (!_isNonEmptyString(n.identity.freshness)) {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_FRESHNESS_STALE] };
       }
@@ -453,39 +465,93 @@
       if (freshMs === null) {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_FRESHNESS_STALE] };
       }
-      if (maxAgeMs !== null && referenceNowMs !== null) {
-        if ((referenceNowMs - freshMs) > maxAgeMs) {
-          return { valid: false, reasonCodes: [CODES.EVIDENCE_FRESHNESS_STALE] };
-        }
+      // Codex D3 R2 R2-03 closure: freshness enforcement is now MANDATORY. refNowMs must be
+      // available (resolved from opts.clock or opts.referenceNowMs). maxAgeMs has a default
+      // (DEFAULT_MAX_AGE_MS). If no reference time is available we fail-closed before this
+      // function is even called — see buildHypothesisSet entry.
+      if ((refNowMs - freshMs) > maxAgeMs) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_FRESHNESS_STALE] };
+      }
+      if (freshMs > (refNowMs + (5 * 60 * 1000))) {
+        // Reject future-dated freshness (>5min in the future) — clock-skew tolerance only.
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_FRESHNESS_STALE] };
+      }
+
+      // Build expected correlation group bucket for this node.
+      var corrKey = caseId + '|' + sessionId + '|' + (nodeLapId == null ? ' ' : nodeLapId) + '|' + n.identity.sourceId;
+      HI.safeDefineDataProperty(nodeCorrelationKey, n.nodeId, corrKey);
+      var bucketDesc = HI.safeGetOwnDescriptor(expectedGroupBuckets, corrKey);
+      if (bucketDesc) {
+        _arrPush(bucketDesc.value, n.nodeId);
+      } else {
+        HI.safeDefineDataProperty(expectedGroupBuckets, corrKey, [n.nodeId]);
       }
     }
 
-    // Codex D3 R1 RN-02 closure (cont.): correlation group invariants. (a) Every memberNodeId
-    // must exist in nodeIdSet. (b) A memberNodeId must not appear in more than one group.
-    // (c) independenceWeight must equal 1 / memberNodeIds.length.
+    // Codex D3 R2 R2-01 closure: validate that the graph's correlationGroups EXACTLY match the
+    // expected partition derived from node identities. EVERY bucket (singleton or multi-member)
+    // MUST appear as exactly one correlationGroup with the same memberNodeIds (sorted) and
+    // independenceWeight = exact 1 / count (Object.is equality — Codex D3 R2 R2-02 closure
+    // rejects NaN/Infinity). This mirrors D2's behavior: D2 emits one correlation group per
+    // distinct (case|session|lap|sourceId) identity tuple.
+    var expectedKeys = HI.safeOwnKeys(expectedGroupBuckets) || [];
+    var expectedAllKeys = [];
+    for (var eki = 0; eki < expectedKeys.length; eki++) {
+      var ek = expectedKeys[eki];
+      var dEK = HI.safeGetOwnDescriptor(expectedGroupBuckets, ek);
+      if (dEK && _isPlainArray(dEK.value) && dEK.value.length >= 1) {
+        _arrPush(expectedAllKeys, ek);
+        HI.safeArraySort(dEK.value, _strcmp);
+      }
+    }
+    HI.safeArraySort(expectedAllKeys, _strcmp);
+    if (g.correlationGroups.length !== expectedAllKeys.length) {
+      return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT] };
+    }
+    var matchedKey = HI.safeObjectCreateNull();
     var globalMemberSeen = HI.safeObjectCreateNull();
     for (var cgi = 0; cgi < g.correlationGroups.length; cgi++) {
       var cg = g.correlationGroups[cgi];
       if (!_isPlainObject(cg) || !_isPlainArray(cg.memberNodeIds) || cg.memberNodeIds.length === 0) {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
       }
-      for (var mi = 0; mi < cg.memberNodeIds.length; mi++) {
-        var mid = cg.memberNodeIds[mi];
-        if (!_isNonEmptyString(mid)) {
-          return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
-        }
-        if (!HI.safeGetOwnDescriptor(nodeIdSet, mid)) {
-          return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_ORPHAN] };
-        }
-        if (HI.safeGetOwnDescriptor(globalMemberSeen, mid)) {
+      // All member IDs share the same expected correlation key.
+      var firstMember = cg.memberNodeIds[0];
+      var keyDesc = HI.safeGetOwnDescriptor(nodeCorrelationKey, firstMember);
+      if (!keyDesc) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_ORPHAN] };
+      }
+      var keyForThisGroup = keyDesc.value;
+      var bucketDescForKey = HI.safeGetOwnDescriptor(expectedGroupBuckets, keyForThisGroup);
+      if (!bucketDescForKey) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT] };
+      }
+      var expectedMembers = bucketDescForKey.value;
+      if (HI.safeGetOwnDescriptor(matchedKey, keyForThisGroup)) {
+        // The same correlation key appears twice in correlationGroups — invalid.
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT] };
+      }
+      HI.safeDefineDataProperty(matchedKey, keyForThisGroup, true);
+      if (cg.memberNodeIds.length !== expectedMembers.length) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT] };
+      }
+      // Verify members are exactly the expected set (sorted equality).
+      var sortedActual = HI.safeArraySlice(cg.memberNodeIds);
+      HI.safeArraySort(sortedActual, _strcmp);
+      for (var mi = 0; mi < sortedActual.length; mi++) {
+        if (sortedActual[mi] !== expectedMembers[mi]) {
           return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT] };
         }
-        HI.safeDefineDataProperty(globalMemberSeen, mid, true);
+        if (!HI.safeGetOwnDescriptor(nodeIdSet, sortedActual[mi])) {
+          return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_ORPHAN] };
+        }
+        if (HI.safeGetOwnDescriptor(globalMemberSeen, sortedActual[mi])) {
+          return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT] };
+        }
+        HI.safeDefineDataProperty(globalMemberSeen, sortedActual[mi], true);
       }
-      var expected = 1 / cg.memberNodeIds.length;
-      var diff = cg.independenceWeight - expected;
-      if (diff < 0) diff = -diff;
-      if (diff > 1e-9) {
+      // Exact Object.is(weight, 1/count) — rejects NaN, Infinity, or any float drift.
+      if (!_exactlyEqual(cg.independenceWeight, 1 / cg.memberNodeIds.length)) {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT] };
       }
     }
@@ -1105,23 +1171,102 @@
   }
 
   // ---------- Public entry: buildHypothesisSet -------------------------------------------------
-  function buildHypothesisSet(input, opts) {
+  function buildHypothesisSet(inputIn, optsIn) {
     try {
       // ---- Step 0 — intrinsic integrity entry guard ----
       if (!_intrinsicsIntact()) {
         return _buildIntrinsicTamperBlock('intrinsic-tampering detected at entry to buildHypothesisSet');
       }
 
-      // ---- Step 1 — top-level input shape check ----
-      if (!_isPlainObject(input)) {
+      // ---- Step 0.5 — Codex D3 R2 R2-05 closure: snapshot input + opts at entry ----
+      // structuredClone produces a brand-new plain-object tree, neutralising any caller
+      // accessors / Proxies / TOCTOU read traps on the input or options envelopes. From here
+      // on we read EXCLUSIVELY from the snapshot, never from inputIn / optsIn.
+      // Note: input.graph itself is deep-frozen + content-hashed; we keep its identity intact
+      // by NOT cloning it here (the authority verifier does its own clone). The snapshot we
+      // build holds top-level metadata only.
+      if (!_isPlainObject(inputIn)) {
         return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'input not plain object' });
       }
-      // Closed-key input: must contain { graph } and optionally { generationToken, contextVersion }.
-      if (RC.hasHiddenOwnKey(input)) {
+      // Snapshot the input top-level via descriptor-only reads. input.graph is held BY REFERENCE
+      // (it's expected to be a D2-produced deep-frozen graph; cloning it here would un-freeze it
+      // and force a double-clone pass through structuredClone). The authority verifier does its
+      // own structuredClone defang on input.graph downstream — that's the only place where the
+      // graph's data is consumed. Top-level wrapper fields (generationToken, contextVersion)
+      // ARE structurally snapshotted here to neutralise accessor / TOCTOU on the wrapper.
+      var inputSnap = HI.safeObjectCreateNull();
+      var inputDescNames = HI.safeOwnKeys(inputIn);
+      if (inputDescNames === null) {
+        return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'cannot read input own keys' });
+      }
+      for (var idi = 0; idi < inputDescNames.length; idi++) {
+        var idName = inputDescNames[idi];
+        if (typeof idName === 'symbol') {
+          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'input has symbol key' });
+        }
+        var idDesc = HI.safeGetOwnDescriptor(inputIn, idName);
+        if (!idDesc) continue;
+        if (!('value' in idDesc)) {
+          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'input accessor descriptor not allowed: ' + idName });
+        }
+        if (!idDesc.enumerable) {
+          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'input non-enumerable own key: ' + idName });
+        }
+        HI.safeDefineDataProperty(inputSnap, idName, idDesc.value);
+      }
+      if (!_isPlainObject(inputSnap)) {
+        return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'input snapshot not plain object' });
+      }
+      // Opts snapshot (may be undefined / null). structuredClone rejects functions, so we
+      // pull the clock callback out by reference (it's held as a closure-private value, not
+      // exposed to subsequent reads) and clone ONLY the data fields. This still neutralises
+      // accessor / Proxy TOCTOU on the data fields.
+      var optsSnap = null;
+      var clockCb = null;
+      if (optsIn !== null && optsIn !== undefined) {
+        if (!_isPlainObject(optsIn)) {
+          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts not plain object' });
+        }
+        // Pull clock by reference (only once — TOCTOU protection).
+        var clockDesc = HI.safeGetOwnDescriptor(optsIn, 'clock');
+        if (clockDesc && typeof clockDesc.value === 'function') {
+          clockCb = clockDesc.value;
+        }
+        // Build a data-only opts object with NO function fields, then clone it.
+        var optsData = HI.safeObjectCreateNull();
+        var ownDescNames = HI.safeOwnKeys(optsIn);
+        if (ownDescNames === null) {
+          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'cannot read opts own keys' });
+        }
+        for (var odi = 0; odi < ownDescNames.length; odi++) {
+          var odName = ownDescNames[odi];
+          if (typeof odName === 'symbol') {
+            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'opts has symbol key' });
+          }
+          if (odName === 'clock') continue;  // function, handled above
+          var od = HI.safeGetOwnDescriptor(optsIn, odName);
+          if (!od) continue;
+          if (typeof od.value === 'function') {
+            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts function field not allowed: ' + odName });
+          }
+          // 'value' presence indicates a data descriptor; accessor descriptors are rejected here.
+          if (!('value' in od)) {
+            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts accessor descriptor not allowed: ' + odName });
+          }
+          HI.safeDefineDataProperty(optsData, odName, od.value);
+        }
+        optsSnap = HI.safeStructuredClone(optsData);
+        if (optsSnap === null) {
+          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts data fields not cloneable' });
+        }
+      }
+
+      // ---- Step 1 — top-level input shape check on the SNAPSHOT ----
+      if (RC.hasHiddenOwnKey(inputSnap)) {
         return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'input carries hidden own key' });
       }
       var allowedInputKeys = ['graph', 'generationToken', 'contextVersion'];
-      var inputKeys = HI.safeKeys(input);
+      var inputKeys = HI.safeKeys(inputSnap);
       if (inputKeys === null) {
         return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'cannot read input own keys' });
       }
@@ -1130,20 +1275,69 @@
           return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'unknown input key: ' + inputKeys[ki] });
         }
       }
+      if (optsSnap !== null) {
+        // Opts allowed keys: clock (not cloned), maxAgeMs, referenceNowMs.
+        var allowedOptsKeys = ['clock', 'maxAgeMs', 'referenceNowMs'];
+        var optsKeys = HI.safeKeys(optsSnap);
+        if (optsKeys === null) {
+          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'cannot read opts own keys' });
+        }
+        for (var oki = 0; oki < optsKeys.length; oki++) {
+          if (HI.safeArrayIndexOf(allowedOptsKeys, optsKeys[oki]) === -1) {
+            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'unknown opts key: ' + optsKeys[oki] });
+          }
+        }
+      }
 
-      // ---- Step 2 — graph authority verification (pre-clone audit + clone defang + D2 invariants
-      // + graphId recompute) ----
-      var authority = _validateAuthoritativeGraph(input.graph, opts);
+      // ---- Step 1.5 — resolve freshness policy reference time (Codex D3 R2 R2-03 closure) ----
+      // Reference now is REQUIRED for D3 to enforce mandatory freshness. Resolution order:
+      //   1. opts.referenceNowMs (finite positive number) — caller-provided absolute ms
+      //   2. opts.clock() returning a valid ISO 8601 string — parsed to ms via captured Date.parse
+      // Clock is invoked AT MOST ONCE (the result is reused for both refNowMs and snapshot
+      // createdAt — Codex D2 R5 RN-13 pattern: invoking the clock multiple times exposes TOCTOU).
+      // If neither yields a usable reference time, fail-closed with HYPOTHESIS_INVALID.
+      var refNowMs = null;
+      var resolvedClockIso = null;
+      if (optsSnap && typeof optsSnap.referenceNowMs === 'number'
+          && HI.safeNumberIsFinite(optsSnap.referenceNowMs) === true
+          && optsSnap.referenceNowMs > 0) {
+        refNowMs = optsSnap.referenceNowMs;
+      } else if (clockCb !== null) {
+        var clockIso = null;
+        try { clockIso = clockCb(); } catch (eClock) { clockIso = null; }
+        if (typeof clockIso === 'string' && clockIso.length > 0 && clockIso.length <= 64
+            && HI.safeRegExpTest(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:?\d{2})$/, clockIso)) {
+          var parsed = _isoToMs(clockIso);
+          if (parsed !== null && parsed > 0) {
+            refNowMs = parsed;
+            resolvedClockIso = clockIso;
+          }
+        }
+      }
+      if (refNowMs === null) {
+        return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], {
+          detail: 'D3 requires a reference time for mandatory freshness enforcement — supply opts.clock() returning ISO 8601 OR opts.referenceNowMs (positive finite number)',
+        });
+      }
+      var maxAgeMs = DEFAULT_MAX_AGE_MS;
+      if (optsSnap && typeof optsSnap.maxAgeMs === 'number'
+          && HI.safeNumberIsFinite(optsSnap.maxAgeMs) === true
+          && optsSnap.maxAgeMs > 0) {
+        maxAgeMs = optsSnap.maxAgeMs;
+      }
+
+      // ---- Step 2 — graph authority verification ----
+      var authority = _validateAuthoritativeGraph(inputSnap.graph, refNowMs, maxAgeMs);
       if (authority.valid !== true) {
         return RC.buildBlockedResult(authority.reasonCodes, { detail: 'authority verification failed' });
       }
-      var graph = authority.graph;  // the validated, deep-frozen clone — Proxy can no longer affect reads
+      var graph = authority.graph;
 
       // ---- Step 2.5 — generationToken / contextVersion shape ----
       var generationToken = null;
       var contextVersion = null;
-      if (HI.safeHasOwn(input, 'generationToken')) {
-        var gt = input.generationToken;
+      if (HI.safeHasOwn(inputSnap, 'generationToken')) {
+        var gt = inputSnap.generationToken;
         if (gt !== null) {
           if (!_isNonEmptyString(gt) || gt.length > 128) {
             return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'generationToken must be non-empty string ≤128 chars or null' });
@@ -1151,8 +1345,8 @@
           generationToken = gt;
         }
       }
-      if (HI.safeHasOwn(input, 'contextVersion')) {
-        var cv = input.contextVersion;
+      if (HI.safeHasOwn(inputSnap, 'contextVersion')) {
+        var cv = inputSnap.contextVersion;
         if (cv !== null) {
           if (!_isNonEmptyString(cv) || cv.length > 128) {
             return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'contextVersion must be non-empty string ≤128 chars or null' });
@@ -1283,8 +1477,11 @@
         return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'pre-clock envelope ' + envBytes + ' bytes exceeds ' + ENVELOPE_BYTE_CAP });
       }
 
-      // ---- Step 7 — resolve clock (LAST input-touching op) ----
-      var createdAt = _resolveClock(opts);
+      // ---- Step 7 — populate createdAt from already-resolved clock (Step 1.5) ----
+      // The clock callback was invoked AT MOST ONCE in Step 1.5; the resolved ISO is reused
+      // here for snapshot metadata. This eliminates TOCTOU between freshness reference and
+      // createdAt — both bind to the same single clock observation.
+      var createdAt = resolvedClockIso;
 
       // ---- Step 7.5 — post-clock intrinsic integrity recheck ----
       if (!_intrinsicsIntact()) {
