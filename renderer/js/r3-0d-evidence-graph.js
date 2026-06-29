@@ -120,6 +120,20 @@
   if (!Contracts && typeof R3_0D_Contracts !== 'undefined') Contracts = R3_0D_Contracts;
   if (!Contracts) throw new Error('renderer/js/r3-0d-evidence-graph.js requires contracts/r3.0d/index.js');
 
+  // Codex D2 Round 16 architectural convergence: route every primitive operation through the
+  // R3.0D hardened-intrinsics toolkit so the validator NEVER calls an ambient prototype method.
+  // The HI module captures pristine intrinsic references at its own module-init time and exposes
+  // only safe wrappers; any ambient rebinding installed after HI loads cannot reach the wrapper
+  // bodies, so self-restoring attacker tampering is structurally inert here. The integrity guard
+  // below remains as defence-in-depth, primarily as an observability mechanism that surfaces
+  // INTERNAL_CONTRACT_VIOLATION when the runtime's own globals diverge from our captured view.
+  var HI = null;
+  if (typeof module !== 'undefined' && module.exports) {
+    try { HI = require('../../contracts/r3.0d/hardened-intrinsics.js'); } catch (e) { HI = null; }
+  }
+  if (!HI && typeof R3_0D_HardenedIntrinsics !== 'undefined') HI = R3_0D_HardenedIntrinsics;
+  if (!HI) throw new Error('renderer/js/r3-0d-evidence-graph.js requires contracts/r3.0d/hardened-intrinsics.js');
+
   var RC = Contracts.reasonCodes;
   var SI = Contracts.sourceIdentity;
   var EN = Contracts.evidenceNode;
@@ -352,8 +366,8 @@
 
   // Closed enum — directive §8 Edge closed enum. derived_from + invalidates are reserved (D2 emits
   // none; later D-phase or test-fixture inputs may introduce them via dedicated APIs).
-  var EDGE_KIND_ALLOWED = Object.freeze(['supports', 'contradicts', 'derived_from', 'correlated_with', 'invalidates']);
-  var EDGE_KIND_CAUSAL = Object.freeze({ supports: true, contradicts: true });
+  var EDGE_KIND_ALLOWED = HI.deepFreeze(['supports', 'contradicts', 'derived_from', 'correlated_with', 'invalidates']);
+  var EDGE_KIND_CAUSAL = HI.deepFreeze({ supports: true, contradicts: true });
 
   // Caps. Mirror D1 envelope language so the contract surface is consistent.
   var NODES_CAP = 256;
@@ -374,51 +388,42 @@
   var IMPORTED_SUMMARY_MAX_CREDIBILITY = 'derived'; // 'measured' is denied
 
   // Input envelope closed key set.
-  var INPUT_KEYS = Object.freeze(['caseAssociation', 'rawEvidence', 'generationToken', 'contextVersion']);
-  var CASE_ASSOCIATION_KEYS = Object.freeze(['caseId', 'sessionId', 'lapId']);
-  var CASE_ASSOCIATION_REQUIRED = Object.freeze(['caseId', 'sessionId']);
-  var OPTS_KEYS = Object.freeze(['clock']);
+  var INPUT_KEYS = HI.deepFreeze(['caseAssociation', 'rawEvidence', 'generationToken', 'contextVersion']);
+  var CASE_ASSOCIATION_KEYS = HI.deepFreeze(['caseId', 'sessionId', 'lapId']);
+  var CASE_ASSOCIATION_REQUIRED = HI.deepFreeze(['caseId', 'sessionId']);
+  var OPTS_KEYS = HI.deepFreeze(['clock']);
 
   // ─── Defence-in-depth helpers ────────────────────────────────────────────────
-  function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
+  // _isPlain: HI.safeIsPlainShape returns 'plain-object' for non-array plain objects, which is
+  // what this helper needs. (Arrays are excluded — the original implementation rejected them.)
+  function _isPlain(v) { return HI.safeIsPlainShape(v) === 'plain-object'; }
   function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
-  function _isFiniteNum(v) { return typeof v === 'number' && v === v && v !== Infinity && v !== -Infinity; }
-  function _isIsoTimestamp(s) { return typeof s === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(s); }
+  function _isFiniteNum(v) { return typeof v === 'number' && HI.safeNumberIsFinite(v); }
+  var _ISO_TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
+  function _isIsoTimestamp(s) { return typeof s === 'string' && HI.safeRegExpTest(_ISO_TIMESTAMP_RE, s); }
   function _hasOnlyAllowedKeys(o, allowed) {
-    var keys;
-    try { keys = _ReflectOwnKeys ? _ReflectOwnKeys(o) : _ObjectKeys(o); }
-    catch (e) { return false; }
+    var keys = HI.safeOwnKeys(o);
+    if (keys === null) {
+      // Fall back to enumerable-string-key view when ownKeys is unavailable.
+      keys = HI.safeKeys(o);
+      if (keys === null) return false;
+    }
     for (var i = 0; i < keys.length; i++) {
       var k = keys[i];
       if (typeof k === 'symbol') return false;
-      if (_arrIndexOf(allowed, k) === -1) return false;
+      if (HI.safeArrayIndexOf(allowed, k) === -1) return false;
     }
     return true;
   }
-  // Codex D2 Round 9 RN-20 closure helper: own-property check via captured
-  // _ObjectGetOwnPropertyDescriptor, bypassing both Object.prototype.hasOwnProperty rebinding AND
-  // Function.prototype.call rebinding. Used on _ObjectCreate(null) maps where the answer is the
-  // same as `key in obj` but more defence-in-depth.
-  function _hasOwn(obj, key) {
-    try { return _ObjectGetOwnPropertyDescriptor(obj, key) !== undefined; }
-    catch (e) { return false; }
-  }
+  // Own-property check delegated to HI.safeHasOwn (descriptor-based; bypasses both
+  // Object.prototype.hasOwnProperty rebinding AND Function.prototype.call rebinding).
+  function _hasOwn(obj, key) { return HI.safeHasOwn(obj, key); }
   function _strcmp(a, b) { if (a === b) return 0; return a < b ? -1 : 1; }
 
-  // UTF-8 byte-length helper. Uses TextEncoder when available, Buffer.byteLength otherwise.
-  // Codex D2 Round 3 RN-09 closure: distinguishes UTF-16 code units (string.length) from real
-  // on-wire UTF-8 byte size. A Unicode-heavy payload no longer slips through the rough estimator
-  // because string.length undercount.
-  function _utf8len(s) {
-    if (typeof s !== 'string') return 0;
-    if (_TextEncoder) {
-      try { return new _TextEncoder().encode(s).length; } catch (e) { /* fall through */ }
-    }
-    if (_BufferByteLength) {
-      try { return _BufferByteLength(s, 'utf8'); } catch (e) { /* fall through */ }
-    }
-    return s.length * 4; // worst-case bound when neither API is present
-  }
+  // UTF-8 byte-length helper delegated to HI.safeUtf8ByteLength (TextEncoder via captured ref,
+  // with manual char-code summation fallback that already accounts for lone surrogates as the
+  // 6-byte \uXXXX JSON escape width).
+  function _utf8len(s) { return HI.safeUtf8ByteLength(s); }
 
   // Codex D2 Round 4 RN-15 + Round 5 RN-15 round-4 + Round 6 RN-17 closure: JSON canonical width
   // estimator. Counts the actual byte width a string occupies when serialised to canonical JSON
@@ -450,7 +455,7 @@
     var n = 2; // surrounding quotes
     var len = s.length;
     for (var i = 0; i < len; i++) {
-      var c = s.charCodeAt(i);
+      var c = HI.safeStringCharCodeAt(s, i);
       if (c === 0x22 || c === 0x5C) { n += 2; continue; }                  // " or \  → escaped
       if (c < 0x20) { n += 6; continue; }                                  // control U+0000..U+001F → \uXXXX
       if (c < 0x80) { n += 1; continue; }                                  // ASCII printable + DEL (no escape)
@@ -458,7 +463,7 @@
       if (c >= 0xDC00 && c <= 0xDFFF) { n += 6; continue; }                // LONE low surrogate → \uXXXX
       if (c >= 0xD800 && c <= 0xDBFF) {                                    // high surrogate — check pairing
         if (i + 1 < len) {
-          var c2 = s.charCodeAt(i + 1);
+          var c2 = HI.safeStringCharCodeAt(s, i + 1);
           if (c2 >= 0xDC00 && c2 <= 0xDFFF) { n += 4; i++; continue; }     // valid pair → 4-byte UTF-8
         }
         n += 6; continue;                                                  // LONE high surrogate → \uXXXX
@@ -468,128 +473,77 @@
     return n;
   }
 
-  // Codex D2 Round 5 RN-13 round-4 closure (Round 7 final): array copy / map helpers safe against
-  // both Function.prototype.call replacement AND Array.prototype indexed setter installation.
-  //
-  // Round 5 BLOCK: `_ArrayPrototypeSlice.call(arr)` / `_ArrayPrototypeMap.call(arr, fn)` routed
-  // through `Function.prototype.call`, which a hostile opts.clock could replace to return
-  // `[{tampered:true}]`. Round 6 fix moved to direct-loop `out[i] = arr[i]`.
-  //
-  // Round 6 BLOCK: a hostile clock could install `Object.defineProperty(Array.prototype, "0",
-  // { set: function(v) { Object.defineProperty(this, "0", { value: {tampered:true}, ... }); } })`.
-  // Then `out[i] = ...` on a freshly-created `out = []` would use OrdinarySet → check own
-  // descriptor (none) → traverse prototype chain → find the setter on Array.prototype → invoke it
-  // on `out` as the receiver. The setter then installs its OWN data descriptor on `out[0]` with
-  // the attacker shape, so `out[0]` thereafter returns `{tampered:true}`. Codex Round 6 evidence
-  // reproduced this with `nodes/groups/topology = [{tampered:true}]`, entries unfrozen.
-  //
-  // Round 7 closure: indexed assignment uses captured `_ObjectDefineProperty` with a full data
-  // descriptor — `_ObjectDefineProperty(out, i, { value, writable: true, enumerable: true,
-  // configurable: true })`. Per ES spec §10.1.6 [[DefineOwnProperty]] directly installs an own
-  // data descriptor without invoking the [[Set]] protocol or any prototype-chain accessor.
-  // Subsequent `out[i]` reads return the own value because own properties shadow the prototype.
-  // The captured `_ObjectDefineProperty` reference is taken at module-init time so a clock that
-  // overwrites `Object.defineProperty` later cannot tamper with this helper.
-  function _safeSlice(arr) {
-    var out = [];
-    var len;
-    try { len = (arr == null) ? 0 : arr.length; } catch (e) { return out; }
-    if (typeof len !== 'number' || len !== len || len < 0) return out;
-    len = len | 0;
-    for (var i = 0; i < len; i++) {
-      _ObjectDefineProperty(out, i, { value: arr[i], writable: true, enumerable: true, configurable: true });
-    }
-    return out;
-  }
-  function _safeMap(arr, fn) {
-    var out = [];
-    var len;
-    try { len = (arr == null) ? 0 : arr.length; } catch (e) { return out; }
-    if (typeof len !== 'number' || len !== len || len < 0) return out;
-    len = len | 0;
-    for (var i = 0; i < len; i++) {
-      _ObjectDefineProperty(out, i, { value: fn(arr[i], i), writable: true, enumerable: true, configurable: true });
-    }
-    return out;
-  }
-
-  // Codex D2 Round 9 RN-19 closure helpers: safe array operations that bypass
-  // Function.prototype.call / .apply / .bind rebinding and ambient Array.prototype.* rebinding.
-  // _arrSort uses captured Reflect.apply on captured Array.prototype.sort — Reflect.apply uses
-  // [[Call]] directly per ES §28.1.1 RA(target, thisArgument, argumentsList), not the rebindable
-  // Function.prototype.call hop. _arrPush installs an own data descriptor at index `arr.length`
-  // via captured _ObjectDefineProperty (bypassing both Array.prototype.push rebinding AND any
-  // Array.prototype["N"] setter installed by the attacker).
-  function _arrSort(arr, cmp) {
-    if (_ReflectApply) {
-      try { return _ReflectApply(_ArrayPrototypeSort, arr, cmp ? [cmp] : []); }
-      catch (e) { /* fall through to in-place manual sort */ }
-    }
-    // Fallback (only reached if Reflect.apply is unavailable): manual insertion sort.
-    var len = arr.length;
-    for (var s = 1; s < len; s++) {
-      var cur = arr[s];
-      var k = s - 1;
-      while (k >= 0 && (cmp ? cmp(arr[k], cur) > 0 : arr[k] > cur)) { arr[k + 1] = arr[k]; k--; }
-      arr[k + 1] = cur;
-    }
-    return arr;
-  }
-  function _arrPush(arr, val) {
-    _ObjectDefineProperty(arr, arr.length, { value: val, writable: true, enumerable: true, configurable: true });
-  }
+  // Codex D2 Round 16 architectural convergence: every array helper now delegates to the
+  // hardened-intrinsics toolkit. Each HI.* wrapper uses HI's own closure-private intrinsic
+  // captures + Reflect.apply via [[Call]] directly, so neither Function.prototype.* nor
+  // Array.prototype.* rebinding (whether persistent or self-restoring) reaches the wrapper
+  // bodies. The historical Rounds 5-9 BLOCK rationales documented in the previous in-file
+  // captures are preserved in spirit by HI's own implementation (defineProperty-based writes,
+  // Reflect.apply-based sort, indexed reads only via own descriptors).
+  function _safeSlice(arr) { return HI.safeArraySlice(arr); }
+  function _safeMap(arr, fn) { return HI.safeArrayMap(arr, fn); }
+  function _arrSort(arr, cmp) { return HI.safeArraySort(arr, cmp); }
+  function _arrPush(arr, val) { HI.safeArrayPush(arr, val); }
+  function _arrIndexOf(arr, target) { return HI.safeArrayIndexOf(arr, target); }
   function _arrSliceN(arr, n) {
+    // HI exposes a full slice; emulate take-N via map+early-exit semantics. A direct loop using
+    // HI.safeDefineDataProperty preserves the per-index defineProperty write contract.
     var out = [];
-    var len = arr.length;
+    var len;
+    try { len = arr.length; } catch (e) { return out; }
+    if (typeof len !== 'number') return out;
+    len = len | 0;
     var limit = n < len ? n : len;
-    for (var i = 0; i < limit; i++) {
-      _ObjectDefineProperty(out, i, { value: arr[i], writable: true, enumerable: true, configurable: true });
-    }
+    for (var i = 0; i < limit; i++) HI.safeDefineDataProperty(out, i, arr[i]);
     return out;
   }
-  // Manual "last N chars" extraction. Used in place of String.prototype.slice(-N) so a hostile
-  // String.prototype.slice rebinding cannot tamper with hash digest formatting.
+  // Manual "last N chars" extraction via HI.safeStringSlice so a hostile String.prototype.slice
+  // rebinding cannot tamper with hash digest formatting.
   function _strLastN(s, n) {
+    if (typeof s !== 'string') return '';
     var len = s.length;
     var start = len > n ? len - n : 0;
-    var out = '';
-    for (var i = start; i < len; i++) out += s[i];
-    return out;
+    return HI.safeStringSlice(s, start, len);
   }
-  // Direct-loop indexOf — bypasses Array.prototype.indexOf rebinding.
-  function _arrIndexOf(arr, target) {
-    var len = arr.length;
-    for (var i = 0; i < len; i++) if (arr[i] === target) return i;
-    return -1;
-  }
-  // Direct-loop concat (two arrays only) — bypasses Array.prototype.concat rebinding.
+  // Direct-loop concat (two arrays only) — bypasses Array.prototype.concat rebinding by going
+  // through HI.safeDefineDataProperty writes.
   function _arrConcat2(a, b) {
     var out = [];
-    var la = a.length;
-    var lb = b.length;
+    var la; try { la = a.length; } catch (e) { la = 0; }
+    var lb; try { lb = b.length; } catch (e) { lb = 0; }
+    if (typeof la !== 'number') la = 0;
+    if (typeof lb !== 'number') lb = 0;
+    la = la | 0; lb = lb | 0;
     var idx = 0;
-    for (var i = 0; i < la; i++) { _ObjectDefineProperty(out, idx, { value: a[i], writable: true, enumerable: true, configurable: true }); idx++; }
-    for (var j = 0; j < lb; j++) { _ObjectDefineProperty(out, idx, { value: b[j], writable: true, enumerable: true, configurable: true }); idx++; }
+    for (var i = 0; i < la; i++) { HI.safeDefineDataProperty(out, idx, a[i]); idx++; }
+    for (var j = 0; j < lb; j++) { HI.safeDefineDataProperty(out, idx, b[j]); idx++; }
     return out;
   }
   // Direct-loop shift / sortedInsert for Kahn's algorithm queue. Bypasses Array.prototype.shift +
-  // Array.prototype.splice rebinding. _arrShift removes and returns first element; _arrSortedInsert
-  // inserts a value into a pre-sorted-by-strcmp array at the correct position.
+  // Array.prototype.splice rebinding. _arrShift removes and returns first element via
+  // HI.safeDefineDataProperty rewrites; _arrSortedInsert inserts a value into a pre-sorted-by-
+  // strcmp array at the correct position.
   function _arrShift(arr) {
-    if (arr.length === 0) return undefined;
+    var len; try { len = arr.length; } catch (e) { return undefined; }
+    if (typeof len !== 'number' || len === 0) return undefined;
+    len = len | 0;
     var first = arr[0];
-    var len = arr.length;
-    for (var i = 1; i < len; i++) _ObjectDefineProperty(arr, i - 1, { value: arr[i], writable: true, enumerable: true, configurable: true });
+    for (var i = 1; i < len; i++) HI.safeDefineDataProperty(arr, i - 1, arr[i]);
     arr.length = len - 1;
     return first;
   }
   function _arrSortedInsert(arr, value) {
-    var lo = 0, hi = arr.length;
+    var lo = 0;
+    var hi; try { hi = arr.length; } catch (e) { hi = 0; }
+    if (typeof hi !== 'number') hi = 0;
+    hi = hi | 0;
     while (lo < hi) { var mid = (lo + hi) >>> 1; if (arr[mid] < value) lo = mid + 1; else hi = mid; }
     // Insert at `lo`: shift later elements right by one, then place value.
-    var len = arr.length;
-    for (var i = len; i > lo; i--) _ObjectDefineProperty(arr, i, { value: arr[i - 1], writable: true, enumerable: true, configurable: true });
-    _ObjectDefineProperty(arr, lo, { value: value, writable: true, enumerable: true, configurable: true });
+    var len; try { len = arr.length; } catch (e) { len = 0; }
+    if (typeof len !== 'number') len = 0;
+    len = len | 0;
+    for (var i = len; i > lo; i--) HI.safeDefineDataProperty(arr, i, arr[i - 1]);
+    HI.safeDefineDataProperty(arr, lo, value);
   }
 
   // Codex D2 Round 6 RN-16 closure: exact per-node byte measurement via captured _JSONStringify +
@@ -648,70 +602,42 @@
   // checks, and any envelope overflow they cause is the authoritative Step 17 check's job.
   var WRAPPER_FIXED_BYTES = 256;
 
-  // Stable canonical JSON serialiser — sorted keys at every depth; arrays preserved in order. Used
-  // for semantic dedup keys + graphId hashing + Round 9 byte cap measurements. Codex D2 Round 8
-  // RN-18 + Round 9 RN-19 closure: this serialiser uses ONLY captured intrinsics + direct string
-  // concatenation + a manual insertion sort. It NEVER calls any prototype method on a dynamically
-  // built array — no `.push`, no `.join`, no `.sort` — so an attacker that rebinds
-  // `Array.prototype.push` / `Array.prototype.join` / `Array.prototype.sort` AFTER module load
-  // (or installs an inherited `toJSON` via `Object.prototype.toJSON`) cannot tamper with the
-  // canonical bytes here. Indexed reads/writes to the keys array stay within keys.length so they
-  // hit own data descriptors (Object.keys returns an array with own descriptors at every index)
-  // and cannot trigger an Array.prototype-installed setter.
-  function _stableStringify(value) {
-    if (value === null) return 'null';
-    var t = typeof value;
-    if (t === 'string') return _JSONStringify(value);
-    if (t === 'number') {
-      if (!_isFiniteNum(value)) return 'null';
-      return _String(value);
-    }
-    if (t === 'boolean') return value ? 'true' : 'false';
-    if (t === 'undefined') return 'null';
-    if (_ArrayIsArray(value)) {
-      var result = '[';
-      var len = value.length;
-      for (var i = 0; i < len; i++) {
-        if (i > 0) result += ',';
-        result += _stableStringify(value[i]);
-      }
-      return result + ']';
-    }
-    if (t === 'object') {
-      var keys; try { keys = _ObjectKeys(value); } catch (e) { return 'null'; }
-      // Manual insertion sort — no Array.prototype.sort dependency. keys is an array whose
-      // every index (0..keys.length-1) has an own data descriptor from Object.keys, so the
-      // in-place swaps below cannot trigger any Array.prototype indexed setter.
-      var sortLen = keys.length;
-      for (var s = 1; s < sortLen; s++) {
-        var cur = keys[s];
-        var k = s - 1;
-        while (k >= 0 && keys[k] > cur) { keys[k + 1] = keys[k]; k--; }
-        keys[k + 1] = cur;
-      }
-      var obj = '{';
-      for (var j = 0; j < sortLen; j++) {
-        if (j > 0) obj += ',';
-        var key = keys[j];
-        obj += _JSONStringify(key) + ':' + _stableStringify(value[key]);
-      }
-      return obj + '}';
-    }
-    return 'null';
-  }
+  // Stable canonical JSON serialiser — delegates to HI.stableStringify. HI's implementation uses
+  // closure-private intrinsic captures + manual insertion sort + direct primitive encoding, NEVER
+  // invoking .push / .join / .sort or Object.prototype.toJSON. The historical Rounds 8/9 BLOCK
+  // rationales (RN-18 toJSON hook, RN-19 Array.prototype rebinding) are structurally closed by
+  // routing through HI rather than reimplementing the same logic locally.
+  function _stableStringify(value) { return HI.stableStringify(value); }
 
   // FNV-1a 32-bit hash → lowercase hex. Used ONLY as a diagnostic identifier (graphId / correlationGroupId);
   // the actual dedup decisions use the FULL canonical string, not the hash, so a collision in the hash
   // CANNOT cause silent data loss (RN-04 closure). Double-pass widening for nicer-looking ids.
+  // Char-code reads go through HI.safeStringCharCodeAt; numeric-to-hex coercion uses
+  // HI.safeStringCoerce together with a manual base-16 fold (no Number.prototype.toString ambient
+  // call). _strLastN already routes through HI.safeStringSlice.
+  function _toHex8(h) {
+    var hexChars = '0123456789abcdef';
+    var out = '';
+    var x = h >>> 0;
+    for (var i = 7; i >= 0; i--) {
+      var nibble = (x >>> (i * 4)) & 0xF;
+      out += hexChars[nibble];
+    }
+    return out;
+  }
   function _hash32(s) {
     var h = 0x811c9dc5;
-    for (var i = 0; i < s.length; i++) {
-      h ^= s.charCodeAt(i);
+    var len = (typeof s === 'string') ? s.length : 0;
+    for (var i = 0; i < len; i++) {
+      h ^= HI.safeStringCharCodeAt(s, i);
       h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
     }
-    return _strLastN('00000000' + (_ReflectApply ? _ReflectApply(_NumberPrototypeToString, h, [16]) : h.toString(16)), 8);
+    return _toHex8(h);
   }
-  function _hash64(s) { return _hash32(s) + _hash32(s + '|' + s.length); }
+  function _hash64(s) {
+    var slen = (typeof s === 'string') ? s.length : 0;
+    return _hash32(s) + _hash32(s + '|' + slen);
+  }
 
   // Semantic canonical string — used as the DEDUP MAP KEY (not a hash). Excludes nodeId so a
   // renamed-id replay collides; excludes freshness so a re-issue at a later timestamp still
@@ -743,17 +669,18 @@
   // BEFORE dedup (RN-03 closure) so caller permutation cannot change the dedup winner. Round 2
   // closure: also includes confidence.state so two same-nodeId candidates differing only by
   // unresolved/not_computed sort deterministically (round 2 RN-03 evidence).
+  // All JSON encoding goes through HI.stableStringify (no toJSON invocation, captured intrinsics).
   function _fullCanonicalString(node) {
-    return _JSONStringify(node.nodeId) + '|' + _semanticCanonicalString(node) + '|cred:' + node.credibility + '|prov:' + node.provenance + '|avl:' + node.availability + '|conf:' + (node.confidence && node.confidence.state ? node.confidence.state : 'null') + '|fresh:' + node.identity.freshness + '|supE:' + _stableStringify(node.supportingEdges) + '|conE:' + _stableStringify(node.contradictingEdges) + '|lims:' + _stableStringify(node.limitations);
+    return HI.stableStringify(node.nodeId) + '|' + _semanticCanonicalString(node) + '|cred:' + node.credibility + '|prov:' + node.provenance + '|avl:' + node.availability + '|conf:' + (node.confidence && node.confidence.state ? node.confidence.state : 'null') + '|fresh:' + node.identity.freshness + '|supE:' + _stableStringify(node.supportingEdges) + '|conE:' + _stableStringify(node.contradictingEdges) + '|lims:' + _stableStringify(node.limitations);
   }
 
   // Correlation group key — nodes sharing this key are correlated (same source observing the same
   // (case, session, lap, sourceId) origin). Uses canonical string (deterministic), then a hash of
   // it for the displayed group id (cosmetic — actual grouping uses the canonical string in a
-  // _ObjectCreate(null) map).
+  // proto-null map). All JSON encoding routes through HI.stableStringify.
   function _correlationGroupCanonical(node) {
     var id = node.identity;
-    return _JSONStringify(id.caseId) + '|' + _JSONStringify(id.sessionId) + '|' + _JSONStringify(id.lapId == null ? null : id.lapId) + '|' + _JSONStringify(id.sourceId);
+    return HI.stableStringify(id.caseId) + '|' + HI.stableStringify(id.sessionId) + '|' + HI.stableStringify(id.lapId == null ? null : id.lapId) + '|' + HI.stableStringify(id.sourceId);
   }
   function _correlationGroupId(canonical) { return 'corr_' + _hash64('corr|' + canonical); }
 
@@ -765,8 +692,8 @@
     if (RC.hasHiddenOwnKey(input)) return RC.buildBlockedResult([CODES.UNKNOWN_OWN_KEY], { detail: 'input envelope carries Symbol-keyed or non-enumerable own property' });
     if (!_hasOnlyAllowedKeys(input, INPUT_KEYS)) return RC.buildBlockedResult([CODES.UNKNOWN_OWN_KEY], { detail: 'input envelope carries forbidden own key' });
     // caseAssociation — read via descriptor (RN-01: no caller getter), then deep-validate the clone.
-    var caDesc; try { caDesc = _ObjectGetOwnPropertyDescriptor(input, 'caseAssociation'); }
-    catch (e) { return RC.buildBlockedResult([CODES.EVIDENCE_ASSOCIATION_MISMATCH], { detail: 'caseAssociation descriptor read threw' }); }
+    var caDesc = HI.safeGetOwnDescriptor(input, 'caseAssociation');
+    if (caDesc === null) return RC.buildBlockedResult([CODES.EVIDENCE_ASSOCIATION_MISMATCH], { detail: 'caseAssociation descriptor read threw' });
     if (!caDesc || !('value' in caDesc)) return RC.buildBlockedResult([CODES.EVIDENCE_ASSOCIATION_MISMATCH], { detail: 'caseAssociation must be a data property' });
     var ca = caDesc.value;
     if (!RC.isOriginalPlainObject(ca)) return RC.buildBlockedResult([CODES.EVIDENCE_ASSOCIATION_MISMATCH, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'caseAssociation prototype is not Object.prototype or null' });
@@ -781,50 +708,46 @@
     }
     if ('lapId' in caClone && caClone.lapId !== null && !_nonEmptyStr(caClone.lapId)) return RC.buildBlockedResult([CODES.EVIDENCE_ASSOCIATION_MISMATCH], { detail: 'caseAssociation.lapId must be null or non-empty string' });
     // rawEvidence — array gate ONLY (per-node body validates contents independently via per-index descriptor).
-    var reDesc; try { reDesc = _ObjectGetOwnPropertyDescriptor(input, 'rawEvidence'); }
-    catch (e) { return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence descriptor read threw' }); }
+    var reDesc = HI.safeGetOwnDescriptor(input, 'rawEvidence');
+    if (reDesc === null) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence descriptor read threw' });
     if (!reDesc || !('value' in reDesc)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence must be a data property' });
     var re = reDesc.value;
-    if (!_ArrayIsArray(re)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence must be an array' });
-    try { if (_ObjectGetPrototypeOf(re) !== _Array.prototype) return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence is not a plain Array (subclass / mutated prototype rejected)' }); }
-    catch (e) { return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence prototype access threw' }); }
+    if (!HI.safeIsArray(re)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence must be an array' });
+    var reProto = HI.safeGetPrototypeOf(re);
+    if (reProto !== _Array.prototype) return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence is not a plain Array (subclass / mutated prototype rejected)' });
     // Codex D2 Round 13 RN-21/27 closure: read length via the captured descriptor reader (avoids
     // [[Get]] which would invoke a Proxy `get` trap that could rebind globals; structurally just
     // returns the own descriptor). Length-read trap is the specific RN-21/27 exploit surface.
-    var reLen;
-    try {
-      var lenDesc = _ObjectGetOwnPropertyDescriptor(re, 'length');
-      if (!lenDesc || !('value' in lenDesc)) return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence.length is not a data property' });
-      reLen = lenDesc.value;
-      if (typeof reLen !== 'number' || !_isFiniteNum(reLen) || reLen < 0 || _MathFloor(reLen) !== reLen) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence.length malformed' });
-    } catch (e) { return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence.length descriptor read threw' }); }
+    var lenDesc = HI.safeGetOwnDescriptor(re, 'length');
+    if (lenDesc === null) return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence.length descriptor read threw' });
+    if (!lenDesc || !('value' in lenDesc)) return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence.length is not a data property' });
+    var reLen = lenDesc.value;
+    if (typeof reLen !== 'number' || !_isFiniteNum(reLen) || reLen < 0 || HI.safeMathFloor(reLen) !== reLen) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence.length malformed' });
     if (reLen > INPUT_RAW_EVIDENCE_CAP) return RC.buildBlockedResult([CODES.GRAPH_CAP_EXCEEDED], { detail: 'rawEvidence array length ' + reLen + ' exceeds cap ' + INPUT_RAW_EVIDENCE_CAP });
     // optional generationToken — descriptor-safe read
     var gt = null;
-    try {
-      var gtDesc = _ObjectGetOwnPropertyDescriptor(input, 'generationToken');
-      if (gtDesc) {
-        if (!('value' in gtDesc)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'generationToken must be a data property' });
-        var gtv = gtDesc.value;
-        if (gtv === null) gt = null;
-        else if (typeof gtv !== 'string' || gtv.length === 0) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'generationToken must be null or non-empty string' });
-        else if (gtv.length > 256) return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'generationToken exceeds 256 chars' });
-        else gt = gtv;
-      }
-    } catch (e) { return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'generationToken descriptor read threw' }); }
+    var gtDesc = HI.safeGetOwnDescriptor(input, 'generationToken');
+    if (gtDesc === null) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'generationToken descriptor read threw' });
+    if (gtDesc) {
+      if (!('value' in gtDesc)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'generationToken must be a data property' });
+      var gtv = gtDesc.value;
+      if (gtv === null) gt = null;
+      else if (typeof gtv !== 'string' || gtv.length === 0) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'generationToken must be null or non-empty string' });
+      else if (gtv.length > 256) return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'generationToken exceeds 256 chars' });
+      else gt = gtv;
+    }
     // optional contextVersion — descriptor-safe read
     var cv = null;
-    try {
-      var cvDesc = _ObjectGetOwnPropertyDescriptor(input, 'contextVersion');
-      if (cvDesc) {
-        if (!('value' in cvDesc)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'contextVersion must be a data property' });
-        var cvv = cvDesc.value;
-        if (cvv === null) cv = null;
-        else if (typeof cvv !== 'string' || cvv.length === 0) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'contextVersion must be null or non-empty string' });
-        else if (cvv.length > 64) return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'contextVersion exceeds 64 chars' });
-        else cv = cvv;
-      }
-    } catch (e) { return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'contextVersion descriptor read threw' }); }
+    var cvDesc = HI.safeGetOwnDescriptor(input, 'contextVersion');
+    if (cvDesc === null) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'contextVersion descriptor read threw' });
+    if (cvDesc) {
+      if (!('value' in cvDesc)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'contextVersion must be a data property' });
+      var cvv = cvDesc.value;
+      if (cvv === null) cv = null;
+      else if (typeof cvv !== 'string' || cvv.length === 0) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'contextVersion must be null or non-empty string' });
+      else if (cvv.length > 64) return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'contextVersion exceeds 64 chars' });
+      else cv = cvv;
+    }
     return {
       ok: true,
       snapshot: {
@@ -841,6 +764,27 @@
     };
   }
 
+  // Build a BLOCK envelope directly via HI without going through RC.buildBlockedResult — the
+  // contract module's _normCodes would itself depend on ambient prototype methods that the
+  // integrity guard has flagged as compromised, so we use HI primitives only. Used at every
+  // integrity-guard checkpoint (Step 0 / 1.5 / 3.5 / 17.6).
+  function _buildIntrinsicTamperBlock(detail) {
+    var reasonCodes = [];
+    HI.safeDefineDataProperty(reasonCodes, 0, CODES.INTERNAL_CONTRACT_VIOLATION);
+    HI.deepFreeze(reasonCodes);
+    var explanationKeys = [];
+    HI.safeDefineDataProperty(explanationKeys, 0, 'r3_0d.reason.internal_contract_violation');
+    HI.deepFreeze(explanationKeys);
+    return HI.deepFreeze({
+      eligible: false,
+      status: 'blocked',
+      reasonCodes: reasonCodes,
+      explanationKeys: explanationKeys,
+      detail: detail,
+      result: null,
+    });
+  }
+
   // RN-06 closure: resolve opts.clock AFTER envelope validation; descriptor-safe; throwing getter
   // collapses to createdAt = null (clock is best-effort; never blocks the build).
   function _resolveClock(opts) {
@@ -848,10 +792,8 @@
     if (!RC.isOriginalPlainObject(opts)) return null;
     if (RC.hasHiddenOwnKey(opts)) return null;
     if (!_hasOnlyAllowedKeys(opts, OPTS_KEYS)) return null;
-    var desc;
-    try { desc = _ObjectGetOwnPropertyDescriptor(opts, 'clock'); }
-    catch (e) { return null; }
-    if (!desc) return null;
+    var desc = HI.safeGetOwnDescriptor(opts, 'clock');
+    if (!desc) return null;                    // null (throw) or undefined (missing key) — fail-soft
     if (!('value' in desc)) return null;       // accessor descriptor — fail-soft
     var clock = desc.value;
     if (typeof clock !== 'function') return null;
@@ -863,10 +805,12 @@
     } catch (e) { return null; }
   }
 
-  // DFS cycle detection over the directed CAUSAL edge list. Uses a proto-null colour map (RN-08).
+  // DFS cycle detection over the directed CAUSAL edge list. Uses a proto-null colour map (RN-08)
+  // via HI.safeObjectCreateNull so a hostile clock that rebinds Object.create cannot poison the
+  // map's prototype chain.
   function _findCycle(nodeIds, adjacencyCausal) {
     var WHITE = 0, GREY = 1, BLACK = 2;
-    var color = _ObjectCreate(null);
+    var color = HI.safeObjectCreateNull();
     for (var i = 0; i < nodeIds.length; i++) color[nodeIds[i]] = WHITE;
     function visit(u) {
       color[u] = GREY;
@@ -893,9 +837,9 @@
   }
 
   // Kahn's algorithm — deterministic by tie-breaking on sorted nodeId. Assumes no cycle. Uses
-  // proto-null in-degree map (RN-08).
+  // proto-null in-degree map (RN-08) via HI.safeObjectCreateNull.
   function _topologicalOrder(nodeIds, adjacencyCausal) {
-    var inDegree = _ObjectCreate(null);
+    var inDegree = HI.safeObjectCreateNull();
     var i;
     for (i = 0; i < nodeIds.length; i++) inDegree[nodeIds[i]] = 0;
     for (i = 0; i < nodeIds.length; i++) {
@@ -933,73 +877,70 @@
   // manual _ObjectKeys + indexed copy loop) so a clock that tampers with Object.assign cannot
   // inject keys, and so a clock that tampers with Array.prototype.* cannot poison the slice/map
   // shape of any graph-owned container.
+  // Codex D2 Round 16 architectural convergence: every primitive op (map / slice / freeze /
+  // proto-null-create / object-keys / defineProperty) routes through HI. The historical Round 6
+  // RN-13 closure (defineProperty bypass of Object.prototype setters) is now structurally enforced
+  // by HI.safeObjectAssign + HI.safeDefineDataProperty (both [[DefineOwnProperty]] writes), so
+  // the rationale carries forward without an in-file defineProperty loop.
   function _materializeGraph(o) {
     var cgFrozen = _safeMap(o.correlationGroups, function (g) {
-      return _ObjectFreeze({
+      return HI.deepFreeze({
         correlationGroupId: g.correlationGroupId,
-        memberNodeIds: _ObjectFreeze(_safeSlice(g.memberNodeIds)),
+        memberNodeIds: HI.deepFreeze(_safeSlice(g.memberNodeIds)),
         independenceWeight: g.independenceWeight,
       });
     });
     var rejSemFrozen = _safeMap(o.dedup.rejectedSemanticDuplicates, function (r) {
-      return _ObjectFreeze({
+      return HI.deepFreeze({
         fingerprint: r.fingerprint,
         keptNodeId: r.keptNodeId,
         droppedNodeId: r.droppedNodeId,
       });
     });
     var rejReplaysFrozen = _safeMap(o.dedup.rejectedSourceReplays, function (r) {
-      // Codex D2 Round 6 RN-13 round-4 closure: use _ObjectDefineProperty so a hostile clock-
-      // installed setter on Object.prototype[<key>] cannot intercept the keyed assignment and
-      // inject a `{tampered:true}` value into the materialised graph.
-      var copy = _ObjectCreate(null);
-      var kk; try { kk = _ObjectKeys(r); } catch (e) { kk = []; }
-      for (var i = 0; i < kk.length; i++) {
-        _ObjectDefineProperty(copy, kk[i], { value: r[kk[i]], writable: true, enumerable: true, configurable: true });
-      }
-      return _ObjectFreeze(copy);
+      // HI.safeObjectAssign + HI.safeDefineDataProperty install own data descriptors via
+      // [[DefineOwnProperty]] so a hostile clock-installed setter on Object.prototype[<key>]
+      // cannot intercept the keyed assignment and inject a `{tampered:true}` value.
+      var copy = HI.safeObjectAssign(HI.safeObjectCreateNull(), r);
+      return HI.deepFreeze(copy);
     });
-    var dedupSummaryFrozen = _ObjectFreeze({
-      rejectedDuplicateIds: _ObjectFreeze(_safeSlice(o.dedup.rejectedDuplicateIds)),
-      rejectedSemanticDuplicates: _ObjectFreeze(rejSemFrozen),
-      rejectedSourceReplays: _ObjectFreeze(rejReplaysFrozen),
+    var dedupSummaryFrozen = HI.deepFreeze({
+      rejectedDuplicateIds: HI.deepFreeze(_safeSlice(o.dedup.rejectedDuplicateIds)),
+      rejectedSemanticDuplicates: HI.deepFreeze(rejSemFrozen),
+      rejectedSourceReplays: HI.deepFreeze(rejReplaysFrozen),
     });
-    // Codex D2 Round 6 RN-13 round-4 closure: _ObjectCreate(null) + defineProperty so a hostile
-    // clock-installed setter on Object.prototype[<reasonCode>] cannot intercept the keyed
-    // assignment and inject a `{tampered:true}` count into rejectedReasonsSummary.
-    var rrsCopy = _ObjectCreate(null);
-    var rrsKeys; try { rrsKeys = _ObjectKeys(o.provenance.rejectedReasonsSummary); } catch (e) { rrsKeys = []; }
-    for (var ri = 0; ri < rrsKeys.length; ri++) {
-      _ObjectDefineProperty(rrsCopy, rrsKeys[ri], { value: o.provenance.rejectedReasonsSummary[rrsKeys[ri]], writable: true, enumerable: true, configurable: true });
-    }
+    // HI.safeObjectAssign onto a HI.safeObjectCreateNull() base so a hostile clock-installed
+    // setter on Object.prototype[<reasonCode>] cannot intercept the keyed assignment and inject
+    // a `{tampered:true}` count into rejectedReasonsSummary.
+    var rrsCopy = HI.safeObjectAssign(HI.safeObjectCreateNull(), o.provenance.rejectedReasonsSummary);
     var graph = {
       schemaVersion: GRAPH_SCHEMA_VERSION,
       graphId: o.graphId,
-      caseAssociation: _ObjectFreeze({
+      caseAssociation: HI.deepFreeze({
         caseId: o.caseAssociation.caseId,
         sessionId: o.caseAssociation.sessionId,
         lapId: o.caseAssociation.lapId == null ? null : o.caseAssociation.lapId,
       }),
-      sessionAssociation: _ObjectFreeze({ sessionId: o.caseAssociation.sessionId }),
-      nodes: _ObjectFreeze(_safeSlice(o.nodes)),
-      edges: _ObjectFreeze(_safeSlice(o.edges)),
-      topologicalOrder: _ObjectFreeze(_safeSlice(o.topologicalOrder)),
+      sessionAssociation: HI.deepFreeze({ sessionId: o.caseAssociation.sessionId }),
+      nodes: HI.deepFreeze(_safeSlice(o.nodes)),
+      edges: HI.deepFreeze(_safeSlice(o.edges)),
+      topologicalOrder: HI.deepFreeze(_safeSlice(o.topologicalOrder)),
       deduplicationSummary: dedupSummaryFrozen,
-      correlationGroups: _ObjectFreeze(cgFrozen),
-      limitations: _ObjectFreeze(_safeSlice(o.limitations)),
-      cannotConclude: _ObjectFreeze(_safeSlice(o.cannotConclude)),
-      provenance: _ObjectFreeze({
+      correlationGroups: HI.deepFreeze(cgFrozen),
+      limitations: HI.deepFreeze(_safeSlice(o.limitations)),
+      cannotConclude: HI.deepFreeze(_safeSlice(o.cannotConclude)),
+      provenance: HI.deepFreeze({
         builderVersion: SERVICE_VERSION,
         inputCount: o.provenance.inputCount,
         sanitizedCount: o.provenance.sanitizedCount,
         rejectedCount: o.provenance.rejectedCount,
-        rejectedReasonsSummary: _ObjectFreeze(rrsCopy),
+        rejectedReasonsSummary: HI.deepFreeze(rrsCopy),
       }),
       createdAt: o.createdAt,
       generationToken: o.generationToken,
       contextVersion: o.contextVersion,
     };
-    return _ObjectFreeze(graph);
+    return HI.deepFreeze(graph);
   }
 
   /**
@@ -1017,20 +958,7 @@
       // contract module's _normCodes uses ambient Array.prototype.push / .forEach which would be
       // corrupted by the same rebinding.
       if (!_intrinsicsIntact()) {
-        var entryReasonCodes = [];
-        _ObjectDefineProperty(entryReasonCodes, 0, { value: CODES.INTERNAL_CONTRACT_VIOLATION, writable: true, enumerable: true, configurable: true });
-        _ObjectFreeze(entryReasonCodes);
-        var entryExplanationKeys = [];
-        _ObjectDefineProperty(entryExplanationKeys, 0, { value: 'r3_0d.reason.internal_contract_violation', writable: true, enumerable: true, configurable: true });
-        _ObjectFreeze(entryExplanationKeys);
-        return _ObjectFreeze({
-          eligible: false,
-          status: 'blocked',
-          reasonCodes: entryReasonCodes,
-          explanationKeys: entryExplanationKeys,
-          detail: 'intrinsic-tampering detected at entry: a captured global primitive method has been rebound since module init',
-          result: null,
-        });
+        return _buildIntrinsicTamperBlock('intrinsic-tampering detected at entry: a captured global primitive method has been rebound since module init');
       }
 
       // Step 1 — input envelope structural gate + TRUSTED SNAPSHOT (RN-01 closure). Envelope-
@@ -1047,20 +975,7 @@
       // restoring the binding so the post-clock guard alone passes. This re-check catches any
       // such rebinding immediately after the envelope's input-touching reads.
       if (!_intrinsicsIntact()) {
-        var postEnvReasonCodes = [];
-        _ObjectDefineProperty(postEnvReasonCodes, 0, { value: CODES.INTERNAL_CONTRACT_VIOLATION, writable: true, enumerable: true, configurable: true });
-        _ObjectFreeze(postEnvReasonCodes);
-        var postEnvExplanationKeys = [];
-        _ObjectDefineProperty(postEnvExplanationKeys, 0, { value: 'r3_0d.reason.internal_contract_violation', writable: true, enumerable: true, configurable: true });
-        _ObjectFreeze(postEnvExplanationKeys);
-        return _ObjectFreeze({
-          eligible: false,
-          status: 'blocked',
-          reasonCodes: postEnvReasonCodes,
-          explanationKeys: postEnvExplanationKeys,
-          detail: 'intrinsic-tampering detected post-envelope: input Proxy trap rebound a captured global primitive method during envelope validation',
-          result: null,
-        });
+        return _buildIntrinsicTamperBlock('intrinsic-tampering detected post-envelope: input Proxy trap rebound a captured global primitive method during envelope validation');
       }
       var caseAssociation = env.snapshot.caseAssociation;
       var generationToken = env.snapshot.generationToken;
@@ -1076,13 +991,25 @@
       // accessor / sparse / inherited slots become ONE rejected node, never a whole-build throw.
       var sanitized = [];
       var rejectedCount = 0;
-      var rejectedReasons = _ObjectCreate(null);
+      var rejectedReasons = HI.safeObjectCreateNull();
       function tally(code) { rejectedReasons[code] = (rejectedReasons[code] || 0) + 1; }
 
       for (var i = 0; i < inputCount; i++) {
-        var desc;
-        try { desc = _ObjectGetOwnPropertyDescriptor(rawEvidenceRef, i); }
-        catch (e) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
+        // Codex D2 Round 16 architectural convergence: the per-rawEvidence descriptor read can
+        // fire a Proxy [[GetOwnProperty]] trap that installs a hostile global rebind and SELF-
+        // RESTORES on the next trap fire. The mid-iteration integrity guard must run BEFORE any
+        // short-circuiting `continue` in this iteration body (rejecting a node early would
+        // otherwise skip the historical end-of-iteration check and let the rebind survive until
+        // the next trap fires the restoration — leaving only the post-iteration Step 3.5 guard,
+        // which sees clean state). Running here closes the self-restoring window at the narrowest
+        // possible point — immediately after the trap fire.
+        var desc = HI.safeGetOwnDescriptor(rawEvidenceRef, i);
+        if (!_intrinsicsIntact()) {
+          return _buildIntrinsicTamperBlock('intrinsic-tampering detected mid-iteration: a Proxy/getter trap rebound a captured global primitive method during per-node validation at index ' + i);
+        }
+        // HI returns null on throw, undefined on missing index — both signal a hostile shape;
+        // accessor descriptors are caught by the `'value' in desc` check below.
+        if (desc === null) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
         if (!desc) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
         if (!('value' in desc)) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
         var raw = desc.value;
@@ -1093,7 +1020,7 @@
         var check = EN.validateEvidenceNodeShape(raw);
         if (check.valid !== true) {
           rejectedCount++;
-          var codes = _ArrayIsArray(check.reasonCodes) ? check.reasonCodes : [CODES.EVIDENCE_NODE_INVALID];
+          var codes = HI.safeIsArray(check.reasonCodes) ? check.reasonCodes : [CODES.EVIDENCE_NODE_INVALID];
           for (var rci = 0; rci < codes.length; rci++) tally(codes[rci]);
           continue;
         }
@@ -1101,15 +1028,14 @@
         // RN-09 — per-observation params key count cap + per-key UTF-8 BYTE cap (round-3 fix
         // uses _utf8len helper for actual UTF-8 byte width, not UTF-16 code units).
         if (san.observation && san.observation.params && typeof san.observation.params === 'object') {
-          try {
-            var paramKeys = _ObjectKeys(san.observation.params);
-            if (paramKeys.length > PARAMS_KEYS_CAP) { rejectedCount++; tally(CODES.ARRAY_CAP_EXCEEDED); continue; }
-            var anyOversizeKey = false;
-            for (var pki = 0; pki < paramKeys.length; pki++) {
-              if (_utf8len(paramKeys[pki]) > PARAM_KEY_BYTE_CAP) { anyOversizeKey = true; break; }
-            }
-            if (anyOversizeKey) { rejectedCount++; tally(CODES.BYTE_CAP_EXCEEDED); continue; }
-          } catch (e) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
+          var paramKeys = HI.safeKeys(san.observation.params);
+          if (paramKeys === null) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
+          if (paramKeys.length > PARAMS_KEYS_CAP) { rejectedCount++; tally(CODES.ARRAY_CAP_EXCEEDED); continue; }
+          var anyOversizeKey = false;
+          for (var pki = 0; pki < paramKeys.length; pki++) {
+            if (_utf8len(paramKeys[pki]) > PARAM_KEY_BYTE_CAP) { anyOversizeKey = true; break; }
+          }
+          if (anyOversizeKey) { rejectedCount++; tally(CODES.BYTE_CAP_EXCEEDED); continue; }
         }
         // Association binding — caseId / sessionId MUST equal envelope.caseAssociation.
         if (san.identity.caseId !== caseAssociation.caseId) { rejectedCount++; tally(CODES.SOURCE_IDENTITY_CASE_MISMATCH); continue; }
@@ -1133,20 +1059,7 @@
         // a single loop-exit check but is the only correct defence for the self-restoring
         // attack class identified in Codex Round 14.
         if (!_intrinsicsIntact()) {
-          var perIterReasonCodes = [];
-          _ObjectDefineProperty(perIterReasonCodes, 0, { value: CODES.INTERNAL_CONTRACT_VIOLATION, writable: true, enumerable: true, configurable: true });
-          _ObjectFreeze(perIterReasonCodes);
-          var perIterExplanationKeys = [];
-          _ObjectDefineProperty(perIterExplanationKeys, 0, { value: 'r3_0d.reason.internal_contract_violation', writable: true, enumerable: true, configurable: true });
-          _ObjectFreeze(perIterExplanationKeys);
-          return _ObjectFreeze({
-            eligible: false,
-            status: 'blocked',
-            reasonCodes: perIterReasonCodes,
-            explanationKeys: perIterExplanationKeys,
-            detail: 'intrinsic-tampering detected mid-iteration: a Proxy/getter trap rebound a captured global primitive method during per-node validation at index ' + i,
-            result: null,
-          });
+          return _buildIntrinsicTamperBlock('intrinsic-tampering detected mid-iteration: a Proxy/getter trap rebound a captured global primitive method during per-node validation at index ' + i);
         }
       }
 
@@ -1158,20 +1071,7 @@
       // guard alone passes. This re-check catches any such mid-iteration rebinding immediately
       // before Step 4's NODES_CAP check (which uses sanitized.length, intrinsic-safe).
       if (!_intrinsicsIntact()) {
-        var postIterReasonCodes = [];
-        _ObjectDefineProperty(postIterReasonCodes, 0, { value: CODES.INTERNAL_CONTRACT_VIOLATION, writable: true, enumerable: true, configurable: true });
-        _ObjectFreeze(postIterReasonCodes);
-        var postIterExplanationKeys = [];
-        _ObjectDefineProperty(postIterExplanationKeys, 0, { value: 'r3_0d.reason.internal_contract_violation', writable: true, enumerable: true, configurable: true });
-        _ObjectFreeze(postIterExplanationKeys);
-        return _ObjectFreeze({
-          eligible: false,
-          status: 'blocked',
-          reasonCodes: postIterReasonCodes,
-          explanationKeys: postIterExplanationKeys,
-          detail: 'intrinsic-tampering detected post-iteration: input Proxy/getter trap rebound a captured global primitive method during per-node validation',
-          result: null,
-        });
+        return _buildIntrinsicTamperBlock('intrinsic-tampering detected post-iteration: input Proxy/getter trap rebound a captured global primitive method during per-node validation');
       }
 
       // Step 4 — cap on accepted nodes.
@@ -1201,9 +1101,9 @@
       // permutation cannot influence which duplicate wins. Tie-breaker on a deterministic field.
       _arrSort(sanitized, function (a, b) { return _strcmp(_fullCanonicalString(a), _fullCanonicalString(b)); });
 
-      // Step 6 — duplicate-ID dedup (_ObjectCreate(null) map — RN-08 closure). First by sort order
-      // (deterministic) is kept; subsequent rejected.
-      var byId = _ObjectCreate(null);
+      // Step 6 — duplicate-ID dedup (HI.safeObjectCreateNull() map — RN-08 closure). First by sort
+      // order (deterministic) is kept; subsequent rejected.
+      var byId = HI.safeObjectCreateNull();
       var keptById = [];
       var rejectedDuplicateIds = [];
       for (var d = 0; d < sanitized.length; d++) {
@@ -1221,7 +1121,7 @@
 
       // Step 7 — semantic CANONICAL STRING dedup (RN-04 closure). The map KEY is the full canonical
       // string itself, not a hash. Collisions are impossible by definition.
-      var semSeen = _ObjectCreate(null);
+      var semSeen = HI.safeObjectCreateNull();
       var keptAfterSemantic = [];
       var rejectedSemanticDuplicates = [];
       for (var s = 0; s < keptById.length; s++) {
@@ -1262,7 +1162,7 @@
 
       // Step 9 — build edges + causal adjacency (RN-08: proto-null map).
       var edges = [];
-      var adjacencyCausal = _ObjectCreate(null);
+      var adjacencyCausal = HI.safeObjectCreateNull();
       function addEdge(from, to, kind) {
         if (_arrIndexOf(EDGE_KIND_ALLOWED, kind) === -1) return false;
         _arrPush(edges, { from: from, to: to, kind: kind });
@@ -1289,14 +1189,14 @@
       }
 
       // Step 10 — correlation groups. Same canonical (caseId|sessionId|lapId|sourceId) → one group.
-      var groupBucket = _ObjectCreate(null);
+      var groupBucket = HI.safeObjectCreateNull();
       for (var g = 0; g < keptAfterSemantic.length; g++) {
         var ng = keptAfterSemantic[g];
         var gk = _correlationGroupCanonical(ng);
         if (!groupBucket[gk]) groupBucket[gk] = [];
         _arrPush(groupBucket[gk], ng.nodeId);
       }
-      var groupKeysSorted = _arrSort(_ObjectKeys(groupBucket), _strcmp);
+      var groupKeysSorted = _arrSort(HI.safeKeys(groupBucket) || [], _strcmp);
       var correlationGroups = [];
       for (var gi = 0; gi < groupKeysSorted.length; gi++) {
         var gk2 = groupKeysSorted[gi];
@@ -1374,20 +1274,17 @@
         c = _strcmp(a.to, b.to); if (c !== 0) return c;
         return _strcmp(a.kind, b.kind);
       });
-      // Codex D2 Round 9 RN-20 closure: use captured _ObjectFreeze instead of ambient
-      // Object.freeze. A pre-call replacement of Object.freeze (e.g. via Object.defineProperty(
-      // Object, 'freeze', { value: function(o){ for (var k in o) if (k === 'kind') o[k] =
-      // 'invalid_kind'; return o; } })) would otherwise let an attacker mutate edge kinds (or
-      // any other field) IMMEDIATELY BEFORE the would-be-frozen object is wrapped, producing a
-      // "frozen" graph that nonetheless contains forbidden edge kinds. The captured ref is
-      // taken at module-init time, before any caller has a chance to rebind Object.freeze.
-      for (var ni = 0; ni < nodesOut.length; ni++) _ObjectFreeze(nodesOut[ni]);
-      for (var ei = 0; ei < edgesOut.length; ei++) _ObjectFreeze(edgesOut[ei]);
+      // Codex D2 Round 9 RN-20 closure: HI.deepFreeze uses HI's closure-private _ObjectFreeze
+      // capture and Reflect.apply, so a pre-call replacement of Object.freeze cannot reach the
+      // freeze body. The historical rationale (preventing a hostile freeze stub from mutating
+      // edge kinds at freeze time) is structurally enforced by HI's wrapper.
+      for (var ni = 0; ni < nodesOut.length; ni++) HI.deepFreeze(nodesOut[ni]);
+      for (var ei = 0; ei < edgesOut.length; ei++) HI.deepFreeze(edgesOut[ei]);
 
       // Step 15 — limitations / cannotConclude derivation.
       var limitations = [];
       var cannotConclude = [];
-      var limSeen = _ObjectCreate(null);
+      var limSeen = HI.safeObjectCreateNull();
       for (var li = 0; li < nodesOut.length; li++) {
         var lims = nodesOut[li].limitations;
         for (var lj = 0; lj < lims.length; lj++) {
@@ -1470,20 +1367,7 @@
       // using captured intrinsics so the result envelope is byte-identical to what the contract
       // would have produced under intact intrinsics.
       if (!_intrinsicsIntact()) {
-        var blockReasonCodes = [];
-        _ObjectDefineProperty(blockReasonCodes, 0, { value: CODES.INTERNAL_CONTRACT_VIOLATION, writable: true, enumerable: true, configurable: true });
-        _ObjectFreeze(blockReasonCodes);
-        var blockExplanationKeys = [];
-        _ObjectDefineProperty(blockExplanationKeys, 0, { value: 'r3_0d.reason.internal_contract_violation', writable: true, enumerable: true, configurable: true });
-        _ObjectFreeze(blockExplanationKeys);
-        return _ObjectFreeze({
-          eligible: false,
-          status: 'blocked',
-          reasonCodes: blockReasonCodes,
-          explanationKeys: blockExplanationKeys,
-          detail: 'intrinsic-tampering detected post-clock: a captured global primitive method has been rebound during clock invocation',
-          result: null,
-        });
+        return _buildIntrinsicTamperBlock('intrinsic-tampering detected post-clock: a captured global primitive method has been rebound during clock invocation');
       }
 
       // Step 18 — final materialisation
@@ -1512,7 +1396,7 @@
         contextVersion: contextVersion,
       });
 
-      return _ObjectFreeze({ valid: true, graph: graph });
+      return HI.deepFreeze({ valid: true, graph: graph });
     } catch (e) {
       return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'buildEvidenceGraph threw on hostile input' });
     }

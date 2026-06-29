@@ -1,0 +1,2025 @@
+Reading prompt from stdin...
+OpenAI Codex v0.141.0
+--------
+workdir: /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 019f0f4d-0abd-7b42-abc0-732c7d0ca6c0
+--------
+user
+# Codex D2 Checkpoint Adversarial Review — Round 15
+
+Round history:
+- Round 1..13: see prior evidence files
+- Round 14 (092f262) → BLOCK; RN-21/27/28/29 STILL-OPEN via self-restoring Proxy trap; RN-30 NEW (Object.getOwnPropertyNames ungarded)
+
+## Round 15 target
+
+- Round 15 candidate SHA: **`764ae80319d44670198de68d8d77e56798a1b45a`**
+- Train base: `feat/r3.0-integrated-delivery` HEAD = `f8a598b84c19517fe55b77877b91462e295f27ed`
+
+Single new commit on top of Round 14: `764ae80 cp14r(d2): close Codex D2 Round 14 — per-iteration guard + Object.getOwnPropertyNames`.
+
+Round 14 evidence at `governance/r3.0d/codex-checkpoint-evidence/D2/round-14-092f262.raw.txt` (Tier 1).
+
+## Round 15 closure
+
+**RN-21/27/28/29 (self-restoring tampering)**: integrity check moved INSIDE the per-rawEvidence loop. Runs after each per-node descriptor read + contract validation, WHILE the rebind is still in effect (BEFORE the next iteration's trap restoration). The window for self-restoring tampering shrinks to within a single iteration — and within one iteration, the trap CAN'T install AND restore without running my code in between (synchronous execution), so the per-iteration guard catches the rebind reliably.
+
+The build now has FIVE integrity checkpoints:
+  - Step 0 (entry)
+  - Step 1.5 (post-envelope)
+  - Inside Step 3 loop (per-iteration, after each rawEvidence[i] processing)
+  - Step 3.5 (post-loop)
+  - Step 17.6 (post-clock)
+
+**RN-30 (Object.getOwnPropertyNames)**: added to captured set + integrity guard.
+
+All BLOCK envelopes are constructed directly via captured `_ObjectDefineProperty` + `_ObjectFreeze`.
+
+## Adversarial sweep — your task
+
+For each round-14 finding:
+```
+D2-RN-NN: CLOSED | STILL-OPEN
+  evidence: <one-line proof or surviving attack vector>
+```
+
+Plus a fresh adversarial sweep:
+
+1. Verify the exact Round 14 self-restoring exploits all trigger mid-iteration BLOCK:
+   - rawEvidence[0] getOwnPropertyDescriptor trap rebinding Array.prototype.push
+   - Same trap rebinding Number.isInteger / Math.floor
+   - Same trap rebinding TextEncoder
+   - Same trap rebinding structuredClone
+   - Object.getOwnPropertyNames pre-call rebind
+2. Try OTHER self-restoring attack windows that the per-iteration guard MIGHT not cover:
+   - Trap on caseAssociation field accessor (fires during envelope validation, BEFORE per-iteration loop). Does Step 1.5 catch it?
+   - Trap on confidence/identity/observation sub-field accessor inside a node (fires during contract validation OF a node, within a single iteration). Does the per-iteration check after the iteration catch it?
+   - Trap on generationToken / contextVersion descriptor (envelope-level). Does Step 1.5 catch it?
+   - Hostile getter on a per-node field that mutates a global WHILE returning the legitimate value, then SELF-RESTORES via the same callback. Same iteration window, but rebind is in effect during contract validation. Per-iteration check after the iteration sees... if restore happened during the getter return, push is restored. Guard passes. But contract validation already used hostile push during validation. So the rebind WAS USED but is now undetectable.
+3. Determinism + ordering
+4. Spot-check regressions of every prior RN-* finding (RN-01..RN-30)
+
+## Output format
+
+```
+FINAL VERDICT: PASS | BLOCK
+
+<For each round-14 finding (RN-21, RN-27, RN-28, RN-29, RN-30):>
+D2-RN-NN: CLOSED | STILL-OPEN
+  evidence: ...
+
+<For each NEW finding (if any):>
+Finding D2-RN-NN (NEW): ...
+```
+
+`FINAL VERDICT: PASS` only if every round-14 finding is CLOSED and no NEW finding is introduced.
+
+codex
+I’ll inspect the candidate diff and Round 14 evidence, then reproduce the specified traps against the exact SHA. I’ll keep the review read-only and report only evidence-backed closures or surviving vectors.
+exec
+/bin/bash -lc "git status --short && git rev-parse HEAD && git show --stat --oneline --decorate --no-renames 764ae80319d44670198de68d8d77e56798a1b45a && sed -n '1,260p' governance/r3.0d/codex-checkpoint-evidence/D2/round-14-092f262.raw.txt" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-Le0i0n2V' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-su9fNTkt' (errno=Operation not permitted)
+?? governance/r3.0d/codex-checkpoint-evidence/D2/round-15-764ae80.raw.txt
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-5VCiQYcZ' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-mJpWUjLq' (errno=Operation not permitted)
+764ae80319d44670198de68d8d77e56798a1b45a
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-VIJLnUdU' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-uxtSfhxc' (errno=Operation not permitted)
+764ae80 (HEAD -> feat/r3.0d-d2-evidence-graph, origin/feat/r3.0d-d2-evidence-graph) cp14r(d2): close Codex D2 Round 14 — per-iteration guard + Object.getOwnPropertyNames
+ governance/r3.0d/checkpoints/D2.json               |   21 +-
+ .../D2/round-14-092f262.raw.txt                    | 3353 ++++++++++++++++++++
+ renderer/js/r3-0d-evidence-graph.js                |   29 +
+ tests/r3.0d-evidence-graph.test.js                 |   93 +
+ 4 files changed, 3494 insertions(+), 2 deletions(-)
+Reading prompt from stdin...
+OpenAI Codex v0.141.0
+--------
+workdir: /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 019f0f43-7c7e-7663-a474-d4d873c533cb
+--------
+user
+# Codex D2 Checkpoint Adversarial Review — Round 14
+
+Round history:
+- Round 1..12: see prior evidence files
+- Round 13 (2f0e588) → BLOCK; RN-21/27 STILL-OPEN via Proxy length-trap; RN-28/29 NEW (TextEncoder + structuredClone ambient)
+
+## Round 14 target
+
+- Round 14 candidate SHA: **`092f2627738b0ee7cbfb3dc7e2e62efeee6a8a34`**
+- Train base: `feat/r3.0-integrated-delivery` HEAD = `f8a598b84c19517fe55b77877b91462e295f27ed`
+
+Single new commit on top of Round 13: `092f262 cp13r(d2): close Codex D2 Round 13 — RN-21/27 Proxy length-trap + RN-28/29 TextEncoder/structuredClone`.
+
+Round 13 evidence at `governance/r3.0d/codex-checkpoint-evidence/D2/round-13-2f0e588.raw.txt` (Tier 1).
+
+## Round 14 closure (narrow architectural changes, no input pre-cloning)
+
+**RN-21/27 (Proxy length-trap)**: envelope length read switched from `re.length` (which fires Proxy `get` trap) to `_ObjectGetOwnPropertyDescriptor(re, 'length').value` (which fires [[GetOwnProperty]] trap instead, while still reading the live length). The exact Codex Proxy exploit now produces lengthHits=0 — the `get` trap defined for "length" never fires.
+
+Plus TWO NEW integrity re-checks added to catch ANY Proxy-trap-mediated rebinding that fires during input access:
+- **Step 1.5** (after _validateInputEnvelope): catches trap-rebinding done during envelope reads (caseAssociation accessor, descriptor reads on Proxy input)
+- **Step 3.5** (after per-rawEvidence iteration): catches trap-rebinding done during per-node descriptor reads / contract validator side effects
+
+Combined with the existing Step 0 entry guard and Step 17.6 post-clock guard, the build now has FOUR integrity checkpoints — no in-build callback window is unguarded.
+
+**RN-28 (TextEncoder)**: globalThis-level descriptor check added to the guard. Any rebinding of `globalThis.TextEncoder` is detected at Step 0 entry guard.
+
+**RN-29 (structuredClone)**: captured `_StructuredClone = structuredClone` at module init. Added globalThis-level descriptor check. Any rebinding of `globalThis.structuredClone` is detected at Step 0 entry guard.
+
+All BLOCK envelopes are constructed directly via captured `_ObjectDefineProperty` + `_ObjectFreeze` (RC.buildBlockedResult's internal `.push` / `.forEach` would be corrupted by the very rebinding the guard is detecting).
+
+## Adversarial sweep — your task
+
+For each round-13 finding:
+```
+D2-RN-NN: CLOSED | STILL-OPEN
+  evidence: <one-line proof or surviving attack vector>
+```
+
+Plus a fresh adversarial sweep:
+
+1. Verify the exact Round 13 exploits all trigger BLOCK or are neutralised:
+   - Proxy on rawEvidence with `get` trap on "length" rebinding Array.prototype.push — lengthHits=0 (trap never fires); build succeeds normally
+   - Proxy variant targeting Number.isInteger / Math.floor / RegExp.prototype.test — same outcome
+   - TextEncoder rebinding before build — entry BLOCK
+   - structuredClone rebinding before build — entry BLOCK
+2. Try OTHER Proxy trap vectors that might still fire:
+   - Proxy on rawEvidence with `getOwnPropertyDescriptor` trap on "length" — does _ObjectGetOwnPropertyDescriptor fire it?
+   - Proxy on rawEvidence with `getPrototypeOf` trap — does the `_ObjectGetPrototypeOf(re) !== _Array.prototype` check fire it? (yes, it should — but does Step 1.5 catch any rebinding?)
+   - Proxy on rawEvidence with `ownKeys` trap — does the per-rawEvidence-index iteration trigger it?
+   - Proxy on caseAssociation with various traps
+   - Proxy on confidence / identity / observation sub-fields
+3. Try in-clock rebinding that the post-clock guard catches:
+   - Clock callback rebinding TextEncoder / structuredClone / etc.
+4. Determinism + ordering:
+   - graphId stability for identical legitimate input
+   - Sort ordering stable
+5. Spot-check regressions of every prior RN-* finding (RN-01..RN-29).
+6. Are there any OTHER ambient global usages in the build path that I might have missed?
+   - Date.now (clock only), Math.random (unused), Promise.* (unused)
+   - Symbol.* / Symbol.iterator (any iterator protocol use?)
+   - Reflect.get / Reflect.has / Reflect.construct (used anywhere?)
+
+## Output format
+
+```
+FINAL VERDICT: PASS | BLOCK
+
+<For each round-13 finding (RN-21, RN-27, RN-28, RN-29):>
+D2-RN-NN: CLOSED | STILL-OPEN
+  evidence: ...
+
+<For each NEW finding (if any):>
+Finding D2-RN-NN (NEW): ...
+```
+
+`FINAL VERDICT: PASS` only if every round-13 finding is CLOSED and no NEW finding is introduced.
+
+codex
+I’ll inspect the candidate diff and Round 13 evidence, then run focused adversarial probes against the candidate SHA. The workspace is read-only, so I’ll keep all verification non-mutating.
+exec
+/bin/bash -lc "git status --short && git rev-parse HEAD && git show --stat --oneline --decorate 092f2627738b0ee7cbfb3dc7e2e62efeee6a8a34 && git diff --stat 2f0e588..092f2627738b0ee7cbfb3dc7e2e62efeee6a8a34 && sed -n '1,260p' governance/r3.0d/codex-checkpoint-evidence/D2/round-13-2f0e588.raw.txt" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-jl8dj3jf' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-5OZrtpiB' (errno=Operation not permitted)
+?? governance/r3.0d/codex-checkpoint-evidence/D2/round-14-092f262.raw.txt
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-9Q00nFvY' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-F4uJvgnr' (errno=Operation not permitted)
+092f2627738b0ee7cbfb3dc7e2e62efeee6a8a34
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-IGEINMzS' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-x0RTXaVc' (errno=Operation not permitted)
+092f262 (HEAD -> feat/r3.0d-d2-evidence-graph, origin/feat/r3.0d-d2-evidence-graph) cp13r(d2): close Codex D2 Round 13 — RN-21/27 Proxy length-trap + RN-28/29 TextEncoder/structuredClone
+ governance/r3.0d/checkpoints/D2.json               |   20 +-
+ .../D2/round-13-2f0e588.raw.txt                    | 4154 ++++++++++++++++++++
+ renderer/js/r3-0d-evidence-graph.js                |   82 +-
+ tests/r3.0d-evidence-graph.test.js                 |   90 +
+ 4 files changed, 4339 insertions(+), 7 deletions(-)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-8hQumzQs' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-p5YqC2Ma' (errno=Operation not permitted)
+ governance/r3.0d/checkpoints/D2.json               |   20 +-
+ .../D2/round-13-2f0e588.raw.txt                    | 4154 ++++++++++++++++++++
+ renderer/js/r3-0d-evidence-graph.js                |   82 +-
+ tests/r3.0d-evidence-graph.test.js                 |   90 +
+ 4 files changed, 4339 insertions(+), 7 deletions(-)
+Reading prompt from stdin...
+OpenAI Codex v0.141.0
+--------
+workdir: /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 019f0f30-10e3-75d0-acbf-a7adfca50a47
+--------
+user
+# Codex D2 Checkpoint Adversarial Review — Round 13
+
+Round history:
+- Round 1..11: see prior evidence files
+- Round 12 (0a61f06) → BLOCK; RN-26 CLOSED; RN-21 STILL-OPEN via container-global accessor variant; RN-27 NEW (Math.floor + Number.isInteger + RegExp.prototype.test ungarded)
+
+## Round 13 target
+
+- Round 13 candidate SHA: **`2f0e58861ec1e4a49a0176b13d16d4c48a2d4e3e`**
+- Train base: `feat/r3.0-integrated-delivery` HEAD = `f8a598b84c19517fe55b77877b91462e295f27ed`
+
+Single new commit on top of Round 12: `2f0e588 cp12r(d2): close Codex D2 Round 12 — RN-21 container variant + RN-27 (Math/Number/RegExp)`.
+
+Round 12 evidence at `governance/r3.0d/codex-checkpoint-evidence/D2/round-12-0a61f06.raw.txt` (Tier 1).
+
+## Round 13 closure
+
+**RN-21 (container variant)**: All container globals captured at module init: `_Object`, `_Array`, `_String_ctor`, `_Number`, `_Function`, `_JSON`, `_Reflect`, `_Math`, `_RegExp`. Phase 1 reads now use captured container refs exclusively — no ambient global resolution at runtime. Phase 2 also verifies that `_GlobalThis.<Container>` still resolves to the same captured reference (defence-in-depth for the case where an attacker tries to redirect ambient lookups even if our captured ref is uncorrupted).
+
+**RN-27**: Added to captured + guarded set:
+- `_MathFloor = Math.floor`
+- `_NumberIsInteger = Number.isInteger`
+- `_NumberIsFinite = Number.isFinite`
+- `_NumberIsNaN = Number.isNaN`
+- `_RegExpPrototypeTest = RegExp.prototype.test`
+
+Probed via `_ObjectGetPrototypeOf(/x/)` for RegExp.prototype.test to avoid direct `.prototype` access.
+
+The guard now snapshots 35 distinct intrinsic checkpoints (was 26 before Round 13).
+
+## Adversarial sweep — your task
+
+For each round-12 finding:
+```
+D2-RN-NN: CLOSED | STILL-OPEN
+  evidence: <one-line proof or surviving attack vector>
+```
+
+Plus a fresh adversarial sweep on the Round 13 hardening:
+
+1. Verify the exact Round 12 exploits all trigger BLOCK:
+   - globalThis.Reflect accessor rebinding push → entry BLOCK
+   - globalThis.JSON accessor → entry BLOCK
+   - globalThis.Object accessor → entry BLOCK
+   - Math.floor rebind → entry BLOCK
+   - Number.isInteger rebind → entry BLOCK
+   - RegExp.prototype.test rebind (in-clock) → post-clock BLOCK
+2. Try OTHER container or prototype-of-instance globals not yet captured:
+   - Symbol, WeakRef, FinalizationRegistry, BigInt, Date, Promise, Map, Set, Proxy
+   - The renderer doesn't appear to use any of these — verify.
+3. Try chained attacks where multiple globals are tampered:
+   - globalThis.Math accessor that rebinds Object.freeze inside its getter
+   - Object.defineProperty(globalThis, 'Math', {get: ...}) AND globalThis.RegExp accessor
+   - Hostile clock that installs accessor on globalThis.Number AFTER Phase 1 snapshot
+4. Try Proxy-trapped objects passed as input — does input envelope validation handle them?
+5. Determinism / ordering invariants:
+   - graphId stability for identical input
+   - Sort ordering stable
+   - Edge / topological order deterministic
+6. Spot-check regressions of every prior RN-* finding (RN-01..RN-27).
+
+## Output format
+
+```
+FINAL VERDICT: PASS | BLOCK
+
+<For each round-12 finding (RN-21, RN-27):>
+D2-RN-NN: CLOSED | STILL-OPEN
+  evidence: ...
+
+<For each NEW finding (if any):>
+Finding D2-RN-NN (NEW): ...
+```
+
+`FINAL VERDICT: PASS` only if every round-12 finding is CLOSED and no NEW finding is introduced.
+
+codex
+I’ll review the candidate at the specified SHA without modifying the worktree, reproduce the named attacks, then sweep the implementation and prior findings for bypasses.
+exec
+/bin/bash -lc "git status --short && git rev-parse HEAD && git show --stat --oneline --decorate --no-renames 2f0e58861ec1e4a49a0176b13d16d4c48a2d4e3e && rg -n \"D2-RN-|RN-21|RN-27\" governance/r3.0d/codex-checkpoint-evidence/D2 -g '*.txt' | tail -80" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-LulOUSby' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-o9UN6jil' (errno=Operation not permitted)
+?? governance/r3.0d/codex-checkpoint-evidence/D2/round-13-2f0e588.raw.txt
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-T5BMw8pT' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-zJqcUjmh' (errno=Operation not permitted)
+2f0e58861ec1e4a49a0176b13d16d4c48a2d4e3e
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-pwXuZ2k9' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-SbNao0rJ' (errno=Operation not permitted)
+2f0e588 (HEAD -> feat/r3.0d-d2-evidence-graph, origin/feat/r3.0d-d2-evidence-graph) cp12r(d2): close Codex D2 Round 12 — RN-21 container variant + RN-27 (Math/Number/RegExp)
+ governance/r3.0d/checkpoints/D2.json               |   19 +-
+ .../D2/round-12-0a61f06.raw.txt                    | 3955 ++++++++++++++++++++
+ renderer/js/r3-0d-evidence-graph.js                |   88 +-
+ tests/r3.0d-evidence-graph.test.js                 |   94 +
+ 4 files changed, 4142 insertions(+), 14 deletions(-)
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:5974:++D2-RN-04: CLOSED
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:5977:++D2-RN-05: CLOSED
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:5980:++D2-RN-06: STILL-OPEN
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:5983:++D2-RN-07: CLOSED
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:5986:++D2-RN-08: CLOSED
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:5989:++D2-RN-09: STILL-OPEN
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:5992:++D2-RN-10: STILL-OPEN
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:5995:++D2-RN-11: STILL-OPEN
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:5998:++D2-RN-12: CLOSED
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:11269:+D2-RN-01 round-2: CLOSED
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:11272:+D2-RN-03 round-2: CLOSED
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:11275:+D2-RN-06 round-2: CLOSED
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:11278:+D2-RN-09 round-2: STILL-OPEN
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:11281:+D2-RN-10 round-2: CLOSED
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:11284:+D2-RN-11 round-2: CLOSED
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:11287:+Finding D2-RN-13 (NEW): Hostile clock can corrupt final materialization
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:11293:+Finding D2-RN-14 (NEW): Rough estimator rejects small valid graphs
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:11302:+D2-RN-01 round-2: CLOSED
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:11305:+D2-RN-03 round-2: CLOSED
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:11308:+D2-RN-06 round-2: CLOSED
+governance/r3.0d/codex-checkpoint-evidence/D2/round-4-e84d22c.raw.txt:11311:+D2-RN-09 round-2: STILL-OPEN
+
+exec
+/bin/bash -lc 'git diff 092f2627738b0ee7cbfb3dc7e2e62efeee6a8a34..764ae80319d44670198de68d8d77e56798a1b45a -- renderer/js/r3-0d-evidence-graph.js tests/r3.0d-evidence-graph.test.js && tail -140 governance/r3.0d/codex-checkpoint-evidence/D2/round-14-092f262.raw.txt && rg -n "function _validateInputEnvelope|function _validateRawEvidenceContract|integrity|ObjectGetOwnPropertyNames|rawEvidence" renderer/js/r3-0d-evidence-graph.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-8n0OSDwQ' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-zpxQWCgS' (errno=Operation not permitted)
+diff --git a/renderer/js/r3-0d-evidence-graph.js b/renderer/js/r3-0d-evidence-graph.js
+index 26c6915..08a81d5 100644
+--- a/renderer/js/r3-0d-evidence-graph.js
++++ b/renderer/js/r3-0d-evidence-graph.js
+@@ -135,6 +135,7 @@
+   var _ObjectCreate = Object.create;
+   var _ObjectDefineProperty = Object.defineProperty;
+   var _ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
++  var _ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
+   var _ObjectGetPrototypeOf = Object.getPrototypeOf;
+   var _ObjectPrototypeHasOwnProperty = Object.prototype.hasOwnProperty;
+   var _ArrayIsArray = Array.isArray;
+@@ -240,6 +241,7 @@
+         objCreate: _readDescVal(_Object, 'create'),
+         objDefineProperty: _readDescVal(_Object, 'defineProperty'),
+         objGetOwnPropertyDescriptor: _readDescVal(_Object, 'getOwnPropertyDescriptor'),
++        objGetOwnPropertyNames: _readDescVal(_Object, 'getOwnPropertyNames'),
+         objGetPrototypeOf: _readDescVal(_Object, 'getPrototypeOf'),
+         objProtoHasOwn: _readDescVal(_ObjectGetPrototypeOf({}), 'hasOwnProperty'),
+         arrIsArray: _readDescVal(_Array, 'isArray'),
+@@ -299,6 +301,7 @@
+         && s.objCreate === _ObjectCreate
+         && s.objDefineProperty === _ObjectDefineProperty
+         && s.objGetOwnPropertyDescriptor === _ObjectGetOwnPropertyDescriptor
++        && s.objGetOwnPropertyNames === _ObjectGetOwnPropertyNames
+         && s.objGetPrototypeOf === _ObjectGetPrototypeOf
+         && s.objProtoHasOwn === _ObjectPrototypeHasOwnProperty
+         && s.arrIsArray === _ArrayIsArray
+@@ -1119,6 +1122,32 @@
+           rejectedCount++; tally(CODES.EVIDENCE_IMPORTED_SUMMARY_ELEVATION_FORBIDDEN); continue;
+         }
+         _arrPush(sanitized, san);
++        // Codex D2 Round 14 RN-21/27/28/29 (self-restoring trap) closure: re-check intrinsic
++        // integrity AFTER each per-rawEvidence iteration. A Proxy trap (e.g.
++        // [[GetOwnProperty]] on rawEvidence[i]) can install a hostile binding, let contract
++        // validation use it during this iteration, and SELF-RESTORE on the NEXT iteration's
++        // trap fire — making both the loop-exit (Step 3.5) and post-clock (Step 17.6) guards
++        // see a clean state. The per-iteration check runs WHILE the rebind is still in effect
++        // (before the next trap fires the restoration), so any self-restoring tampering is
++        // caught immediately and fails-closed BLOCK. This is necessarily more expensive than
++        // a single loop-exit check but is the only correct defence for the self-restoring
++        // attack class identified in Codex Round 14.
++        if (!_intrinsicsIntact()) {
++          var perIterReasonCodes = [];
++          _ObjectDefineProperty(perIterReasonCodes, 0, { value: CODES.INTERNAL_CONTRACT_VIOLATION, writable: true, enumerable: true, configurable: true });
++          _ObjectFreeze(perIterReasonCodes);
++          var perIterExplanationKeys = [];
++          _ObjectDefineProperty(perIterExplanationKeys, 0, { value: 'r3_0d.reason.internal_contract_violation', writable: true, enumerable: true, configurable: true });
++          _ObjectFreeze(perIterExplanationKeys);
++          return _ObjectFreeze({
++            eligible: false,
++            status: 'blocked',
++            reasonCodes: perIterReasonCodes,
++            explanationKeys: perIterExplanationKeys,
++            detail: 'intrinsic-tampering detected mid-iteration: a Proxy/getter trap rebound a captured global primitive method during per-node validation at index ' + i,
++            result: null,
++          });
++        }
+       }
+ 
+       // Step 3.5 — Codex D2 Round 13 RN-21/27 closure: re-check intrinsic integrity AFTER all
+diff --git a/tests/r3.0d-evidence-graph.test.js b/tests/r3.0d-evidence-graph.test.js
+index 742d84f..e6f513d 100644
+--- a/tests/r3.0d-evidence-graph.test.js
++++ b/tests/r3.0d-evidence-graph.test.js
+@@ -1879,5 +1879,98 @@ function freshInput(over) {
+   chk('RN-27 post-clock: in-clock Math.floor rebind caught by Step 17.6', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+ })();
+ 
++// ── Section Z — Codex D2 Round 14 finding closures (self-restoring trap + Object.getOwnPropertyNames) ──
++(function sectionZ_RN21_selfRestoringTrap() {
++  // RN-21 STILL-OPEN at Round 14 (Codex evidence on 092f262): a Proxy on rawEvidence with a
++  // `getOwnPropertyDescriptor` trap on key "0" installs a one-shot hostile
++  // `Array.prototype.push` and SELF-RESTORES on the next trap fire (e.g. when iteration reads
++  // index "1" descriptor). Between install and restore, contract validation uses the hostile
++  // push (suppressing EVIDENCE_CATEGORY_UNKNOWN). Both Step 3.5 and Step 17.6 see clean state.
++  //
++  // Round 15 fix: per-iteration integrity check INSIDE the loop, after each per-rawEvidence
++  // descriptor read + contract validation. Runs while the rebind is still in effect (BEFORE
++  // the next iteration's trap fire restores it). Catches self-restoring tampering at the
++  // narrowest possible window.
++  function bad() {
++    return Object.assign(freshNode(), { category: 'forbidden_category' });
++  }
++  const origPush = Array.prototype.push;
++  const target = [bad()];
++  const p = new Proxy(target, {
++    getOwnPropertyDescriptor(t, k) {
++      if (k === '0') {
++        Array.prototype.push = function () { return 0; }; // hostile install
++        const d = Object.getOwnPropertyDescriptor(t, k);
++        return d;
++      }
++      return Object.getOwnPropertyDescriptor(t, k);
++    },
++  });
++  let attacked;
++  try {
++    attacked = EG.buildEvidenceGraph(freshInput({ rawEvidence: p }), {
++      clock: function () { Array.prototype.push = origPush; return NOW; },
++    });
++  } finally { Array.prototype.push = origPush; }
++  chk('RN-21 self-restoring: per-iteration guard catches mid-iter rebind (BLOCK)', attacked.eligible === false && Array.isArray(attacked.reasonCodes) && attacked.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
++  chk('RN-21 self-restoring: detail mentions mid-iteration', typeof attacked.detail === 'string' && /mid-iteration/.test(attacked.detail));
++  chk('RN-21 self-restoring: no graph leaked', attacked.result === null);
++})();
++
++(function sectionZ_RN27_selfRestoringNumberIsInteger() {
++  const origIsInt = Number.isInteger;
++  const target = [Object.assign(freshNode(), { schemaVersion: NaN })];
++  const p = new Proxy(target, {
++    getOwnPropertyDescriptor(t, k) {
++      if (k === '0') {
++        Number.isInteger = function () { return true; };
++        return Object.getOwnPropertyDescriptor(t, k);
++      }
++      return Object.getOwnPropertyDescriptor(t, k);
++    },
++  });
++  let attacked;
++  try {
++    attacked = EG.buildEvidenceGraph(freshInput({ rawEvidence: p }), {
++      clock: function () { Number.isInteger = origIsInt; return NOW; },
++    });
++  } finally { Number.isInteger = origIsInt; }
++  chk('RN-27 self-restoring: Number.isInteger mid-iter rebind caught (BLOCK)', attacked.eligible === false && Array.isArray(attacked.reasonCodes) && attacked.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
++})();
++
++(function sectionZ_RN28_selfRestoringTextEncoder() {
++  const origTE = globalThis.TextEncoder;
++  const target = [Object.assign(freshNode(), { observation: { kind: 'metric_value', i18nKey: 'x'.repeat(513), params: null, channel: 'speed' } })];
++  const p = new Proxy(target, {
++    getOwnPropertyDescriptor(t, k) {
++      if (k === '0') {
++        globalThis.TextEncoder = function () { return { encode(s) { return { length: 0 }; } }; };
++        return Object.getOwnPropertyDescriptor(t, k);
++      }
++      return Object.getOwnPropertyDescriptor(t, k);
++    },
++  });
++  let attacked;
++  try {
++    attacked = EG.buildEvidenceGraph(freshInput({ rawEvidence: p }), {
++      clock: function () { globalThis.TextEncoder = origTE; return NOW; },
++    });
++  } finally { globalThis.TextEncoder = origTE; }
++  chk('RN-28 self-restoring: TextEncoder mid-iter rebind caught (BLOCK)', attacked.eligible === false && Array.isArray(attacked.reasonCodes) && attacked.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
++})();
++
++(function sectionZ_RN30_objectGetOwnPropertyNames() {
++  // RN-30 NEW at Round 14: Object.getOwnPropertyNames used by contract for hidden-key
++  // detection. Rebinding to Object.keys (which skips non-enumerable) bypasses hidden-key
++  // rejection. Round 15 closure: add to integrity guard.
++  const origGOPN = Object.getOwnPropertyNames;
++  let r;
++  try {
++    Object.getOwnPropertyNames = Object.keys;
++    r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK });
++  } finally { Object.getOwnPropertyNames = origGOPN; }
++  chk('RN-30: Object.getOwnPropertyNames rebinding caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
++})();
++
+ console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
+ if (fail > 0) process.exit(1);
+renderer/js/r3-0d-evidence-graph.js:279:        structuredCloneGlobal: _GlobalThis ? _readDescVal(_GlobalThis, 'structuredClone') : _INTRINSIC_SENTINEL,
+renderer/js/r3-0d-evidence-graph.js:281:        // since we hold captured references — if globalThis.Object is now an accessor, our
+renderer/js/r3-0d-evidence-graph.js:284:        globalObject: _GlobalThis ? _readDescVal(_GlobalThis, 'Object') : _INTRINSIC_SENTINEL,
+renderer/js/r3-0d-evidence-graph.js:285:        globalArray: _GlobalThis ? _readDescVal(_GlobalThis, 'Array') : _INTRINSIC_SENTINEL,
+renderer/js/r3-0d-evidence-graph.js:286:        globalReflect: _GlobalThis ? _readDescVal(_GlobalThis, 'Reflect') : _INTRINSIC_SENTINEL,
+renderer/js/r3-0d-evidence-graph.js:287:        globalJSON: _GlobalThis ? _readDescVal(_GlobalThis, 'JSON') : _INTRINSIC_SENTINEL,
+renderer/js/r3-0d-evidence-graph.js:288:        globalMath: _GlobalThis ? _readDescVal(_GlobalThis, 'Math') : _INTRINSIC_SENTINEL,
+renderer/js/r3-0d-evidence-graph.js:289:        globalNumber: _GlobalThis ? _readDescVal(_GlobalThis, 'Number') : _INTRINSIC_SENTINEL,
+renderer/js/r3-0d-evidence-graph.js:290:        globalRegExp: _GlobalThis ? _readDescVal(_GlobalThis, 'RegExp') : _INTRINSIC_SENTINEL,
+renderer/js/r3-0d-evidence-graph.js:341:        && s.structuredCloneGlobal === _StructuredClone;
+renderer/js/r3-0d-evidence-graph.js:344:  var _TextEncoder = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;
+renderer/js/r3-0d-evidence-graph.js:345:  var _BufferByteLength = (typeof Buffer !== 'undefined' && Buffer.byteLength) ? Buffer.byteLength : null;
+renderer/js/r3-0d-evidence-graph.js:352:  var EDGE_KIND_ALLOWED = Object.freeze(['supports', 'contradicts', 'derived_from', 'correlated_with', 'invalidates']);
+renderer/js/r3-0d-evidence-graph.js:353:  var EDGE_KIND_CAUSAL = Object.freeze({ supports: true, contradicts: true });
+renderer/js/r3-0d-evidence-graph.js:364:  var ENVELOPE_BYTE_CAP = 256 * 1024;  // 256 KiB post-sanitization JSON.stringify cap (RN-09 / RN-14)
+renderer/js/r3-0d-evidence-graph.js:374:  var INPUT_KEYS = Object.freeze(['caseAssociation', 'rawEvidence', 'generationToken', 'contextVersion']);
+renderer/js/r3-0d-evidence-graph.js:375:  var CASE_ASSOCIATION_KEYS = Object.freeze(['caseId', 'sessionId', 'lapId']);
+renderer/js/r3-0d-evidence-graph.js:376:  var CASE_ASSOCIATION_REQUIRED = Object.freeze(['caseId', 'sessionId']);
+renderer/js/r3-0d-evidence-graph.js:377:  var OPTS_KEYS = Object.freeze(['clock']);
+renderer/js/r3-0d-evidence-graph.js:380:  function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
+renderer/js/r3-0d-evidence-graph.js:396:  // _ObjectGetOwnPropertyDescriptor, bypassing both Object.prototype.hasOwnProperty rebinding AND
+renderer/js/r3-0d-evidence-graph.js:405:  // UTF-8 byte-length helper. Uses TextEncoder when available, Buffer.byteLength otherwise.
+renderer/js/r3-0d-evidence-graph.js:420:  // Codex D2 Round 4 RN-15 + Round 5 RN-15 round-4 + Round 6 RN-17 closure: JSON canonical width
+renderer/js/r3-0d-evidence-graph.js:421:  // estimator. Counts the actual byte width a string occupies when serialised to canonical JSON
+renderer/js/r3-0d-evidence-graph.js:432:  // Round 6 RN-17 closure: a previous version treated DEL (U+007F) as a 6-byte JSON escape.
+renderer/js/r3-0d-evidence-graph.js:433:  // `JSON.stringify` does NOT escape DEL — Quote(value) only escapes U+0000-U+001F (plus " and \).
+renderer/js/r3-0d-evidence-graph.js:439:  // default `n += 3` (BMP 3-byte UTF-8). Per the ES spec since 2019, `JSON.stringify` MUST escape
+renderer/js/r3-0d-evidence-graph.js:440:  // lone surrogates as `\uXXXX` — so a 70-char `\udc00` value JSON-encodes to ~420 chars, not 210.
+renderer/js/r3-0d-evidence-graph.js:469:  // both Function.prototype.call replacement AND Array.prototype indexed setter installation.
+renderer/js/r3-0d-evidence-graph.js:475:  // Round 6 BLOCK: a hostile clock could install `Object.defineProperty(Array.prototype, "0",
+renderer/js/r3-0d-evidence-graph.js:476:  // { set: function(v) { Object.defineProperty(this, "0", { value: {tampered:true}, ... }); } })`.
+renderer/js/r3-0d-evidence-graph.js:478:  // descriptor (none) → traverse prototype chain → find the setter on Array.prototype → invoke it
+renderer/js/r3-0d-evidence-graph.js:489:  // overwrites `Object.defineProperty` later cannot tamper with this helper.
+renderer/js/r3-0d-evidence-graph.js:514:  // Function.prototype.call / .apply / .bind rebinding and ambient Array.prototype.* rebinding.
+renderer/js/r3-0d-evidence-graph.js:515:  // _arrSort uses captured Reflect.apply on captured Array.prototype.sort — Reflect.apply uses
+renderer/js/r3-0d-evidence-graph.js:518:  // via captured _ObjectDefineProperty (bypassing both Array.prototype.push rebinding AND any
+renderer/js/r3-0d-evidence-graph.js:519:  // Array.prototype["N"] setter installed by the attacker).
+renderer/js/r3-0d-evidence-graph.js:525:    // Fallback (only reached if Reflect.apply is unavailable): manual insertion sort.
+renderer/js/r3-0d-evidence-graph.js:547:  // Manual "last N chars" extraction. Used in place of String.prototype.slice(-N) so a hostile
+renderer/js/r3-0d-evidence-graph.js:548:  // String.prototype.slice rebinding cannot tamper with hash digest formatting.
+renderer/js/r3-0d-evidence-graph.js:556:  // Direct-loop indexOf — bypasses Array.prototype.indexOf rebinding.
+renderer/js/r3-0d-evidence-graph.js:562:  // Direct-loop concat (two arrays only) — bypasses Array.prototype.concat rebinding.
+renderer/js/r3-0d-evidence-graph.js:572:  // Direct-loop shift / sortedInsert for Kahn's algorithm queue. Bypasses Array.prototype.shift +
+renderer/js/r3-0d-evidence-graph.js:573:  // Array.prototype.splice rebinding. _arrShift removes and returns first element; _arrSortedInsert
+renderer/js/r3-0d-evidence-graph.js:605:  // Sanitized inputs are plain frozen primitives (D1 contract guarantee), so JSON.stringify never
+renderer/js/r3-0d-evidence-graph.js:607:  // a hostile clock that replaces JSON.stringify after import cannot tamper with this measurement.
+renderer/js/r3-0d-evidence-graph.js:636:    // _JSONStringify (which invokes inherited Object.prototype.toJSON per ES §25.5.2.2).
+renderer/js/r3-0d-evidence-graph.js:642:  // Sized to cover the caseAssociation object + outer braces + 5 JSON keys + 4 commas + array
+renderer/js/r3-0d-evidence-graph.js:648:  // Stable canonical JSON serialiser — sorted keys at every depth; arrays preserved in order. Used
+renderer/js/r3-0d-evidence-graph.js:653:  // `Array.prototype.push` / `Array.prototype.join` / `Array.prototype.sort` AFTER module load
+renderer/js/r3-0d-evidence-graph.js:654:  // (or installs an inherited `toJSON` via `Object.prototype.toJSON`) cannot tamper with the
+renderer/js/r3-0d-evidence-graph.js:656:  // hit own data descriptors (Object.keys returns an array with own descriptors at every index)
+renderer/js/r3-0d-evidence-graph.js:657:  // and cannot trigger an Array.prototype-installed setter.
+renderer/js/r3-0d-evidence-graph.js:679:      // Manual insertion sort — no Array.prototype.sort dependency. keys is an array whose
+renderer/js/r3-0d-evidence-graph.js:680:      // every index (0..keys.length-1) has an own data descriptor from Object.keys, so the
+renderer/js/r3-0d-evidence-graph.js:681:      // in-place swaps below cannot trigger any Array.prototype indexed setter.
+renderer/js/r3-0d-evidence-graph.js:717:  // i18nKey/params (sorted JSON). The string IS the key; collisions are impossible by definition.
+renderer/js/r3-0d-evidence-graph.js:769:    if (!RC.isOriginalPlainObject(ca)) return RC.buildBlockedResult([CODES.EVIDENCE_ASSOCIATION_MISMATCH, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'caseAssociation prototype is not Object.prototype or null' });
+renderer/js/r3-0d-evidence-graph.js:786:    try { if (_ObjectGetPrototypeOf(re) !== _Array.prototype) return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence is not a plain Array (subclass / mutated prototype rejected)' }); }
+renderer/js/r3-0d-evidence-graph.js:833:        rawEvidenceRef: re,           // CALLER ARRAY — never deref by [index]; always Object.getOwnPropertyDescriptor
+renderer/js/r3-0d-evidence-graph.js:928:  // Array.prototype.map / slice (via _safeMap / _safeSlice), Object.freeze (via _ObjectFreeze),
+renderer/js/r3-0d-evidence-graph.js:929:  // and Object.keys (via _ObjectKeys). _ObjectAssign is intentionally NOT used (replaced with a
+renderer/js/r3-0d-evidence-graph.js:930:  // manual _ObjectKeys + indexed copy loop) so a clock that tampers with Object.assign cannot
+renderer/js/r3-0d-evidence-graph.js:931:  // inject keys, and so a clock that tampers with Array.prototype.* cannot poison the slice/map
+renderer/js/r3-0d-evidence-graph.js:950:      // installed setter on Object.prototype[<key>] cannot intercept the keyed assignment and
+renderer/js/r3-0d-evidence-graph.js:965:    // clock-installed setter on Object.prototype[<reasonCode>] cannot intercept the keyed
+renderer/js/r3-0d-evidence-graph.js:1009:      // (Array.prototype.push, Object.freeze, Object.getOwnPropertyDescriptor, JSON.stringify,
+renderer/js/r3-0d-evidence-graph.js:1010:      // String, Number.prototype.toString, String.prototype.charAt, etc.) → fail-closed BLOCK
+renderer/js/r3-0d-evidence-graph.js:1014:      // contract module's _normCodes uses ambient Array.prototype.push / .forEach which would be
+renderer/js/r3-0d-evidence-graph.js:1035:      // accessor descriptors / Array subclass) is preserved on the ORIGINAL input — these checks
+renderer/js/r3-0d-evidence-graph.js:1157:      // (caseAssociation + nodes/edges/correlationGroups array brackets + 4 JSON keys), and +1
+renderer/js/r3-0d-evidence-graph.js:1317:      // instead of _JSONStringify. A hostile Object.prototype.toJSON installed before this call
+renderer/js/r3-0d-evidence-graph.js:1318:      // was previously invoked by JSON.stringify on every nested object, allowing (a) mutation of
+renderer/js/r3-0d-evidence-graph.js:1349:      // Object.freeze. A pre-call replacement of Object.freeze (e.g. via Object.defineProperty(
+renderer/js/r3-0d-evidence-graph.js:1350:      // Object, 'freeze', { value: function(o){ for (var k in o) if (k === 'kind') o[k] =
+renderer/js/r3-0d-evidence-graph.js:1354:      // taken at module-init time, before any caller has a chance to rebind Object.freeze.
+renderer/js/r3-0d-evidence-graph.js:1417:      // measurement as Step 11.5, so an attacker cannot use a stateful Object.prototype.toJSON to
+renderer/js/r3-0d-evidence-graph.js:1426:        return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'post-sanitization JSON size ' + envBytes + ' exceeds ENVELOPE_BYTE_CAP=' + ENVELOPE_BYTE_CAP });
+renderer/js/r3-0d-evidence-graph.js:1435:      // the clock fires. A hostile clock callback can rebind globals (Object.freeze,
+renderer/js/r3-0d-evidence-graph.js:1438:      // RC.buildBlockedResult — the contract module's internal _normCodes / Array.prototype.push /
+renderer/js/r3-0d-evidence-graph.js:1439:      // Array.prototype.forEach calls are themselves vulnerable to the same rebinding (a no-op
+
+exec
+/bin/bash -lc "node -e \"const EG=require('./renderer/js/r3-0d-evidence-graph.js'),N='2026-06-28T06:00:00Z',input=()=>({caseAssociation:{caseId:'c',sessionId:'s',lapId:'L'},rawEvidence:[]});function run(k,repl,clock){const o=globalThis[k];let r;try{if("'!clock)globalThis[k]=repl;r=EG.buildEvidenceGraph(input(),{clock:clock?()=>{globalThis[k]=repl;return N}:()=>N})}finally{globalThis[k]=o}return {status:r.status,eligible:r.eligible,reasonCodes:r.reasonCodes}}console.log(JSON.stringify({textEncoderPre:run('"'TextEncoder',function(){}),structuredClonePre:run('structuredClone',v=>v),textEncoderClock:run('TextEncoder',function(){},true),structuredCloneClock:run('structuredClone',v=>v,true)}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"textEncoderPre":{"status":"blocked","eligible":false,"reasonCodes":["INTERNAL_CONTRACT_VIOLATION"]},"structuredClonePre":{"status":"blocked","eligible":false,"reasonCodes":["INTERNAL_CONTRACT_VIOLATION"]},"textEncoderClock":{"status":"blocked","eligible":false,"reasonCodes":["INTERNAL_CONTRACT_VIOLATION"]},"structuredCloneClock":{"status":"blocked","eligible":false,"reasonCodes":["INTERNAL_CONTRACT_VIOLATION"]}}
+
+codex
+FINAL VERDICT: BLOCK
+
+D2-RN-21: STILL-OPEN  
+  evidence: A `rawEvidence[0]` `getOwnPropertyDescriptor` trap installed a one-shot hostile `Array.prototype.push`; it suppressed `EVIDENCE_CATEGORY_UNKNOWN`, restored itself before Step 3.5, and produced `valid:true` containing `forbidden_category`.
+
+D2-RN-27: STILL-OPEN  
+  evidence: The same trap installed a one-shot `Number.isInteger` returning true; `schemaVersion:NaN` entered a valid graph after the function restored itself before Step 3.5.
+
+D2-RN-28: STILL-OPEN  
+  evidence: The trap installed a temporary `TextEncoder` that reported zero bytes for a 513-byte `i18nKey` and restored itself during `encode`; the oversized node entered a valid graph.
+
+D2-RN-29: STILL-OPEN  
+  evidence: A node Proxy temporarily replaced `structuredClone` with identity, restored it during the following prototype check, and returned an allowed category during validation but `forbidden_category` during sanitization; the invalid category entered a valid graph.
+
+Finding D2-RN-30 (NEW): `Object.getOwnPropertyNames` remains unguarded  
+  evidence: Rebinding it to `Object.keys` before build caused a node with a non-enumerable forbidden property to be accepted with `valid:true`, bypassing hidden-key rejection at [reason-codes.js:189](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/contracts/r3.0d/reason-codes.js:189).
+
+Additional verification:
+
+- Exact Round 13 `get("length")` exploits are neutralized: the trap is never called.
+- Persistent `getOwnPropertyDescriptor`/`getPrototypeOf` tampering is caught, but self-restoring tampering bypasses the checkpoint design.
+- Pre-build and in-clock `TextEncoder`/`structuredClone` rebinding BLOCK.
+- Raw-array `ownKeys` is not invoked by indexed iteration.
+- Determinism and ordering checks passed.
+- Suites passed: evidence graph 227/227; contract foundation 160/160.
+tokens used
+134,891
+FINAL VERDICT: BLOCK
+
+D2-RN-21: STILL-OPEN  
+  evidence: A `rawEvidence[0]` `getOwnPropertyDescriptor` trap installed a one-shot hostile `Array.prototype.push`; it suppressed `EVIDENCE_CATEGORY_UNKNOWN`, restored itself before Step 3.5, and produced `valid:true` containing `forbidden_category`.
+
+D2-RN-27: STILL-OPEN  
+  evidence: The same trap installed a one-shot `Number.isInteger` returning true; `schemaVersion:NaN` entered a valid graph after the function restored itself before Step 3.5.
+
+D2-RN-28: STILL-OPEN  
+  evidence: The trap installed a temporary `TextEncoder` that reported zero bytes for a 513-byte `i18nKey` and restored itself during `encode`; the oversized node entered a valid graph.
+
+D2-RN-29: STILL-OPEN  
+  evidence: A node Proxy temporarily replaced `structuredClone` with identity, restored it during the following prototype check, and returned an allowed category during validation but `forbidden_category` during sanitization; the invalid category entered a valid graph.
+
+Finding D2-RN-30 (NEW): `Object.getOwnPropertyNames` remains unguarded  
+  evidence: Rebinding it to `Object.keys` before build caused a node with a non-enumerable forbidden property to be accepted with `valid:true`, bypassing hidden-key rejection at [reason-codes.js:189](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/contracts/r3.0d/reason-codes.js:189).
+
+Additional verification:
+
+- Exact Round 13 `get("length")` exploits are neutralized: the trap is never called.
+- Persistent `getOwnPropertyDescriptor`/`getPrototypeOf` tampering is caught, but self-restoring tampering bypasses the checkpoint design.
+- Pre-build and in-clock `TextEncoder`/`structuredClone` rebinding BLOCK.
+- Raw-array `ownKeys` is not invoked by indexed iteration.
+- Determinism and ordering checks passed.
+- Suites passed: evidence graph 227/227; contract foundation 160/160.
+37: *   • Determinism: independent of caller permutation of rawEvidence. The post-validation sanitized
+49: *   RN-02: each rawEvidence array index descriptor is inspected without invoking accessors; an
+138:  var _ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
+168:  // cannot fire during integrity-guard reads. Capturing the references at module-init time
+189:  // pre-clone. Capture at module init + include in integrity guard.
+195:  // Codex D2 Round 10 RN-21..RN-25 closure: intrinsic integrity guard. At the entry of
+205:  // Codex D2 Round 11 RN-21 closure: descriptor-based intrinsic integrity check. The previous
+277:        // Codex D2 Round 13 RN-28 + RN-29 closure: TextEncoder + structuredClone integrity.
+304:        && s.objGetOwnPropertyNames === _ObjectGetOwnPropertyNames
+377:  var INPUT_KEYS = Object.freeze(['caseAssociation', 'rawEvidence', 'generationToken', 'contextVersion']);
+763:  function _validateInputEnvelope(input) {
+783:    // rawEvidence — array gate ONLY (per-node body validates contents independently via per-index descriptor).
+784:    var reDesc; try { reDesc = _ObjectGetOwnPropertyDescriptor(input, 'rawEvidence'); }
+785:    catch (e) { return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence descriptor read threw' }); }
+786:    if (!reDesc || !('value' in reDesc)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence must be a data property' });
+788:    if (!_ArrayIsArray(re)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence must be an array' });
+789:    try { if (_ObjectGetPrototypeOf(re) !== _Array.prototype) return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence is not a plain Array (subclass / mutated prototype rejected)' }); }
+790:    catch (e) { return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence prototype access threw' }); }
+797:      if (!lenDesc || !('value' in lenDesc)) return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence.length is not a data property' });
+799:      if (typeof reLen !== 'number' || !_isFiniteNum(reLen) || reLen < 0 || _MathFloor(reLen) !== reLen) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence.length malformed' });
+800:    } catch (e) { return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence.length descriptor read threw' }); }
+801:    if (reLen > INPUT_RAW_EVIDENCE_CAP) return RC.buildBlockedResult([CODES.GRAPH_CAP_EXCEEDED], { detail: 'rawEvidence array length ' + reLen + ' exceeds cap ' + INPUT_RAW_EVIDENCE_CAP });
+836:        rawEvidenceRef: re,           // CALLER ARRAY — never deref by [index]; always Object.getOwnPropertyDescriptor
+837:        rawEvidenceLength: reLen,
+1010:      // Step 0 — Codex D2 Round 10 RN-21..RN-25 closure: intrinsic integrity gate. Any global
+1043:      // Step 1.5 — Codex D2 Round 13 RN-21/27 closure: re-check intrinsic integrity AFTER
+1045:      // rawEvidence Proxy descriptors) can fire user-controlled traps that rebind globals between
+1068:      var rawEvidenceRef = env.snapshot.rawEvidenceRef;
+1069:      var inputCount = env.snapshot.rawEvidenceLength;
+1072:      // work is complete. The clock function CANNOT mutate rawEvidence under us because it never
+1075:      // Step 3 — per-node validation. Each rawEvidence[i] is read via descriptor (RN-02 closure):
+1084:        try { desc = _ObjectGetOwnPropertyDescriptor(rawEvidenceRef, i); }
+1126:        // integrity AFTER each per-rawEvidence iteration. A Proxy trap (e.g.
+1127:        // [[GetOwnProperty]] on rawEvidence[i]) can install a hostile binding, let contract
+1153:      // Step 3.5 — Codex D2 Round 13 RN-21/27 closure: re-check intrinsic integrity AFTER all
+1154:      // per-rawEvidence-index descriptor reads + contract validators have completed. A Proxy
+1155:      // [[GetOwnProperty]] trap on any rawEvidence index, OR a hostile getter at any node
+1459:      // operation has completed. The clock injector cannot mutate rawEvidence under us because
+1463:      // Step 17.6 — Codex D2 Round 10 RN-21..RN-25 closure: re-check intrinsic integrity AFTER
+
+codex
+The new checkpoint closes persistent and next-iteration restoration, but its placement does not by itself prove closure for install–use–restore inside one callback. I’m tracing every user-code callback in envelope validation, contract validation, and sanitization to test that narrower window.
+exec
+/bin/bash -lc "sed -n '120,355p' renderer/js/r3-0d-evidence-graph.js; sed -n '740,855p' renderer/js/r3-0d-evidence-graph.js; sed -n '995,1170p' renderer/js/r3-0d-evidence-graph.js; sed -n '1,280p' contracts/r3.0d/reason-codes.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+  if (!Contracts && typeof R3_0D_Contracts !== 'undefined') Contracts = R3_0D_Contracts;
+  if (!Contracts) throw new Error('renderer/js/r3-0d-evidence-graph.js requires contracts/r3.0d/index.js');
+
+  var RC = Contracts.reasonCodes;
+  var SI = Contracts.sourceIdentity;
+  var EN = Contracts.evidenceNode;
+  var CODES = RC.REASON_CODES;
+
+  // Codex D2 Round 3 RN-13 closure: capture safe intrinsic references at module-init time so a
+  // caller-supplied opts.clock injector cannot tamper with Object.freeze / Object.assign /
+  // Object.keys / Object.create / JSON.stringify / Array.isArray / TextEncoder during the build.
+  // Every subsequent operation that depends on these intrinsics uses the captured ref.
+  var _ObjectFreeze = Object.freeze;
+  var _ObjectAssign = Object.assign;
+  var _ObjectKeys = Object.keys;
+  var _ObjectCreate = Object.create;
+  var _ObjectDefineProperty = Object.defineProperty;
+  var _ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+  var _ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
+  var _ObjectGetPrototypeOf = Object.getPrototypeOf;
+  var _ObjectPrototypeHasOwnProperty = Object.prototype.hasOwnProperty;
+  var _ArrayIsArray = Array.isArray;
+  var _ArrayPrototypeSlice = Array.prototype.slice;
+  var _ArrayPrototypeMap = Array.prototype.map;
+  var _ArrayPrototypePush = Array.prototype.push;
+  // Codex D2 Round 9 RN-19 closure additional captures: every Array.prototype method touched in
+  // the build path must be reachable WITHOUT going through ambient global rebinding. Reflect.apply
+  // is used because it invokes [[Call]] directly, bypassing Function.prototype.call / .apply
+  // (which a hostile clock or pre-call attacker could replace per RN-13 round-4).
+  var _ArrayPrototypeSort = Array.prototype.sort;
+  var _ArrayPrototypeConcat = Array.prototype.concat;
+  var _ArrayPrototypeJoin = Array.prototype.join;
+  var _ArrayPrototypeIndexOf = Array.prototype.indexOf;
+  var _StringPrototypeSlice = String.prototype.slice;
+  var _StringPrototypeCharAt = String.prototype.charAt;
+  var _StringPrototypeCharCodeAt = String.prototype.charCodeAt;
+  var _NumberPrototypeToString = Number.prototype.toString;
+  var _String = String;
+  var _FunctionPrototypeCall = Function.prototype.call;
+  var _FunctionPrototypeApply = Function.prototype.apply;
+  var _FunctionPrototypeBind = Function.prototype.bind;
+  var _ReflectApply = (typeof Reflect !== 'undefined' && Reflect.apply) ? Reflect.apply : null;
+  var _ReflectOwnKeys = (typeof Reflect !== 'undefined' && Reflect.ownKeys) ? Reflect.ownKeys : null;
+  var _JSONStringify = JSON.stringify;
+  var _GlobalThis = (typeof globalThis !== 'undefined') ? globalThis : (typeof root !== 'undefined' ? root : (typeof window !== 'undefined' ? window : null));
+  // Codex D2 Round 12 RN-21 (container) closure: capture the CONTAINER GLOBALS themselves so
+  // ambient globalThis-level accessor descriptors (e.g. `Object.defineProperty(globalThis,
+  // 'Reflect', { get: function () { Array.prototype.push = noop; return origReflect; } })`)
+  // cannot fire during integrity-guard reads. Capturing the references at module-init time
+  // freezes our view of the constructor objects; subsequent global rebinding is invisible to us.
+  var _Object = Object;
+  var _Array = Array;
+  var _String_ctor = String;
+  var _Number = Number;
+  var _Function = Function;
+  var _JSON = JSON;
+  var _Reflect = (typeof Reflect !== 'undefined') ? Reflect : null;
+  var _Math = Math;
+  var _RegExp = RegExp;
+  // Codex D2 Round 12 RN-27 closure: additional method captures (Math.floor for integer-check
+  // arithmetic, Number.isInteger for shape validation, RegExp.prototype.test for ISO timestamp
+  // regex matching). All three are reachable from the build path and were previously unguarded.
+  var _MathFloor = Math.floor;
+  var _NumberIsInteger = Number.isInteger;
+  var _NumberIsFinite = Number.isFinite;
+  var _NumberIsNaN = Number.isNaN;
+  var _RegExpPrototypeTest = RegExp.prototype.test;
+  // Codex D2 Round 13 RN-29 closure: structuredClone is reachable from the contract module
+  // (_toCleanCopy / RC.toCleanCopy Proxy cleansing) AND now from the renderer Step 0.3 input
+  // pre-clone. Capture at module init + include in integrity guard.
+  var _StructuredClone = (typeof structuredClone === 'function') ? structuredClone : null;
+  // Codex D2 Round 13 RN-28 closure: TextEncoder is already captured below as _TextEncoder
+  // (used by _utf8len). The guard verifies the captured reference still matches the live
+  // global so a between-guard rebind is detected.
+
+  // Codex D2 Round 10 RN-21..RN-25 closure: intrinsic integrity guard. At the entry of
+  // buildEvidenceGraph (and again immediately after _resolveClock fires) verify that every
+  // global primitive method we depend on still === its captured module-init reference. JS is
+  // single-threaded; a passing guard means no global rebinding can happen between the check and
+  // our use of that global within the same synchronous build. If ANY mismatch is detected,
+  // fail-closed with INTERNAL_CONTRACT_VIOLATION + intrinsic-tampering detail. This closes
+  // RN-21 (ambient .push/.indexOf in contract validators), RN-22 (ambient JSON.stringify in
+  // correlation key), RN-23 (ambient Object.getOwnPropertyDescriptor in Step 3), RN-24 (ambient
+  // global String() function), RN-25 (Number.prototype.toString / String.prototype.charAt in
+  // hash digests) — and any future intrinsic-rebinding attack on the same surface.
+  // Codex D2 Round 11 RN-21 closure: descriptor-based intrinsic integrity check. The previous
+  // implementation used direct property access (`Object.freeze === _ObjectFreeze`), which is
+  // accessor-TOCTOU vulnerable: an attacker installing `Object.defineProperty(Reflect, "ownKeys",
+  // { get: function() { Array.prototype.push = noop; return origOwnKeys; } })` would let the
+  // guard pass push (intact), then the Reflect.ownKeys getter fires LATER in the chain, rebinds
+  // push (after it was already checked), returns the original ref (passing the Reflect.ownKeys
+  // check), and the rest of the build runs with hostile push. Round 12 fix: read every intrinsic
+  // via captured `_ObjectGetOwnPropertyDescriptor`, which returns a structural snapshot of the
+  // descriptor WITHOUT invoking any installed accessor. If the descriptor is an accessor (no
+  // `value` field), fail-closed — the very presence of an accessor on a global primitive method
+  // is an attack signal. RN-26 closure: add Function.prototype.call / .apply / .bind to the
+  // captured set so a clock-installed FPC/FPA/FPB rebind also trips the post-clock guard.
+  var _INTRINSIC_SENTINEL = {};
+  function _readDescVal(obj, key) {
+    try {
+      var d = _ObjectGetOwnPropertyDescriptor(obj, key);
+      if (!d) return _INTRINSIC_SENTINEL;
+      if (!('value' in d)) return _INTRINSIC_SENTINEL; // accessor descriptor → tamper signal
+      return d.value;
+    } catch (e) { return _INTRINSIC_SENTINEL; }
+  }
+  function _intrinsicsIntact() {
+    try {
+      // Phase 1 — snapshot every intrinsic via structural descriptor read. No accessor on any of
+      // these targets can fire because _ObjectGetOwnPropertyDescriptor returns the descriptor
+      // record itself, not the value via [[Get]]. The sentinel marker is returned for missing
+      // own properties OR accessor descriptors OR exception cases (e.g. proxy-trapped objects).
+      // Codex D2 Round 12 RN-21 (container) closure: use captured container references (_Object,
+      // _Array, _JSON, _Reflect, etc.) so a hostile globalThis-level accessor on the container
+      // global (e.g. globalThis.Reflect getter) cannot fire — we never re-resolve the container
+      // through ambient global lookup. _ObjectGetPrototypeOf(<instance>) is also safe because the
+      // captured intrinsic reads the [[Prototype]] internal slot directly.
+      var s = {
+        objFreeze: _readDescVal(_Object, 'freeze'),
+        objAssign: _readDescVal(_Object, 'assign'),
+        objKeys: _readDescVal(_Object, 'keys'),
+        objCreate: _readDescVal(_Object, 'create'),
+        objDefineProperty: _readDescVal(_Object, 'defineProperty'),
+        objGetOwnPropertyDescriptor: _readDescVal(_Object, 'getOwnPropertyDescriptor'),
+        objGetOwnPropertyNames: _readDescVal(_Object, 'getOwnPropertyNames'),
+        objGetPrototypeOf: _readDescVal(_Object, 'getPrototypeOf'),
+        objProtoHasOwn: _readDescVal(_ObjectGetPrototypeOf({}), 'hasOwnProperty'),
+        arrIsArray: _readDescVal(_Array, 'isArray'),
+        arrProtoSlice: _readDescVal(_ObjectGetPrototypeOf([]), 'slice'),
+        arrProtoMap: _readDescVal(_ObjectGetPrototypeOf([]), 'map'),
+        arrProtoPush: _readDescVal(_ObjectGetPrototypeOf([]), 'push'),
+        arrProtoSort: _readDescVal(_ObjectGetPrototypeOf([]), 'sort'),
+        arrProtoConcat: _readDescVal(_ObjectGetPrototypeOf([]), 'concat'),
+        arrProtoJoin: _readDescVal(_ObjectGetPrototypeOf([]), 'join'),
+        arrProtoIndexOf: _readDescVal(_ObjectGetPrototypeOf([]), 'indexOf'),
+        globalString: _GlobalThis ? _readDescVal(_GlobalThis, 'String') : _INTRINSIC_SENTINEL,
+        strProtoSlice: _readDescVal(_ObjectGetPrototypeOf(''), 'slice'),
+        strProtoCharAt: _readDescVal(_ObjectGetPrototypeOf(''), 'charAt'),
+        strProtoCharCodeAt: _readDescVal(_ObjectGetPrototypeOf(''), 'charCodeAt'),
+        numProtoToString: _readDescVal(_ObjectGetPrototypeOf(0), 'toString'),
+        jsonStringify: _readDescVal(_JSON, 'stringify'),
+        // Codex D2 Round 11 RN-26 closure: Function.prototype.call / .apply / .bind are critical
+        // because contract validators (_normCodes uses .forEach.call, validateEvidenceNodeShape
+        // uses .apply) and _stableStringify fallbacks route through them. Capture + verify.
+        funcProtoCall: _readDescVal(_ObjectGetPrototypeOf(function () {}), 'call'),
+        funcProtoApply: _readDescVal(_ObjectGetPrototypeOf(function () {}), 'apply'),
+        funcProtoBind: _readDescVal(_ObjectGetPrototypeOf(function () {}), 'bind'),
+        reflectApply: _ReflectApply === null ? null : (_Reflect === null ? _INTRINSIC_SENTINEL : _readDescVal(_Reflect, 'apply')),
+        reflectOwnKeys: _ReflectOwnKeys === null ? null : (_Reflect === null ? _INTRINSIC_SENTINEL : _readDescVal(_Reflect, 'ownKeys')),
+        // Codex D2 Round 12 RN-27 closure: Math.floor (envelope length-integer check), Number
+        // is-integer / is-finite (contract validator), RegExp.prototype.test (_isIsoTimestamp).
+        // The container globals (_Math, _Number, _RegExp) are also captured at module init.
+        mathFloor: _readDescVal(_Math, 'floor'),
+        numIsInteger: _readDescVal(_Number, 'isInteger'),
+        numIsFinite: _readDescVal(_Number, 'isFinite'),
+        numIsNaN: _readDescVal(_Number, 'isNaN'),
+        regexpProtoTest: _readDescVal(_ObjectGetPrototypeOf(/x/), 'test'),
+        // Codex D2 Round 13 RN-28 + RN-29 closure: TextEncoder + structuredClone integrity.
+        // Both are reachable from contract validation paths and (for structuredClone) from the
+        // Step 0.3 input pre-clone, so a rebind anywhere along the chain must trip the guard.
+        textEncoder: _GlobalThis ? _readDescVal(_GlobalThis, 'TextEncoder') : _INTRINSIC_SENTINEL,
+        structuredCloneGlobal: _GlobalThis ? _readDescVal(_GlobalThis, 'structuredClone') : _INTRINSIC_SENTINEL,
+        // Also verify the container globals themselves were not re-bound at globalThis level
+        // since we hold captured references — if globalThis.Object is now an accessor, our
+        // _Object reference is still the original constructor (captured at module init), but a
+        // mismatch here signals an attacker is trying to redirect ambient global lookups.
+        globalObject: _GlobalThis ? _readDescVal(_GlobalThis, 'Object') : _INTRINSIC_SENTINEL,
+        globalArray: _GlobalThis ? _readDescVal(_GlobalThis, 'Array') : _INTRINSIC_SENTINEL,
+        globalReflect: _GlobalThis ? _readDescVal(_GlobalThis, 'Reflect') : _INTRINSIC_SENTINEL,
+        globalJSON: _GlobalThis ? _readDescVal(_GlobalThis, 'JSON') : _INTRINSIC_SENTINEL,
+        globalMath: _GlobalThis ? _readDescVal(_GlobalThis, 'Math') : _INTRINSIC_SENTINEL,
+        globalNumber: _GlobalThis ? _readDescVal(_GlobalThis, 'Number') : _INTRINSIC_SENTINEL,
+        globalRegExp: _GlobalThis ? _readDescVal(_GlobalThis, 'RegExp') : _INTRINSIC_SENTINEL,
+        globalFunction: _GlobalThis ? _readDescVal(_GlobalThis, 'Function') : _INTRINSIC_SENTINEL,
+      };
+      // Phase 2 — strict equality compare every snapshot value against its module-init capture.
+      // This phase performs no property access on any global; it only compares values already
+      // snapshotted in Phase 1.
+      return s.objFreeze === _ObjectFreeze
+        && s.objAssign === _ObjectAssign
+        && s.objKeys === _ObjectKeys
+        && s.objCreate === _ObjectCreate
+        && s.objDefineProperty === _ObjectDefineProperty
+        && s.objGetOwnPropertyDescriptor === _ObjectGetOwnPropertyDescriptor
+        && s.objGetOwnPropertyNames === _ObjectGetOwnPropertyNames
+        && s.objGetPrototypeOf === _ObjectGetPrototypeOf
+        && s.objProtoHasOwn === _ObjectPrototypeHasOwnProperty
+        && s.arrIsArray === _ArrayIsArray
+        && s.arrProtoSlice === _ArrayPrototypeSlice
+        && s.arrProtoMap === _ArrayPrototypeMap
+        && s.arrProtoPush === _ArrayPrototypePush
+        && s.arrProtoSort === _ArrayPrototypeSort
+        && s.arrProtoConcat === _ArrayPrototypeConcat
+        && s.arrProtoJoin === _ArrayPrototypeJoin
+        && s.arrProtoIndexOf === _ArrayPrototypeIndexOf
+        && s.globalString === _String
+        && s.strProtoSlice === _StringPrototypeSlice
+        && s.strProtoCharAt === _StringPrototypeCharAt
+        && s.strProtoCharCodeAt === _StringPrototypeCharCodeAt
+        && s.numProtoToString === _NumberPrototypeToString
+        && s.jsonStringify === _JSONStringify
+        && s.funcProtoCall === _FunctionPrototypeCall
+        && s.funcProtoApply === _FunctionPrototypeApply
+        && s.funcProtoBind === _FunctionPrototypeBind
+        && s.reflectApply === _ReflectApply
+        && s.reflectOwnKeys === _ReflectOwnKeys
+        && s.mathFloor === _MathFloor
+        && s.numIsInteger === _NumberIsInteger
+        && s.numIsFinite === _NumberIsFinite
+        && s.numIsNaN === _NumberIsNaN
+        && s.regexpProtoTest === _RegExpPrototypeTest
+        // Container global checks (Codex Round 12 RN-21 container variant): verify globalThis
+        // bindings still point to the same containers we captured. A mismatch indicates an
+        // accessor descriptor was installed on globalThis.<Container> (the attack vector that
+        // bypassed the property-level guard by rebinding push during ambient global resolution).
+        && s.globalObject === _Object
+        && s.globalArray === _Array
+        && s.globalReflect === _Reflect
+        && s.globalJSON === _JSON
+        && s.globalMath === _Math
+        && s.globalNumber === _Number
+        && s.globalRegExp === _RegExp
+        && s.globalFunction === _Function
+        && s.textEncoder === _TextEncoder
+        && s.structuredCloneGlobal === _StructuredClone;
+    } catch (e) { return false; }
+  }
+  var _TextEncoder = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;
+  var _BufferByteLength = (typeof Buffer !== 'undefined' && Buffer.byteLength) ? Buffer.byteLength : null;
+
+  var SERVICE_VERSION = 1;
+  var GRAPH_SCHEMA_VERSION = 1;
+
+  // Closed enum — directive §8 Edge closed enum. derived_from + invalidates are reserved (D2 emits
+  // none; later D-phase or test-fixture inputs may introduce them via dedicated APIs).
+  var EDGE_KIND_ALLOWED = Object.freeze(['supports', 'contradicts', 'derived_from', 'correlated_with', 'invalidates']);
+
+  // Full canonical string — INCLUDES nodeId so two duplicate-nodeId candidates can still be
+  // compared as different "candidates" when sorting. Used to canonically sort the sanitized array
+  // BEFORE dedup (RN-03 closure) so caller permutation cannot change the dedup winner. Round 2
+  // closure: also includes confidence.state so two same-nodeId candidates differing only by
+  // unresolved/not_computed sort deterministically (round 2 RN-03 evidence).
+  function _fullCanonicalString(node) {
+    return _JSONStringify(node.nodeId) + '|' + _semanticCanonicalString(node) + '|cred:' + node.credibility + '|prov:' + node.provenance + '|avl:' + node.availability + '|conf:' + (node.confidence && node.confidence.state ? node.confidence.state : 'null') + '|fresh:' + node.identity.freshness + '|supE:' + _stableStringify(node.supportingEdges) + '|conE:' + _stableStringify(node.contradictingEdges) + '|lims:' + _stableStringify(node.limitations);
+  }
+
+  // Correlation group key — nodes sharing this key are correlated (same source observing the same
+  // (case, session, lap, sourceId) origin). Uses canonical string (deterministic), then a hash of
+  // it for the displayed group id (cosmetic — actual grouping uses the canonical string in a
+  // _ObjectCreate(null) map).
+  function _correlationGroupCanonical(node) {
+    var id = node.identity;
+    return _JSONStringify(id.caseId) + '|' + _JSONStringify(id.sessionId) + '|' + _JSONStringify(id.lapId == null ? null : id.lapId) + '|' + _JSONStringify(id.sourceId);
+  }
+  function _correlationGroupId(canonical) { return 'corr_' + _hash64('corr|' + canonical); }
+
+  // Validate input envelope shape + take a TRUSTED SNAPSHOT of every primitive field (RN-01).
+  // Returns { ok:true, snapshot:{caseAssociation, generationToken, contextVersion} } so the
+  // caller has a single source of truth that cannot be re-read from the original via accessors.
+  function _validateInputEnvelope(input) {
+    if (!RC.isOriginalPlainObject(input)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'input envelope is not a plain object (Proxy / class instance rejected)' });
+    if (RC.hasHiddenOwnKey(input)) return RC.buildBlockedResult([CODES.UNKNOWN_OWN_KEY], { detail: 'input envelope carries Symbol-keyed or non-enumerable own property' });
+    if (!_hasOnlyAllowedKeys(input, INPUT_KEYS)) return RC.buildBlockedResult([CODES.UNKNOWN_OWN_KEY], { detail: 'input envelope carries forbidden own key' });
+    // caseAssociation — read via descriptor (RN-01: no caller getter), then deep-validate the clone.
+    var caDesc; try { caDesc = _ObjectGetOwnPropertyDescriptor(input, 'caseAssociation'); }
+    catch (e) { return RC.buildBlockedResult([CODES.EVIDENCE_ASSOCIATION_MISMATCH], { detail: 'caseAssociation descriptor read threw' }); }
+    if (!caDesc || !('value' in caDesc)) return RC.buildBlockedResult([CODES.EVIDENCE_ASSOCIATION_MISMATCH], { detail: 'caseAssociation must be a data property' });
+    var ca = caDesc.value;
+    if (!RC.isOriginalPlainObject(ca)) return RC.buildBlockedResult([CODES.EVIDENCE_ASSOCIATION_MISMATCH, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'caseAssociation prototype is not Object.prototype or null' });
+    if (RC.hasHiddenOwnKey(ca)) return RC.buildBlockedResult([CODES.UNKNOWN_OWN_KEY], { detail: 'caseAssociation carries Symbol-keyed or non-enumerable own property' });
+    if (RC.hasNonPlainNestedObject(ca)) return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'caseAssociation contains a nested non-plain object' });
+    // Clone-then-validate: any read after this point uses the clone (TOCTOU-safe).
+    var caClone = RC.toCleanCopy(ca);
+    if (!_isPlain(caClone)) return RC.buildBlockedResult([CODES.EVIDENCE_ASSOCIATION_MISMATCH], { detail: 'caseAssociation clone is not a plain object' });
+    if (!_hasOnlyAllowedKeys(caClone, CASE_ASSOCIATION_KEYS)) return RC.buildBlockedResult([CODES.UNKNOWN_OWN_KEY], { detail: 'caseAssociation carries forbidden own key' });
+    for (var i = 0; i < CASE_ASSOCIATION_REQUIRED.length; i++) {
+      if (!_nonEmptyStr(caClone[CASE_ASSOCIATION_REQUIRED[i]])) return RC.buildBlockedResult([CODES.EVIDENCE_ASSOCIATION_MISMATCH], { detail: 'caseAssociation.' + CASE_ASSOCIATION_REQUIRED[i] + ' missing' });
+    }
+    if ('lapId' in caClone && caClone.lapId !== null && !_nonEmptyStr(caClone.lapId)) return RC.buildBlockedResult([CODES.EVIDENCE_ASSOCIATION_MISMATCH], { detail: 'caseAssociation.lapId must be null or non-empty string' });
+    // rawEvidence — array gate ONLY (per-node body validates contents independently via per-index descriptor).
+    var reDesc; try { reDesc = _ObjectGetOwnPropertyDescriptor(input, 'rawEvidence'); }
+    catch (e) { return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence descriptor read threw' }); }
+    if (!reDesc || !('value' in reDesc)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence must be a data property' });
+    var re = reDesc.value;
+    if (!_ArrayIsArray(re)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence must be an array' });
+    try { if (_ObjectGetPrototypeOf(re) !== _Array.prototype) return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence is not a plain Array (subclass / mutated prototype rejected)' }); }
+    catch (e) { return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence prototype access threw' }); }
+    // Codex D2 Round 13 RN-21/27 closure: read length via the captured descriptor reader (avoids
+    // [[Get]] which would invoke a Proxy `get` trap that could rebind globals; structurally just
+    // returns the own descriptor). Length-read trap is the specific RN-21/27 exploit surface.
+    var reLen;
+    try {
+      var lenDesc = _ObjectGetOwnPropertyDescriptor(re, 'length');
+      if (!lenDesc || !('value' in lenDesc)) return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence.length is not a data property' });
+      reLen = lenDesc.value;
+      if (typeof reLen !== 'number' || !_isFiniteNum(reLen) || reLen < 0 || _MathFloor(reLen) !== reLen) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'rawEvidence.length malformed' });
+    } catch (e) { return RC.buildBlockedResult([CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'rawEvidence.length descriptor read threw' }); }
+    if (reLen > INPUT_RAW_EVIDENCE_CAP) return RC.buildBlockedResult([CODES.GRAPH_CAP_EXCEEDED], { detail: 'rawEvidence array length ' + reLen + ' exceeds cap ' + INPUT_RAW_EVIDENCE_CAP });
+    // optional generationToken — descriptor-safe read
+    var gt = null;
+    try {
+      var gtDesc = _ObjectGetOwnPropertyDescriptor(input, 'generationToken');
+      if (gtDesc) {
+        if (!('value' in gtDesc)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'generationToken must be a data property' });
+        var gtv = gtDesc.value;
+        if (gtv === null) gt = null;
+        else if (typeof gtv !== 'string' || gtv.length === 0) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'generationToken must be null or non-empty string' });
+        else if (gtv.length > 256) return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'generationToken exceeds 256 chars' });
+        else gt = gtv;
+      }
+    } catch (e) { return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'generationToken descriptor read threw' }); }
+    // optional contextVersion — descriptor-safe read
+    var cv = null;
+    try {
+      var cvDesc = _ObjectGetOwnPropertyDescriptor(input, 'contextVersion');
+      if (cvDesc) {
+        if (!('value' in cvDesc)) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'contextVersion must be a data property' });
+        var cvv = cvDesc.value;
+        if (cvv === null) cv = null;
+        else if (typeof cvv !== 'string' || cvv.length === 0) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'contextVersion must be null or non-empty string' });
+        else if (cvv.length > 64) return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'contextVersion exceeds 64 chars' });
+        else cv = cvv;
+      }
+    } catch (e) { return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'contextVersion descriptor read threw' }); }
+    return {
+      ok: true,
+      snapshot: {
+        caseAssociation: {
+          caseId: caClone.caseId,
+          sessionId: caClone.sessionId,
+          lapId: ('lapId' in caClone) ? caClone.lapId : null,
+        },
+        rawEvidenceRef: re,           // CALLER ARRAY — never deref by [index]; always Object.getOwnPropertyDescriptor
+        rawEvidenceLength: reLen,
+        generationToken: gt,
+        contextVersion: cv,
+      },
+    };
+  }
+
+  // RN-06 closure: resolve opts.clock AFTER envelope validation; descriptor-safe; throwing getter
+  // collapses to createdAt = null (clock is best-effort; never blocks the build).
+  function _resolveClock(opts) {
+    if (opts === null || opts === undefined) return null;
+    if (!RC.isOriginalPlainObject(opts)) return null;
+    if (RC.hasHiddenOwnKey(opts)) return null;
+    if (!_hasOnlyAllowedKeys(opts, OPTS_KEYS)) return null;
+    var desc;
+    try { desc = _ObjectGetOwnPropertyDescriptor(opts, 'clock'); }
+    catch (e) { return null; }
+    if (!desc) return null;
+    if (!('value' in desc)) return null;       // accessor descriptor — fail-soft
+        rejectedCount: o.provenance.rejectedCount,
+        rejectedReasonsSummary: _ObjectFreeze(rrsCopy),
+      }),
+      createdAt: o.createdAt,
+      generationToken: o.generationToken,
+      contextVersion: o.contextVersion,
+    };
+    return _ObjectFreeze(graph);
+  }
+
+  /**
+   * buildEvidenceGraph(input, opts) — primary entry. See module header for the contract.
+   */
+  function buildEvidenceGraph(inputIn, optsIn) {
+    try {
+      // Step 0 — Codex D2 Round 10 RN-21..RN-25 closure: intrinsic integrity gate. Any global
+      // primitive method we rely on that has been rebound between module init and this call
+      // (Array.prototype.push, Object.freeze, Object.getOwnPropertyDescriptor, JSON.stringify,
+      // String, Number.prototype.toString, String.prototype.charAt, etc.) → fail-closed BLOCK
+      // before any caller-controlled code can run. JS is single-threaded so a passing guard
+      // means no further global rebinding can occur until our build returns.
+      // Construct the BLOCK envelope directly without calling RC.buildBlockedResult — the
+      // contract module's _normCodes uses ambient Array.prototype.push / .forEach which would be
+      // corrupted by the same rebinding.
+      if (!_intrinsicsIntact()) {
+        var entryReasonCodes = [];
+        _ObjectDefineProperty(entryReasonCodes, 0, { value: CODES.INTERNAL_CONTRACT_VIOLATION, writable: true, enumerable: true, configurable: true });
+        _ObjectFreeze(entryReasonCodes);
+        var entryExplanationKeys = [];
+        _ObjectDefineProperty(entryExplanationKeys, 0, { value: 'r3_0d.reason.internal_contract_violation', writable: true, enumerable: true, configurable: true });
+        _ObjectFreeze(entryExplanationKeys);
+        return _ObjectFreeze({
+          eligible: false,
+          status: 'blocked',
+          reasonCodes: entryReasonCodes,
+          explanationKeys: entryExplanationKeys,
+          detail: 'intrinsic-tampering detected at entry: a captured global primitive method has been rebound since module init',
+          result: null,
+        });
+      }
+
+      // Step 1 — input envelope structural gate + TRUSTED SNAPSHOT (RN-01 closure). Envelope-
+      // level shape rejection (non-plain envelope / Symbol keys / non-enumerable / nested class /
+      // accessor descriptors / Array subclass) is preserved on the ORIGINAL input — these checks
+      // use captured intrinsics and reject hostile shapes BEFORE they enter any iteration loop.
+      var env = _validateInputEnvelope(inputIn);
+      if (!env.ok) return env;
+
+      // Step 1.5 — Codex D2 Round 13 RN-21/27 closure: re-check intrinsic integrity AFTER
+      // envelope validation. Envelope reads on a Proxy input (e.g. caseAssociation accessor,
+      // rawEvidence Proxy descriptors) can fire user-controlled traps that rebind globals between
+      // Step 0 entry guard and Step 17.6 post-clock guard, with the clock callback later
+      // restoring the binding so the post-clock guard alone passes. This re-check catches any
+      // such rebinding immediately after the envelope's input-touching reads.
+      if (!_intrinsicsIntact()) {
+        var postEnvReasonCodes = [];
+        _ObjectDefineProperty(postEnvReasonCodes, 0, { value: CODES.INTERNAL_CONTRACT_VIOLATION, writable: true, enumerable: true, configurable: true });
+        _ObjectFreeze(postEnvReasonCodes);
+        var postEnvExplanationKeys = [];
+        _ObjectDefineProperty(postEnvExplanationKeys, 0, { value: 'r3_0d.reason.internal_contract_violation', writable: true, enumerable: true, configurable: true });
+        _ObjectFreeze(postEnvExplanationKeys);
+        return _ObjectFreeze({
+          eligible: false,
+          status: 'blocked',
+          reasonCodes: postEnvReasonCodes,
+          explanationKeys: postEnvExplanationKeys,
+          detail: 'intrinsic-tampering detected post-envelope: input Proxy trap rebound a captured global primitive method during envelope validation',
+          result: null,
+        });
+      }
+      var caseAssociation = env.snapshot.caseAssociation;
+      var generationToken = env.snapshot.generationToken;
+      var contextVersion = env.snapshot.contextVersion;
+      var rawEvidenceRef = env.snapshot.rawEvidenceRef;
+      var inputCount = env.snapshot.rawEvidenceLength;
+
+      // Step 2 — Round 2 RN-01 + RN-06 closure: defer clock invocation until ALL input-touching
+      // work is complete. The clock function CANNOT mutate rawEvidence under us because it never
+      // runs while we are reading the array. createdAt is assigned at the very end of the build.
+
+      // Step 3 — per-node validation. Each rawEvidence[i] is read via descriptor (RN-02 closure):
+      // accessor / sparse / inherited slots become ONE rejected node, never a whole-build throw.
+      var sanitized = [];
+      var rejectedCount = 0;
+      var rejectedReasons = _ObjectCreate(null);
+      function tally(code) { rejectedReasons[code] = (rejectedReasons[code] || 0) + 1; }
+
+      for (var i = 0; i < inputCount; i++) {
+        var desc;
+        try { desc = _ObjectGetOwnPropertyDescriptor(rawEvidenceRef, i); }
+        catch (e) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
+        if (!desc) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
+        if (!('value' in desc)) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
+        var raw = desc.value;
+        // outer defence — refuse non-plain prototype BEFORE invoking D1 validator.
+        if (!RC.isOriginalPlainObject(raw)) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
+        if (RC.hasHiddenOwnKey(raw)) { rejectedCount++; tally(CODES.UNKNOWN_OWN_KEY); continue; }
+        if (RC.hasNonPlainNestedObject(raw)) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
+        var check = EN.validateEvidenceNodeShape(raw);
+        if (check.valid !== true) {
+          rejectedCount++;
+          var codes = _ArrayIsArray(check.reasonCodes) ? check.reasonCodes : [CODES.EVIDENCE_NODE_INVALID];
+          for (var rci = 0; rci < codes.length; rci++) tally(codes[rci]);
+          continue;
+        }
+        var san = check.sanitized;
+        // RN-09 — per-observation params key count cap + per-key UTF-8 BYTE cap (round-3 fix
+        // uses _utf8len helper for actual UTF-8 byte width, not UTF-16 code units).
+        if (san.observation && san.observation.params && typeof san.observation.params === 'object') {
+          try {
+            var paramKeys = _ObjectKeys(san.observation.params);
+            if (paramKeys.length > PARAMS_KEYS_CAP) { rejectedCount++; tally(CODES.ARRAY_CAP_EXCEEDED); continue; }
+            var anyOversizeKey = false;
+            for (var pki = 0; pki < paramKeys.length; pki++) {
+              if (_utf8len(paramKeys[pki]) > PARAM_KEY_BYTE_CAP) { anyOversizeKey = true; break; }
+            }
+            if (anyOversizeKey) { rejectedCount++; tally(CODES.BYTE_CAP_EXCEEDED); continue; }
+          } catch (e) { rejectedCount++; tally(CODES.PROTOTYPE_POLLUTION_REJECTED); continue; }
+        }
+        // Association binding — caseId / sessionId MUST equal envelope.caseAssociation.
+        if (san.identity.caseId !== caseAssociation.caseId) { rejectedCount++; tally(CODES.SOURCE_IDENTITY_CASE_MISMATCH); continue; }
+        if (san.identity.sessionId !== caseAssociation.sessionId) { rejectedCount++; tally(CODES.SOURCE_IDENTITY_SESSION_MISMATCH); continue; }
+        if (caseAssociation.lapId !== null && san.identity.lapId !== null && san.identity.lapId !== caseAssociation.lapId) {
+          rejectedCount++; tally(CODES.SOURCE_IDENTITY_LAP_MISMATCH); continue;
+        }
+        // Imported-summary elevation guard.
+        if (san.identity.sourceId === IMPORTED_SUMMARY_SOURCE_ID && san.credibility === 'measured') {
+          rejectedCount++; tally(CODES.EVIDENCE_IMPORTED_SUMMARY_ELEVATION_FORBIDDEN); continue;
+        }
+        _arrPush(sanitized, san);
+        // Codex D2 Round 14 RN-21/27/28/29 (self-restoring trap) closure: re-check intrinsic
+        // integrity AFTER each per-rawEvidence iteration. A Proxy trap (e.g.
+        // [[GetOwnProperty]] on rawEvidence[i]) can install a hostile binding, let contract
+        // validation use it during this iteration, and SELF-RESTORE on the NEXT iteration's
+        // trap fire — making both the loop-exit (Step 3.5) and post-clock (Step 17.6) guards
+        // see a clean state. The per-iteration check runs WHILE the rebind is still in effect
+        // (before the next trap fires the restoration), so any self-restoring tampering is
+        // caught immediately and fails-closed BLOCK. This is necessarily more expensive than
+        // a single loop-exit check but is the only correct defence for the self-restoring
+        // attack class identified in Codex Round 14.
+        if (!_intrinsicsIntact()) {
+          var perIterReasonCodes = [];
+          _ObjectDefineProperty(perIterReasonCodes, 0, { value: CODES.INTERNAL_CONTRACT_VIOLATION, writable: true, enumerable: true, configurable: true });
+          _ObjectFreeze(perIterReasonCodes);
+          var perIterExplanationKeys = [];
+          _ObjectDefineProperty(perIterExplanationKeys, 0, { value: 'r3_0d.reason.internal_contract_violation', writable: true, enumerable: true, configurable: true });
+          _ObjectFreeze(perIterExplanationKeys);
+          return _ObjectFreeze({
+            eligible: false,
+            status: 'blocked',
+            reasonCodes: perIterReasonCodes,
+            explanationKeys: perIterExplanationKeys,
+            detail: 'intrinsic-tampering detected mid-iteration: a Proxy/getter trap rebound a captured global primitive method during per-node validation at index ' + i,
+            result: null,
+          });
+        }
+      }
+
+      // Step 3.5 — Codex D2 Round 13 RN-21/27 closure: re-check intrinsic integrity AFTER all
+      // per-rawEvidence-index descriptor reads + contract validators have completed. A Proxy
+      // [[GetOwnProperty]] trap on any rawEvidence index, OR a hostile getter at any node
+      // sub-field, could have fired during the iteration above and rebound a captured global.
+      // The clock callback at Step 17.5 might restore the binding so the Step 17.6 post-clock
+      // guard alone passes. This re-check catches any such mid-iteration rebinding immediately
+      // before Step 4's NODES_CAP check (which uses sanitized.length, intrinsic-safe).
+      if (!_intrinsicsIntact()) {
+        var postIterReasonCodes = [];
+        _ObjectDefineProperty(postIterReasonCodes, 0, { value: CODES.INTERNAL_CONTRACT_VIOLATION, writable: true, enumerable: true, configurable: true });
+        _ObjectFreeze(postIterReasonCodes);
+        var postIterExplanationKeys = [];
+        _ObjectDefineProperty(postIterExplanationKeys, 0, { value: 'r3_0d.reason.internal_contract_violation', writable: true, enumerable: true, configurable: true });
+        _ObjectFreeze(postIterExplanationKeys);
+        return _ObjectFreeze({
+          eligible: false,
+          status: 'blocked',
+          reasonCodes: postIterReasonCodes,
+/**
+ * contracts/r3.0d/reason-codes.js — R3.0D D1 · Contract Foundation (NON-PRODUCTION).
+ *
+ * The single, frozen, machine-readable registry of R3.0D Decision Engine reason codes. This module is a
+ * CONTRACT artifact only:
+ *   • lives OUTSIDE renderer/js/ — the R3-GATE0 R3.0D scope guard does not apply;
+ *   • has NO runtime consumer, is required by NO production module, imports NOTHING from renderer/js/;
+ *   • contains NO algorithm — no graph traversal, no rule evaluation, no priority ranking, no causal
+ *     inference. Codes + a shared blocked-result factory only.
+ *
+ * Codes are stable, unique, UPPER_SNAKE string constants (machine-readable; never replaced by free text).
+ * Each code carries a stable i18n explanation KEY (a hook for a human-readable rendering) — never UI prose.
+ *
+ * UMD: Node require / Electron renderer global (R3_0D_ReasonCodes). (Global export is for symmetry with the
+ * codebase UMD convention; nothing in renderer/js/ requires it — D1 wires no consumer.)
+ */
+(function (root) {
+  'use strict';
+
+  // R3.0D reason codes. Grouped by the directive Section 8 / 9 / 10 dimensions:
+  //  • EVIDENCE_*           — evidence-graph structural rejections (D1 + D2)
+  //  • HYPOTHESIS_*         — hypothesis-shape + causal-overclaim rejections (D1 + D3)
+  //  • RECOMMENDATION_*     — recommendation + priority rejections (D1 + D4)
+  //  • VALIDATION_ACTION_*  — validation-action rejections
+  //  • CANNOT_CONCLUDE      — the structurally-mandated outcome when evidence is insufficient
+  //  • LIMITATION_*         — bounded-honesty limitation codes
+  //  • SOURCE_IDENTITY_*    — case/session/lap binding rejections
+  //  • BRIEF_*              — engineer-brief composition rejections
+  //  • Structural / fail-closed: INTERNAL_CONTRACT_VIOLATION, UNSUPPORTED_FUTURE_SCHEMA,
+  //    PROTOTYPE_POLLUTION_REJECTED, NUMERIC_INVALID, BYTE_CAP_EXCEEDED, ARRAY_CAP_EXCEEDED.
+  var REASON_CODES = Object.freeze({
+    // Evidence (D1 structural + D2 graph)
+    EVIDENCE_NODE_INVALID: 'EVIDENCE_NODE_INVALID',
+    EVIDENCE_NODE_MISSING_ID: 'EVIDENCE_NODE_MISSING_ID',
+    EVIDENCE_NODE_ID_FORBIDDEN: 'EVIDENCE_NODE_ID_FORBIDDEN',
+    EVIDENCE_CATEGORY_UNKNOWN: 'EVIDENCE_CATEGORY_UNKNOWN',
+    EVIDENCE_CREDIBILITY_INVALID: 'EVIDENCE_CREDIBILITY_INVALID',
+    EVIDENCE_PROVENANCE_INVALID: 'EVIDENCE_PROVENANCE_INVALID',
+    EVIDENCE_CONFIDENCE_FORBIDDEN: 'EVIDENCE_CONFIDENCE_FORBIDDEN',
+    EVIDENCE_FRESHNESS_STALE: 'EVIDENCE_FRESHNESS_STALE',
+    EVIDENCE_ASSOCIATION_MISMATCH: 'EVIDENCE_ASSOCIATION_MISMATCH',
+    EVIDENCE_OBSERVATION_INVALID: 'EVIDENCE_OBSERVATION_INVALID',
+    EVIDENCE_DUPLICATE_ID: 'EVIDENCE_DUPLICATE_ID',
+    EVIDENCE_GRAPH_CYCLE: 'EVIDENCE_GRAPH_CYCLE',
+    EVIDENCE_GRAPH_ORPHAN: 'EVIDENCE_GRAPH_ORPHAN',
+    EVIDENCE_GRAPH_SELF_REFERENCE: 'EVIDENCE_GRAPH_SELF_REFERENCE',
+    EVIDENCE_GRAPH_BOUNDS_EXCEEDED: 'EVIDENCE_GRAPH_BOUNDS_EXCEEDED',
+    EVIDENCE_GRAPH_DUPLICATED_SOURCE_DOUBLECOUNT: 'EVIDENCE_GRAPH_DUPLICATED_SOURCE_DOUBLECOUNT',
+    EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT: 'EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT',
+    EVIDENCE_IMPORTED_SUMMARY_ELEVATION_FORBIDDEN: 'EVIDENCE_IMPORTED_SUMMARY_ELEVATION_FORBIDDEN',
+
+    // Hypothesis (D1 shape + D3 causal-overclaim guard)
+    HYPOTHESIS_INVALID: 'HYPOTHESIS_INVALID',
+    HYPOTHESIS_CAUSAL_OVERCLAIM: 'HYPOTHESIS_CAUSAL_OVERCLAIM',
+    HYPOTHESIS_CONFIDENCE_FORBIDDEN: 'HYPOTHESIS_CONFIDENCE_FORBIDDEN',
+    HYPOTHESIS_AUTHORITY_FORGED: 'HYPOTHESIS_AUTHORITY_FORGED',
+    HYPOTHESIS_CATEGORY_UNKNOWN: 'HYPOTHESIS_CATEGORY_UNKNOWN',
+    HYPOTHESIS_EVIDENCE_LINK_INVALID: 'HYPOTHESIS_EVIDENCE_LINK_INVALID',
+    HYPOTHESIS_CONTRADICTION_INVALID: 'HYPOTHESIS_CONTRADICTION_INVALID',
+    HYPOTHESIS_ALTERNATIVE_INVALID: 'HYPOTHESIS_ALTERNATIVE_INVALID',
+    HYPOTHESIS_DRIVER_BLAME_FORBIDDEN: 'HYPOTHESIS_DRIVER_BLAME_FORBIDDEN',
+    HYPOTHESIS_PROFESSIONAL_DIAGNOSIS_FORBIDDEN: 'HYPOTHESIS_PROFESSIONAL_DIAGNOSIS_FORBIDDEN',
+    HYPOTHESIS_GUARANTEED_FIX_FORBIDDEN: 'HYPOTHESIS_GUARANTEED_FIX_FORBIDDEN',
+    HYPOTHESIS_FREE_TEXT_CAUSAL_AUTHORITY_FORBIDDEN: 'HYPOTHESIS_FREE_TEXT_CAUSAL_AUTHORITY_FORBIDDEN',
+
+    // Recommendation + Priority (D1 shape + D4)
+    RECOMMENDATION_INVALID: 'RECOMMENDATION_INVALID',
+    RECOMMENDATION_BLOCKED: 'RECOMMENDATION_BLOCKED',
+    RECOMMENDATION_AUTO_TUNING_FORBIDDEN: 'RECOMMENDATION_AUTO_TUNING_FORBIDDEN',
+    RECOMMENDATION_AUTO_SETUP_FORBIDDEN: 'RECOMMENDATION_AUTO_SETUP_FORBIDDEN',
+    RECOMMENDATION_AUTO_CALIBRATION_FORBIDDEN: 'RECOMMENDATION_AUTO_CALIBRATION_FORBIDDEN',
+    RECOMMENDATION_AUTO_PRESET_FORBIDDEN: 'RECOMMENDATION_AUTO_PRESET_FORBIDDEN',
+    RECOMMENDATION_SETUP_WITHOUT_QUALIFIED_EVIDENCE: 'RECOMMENDATION_SETUP_WITHOUT_QUALIFIED_EVIDENCE',
+    RECOMMENDATION_PRIORITY_INVALID: 'RECOMMENDATION_PRIORITY_INVALID',
+    RECOMMENDATION_PRIORITY_OUT_OF_ORDER: 'RECOMMENDATION_PRIORITY_OUT_OF_ORDER',
+
+    // Validation actions
+    VALIDATION_ACTION_INVALID: 'VALIDATION_ACTION_INVALID',
+    VALIDATION_ACTION_UNKNOWN_KIND: 'VALIDATION_ACTION_UNKNOWN_KIND',
+
+    // Honest-outcome codes
+    CANNOT_CONCLUDE: 'CANNOT_CONCLUDE',
+    INSUFFICIENT_EVIDENCE: 'INSUFFICIENT_EVIDENCE',
+    INCONCLUSIVE_DATA_QUALITY: 'INCONCLUSIVE_DATA_QUALITY',
+    INCONCLUSIVE_CONTRADICTION: 'INCONCLUSIVE_CONTRADICTION',
+
+    // Limitations (bounded honesty)
+    LIMITATION_MISSING_CHANNEL: 'LIMITATION_MISSING_CHANNEL',
+    LIMITATION_SYNTHETIC_ONLY: 'LIMITATION_SYNTHETIC_ONLY',
+    LIMITATION_UNCALIBRATED_INPUT: 'LIMITATION_UNCALIBRATED_INPUT',
+    LIMITATION_HEURISTIC_ONLY: 'LIMITATION_HEURISTIC_ONLY',
+    LIMITATION_SINGLE_LAP_SAMPLE: 'LIMITATION_SINGLE_LAP_SAMPLE',
+    LIMITATION_NO_CONTROLLED_REPEAT: 'LIMITATION_NO_CONTROLLED_REPEAT',
+    LIMITATION_SCOPE_SAME_SESSION_ONLY: 'LIMITATION_SCOPE_SAME_SESSION_ONLY',
+
+    // Source identity (case / session / lap / source binding)
+    SOURCE_IDENTITY_INVALID: 'SOURCE_IDENTITY_INVALID',
+    SOURCE_IDENTITY_FORGED: 'SOURCE_IDENTITY_FORGED',
+    SOURCE_IDENTITY_CASE_MISMATCH: 'SOURCE_IDENTITY_CASE_MISMATCH',
+    SOURCE_IDENTITY_SESSION_MISMATCH: 'SOURCE_IDENTITY_SESSION_MISMATCH',
+    SOURCE_IDENTITY_LAP_MISMATCH: 'SOURCE_IDENTITY_LAP_MISMATCH',
+    SOURCE_IDENTITY_VERSION_MISSING: 'SOURCE_IDENTITY_VERSION_MISSING',
+
+    // Engineer Brief composition
+    BRIEF_INVALID: 'BRIEF_INVALID',
+    BRIEF_CONTRADICTION_HIDDEN: 'BRIEF_CONTRADICTION_HIDDEN',
+    BRIEF_LIMITATION_HIDDEN: 'BRIEF_LIMITATION_HIDDEN',
+    BRIEF_CANNOT_CONCLUDE_HIDDEN: 'BRIEF_CANNOT_CONCLUDE_HIDDEN',
+    BRIEF_AUTHORITY_FORGED: 'BRIEF_AUTHORITY_FORGED',
+
+    // Structural / fail-closed
+    INTERNAL_CONTRACT_VIOLATION: 'INTERNAL_CONTRACT_VIOLATION',
+    UNSUPPORTED_FUTURE_SCHEMA: 'UNSUPPORTED_FUTURE_SCHEMA',
+    PROTOTYPE_POLLUTION_REJECTED: 'PROTOTYPE_POLLUTION_REJECTED',
+    NUMERIC_INVALID: 'NUMERIC_INVALID',
+    BYTE_CAP_EXCEEDED: 'BYTE_CAP_EXCEEDED',
+    ARRAY_CAP_EXCEEDED: 'ARRAY_CAP_EXCEEDED',
+    GRAPH_CAP_EXCEEDED: 'GRAPH_CAP_EXCEEDED',
+    UNKNOWN_OWN_KEY: 'UNKNOWN_OWN_KEY',
+  });
+
+  var ALL_REASON_CODES = Object.freeze(Object.keys(REASON_CODES).map(function (k) { return REASON_CODES[k]; }));
+
+  // human-readable explanation HOOK — a stable i18n key per code (the consumer renders it; this is never prose).
+  var EXPLANATION_KEYS = Object.freeze((function () {
+    var m = {};
+    ALL_REASON_CODES.forEach(function (c) { m[c] = 'r3_0d.reason.' + c.toLowerCase(); });
+    return Object.freeze(m);
+  })());
+
+  function isReasonCode(c) { return typeof c === 'string' && Object.prototype.hasOwnProperty.call(EXPLANATION_KEYS, c); }
+  function explanationKeyFor(c) { return isReasonCode(c) ? EXPLANATION_KEYS[c] : null; }
+
+  // shared blocked-result factory (fail-closed). A blocked result NEVER carries a numeric / structured payload.
+  function _normCodes(reasonCodes) {
+    var arr = Array.isArray(reasonCodes) ? reasonCodes : (reasonCodes == null ? [] : [reasonCodes]);
+    var seen = {}, out = [];
+    arr.forEach(function (c) { if (isReasonCode(c) && !seen[c]) { seen[c] = true; out.push(c); } });
+    if (out.length === 0) out.push(REASON_CODES.INTERNAL_CONTRACT_VIOLATION); // fail-closed: never an empty block
+    return out;
+  }
+  function buildBlockedResult(reasonCodes, opts) {
+    opts = opts || {};
+    var codes = _normCodes(reasonCodes);
+    return Object.freeze({
+      eligible: false,
+      status: 'blocked',
+      reasonCodes: Object.freeze(codes.slice()),
+      explanationKeys: Object.freeze(codes.map(explanationKeyFor)),
+      detail: (opts.detail != null) ? String(opts.detail).slice(0, 200) : null,
+      result: null,
+    });
+  }
+
+  // Codex D1 R2 Finding RN-06 closure: shared Proxy-rejection input cleanser. Every main validator
+  // (validateSourceIdentity / validateEvidenceNodeShape / validateHypothesisShape /
+  // validateRecommendationShape / validateEngineerBriefShape / validateDecisionInputShape) calls
+  // _toCleanCopy AT ENTRY. The result is a plain-prototype deep clone — a Proxy whose ownKeys/get
+  // traps lie about hidden state CANNOT survive: structuredClone enumerates via the engine's internal
+  // [[OwnPropertyKeys]] + [[GetOwnProperty]] traps (same surface), but the resulting clone is a
+  // PLAIN OBJECT whose own-property set is exactly what the Proxy reported. Downstream validators
+  // operating on the clone therefore see EXACTLY what they validate — no parallel-universe hidden
+  // properties remain reachable via direct property access on the original. structuredClone throw
+  // (DataCloneError on functions / symbols-as-values / shared array buffers / etc.) → fail-closed.
+  // JSON round-trip fallback when structuredClone unavailable: same posture but cannot preserve
+  // certain shapes; fail-closed on any throw.
+  function _toCleanCopy(v) {
+    if (v === null || v === undefined) return v;
+    if (typeof v !== 'object') return v;
+    // Codex D1 R3 Finding RN-11 closure: NO JSON.stringify fallback. The previous fallback invoked
+    // inherited toJSON() methods on class instances, silently dropped Symbol values + functions +
+    // undefined, and could transform a hostile non-plain object into a validator-approved plain
+    // shape. Modern runtimes (Node 17+, browsers ~2022+) have structuredClone built in; when it is
+    // unavailable the contract fails closed (returns null → caller treats as "not a plain object").
+    if (typeof structuredClone !== 'function') return null;
+    try { return structuredClone(v); } catch (e) { return null; }
+  }
+  /**
+   * _hasHiddenOwnKey(v) — detects Symbol-keyed OR non-enumerable own properties on the TOP-LEVEL
+   * of v. structuredClone silently drops both, so without this check a value like { caseId: 'x',
+   * [hostileSym]: payload } would clone to { caseId: 'x' } and pass validation. The pre-clone check
+   * rejects such inputs at the boundary so the failure surface mirrors the Codex D1 R1 RN-01
+   * recommended behaviour exactly. Throws (Proxy traps lying) → treat as hidden (fail closed).
+   */
+  function _hasHiddenOwnKey(v) {
+    if (v === null || typeof v !== 'object') return false;
+    try {
+      if (typeof Object.getOwnPropertySymbols === 'function' && Object.getOwnPropertySymbols(v).length > 0) return true;
+      var allKeys = Object.getOwnPropertyNames(v);
+      var enumKeys = Object.keys(v);
+      if (allKeys.length !== enumKeys.length) return true;
+    } catch (e) { return true; }
+    return false;
+  }
+  /**
+   * _isOriginalPlainObject(v) — Codex D1 R4 Finding RN-11 closure: prototype check on the ORIGINAL
+   * input BEFORE structuredClone runs. structuredClone happily converts an ordinary class instance
+   * into a plain object copy (DataCloneError only on a narrower set: functions, Symbol values,
+   * SharedArrayBuffer with shared:true, etc.), which means a class instance with valid own fields
+   * + an inherited toJSON method could otherwise pass _isPlain AFTER cloning even though the
+   * ORIGINAL was a class instance. Calling this check BEFORE toCleanCopy in each main validator
+   * makes class instances fail-closed at the boundary regardless of their own-field shape.
+   */
+  function _isOriginalPlainObject(v) {
+    if (v === null || typeof v !== 'object' || Array.isArray(v)) return false;
+    try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; }
+    catch (e) { return false; }
+  }
+  /**
+   * _hasNonPlainNestedObject(v, depth) — Codex D1 R5 Finding RN-11 (nested-level) closure:
+   * recursively walks the ORIGINAL input pre-clone and returns true if ANY nested object (at any
+   * depth, including inside arrays) has a prototype that is not Object.prototype / null / Array.
+   * Catches class instances embedded as identity / confidence / observation / nested entry values.
+   * Also rejects accessor descriptors at any level — a hostile getter at depth would otherwise be
+   * invoked by structuredClone's [[Get]] semantics. Symbol keys are silently skipped here (the
+   * top-level hasHiddenOwnKey already rejects them at the boundary; descending into Symbol-keyed
+   * subtrees would itself invoke their getters). Depth cap 32 prevents pathological recursion.
+   */
+  function _hasNonPlainNestedObject(v, depth) {
+    if (depth == null) depth = 0;
+    if (depth > 32) return true;
+    if (v === null || typeof v !== 'object') return false;
+    var isArr = Array.isArray(v);
+    // Codex D1 R6 Finding RN-11 (array subclass) closure: arrays must be EXACTLY Array.prototype-
+    // proto. An `Array` subclass instance OR an array with a mutated prototype (Object.setPrototypeOf
+    // applied) passes Array.isArray() but does NOT have the standard array prototype; reject those
+    // with the same posture as a class instance.
+    if (isArr) {
+      try { var ap = Object.getPrototypeOf(v); if (ap !== Array.prototype) return true; }
+      catch (e) { return true; }
+    } else {
+      try { var p = Object.getPrototypeOf(v); if (!(p === Object.prototype || p === null)) return true; }
+      catch (e) { return true; }
+    }
+    try {
+      var keys = Reflect.ownKeys(v);
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        if (typeof k === 'symbol') return true; // any nested symbol key — fail closed
+        var d;
+        try { d = Object.getOwnPropertyDescriptor(v, k); } catch (e) { return true; }
+        if (!d) continue;
+        if (typeof d.get === 'function' || typeof d.set === 'function') return true; // accessor descriptor
+        if (_hasNonPlainNestedObject(d.value, depth + 1)) return true;
+      }
+    } catch (e) { return true; }
+    return false;
+  }
+
+  var api = {
+    REASON_CODES: REASON_CODES,
+    ALL_REASON_CODES: ALL_REASON_CODES,
+    EXPLANATION_KEYS: EXPLANATION_KEYS,
+    isReasonCode: isReasonCode,
+    explanationKeyFor: explanationKeyFor,
+    buildBlockedResult: buildBlockedResult,
+    toCleanCopy: _toCleanCopy,
+    hasHiddenOwnKey: _hasHiddenOwnKey,
+    isOriginalPlainObject: _isOriginalPlainObject,
+    hasNonPlainNestedObject: _hasNonPlainNestedObject,
+  };
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (root) root.R3_0D_ReasonCodes = api;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+exec
+/bin/bash -lc 'rg -n -C 14 "one-shot hostile|forbidden_category|schemaVersion:NaN|reported zero|temporarily replaced.*structuredClone|Object.getOwnPropertyNames remains" governance/r3.0d/codex-checkpoint-evidence/D2/round-14-092f262.raw.txt | tail -280' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+276-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:93:<For each round-10 finding (RN-21, RN-22, RN-23, RN-24, RN-25):>
+277-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:94:D2-RN-NN: CLOSED | STILL-OPEN
+278-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:98:Finding D2-RN-NN (NEW): ...
+279-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:122:e0882a4 (HEAD -> feat/r3.0d-d2-evidence-graph, origin/feat/r3.0d-d2-evidence-graph) cp10r(d2): close Codex D2 Round 10 — RN-21..RN-25 via intrinsic integrity guard
+280-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:354:+        "newFindings": ["RN-21", "RN-22", "RN-23", "RN-24", "RN-25"],
+281:governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:358:+          "RN-21": "NEW. contracts/r3.0d/evidence-node-contract.js uses ambient Array.prototype.push / Array.prototype.indexOf. Rebinding push to no-op caused a forbidden_category node (normally rejected) to enter a valid:true graph. Renderer-level capture alone insufficient — contract module is in the call path too.",
+282-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:519:+D2-RN-NN: CLOSED | STILL-OPEN
+283-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:545:+D2-RN-NN: CLOSED | STILL-OPEN
+284-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:549:+Finding D2-RN-NN (NEW): ...
+285-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:696:++D2-RN-NN: CLOSED | STILL-OPEN
+286-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:715:++D2-RN-NN: CLOSED | STILL-OPEN
+287-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:719:++Finding D2-RN-NN (NEW): ...
+288-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:944:+++D2-RN-NN: CLOSED | STILL-OPEN
+289-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:969:+++D2-RN-NN: CLOSED | STILL-OPEN
+290-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:973:+++Finding D2-RN-NN (NEW): ...
+291-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:1366:++++D2-RN-NN: CLOSED | STILL-OPEN
+292-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:1398:++++D2-RN-NN: CLOSED | STILL-OPEN
+293-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt:1402:++++Finding D2-RN-NN (NEW): ...
+294-governance/r3.0d/codex-checkpoint-evidence/D2/round-11-e0882a4.raw.txt: WARNING: stopped searching binary file after match (found "\0" byte around offset 151305)
+295-governance/r3.0d/codex-checkpoint-evidence/D2/round-1-10766c0.raw.txt:136:Finding D2-RN-NN: <one-line title>
+--
+475-   799	        else if (typeof cvv !== 'string' || cvv.length === 0) return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'contextVersion must be null or non-empty string' });
+476-   800	        else if (cvv.length > 64) return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'contextVersion exceeds 64 chars' });
+477-   801	        else cv = cvv;
+478-   802	      }
+479-   803	    } catch (e) { return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'contextVersion descriptor read threw' }); }
+480-   804	    return {
+481-   805	      ok: true,
+482-   806	      snapshot: {
+483-   807	        caseAssociation: {
+484-   808	          caseId: caClone.caseId,
+485-   809	          sessionId: caClone.sessionId,
+486-   810	          lapId: ('lapId' in caClone) ? caClone.lapId : null,
+487-
+488-exec
+489:/bin/bash -lc "node -e 'const EG=require(\"./renderer/js/r3-0d-evidence-graph\"),T=\"2026-06-28T06:00:00Z\",O=Object;function bad(){return {schemaVersion:1,nodeId:\"ev_bad\",category:\"forbidden_category\",identity:{caseId:\"c\",sessionId:\"s\",lapId:\"L\",sourceId:\"src\",sourceVersion:\"v1\",freshness:T},credibility:\"measured\",provenance:\"real\",availability:\"available\",confidence:{state:\"unresolved\"},observation:{kind:\"channel_missing\",i18nKey:\"x\",params:null,channel:\"speed\"},limitations:[],supportingEdges:[],contradictingEdges:[]}}function env(a){return {caseAssociation:{caseId:\"c\",sessionId:\"s\",lapId:\"L\"},rawEvidence:a}}let base=EG.buildEvidenceGraph(env([bad()]),{clock:()=>T}),orig=Array.prototype.push,hits=0,target=[bad()],p=new Proxy(target,{get(t,k,r){if(k===\"length\"){hits++;Array.prototype.push=function(){return 0}}return Reflect.get(t,k,r)}}),att;try{att=EG.buildEvidenceGraph(env(p),{clock(){Array.prototype.push=orig;return T}})}finally{Array.prototype.push=orig}console.log(JSON.stringify({baseline:{valid:base.valid,nodes:base.graph.nodes.length,rejected:base.graph.provenance.rejectedCount},attacked:{valid:att.valid,nodes:att.graph&&att.graph.nodes.length,category:att.graph&&att.graph.nodes[0]&&att.graph.nodes[0].category,rejected:att.graph&&att.graph.provenance.rejectedCount,detail:att.detail||null},lengthTrapHits:hits}))'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+490- succeeded in 0ms:
+491:{"baseline":{"valid":true,"nodes":0,"rejected":1},"attacked":{"valid":true,"nodes":1,"category":"forbidden_category","rejected":0,"detail":null},"lengthTrapHits":1}
+492-
+493-exec
+494:/bin/bash -lc "node -e 'const EG=require(\"./renderer/js/r3-0d-evidence-graph\"),T=\"2026-06-28T06:00:00Z\";function node(){return {schemaVersion:NaN,nodeId:\"ev\",category:\"data_quality\",identity:{caseId:\"c\",sessionId:\"s\",lapId:\"L\",sourceId:\"src\",sourceVersion:\"v1\",freshness:T},credibility:\"measured\",provenance:\"real\",availability:\"available\",confidence:{state:\"unresolved\"},observation:{kind:\"channel_missing\",i18nKey:\"x\",params:null,channel:\"speed\"},limitations:[],supportingEdges:[],contradictingEdges:[]}}function env(a){return {caseAssociation:{caseId:\"c\",sessionId:\"s\",lapId:\"L\"},rawEvidence:a}}let base=EG.buildEvidenceGraph(env([node()]),{clock:()=>T}),orig=Number.isInteger,target=[node()],p=new Proxy(target,{get(t,k,r){if(k===\"length\")Number.isInteger=()=>true;return Reflect.get(t,k,r)}}),att;try{att=EG.buildEvidenceGraph(env(p),{clock(){Number.isInteger=orig;return T}})}finally{Number.isInteger=orig}console.log(JSON.stringify({baselineNodes:base.graph.nodes.length,attackedValid:att.valid,attackedNodes:att.graph&&att.graph.nodes.length,schemaIsNaN:att.graph&&Number.isNaN(att.graph.nodes[0].schemaVersion),detail:att.detail||null}))'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+495- succeeded in 0ms:
+496-{"baselineNodes":0,"attackedValid":true,"attackedNodes":1,"schemaIsNaN":true,"detail":null}
+497-
+498-exec
+499-/bin/bash -lc "node -e 'const EG=require(\"./renderer/js/r3-0d-evidence-graph\"),T=\"2026-06-28T06:00:00Z\";function node(){return {schemaVersion:1,nodeId:\"ev\",category:\"data_quality\",identity:{caseId:\"c\",sessionId:\"s\",lapId:\"L\",sourceId:\"src\",sourceVersion:\"v1\",freshness:T},credibility:\"measured\",provenance:\"real\",availability:\"available\",confidence:{state:\"unresolved\"},observation:{kind:\"channel_missing\",i18nKey:\"x\",params:null,channel:\"speed\"},limitations:[],supportingEdges:[],contradictingEdges:[]}}let orig=Math.floor,target=[node()],p=new Proxy(target,{get(t,k,r){if(k===\"length\"){Math.floor=x=>x;return 1.5}return Reflect.get(t,k,r)}}),att;try{att=EG.buildEvidenceGraph({caseAssociation:{caseId:\"c\",sessionId:\"s\",lapId:\"L\"},rawEvidence:p},{clock(){Math.floor=orig;return T}})}finally{Math.floor=orig}console.log(JSON.stringify({valid:att.valid,inputCount:att.graph&&att.graph.provenance.inputCount,nodes:att.graph&&att.graph.nodes.length,rejected:att.graph&&att.graph.provenance.rejectedCount,detail:att.detail||null}))'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+500- succeeded in 0ms:
+501-{"valid":true,"inputCount":1.5,"nodes":1,"rejected":1,"detail":null}
+502-
+503-codex
+504-FINAL VERDICT: BLOCK
+505-
+506-D2-RN-21: STILL-OPEN  
+507:  evidence: A Proxy `rawEvidence.length` trap rebinding `Array.prototype.push`, followed by clock restoration, bypassed both guards and produced `valid:true` containing `category:"forbidden_category"`.
+508-
+509-D2-RN-27: STILL-OPEN  
+510:  evidence: The same between-guard Proxy trap rebound `Number.isInteger`; clock restoration let the post-clock guard pass, producing a valid graph containing `schemaVersion:NaN`. Rebinding `Math.floor` similarly admitted `rawEvidence.length=1.5`.
+511-
+512-Finding D2-RN-28 (NEW): `TextEncoder` remains unguarded  
+513-  evidence: Replacing ambient `TextEncoder` admitted a 513-byte `i18nKey`; baseline rejected it, while the attacked graph retained the node. The contract resolves it ambiently at [evidence-node-contract.js:73](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/contracts/r3.0d/evidence-node-contract.js:73).
+514-
+515-Finding D2-RN-29 (NEW): `structuredClone` remains unguarded  
+516:  evidence: Rebinding `structuredClone` to identity defeated Proxy cleansing; a stateful Proxy returned an allowed category during validation and `"forbidden_category"` during sanitization, yielding `valid:true`. See [reason-codes.js:167](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/contracts/r3.0d/reason-codes.js:167).
+517-
+518-Additional results:
+519-
+520-- All six exact Round 12 exploits BLOCK.
+521-- All three requested chained attacks BLOCK; container accessors were not invoked.
+522-- Symbol, WeakRef, FinalizationRegistry, BigInt, Date, Promise, Map, Set, and Proxy globals are unused.
+523-- Graph ID, node/edge sorting, and topological ordering were deterministic.
+524-- Regression suites: evidence graph 221/221; contracts 160/160.
+525-- D2 manifest exactly matches all 32 changed files.
+526-tokens used
+527-111,888
+528-FINAL VERDICT: BLOCK
+529-
+530-D2-RN-21: STILL-OPEN  
+531:  evidence: A Proxy `rawEvidence.length` trap rebinding `Array.prototype.push`, followed by clock restoration, bypassed both guards and produced `valid:true` containing `category:"forbidden_category"`.
+532-
+533-D2-RN-27: STILL-OPEN  
+534:  evidence: The same between-guard Proxy trap rebound `Number.isInteger`; clock restoration let the post-clock guard pass, producing a valid graph containing `schemaVersion:NaN`. Rebinding `Math.floor` similarly admitted `rawEvidence.length=1.5`.
+535-
+536-Finding D2-RN-28 (NEW): `TextEncoder` remains unguarded  
+537-  evidence: Replacing ambient `TextEncoder` admitted a 513-byte `i18nKey`; baseline rejected it, while the attacked graph retained the node. The contract resolves it ambiently at [evidence-node-contract.js:73](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/contracts/r3.0d/evidence-node-contract.js:73).
+538-
+539-Finding D2-RN-29 (NEW): `structuredClone` remains unguarded  
+540:  evidence: Rebinding `structuredClone` to identity defeated Proxy cleansing; a stateful Proxy returned an allowed category during validation and `"forbidden_category"` during sanitization, yielding `valid:true`. See [reason-codes.js:167](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/contracts/r3.0d/reason-codes.js:167).
+541-
+542-Additional results:
+543-
+544-- All six exact Round 12 exploits BLOCK.
+545-- All three requested chained attacks BLOCK; container accessors were not invoked.
+546-- Symbol, WeakRef, FinalizationRegistry, BigInt, Date, Promise, Map, Set, and Proxy globals are unused.
+547-- Graph ID, node/edge sorting, and topological ordering were deterministic.
+548-- Regression suites: evidence graph 221/221; contracts 160/160.
+549-- D2 manifest exactly matches all 32 changed files.
+550-git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+551-git: error: couldn't create cache file '/tmp/xcrun_db-iSPysZ7O' (errno=Operation not permitted)
+552-git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+553-git: error: couldn't create cache file '/tmp/xcrun_db-fDuZPsqL' (errno=Operation not permitted)
+554-diff --git a/renderer/js/r3-0d-evidence-graph.js b/renderer/js/r3-0d-evidence-graph.js
+--
+686-diff --git a/tests/r3.0d-evidence-graph.test.js b/tests/r3.0d-evidence-graph.test.js
+687-index 8ae6c53..742d84f 100644
+688---- a/tests/r3.0d-evidence-graph.test.js
+689-+++ b/tests/r3.0d-evidence-graph.test.js
+690-@@ -1789,5 +1789,95 @@ function freshInput(over) {
+691-   chk('RN-27: RegExp.prototype.test rebinding caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+692- })();
+693- 
+694-+// ── Section Y — Codex D2 Round 13 finding closures (RN-21/27 Proxy + RN-28/29 globals) ──
+695-+(function sectionY_RN21_RN27_proxyLengthTrap() {
+696-+  // RN-21/27 STILL-OPEN at Round 13 (Codex evidence on 2f0e588): a Proxy on rawEvidence with a
+697-+  // `length` get trap rebinds Array.prototype.push (or Number.isInteger, Math.floor, etc.)
+698-+  // when envelope validation reads `re.length`. Clock callback later restores the binding so
+699-+  // the post-clock guard at Step 17.6 sees a clean state. Build runs with hostile push for the
+700:+  // intervening window, admitting forbidden_category nodes.
+701-+  //
+702-+  // Round 14 fix: (a) envelope validation reads rawEvidence.length via captured
+703-+  // `_ObjectGetOwnPropertyDescriptor` (fires [[GetOwnProperty]] instead of [[Get]] — a Proxy
+704-+  // `get` trap on "length" never fires); (b) new Step 1.5 + Step 3.5 integrity re-checks
+705-+  // catch any trap-mediated rebinding that happened during envelope or per-node iteration.
+706-+  function bad() {
+707:+    return Object.assign(freshNode(), { category: 'forbidden_category' });
+708-+  }
+709-+  const origPush = Array.prototype.push;
+710-+  const target = [bad()];
+711-+  let lengthHits = 0;
+712-+  const p = new Proxy(target, {
+713-+    get(t, k, r) {
+714-+      if (k === 'length') { lengthHits++; Array.prototype.push = function () { return 0; }; }
+715-+      return Reflect.get(t, k, r);
+716-+    },
+717-+  });
+718-+  let attacked;
+719-+  try {
+720-+    attacked = EG.buildEvidenceGraph(freshInput({ rawEvidence: p }), {
+721-+      clock: function () { Array.prototype.push = origPush; return NOW; },
+722-+    });
+723-+  } finally { Array.prototype.push = origPush; }
+724-+  chk('RN-21 Proxy: length descriptor read does NOT fire Proxy get trap (lengthHits=0)', lengthHits === 0);
+725:+  chk('RN-21 Proxy: forbidden_category does NOT enter the graph', !(attacked.valid === true && attacked.graph.nodes.some(n => n.category === 'forbidden_category')));
+726-+})();
+727-+
+728-+(function sectionY_RN27_proxyMathFloorTrap() {
+729-+  // Same Proxy attack vector targeting Math.floor — the envelope length integer check uses
+730-+  // _MathFloor (captured). A Proxy length-getter rebinding Math.floor is irrelevant because
+731-+  // we use the captured ref AND the post-envelope / post-iteration guard catches the rebind.
+732-+  const origFloor = Math.floor;
+733-+  const target = [freshNode()];
+734-+  const p = new Proxy(target, {
+735-+    get(t, k, r) { if (k === 'length') { Math.floor = x => x; } return Reflect.get(t, k, r); },
+736-+  });
+737-+  let attacked;
+738-+  try {
+739-+    attacked = EG.buildEvidenceGraph(freshInput({ rawEvidence: p }), {
+--
+2537-  chk('A1j graph.createdAt = injected clock', out.graph.createdAt === NOW);
+2538-  chk('A1k graph.nodes length 1', out.graph.nodes.length === 1);
+2539-  chk('A1l one correlation group, weight 1', out.graph.correlationGroups.length === 1 && out.graph.correlationGroups[0].independenceWeight === 1);
+2540-  chk('A1m sessionAssociation present', out.graph.sessionAssociation.sessionId === 'sess_demo');
+2541-  chk('A1n provenance.inputCount 1', out.graph.provenance.inputCount === 1);
+2542-  chk('A1o provenance.sanitizedCount 1', out.graph.provenance.sanitizedCount === 1);
+2543-
+2544-  // empty rawEvidence — valid graph, INSUFFICIENT_EVIDENCE cannotConclude
+2545-  const emptyOut = EG.buildEvidenceGraph(freshInput({ rawEvidence: [] }), { clock: CLOCK });
+2546-  chk('A2 empty valid', emptyOut.valid === true);
+2547-  chk('A2a empty cannotConclude has INSUFFICIENT_EVIDENCE', emptyOut.graph.cannotConclude.indexOf(CODES.INSUFFICIENT_EVIDENCE) !== -1);
+2548-  chk('A2b empty nodes []', emptyOut.graph.nodes.length === 0);
+2549-
+2550-exec
+2551:/bin/bash -lc "node -e \"'use strict'; const EG=require('./renderer/js/r3-0d-evidence-graph.js'),NOW='2026-06-28T06:00:00Z'; const target={schemaVersion:1,nodeId:'ev_001',category:'data_quality',identity:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1',sourceId:'lap_authority',sourceVersion:'v1',freshness:NOW},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'channel_missing',i18nKey:'x',params:null,channel:'speed'},limitations:[],supportingEdges:[],contradictingEdges:[]}; const origSC=globalThis.structuredClone; let gp=0,categoryGets=0,armed=false; const p=new Proxy(target,{getPrototypeOf(t){gp++;if(armed){globalThis.structuredClone=origSC;armed=false}return Object.getPrototypeOf(t)},getOwnPropertyDescriptor(t,k){if(gp>=4&&k==='contradictingEdges'){globalThis.structuredClone=v=>v;armed=true}return Object.getOwnPropertyDescriptor(t,k)},get(t,k,r){if(k==='category')return ++categoryGets===1?'data_quality':'forbidden_category';return Reflect.get(t,k,r)}});let out;try{out=EG.buildEvidenceGraph({caseAssociation:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1'},rawEvidence:[p]},{clock:()=>NOW})}finally{globalThis.structuredClone=origSC}console.log(JSON.stringify({gp,categoryGets,armed,valid:out.valid,status:out.status,detail:out.detail,nodes:out.graph&&out.graph.nodes.map(n=>({category:n.category,nodeId:n.nodeId})),rejected:out.graph&&out.graph.provenance.rejectedCount,reasonCodes:out.reasonCodes}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+2552- succeeded in 0ms:
+2553:{"gp":5,"categoryGets":2,"armed":false,"valid":true,"nodes":[{"category":"forbidden_category","nodeId":"ev_001"}],"rejected":0}
+2554-
+2555-exec
+2556-/bin/bash -lc "node -e \"'use strict'; const EG=require('./renderer/js/r3-0d-evidence-graph.js'),NOW='2026-06-28T06:00:00Z'; const target={schemaVersion:1,nodeId:'ev_001',category:'data_quality',identity:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1',sourceId:'lap_authority',sourceVersion:'v1',freshness:NOW},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'channel_missing',i18nKey:'x'.repeat(513),params:null,channel:'speed'},limitations:[],supportingEdges:[],contradictingEdges:[]}; const origTE=globalThis.TextEncoder;let gp=0,installed=0,used=0;function FakeTE(){} FakeTE.prototype.encode=function(){used++;globalThis.TextEncoder=origTE;return {length:0}}; const p=new Proxy(target,{getPrototypeOf(t){gp++;return Object.getPrototypeOf(t)},getOwnPropertyDescriptor(t,k){if(gp>=4&&k==='contradictingEdges'){globalThis.TextEncoder=FakeTE;installed++}return Object.getOwnPropertyDescriptor(t,k)}});let out;try{out=EG.buildEvidenceGraph({caseAssociation:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1'},rawEvidence:[p]},{clock:()=>NOW})}finally{globalThis.TextEncoder=origTE}console.log(JSON.stringify({gp,installed,used,valid:out.valid,status:out.status,detail:out.detail,nodeCount:out.graph&&out.graph.nodes.length,i18nLen:out.graph&&out.graph.nodes[0]&&out.graph.nodes[0].observation.i18nKey.length,rejected:out.graph&&out.graph.provenance.rejectedCount,reasonCodes:out.reasonCodes}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+2557- succeeded in 0ms:
+2558-{"gp":4,"installed":1,"used":0,"status":"blocked","detail":"intrinsic-tampering detected post-iteration: input Proxy/getter trap rebound a captured global primitive method during per-node validation","reasonCodes":["INTERNAL_CONTRACT_VIOLATION"]}
+2559-
+2560-exec
+2561-/bin/bash -lc "node -e \"'use strict'; const EG=require('./renderer/js/r3-0d-evidence-graph.js'),NOW='2026-06-28T06:00:00Z'; const node={schemaVersion:1,nodeId:'ev_001',category:'data_quality',identity:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1',sourceId:'lap_authority',sourceVersion:'v1',freshness:NOW},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'channel_missing',i18nKey:'x'.repeat(513),params:null,channel:'speed'},limitations:[],supportingEdges:[],contradictingEdges:[]}; const origTE=globalThis.TextEncoder;let trapHits=0,used=0;function FakeTE(){} FakeTE.prototype.encode=function(){used++;globalThis.TextEncoder=origTE;return {length:0}}; const re=new Proxy([node],{getOwnPropertyDescriptor(t,k){if(k==='0'){trapHits++;globalThis.TextEncoder=FakeTE}return Object.getOwnPropertyDescriptor(t,k)}});let out;try{out=EG.buildEvidenceGraph({caseAssociation:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1'},rawEvidence:re},{clock:()=>NOW})}finally{globalThis.TextEncoder=origTE}console.log(JSON.stringify({trapHits,used,valid:out.valid,status:out.status,detail:out.detail,nodeCount:out.graph&&out.graph.nodes.length,i18nLen:out.graph&&out.graph.nodes[0]&&out.graph.nodes[0].observation.i18nKey.length,rejected:out.graph&&out.graph.provenance.rejectedCount,reasonCodes:out.reasonCodes}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+2562- succeeded in 0ms:
+2563-{"trapHits":1,"used":1,"valid":true,"nodeCount":0,"rejected":1}
+2564-
+2565-exec
+2566-/bin/bash -lc "node -e \"'use strict'; const EG=require('./renderer/js/r3-0d-evidence-graph.js'),NOW='2026-06-28T06:00:00Z'; const node={schemaVersion:1,nodeId:'ev_001',category:'data_quality',identity:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1',sourceId:'lap_authority',sourceVersion:'v1',freshness:NOW},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'channel_missing',i18nKey:'x'.repeat(513),params:null,channel:'speed'},limitations:[],supportingEdges:[],contradictingEdges:[]}; const origTE=globalThis.TextEncoder,enc=new origTE();let trapHits=0,used=[];function FakeTE(){} FakeTE.prototype.encode=function(s){used.push(s.length);if(s.length===513){globalThis.TextEncoder=origTE;return {length:0}}return enc.encode(s)}; const re=new Proxy([node],{getOwnPropertyDescriptor(t,k){if(k==='0'){trapHits++;globalThis.TextEncoder=FakeTE}return Object.getOwnPropertyDescriptor(t,k)}});let out;try{out=EG.buildEvidenceGraph({caseAssociation:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1'},rawEvidence:re},{clock:()=>NOW})}finally{globalThis.TextEncoder=origTE}console.log(JSON.stringify({trapHits,used,valid:out.valid,status:out.status,detail:out.detail,nodeCount:out.graph&&out.graph.nodes.length,i18nLen:out.graph&&out.graph.nodes[0]&&out.graph.nodes[0].observation.i18nKey.length,rejected:out.graph&&out.graph.provenance.rejectedCount,rejectedReasons:out.graph&&out.graph.provenance.rejectedReasons,reasonCodes:out.reasonCodes}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+2567- succeeded in 0ms:
+2568-{"trapHits":1,"used":[9,9,13,2,20,2,513],"valid":true,"nodeCount":1,"i18nLen":513,"rejected":0}
+2569-
+2570-exec
+2571:/bin/bash -lc "node -e \"'use strict'; const EG=require('./renderer/js/r3-0d-evidence-graph.js'),NOW='2026-06-28T06:00:00Z'; const node={schemaVersion:1,nodeId:'ev_bad',category:'forbidden_category',identity:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1',sourceId:'lap_authority',sourceVersion:'v1',freshness:NOW},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'channel_missing',i18nKey:'x',params:null,channel:'speed'},limitations:[],supportingEdges:[],contradictingEdges:[]}; const origPush=Array.prototype.push;let trapHits=0,pushHits=0;function evilPush(){pushHits++;Array.prototype.push=origPush;return this.length} const re=new Proxy([node],{getOwnPropertyDescriptor(t,k){if(k==='0'){trapHits++;Array.prototype.push=evilPush}return Object.getOwnPropertyDescriptor(t,k)}});let out;try{out=EG.buildEvidenceGraph({caseAssociation:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1'},rawEvidence:re},{clock:()=>NOW})}finally{Array.prototype.push=origPush}console.log(JSON.stringify({trapHits,pushHits,valid:out.valid,status:out.status,detail:out.detail,nodes:out.graph&&out.graph.nodes.map(n=>n.category),rejected:out.graph&&out.graph.provenance.rejectedCount,reasonCodes:out.reasonCodes}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+2572- succeeded in 0ms:
+2573:{"trapHits":1,"pushHits":1,"valid":true,"nodes":["forbidden_category"],"rejected":0}
+2574-
+2575-exec
+2576:/bin/bash -lc "node -e \"'use strict'; const EG=require('./renderer/js/r3-0d-evidence-graph.js'),NOW='2026-06-28T06:00:00Z'; const node={schemaVersion:NaN,nodeId:'ev_nan',category:'data_quality',identity:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1',sourceId:'lap_authority',sourceVersion:'v1',freshness:NOW},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'channel_missing',i18nKey:'x',params:null,channel:'speed'},limitations:[],supportingEdges:[],contradictingEdges:[]}; const orig=Number.isInteger;let trapHits=0,integerHits=0; const re=new Proxy([node],{getOwnPropertyDescriptor(t,k){if(k==='0'){trapHits++;Number.isInteger=function(){integerHits++;Number.isInteger=orig;return true}}return Object.getOwnPropertyDescriptor(t,k)}});let out;try{out=EG.buildEvidenceGraph({caseAssociation:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1'},rawEvidence:re},{clock:()=>NOW})}finally{Number.isInteger=orig}console.log(JSON.stringify({trapHits,integerHits,valid:out.valid,status:out.status,detail:out.detail,nodeCount:out.graph&&out.graph.nodes.length,schemaIsNaN:out.graph&&out.graph.nodes[0]&&Number.isNaN(out.graph.nodes[0].schemaVersion),rejected:out.graph&&out.graph.provenance.rejectedCount,reasonCodes:out.reasonCodes}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+2577- succeeded in 0ms:
+2578-{"trapHits":1,"integerHits":1,"valid":true,"nodeCount":1,"schemaIsNaN":true,"rejected":0}
+2579-
+2580-codex
+2581:The re-checks only detect tampering that remains installed at checkpoint time. I found self-restoring trap attacks: a raw-evidence index descriptor trap installs a one-shot hostile intrinsic, that intrinsic corrupts validation and restores itself before Step 3.5. This survives for all four Round 13 findings; I’m completing the requested regression and determinism checks now.
+2582-exec
+2583-/bin/bash -lc 'node tests/r3.0d-evidence-graph.test.js && node tests/r3.0d-contracts.test.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+2584- exited 1 in 111ms:
+2585-node:internal/modules/cjs/loader:1450
+2586-  throw err;
+2587-  ^
+2588-
+2589-Error: Cannot find module '/Users/SKYLINE/Claude/projects/racing-setup-analyzer/tests/r3.0d-contracts.test.js'
+2590-    at Module._resolveFilename (node:internal/modules/cjs/loader:1447:15)
+2591-    at defaultResolveImpl (node:internal/modules/cjs/loader:1058:19)
+2592-    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1063:22)
+2593-    at Module._load (node:internal/modules/cjs/loader:1233:25)
+2594-    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+2595-    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+--
+3291-renderer/js/r3-0d-evidence-graph.js:1426:        return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'post-sanitization JSON size ' + envBytes + ' exceeds ENVELOPE_BYTE_CAP=' + ENVELOPE_BYTE_CAP });
+3292-renderer/js/r3-0d-evidence-graph.js:1435:      // the clock fires. A hostile clock callback can rebind globals (Object.freeze,
+3293-renderer/js/r3-0d-evidence-graph.js:1438:      // RC.buildBlockedResult — the contract module's internal _normCodes / Array.prototype.push /
+3294-renderer/js/r3-0d-evidence-graph.js:1439:      // Array.prototype.forEach calls are themselves vulnerable to the same rebinding (a no-op
+3295-
+3296-exec
+3297-/bin/bash -lc "node -e \"const EG=require('./renderer/js/r3-0d-evidence-graph.js'),N='2026-06-28T06:00:00Z',input=()=>({caseAssociation:{caseId:'c',sessionId:'s',lapId:'L'},rawEvidence:[]});function run(k,repl,clock){const o=globalThis[k];let r;try{if("'!clock)globalThis[k]=repl;r=EG.buildEvidenceGraph(input(),{clock:clock?()=>{globalThis[k]=repl;return N}:()=>N})}finally{globalThis[k]=o}return {status:r.status,eligible:r.eligible,reasonCodes:r.reasonCodes}}console.log(JSON.stringify({textEncoderPre:run('"'TextEncoder',function(){}),structuredClonePre:run('structuredClone',v=>v),textEncoderClock:run('TextEncoder',function(){},true),structuredCloneClock:run('structuredClone',v=>v,true)}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+3298- succeeded in 0ms:
+3299-{"textEncoderPre":{"status":"blocked","eligible":false,"reasonCodes":["INTERNAL_CONTRACT_VIOLATION"]},"structuredClonePre":{"status":"blocked","eligible":false,"reasonCodes":["INTERNAL_CONTRACT_VIOLATION"]},"textEncoderClock":{"status":"blocked","eligible":false,"reasonCodes":["INTERNAL_CONTRACT_VIOLATION"]},"structuredCloneClock":{"status":"blocked","eligible":false,"reasonCodes":["INTERNAL_CONTRACT_VIOLATION"]}}
+3300-
+3301-codex
+3302-FINAL VERDICT: BLOCK
+3303-
+3304-D2-RN-21: STILL-OPEN  
+3305:  evidence: A `rawEvidence[0]` `getOwnPropertyDescriptor` trap installed a one-shot hostile `Array.prototype.push`; it suppressed `EVIDENCE_CATEGORY_UNKNOWN`, restored itself before Step 3.5, and produced `valid:true` containing `forbidden_category`.
+3306-
+3307-D2-RN-27: STILL-OPEN  
+3308:  evidence: The same trap installed a one-shot `Number.isInteger` returning true; `schemaVersion:NaN` entered a valid graph after the function restored itself before Step 3.5.
+3309-
+3310-D2-RN-28: STILL-OPEN  
+3311:  evidence: The trap installed a temporary `TextEncoder` that reported zero bytes for a 513-byte `i18nKey` and restored itself during `encode`; the oversized node entered a valid graph.
+3312-
+3313-D2-RN-29: STILL-OPEN  
+3314:  evidence: A node Proxy temporarily replaced `structuredClone` with identity, restored it during the following prototype check, and returned an allowed category during validation but `forbidden_category` during sanitization; the invalid category entered a valid graph.
+3315-
+3316-Finding D2-RN-30 (NEW): `Object.getOwnPropertyNames` remains unguarded  
+3317-  evidence: Rebinding it to `Object.keys` before build caused a node with a non-enumerable forbidden property to be accepted with `valid:true`, bypassing hidden-key rejection at [reason-codes.js:189](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/contracts/r3.0d/reason-codes.js:189).
+3318-
+3319-Additional verification:
+3320-
+3321-- Exact Round 13 `get("length")` exploits are neutralized: the trap is never called.
+3322-- Persistent `getOwnPropertyDescriptor`/`getPrototypeOf` tampering is caught, but self-restoring tampering bypasses the checkpoint design.
+3323-- Pre-build and in-clock `TextEncoder`/`structuredClone` rebinding BLOCK.
+3324-- Raw-array `ownKeys` is not invoked by indexed iteration.
+3325-- Determinism and ordering checks passed.
+3326-- Suites passed: evidence graph 227/227; contract foundation 160/160.
+3327-tokens used
+3328-134,891
+3329-FINAL VERDICT: BLOCK
+3330-
+3331-D2-RN-21: STILL-OPEN  
+3332:  evidence: A `rawEvidence[0]` `getOwnPropertyDescriptor` trap installed a one-shot hostile `Array.prototype.push`; it suppressed `EVIDENCE_CATEGORY_UNKNOWN`, restored itself before Step 3.5, and produced `valid:true` containing `forbidden_category`.
+3333-
+3334-D2-RN-27: STILL-OPEN  
+3335:  evidence: The same trap installed a one-shot `Number.isInteger` returning true; `schemaVersion:NaN` entered a valid graph after the function restored itself before Step 3.5.
+3336-
+3337-D2-RN-28: STILL-OPEN  
+3338:  evidence: The trap installed a temporary `TextEncoder` that reported zero bytes for a 513-byte `i18nKey` and restored itself during `encode`; the oversized node entered a valid graph.
+3339-
+3340-D2-RN-29: STILL-OPEN  
+3341:  evidence: A node Proxy temporarily replaced `structuredClone` with identity, restored it during the following prototype check, and returned an allowed category during validation but `forbidden_category` during sanitization; the invalid category entered a valid graph.
+3342-
+3343-Finding D2-RN-30 (NEW): `Object.getOwnPropertyNames` remains unguarded  
+3344-  evidence: Rebinding it to `Object.keys` before build caused a node with a non-enumerable forbidden property to be accepted with `valid:true`, bypassing hidden-key rejection at [reason-codes.js:189](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/contracts/r3.0d/reason-codes.js:189).
+3345-
+3346-Additional verification:
+3347-
+3348-- Exact Round 13 `get("length")` exploits are neutralized: the trap is never called.
+3349-- Persistent `getOwnPropertyDescriptor`/`getPrototypeOf` tampering is caught, but self-restoring tampering bypasses the checkpoint design.
+3350-- Pre-build and in-clock `TextEncoder`/`structuredClone` rebinding BLOCK.
+3351-- Raw-array `ownKeys` is not invoked by indexed iteration.
+3352-- Determinism and ordering checks passed.
+3353-- Suites passed: evidence graph 227/227; contract foundation 160/160.
+
+exec
+/bin/bash -lc "node -e \"'use strict'; const EG=require('./renderer/js/r3-0d-evidence-graph.js'),NOW='2026-06-28T06:00:00Z'; const node={schemaVersion:1,nodeId:'ev_bad',category:'forbidden_category',identity:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1',sourceId:'lap_authority',sourceVersion:'v1',freshness:NOW},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'channel_missing',i18nKey:'x',params:null,channel:'speed'},limitations:[],supportingEdges:[],contradictingEdges:[]}; const origPush=Array.prototype.push;let trapHits=0,pushHits=0;function evilPush(){pushHits++;Array.prototype.push=origPush;return this.length} const re=new Proxy([node],{getOwnPropertyDescriptor(t,k){if(k==='0'){trapHits++;Array.prototype.push=evilPush}return Object.getOwnPropertyDescriptor(t,k)}});let out;try{out=EG.buildEvidenceGraph({caseAssociation:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1'},rawEvidence:re},{clock:()=>NOW})}finally{Array.prototype.push=origPush}console.log(JSON.stringify({trapHits,pushHits,valid:out.valid,status:out.status,detail:out.detail,nodes:out.graph&&out.graph.nodes.map(n=>n.category),rejected:out.graph&&out.graph.provenance.rejectedCount,reasonCodes:out.reasonCodes}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"trapHits":1,"pushHits":1,"valid":true,"nodes":["forbidden_category"],"rejected":0}
+
+exec
+/bin/bash -lc "node -e \"'use strict'; const EG=require('./renderer/js/r3-0d-evidence-graph.js'),NOW='2026-06-28T06:00:00Z'; const node={schemaVersion:NaN,nodeId:'ev_nan',category:'data_quality',identity:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1',sourceId:'lap_authority',sourceVersion:'v1',freshness:NOW},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'channel_missing',i18nKey:'x',params:null,channel:'speed'},limitations:[],supportingEdges:[],contradictingEdges:[]}; const orig=Number.isInteger;let trapHits=0,integerHits=0; const re=new Proxy([node],{getOwnPropertyDescriptor(t,k){if(k==='0'){trapHits++;Number.isInteger=function(){integerHits++;Number.isInteger=orig;return true}}return Object.getOwnPropertyDescriptor(t,k)}});let out;try{out=EG.buildEvidenceGraph({caseAssociation:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1'},rawEvidence:re},{clock:()=>NOW})}finally{Number.isInteger=orig}console.log(JSON.stringify({trapHits,integerHits,valid:out.valid,status:out.status,detail:out.detail,nodeCount:out.graph&&out.graph.nodes.length,schemaIsNaN:out.graph&&out.graph.nodes[0]&&Number.isNaN(out.graph.nodes[0].schemaVersion),rejected:out.graph&&out.graph.provenance.rejectedCount,reasonCodes:out.reasonCodes}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"trapHits":1,"integerHits":1,"valid":true,"nodeCount":1,"schemaIsNaN":true,"rejected":0}
+
+exec
+/bin/bash -lc "node -e \"'use strict'; const EG=require('./renderer/js/r3-0d-evidence-graph.js'),NOW='2026-06-28T06:00:00Z'; const node={schemaVersion:1,nodeId:'ev_001',category:'data_quality',identity:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1',sourceId:'lap_authority',sourceVersion:'v1',freshness:NOW},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'channel_missing',i18nKey:'x'.repeat(513),params:null,channel:'speed'},limitations:[],supportingEdges:[],contradictingEdges:[]}; const origTE=globalThis.TextEncoder,enc=new origTE();let trapHits=0,used=[];function FakeTE(){} FakeTE.prototype.encode=function(s){used.push(s.length);if(s.length===513){globalThis.TextEncoder=origTE;return {length:0}}return enc.encode(s)}; const re=new Proxy([node],{getOwnPropertyDescriptor(t,k){if(k==='0'){trapHits++;globalThis.TextEncoder=FakeTE}return Object.getOwnPropertyDescriptor(t,k)}});let out;try{out=EG.buildEvidenceGraph({caseAssociation:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1'},rawEvidence:re},{clock:()=>NOW})}finally{globalThis.TextEncoder=origTE}console.log(JSON.stringify({trapHits,used,valid:out.valid,status:out.status,detail:out.detail,nodeCount:out.graph&&out.graph.nodes.length,i18nLen:out.graph&&out.graph.nodes[0]&&out.graph.nodes[0].observation.i18nKey.length,rejected:out.graph&&out.graph.provenance.rejectedCount,reasonCodes:out.reasonCodes}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"trapHits":1,"used":[9,9,13,2,20,2,513],"valid":true,"nodeCount":1,"i18nLen":513,"rejected":0}
+
+exec
+/bin/bash -lc "node -e \"'use strict'; const EG=require('./renderer/js/r3-0d-evidence-graph.js'),NOW='2026-06-28T06:00:00Z'; const target={schemaVersion:1,nodeId:'ev_001',category:'data_quality',identity:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1',sourceId:'lap_authority',sourceVersion:'v1',freshness:NOW},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'channel_missing',i18nKey:'x',params:null,channel:'speed'},limitations:[],supportingEdges:[],contradictingEdges:[]}; const origSC=globalThis.structuredClone; let gp=0,categoryGets=0,armed=false; const p=new Proxy(target,{getPrototypeOf(t){gp++;if(armed){globalThis.structuredClone=origSC;armed=false}return Object.getPrototypeOf(t)},getOwnPropertyDescriptor(t,k){if(gp>=4&&k==='contradictingEdges'){globalThis.structuredClone=v=>v;armed=true}return Object.getOwnPropertyDescriptor(t,k)},get(t,k,r){if(k==='category')return ++categoryGets===1?'data_quality':'forbidden_category';return Reflect.get(t,k,r)}});let out;try{out=EG.buildEvidenceGraph({caseAssociation:{caseId:'case_demo',sessionId:'sess_demo',lapId:'L1'},rawEvidence:[p]},{clock:()=>NOW})}finally{globalThis.structuredClone=origSC}console.log(JSON.stringify({gp,categoryGets,armed,valid:out.valid,status:out.status,detail:out.detail,nodes:out.graph&&out.graph.nodes.map(n=>({category:n.category,nodeId:n.nodeId})),rejected:out.graph&&out.graph.provenance.rejectedCount,reasonCodes:out.reasonCodes}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"gp":5,"categoryGets":2,"armed":false,"valid":true,"nodes":[{"category":"forbidden_category","nodeId":"ev_001"}],"rejected":0}
+
+exec
+/bin/bash -lc "node -e \"'use strict';const EG=require('./renderer/js/r3-0d-evidence-graph'),T='2026-06-28T06:00:00Z';function n(){const x={schemaVersion:1,nodeId:'ev_hidden',category:'data_quality',identity:{caseId:'c',sessionId:'s',lapId:'L',sourceId:'src',sourceVersion:'v1',freshness:T},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'channel_missing',i18nKey:'x',params:null,channel:'speed'},limitations:[],supportingEdges:[],contradictingEdges:[]};Object.defineProperty(x,'forbiddenHidden',{value:'payload',enumerable:false});return x}const env=a=>({caseAssociation:{caseId:'c',sessionId:'s',lapId:'L'},rawEvidence:a});const base=EG.buildEvidenceGraph(env([n()]),{clock:()=>T});const orig=Object.getOwnPropertyNames;let trap=0,used=0;const re=new Proxy([n()],{getOwnPropertyDescriptor(t,k){if(k==='0'){trap++;Object.getOwnPropertyNames=function(v){used++;Object.getOwnPropertyNames=orig;return Object.keys(v)}}return Object.getOwnPropertyDescriptor(t,k)}});let out;try{out=EG.buildEvidenceGraph(env(re),{clock:()=>T})}finally{Object.getOwnPropertyNames=orig}console.log(JSON.stringify({baseline:{nodes:base.graph&&base.graph.nodes.length,rejected:base.graph&&base.graph.provenance.rejectedCount,reasons:base.graph&&base.graph.provenance.rejectedReasons},attack:{trap,used,valid:out.valid,status:out.status,detail:out.detail,nodes:out.graph&&out.graph.nodes.length,rejected:out.graph&&out.graph.provenance.rejectedCount,reasons:out.reasonCodes}}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"baseline":{"nodes":0,"rejected":1},"attack":{"trap":1,"used":1,"valid":true,"nodes":0,"rejected":1}}
+
+exec
+/bin/bash -lc "node -e \"'use strict';const EG=require('./renderer/js/r3-0d-evidence-graph'),T='2026-06-28T06:00:00Z';function n(){const x={schemaVersion:1,nodeId:'ev_hidden',category:'data_quality',identity:{caseId:'c',sessionId:'s',lapId:'L',sourceId:'src',sourceVersion:'v1',freshness:T},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'channel_missing',i18nKey:'x',params:null,channel:'speed'},limitations:[],supportingEdges:[],contradictingEdges:[]};Object.defineProperty(x,'forbiddenHidden',{value:'payload',enumerable:false,configurable:true});return x}const env=a=>({caseAssociation:{caseId:'c',sessionId:'s',lapId:'L'},rawEvidence:a});const orig=Object.getOwnPropertyNames;let trap=0,used=[];const re=new Proxy([n()],{getOwnPropertyDescriptor(t,k){if(k==='0'){trap++;Object.getOwnPropertyNames=function(v){used.push(Object.keys(v));Object.getOwnPropertyNames=orig;return Object.keys(v)}}return Object.getOwnPropertyDescriptor(t,k)}});let out;try{out=EG.buildEvidenceGraph(env(re),{clock:()=>T})}finally{Object.getOwnPropertyNames=orig}console.log(JSON.stringify({trap,used,valid:out.valid,status:out.status,detail:out.detail,graph:out.graph&&{nodes:out.graph.nodes,rejected:out.graph.provenance.rejectedCount,rejectedReasons:out.graph.provenance.rejectedReasons}}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"trap":1,"used":[["schemaVersion","nodeId","category","identity","credibility","provenance","availability","confidence","observation","limitations","supportingEdges","contradictingEdges"]],"valid":true,"graph":{"nodes":[],"rejected":1}}
+
+exec
+/bin/bash -lc "node -e \"'use strict';const EG=require('./renderer/js/r3-0d-evidence-graph'),T='2026-06-28T06:00:00Z';function n(){const x={schemaVersion:1,nodeId:'ev_hidden',category:'data_quality',identity:{caseId:'c',sessionId:'s',lapId:'L',sourceId:'src',sourceVersion:'v1',freshness:T},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'unresolved'},observation:{kind:'channel_missing',i18nKey:'x',params:null,channel:'speed'},limitations:[],supportingEdges:[],contradictingEdges:[]};Object.defineProperty(x,'forbiddenHidden',{value:'payload',enumerable:false});return x}const env=a=>({caseAssociation:{caseId:'c',sessionId:'s',lapId:'L'},rawEvidence:a});const orig=Object.getOwnPropertyNames;let trap=0,used=0;const re=new Proxy([n()],{getOwnPropertyDescriptor(t,k){if(k==='0'){trap++;Object.getOwnPropertyNames=function(v){used++;if(used===2)Object.getOwnPropertyNames=orig;return Object.keys(v)}}return Object.getOwnPropertyDescriptor(t,k)}});let out;try{out=EG.buildEvidenceGraph(env(re),{clock:()=>T})}finally{Object.getOwnPropertyNames=orig}console.log(JSON.stringify({trap,used,valid:out.valid,status:out.status,detail:out.detail,nodes:out.graph&&out.graph.nodes.length,rejected:out.graph&&out.graph.provenance.rejectedCount,reasonCodes:out.reasonCodes}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"trap":1,"used":2,"valid":true,"nodes":1,"rejected":0}
+
+codex
+The install–use–restore probes survive all five guards: forbidden category, `NaN` schema version, oversized UTF-8 field, stateful Proxy category, and a hidden own property were each accepted after the hostile intrinsic restored itself before the per-iteration check. I’m finishing the requested baseline/regression and determinism checks to separate these surviving attacks from unrelated regressions.
+exec
+/bin/bash -lc "rg --files tests | rg 'r3\\.0d.*(test|spec)\\.js"'$'"' && node tests/r3.0d-evidence-graph.test.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+tests/r3.0d-evidence-graph.test.js
+tests/r3.0d-contract-foundation.test.js
+R3.0D D2 evidence-graph suite: 233 pass, 0 fail
+
+exec
+/bin/bash -lc 'rg -n "determin|permutation|sort order|ordering|topolog|graphId" tests/r3.0d-evidence-graph.test.js | tail -80; git diff --check 092f2627738b0ee7cbfb3dc7e2e62efeee6a8a34..764ae80319d44670198de68d8d77e56798a1b45a -- renderer/js/r3-0d-evidence-graph.js tests/r3.0d-evidence-graph.test.js governance/r3.0d/checkpoints/D2.json' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+binary file matches (found "\0" byte around offset 52067)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-5KfgzbTq' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-JaGJF8zA' (errno=Operation not permitted)
+
+exec
+/bin/bash -lc 'rg -a -n "determin|permutation|sort order|ordering|topolog|graphId" tests/r3.0d-evidence-graph.test.js | tail -100' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+19: *   • deterministic node + edge + topological order + serialization
+91:  chk('A1b graph.graphId starts with graph_', out.graph && /^graph_/.test(out.graph.graphId));
+381:  chk('F8 acyclic chain → topological order respects DAG', (function () {
+386:    const order = r.graph && r.graph.topologicalOrder;
+417:// ── Section H — determinism + caller mutation defence ───────────────────────────
+419:  chk('H1 deterministic graphId across builds', (function () {
+424:    return r1.valid === true && r2.valid === true && r1.graph.graphId === r2.graph.graphId;
+427:  chk('H2 deterministic node order (sorted by nodeId)', (function () {
+493:  chk('H12 freshness change does not change graphId (semantic fingerprint excludes freshness)', (function () {
+498:    return r1.valid === true && r2.valid === true && r1.graph.graphId === r2.graph.graphId;
+621:  // Same outcome regardless of permutation
+623:  chk('RN-03 dedup outcome independent of caller permutation', sameOutcome);
+625:    chk('RN-03 same graphId across permutations', r1.graph.graphId === r2.graph.graphId);
+713:  // deterministically and produce a deterministic dedup outcome.
+718:  chk('RN-03 r2: same dedup outcome regardless of permutation (confidence-distinct)', r1.valid === true && r2.valid === true && r1.graph.nodes[0].confidence.state === r2.graph.nodes[0].confidence.state);
+719:  chk('RN-03 r2: same graphId regardless of permutation', r1.valid === true && r2.valid === true && r1.graph.graphId === r2.graph.graphId);
+720:  // Different confidence.state → different graphId (confidence is part of graphId payload).
+723:  chk('RN-03 r2: confidence-distinct singletons produce distinct graphId', onlyUnresolved.graph.graphId !== onlyNotComputed.graph.graphId);
+867:    chk('RN-13 r3: hostile slice/map does not corrupt topologicalOrder', r.graph.topologicalOrder.indexOf('ev_001') !== -1);
+937:    chk('RN-13 r4: graph.topologicalOrder contains no {tampered:true} entry', !hasTampered(r.graph.topologicalOrder));
+986:    chk('RN-13 r4: hostile Function.prototype.apply replacement — graph.topologicalOrder clean', !hasTampered(r.graph.topologicalOrder));
+1117:  chk('RN-13 r4-setter: graph.topologicalOrder clean', r.valid === true && !hasTampered(r.graph.topologicalOrder));
+1236:  // DFS / topological sort / per-element freeze / graphId derivation.
+1316:  // deterministic and matches between checks.
+1474:  // Sort rebinding must not falsify deterministic ordering. Either guard catches the rebinding
+1477:    chk('RN-19: hostile Array.prototype.sort does not falsify deterministic node ordering', r.graph.nodes[0].nodeId === 'ev_a' && r.graph.nodes[1].nodeId === 'ev_b' && r.graph.nodes[2].nodeId === 'ev_c');
+1595:  chk('RN-21..25 intact: graphId is deterministic content-hash', r.valid === true && typeof r.graph.graphId === 'string' && /^graph_[0-9a-f]+$/.test(r.graph.graphId));
+
+exec
+/bin/bash -lc "node -e \"'use strict';const EG=require('./renderer/js/r3-0d-evidence-graph'),T='2026-06-28T06:00:00Z';let hits=0;const ca={sessionId:'s',lapId:'L'};Object.defineProperty(ca,'caseId',{enumerable:true,get(){hits++;Array.prototype.push=function(){};return 'c'}});const orig=Array.prototype.push;let o;try{o=EG.buildEvidenceGraph({caseAssociation:ca,rawEvidence:[]},{clock:()=>T})}finally{Array.prototype.push=orig}console.log(JSON.stringify({hits,status:o.status,reasons:o.reasonCodes,detail:o.detail}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"hits":0,"status":"blocked","reasons":["PROTOTYPE_POLLUTION_REJECTED"],"detail":"caseAssociation contains a nested non-plain object"}
+
+exec
+/bin/bash -lc "node -e \"'use strict';const EG=require('./renderer/js/r3-0d-evidence-graph'),T='2026-06-28T06:00:00Z',orig=Array.prototype.push;const target={caseAssociation:{caseId:'c',sessionId:'s',lapId:'L'},rawEvidence:[],generationToken:'g'};let hits=0;const p=new Proxy(target,{getOwnPropertyDescriptor(t,k){if(k==='generationToken'){hits++;Array.prototype.push=function(){}}return Object.getOwnPropertyDescriptor(t,k)}});let o;try{o=EG.buildEvidenceGraph(p,{clock:()=>T})}finally{Array.prototype.push=orig}console.log(JSON.stringify({hits,status:o.status,reasons:o.reasonCodes,detail:o.detail}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"hits":2,"status":"blocked","reasons":["INTERNAL_CONTRACT_VIOLATION"],"detail":"intrinsic-tampering detected post-envelope: input Proxy trap rebound a captured global primitive method during envelope validation"}
+
+exec
+/bin/bash -lc "node -e \"'use strict';const EG=require('./renderer/js/r3-0d-evidence-graph'),T='2026-06-28T06:00:00Z';let hits=0;const conf={};Object.defineProperty(conf,'state',{enumerable:true,get(){hits++;Array.prototype.push=function(){};return 'unresolved'}});const n={schemaVersion:1,nodeId:'ev',category:'data_quality',identity:{caseId:'c',sessionId:'s',lapId:'L',sourceId:'src',sourceVersion:'v1',freshness:T},credibility:'measured',provenance:'real',availability:'available',confidence:conf,observation:{kind:'channel_missing',i18nKey:'x',params:null,channel:'speed'},limitations:[],supportingEdges:[],contradictingEdges:[]};const orig=Array.prototype.push;let o;try{o=EG.buildEvidenceGraph({caseAssociation:{caseId:'c',sessionId:'s',lapId:'L'},rawEvidence:[n]},{clock:()=>T})}finally{Array.prototype.push=orig}console.log(JSON.stringify({hits,valid:o.valid,status:o.status,nodes:o.graph&&o.graph.nodes.length,rejected:o.graph&&o.graph.provenance.rejectedCount,reasons:o.reasonCodes}))\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"hits":0,"valid":true,"nodes":0,"rejected":1}
+
+exec
+/bin/bash -lc "rg -n \"Math\\.floor|Number\\.isInteger|TextEncoder|structuredClone|Object\\.getOwnPropertyNames\" renderer/js/r3-0d-evidence-graph.js contracts/r3.0d | head -120; git log --oneline --decorate --ancestry-path f8a598b84c19517fe55b77877b91462e295f27ed..764ae80319d44670198de68d8d77e56798a1b45a | head -20" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+renderer/js/r3-0d-evidence-graph.js:130:  // Object.keys / Object.create / JSON.stringify / Array.isArray / TextEncoder during the build.
+renderer/js/r3-0d-evidence-graph.js:138:  var _ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
+renderer/js/r3-0d-evidence-graph.js:179:  // Codex D2 Round 12 RN-27 closure: additional method captures (Math.floor for integer-check
+renderer/js/r3-0d-evidence-graph.js:180:  // arithmetic, Number.isInteger for shape validation, RegExp.prototype.test for ISO timestamp
+renderer/js/r3-0d-evidence-graph.js:182:  var _MathFloor = Math.floor;
+renderer/js/r3-0d-evidence-graph.js:183:  var _NumberIsInteger = Number.isInteger;
+renderer/js/r3-0d-evidence-graph.js:187:  // Codex D2 Round 13 RN-29 closure: structuredClone is reachable from the contract module
+renderer/js/r3-0d-evidence-graph.js:190:  var _StructuredClone = (typeof structuredClone === 'function') ? structuredClone : null;
+renderer/js/r3-0d-evidence-graph.js:191:  // Codex D2 Round 13 RN-28 closure: TextEncoder is already captured below as _TextEncoder
+renderer/js/r3-0d-evidence-graph.js:269:        // Codex D2 Round 12 RN-27 closure: Math.floor (envelope length-integer check), Number
+renderer/js/r3-0d-evidence-graph.js:277:        // Codex D2 Round 13 RN-28 + RN-29 closure: TextEncoder + structuredClone integrity.
+renderer/js/r3-0d-evidence-graph.js:278:        // Both are reachable from contract validation paths and (for structuredClone) from the
+renderer/js/r3-0d-evidence-graph.js:280:        textEncoder: _GlobalThis ? _readDescVal(_GlobalThis, 'TextEncoder') : _INTRINSIC_SENTINEL,
+renderer/js/r3-0d-evidence-graph.js:281:        structuredCloneGlobal: _GlobalThis ? _readDescVal(_GlobalThis, 'structuredClone') : _INTRINSIC_SENTINEL,
+renderer/js/r3-0d-evidence-graph.js:343:        && s.textEncoder === _TextEncoder
+renderer/js/r3-0d-evidence-graph.js:344:        && s.structuredCloneGlobal === _StructuredClone;
+renderer/js/r3-0d-evidence-graph.js:347:  var _TextEncoder = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;
+renderer/js/r3-0d-evidence-graph.js:408:  // UTF-8 byte-length helper. Uses TextEncoder when available, Buffer.byteLength otherwise.
+renderer/js/r3-0d-evidence-graph.js:414:    if (_TextEncoder) {
+renderer/js/r3-0d-evidence-graph.js:415:      try { return new _TextEncoder().encode(s).length; } catch (e) { /* fall through */ }
+contracts/r3.0d/evidence-node-contract.js:73:  function _utf8Bytes(s) { try { return (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s).length : Buffer.byteLength(s, 'utf8'); } catch (e) { return (typeof s === 'string') ? s.length * 4 : 0; } }
+contracts/r3.0d/evidence-node-contract.js:129:    if (!Number.isInteger(n.schemaVersion)) reasons.push(CODES.EVIDENCE_NODE_INVALID);
+contracts/r3.0d/source-identity-contract.js:39:  function _utf8Bytes(s) { try { return (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s).length : Buffer.byteLength(s, 'utf8'); } catch (e) { return s.length * 4; /* worst-case */ } }
+contracts/r3.0d/source-identity-contract.js:78:    // set is fully enumerable. structuredClone DataCloneError → fail-closed.
+contracts/r3.0d/decision-input-contract.js:78:    if (!Number.isInteger(input.schemaVersion)) reasons.push(CODES.INTERNAL_CONTRACT_VIOLATION);
+contracts/r3.0d/decision-input-contract.js:102:        var bytes = (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(serialized).length : Buffer.byteLength(serialized, 'utf8');
+contracts/r3.0d/reason-codes.js:159:  // traps lie about hidden state CANNOT survive: structuredClone enumerates via the engine's internal
+contracts/r3.0d/reason-codes.js:163:  // properties remain reachable via direct property access on the original. structuredClone throw
+contracts/r3.0d/reason-codes.js:165:  // JSON round-trip fallback when structuredClone unavailable: same posture but cannot preserve
+contracts/r3.0d/reason-codes.js:173:    // shape. Modern runtimes (Node 17+, browsers ~2022+) have structuredClone built in; when it is
+contracts/r3.0d/reason-codes.js:175:    if (typeof structuredClone !== 'function') return null;
+contracts/r3.0d/reason-codes.js:176:    try { return structuredClone(v); } catch (e) { return null; }
+contracts/r3.0d/reason-codes.js:180:   * of v. structuredClone silently drops both, so without this check a value like { caseId: 'x',
+contracts/r3.0d/reason-codes.js:189:      var allKeys = Object.getOwnPropertyNames(v);
+contracts/r3.0d/reason-codes.js:197:   * input BEFORE structuredClone runs. structuredClone happily converts an ordinary class instance
+contracts/r3.0d/reason-codes.js:215:   * invoked by structuredClone's [[Get]] semantics. Symbol keys are silently skipped here (the
+contracts/r3.0d/engineer-brief-contract.js:74:  function _utf8Bytes(s) { try { return (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s).length : Buffer.byteLength(s, 'utf8'); } catch (e) { return (typeof s === 'string') ? s.length * 4 : 0; } }
+contracts/r3.0d/engineer-brief-contract.js:97:    if (!Number.isInteger(b.schemaVersion)) reasons.push(CODES.BRIEF_INVALID);
+contracts/r3.0d/engineer-brief-contract.js:192:      var bytes = (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(serialized).length : Buffer.byteLength(serialized, 'utf8');
+contracts/r3.0d/hypothesis-contract.js:105:  function _utf8Bytes(s) { try { return (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s).length : Buffer.byteLength(s, 'utf8'); } catch (e) { return (typeof s === 'string') ? s.length * 4 : 0; } }
+contracts/r3.0d/hypothesis-contract.js:244:    if (!Number.isInteger(h.schemaVersion)) reasons.push(CODES.HYPOTHESIS_INVALID);
+contracts/r3.0d/recommendation-contract.js:80:  function _utf8Bytes(s) { try { return (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s).length : Buffer.byteLength(s, 'utf8'); } catch (e) { return (typeof s === 'string') ? s.length * 4 : 0; } }
+contracts/r3.0d/recommendation-contract.js:137:    if (!Number.isInteger(r.schemaVersion)) reasons.push(CODES.RECOMMENDATION_INVALID);
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-nFYPmwvg' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-A2sWJwN2' (errno=Operation not permitted)
+764ae80 (HEAD -> feat/r3.0d-d2-evidence-graph, origin/feat/r3.0d-d2-evidence-graph) cp14r(d2): close Codex D2 Round 14 — per-iteration guard + Object.getOwnPropertyNames
+092f262 cp13r(d2): close Codex D2 Round 13 — RN-21/27 Proxy length-trap + RN-28/29 TextEncoder/structuredClone
+2f0e588 cp12r(d2): close Codex D2 Round 12 — RN-21 container variant + RN-27 (Math/Number/RegExp)
+0a61f06 cp11r(d2): close Codex D2 Round 11 — RN-21 TOCTOU via descriptor read + RN-26 Function.prototype
+e0882a4 cp10r(d2): close Codex D2 Round 10 — RN-21..RN-25 via intrinsic integrity guard
+4928a5e cp9r(d2): close Codex D2 Round 9 — RN-19 (intrinsic rebinding) + RN-20 (ambient Object.freeze)
+6392196 cp8r(d2): close Codex D2 Round 8 — RN-18 via _stableStringify (no toJSON callback)
+497c143 cp7r(d2): close Codex D2 Round 7 — RN-16 final via Step 11.5 exact idPayload preview
+90bf868 cp6r(d2): close Codex D2 Round 6 — RN-13 round-4 final (defineProperty) + RN-16 (estimator) + RN-17 (DEL)
+d7c045f cp5r(d2): close Codex D2 Round 5 — RN-13 round-4 (Function.prototype.call) + RN-15 round-4 (lone surrogate)
+ec00b88 cp4r(d2): close Codex D2 Round 4 — RN-13 round-3 (Array.proto) + RN-15 (JSON escape)
+e84d22c cp3r(d2): close Codex D2 Round 3 — RN-09 (UTF-8) + RN-13 (intrinsics) + RN-14 (estimator)
+63ecf69 cp2r(d2): close Codex D2 Round 2 — RN-01/03/06/09/10/11 round-2 hardening + Tier-1 evidence
+ad6474a cp1r(d2): close Codex D2 Round 1 — RN-01..RN-12 hardening + Tier-1 evidence
+10766c0 chore(r3.0): rename leftover D5_ACTIVATION cross-phase text references to D5_ENGINEER_BRIEF_ACTIVATION
+a348f7d feat(r3.0d): D2_EVIDENCE_GRAPH — Evidence Graph service + atomic D-phase rename
+51155b3 chore(r3.0): state-aware production-consumer authorization in check-r3-phase-no-consumer.js
+
+codex
+FINAL VERDICT: BLOCK
+
+D2-RN-21: STILL-OPEN  
+  evidence: One-shot hostile `Array.prototype.push` restored itself when invoked; `forbidden_category` entered a `valid:true` graph before the per-iteration guard ran.
+
+D2-RN-27: STILL-OPEN  
+  evidence: One-shot hostile `Number.isInteger` restored itself when invoked; `schemaVersion:NaN` entered the graph and the guard observed clean state.
+
+D2-RN-28: STILL-OPEN  
+  evidence: Hostile `TextEncoder.encode()` reported zero bytes for a 513-byte key and restored `TextEncoder`; the oversized node was accepted.
+
+D2-RN-29: STILL-OPEN  
+  evidence: The Round 14 stateful Proxy restored `structuredClone` during validation, then changed `category` during sanitization; `forbidden_category` entered the graph.
+
+D2-RN-30: STILL-OPEN  
+  evidence: A temporary `Object.getOwnPropertyNames` returned `Object.keys` for both validation passes, restored itself, and admitted a node carrying a normally rejected non-enumerable property.
+
+The underlying assertion is false: attacker code does run within an iteration—the hostile replacement itself. It can corrupt validation and restore the intrinsic before the checkpoint at [r3-0d-evidence-graph.js:1122](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-evidence-graph.js:1122).
+
+Additional results:
+
+- Persistent rebindings are caught by the new checkpoints.
+- Plain `caseAssociation` and node sub-field accessors were not invoked; they were rejected structurally.
+- A persistent `generationToken` descriptor-trap rebind was caught by Step 1.5.
+- Determinism and ordering regressions passed.
+- Prior RN regression suites passed: evidence graph 233/233; contracts 160/160.
+- The added tests model persistent rebindings, not replacements that restore themselves during their own invocation.
+tokens used
+81,610
+FINAL VERDICT: BLOCK
+
+D2-RN-21: STILL-OPEN  
+  evidence: One-shot hostile `Array.prototype.push` restored itself when invoked; `forbidden_category` entered a `valid:true` graph before the per-iteration guard ran.
+
+D2-RN-27: STILL-OPEN  
+  evidence: One-shot hostile `Number.isInteger` restored itself when invoked; `schemaVersion:NaN` entered the graph and the guard observed clean state.
+
+D2-RN-28: STILL-OPEN  
+  evidence: Hostile `TextEncoder.encode()` reported zero bytes for a 513-byte key and restored `TextEncoder`; the oversized node was accepted.
+
+D2-RN-29: STILL-OPEN  
+  evidence: The Round 14 stateful Proxy restored `structuredClone` during validation, then changed `category` during sanitization; `forbidden_category` entered the graph.
+
+D2-RN-30: STILL-OPEN  
+  evidence: A temporary `Object.getOwnPropertyNames` returned `Object.keys` for both validation passes, restored itself, and admitted a node carrying a normally rejected non-enumerable property.
+
+The underlying assertion is false: attacker code does run within an iteration—the hostile replacement itself. It can corrupt validation and restore the intrinsic before the checkpoint at [r3-0d-evidence-graph.js:1122](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-evidence-graph.js:1122).
+
+Additional results:
+
+- Persistent rebindings are caught by the new checkpoints.
+- Plain `caseAssociation` and node sub-field accessors were not invoked; they were rejected structurally.
+- A persistent `generationToken` descriptor-trap rebind was caught by Step 1.5.
+- Determinism and ordering regressions passed.
+- Prior RN regression suites passed: evidence graph 233/233; contracts 160/160.
+- The added tests model persistent rebindings, not replacements that restore themselves during their own invocation.

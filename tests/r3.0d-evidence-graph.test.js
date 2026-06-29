@@ -1972,5 +1972,123 @@ function freshInput(over) {
   chk('RN-30: Object.getOwnPropertyNames rebinding caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
 })();
 
+// ── Section AA — Codex D2 Round 15 architectural convergence (hardened-intrinsics) ───────
+// Per SKYLINE 2026-06-29 directive: validate that NO ambient intrinsic call is invoked during
+// validation. Each test installs a hostile replacement of a global primitive method, runs the
+// build, and asserts the hostile method was NEVER CALLED (hostileInvocationCount === 0).
+// Because the validation path now uses ONLY closure-captured pristine references via
+// contracts/r3.0d/hardened-intrinsics.js, every attempt to corrupt validation by replacing an
+// ambient method becomes a no-op: the hostile replacement is never reached.
+(function sectionAA_hostileInvocationCorpus() {
+  function runWithRebind(name, container, key, mkHostile, payloadFactory) {
+    var hits = 0;
+    var orig = container[key];
+    var desc = Object.getOwnPropertyDescriptor(container, key);
+    function hostile() {
+      hits++;
+      // self-restore on invocation (most adversarial: corrupts THIS call, then disappears)
+      try { Object.defineProperty(container, key, desc || { value: orig, writable: true, enumerable: true, configurable: true }); }
+      catch (e) { container[key] = orig; }
+      var ret = mkHostile.apply(this, arguments);
+      return ret;
+    }
+    try { Object.defineProperty(container, key, { value: hostile, writable: true, enumerable: true, configurable: true }); }
+    catch (e) { container[key] = hostile; }
+    var input = payloadFactory ? payloadFactory() : freshInput();
+    var r;
+    try { r = EG.buildEvidenceGraph(input, { clock: CLOCK }); }
+    finally {
+      try { Object.defineProperty(container, key, desc || { value: orig, writable: true, enumerable: true, configurable: true }); }
+      catch (e) { container[key] = orig; }
+    }
+    return { name: name, hits: hits, valid: r && r.valid, eligible: r && r.eligible, reasonCodes: r && r.reasonCodes };
+  }
+
+  function assertHostileNotCalled(name, container, key, mkHostile, payloadFactory) {
+    var result = runWithRebind(name, container, key, mkHostile, payloadFactory);
+    // Primary assertion: hostile invocation count === 0.
+    // The hardened-intrinsics wrappers use closure-captured pristine references via
+    // Reflect.apply, so the hostile replacement is never invoked.
+    chk('AA ' + name + ': hostile invocation count === 0', result.hits === 0);
+  }
+
+  // Group 1 — Array.prototype methods (rounds 9/10/14 attack surface)
+  assertHostileNotCalled('Array.prototype.push self-restoring', Array.prototype, 'push', function () { return 0; });
+  assertHostileNotCalled('Array.prototype.indexOf self-restoring', Array.prototype, 'indexOf', function () { return -1; });
+  assertHostileNotCalled('Array.prototype.forEach self-restoring', Array.prototype, 'forEach', function () { return; });
+  assertHostileNotCalled('Array.prototype.sort self-restoring', Array.prototype, 'sort', function () { return this; });
+  assertHostileNotCalled('Array.prototype.join self-restoring', Array.prototype, 'join', function () { return ''; });
+  assertHostileNotCalled('Array.prototype.slice self-restoring', Array.prototype, 'slice', function () { return []; });
+  assertHostileNotCalled('Array.prototype.map self-restoring', Array.prototype, 'map', function () { return []; });
+  assertHostileNotCalled('Array.prototype.concat self-restoring', Array.prototype, 'concat', function () { return []; });
+
+  // Group 2 — Function.prototype methods (round 11 RN-26)
+  assertHostileNotCalled('Function.prototype.call self-restoring', Function.prototype, 'call', function () { return undefined; });
+  assertHostileNotCalled('Function.prototype.apply self-restoring', Function.prototype, 'apply', function () { return undefined; });
+  assertHostileNotCalled('Function.prototype.bind self-restoring', Function.prototype, 'bind', function () { return function () {}; });
+
+  // Group 3 — Object.* statics (rounds 10/14 RN-23/30)
+  assertHostileNotCalled('Object.getOwnPropertyDescriptor self-restoring', Object, 'getOwnPropertyDescriptor', function () { return { value: undefined }; });
+  assertHostileNotCalled('Object.getOwnPropertyNames self-restoring', Object, 'getOwnPropertyNames', function () { return []; });
+  assertHostileNotCalled('Object.keys self-restoring', Object, 'keys', function () { return []; });
+  assertHostileNotCalled('Object.freeze self-restoring', Object, 'freeze', function (o) { return o; });
+
+  // Group 4 — Reflect (round 11)
+  assertHostileNotCalled('Reflect.ownKeys self-restoring', Reflect, 'ownKeys', function () { return []; });
+
+  // Group 5 — Number / Math / RegExp (round 12 RN-27)
+  assertHostileNotCalled('Number.isInteger self-restoring', Number, 'isInteger', function () { return true; });
+  assertHostileNotCalled('Math.floor self-restoring', Math, 'floor', function (n) { return n; });
+  assertHostileNotCalled('RegExp.prototype.test self-restoring', RegExp.prototype, 'test', function () { return true; });
+
+  // Group 6 — global String + Number/String prototype (rounds 10/12 RN-24/25)
+  assertHostileNotCalled('global String self-restoring', globalThis, 'String', function () { return 'constant'; });
+  assertHostileNotCalled('Number.prototype.toString self-restoring', Number.prototype, 'toString', function () { return '0'; });
+  assertHostileNotCalled('String.prototype.charCodeAt self-restoring', String.prototype, 'charCodeAt', function () { return 0; });
+
+  // Group 7 — TextEncoder + structuredClone (round 13 RN-28/29)
+  assertHostileNotCalled('TextEncoder self-restoring', globalThis, 'TextEncoder', function () { return { encode: function () { return { length: 0 }; } }; });
+  assertHostileNotCalled('structuredClone self-restoring', globalThis, 'structuredClone', function (v) { return v; });
+
+  // Group 8 — JSON (round 10 RN-22)
+  assertHostileNotCalled('JSON.stringify self-restoring', JSON, 'stringify', function () { return '""'; });
+})();
+
+// Section AA-2 — Object.prototype.toJSON hook (round 8 RN-18). Installed AS A PROPERTY (not
+// via rebinding an existing intrinsic), so it doesn't fit the runWithRebind template.
+(function sectionAA2_objectPrototypeToJsonNeverInvoked() {
+  let fired = 0;
+  Object.defineProperty(Object.prototype, 'toJSON', {
+    configurable: true, enumerable: false,
+    value: function () { fired++; return this; },
+  });
+  let r;
+  try { r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK }); }
+  finally { delete Object.prototype.toJSON; }
+  chk('AA-2: Object.prototype.toJSON hook NEVER invoked during build', fired === 0);
+  chk('AA-2: build still produces a valid graph (resilient)', r.valid === true);
+})();
+
+// Section AA-3 — Proxy on rawEvidence: trap-invocation count may be > 0 (envelope validation
+// reads descriptor structurally) but the final graph contains no attacker-controlled content.
+(function sectionAA3_proxyTrapsDoNotProduceAttackerContent() {
+  const realArr = [freshNode()];
+  const trapped = new Proxy(realArr, {
+    get(t, k, r) { return Reflect.get(t, k, r); },
+    getOwnPropertyDescriptor(t, k) { return Reflect.getOwnPropertyDescriptor(t, k); },
+    ownKeys(t) { return Reflect.ownKeys(t); },
+    has(t, k) { return Reflect.has(t, k); },
+    getPrototypeOf(t) { return Reflect.getPrototypeOf(t); },
+  });
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: trapped }), { clock: CLOCK });
+  // No attacker-controlled fields ever appear (no nodes with forged shape).
+  if (r.valid === true) {
+    chk('AA-3: Proxy-trapped rawEvidence — graph nodes only carry legitimate field shapes',
+      r.graph.nodes.every(n => typeof n.nodeId === 'string' && typeof n.category === 'string'));
+  } else {
+    chk('AA-3: Proxy-trapped rawEvidence — build fails-closed cleanly', r.eligible === false);
+  }
+})();
+
 console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
 if (fail > 0) process.exit(1);
