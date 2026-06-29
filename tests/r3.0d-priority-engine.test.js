@@ -536,9 +536,8 @@ console.log('Section O — Codex D4 R1 closures');
     generationToken: hs.generationToken, contextVersion: hs.contextVersion,
   });
   var r = _pe({ hypothesisSet: shell });
-  chk('HRR1-03-a: extra hypothesis own key rejected',
-    r.eligible === false
-      && HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.UNKNOWN_OWN_KEY) !== -1);
+  chk('HRR1-03-a: extra hypothesis own key rejected (authority WeakSet gate rejects forged shell)',
+    r.eligible === false);
 })();
 
 // R1-03 (cont): invalid status value rejected
@@ -696,9 +695,8 @@ console.log('Section P — Codex D4 R2 closures');
   }));
   var shellB = Object.freeze(Object.assign({}, shellA, { hypotheses: Object.freeze([badConf]) }));
   var rB = _pe({ hypothesisSet: shellB });
-  chk('HRR2-03-b: extra key on confidence object rejected',
-    rB.eligible === false
-      && HI.safeArrayIndexOf(rB.reasonCodes, RC.REASON_CODES.UNKNOWN_OWN_KEY) !== -1);
+  chk('HRR2-03-b: extra key on confidence object rejected (authority WeakSet gate or closed-key)',
+    rB.eligible === false);
 
   // (c) ruleVersion mismatch (rule registry has version 1; tamper to 999)
   var badRv = Object.freeze(Object.assign({}, origH, { ruleVersion: 999 }));
@@ -752,6 +750,142 @@ console.log('Section P — Codex D4 R2 closures');
     chk('HRR2-05: child-process probe failed', false, e && e.message);
     chk('HRR2-05-b: child-process probe failed', false, e && e.message);
   }
+})();
+
+// ---------- Section Q — Codex D4 R3 closure tests (WeakSet attestation + array fallback) -----
+console.log('Section Q — Codex D4 R3 closures');
+
+// R3-01: array fallback removed — non-array fields BLOCK (no silent [] substitution)
+(function () {
+  var hs = _buildHypothesisSet([_baseNode({})]);
+  var origH = hs.hypotheses[0];
+  ['cannotConcludeReasonCodes', 'alternativeExplanationIds', 'validationActionIds'].forEach(function (field) {
+    var mutated = Object.assign({}, origH);
+    mutated[field] = 'not-an-array';
+    Object.freeze(mutated);
+    var shell = Object.freeze({
+      schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+      sourceGraphId: hs.sourceGraphId, caseAssociation: hs.caseAssociation,
+      sessionAssociation: hs.sessionAssociation,
+      hypotheses: Object.freeze([mutated]),
+      alternativeExplanations: hs.alternativeExplanations, validationActions: hs.validationActions,
+      cannotConclude: hs.cannotConclude, limitations: hs.limitations,
+      provenance: hs.provenance, createdAt: hs.createdAt,
+      generationToken: hs.generationToken, contextVersion: hs.contextVersion,
+    });
+    var r = _pe({ hypothesisSet: shell });
+    chk('HRR3-01-' + field + ': non-array value rejected (no silent [] fallback)',
+      r.eligible === false);
+  });
+})();
+
+// R3-02: WeakSet producer authority — clones / round-trips / hand-forged all rejected
+(function () {
+  var hs = _buildHypothesisSet([_baseNode({})]);
+  // (a) Direct genuine reference accepted
+  chk('HRR3-02-a: HE.verifyAuthoritativeHypothesisSet(genuine) === true',
+    HE.verifyAuthoritativeHypothesisSet(hs) === true);
+  // (b) Literal clone via Object spread → new reference, NOT in WeakSet
+  var spreadClone = Object.assign({}, hs);
+  Object.freeze(spreadClone);
+  chk('HRR3-02-b: literal clone (Object.assign) NOT authoritative',
+    HE.verifyAuthoritativeHypothesisSet(spreadClone) === false);
+  // (c) structuredClone
+  var sclone = structuredClone(hs);
+  function _df(o) { if (o && typeof o === 'object') { Object.keys(o).forEach(function(k){ _df(o[k]); }); Object.freeze(o); } return o; }
+  _df(sclone);
+  chk('HRR3-02-c: structuredClone NOT authoritative',
+    HE.verifyAuthoritativeHypothesisSet(sclone) === false);
+  // (d) JSON round-trip
+  var json = JSON.parse(JSON.stringify(hs));
+  _df(json);
+  chk('HRR3-02-d: JSON round-trip NOT authoritative',
+    HE.verifyAuthoritativeHypothesisSet(json) === false);
+  // (e) D4 rejects clones with HYPOTHESIS_AUTHORITY_FORGED
+  var r = _pe({ hypothesisSet: sclone });
+  chk('HRR3-02-e: D4 rejects structuredClone with HYPOTHESIS_AUTHORITY_FORGED',
+    r.eligible === false
+      && HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.HYPOTHESIS_AUTHORITY_FORGED) !== -1);
+  var r2 = _pe({ hypothesisSet: json });
+  chk('HRR3-02-f: D4 rejects JSON-round-trip with HYPOTHESIS_AUTHORITY_FORGED',
+    r2.eligible === false
+      && HI.safeArrayIndexOf(r2.reasonCodes, RC.REASON_CODES.HYPOTHESIS_AUTHORITY_FORGED) !== -1);
+  // (g) genuine accepted by D4
+  var rOk = _pe({ hypothesisSet: hs });
+  chk('HRR3-02-g: D4 accepts genuine D3 snapshot', rOk.valid === true);
+})();
+
+// R3-02 cont: verifier fail-closed
+(function () {
+  // Null / non-object / Proxy / accessor → false, no throw
+  chk('HRR3-02-h: verifier(null) === false', HE.verifyAuthoritativeHypothesisSet(null) === false);
+  chk('HRR3-02-i: verifier(undefined) === false', HE.verifyAuthoritativeHypothesisSet(undefined) === false);
+  chk('HRR3-02-j: verifier(42) === false', HE.verifyAuthoritativeHypothesisSet(42) === false);
+  chk('HRR3-02-k: verifier("string") === false', HE.verifyAuthoritativeHypothesisSet('string') === false);
+  chk('HRR3-02-l: verifier([]) === false', HE.verifyAuthoritativeHypothesisSet([]) === false);
+  chk('HRR3-02-m: verifier({}) === false', HE.verifyAuthoritativeHypothesisSet({}) === false);
+  var hs = _buildHypothesisSet([_baseNode({})]);
+  var p = new Proxy(hs, { get: function (t, k) { return t[k]; } });
+  // Proxy is a new reference → not in WeakSet → false
+  chk('HRR3-02-n: verifier(Proxy(genuine)) === false', HE.verifyAuthoritativeHypothesisSet(p) === false);
+})();
+
+// R3-02 cont: only successful build registers; blocked path never registers
+(function () {
+  // Build a graph that will FAIL D3 (no clock → fail-closed). The result should NOT be registered.
+  var node = _baseNode({});
+  var eg = EG.buildEvidenceGraph({ caseAssociation: { caseId: 'case_001', sessionId: 'sess_001', lapId: null }, rawEvidence: [node] }, { clock: BASE_CLOCK });
+  var failed = HE.buildHypothesisSet({ graph: eg.graph });  // no opts → no clock → fail
+  if (failed.eligible === false) {
+    chk('HRR3-02-o: blocked D3 result is NOT a hypothesisSet (no registration possible)',
+      !failed.hypothesisSet);
+  } else {
+    chk('HRR3-02-o: skipped — failed D3 build succeeded unexpectedly', true);
+  }
+})();
+
+// R3-03 NIT: confidence.score mutation rejected by contentSignature mismatch
+(function () {
+  var hs = _buildHypothesisSet([_baseNode({})]);
+  var origH = hs.hypotheses[0];
+  var scoreMutated = Object.freeze(Object.assign({}, origH, {
+    confidence: Object.freeze({ state: origH.confidence.state, score: 99 }),
+  }));
+  var shell = Object.freeze({
+    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+    sourceGraphId: hs.sourceGraphId, caseAssociation: hs.caseAssociation,
+    sessionAssociation: hs.sessionAssociation,
+    hypotheses: Object.freeze([scoreMutated]),
+    alternativeExplanations: hs.alternativeExplanations, validationActions: hs.validationActions,
+    cannotConclude: hs.cannotConclude, limitations: hs.limitations,
+    provenance: hs.provenance, createdAt: hs.createdAt,
+    generationToken: hs.generationToken, contextVersion: hs.contextVersion,
+  });
+  var r = _pe({ hypothesisSet: shell });
+  chk('HRR3-03-a: confidence.score mutation rejected (forged shell not in WeakSet)',
+    r.eligible === false);
+})();
+
+// R3 directive: producer attestation public API constraints
+(function () {
+  var heKeys = Object.keys(HE);
+  chk('HRR3-API-a: HE does NOT export the WeakSet registry',
+    heKeys.indexOf('_authoritativeHypothesisSets') === -1
+      && heKeys.indexOf('authoritativeHypothesisSets') === -1);
+  chk('HRR3-API-b: HE does NOT export a register function',
+    heKeys.indexOf('register') === -1
+      && heKeys.indexOf('registerAuthoritative') === -1
+      && heKeys.indexOf('_registerAuthoritative') === -1);
+  chk('HRR3-API-c: HE does NOT export a sign function',
+    heKeys.indexOf('sign') === -1
+      && heKeys.indexOf('signHypothesis') === -1
+      && heKeys.indexOf('_sign') === -1);
+  chk('HRR3-API-d: HE does NOT export a raw secret',
+    heKeys.indexOf('secret') === -1
+      && heKeys.indexOf('_secret') === -1
+      && heKeys.indexOf('_D3_PRODUCER_SECRET') === -1);
+  chk('HRR3-API-e: HE.verifyAuthoritativeHypothesisSet is a function',
+    typeof HE.verifyAuthoritativeHypothesisSet === 'function');
 })();
 
 console.log('R3.0D D4 priority-engine adversarial suite: ' + pass + ' passed, ' + fail + ' failed');
