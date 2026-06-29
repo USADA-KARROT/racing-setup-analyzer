@@ -41,7 +41,7 @@ The train validator enforces (with `crossPhaseAdvanceRequires` from `train.schem
 | Downstream phase | Allowed to leave bootstrap iff upstream phase state is |
 |---|---|
 | R3.0D | R3.0C `state.currentCheckpoint === 'C8_ACTIVATION'` |
-| R3.0E | R3.0D `state.currentCheckpoint === 'D5_ACTIVATION'` |
+| R3.0E | R3.0D `state.currentCheckpoint === 'D5_ENGINEER_BRIEF_ACTIVATION'` |
 | R3.0F | R3.0E `state.currentCheckpoint === 'E5_ACTIVATION'` |
 
 Bootstrap-to-bootstrap states (D0 with R3.0C at any state, E0 with R3.0D at any state, F0 with R3.0E at any state) are always allowed — bootstrap simply declares the scaffold exists.

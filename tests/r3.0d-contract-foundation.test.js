@@ -320,25 +320,40 @@ chk('BRIEF numeric confidence rejected', (function () { var b = validBrief(); b.
 chk('BRIEF future schema rejected', EB.validateEngineerBriefShape(validBrief({ schemaVersion: 99 })).valid === undefined);
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Section I — D1 scope guard: no production code under renderer/js/, no runtime consumer
+// Section I — state-aware production consumer guard.
+//   At D1: no renderer/js may require contracts/r3.0d (contracts-only checkpoint).
+//   At D2_EVIDENCE_GRAPH and beyond: each renderer/js consumer of contracts/r3.0d MUST be listed
+//     in state.authorizedProductionPaths. Unauthorised consumers fail closed.
+//   In all cases: renderer/index.html MUST NOT <script src=...contracts/r3.0d...> (those modules are
+//     UMD via require, never page-loaded as scripts — D5_ENGINEER_BRIEF_ACTIVATION is the earliest
+//     point where adapter inclusion is even contemplated, and even then only via the adapter, not
+//     via a raw contracts/r3.0d script src).
 // ─────────────────────────────────────────────────────────────────────────────
 (function () {
-  // No renderer/js/ file may require contracts/r3.0d
+  var stPath = path.join(REPO, 'governance', 'r3.0d', 'state.json');
+  var st = null;
+  try { st = JSON.parse(fs.readFileSync(stPath, 'utf8')); } catch (_) { st = null; }
+  var allowed = new Set(((st && st.authorizedProductionPaths) || []).map(function (e) { return e.path; }));
   var rendererDir = path.join(REPO, 'renderer', 'js');
   var files = fs.readdirSync(rendererDir).filter(function (f) { return f.endsWith('.js'); });
   var leaks = [];
   files.forEach(function (f) {
     var src = fs.readFileSync(path.join(rendererDir, f), 'utf8');
-    if (/contracts\/r3\.0d/.test(src)) leaks.push(f);
+    if (/contracts\/r3\.0d/.test(src)) {
+      var rel = 'renderer/js/' + f;
+      if (!allowed.has(rel)) leaks.push(f);
+    }
   });
-  chk('no renderer/js file requires contracts/r3.0d (D1 is contracts-only)', leaks.length === 0, leaks);
-  // No index.html script src references contracts/r3.0d
+  chk('renderer/js consumers of contracts/r3.0d are limited to state.authorizedProductionPaths', leaks.length === 0, leaks);
   var html = fs.readFileSync(path.join(REPO, 'renderer', 'index.html'), 'utf8');
   chk('renderer/index.html does NOT load contracts/r3.0d via script src', !/<script[^>]*src=["'][^"']*contracts\/r3\.0d/.test(html));
 })();
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Section J — Governance state expected at D1 (after the flip below)
+// Section J — state-aware governance assertions for the current R3.0D checkpoint.
+//   At D1_CONTRACT_FOUNDATION: contracts-only — no authorized paths, no runtime consumers, no UI.
+//   At D2_EVIDENCE_GRAPH: production introduced — runtimeConsumers + algorithms allowed, UI + activation still false.
+//   The assertions below stay focused on D1 + D2 (D3/D4/D5 are tested in their own suites).
 // ─────────────────────────────────────────────────────────────────────────────
 (function () {
   var stPath = path.join(REPO, 'governance', 'r3.0d', 'state.json');
@@ -346,17 +361,22 @@ chk('BRIEF future schema rejected', EB.validateEngineerBriefShape(validBrief({ s
   try { st = JSON.parse(fs.readFileSync(stPath, 'utf8')); } catch (_) { st = null; }
   chk('governance/r3.0d/state.json readable', st !== null);
   if (st) {
-    // After the D1 flip, currentCheckpoint should be D1_CONTRACT_FOUNDATION. Before the flip the test
-    // accepts either D0_BOOTSTRAP or D1_CONTRACT_FOUNDATION (no false positives during transitional commit).
-    chk('R3.0D currentCheckpoint is D0 or D1', st.currentCheckpoint === 'D0_BOOTSTRAP' || st.currentCheckpoint === 'D1_CONTRACT_FOUNDATION');
-    // R3.0D still has no production paths or runtime consumers at D1 — contracts-only checkpoint.
-    chk('R3.0D authorizedProductionPaths is empty at D1', Array.isArray(st.authorizedProductionPaths) && st.authorizedProductionPaths.length === 0);
-    chk('R3.0D runtimeConsumersAllowed=false at D1', st.runtimeConsumersAllowed === false);
-    chk('R3.0D uiAllowed=false at D1', st.uiAllowed === false);
-    chk('R3.0D featureRegistryActivationAllowed=false at D1', st.featureRegistryActivationAllowed === false);
-    chk('R3.0D algorithmsAllowed=false at D1', st.algorithmsAllowed === false);
+    chk('R3.0D currentCheckpoint is a known D-phase checkpoint', ['D0_BOOTSTRAP', 'D1_CONTRACT_FOUNDATION', 'D2_EVIDENCE_GRAPH', 'D3_HYPOTHESIS_ENGINE', 'D4_PRIORITY_ENGINE', 'D5_ENGINEER_BRIEF_ACTIVATION'].indexOf(st.currentCheckpoint) !== -1);
+    chk('R3.0D uiAllowed=false (until D5)', st.uiAllowed === false);
+    chk('R3.0D featureRegistryActivationAllowed=false (until D5)', st.featureRegistryActivationAllowed === false);
     if (st.currentCheckpoint === 'D1_CONTRACT_FOUNDATION') {
+      chk('D1: authorizedProductionPaths empty', Array.isArray(st.authorizedProductionPaths) && st.authorizedProductionPaths.length === 0);
+      chk('D1: runtimeConsumersAllowed=false', st.runtimeConsumersAllowed === false);
+      chk('D1: algorithmsAllowed=false', st.algorithmsAllowed === false);
       chk('D1: contract_foundation_present in enabledCapabilities', (st.enabledCapabilities || []).indexOf('contract_foundation_present') !== -1);
+    } else if (st.currentCheckpoint === 'D2_EVIDENCE_GRAPH') {
+      chk('D2: runtimeConsumersAllowed=true', st.runtimeConsumersAllowed === true);
+      chk('D2: algorithmsAllowed=true', st.algorithmsAllowed === true);
+      chk('D2: contract_foundation_present + evidence_graph_present in enabledCapabilities', (st.enabledCapabilities || []).indexOf('contract_foundation_present') !== -1 && (st.enabledCapabilities || []).indexOf('evidence_graph_present') !== -1);
+      chk('D2: renderer/js/r3-0d-evidence-graph.js is the sole authorized R3.0D production path', (function () {
+        var paths = (st.authorizedProductionPaths || []).map(function (e) { return e.path; });
+        return paths.length === 1 && paths[0] === 'renderer/js/r3-0d-evidence-graph.js';
+      })());
     }
   }
 })();

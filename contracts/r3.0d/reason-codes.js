@@ -11,11 +11,23 @@
  * Codes are stable, unique, UPPER_SNAKE string constants (machine-readable; never replaced by free text).
  * Each code carries a stable i18n explanation KEY (a hook for a human-readable rendering) — never UI prose.
  *
+ * R3.0D hardened-intrinsics refactor: every ambient intrinsic call routed through the
+ * closure-captured wrappers in contracts/r3.0d/hardened-intrinsics.js. No direct ambient
+ * Object.* / Array.* / String() / structuredClone() / .push / .forEach / .map / .slice
+ * remains in this file. See the per-call comments below.
+ *
  * UMD: Node require / Electron renderer global (R3_0D_ReasonCodes). (Global export is for symmetry with the
  * codebase UMD convention; nothing in renderer/js/ requires it — D1 wires no consumer.)
  */
 (function (root) {
   'use strict';
+
+  // ─── Hardened-intrinsics import ─────────────────────────────────────────────
+  // Every primitive-method dependency in this file goes through HI.*. Ambient
+  // Object.* / Array.* / String() / structuredClone(...) calls are FORBIDDEN here.
+  var HI = (typeof module !== 'undefined' && module.exports)
+    ? require('./hardened-intrinsics.js')
+    : (root && root.R3_0D_HardenedIntrinsics);
 
   // R3.0D reason codes. Grouped by the directive Section 8 / 9 / 10 dimensions:
   //  • EVIDENCE_*           — evidence-graph structural rejections (D1 + D2)
@@ -28,7 +40,9 @@
   //  • BRIEF_*              — engineer-brief composition rejections
   //  • Structural / fail-closed: INTERNAL_CONTRACT_VIOLATION, UNSUPPORTED_FUTURE_SCHEMA,
   //    PROTOTYPE_POLLUTION_REJECTED, NUMERIC_INVALID, BYTE_CAP_EXCEEDED, ARRAY_CAP_EXCEEDED.
-  var REASON_CODES = Object.freeze({
+  // The REASON_CODES object literal is built via a plain literal (allowed: literal construction
+  // uses [[CreateDataPropertyOrThrow]], not [[Set]]) then deep-frozen via HI.deepFreeze.
+  var REASON_CODES = HI.deepFreeze({
     // Evidence (D1 structural + D2 graph)
     EVIDENCE_NODE_INVALID: 'EVIDENCE_NODE_INVALID',
     EVIDENCE_NODE_MISSING_ID: 'EVIDENCE_NODE_MISSING_ID',
@@ -119,35 +133,55 @@
     UNKNOWN_OWN_KEY: 'UNKNOWN_OWN_KEY',
   });
 
-  var ALL_REASON_CODES = Object.freeze(Object.keys(REASON_CODES).map(function (k) { return REASON_CODES[k]; }));
+  // Build ALL_REASON_CODES via captured wrappers: safeKeys (replaces Object.keys),
+  // safeArrayMap (replaces .map), then HI.deepFreeze (replaces Object.freeze).
+  var ALL_REASON_CODES = HI.deepFreeze(
+    HI.safeArrayMap(HI.safeKeys(REASON_CODES), function (k) { return REASON_CODES[k]; })
+  );
 
   // human-readable explanation HOOK — a stable i18n key per code (the consumer renders it; this is never prose).
-  var EXPLANATION_KEYS = Object.freeze((function () {
+  // Built with safeArrayForEach + safeDefineDataProperty + safeStringToLowerCase to avoid
+  // ambient .forEach / obj[k]=v / str.toLowerCase() lookups.
+  var EXPLANATION_KEYS = HI.deepFreeze((function () {
     var m = {};
-    ALL_REASON_CODES.forEach(function (c) { m[c] = 'r3_0d.reason.' + c.toLowerCase(); });
-    return Object.freeze(m);
+    HI.safeArrayForEach(ALL_REASON_CODES, function (c) {
+      HI.safeDefineDataProperty(m, c, 'r3_0d.reason.' + HI.safeStringToLowerCase(c));
+    });
+    return m;
   })());
 
-  function isReasonCode(c) { return typeof c === 'string' && Object.prototype.hasOwnProperty.call(EXPLANATION_KEYS, c); }
+  // safeHasOwn replaces Object.prototype.hasOwnProperty.call.
+  function isReasonCode(c) { return typeof c === 'string' && HI.safeHasOwn(EXPLANATION_KEYS, c); }
   function explanationKeyFor(c) { return isReasonCode(c) ? EXPLANATION_KEYS[c] : null; }
 
   // shared blocked-result factory (fail-closed). A blocked result NEVER carries a numeric / structured payload.
   function _normCodes(reasonCodes) {
-    var arr = Array.isArray(reasonCodes) ? reasonCodes : (reasonCodes == null ? [] : [reasonCodes]);
+    // safeIsArray replaces Array.isArray.
+    var arr = HI.safeIsArray(reasonCodes) ? reasonCodes : (reasonCodes == null ? [] : [reasonCodes]);
     var seen = {}, out = [];
-    arr.forEach(function (c) { if (isReasonCode(c) && !seen[c]) { seen[c] = true; out.push(c); } });
-    if (out.length === 0) out.push(REASON_CODES.INTERNAL_CONTRACT_VIOLATION); // fail-closed: never an empty block
+    // safeArrayForEach replaces .forEach; safeDefineDataProperty replaces seen[c]=true;
+    // safeArrayPush replaces .push.
+    HI.safeArrayForEach(arr, function (c) {
+      if (isReasonCode(c) && !seen[c]) {
+        HI.safeDefineDataProperty(seen, c, true);
+        HI.safeArrayPush(out, c);
+      }
+    });
+    if (out.length === 0) HI.safeArrayPush(out, REASON_CODES.INTERNAL_CONTRACT_VIOLATION); // fail-closed: never an empty block
     return out;
   }
   function buildBlockedResult(reasonCodes, opts) {
     opts = opts || {};
     var codes = _normCodes(reasonCodes);
-    return Object.freeze({
+    // safeArraySlice replaces .slice; safeArrayMap replaces .map; safeStringCoerce replaces String(...);
+    // safeStringSlice replaces .slice on string; HI.deepFreeze replaces Object.freeze.
+    var detail = (opts.detail != null) ? HI.safeStringSlice(HI.safeStringCoerce(opts.detail), 0, 200) : null;
+    return HI.deepFreeze({
       eligible: false,
       status: 'blocked',
-      reasonCodes: Object.freeze(codes.slice()),
-      explanationKeys: Object.freeze(codes.map(explanationKeyFor)),
-      detail: (opts.detail != null) ? String(opts.detail).slice(0, 200) : null,
+      reasonCodes: HI.deepFreeze(HI.safeArraySlice(codes)),
+      explanationKeys: HI.deepFreeze(HI.safeArrayMap(codes, explanationKeyFor)),
+      detail: detail,
       result: null,
     });
   }
@@ -167,13 +201,10 @@
   function _toCleanCopy(v) {
     if (v === null || v === undefined) return v;
     if (typeof v !== 'object') return v;
-    // Codex D1 R3 Finding RN-11 closure: NO JSON.stringify fallback. The previous fallback invoked
-    // inherited toJSON() methods on class instances, silently dropped Symbol values + functions +
-    // undefined, and could transform a hostile non-plain object into a validator-approved plain
-    // shape. Modern runtimes (Node 17+, browsers ~2022+) have structuredClone built in; when it is
-    // unavailable the contract fails closed (returns null → caller treats as "not a plain object").
-    if (typeof structuredClone !== 'function') return null;
-    try { return structuredClone(v); } catch (e) { return null; }
+    // Codex D1 R3 Finding RN-11 closure: NO JSON.stringify fallback. HI.safeStructuredClone
+    // returns null when structuredClone is unavailable OR when the clone throws — preserving the
+    // original fail-closed posture (caller treats null as "not a plain object").
+    return HI.safeStructuredClone(v);
   }
   /**
    * _hasHiddenOwnKey(v) — detects Symbol-keyed OR non-enumerable own properties on the TOP-LEVEL
@@ -181,15 +212,25 @@
    * [hostileSym]: payload } would clone to { caseId: 'x' } and pass validation. The pre-clone check
    * rejects such inputs at the boundary so the failure surface mirrors the Codex D1 R1 RN-01
    * recommended behaviour exactly. Throws (Proxy traps lying) → treat as hidden (fail closed).
+   *
+   * Refactored: safeOwnKeys returns BOTH string + symbol own keys, safeGetOwnPropertyNames returns
+   * all string own keys (enumerable + non-enumerable), safeKeys returns only enumerable string
+   * keys. (a) any symbol key in safeOwnKeys → hidden. (b) allStringNames.length !==
+   * enumStringKeys.length → at least one non-enumerable string own property → hidden.
+   * Any wrapper-null return (= Proxy/intrinsic failure) → fail-closed = hidden.
    */
   function _hasHiddenOwnKey(v) {
     if (v === null || typeof v !== 'object') return false;
-    try {
-      if (typeof Object.getOwnPropertySymbols === 'function' && Object.getOwnPropertySymbols(v).length > 0) return true;
-      var allKeys = Object.getOwnPropertyNames(v);
-      var enumKeys = Object.keys(v);
-      if (allKeys.length !== enumKeys.length) return true;
-    } catch (e) { return true; }
+    var ownKeys = HI.safeOwnKeys(v);
+    if (ownKeys === null) return true;
+    var len = ownKeys.length;
+    for (var i = 0; i < len; i++) {
+      if (typeof ownKeys[i] === 'symbol') return true;
+    }
+    var allNames = HI.safeGetOwnPropertyNames(v);
+    var enumKeys = HI.safeKeys(v);
+    if (allNames === null || enumKeys === null) return true;
+    if (allNames.length !== enumKeys.length) return true;
     return false;
   }
   /**
@@ -200,11 +241,13 @@
    * + an inherited toJSON method could otherwise pass _isPlain AFTER cloning even though the
    * ORIGINAL was a class instance. Calling this check BEFORE toCleanCopy in each main validator
    * makes class instances fail-closed at the boundary regardless of their own-field shape.
+   *
+   * Refactored to HI.safeIsPlainShape which performs the captured Array.isArray + captured
+   * getPrototypeOf check internally. Returns true only for the 'plain-object' classification
+   * (proto === Object.prototype OR null, non-array, non-null object).
    */
   function _isOriginalPlainObject(v) {
-    if (v === null || typeof v !== 'object' || Array.isArray(v)) return false;
-    try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; }
-    catch (e) { return false; }
+    return HI.safeIsPlainShape(v) === 'plain-object';
   }
   /**
    * _hasNonPlainNestedObject(v, depth) — Codex D1 R5 Finding RN-11 (nested-level) closure:
@@ -215,35 +258,29 @@
    * invoked by structuredClone's [[Get]] semantics. Symbol keys are silently skipped here (the
    * top-level hasHiddenOwnKey already rejects them at the boundary; descending into Symbol-keyed
    * subtrees would itself invoke their getters). Depth cap 32 prevents pathological recursion.
+   *
+   * Refactored: HI.safeIsPlainShape does the per-level Array-subclass / class-instance / mutated-
+   * prototype rejection (Codex D1 R6 Finding RN-11 closure for array subclasses); HI.safeOwnKeys
+   * + HI.safeGetOwnDescriptor handle the per-key walk; the .value structural read still avoids
+   * invoking [[Get]] (so a hostile accessor at depth is never fired).
    */
   function _hasNonPlainNestedObject(v, depth) {
     if (depth == null) depth = 0;
     if (depth > 32) return true;
     if (v === null || typeof v !== 'object') return false;
-    var isArr = Array.isArray(v);
-    // Codex D1 R6 Finding RN-11 (array subclass) closure: arrays must be EXACTLY Array.prototype-
-    // proto. An `Array` subclass instance OR an array with a mutated prototype (Object.setPrototypeOf
-    // applied) passes Array.isArray() but does NOT have the standard array prototype; reject those
-    // with the same posture as a class instance.
-    if (isArr) {
-      try { var ap = Object.getPrototypeOf(v); if (ap !== Array.prototype) return true; }
-      catch (e) { return true; }
-    } else {
-      try { var p = Object.getPrototypeOf(v); if (!(p === Object.prototype || p === null)) return true; }
-      catch (e) { return true; }
+    var shape = HI.safeIsPlainShape(v);
+    if (shape === 'reject') return true;
+    var keys = HI.safeOwnKeys(v);
+    if (keys === null) return true;
+    var len = keys.length;
+    for (var i = 0; i < len; i++) {
+      var k = keys[i];
+      if (typeof k === 'symbol') return true; // any nested symbol key — fail closed
+      var d = HI.safeGetOwnDescriptor(v, k);
+      if (d === null || d === undefined) return true;
+      if (typeof d.get === 'function' || typeof d.set === 'function') return true; // accessor descriptor
+      if (_hasNonPlainNestedObject(d.value, depth + 1)) return true;
     }
-    try {
-      var keys = Reflect.ownKeys(v);
-      for (var i = 0; i < keys.length; i++) {
-        var k = keys[i];
-        if (typeof k === 'symbol') return true; // any nested symbol key — fail closed
-        var d;
-        try { d = Object.getOwnPropertyDescriptor(v, k); } catch (e) { return true; }
-        if (!d) continue;
-        if (typeof d.get === 'function' || typeof d.set === 'function') return true; // accessor descriptor
-        if (_hasNonPlainNestedObject(d.value, depth + 1)) return true;
-      }
-    } catch (e) { return true; }
     return false;
   }
 

@@ -88,12 +88,12 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
   cs.authorizedProductionPaths = (cs.authorizedProductionPaths || []).filter(e => !(e && e.capability === 'feature_registry_active'));
   writeJson(path.join(dir, 'governance', 'r3.0c', 'state.json'), cs);
   const ds = readJson(path.join(dir, 'governance', 'r3.0d', 'state.json'));
-  ds.currentCheckpoint = 'D2_HYPOTHESIS_ENGINE'; ds.authorizedProductionPaths = []; ds.enabledCapabilities = [];
+  ds.currentCheckpoint = 'D2_EVIDENCE_GRAPH'; ds.authorizedProductionPaths = []; ds.enabledCapabilities = [];
   writeJson(path.join(dir, 'governance', 'r3.0d', 'state.json'), ds);
   const ts = readJson(path.join(dir, 'governance', 'r3.0', 'train.json'));
   ts.phaseStates['R3.0C'].currentCheckpoint = 'C7_UI'; ts.phaseStates['R3.0C'].finalActivationReached = false;
   ts.currentPhaseCheckpoint = 'C7_UI';
-  ts.phaseStates['R3.0D'].currentCheckpoint = 'D2_HYPOTHESIS_ENGINE';
+  ts.phaseStates['R3.0D'].currentCheckpoint = 'D2_EVIDENCE_GRAPH';
   writeJson(path.join(dir, 'governance', 'r3.0', 'train.json'), ts);
   const r = runValidator(dir);
   chk('FAIL D before C8 rc!=0', r.status !== 0);
@@ -135,7 +135,7 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
     forbiddenCapabilities: [], tests: null, workflowRunId: null, artifactId: null, artifactBoundSha: null, codexVerdict: null,
     frozenDiff: 0, productionDiff: 0, runtimeConsumerCount: 0, featureRegistryState: {}, packageVersion: '1.4.0', createdAt: null,
     status: 'pending', governanceChanged: false, crossPhaseGate: { r3cCheckpoint: 'C8_ACTIVATION', requiredFor: 'D1_CONTRACT_FOUNDATION', satisfied: true } };
-  const d2 = Object.assign({}, d1, { checkpoint: 'D2_HYPOTHESIS_ENGINE', previousCheckpoint: 'D1_CONTRACT_FOUNDATION', enabledCapabilitiesBefore: ['contract_foundation_present'], enabledCapabilitiesAfter: [] });
+  const d2 = Object.assign({}, d1, { checkpoint: 'D2_EVIDENCE_GRAPH', previousCheckpoint: 'D1_CONTRACT_FOUNDATION', enabledCapabilitiesBefore: ['contract_foundation_present'], enabledCapabilitiesAfter: [] });
   writeJson(path.join(dir, 'governance', 'r3.0d', 'checkpoints', 'D1.json'), d1);
   writeJson(path.join(dir, 'governance', 'r3.0d', 'checkpoints', 'D2.json'), d2);
   const r = runValidator(dir);
@@ -150,7 +150,7 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
     forbiddenCapabilities: [], tests: null, workflowRunId: null, artifactId: null, artifactBoundSha: null, codexVerdict: null,
     frozenDiff: 0, productionDiff: 0, runtimeConsumerCount: 0, featureRegistryState: {}, packageVersion: '1.4.0', createdAt: null,
     status: 'pending', governanceChanged: false, crossPhaseGate: { r3cCheckpoint: 'C8_ACTIVATION', requiredFor: 'D1_CONTRACT_FOUNDATION', satisfied: true } };
-  const d2 = Object.assign({}, d1, { checkpoint: 'D2_HYPOTHESIS_ENGINE', previousCheckpoint: 'D1_CONTRACT_FOUNDATION', authorizedPaths: [] });
+  const d2 = Object.assign({}, d1, { checkpoint: 'D2_EVIDENCE_GRAPH', previousCheckpoint: 'D1_CONTRACT_FOUNDATION', authorizedPaths: [] });
   writeJson(path.join(dir, 'governance', 'r3.0d', 'checkpoints', 'D1.json'), d1);
   writeJson(path.join(dir, 'governance', 'r3.0d', 'checkpoints', 'D2.json'), d2);
   const r = runValidator(dir);
@@ -292,7 +292,7 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
   const dir = buildFixture();
   const dsch = readJson(path.join(dir, 'governance', 'r3.0d', 'schema.json'));
   dsch.capabilities.push('r4_closed_loop_present');
-  dsch.capabilityUnlockFloor['r4_closed_loop_present'] = 'D5_ACTIVATION';
+  dsch.capabilityUnlockFloor['r4_closed_loop_present'] = 'D5_ENGINEER_BRIEF_ACTIVATION';
   writeJson(path.join(dir, 'governance', 'r3.0d', 'schema.json'), dsch);
   const r = runValidator(dir);
   chk('FAIL R4 capability present', hasViolation(r.artifact, 'R4_CAPABILITY_PRESENT'));
@@ -305,7 +305,7 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
     previousCheckpoint: 'E1_CONTRACT_FOUNDATION', authorizedPaths: ['renderer/js/case-record-schema.js'], enabledCapabilitiesBefore: ['contract_foundation_present'], enabledCapabilitiesAfter: ['contract_foundation_present', 'experiment_store_present'],
     forbiddenCapabilities: [], tests: null, workflowRunId: null, artifactId: null, artifactBoundSha: null, codexVerdict: null,
     frozenDiff: 0, productionDiff: 0, runtimeConsumerCount: 0, featureRegistryState: {}, packageVersion: '1.4.0', createdAt: null,
-    status: 'pending', governanceChanged: true, crossPhaseGate: { r3dCheckpoint: 'D5_ACTIVATION', requiredFor: 'E2_EXPERIMENT_STORE', satisfied: true },
+    status: 'pending', governanceChanged: true, crossPhaseGate: { r3dCheckpoint: 'D5_ENGINEER_BRIEF_ACTIVATION', requiredFor: 'E2_EXPERIMENT_STORE', satisfied: true },
     r3bCaseRecordSchemaUntouched: true };
   writeJson(path.join(dir, 'governance', 'r3.0e', 'checkpoints', 'E2.json'), manifest);
   const r = runValidator(dir);
@@ -319,7 +319,7 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
     previousCheckpoint: 'E1_CONTRACT_FOUNDATION', authorizedPaths: ['renderer/js/experiment-store.js'], enabledCapabilitiesBefore: ['contract_foundation_present'], enabledCapabilitiesAfter: ['contract_foundation_present', 'experiment_store_present'],
     forbiddenCapabilities: [], tests: null, workflowRunId: null, artifactId: null, artifactBoundSha: null, codexVerdict: null,
     frozenDiff: 0, productionDiff: 0, runtimeConsumerCount: 0, featureRegistryState: {}, packageVersion: '1.4.0', createdAt: null,
-    status: 'pending', governanceChanged: true, crossPhaseGate: { r3dCheckpoint: 'D5_ACTIVATION', requiredFor: 'E2_EXPERIMENT_STORE', satisfied: true },
+    status: 'pending', governanceChanged: true, crossPhaseGate: { r3dCheckpoint: 'D5_ENGINEER_BRIEF_ACTIVATION', requiredFor: 'E2_EXPERIMENT_STORE', satisfied: true },
     r3bCaseRecordSchemaUntouched: false };
   writeJson(path.join(dir, 'governance', 'r3.0e', 'checkpoints', 'E2.json'), manifest);
   const r = runValidator(dir);
@@ -354,7 +354,7 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
 {
   const dir = buildFixture();
   const ts = readJson(path.join(dir, 'governance', 'r3.0', 'train.json'));
-  ts.phaseStates['R3.0D'].currentCheckpoint = 'D5_ACTIVATION'; // disagrees with state.json D0_BOOTSTRAP
+  ts.phaseStates['R3.0D'].currentCheckpoint = 'D5_ENGINEER_BRIEF_ACTIVATION'; // disagrees with state.json D0_BOOTSTRAP
   writeJson(path.join(dir, 'governance', 'r3.0', 'train.json'), ts);
   const r = runValidator(dir);
   chk('FAIL phase checkpoint mismatch', hasViolation(r.artifact, 'TRAIN_PHASE_CHECKPOINT_MISMATCH'));

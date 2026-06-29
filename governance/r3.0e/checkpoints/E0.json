@@ -36,7 +36,7 @@
     "r3dCheckpoint": "D0_BOOTSTRAP",
     "requiredFor": "E0_BOOTSTRAP",
     "satisfied": true,
-    "note": "E0 bootstrap does not require R3.0D D5. Only non-bootstrap E checkpoints require R3.0D state.currentCheckpoint === 'D5_ACTIVATION'."
+    "note": "E0 bootstrap does not require R3.0D D5. Only non-bootstrap E checkpoints require R3.0D state.currentCheckpoint === 'D5_ENGINEER_BRIEF_ACTIVATION'."
   },
   "r3bCaseRecordSchemaUntouched": true,
   "note": "E0 establishes the R3.0E Integrated Delivery Governance scaffold. Production switches stay OFF: zero authorized paths, zero enabled production capabilities, all *Allowed flags false. The frozen R3.0B case-record schema is untouched. The trusted-verification artifact bound to this PR's head SHA is the PASS authority — this file stays 'pending' in-commit."
