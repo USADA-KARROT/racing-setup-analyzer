@@ -316,20 +316,24 @@
   }
 
   function _validateAuthoritativeHypothesisSet(hsIn, refNowMs, maxAgeMs) {
+    // Codex D4 R5 D4-R5-01 closure: PRODUCER AUTHORITY via D3's closure-private WeakSet
+    // MUST be the FIRST operation on hsIn — before _isPlainObject (which reads the
+    // prototype, firing Proxy getPrototypeOf trap), before _isFrozenSafe (which fires
+    // isExtensible trap), before HI.safeStructuredClone (which fires multiple traps),
+    // before HI.deepOriginalShapeAudit (which fires ownKeys + getOwnPropertyDescriptor
+    // traps). The verifier ITSELF does NOT trigger Proxy traps for non-members because
+    // WeakSet.has is an identity comparison on captured Reflect.apply — it never reads
+    // [[Get]] on the candidate.
+    if (typeof HE.verifyAuthoritativeHypothesisSet !== 'function'
+        || HE.verifyAuthoritativeHypothesisSet(hsIn) !== true) {
+      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+    }
+    // Authority verified — hsIn is the actual D3-produced object reference. From here on
+    // shape / frozen / descriptor reads are safe (the underlying object is plain + frozen).
     if (!_isPlainObject(hsIn)) {
       return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
     }
     if (!_isFrozenSafe(hsIn)) {
-      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
-    }
-    // Codex D4 R3 D4-R3-02 closure: PRODUCER AUTHORITY via D3's closure-private WeakSet.
-    // This MUST happen BEFORE any other read of caller-supplied data (before clone, before
-    // schema validation, before reading nested fields, before resolving the clock). A
-    // structuredClone / JSON round-trip / hand-forged shape will fail this check because
-    // the new object reference is not in D3's WeakSet — even if hashes match perfectly.
-    // The verifier is fail-closed (returns false on any throw / Proxy / shape mismatch).
-    if (typeof HE.verifyAuthoritativeHypothesisSet !== 'function'
-        || HE.verifyAuthoritativeHypothesisSet(hsIn) !== true) {
       return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
     }
     // Codex D4 R2 D4-R2-02 closure: RECURSIVE descriptor audit BEFORE clone. The previous
