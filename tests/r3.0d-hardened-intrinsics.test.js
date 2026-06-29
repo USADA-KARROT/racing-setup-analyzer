@@ -466,18 +466,22 @@ function runRebind(container, key, hostileImpl, action) {
   chk('deepOriginalShapeAudit: hostile Object.getPrototypeOf never invoked', r.hits === 0);
   chk('deepOriginalShapeAudit: class instance still rejected under hostile Object.getPrototypeOf', r.result === true);
 
-  // Additional mutation-protection: regress safeIsArray to ambient. If the audit uses captured
-  // safeIsArray (via _ArrayIsArray Reflect.apply), an Array subclass should still be detected
-  // correctly. If it regresses to ambient Array.isArray, the same hostile would intercept.
-  class SubArr extends Array {}
-  const subArrInstance = new SubArr();
+  // Additional mutation-protection: Array.isArray call inside deepOriginalShapeAudit. Codex
+  // Round 19 RN-32 identified that the previous test using an Array SUBCLASS was ineffective —
+  // the subclass is rejected by the prototype check (proto !== _ArrayPrototype) before reaching
+  // the Array.isArray call, so the hostile is never reachable.
+  // Effective test: use a PLAIN ARRAY (proto === Array.prototype). The audit DOES reach
+  // `_apply(_ArrayIsArray, _Array, [v])` for plain arrays. Regressing to ambient + rebinding
+  // Array.isArray to return false makes the audit return false (audit treats "Array.isArray
+  // says false" as a tampering signal), but the captured ref still returns true → audit
+  // accepts the plain array (correct). Mutation test catches the regression because the audit
+  // changes from true to false.
+  const plainArr = [1, 2, 3];
   const r2 = runRebind(Array, 'isArray', function () { return false; }, function () {
-    // Even with Array.isArray rebound to return false, deepOriginalShapeAudit must still
-    // detect a class instance via the prototype check and reject it.
-    return HI.deepOriginalShapeAudit(subArrInstance) === false;
+    return HI.deepOriginalShapeAudit(plainArr) === true;
   });
-  chk('deepOriginalShapeAudit: hostile Array.isArray never invoked', r2.hits === 0);
-  chk('deepOriginalShapeAudit: Array subclass still rejected under hostile Array.isArray', r2.result === true);
+  chk('deepOriginalShapeAudit: hostile Array.isArray never invoked (plain array path)', r2.hits === 0);
+  chk('deepOriginalShapeAudit: plain array still accepted under hostile Array.isArray', r2.result === true);
 })();
 
 console.log('R3.0D hardened-intrinsics direct-test suite: ' + pass + ' pass, ' + fail + ' fail');
