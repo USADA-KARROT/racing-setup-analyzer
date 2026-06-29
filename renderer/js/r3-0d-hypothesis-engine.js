@@ -57,6 +57,27 @@
 
   var CODES = RC.REASON_CODES;
 
+  // ---------- Module-init capture: Object.isFrozen (Codex D3 R1 RN-08 closure) -----------------
+  // Object.isFrozen is not in the HI surface (HI considers it best-effort and never wraps it).
+  // We MUST treat caller-frozen-ness as a security gate, so we capture the pristine reference
+  // at module-init BEFORE any caller code can poison `Object.isFrozen = () => true`.
+  var _CAPTURED_OBJECT_IS_FROZEN = Object.isFrozen;
+  function _isFrozenSafe(v) {
+    try { return _CAPTURED_OBJECT_IS_FROZEN(v) === true; }
+    catch (e) { return false; }
+  }
+  // Also capture ISO date parser primitive — Codex D3 R1 RN-05 freshness check needs to compute
+  // wall-clock age. Date.parse can be rebound at any time; capture once at module init.
+  var _CAPTURED_DATE_PARSE = Date.parse;
+  function _isoToMs(s) {
+    try {
+      if (typeof s !== 'string' || s.length === 0) return null;
+      var n = _CAPTURED_DATE_PARSE(s);
+      if (typeof n !== 'number' || n !== n /* NaN check */) return null;
+      return n;
+    } catch (e) { return null; }
+  }
+
   // ---------- Module-init intrinsic snapshot for the post-load guard -----------------------------
   // Step 0 entry guard recomputes these against the live HI api and rejects the call if the
   // module-init capture was poisoned at module load time. JS is single-threaded so a guard pass
@@ -86,11 +107,14 @@
   function _intrinsicsIntact() {
     if (!_HI_API_FROZEN_AT_LOAD) return false;
     if (!_HI_HAS) return false;
-    // The HI api itself MUST still be frozen at call time; a hostile caller could have replaced
-    // the global R3_0D_HardenedIntrinsics binding, but our local HI reference was captured at
-    // module init and is itself closure-private — only swappable if the module loader was
-    // compromised, which is out-of-scope (the entire contract assumes module-init integrity).
-    try { if (!Object.isFrozen(HI)) return false; } catch (e) { return false; }
+    // The HI api itself MUST still be frozen at call time. We use the captured Object.isFrozen
+    // (Codex D3 R1 RN-08 closure) so caller cannot defeat this check by rebinding ambient.
+    if (!_isFrozenSafe(HI)) return false;
+    // Codex D3 R1 RN-10 closure: narrow guard claim. This routine ONLY verifies HI surface
+    // integrity (and our captured Object.isFrozen reference is sound, since we capture it before
+    // any caller code runs). Validation-path security relies on the HI captured wrappers — the
+    // guard is defence-in-depth on the HI surface itself, not a general intrinsic-rebinding
+    // detector.
     return true;
   }
 
@@ -169,9 +193,7 @@
   function _isPlainArray(v) {
     return HI.safeIsPlainShape(v) === 'plain-array';
   }
-  function _isFrozen(v) {
-    try { return Object.isFrozen(v); } catch (e) { return false; }
-  }
+  function _isFrozen(v) { return _isFrozenSafe(v); }
   function _byteLength(s) {
     if (typeof s !== 'string') return 0;
     return HI.safeUtf8ByteLength(s);
@@ -297,16 +319,28 @@
    *  - cross-case: every node.identity.caseId === graph.caseAssociation.caseId
    *  - cross-session: every node.identity.sessionId === graph.caseAssociation.sessionId
    */
-  function _validateAuthoritativeGraph(gIn) {
+  function _validateAuthoritativeGraph(gIn, opts) {
     if (!_isPlainObject(gIn)) {
       return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
     }
-    // Proxy defang: invoke structuredClone first so the snapshot we trust below is plain
-    // and not a Proxy that can return TOCTOU-divergent values per read. structuredClone
-    // returns a brand-new plain-object tree (no Proxy can survive the clone). If structuredClone
-    // throws (e.g. unclonable function or non-data property), reject. The clone is NOT yet
-    // frozen — we'll freeze it once we've recomputed the hash. From here on, ALL graph reads
-    // use the cloned snapshot, never gIn.
+    // Codex D3 R1 RN-07 closure: audit the ORIGINAL input via HI.deepOriginalShapeAudit BEFORE
+    // structuredClone runs. The HI doc explicitly warns: structuredClone invokes input traps
+    // (accessor [[Get]], Proxy traps). If the original carries getters/Proxy/non-plain children,
+    // those traps would have already fired during clone (potentially poisoning intrinsics or
+    // returning TOCTOU-divergent values). deepOriginalShapeAudit performs a descriptor-only
+    // recursive walk that does NOT invoke any [[Get]] traps — it reads property descriptors.
+    if (HI.deepOriginalShapeAudit(gIn) !== true) {
+      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+    }
+    // gIn must have been deep-frozen by D2 (any caller-fabricated mutable shell is rejected).
+    // Codex D3 R1 RN-08 closure: _isFrozen now uses captured Object.isFrozen — caller cannot
+    // defeat by rebinding ambient.
+    if (!_isFrozen(gIn)) {
+      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+    }
+    // Proxy defang: NOW invoke structuredClone. The pre-clone audit above already established
+    // that the input is pure plain shape (no Proxies, no getters, no class instances), so the
+    // clone-time read traps cannot execute hostile code.
     var g = HI.safeStructuredClone(gIn);
     if (g === null) {
       return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
@@ -314,13 +348,7 @@
     if (!_isPlainObject(g)) {
       return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
     }
-    // gIn must have been deep-frozen by D2 (any caller-fabricated mutable shell is rejected).
-    if (!_isFrozen(gIn)) {
-      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
-    }
-    // After clone, also verify the clone is a pure shape (no class instances, no Symbol keys,
-    // no accessors). The clone IS plain (structuredClone never produces Proxy/class), but the
-    // audit catches edge cases like sparse arrays or non-finite numbers smuggled through.
+    // Belt-and-suspenders post-clone audit.
     if (HI.deepOriginalShapeAudit(g) !== true) {
       return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
     }
@@ -365,9 +393,21 @@
       return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
     }
 
-    // Per-node identity scope check (cross-case / cross-session).
+    // Per-node identity scope + D2 invariant re-validation. Codex D3 R1 RN-01..06 closures:
+    // the graphId hash is a diagnostic identifier, not an integrity proof; D3 MUST independently
+    // re-enforce every D2 invariant on the snapshot it has just cloned. We do NOT trust the
+    // hashed projection alone — the projection itself is not the full graph schema.
     var caseId = g.caseAssociation.caseId;
     var sessionId = g.caseAssociation.sessionId;
+    var caseLapId = (g.caseAssociation.lapId == null) ? null : g.caseAssociation.lapId;
+    var seenNodeIds = HI.safeObjectCreateNull();
+    var nodeIdSet = HI.safeObjectCreateNull();  // for edge endpoint validation
+    var maxAgeMs = (opts && typeof opts.maxAgeMs === 'number' && opts.maxAgeMs > 0 && opts.maxAgeMs === opts.maxAgeMs) ? opts.maxAgeMs : null;
+    var referenceNowMs = null;
+    if (maxAgeMs !== null && opts && typeof opts.referenceNowMs === 'number' && opts.referenceNowMs > 0 && opts.referenceNowMs === opts.referenceNowMs) {
+      referenceNowMs = opts.referenceNowMs;
+    }
+
     for (var i = 0; i < g.nodes.length; i++) {
       var n = g.nodes[i];
       if (!_isPlainObject(n)) {
@@ -376,15 +416,96 @@
       if (!_isPlainObject(n.identity)) {
         return { valid: false, reasonCodes: [CODES.SOURCE_IDENTITY_INVALID] };
       }
+      if (!_isNonEmptyString(n.nodeId)) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_MISSING_ID] };
+      }
+      // Codex D3 R1 RN-02 closure: D2 invariant — no duplicate nodeId.
+      if (HI.safeGetOwnDescriptor(seenNodeIds, n.nodeId)) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_DUPLICATE_ID] };
+      }
+      HI.safeDefineDataProperty(seenNodeIds, n.nodeId, true);
+      HI.safeDefineDataProperty(nodeIdSet, n.nodeId, true);
+
       if (n.identity.caseId !== caseId) {
         return { valid: false, reasonCodes: [CODES.SOURCE_IDENTITY_CASE_MISMATCH] };
       }
       if (n.identity.sessionId !== sessionId) {
         return { valid: false, reasonCodes: [CODES.SOURCE_IDENTITY_SESSION_MISMATCH] };
       }
+      // Codex D3 R1 RN-06 closure: lap mismatch rule (mirrors D2 evidence-graph.js step that
+      // requires equality when both envelope and node lapId are non-null).
+      var nodeLapId = (n.identity.lapId == null) ? null : n.identity.lapId;
+      if (caseLapId !== null && nodeLapId !== null && caseLapId !== nodeLapId) {
+        return { valid: false, reasonCodes: [CODES.SOURCE_IDENTITY_LAP_MISMATCH] };
+      }
+      // Codex D3 R1 RN-04 closure: imported_summary + measured elevation prohibition (D2 enforces
+      // it; D3 must repeat the check independently because graphId only covers a projection).
+      if (n.identity.sourceId === 'imported_summary' && n.credibility === 'measured') {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_IMPORTED_SUMMARY_ELEVATION_FORBIDDEN] };
+      }
+      // Codex D3 R1 RN-05 closure: freshness validity. Always require a parseable ISO 8601
+      // string. If opts.maxAgeMs is supplied with opts.referenceNowMs, reject nodes older
+      // than the cutoff.
+      if (!_isNonEmptyString(n.identity.freshness)) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_FRESHNESS_STALE] };
+      }
+      var freshMs = _isoToMs(n.identity.freshness);
+      if (freshMs === null) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_FRESHNESS_STALE] };
+      }
+      if (maxAgeMs !== null && referenceNowMs !== null) {
+        if ((referenceNowMs - freshMs) > maxAgeMs) {
+          return { valid: false, reasonCodes: [CODES.EVIDENCE_FRESHNESS_STALE] };
+        }
+      }
     }
 
-    // Recompute graphId — independent authority verification.
+    // Codex D3 R1 RN-02 closure (cont.): correlation group invariants. (a) Every memberNodeId
+    // must exist in nodeIdSet. (b) A memberNodeId must not appear in more than one group.
+    // (c) independenceWeight must equal 1 / memberNodeIds.length.
+    var globalMemberSeen = HI.safeObjectCreateNull();
+    for (var cgi = 0; cgi < g.correlationGroups.length; cgi++) {
+      var cg = g.correlationGroups[cgi];
+      if (!_isPlainObject(cg) || !_isPlainArray(cg.memberNodeIds) || cg.memberNodeIds.length === 0) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
+      }
+      for (var mi = 0; mi < cg.memberNodeIds.length; mi++) {
+        var mid = cg.memberNodeIds[mi];
+        if (!_isNonEmptyString(mid)) {
+          return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
+        }
+        if (!HI.safeGetOwnDescriptor(nodeIdSet, mid)) {
+          return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_ORPHAN] };
+        }
+        if (HI.safeGetOwnDescriptor(globalMemberSeen, mid)) {
+          return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT] };
+        }
+        HI.safeDefineDataProperty(globalMemberSeen, mid, true);
+      }
+      var expected = 1 / cg.memberNodeIds.length;
+      var diff = cg.independenceWeight - expected;
+      if (diff < 0) diff = -diff;
+      if (diff > 1e-9) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT] };
+      }
+    }
+
+    // Edge endpoint validation: every edge.from and edge.to must reference a known nodeId.
+    for (var ei = 0; ei < g.edges.length; ei++) {
+      var e = g.edges[ei];
+      if (!_isPlainObject(e) || !_isNonEmptyString(e.from) || !_isNonEmptyString(e.to) || !_isNonEmptyString(e.kind)) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
+      }
+      if (!HI.safeGetOwnDescriptor(nodeIdSet, e.from) || !HI.safeGetOwnDescriptor(nodeIdSet, e.to)) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_ORPHAN] };
+      }
+    }
+
+    // Recompute graphId — independent authority verification. NOTE: the graphId only hashes
+    // (caseAssociation, nodes-projection, edges, correlationGroups). Other fields like
+    // graph.cannotConclude / graph.limitations / graph.provenance / graph.createdAt are NOT
+    // bound to graphId — Codex D3 R1 RN-01 closure: D3's output must NOT consume those fields
+    // from the input graph (they are re-derived from rule firing below).
     var recomputed;
     try { recomputed = _recomputeGraphId(g); }
     catch (e) { return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] }; }
@@ -632,8 +753,11 @@
   }
 
   function _findContradictionsForMatched(graph, matched) {
-    // A contradiction is an edge (from, to, 'contradicts') where 'to' is one of the matched
-    // nodes' nodeIds. We collect the 'from' nodeIds as contradicting evidence.
+    // Codex D3 R1 RN-03 closure: D2 emits contradiction edges as `{from: node, to: other}` where
+    // `from` is the node whose contradictingEdges array referenced `other`. So edges where
+    // `from === matched.nodeId AND kind === 'contradicts'` are the contradictions of a matched
+    // node, and the contradictor is `edge.to`. We also accept the reverse direction for
+    // robustness (some future producer may emit canonical low→high form).
     var matchedIds = _newSet();
     HI.safeArrayForEach(matched, function (n) { _setAdd(matchedIds, n.nodeId); });
     var contradicting = [];
@@ -641,10 +765,21 @@
     for (var i = 0; i < graph.edges.length; i++) {
       var e = graph.edges[i];
       if (e.kind !== 'contradicts') continue;
-      if (!_setHas(matchedIds, e.to)) continue;
-      if (_setHas(seenContra, e.from)) continue;
-      _setAdd(seenContra, e.from);
-      _arrPush(contradicting, e.from);
+      var contraId = null;
+      if (_setHas(matchedIds, e.from) && !_setHas(matchedIds, e.to)) {
+        contraId = e.to;
+      } else if (_setHas(matchedIds, e.to) && !_setHas(matchedIds, e.from)) {
+        // Reverse-direction fallback for symmetry.
+        contraId = e.from;
+      } else if (_setHas(matchedIds, e.from) && _setHas(matchedIds, e.to)) {
+        // Both endpoints matched — pick the non-self side (matched contradicts another matched).
+        // Skip if same nodeId (self-edge, defensive — D2 disallows but defend anyway).
+        if (e.from !== e.to) contraId = e.to;
+      }
+      if (contraId === null) continue;
+      if (_setHas(seenContra, contraId)) continue;
+      _setAdd(seenContra, contraId);
+      _arrPush(contradicting, contraId);
     }
     HI.safeArraySort(contradicting, _strcmp);
     return contradicting;
@@ -996,8 +1131,9 @@
         }
       }
 
-      // ---- Step 2 — graph authority verification (clone-defang Proxy, recompute graphId) ----
-      var authority = _validateAuthoritativeGraph(input.graph);
+      // ---- Step 2 — graph authority verification (pre-clone audit + clone defang + D2 invariants
+      // + graphId recompute) ----
+      var authority = _validateAuthoritativeGraph(input.graph, opts);
       if (authority.valid !== true) {
         return RC.buildBlockedResult(authority.reasonCodes, { detail: 'authority verification failed' });
       }
@@ -1041,21 +1177,11 @@
       var limSeen = _newSet();
       var ccSeen = _newSet();
 
-      // Bring in any cannotConclude reasons from the graph
-      for (var gci = 0; gci < graph.cannotConclude.length; gci++) {
-        var cgc = graph.cannotConclude[gci];
-        if (RC.isReasonCode(cgc) && !_setHas(ccSeen, cgc)) {
-          _setAdd(ccSeen, cgc);
-          _arrPush(snapshotCannotConclude, cgc);
-        }
-      }
-      for (var gli = 0; gli < graph.limitations.length; gli++) {
-        var gl = graph.limitations[gli];
-        if (RC.isReasonCode(gl) && !_setHas(limSeen, gl)) {
-          _setAdd(limSeen, gl);
-          _arrPush(snapshotLimitations, gl);
-        }
-      }
+      // Codex D3 R1 RN-01 closure: do NOT trust graph.cannotConclude / graph.limitations.
+      // Those fields are not bound to graphId — a caller with knowledge of the hash algorithm
+      // could set arbitrary content there while still passing graphId verification. D3 derives
+      // its own snapshotCannotConclude + snapshotLimitations exclusively from per-rule firing
+      // results below.
 
       for (var ri = 0; ri < RULE_REGISTRY.length; ri++) {
         rulesEvaluated += 1;
@@ -1166,10 +1292,13 @@
       }
 
       // ---- Step 8 — build provenance ----
+      // Codex D3 R1 RN-01 closure: D3 derives its OWN sourceGraphSanitizedCount from graph.nodes.length
+      // (this IS bound to graphId since nodes are in the hashed projection). Do NOT trust
+      // graph.provenance.sanitizedCount which is not bound to graphId.
       var provenance = HI.deepFreeze({
         builderVersion: SERVICE_VERSION,
         sourceGraphSchemaVersion: graph.schemaVersion,
-        sourceGraphSanitizedCount: graph.provenance.sanitizedCount,
+        sourceGraphSanitizedCount: graph.nodes.length,
         rulesEvaluated: rulesEvaluated,
         rulesFired: rulesFired,
         rejectedReasonsSummary: HI.deepFreeze(rejectedReasons),
@@ -1196,6 +1325,15 @@
         generationToken: generationToken,
         contextVersion: contextVersion,
       });
+
+      // Codex D3 R1 RN-11 closure: measure FINAL envelope (after assembly) and compare against
+      // ENVELOPE_BYTE_CAP. The Step 6 pre-clock check was a preview; this is the binding check.
+      var finalEnvBytes;
+      try { finalEnvBytes = _byteLength(HI.stableStringify(hypothesisSet)); }
+      catch (eFinalBytes) { finalEnvBytes = Infinity; }
+      if (finalEnvBytes > ENVELOPE_BYTE_CAP) {
+        return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'final envelope ' + finalEnvBytes + ' bytes exceeds ' + ENVELOPE_BYTE_CAP });
+      }
 
       // ---- Step 9.6 — post-freeze final intrinsic check ----
       if (!_intrinsicsIntact()) {
