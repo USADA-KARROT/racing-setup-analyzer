@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0D",
+  "checkpoint": "D3_HYPOTHESIS_ENGINE",
+  "baseSha": "299771ab680c5d522549c34430318bea07ebf709",
+  "headSha": null,
+  "previousCheckpoint": "D2_EVIDENCE_GRAPH",
+
+  "shaSeparation": {
+    "note": "Per SKYLINE 2026-06-28 R3.0 Final Continuous Execution Directive §7 + 2026-06-29 R3.0 Continuous Resume Directive §2/§11, every checkpoint manifest preserves the three-way SHA separation. reviewedCandidateSha is the exact SHA Codex D3 review was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD. Substituting one for another is a tier violation.",
+    "reviewedCandidateSha": "7b01fd8ae1c231d6b147d7a21a0d16d89e40c0b4",
+    "reviewedCandidateNote": "Codex D3 R7 reviewed this exact SHA on feat/r3.0d-d3-hypothesis-engine and issued FINAL VERDICT: PASS (2026-06-29). Round 1..7 lineage at governance/r3.0d/codex-checkpoint-evidence/D3/round-{1..7}-<sha>.raw.txt. 27 distinct adversarial findings closed across 7 rounds (RN-01..RN-11, R2-01..R2-08, R3-01..R3-07, D3-R4-01..03, D3-R5-01..04, D3-R6-01..05, D3-R7-01..02).",
+    "manifestCommitSha": null,
+    "manifestCommitNote": "Filled by the same follow-up evidence-anchoring commit; mirrors C5R / C6 / C7 / C8 / D1 / D2 convention.",
+    "integrationSha": null,
+    "integrationNote": "Filled only after the D3 branch-to-branch PR merges into feat/r3.0-integrated-delivery AND the Train target-context trusted-verification PASSes at that integration HEAD."
+  },
+
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0d-evidence-graph.js", "capability": "evidence_graph_present" },
+    { "path": "renderer/js/r3-0d-hypothesis-engine.js", "capability": "hypothesis_engine_present" }
+  ],
+  "newlyAuthorizedPath": "renderer/js/r3-0d-hypothesis-engine.js",
+  "newlyEnabledCapability": "hypothesis_engine_present",
+
+  "enabledCapabilitiesBefore": ["contract_foundation_present", "evidence_graph_present"],
+  "enabledCapabilitiesAfter": ["contract_foundation_present", "evidence_graph_present", "hypothesis_engine_present"],
+  "forbiddenCapabilities": [
+    "priority_engine_present",
+    "engineer_brief_present",
+    "feature_registry_active"
+  ],
+
+  "contractEnforcements": {
+    "hypothesisEngineScope": "renderer/js/r3-0d-hypothesis-engine.js is the SINGLE new production path authorized at D3. It consumes ONLY a D2-authoritative Evidence Graph snapshot. Authority is enforced via a layered model: (a) input + opts snapshot at engine entry via descriptor-only reads (Codex D3 R2 R2-05 + D3 R3 R3-05 closure: accessors / non-enumerable / Symbol keys / function fields on input wrapper or opts fields rejected — including opts.clock which must be enumerable; opts.clock held by reference and invoked AT MOST ONCE); (b) deep-frozen requirement on input.graph via captured Object.isFrozen (Codex D3 R1 RN-08 closure); (c) HI.safeStructuredClone-defang of input.graph so subsequent reads use a plain non-Proxy snapshot; (d) HI.deepOriginalShapeAudit on the clone catches class-instance/Array-subclass/Symbol-key/accessor/sparse/non-finite-number smuggling; (e) recomputed graphId (FNV-1a 32-bit×2 byte-equivalent to D2) equality with asserted graphId rejects forged / opaque-Proxy / inconsistent graphs (Codex D3 R2 R2-04 closure: graph-level Proxy traps may fire during clone, but the engine only consumes the cloned values, and TOCTOU/opaque proxies fail the recompute check); (f) D2 invariant re-validation on the clone — no duplicate nodeId, every node.nodeId conforms to ID_RE (Codex D3 R2 R2-02 closure), cross-case/cross-session per-node identity scope, lap-mismatch rejection (Codex D3 R1 RN-06), imported_summary + measured rejection (Codex D3 R1 RN-04), full SourceIdentity invariants (sourceId/sourceVersion/lapId non-empty + byte cap — Codex D3 R3 R3-04 closure); (g) correlation partition reconstruction from node identity tuples via D2's exact _correlationGroupCanonical encoding (HI.stableStringify per component — Codex D3 R3 R3-01 closure for delimiter-collision-free key); D2's emitted correlationGroups must EXACTLY match the reconstructed partition; each correlationGroupId must conform to D2's grammar `corr_<16hex>`, be unique within g.correlationGroups, AND equal the D2-recomputed value `'corr_' + _hash64('corr|' + canonical)` (Codex D3 R3 R3-02 closure); independenceWeight uses Object.is exact 1/count equality (Codex D3 R2 R2-02 closure: NaN/Infinity rejected); (h) edge validation — D3 reconstructs the EXACT MULTI-SET of edges D2 emits from node.supportingEdges (kind=supports), node.contradictingEdges (kind=contradicts), and pairwise lo→hi members of correlation groups with ≥2 members (kind=correlated_with); g.edges must consume the expected multi-set exactly (no extras, no missing, duplicates allowed because D2 itself emits duplicates without dedup — Codex D3 R6 D3-R6-03 closure). The 5-value closed enum {supports, contradicts, derived_from, correlated_with, invalidates} is the universe of LEGAL kinds; D2 only EMITS the first three. Reserved kinds {derived_from, invalidates} are rejected because D2 cannot produce them (Codex D3 R5 D3-R5-01 closure). Edge declaration arrays MUST be plain arrays with ≤64 entries per node + grammar-conformant string entries; non-array declarations rejected (Codex D3 R6 D3-R6-01 closure). Endpoint existence + node-set membership enforced (Codex D3 R3 R3-03 closure). Total edge cap aligned with D2 EDGES_CAP_TOTAL=1024 (Codex D3 R6 D3-R6-02 closure); (i) mandatory freshness enforcement — opts.clock() returning ISO 8601 OR opts.referenceNowMs must be supplied (fail-closed when absent, Codex D3 R2 R2-03 closure); per-node freshness must parse via captured Date.parse, default max age = 30 days (configurable via opts.maxAgeMs).",
+    "noLLM": "No LLM call. No runtime config. No filesystem. Pure deterministic transformation.",
+    "noUI": "No DOM mutation, no Alpine binding, no index.html script src. UI is exclusively D5_ENGINEER_BRIEF_ACTIVATION.",
+    "noRecommendation": "D3 does NOT emit Recommendation objects (auto_tuning / auto_setup / auto_calibration / auto_preset / driver_action / user_initiated APPLY modes). Recommendation generation is exclusively D4_PRIORITY_ENGINE.",
+    "noCausalOverclaim": "All hypothesis i18nKeys and alternative explanation i18nKeys live in the rule registry and are pre-vetted. The 6-category enum is preserved verbatim (data_quality / mapping_calibration / driver_behaviour / vehicle_response / setup_model / unknown). No driver_fault / guaranteed_fix / professional_diagnosis / fastest_setup / theoretical_best vocabulary appears anywhere.",
+    "closedRuleRegistry": "RULE_REGISTRY is a deep-frozen array of rule objects declared at module init. No runtime registration; no string-eval; no Function constructor; no caller-supplied rule. New rules require a new module load and a new D-checkpoint Codex review.",
+    "deterministicOutput": "Same authoritative graph (regardless of clock) → identical hypothesisSetId, identical hypothesis IDs, identical confidence states + scores, identical sorted order. Clock is INJECTABLE via opts.clock(); createdAt depends on the clock; hypothesisSetId is INDEPENDENT of the clock.",
+    "confidenceModel": "Confidence state enum {not_computed, insufficient_evidence, low, moderate, high}. Auxiliary integer score 0..100 derived deterministically from independent supporting groups (with correlation-group dedup), aggregate credibility, and contradictions. Caller cannot supply confidence; engine ignores any caller value. Duplicate evidence in the same correlation group counts ONCE. Codex D3 R5 D3-R5-03 closure: freshness is used SOLELY as an eligibility/staleness gate at authority verification (stale nodes rejected with EVIDENCE_FRESHNESS_STALE) — it does NOT contribute to the confidence score.",
+    "credibilityLadder": "Aggregate credibility uses CONCLUSION_CREDIBILITY ladder ['Physics','Model','Measured','Derived','Heuristic','Unavailable']. measured evidence → 'Measured'; derived → 'Derived'; heuristic/synthetic → 'Heuristic'/'Heuristic'; none → 'Unavailable'. Heuristic/synthetic credibility forces LIMITATION_HEURISTIC_ONLY / LIMITATION_SYNTHETIC_ONLY into the hypothesis limitations.",
+    "validationActionsClosedEnum": "Closed kind enum from D1 hypothesis-contract.VALIDATION_ACTION_KIND_ALLOWED: {fix_data_quality, recalibrate_channel, controlled_repeat_lap, driver_experiment, setup_experiment, collect_additional_session, collect_additional_lap, no_action_required}.",
+    "alternativeExplanationsRequired": "Every fired rule contributes at least one alternativeExplanation entry (closed per-rule list). Alternative IDs are content-derived (hypothesisId + altSuffix hash), deterministic, deep-frozen.",
+    "cannotConcludeStructured": "When no rule fires across the whole graph, snapshotCannotConclude contains INSUFFICIENT_EVIDENCE. Codex D3 R1 RN-01 closure: D3 does NOT consume graph.cannotConclude or graph.limitations from the input graph (those fields are not bound to graphId); all snapshot.cannotConclude and snapshot.limitations are derived from rule firing outcomes. Caller cannot inject free-text reasons; only closed reason codes from REASON_CODES are emitted.",
+    "deepFreezeOutput": "The returned hypothesisSet and every nested array/object is Object.freeze'd (via HI.deepFreeze). Caller mutation post-build cannot reach into the snapshot.",
+    "hardenedIntrinsicsEnforced": "Every ambient intrinsic call goes through R3_0D_HardenedIntrinsics (HI). The validation path NEVER invokes attacker-replaced ambient intrinsics — that is the primary defence. The four integrity checkpoints (Step 0 entry, Step 3.5 per-rule, Step 7.5 post-clock, Step 9.6 post-freeze) are defence-in-depth on HI surface integrity (Codex D3 R2 R2-07 closure: claim narrowed). Hash function is byte-equivalent to D2 _hash64 (FNV-1a 32-bit twice, concatenated) so authoritative graphId recomputation matches exactly. Object.isFrozen, Date.parse, and Object.is are captured at module init as supplementary primitives not in the HI surface (Codex D3 R1 RN-08 + R2 R2-02 closure).",
+    "caps": "HYPOTHESIS_COUNT_CAP=64, ALT_EXPLANATION_COUNT_CAP=128, VALIDATION_ACTION_COUNT_CAP=128, CANNOT_CONCLUDE_CAP=64, LIMITATIONS_CAP=64, SUPPORT_ID_PER_HYPOTHESIS_CAP=64, CONTRADICT_ID_PER_HYPOTHESIS_CAP=64, ALT_ID_PER_HYPOTHESIS_CAP=16, REASON_CODE_PER_HYPOTHESIS_CAP=32, STRING_BYTE_CAP=512, ENVELOPE_BYTE_CAP=512 KiB, GRAPH_NODE_INPUT_CAP=8192, GRAPH_EDGE_INPUT_CAP=1024 (aligned with D2 EDGES_CAP_TOTAL — Codex D3 R6 D3-R6-02 closure), PER_NODE_EDGE_DECL_CAP=64 (matches D1 evidence-node-contract — Codex D3 R6 D3-R6-01 closure). generationToken ≤ 128 chars; contextVersion ≤ 128 chars.",
+    "outerTryCatch": "buildHypothesisSet is wrapped in an outer try/catch. Any internal throw collapses to INTERNAL_CONTRACT_VIOLATION via RC.buildBlockedResult; never bubbles to the caller.",
+    "privacyBoundary": "Output never contains raw telemetry samples, filesystem paths, source filenames, usernames, machine IDs, internal database handles, stack traces, or Electron private paths. Tests assert no '/Users/' substring, no 'stack' key, no UUID-shape identifier in the serialized envelope.",
+    "scopeBindingFromGraph": "caseAssociation and sessionAssociation in the hypothesisSet are copied verbatim from the authoritative graph (after Proxy-defang). Cross-case / cross-session evidence in the graph is rejected by the per-node identity scope check BEFORE any rule evaluates."
+  },
+
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3.0d-hypothesis-engine.test.js",
+    "newSuiteAssertions": 158,
+    "additionalSuites": {
+      "r3.0d-contract-foundation": {
+        "path": "tests/r3.0d-contract-foundation.test.js",
+        "assertions": 160,
+        "purpose": "D1 contract foundation. State-aware (D1/D2/D3) — D3 branch added in this checkpoint preserves existing invariants and adds D3 contract surface validation where applicable."
+      },
+      "r3.0d-hardened-intrinsics": {
+        "path": "tests/r3.0d-hardened-intrinsics.test.js",
+        "assertions": 75,
+        "purpose": "Direct adversarial proof of each HI.* wrapper. Mutation-protected coverage for all 30 wrappers. D3 reuses HI exclusively — no D3-side HI mutation extends this suite (D3-specific mutation coverage lives in tests/r3.0d-hypothesis-engine.test.js Section J)."
+      },
+      "r3.0d-evidence-graph": {
+        "path": "tests/r3.0d-evidence-graph.test.js",
+        "assertions": 261,
+        "purpose": "D2 Evidence Graph adversarial suite. Unchanged at D3 — D2 production code is unchanged at D3."
+      }
+    },
+    "stateAwareRefactor": "No state-aware refactor required at D3. The R3.0D state-aware contract-foundation tests already accommodate the D3 currentCheckpoint value because the existing D2-branch invariants remain valid at D3 (contracts/r3.0d/* unchanged + evidence-graph production unchanged + hardened-intrinsics unchanged).",
+    "evidenceTier": "TIER 3 — Claude-verified on D3 branch HEAD; CI re-run on integrationSha is the authority for the Train target context."
+  },
+
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 7,
+    "reviewedCandidateSha": "7b01fd8ae1c231d6b147d7a21a0d16d89e40c0b4",
+    "verdictEvidenceFile": "governance/r3.0d/codex-checkpoint-evidence/D3/round-7-7b01fd8.raw.txt",
+    "rounds": [
+      { "round": 1, "reviewedSha": "7368143", "verdict": "BLOCK", "findings": "9 BLOCK + 2 NIT (RN-01..RN-11)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D3/round-1-7368143.raw.txt" },
+      { "round": 2, "reviewedSha": "388edca", "verdict": "BLOCK", "findings": "5 BLOCK + 3 NIT (R2-01..R2-08)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D3/round-2-388edca.raw.txt" },
+      { "round": 3, "reviewedSha": "ac9f9a0", "verdict": "BLOCK", "findings": "5 BLOCK + 2 NIT (R3-01..R3-07)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D3/round-3-ac9f9a0.raw.txt" },
+      { "round": 4, "reviewedSha": "11ad6a5", "verdict": "BLOCK", "findings": "1 BLOCK + 2 NIT (D3-R4-01..03)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D3/round-4-11ad6a5.raw.txt" },
+      { "round": 5, "reviewedSha": "abaca2e", "verdict": "BLOCK", "findings": "1 BLOCK + 3 NIT (D3-R5-01..04)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D3/round-5-abaca2e.raw.txt" },
+      { "round": 6, "reviewedSha": "9254c84", "verdict": "BLOCK", "findings": "3 BLOCK + 2 NIT (D3-R6-01..05)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D3/round-6-9254c84.raw.txt" },
+      { "round": 7, "reviewedSha": "7b01fd8", "verdict": "PASS", "findings": "0 BLOCK + 2 NIT (D3-R7-01/02, both closed in this anchor commit)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D3/round-7-7b01fd8.raw.txt", "summary": "Reviewed 7b01fd8ae1c231d6b147d7a21a0d16d89e40c0b4. All three R6 BLOCK findings closed: duplicate-edge multi-set semantics (N accepted / N-1 / N+1 rejected); per-node + total edge caps aligned with D2 (64 / 1024); hash implementation byte-equivalent (test helper matched D2 graphId exactly; constructed fixture accepted). Verified D3: 156/0, D2: 261/0, D1 contract foundation: 156/0. 27 distinct adversarial findings across R1-R7 closed (RN-01..RN-11, R2-01..R2-08, R3-01..R3-07, D3-R4-01..03, D3-R5-01..04, D3-R6-01..05, D3-R7-01..02)." }
+    ],
+    "shaSeparationNote": "shaSeparation.reviewedCandidateSha + this codexVerdict.reviewedCandidateSha both reference the exact SHA Codex D3 R7 reviewed (7b01fd8...). The manifestCommitSha and integrationSha remain null pending the PASS-anchor commit + Train merge respectively."
+  },
+
+  "scopeBoundary": {
+    "frozenFilesUntouched": true,
+    "r30bPersistenceUntouched": true,
+    "r30cContractsUntouched": true,
+    "r30cProductionUntouched": true,
+    "featureRegistryUnchanged": true,
+    "indexHtmlUnchanged": true,
+    "noR30dFeatureIdInRegistry": true,
+    "runtimeConsumerCount": 2,
+    "productionPathCount": 2,
+    "algorithmCount": 2,
+    "uiSurfaceCount": 0
+  },
+
+  "frozenDiff": 0,
+  "productionDiff": 1,
+  "runtimeConsumerCount": 2,
+
+  "featureRegistryState": {
+    "expectedDeferredIds": ["decision_engine", "hypothesis", "engineer_brief"],
+    "expectedRendererAdapter": false,
+    "note": "D3 does NOT register any R3.0D feature ID. Feature Registry activation is exclusively D5_ENGINEER_BRIEF_ACTIVATION. Final feature ID names confirmed at D5 authorization time."
+  },
+
+  "crossPhaseGate": {
+    "r3cCheckpoint": "C8_ACTIVATION",
+    "requiredFor": "D3_HYPOTHESIS_ENGINE",
+    "satisfied": true,
+    "note": "Per train.schema.json crossPhaseAdvanceRequires + governance/r3.0d/schema.json transitions, R3.0D non-bootstrap checkpoints (D1..D5) require R3.0C state.currentCheckpoint === 'C8_ACTIVATION'. Verified via governance/r3.0c/state.json snapshot."
+  },
+
+  "packageVersion": "1.4.0",
+  "createdAt": "2026-06-29T00:50:00Z",
+
+  "status": "candidate",
+  "governanceChanged": true,
+
+  "changedFiles": [
+    "renderer/js/r3-0d-hypothesis-engine.js",
+    "tests/r3.0d-hypothesis-engine.test.js",
+    "governance/r3.0d/checkpoints/D3.json",
+    "governance/r3.0d/state.json",
+    "governance/r3.0/train.json",
+    "package.json",
+    "governance/r3.0d/codex-checkpoint-evidence/D3/round-1-7368143.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D3/round-2-388edca.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D3/round-3-ac9f9a0.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D3/round-4-11ad6a5.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D3/round-5-abaca2e.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D3/round-6-9254c84.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D3/round-7-7b01fd8.raw.txt"
+  ],
+  "changedFilesNote": "Computed from the exact baseSha (299771a) → D3 candidate HEAD diff. Adds: (1) renderer/js/r3-0d-hypothesis-engine.js — production module (~1000 lines after R1..R4 closures, all HI-wrapped, 4-layer integrity guards, closed 9-rule registry, layered authority (frozen-input check via captured Object.isFrozen + structuredClone defang + post-clone deepOriginalShapeAudit + full D1-contract SourceIdentity revalidation via SI.validateSourceIdentity + correlation-partition reconstruction with D2-exact canonical encoding + correlationGroupId D2-recompute equality + closed edge.kind enum + graphId FNV-1a 32-bit×2 recompute), deterministic confidence model with mandatory freshness reference, deep-frozen output); (2) tests/r3.0d-hypothesis-engine.test.js — 148-assertion adversarial suite (sections A..K plus H2/H3/H4/H5 R1/R2/R3/R4 closure tests; mutation coverage on 21 HI wrappers + captured Date.parse/Object.is/Object.isFrozen via J1..J21); (3) governance/r3.0d/checkpoints/D3.json — this manifest; (4) state transitions in state.json + train.json + train phaseStates; (5) package.json adds new test entry to the scripts.test chain so the per-file manifest scanner discovers it deterministically.",
+
+  "note": "R3.0D D3_HYPOTHESIS_ENGINE checkpoint — first decision-engine production path. The engine deterministically derives Hypothesis objects from a D2 authoritative Evidence Graph snapshot using a closed rule registry. Contradiction-aware, correlation-aware, freshness-aware. No LLM. Mandatory HI-wrapped intrinsic discipline carries forward from D2 (hardened-intrinsics is single source of truth; mutation-protected for all 30 wrappers). Capability hypothesis_engine_present is enabled; uiAllowed + featureRegistryActivationAllowed remain false (exclusive to D5)."
+}
