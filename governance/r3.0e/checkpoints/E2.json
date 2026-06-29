@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0E",
+  "checkpoint": "E2_EXPERIMENT_STORE",
+  "baseSha": "86682fe1105a02e45212bd7b173637f331063768",
+  "headSha": null,
+  "previousCheckpoint": "E1_CONTRACT_FOUNDATION",
+  "shaSeparation": {
+    "note": "Three-way SHA separation per the established R3.0 convention.",
+    "reviewedCandidateSha": null,
+    "reviewedCandidateNote": "Filled after Codex E2 PASS verdict against a specific candidate SHA. Tier 1 raw evidence: governance/r3.0e/codex-checkpoint-evidence/E2/round-N-<sha>.raw.txt.",
+    "manifestCommitSha": null,
+    "integrationSha": null
+  },
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0e-stores.js", "capability": "experiment_store_present" }
+  ],
+  "newlyAuthorizedPaths": [
+    "renderer/js/r3-0e-stores.js"
+  ],
+  "newlyEnabledCapabilities": ["experiment_store_present"],
+  "enabledCapabilitiesBefore": ["contract_foundation_present"],
+  "enabledCapabilitiesAfter": ["contract_foundation_present", "experiment_store_present"],
+  "forbiddenCapabilities": [
+    "outcome_classifier_present",
+    "case_timeline_present",
+    "feature_registry_active"
+  ],
+  "contractEnforcements": {
+    "storeScope": "renderer/js/r3-0e-stores.js exposes createExperimentStore / createOutcomeStore / createTimelineStore / createFollowUpLinkStore / createStoreMetadata. Each factory takes a backend (matching the R3.0B createCaseStore convention: backend.transact(stores, mode, work)). Stores: r3_0e_experiments / r3_0e_experimentsIndex / r3_0e_outcomes / r3_0e_outcomesIndex / r3_0e_timelines / r3_0e_followupLinks / r3_0e_followupLinksByCase / r3_0e_storeMetadata.",
+    "writeValidation": "Every create / update / appendEvent validates the payload against the E1 contract before write. Invalid payload → reject with R3_0E_*_INVALID + the contract reasonCodes.",
+    "readValidation": "Every get / list re-validates against the E1 contract on read. Corrupted record → R3_0E_*_CORRUPTED. Future schemaVersion → R3_0E_*_FUTURE_SCHEMA (fail-closed — caller cannot accidentally treat a future-version record as current).",
+    "idempotency": "Duplicate create → R3_0E_*_ID_COLLISION. Same-token re-write of timeline event → R3_0E_TIMELINE_DUPLICATE_EVENT.",
+    "staleGeneration": "Experiment update with mismatched createdAt → R3_0E_EXPERIMENT_STALE_WRITE (optimistic concurrency on the immutable createdAt anchor).",
+    "appendOnlyTimeline": "Timeline events are append-only. Existing events are NEVER overwritten. A correction is expressed as a NEW event referencing the prior event id (semantic enforcement at E4).",
+    "rehydrationAuthority": "Persisted records DO NOT carry runtime authority (WeakSet identity cannot survive reload). Rehydration MUST re-validate via the E1 contracts and re-register with the appropriate runtime authority registry BEFORE downstream consumers treat the rehydrated value as authoritative. The store layer does NOT export WeakSet, register function, secret, or signing capability.",
+    "r3bUntouched": "The R3.0B portable case-record schema body remains unchanged. The pre-existing R3.0B associations `experimentId` and `followUpCaseIds` are id-only refs; E2 does not introduce R3.0E-specific fields into renderer/js/case-record-schema.js. Test G1 / G2 confirm case-record-schema.js does NOT require r3-0e-stores.js and does NOT embed E2 store names."
+  },
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3.0e-stores.test.js",
+    "newSuiteAssertions": 30,
+    "evidenceTier": "TIER 3 — Claude-verified on E2 branch HEAD; CI re-run on integrationSha is the authority."
+  },
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": {
+    "verdict": "pending",
+    "verdictRound": 0,
+    "reviewedCandidateSha": null,
+    "verdictEvidenceFile": null,
+    "rounds": []
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "scopeBoundary": {
+    "frozenFilesUntouched": true,
+    "r30bPersistenceUntouched": true,
+    "r30cContractsUntouched": true,
+    "r30cProductionUntouched": true,
+    "r30dContractsUntouched": true,
+    "r30dProductionUntouched": true,
+    "featureRegistryUnchanged": true,
+    "indexHtmlUnchanged": true,
+    "noR30eFeatureIdInRegistry": true,
+    "runtimeConsumerCount": 1,
+    "productionPathCount": 1,
+    "algorithmCount": 1,
+    "uiSurfaceCount": 0
+  },
+  "frozenDiff": 0,
+  "productionDiff": 1,
+  "runtimeConsumerCount": 1,
+  "featureRegistryState": {
+    "expectedRegisteredIds": [],
+    "expectedDeferredIds": ["experiment_loop", "case_timeline"],
+    "note": "E2 does NOT register any R3.0E feature ID. Feature Registry activation is exclusively E5_ACTIVATION."
+  },
+  "crossPhaseGate": {
+    "r3dCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+    "requiredFor": "E2_EXPERIMENT_STORE",
+    "satisfied": true
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": "2026-06-30T00:00:00Z",
+  "status": "candidate",
+  "governanceChanged": true,
+  "changedFiles": [
+    "renderer/js/r3-0e-stores.js",
+    "tests/r3.0e-stores.test.js",
+    "governance/r3.0e/checkpoints/E2.json",
+    "governance/r3.0e/state.json",
+    "governance/r3.0/train.json",
+    "package.json"
+  ],
+  "note": "R3.0E E2_EXPERIMENT_STORE — IndexedDB-backed stores for experiment / outcome / timeline / follow-up link with E1 contract validation on both write and read. No UI; no Feature Registry change."
+}
