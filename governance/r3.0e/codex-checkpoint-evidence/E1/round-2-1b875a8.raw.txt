@@ -1,0 +1,1927 @@
+OpenAI Codex v0.141.0
+--------
+workdir: /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: medium
+reasoning summaries: none
+session id: 019f15c5-c467-7ee1-97b2-38e8c0c2ccdc
+--------
+user
+# Codex E1 Round 2 — review R1 closures + re-sweep
+
+## Subject
+- Branch: feat/r3.0e-e1-experiment-contracts
+- Candidate SHA: **1b875a8d7479801d2ff494a7398875e3093c6d4a**
+- Train base: 2633032
+- PR #27
+- Round 1 (a2f78f7): BLOCK x4, closed in 1b875a8.
+
+## R1 closures applied in 1b875a8
+
+- E1-R1-01: contracts/r3.0e/reason-codes.js hasNonPlainNestedObject — recursive descriptor audit (depth 32 / 4096 nodes); rejects Symbol-keyed, non-enumerable, accessor, non-plain prototype, function/symbol/bigint at any depth.
+- E1-R1-02: case-timeline-contract.js + follow-up-link-contract.js — SUPPORTED_SCHEMA_VERSION + UNSUPPORTED_FUTURE_SCHEMA for version>1.
+- E1-R1-03: experiment-contract.js — outcome MUST be null when status in {draft,planned,applied}; non-null only for {completed,abandoned,invalid}.
+- E1-R1-04: experiment-contract.js — stopConditions ARRAY_CAP + closed-shape per-element.
+
+Section I regression: 13 new assertions; total 46/0.
+Local: npm test 85/85, 0 failures.
+
+## Round 2 task
+
+Verify R1 closures hold. Re-sweep. Be TERSE.
+
+Finding E1-R2-NN: <one-line>
+  evidence: file:line
+  severity: BLOCK|NIT
+  proposed closure: <change>
+
+Maximum 8 findings. Only BLOCK unless materially blocking.
+
+End with EXACTLY one of:
+
+FINAL VERDICT: PASS
+
+FINAL VERDICT: BLOCK
+
+codex
+I’ll inspect the PR diff and the contract/test files around the four R1 fixes, then run a focused sweep for remaining contract gaps. Since the workspace is read-only, I’ll review and test where possible without editing.
+exec
+/bin/bash -lc 'git status --short && git rev-parse HEAD && git log --oneline -5' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-5Uy2EQ5U' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-dT44Ph2h' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-p125gDFi' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-Ngk5o52O' (errno=Operation not permitted)
+1b875a8d7479801d2ff494a7398875e3093c6d4a
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-s9Ta9NsY' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-jyJhIydk' (errno=Operation not permitted)
+1b875a8 e1(r2): close Codex E1 Round 1 — 4 BLOCK findings closed
+a2f78f7 e1(initial): R3.0E E1_CONTRACT_FOUNDATION — Experiment / Outcome / Control Variables / Case Timeline / Follow-up Link shape contracts
+2633032 Merge pull request #26 from USADA-KARROT/chore/r3.0d-formal-d-gate-closures
+43ecfe6 d-gate(r4): anchor Formal Codex D phase gate Round 3 PASS — R3.0D D phase formally complete
+c5d56b7 d-gate(r3): close Formal Codex D phase gate Round 2 — D-GATE-04 (mandatory captured verifier) closed
+
+exec
+/bin/bash -lc 'git diff --stat 2633032..1b875a8d7479801d2ff494a7398875e3093c6d4a && git diff --name-only 2633032..1b875a8d7479801d2ff494a7398875e3093c6d4a' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-9Jqa5gqi' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-PuCWn4j2' (errno=Operation not permitted)
+ contracts/r3.0e/case-timeline-contract.js          |   91 ++
+ contracts/r3.0e/control-variables-contract.js      |   68 +
+ contracts/r3.0e/experiment-contract.js             |  191 +++
+ contracts/r3.0e/follow-up-link-contract.js         |   72 +
+ contracts/r3.0e/index.js                           |   35 +
+ contracts/r3.0e/outcome-contract.js                |  112 ++
+ contracts/r3.0e/reason-codes.js                    |  176 ++
+ governance/r3.0/train.json                         |    8 +-
+ governance/r3.0e/checkpoints/E1.json               |  101 ++
+ .../E1/round-1-a2f78f7.raw.txt                     | 1698 ++++++++++++++++++++
+ governance/r3.0e/state.json                        |    6 +-
+ package.json                                       |    2 +-
+ tests/r3-0c-activation.test.js                     |   13 +-
+ tests/r3.0e-contract-foundation.test.js            |  286 ++++
+ 14 files changed, 2849 insertions(+), 10 deletions(-)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-DlxLRiiZ' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-8s7a8Cqm' (errno=Operation not permitted)
+contracts/r3.0e/case-timeline-contract.js
+contracts/r3.0e/control-variables-contract.js
+contracts/r3.0e/experiment-contract.js
+contracts/r3.0e/follow-up-link-contract.js
+contracts/r3.0e/index.js
+contracts/r3.0e/outcome-contract.js
+contracts/r3.0e/reason-codes.js
+governance/r3.0/train.json
+governance/r3.0e/checkpoints/E1.json
+governance/r3.0e/codex-checkpoint-evidence/E1/round-1-a2f78f7.raw.txt
+governance/r3.0e/state.json
+package.json
+tests/r3-0c-activation.test.js
+tests/r3.0e-contract-foundation.test.js
+
+codex
+HEAD matches the candidate SHA. I’ve got the changed-file set; next I’m reading the R3.0E contracts directly with line numbers and will probe edge cases that could escape the new assertions.
+exec
+/bin/bash -lc 'nl -ba contracts/r3.0e/experiment-contract.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+     1	/**
+     2	 * contracts/r3.0e/experiment-contract.js — R3.0E E1 · Experiment shape contract (NON-PRODUCTION).
+     3	 *
+     4	 * Defines the structural shape of an Experiment object. Mirrors the D1 pattern: closed key
+     5	 * set + closed-enum status + mandatory field presence + bounded strings/arrays + no causal
+     6	 * overclaim at the structural layer (E3 outcome classifier enforces semantic invariants).
+     7	 *
+     8	 * Experiment is a R3.0E-owned object stored in a SEPARATE versioned IndexedDB namespace
+     9	 * at E2_EXPERIMENT_STORE. It is NEVER an extension of the frozen R3.0B case-record schema
+    10	 * (per SKYLINE D12/E1 ruling). The follow-up linkage between Experiment and Case is
+    11	 * BIDIRECTIONAL but lives in a separate linkage object.
+    12	 *
+    13	 * UMD: Node require / Electron renderer global (R3_0E_ExperimentContract).
+    14	 */
+    15	(function (root) {
+    16	  'use strict';
+    17	
+    18	  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+    19	  var RC = _req('./reason-codes.js', typeof R3_0E_ReasonCodes !== 'undefined' ? R3_0E_ReasonCodes : undefined);
+    20	  if (!RC) throw new Error('experiment-contract.js requires reason-codes.js');
+    21	  var CODES = RC.REASON_CODES;
+    22	
+    23	  // Closed key set for an Experiment object.
+    24	  var EXPERIMENT_KEYS = Object.freeze([
+    25	    'schemaVersion',
+    26	    'experimentId',                  // 'exp_<16hex>'
+    27	    'sourceCaseId',                  // R3.0B case-record caseId (string ref only — no schema extension)
+    28	    'sourceHypothesisId',            // R3.0D hypothesisId
+    29	    'sourceRecommendationId',        // R3.0D priorityId or recommendation reference
+    30	    'targetMetric',                  // canonical channel id (e.g., 'roll_gradient_deg_per_g')
+    31	    'baselineValue',                 // numeric baseline (from D5 brief / case observation)
+    32	    'expectedDirection',             // 'increase' | 'decrease' | 'no_change'
+    33	    'expectedMagnitudeRange',        // { min: number, max: number } both finite, min <= max
+    34	    'setupChange',                   // structured object describing the setup mutation
+    35	    'driverInstruction',             // optional driver-facing instruction (i18n key)
+    36	    'controlVariables',              // array of control variable descriptors
+    37	    'validationPlan',                // string i18n key referencing the validation procedure
+    38	    'stopConditions',                // array of { i18nKey, params } guard conditions
+    39	    'status',                        // EXPERIMENT_STATUS_ALLOWED enum
+    40	    'followUpCaseIds',               // array of follow-up case ids (R3.0B references)
+    41	    'outcome',                       // nullable — set at E3
+    42	    'createdAt',                     // ISO 8601 string
+    43	  ]);
+    44	
+    45	  // Status enum — closed.
+    46	  var EXPERIMENT_STATUS_ALLOWED = Object.freeze([
+    47	    'draft',
+    48	    'planned',
+    49	    'applied',
+    50	    'completed',
+    51	    'abandoned',
+    52	    'invalid',
+    53	  ]);
+    54	
+    55	  // Expected direction enum.
+    56	  var EXPECTED_DIRECTION_ALLOWED = Object.freeze(['increase', 'decrease', 'no_change']);
+    57	
+    58	  var SUPPORTED_SCHEMA_VERSION = 1;
+    59	  var ARRAY_CAP = 32;
+    60	  var STRING_BYTE_CAP = 512;
+    61	  var ENVELOPE_BYTE_CAP = 128 * 1024;
+    62	
+    63	  var EXPERIMENT_ID_RE = /^exp_[0-9a-f]{16,32}$/;
+    64	  var ID_GRAMMAR_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+    65	  var ID_FORBIDDEN_RE = /(\.\.|[\/\\]|^\.)/;
+    66	
+    67	  function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
+    68	  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (typeof k === 'symbol') return false; if (allowed.indexOf(k) === -1) return false; } return true; }
+    69	  function _utf8Bytes(s) { try { return (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(s).length : Buffer.byteLength(s, 'utf8'); } catch (e) { return (typeof s === 'string') ? s.length * 4 : 0; } }
+    70	  function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
+    71	  function _finite(n) { return typeof n === 'number' && isFinite(n) && !isNaN(n); }
+    72	
+    73	  /**
+    74	   * validateExperimentShape(e) — E1 STRUCTURAL gate.
+    75	   */
+    76	  function validateExperimentShape(eIn) {
+    77	    try {
+    78	      if (!RC.isOriginalPlainObject(eIn)) return RC.buildBlockedResult([CODES.EXPERIMENT_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'experiment prototype is not Object.prototype or null' });
+    79	      if (RC.hasHiddenOwnKey(eIn)) return RC.buildBlockedResult([CODES.EXPERIMENT_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'experiment carries Symbol-keyed or non-enumerable own property' });
+    80	      if (RC.hasNonPlainNestedObject(eIn)) return RC.buildBlockedResult([CODES.EXPERIMENT_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'experiment contains nested non-plain object' });
+    81	      var e = RC.toCleanCopy(eIn);
+    82	      if (!_isPlain(e)) return RC.buildBlockedResult([CODES.EXPERIMENT_INVALID], { detail: 'experiment not plain object' });
+    83	      if (!_hasOnlyAllowedKeys(e, EXPERIMENT_KEYS)) return RC.buildBlockedResult([CODES.EXPERIMENT_INVALID, CODES.UNKNOWN_OWN_KEY]);
+    84	
+    85	      var reasons = [];
+    86	
+    87	      if (!Number.isInteger(e.schemaVersion)) reasons.push(CODES.EXPERIMENT_INVALID);
+    88	      else if (e.schemaVersion > SUPPORTED_SCHEMA_VERSION) reasons.push(CODES.UNSUPPORTED_FUTURE_SCHEMA);
+    89	      else if (e.schemaVersion < 1) reasons.push(CODES.EXPERIMENT_INVALID);
+    90	
+    91	      if (!_nonEmptyStr(e.experimentId) || !EXPERIMENT_ID_RE.test(e.experimentId)) reasons.push(CODES.EXPERIMENT_INVALID);
+    92	
+    93	      // sourceCaseId — string ref only (no schema extension into R3.0B). Validate grammar only.
+    94	      if (!_nonEmptyStr(e.sourceCaseId) || ID_FORBIDDEN_RE.test(e.sourceCaseId) || !ID_GRAMMAR_RE.test(e.sourceCaseId)) reasons.push(CODES.EXPERIMENT_INVALID);
+    95	
+    96	      if (!_nonEmptyStr(e.sourceHypothesisId) || ID_FORBIDDEN_RE.test(e.sourceHypothesisId) || !ID_GRAMMAR_RE.test(e.sourceHypothesisId)) reasons.push(CODES.EXPERIMENT_INVALID);
+    97	      if (!_nonEmptyStr(e.sourceRecommendationId) || ID_FORBIDDEN_RE.test(e.sourceRecommendationId) || !ID_GRAMMAR_RE.test(e.sourceRecommendationId)) reasons.push(CODES.EXPERIMENT_INVALID);
+    98	
+    99	      if (!_nonEmptyStr(e.targetMetric) || _utf8Bytes(e.targetMetric) > STRING_BYTE_CAP) reasons.push(CODES.EXPERIMENT_TARGET_METRIC_INVALID);
+   100	
+   101	      if (!_finite(e.baselineValue)) reasons.push(CODES.EXPERIMENT_BASELINE_MISSING);
+   102	
+   103	      if (EXPECTED_DIRECTION_ALLOWED.indexOf(e.expectedDirection) === -1) reasons.push(CODES.EXPERIMENT_EXPECTED_DIRECTION_INVALID);
+   104	
+   105	      if (!_isPlain(e.expectedMagnitudeRange) || !_finite(e.expectedMagnitudeRange.min) || !_finite(e.expectedMagnitudeRange.max) || e.expectedMagnitudeRange.min > e.expectedMagnitudeRange.max) {
+   106	        reasons.push(CODES.EXPERIMENT_EXPECTED_MAGNITUDE_RANGE_INVALID);
+   107	      }
+   108	
+   109	      if (!_isPlain(e.setupChange)) reasons.push(CODES.EXPERIMENT_SETUP_CHANGE_INVALID);
+   110	
+   111	      // driverInstruction is OPTIONAL — null permitted; non-empty string when present.
+   112	      if (e.driverInstruction !== null && !_nonEmptyStr(e.driverInstruction)) reasons.push(CODES.EXPERIMENT_DRIVER_INSTRUCTION_INVALID);
+   113	
+   114	      if (!Array.isArray(e.controlVariables) || e.controlVariables.length > ARRAY_CAP) reasons.push(CODES.CONTROL_VARIABLES_INVALID);
+   115	
+   116	      if (!_nonEmptyStr(e.validationPlan) || _utf8Bytes(e.validationPlan) > STRING_BYTE_CAP) reasons.push(CODES.EXPERIMENT_VALIDATION_PLAN_MISSING);
+   117	
+   118	      // Codex E1-R1-04 closure: stopConditions array cap + element-shape enforcement.
+   119	      // Each entry MUST be a plain { i18nKey, params } with non-empty i18nKey; arbitrary
+   120	      // strings, accessors, or nested non-plain rejected.
+   121	      if (!Array.isArray(e.stopConditions) || e.stopConditions.length === 0) reasons.push(CODES.EXPERIMENT_STOP_CONDITIONS_MISSING);
+   122	      else if (e.stopConditions.length > ARRAY_CAP) reasons.push(CODES.ARRAY_CAP_EXCEEDED);
+   123	      else {
+   124	        for (var sci = 0; sci < e.stopConditions.length; sci++) {
+   125	          var sc = e.stopConditions[sci];
+   126	          if (!_isPlain(sc)) { reasons.push(CODES.EXPERIMENT_STOP_CONDITIONS_MISSING); break; }
+   127	          var scKeys; try { scKeys = Reflect.ownKeys(sc); } catch (eK) { reasons.push(CODES.EXPERIMENT_STOP_CONDITIONS_MISSING); break; }
+   128	          var scKeyOk = true;
+   129	          for (var sk = 0; sk < scKeys.length; sk++) {
+   130	            if (typeof scKeys[sk] === 'symbol') { scKeyOk = false; break; }
+   131	            if (['i18nKey', 'params'].indexOf(scKeys[sk]) === -1) { scKeyOk = false; break; }
+   132	          }
+   133	          if (!scKeyOk) { reasons.push(CODES.EXPERIMENT_STOP_CONDITIONS_MISSING); break; }
+   134	          if (!_nonEmptyStr(sc.i18nKey)) { reasons.push(CODES.EXPERIMENT_STOP_CONDITIONS_MISSING); break; }
+   135	          if (sc.params !== null && sc.params !== undefined && !_isPlain(sc.params)) { reasons.push(CODES.EXPERIMENT_STOP_CONDITIONS_MISSING); break; }
+   136	        }
+   137	      }
+   138	
+   139	      if (EXPERIMENT_STATUS_ALLOWED.indexOf(e.status) === -1) reasons.push(CODES.EXPERIMENT_STATUS_INVALID);
+   140	
+   141	      if (!Array.isArray(e.followUpCaseIds) || e.followUpCaseIds.length > ARRAY_CAP) reasons.push(CODES.LINKAGE_INVALID);
+   142	
+   143	      // Codex E1-R1-03 closure: outcome MUST be null until E3 produces it. A draft/planned
+   144	      // experiment cannot carry a caller-supplied outcome object — the outcome belongs to
+   145	      // the E3 outcome classifier authority chain and arrives only AFTER status reaches a
+   146	      // post-applied stage. We allow non-null outcome only for completed/abandoned/invalid
+   147	      // statuses; for draft/planned/applied, outcome MUST be null. This prevents callers
+   148	      // from laundering a "confirmed" classification past the contract layer.
+   149	      var statusAllowsOutcome = (e.status === 'completed' || e.status === 'abandoned' || e.status === 'invalid');
+   150	      if (e.outcome !== null) {
+   151	        if (!statusAllowsOutcome) reasons.push(CODES.OUTCOME_INVALID);
+   152	        else if (!_isPlain(e.outcome)) reasons.push(CODES.OUTCOME_INVALID);
+   153	      }
+   154	
+   155	      if (!_nonEmptyStr(e.createdAt)) reasons.push(CODES.EXPERIMENT_INVALID);
+   156	
+   157	      // Envelope byte cap.
+   158	      try {
+   159	        var serialized = JSON.stringify(e);
+   160	        var bytes = (typeof TextEncoder !== 'undefined') ? new TextEncoder().encode(serialized).length : Buffer.byteLength(serialized, 'utf8');
+   161	        if (bytes > ENVELOPE_BYTE_CAP) reasons.push(CODES.BYTE_CAP_EXCEEDED);
+   162	      } catch (eAny) { reasons.push(CODES.EXPERIMENT_INVALID); }
+   163	
+   164	      if (reasons.length) {
+   165	        var seen = Object.create(null), out = [];
+   166	        reasons.forEach(function (c) { if (!seen[c]) { seen[c] = true; out.push(c); } });
+   167	        return RC.buildBlockedResult(out);
+   168	      }
+   169	      return Object.freeze({ valid: true });
+   170	    } catch (eOuter) {
+   171	      return RC.buildBlockedResult([CODES.EXPERIMENT_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'experiment validator threw on hostile input' });
+   172	    }
+   173	  }
+   174	
+   175	  var api = {
+   176	    EXPERIMENT_KEYS: EXPERIMENT_KEYS,
+   177	    EXPERIMENT_STATUS_ALLOWED: EXPERIMENT_STATUS_ALLOWED,
+   178	    EXPECTED_DIRECTION_ALLOWED: EXPECTED_DIRECTION_ALLOWED,
+   179	    SUPPORTED_SCHEMA_VERSION: SUPPORTED_SCHEMA_VERSION,
+   180	    ARRAY_CAP: ARRAY_CAP,
+   181	    STRING_BYTE_CAP: STRING_BYTE_CAP,
+   182	    ENVELOPE_BYTE_CAP: ENVELOPE_BYTE_CAP,
+   183	    validateExperimentShape: validateExperimentShape,
+   184	  };
+   185	  Object.freeze(api);
+   186	  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+   187	  if (root) {
+   188	    try { Object.defineProperty(root, 'R3_0E_ExperimentContract', { value: api, writable: false, enumerable: false, configurable: false }); }
+   189	    catch (e) { root.R3_0E_ExperimentContract = api; }
+   190	  }
+   191	})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+exec
+/bin/bash -lc 'nl -ba contracts/r3.0e/reason-codes.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+     1	/**
+     2	 * contracts/r3.0e/reason-codes.js — R3.0E E1 · Reason codes (NON-PRODUCTION).
+     3	 *
+     4	 * Closed enum + structural helpers shared by every R3.0E contract module. Mirrors the
+     5	 * D1 reason-codes.js layering (RC.REASON_CODES, RC.ALL_REASON_CODES, RC.isReasonCode,
+     6	 * RC.buildBlockedResult, RC.isOriginalPlainObject, RC.hasHiddenOwnKey, RC.toCleanCopy)
+     7	 * so R3.0E contracts inherit the same hardened verification surface without re-implementing
+     8	 * it. R3.0D codes are NOT re-exported here — each phase owns its own reason-code namespace.
+     9	 *
+    10	 * UMD: Node require / Electron renderer global (R3_0E_ReasonCodes).
+    11	 */
+    12	(function (root) {
+    13	  'use strict';
+    14	
+    15	  // E1 reason codes — Experiment / Outcome / Case Timeline / Control Variables / follow-up
+    16	  // linkage. NOT a superset of D1; R3.0E owns its own namespace. Codes prefixed by the
+    17	  // contract they bind: EXPERIMENT_ / OUTCOME_ / CONTROL_ / TIMELINE_ / LINKAGE_.
+    18	  var REASON_CODES = Object.freeze({
+    19	    // ---- Structural ----
+    20	    EXPERIMENT_INVALID: 'EXPERIMENT_INVALID',
+    21	    OUTCOME_INVALID: 'OUTCOME_INVALID',
+    22	    CONTROL_VARIABLES_INVALID: 'CONTROL_VARIABLES_INVALID',
+    23	    TIMELINE_INVALID: 'TIMELINE_INVALID',
+    24	    LINKAGE_INVALID: 'LINKAGE_INVALID',
+    25	    UNKNOWN_OWN_KEY: 'UNKNOWN_OWN_KEY',
+    26	    BYTE_CAP_EXCEEDED: 'BYTE_CAP_EXCEEDED',
+    27	    ARRAY_CAP_EXCEEDED: 'ARRAY_CAP_EXCEEDED',
+    28	    PROTOTYPE_POLLUTION_REJECTED: 'PROTOTYPE_POLLUTION_REJECTED',
+    29	    UNSUPPORTED_FUTURE_SCHEMA: 'UNSUPPORTED_FUTURE_SCHEMA',
+    30	    INTERNAL_CONTRACT_VIOLATION: 'INTERNAL_CONTRACT_VIOLATION',
+    31	
+    32	    // ---- Experiment lifecycle ----
+    33	    EXPERIMENT_STATUS_INVALID: 'EXPERIMENT_STATUS_INVALID',
+    34	    EXPERIMENT_BASELINE_MISSING: 'EXPERIMENT_BASELINE_MISSING',
+    35	    EXPERIMENT_EXPECTED_DIRECTION_INVALID: 'EXPERIMENT_EXPECTED_DIRECTION_INVALID',
+    36	    EXPERIMENT_EXPECTED_MAGNITUDE_RANGE_INVALID: 'EXPERIMENT_EXPECTED_MAGNITUDE_RANGE_INVALID',
+    37	    EXPERIMENT_TARGET_METRIC_INVALID: 'EXPERIMENT_TARGET_METRIC_INVALID',
+    38	    EXPERIMENT_SETUP_CHANGE_INVALID: 'EXPERIMENT_SETUP_CHANGE_INVALID',
+    39	    EXPERIMENT_DRIVER_INSTRUCTION_INVALID: 'EXPERIMENT_DRIVER_INSTRUCTION_INVALID',
+    40	    EXPERIMENT_VALIDATION_PLAN_MISSING: 'EXPERIMENT_VALIDATION_PLAN_MISSING',
+    41	    EXPERIMENT_STOP_CONDITIONS_MISSING: 'EXPERIMENT_STOP_CONDITIONS_MISSING',
+    42	
+    43	    // ---- Outcome classification ----
+    44	    OUTCOME_CLASS_INVALID: 'OUTCOME_CLASS_INVALID',
+    45	    OUTCOME_COMPARABILITY_INSUFFICIENT: 'OUTCOME_COMPARABILITY_INSUFFICIENT',
+    46	    OUTCOME_CONFOUNDERS_PRESENT: 'OUTCOME_CONFOUNDERS_PRESENT',
+    47	    OUTCOME_DRIVER_FEEDBACK_INVALID: 'OUTCOME_DRIVER_FEEDBACK_INVALID',
+    48	    OUTCOME_DATA_QUALITY_INVALID: 'OUTCOME_DATA_QUALITY_INVALID',
+    49	
+    50	    // ---- Control variables ----
+    51	    CONTROL_VARIABLE_MISSING: 'CONTROL_VARIABLE_MISSING',
+    52	    CONTROL_VARIABLE_OUT_OF_RANGE: 'CONTROL_VARIABLE_OUT_OF_RANGE',
+    53	
+    54	    // ---- Case timeline + follow-up linkage ----
+    55	    TIMELINE_ORDERING_INVALID: 'TIMELINE_ORDERING_INVALID',
+    56	    LINKAGE_PARENT_MISSING: 'LINKAGE_PARENT_MISSING',
+    57	    LINKAGE_ORPHAN_FOLLOW_UP: 'LINKAGE_ORPHAN_FOLLOW_UP',
+    58	
+    59	    // ---- Limitations (bounded honesty) ----
+    60	    LIMITATION_NO_CONTROL_VARIABLES: 'LIMITATION_NO_CONTROL_VARIABLES',
+    61	    LIMITATION_CROSS_SESSION_FOLLOW_UP: 'LIMITATION_CROSS_SESSION_FOLLOW_UP',
+    62	    LIMITATION_PARENT_CASE_ARCHIVED: 'LIMITATION_PARENT_CASE_ARCHIVED',
+    63	  });
+    64	
+    65	  var ALL_REASON_CODES = Object.freeze(Object.keys(REASON_CODES));
+    66	  var _CODE_SET = (function () { var s = Object.create(null); for (var i = 0; i < ALL_REASON_CODES.length; i++) s[ALL_REASON_CODES[i]] = true; return s; })();
+    67	  function isReasonCode(c) { return typeof c === 'string' && _CODE_SET[c] === true; }
+    68	
+    69	  function buildBlockedResult(reasonCodes, opts) {
+    70	    opts = opts || {};
+    71	    var codes = [];
+    72	    var seen = Object.create(null);
+    73	    if (Array.isArray(reasonCodes)) {
+    74	      for (var i = 0; i < reasonCodes.length; i++) {
+    75	        var rc = reasonCodes[i];
+    76	        if (typeof rc === 'string' && !seen[rc]) { seen[rc] = true; codes.push(rc); }
+    77	      }
+    78	    }
+    79	    if (codes.length === 0) codes.push(REASON_CODES.INTERNAL_CONTRACT_VIOLATION);
+    80	    return Object.freeze({
+    81	      eligible: false,
+    82	      status: 'blocked',
+    83	      reasonCodes: Object.freeze(codes),
+    84	      explanationKeys: Object.freeze(codes.map(function (c) { return 'r3_0e.reason.' + c.toLowerCase(); })),
+    85	      detail: typeof opts.detail === 'string' ? opts.detail : '',
+    86	      result: null,
+    87	    });
+    88	  }
+    89	
+    90	  // ---- Structural helpers shared by every R3.0E contract module ----
+    91	  function isOriginalPlainObject(v) {
+    92	    if (v === null || typeof v !== 'object' || Array.isArray(v)) return false;
+    93	    try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; }
+    94	    catch (e) { return false; }
+    95	  }
+    96	  function hasHiddenOwnKey(o) {
+    97	    try {
+    98	      var syms = Object.getOwnPropertySymbols(o);
+    99	      if (syms && syms.length > 0) return true;
+   100	      var names = Object.getOwnPropertyNames(o);
+   101	      for (var i = 0; i < names.length; i++) {
+   102	        var d = Object.getOwnPropertyDescriptor(o, names[i]);
+   103	        if (!d || d.enumerable !== true) return true;
+   104	        if (typeof d.get === 'function' || typeof d.set === 'function') return true;
+   105	      }
+   106	      return false;
+   107	    } catch (e) { return true; }
+   108	  }
+   109	  function hasNonPlainNestedObject(o) {
+   110	    // Codex E1-R1-01 closure: recursive descriptor audit. Walks every nested object/array
+   111	    // descriptor, rejecting Symbol-keyed own keys, non-enumerable own keys, accessor
+   112	    // (get/set) descriptors, non-plain prototypes (class instances / Proxy targets /
+   113	    // arbitrary class), and sparse-array hole patterns. Bounded depth 32 + max nodes
+   114	    // 4096 to bound traversal.
+   115	    try {
+   116	      var stack = [o];
+   117	      var visited = 0;
+   118	      while (stack.length > 0 && visited < 4096) {
+   119	        var v = stack.shift(); visited++;
+   120	        if (v === null) continue;
+   121	        var t = typeof v;
+   122	        if (t === 'function' || t === 'symbol' || t === 'bigint') return true;
+   123	        if (t !== 'object') continue;
+   124	        var isArr = Array.isArray(v);
+   125	        if (!isArr) {
+   126	          var p = Object.getPrototypeOf(v);
+   127	          if (!(p === Object.prototype || p === null)) return true;
+   128	        } else {
+   129	          var p2 = Object.getPrototypeOf(v);
+   130	          if (p2 !== Array.prototype) return true;
+   131	        }
+   132	        // Symbol-keyed own keys → reject at any nesting depth.
+   133	        var syms;
+   134	        try { syms = Object.getOwnPropertySymbols(v); } catch (e) { return true; }
+   135	        if (syms && syms.length > 0) return true;
+   136	        var names = Object.getOwnPropertyNames(v);
+   137	        for (var j = 0; j < names.length; j++) {
+   138	          var name = names[j];
+   139	          // Array.length is non-enumerable own — skip it from the audit while still
+   140	          // walking indexed entries below.
+   141	          if (isArr && name === 'length') continue;
+   142	          var d;
+   143	          try { d = Object.getOwnPropertyDescriptor(v, name); } catch (eDesc) { return true; }
+   144	          if (!d) return true;
+   145	          if (typeof d.get === 'function' || typeof d.set === 'function') return true;
+   146	          if (d.enumerable !== true) return true;
+   147	          stack.push(d.value);
+   148	        }
+   149	      }
+   150	      return false;
+   151	    } catch (e) { return true; }
+   152	  }
+   153	  function toCleanCopy(o) {
+   154	    try {
+   155	      if (typeof structuredClone === 'function') return structuredClone(o);
+   156	      return JSON.parse(JSON.stringify(o));
+   157	    } catch (e) { return null; }
+   158	  }
+   159	
+   160	  var api = {
+   161	    REASON_CODES: REASON_CODES,
+   162	    ALL_REASON_CODES: ALL_REASON_CODES,
+   163	    isReasonCode: isReasonCode,
+   164	    buildBlockedResult: buildBlockedResult,
+   165	    isOriginalPlainObject: isOriginalPlainObject,
+   166	    hasHiddenOwnKey: hasHiddenOwnKey,
+   167	    hasNonPlainNestedObject: hasNonPlainNestedObject,
+   168	    toCleanCopy: toCleanCopy,
+   169	  };
+   170	  Object.freeze(api);
+   171	  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+   172	  if (root) {
+   173	    try { Object.defineProperty(root, 'R3_0E_ReasonCodes', { value: api, writable: false, enumerable: false, configurable: false }); }
+   174	    catch (e) { root.R3_0E_ReasonCodes = api; }
+   175	  }
+   176	})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+exec
+/bin/bash -lc 'nl -ba contracts/r3.0e/case-timeline-contract.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+     1	/**
+     2	 * contracts/r3.0e/case-timeline-contract.js — R3.0E E1 (NON-PRODUCTION).
+     3	 *
+     4	 * Case Timeline shape: a chronologically-ordered, structurally-validated sequence of
+     5	 * timeline events for a case lineage (baseline → recommendation → applied setup → follow-up
+     6	 * → outcome). Bidirectional parent ↔ follow-up linkage lives in the linkage contract; the
+     7	 * timeline contract is the read-only display shape.
+     8	 */
+     9	(function (root) {
+    10	  'use strict';
+    11	  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+    12	  var RC = _req('./reason-codes.js', typeof R3_0E_ReasonCodes !== 'undefined' ? R3_0E_ReasonCodes : undefined);
+    13	  if (!RC) throw new Error('case-timeline-contract.js requires reason-codes.js');
+    14	  var CODES = RC.REASON_CODES;
+    15	
+    16	  var TIMELINE_KEYS = Object.freeze([
+    17	    'schemaVersion',
+    18	    'caseId',
+    19	    'events',                          // array of timeline-event objects
+    20	  ]);
+    21	
+    22	  var EVENT_KEYS = Object.freeze(['eventId', 'kind', 'createdAt', 'i18nKey', 'params']);
+    23	
+    24	  var EVENT_KIND_ALLOWED = Object.freeze([
+    25	    'baseline_captured',
+    26	    'hypothesis_recorded',
+    27	    'recommendation_made',
+    28	    'experiment_planned',
+    29	    'experiment_applied',
+    30	    'follow_up_case_created',
+    31	    'outcome_classified',
+    32	    'experiment_abandoned',
+    33	  ]);
+    34	
+    35	  // Codex E1-R1-02 closure: distinguish UNSUPPORTED_FUTURE_SCHEMA from TIMELINE_INVALID.
+    36	  var SUPPORTED_SCHEMA_VERSION = 1;
+    37	  var ARRAY_CAP = 64;
+    38	
+    39	  function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
+    40	  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (typeof k === 'symbol') return false; if (allowed.indexOf(k) === -1) return false; } return true; }
+    41	  function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
+    42	
+    43	  function validateCaseTimelineShape(tIn) {
+    44	    try {
+    45	      if (!RC.isOriginalPlainObject(tIn)) return RC.buildBlockedResult([CODES.TIMELINE_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED]);
+    46	      if (RC.hasHiddenOwnKey(tIn)) return RC.buildBlockedResult([CODES.TIMELINE_INVALID, CODES.UNKNOWN_OWN_KEY]);
+    47	      var t = RC.toCleanCopy(tIn);
+    48	      if (!_isPlain(t)) return RC.buildBlockedResult([CODES.TIMELINE_INVALID]);
+    49	      if (!_hasOnlyAllowedKeys(t, TIMELINE_KEYS)) return RC.buildBlockedResult([CODES.TIMELINE_INVALID, CODES.UNKNOWN_OWN_KEY]);
+    50	
+    51	      var reasons = [];
+    52	      if (!Number.isInteger(t.schemaVersion)) reasons.push(CODES.TIMELINE_INVALID);
+    53	      else if (t.schemaVersion > SUPPORTED_SCHEMA_VERSION) reasons.push(CODES.UNSUPPORTED_FUTURE_SCHEMA);
+    54	      else if (t.schemaVersion < 1) reasons.push(CODES.TIMELINE_INVALID);
+    55	      if (!_nonEmptyStr(t.caseId)) reasons.push(CODES.TIMELINE_INVALID);
+    56	      if (!Array.isArray(t.events) || t.events.length > ARRAY_CAP) reasons.push(CODES.TIMELINE_INVALID);
+    57	      else {
+    58	        var prevTime = -Infinity;
+    59	        for (var i = 0; i < t.events.length; i++) {
+    60	          var ev = t.events[i];
+    61	          if (!_isPlain(ev) || !_hasOnlyAllowedKeys(ev, EVENT_KEYS)) { reasons.push(CODES.TIMELINE_INVALID); break; }
+    62	          if (!_nonEmptyStr(ev.eventId)) reasons.push(CODES.TIMELINE_INVALID);
+    63	          if (EVENT_KIND_ALLOWED.indexOf(ev.kind) === -1) reasons.push(CODES.TIMELINE_INVALID);
+    64	          if (!_nonEmptyStr(ev.createdAt)) reasons.push(CODES.TIMELINE_INVALID);
+    65	          if (!_nonEmptyStr(ev.i18nKey)) reasons.push(CODES.TIMELINE_INVALID);
+    66	          if (ev.params !== null && !_isPlain(ev.params)) reasons.push(CODES.TIMELINE_INVALID);
+    67	          // Chronological order check: parse createdAt as ISO.
+    68	          var msNow = Date.parse(ev.createdAt);
+    69	          if (isNaN(msNow)) reasons.push(CODES.TIMELINE_INVALID);
+    70	          else if (msNow < prevTime) reasons.push(CODES.TIMELINE_ORDERING_INVALID);
+    71	          else prevTime = msNow;
+    72	        }
+    73	      }
+    74	
+    75	      if (reasons.length) {
+    76	        var seen = Object.create(null), out = [];
+    77	        reasons.forEach(function (c) { if (!seen[c]) { seen[c] = true; out.push(c); } });
+    78	        return RC.buildBlockedResult(out);
+    79	      }
+    80	      return Object.freeze({ valid: true });
+    81	    } catch (e) { return RC.buildBlockedResult([CODES.TIMELINE_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION]); }
+    82	  }
+    83	
+    84	  var api = { TIMELINE_KEYS: TIMELINE_KEYS, EVENT_KIND_ALLOWED: EVENT_KIND_ALLOWED, validateCaseTimelineShape: validateCaseTimelineShape };
+    85	  Object.freeze(api);
+    86	  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+    87	  if (root) {
+    88	    try { Object.defineProperty(root, 'R3_0E_CaseTimelineContract', { value: api, writable: false, enumerable: false, configurable: false }); }
+    89	    catch (e) { root.R3_0E_CaseTimelineContract = api; }
+    90	  }
+    91	})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+exec
+/bin/bash -lc 'nl -ba contracts/r3.0e/follow-up-link-contract.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+     1	/**
+     2	 * contracts/r3.0e/follow-up-link-contract.js — R3.0E E1 (NON-PRODUCTION).
+     3	 *
+     4	 * Bidirectional parent ↔ follow-up linkage between R3.0B case records and R3.0E
+     5	 * Experiments. The linkage object stores parent + child case ids on EACH side so a
+     6	 * deleted parent can be detected (child becomes ORPHAN, never silently broken).
+     7	 * Per SKYLINE D12/E1 ruling: this linkage is stored in a SEPARATE namespace; it
+     8	 * does NOT extend the frozen R3.0B case-record schema.
+     9	 */
+    10	(function (root) {
+    11	  'use strict';
+    12	  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+    13	  var RC = _req('./reason-codes.js', typeof R3_0E_ReasonCodes !== 'undefined' ? R3_0E_ReasonCodes : undefined);
+    14	  if (!RC) throw new Error('follow-up-link-contract.js requires reason-codes.js');
+    15	  var CODES = RC.REASON_CODES;
+    16	
+    17	  var LINK_KEYS = Object.freeze([
+    18	    'schemaVersion',
+    19	    'linkId',
+    20	    'parentCaseId',                     // R3.0B caseId ref
+    21	    'followUpCaseId',                   // R3.0B caseId ref
+    22	    'experimentId',                     // R3.0E experimentId ref
+    23	    'parentStatus',                     // 'present' | 'archived' | 'deleted'
+    24	    'createdAt',
+    25	  ]);
+    26	
+    27	  var PARENT_STATUS_ALLOWED = Object.freeze(['present', 'archived', 'deleted']);
+    28	
+    29	  // Codex E1-R1-02 closure: distinguish UNSUPPORTED_FUTURE_SCHEMA from LINKAGE_INVALID.
+    30	  var SUPPORTED_SCHEMA_VERSION = 1;
+    31	
+    32	  function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
+    33	  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (typeof k === 'symbol') return false; if (allowed.indexOf(k) === -1) return false; } return true; }
+    34	  function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
+    35	
+    36	  function validateFollowUpLinkShape(lIn) {
+    37	    try {
+    38	      if (!RC.isOriginalPlainObject(lIn)) return RC.buildBlockedResult([CODES.LINKAGE_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED]);
+    39	      if (RC.hasHiddenOwnKey(lIn)) return RC.buildBlockedResult([CODES.LINKAGE_INVALID, CODES.UNKNOWN_OWN_KEY]);
+    40	      var l = RC.toCleanCopy(lIn);
+    41	      if (!_isPlain(l)) return RC.buildBlockedResult([CODES.LINKAGE_INVALID]);
+    42	      if (!_hasOnlyAllowedKeys(l, LINK_KEYS)) return RC.buildBlockedResult([CODES.LINKAGE_INVALID, CODES.UNKNOWN_OWN_KEY]);
+    43	
+    44	      var reasons = [];
+    45	      if (!Number.isInteger(l.schemaVersion)) reasons.push(CODES.LINKAGE_INVALID);
+    46	      else if (l.schemaVersion > SUPPORTED_SCHEMA_VERSION) reasons.push(CODES.UNSUPPORTED_FUTURE_SCHEMA);
+    47	      else if (l.schemaVersion < 1) reasons.push(CODES.LINKAGE_INVALID);
+    48	      if (!_nonEmptyStr(l.linkId)) reasons.push(CODES.LINKAGE_INVALID);
+    49	      if (!_nonEmptyStr(l.parentCaseId)) reasons.push(CODES.LINKAGE_PARENT_MISSING);
+    50	      if (!_nonEmptyStr(l.followUpCaseId)) reasons.push(CODES.LINKAGE_INVALID);
+    51	      if (l.parentCaseId === l.followUpCaseId) reasons.push(CODES.LINKAGE_INVALID);  // self-link
+    52	      if (!_nonEmptyStr(l.experimentId)) reasons.push(CODES.LINKAGE_INVALID);
+    53	      if (PARENT_STATUS_ALLOWED.indexOf(l.parentStatus) === -1) reasons.push(CODES.LINKAGE_INVALID);
+    54	      if (!_nonEmptyStr(l.createdAt)) reasons.push(CODES.LINKAGE_INVALID);
+    55	
+    56	      if (reasons.length) {
+    57	        var seen = Object.create(null), out = [];
+    58	        reasons.forEach(function (c) { if (!seen[c]) { seen[c] = true; out.push(c); } });
+    59	        return RC.buildBlockedResult(out);
+    60	      }
+    61	      return Object.freeze({ valid: true });
+    62	    } catch (e) { return RC.buildBlockedResult([CODES.LINKAGE_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION]); }
+    63	  }
+    64	
+    65	  var api = { LINK_KEYS: LINK_KEYS, PARENT_STATUS_ALLOWED: PARENT_STATUS_ALLOWED, validateFollowUpLinkShape: validateFollowUpLinkShape };
+    66	  Object.freeze(api);
+    67	  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+    68	  if (root) {
+    69	    try { Object.defineProperty(root, 'R3_0E_FollowUpLinkContract', { value: api, writable: false, enumerable: false, configurable: false }); }
+    70	    catch (e) { root.R3_0E_FollowUpLinkContract = api; }
+    71	  }
+    72	})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+exec
+/bin/bash -lc 'nl -ba contracts/r3.0e/outcome-contract.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+     1	/**
+     2	 * contracts/r3.0e/outcome-contract.js — R3.0E E1 · Outcome shape contract (NON-PRODUCTION).
+     3	 *
+     4	 * Defines the structural shape of an Outcome — the classification produced at E3 by the
+     5	 * Outcome Classifier and attached to an Experiment. Classes form a closed enum:
+     6	 *   confirmed / partially_confirmed / contradicted / inconclusive / invalid_comparison /
+     7	 *   inconclusive_due_to_confounders.
+     8	 *
+     9	 * E1 contract layer validates SHAPE only. Semantic invariants (direction match, magnitude
+    10	 * within range, confounder detection) are enforced by the E3 algorithm.
+    11	 *
+    12	 * UMD: Node require / Electron renderer global (R3_0E_OutcomeContract).
+    13	 */
+    14	(function (root) {
+    15	  'use strict';
+    16	
+    17	  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+    18	  var RC = _req('./reason-codes.js', typeof R3_0E_ReasonCodes !== 'undefined' ? R3_0E_ReasonCodes : undefined);
+    19	  if (!RC) throw new Error('outcome-contract.js requires reason-codes.js');
+    20	  var CODES = RC.REASON_CODES;
+    21	
+    22	  var OUTCOME_KEYS = Object.freeze([
+    23	    'schemaVersion',
+    24	    'outcomeId',
+    25	    'experimentId',
+    26	    'class',                          // OUTCOME_CLASS_ALLOWED
+    27	    'observedDirection',              // EXPECTED_DIRECTION_ALLOWED OR null
+    28	    'observedMagnitude',              // number OR null
+    29	    'comparabilityScore',             // 0..1
+    30	    'confounders',                    // array of control-variable ids that drifted
+    31	    'driverFeedback',                 // optional i18n key OR null
+    32	    'dataQualityIssues',              // array of i18n keys (or reason codes)
+    33	    'sideEffects',                    // array of structured side-effect descriptors
+    34	    'limitations',                    // array of LIMITATION_* reason codes
+    35	    'createdAt',
+    36	  ]);
+    37	
+    38	  var OUTCOME_CLASS_ALLOWED = Object.freeze([
+    39	    'confirmed',
+    40	    'partially_confirmed',
+    41	    'contradicted',
+    42	    'inconclusive',
+    43	    'invalid_comparison',
+    44	    'inconclusive_due_to_confounders',
+    45	  ]);
+    46	
+    47	  var SUPPORTED_SCHEMA_VERSION = 1;
+    48	  var ARRAY_CAP = 32;
+    49	
+    50	  function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
+    51	  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (typeof k === 'symbol') return false; if (allowed.indexOf(k) === -1) return false; } return true; }
+    52	  function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
+    53	
+    54	  function validateOutcomeShape(oIn) {
+    55	    try {
+    56	      if (!RC.isOriginalPlainObject(oIn)) return RC.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED]);
+    57	      if (RC.hasHiddenOwnKey(oIn)) return RC.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.UNKNOWN_OWN_KEY]);
+    58	      if (RC.hasNonPlainNestedObject(oIn)) return RC.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED]);
+    59	      var o = RC.toCleanCopy(oIn);
+    60	      if (!_isPlain(o)) return RC.buildBlockedResult([CODES.OUTCOME_INVALID]);
+    61	      if (!_hasOnlyAllowedKeys(o, OUTCOME_KEYS)) return RC.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.UNKNOWN_OWN_KEY]);
+    62	
+    63	      var reasons = [];
+    64	      if (!Number.isInteger(o.schemaVersion)) reasons.push(CODES.OUTCOME_INVALID);
+    65	      else if (o.schemaVersion > SUPPORTED_SCHEMA_VERSION) reasons.push(CODES.UNSUPPORTED_FUTURE_SCHEMA);
+    66	      else if (o.schemaVersion < 1) reasons.push(CODES.OUTCOME_INVALID);
+    67	
+    68	      if (!_nonEmptyStr(o.outcomeId)) reasons.push(CODES.OUTCOME_INVALID);
+    69	      if (!_nonEmptyStr(o.experimentId)) reasons.push(CODES.OUTCOME_INVALID);
+    70	      if (OUTCOME_CLASS_ALLOWED.indexOf(o['class']) === -1) reasons.push(CODES.OUTCOME_CLASS_INVALID);
+    71	      if (o.observedDirection !== null && ['increase', 'decrease', 'no_change'].indexOf(o.observedDirection) === -1) reasons.push(CODES.OUTCOME_INVALID);
+    72	      if (o.observedMagnitude !== null && typeof o.observedMagnitude !== 'number') reasons.push(CODES.OUTCOME_INVALID);
+    73	      if (typeof o.comparabilityScore !== 'number' || o.comparabilityScore < 0 || o.comparabilityScore > 1) reasons.push(CODES.OUTCOME_COMPARABILITY_INSUFFICIENT);
+    74	      if (!Array.isArray(o.confounders) || o.confounders.length > ARRAY_CAP) reasons.push(CODES.OUTCOME_INVALID);
+    75	      if (o.driverFeedback !== null && !_nonEmptyStr(o.driverFeedback)) reasons.push(CODES.OUTCOME_DRIVER_FEEDBACK_INVALID);
+    76	      if (!Array.isArray(o.dataQualityIssues) || o.dataQualityIssues.length > ARRAY_CAP) reasons.push(CODES.OUTCOME_DATA_QUALITY_INVALID);
+    77	      if (!Array.isArray(o.sideEffects) || o.sideEffects.length > ARRAY_CAP) reasons.push(CODES.OUTCOME_INVALID);
+    78	      if (!Array.isArray(o.limitations) || o.limitations.length > ARRAY_CAP) reasons.push(CODES.OUTCOME_INVALID);
+    79	      if (!_nonEmptyStr(o.createdAt)) reasons.push(CODES.OUTCOME_INVALID);
+    80	
+    81	      // confounders-present → class must be inconclusive_due_to_confounders OR limitations carries CONTROL_VARIABLE_MISSING.
+    82	      if (Array.isArray(o.confounders) && o.confounders.length > 0
+    83	          && o['class'] !== 'inconclusive_due_to_confounders'
+    84	          && o['class'] !== 'invalid_comparison'
+    85	          && !(Array.isArray(o.limitations) && o.limitations.indexOf('CONTROL_VARIABLE_MISSING') !== -1)) {
+    86	        reasons.push(CODES.OUTCOME_CONFOUNDERS_PRESENT);
+    87	      }
+    88	
+    89	      if (reasons.length) {
+    90	        var seen = Object.create(null), out = [];
+    91	        reasons.forEach(function (c) { if (!seen[c]) { seen[c] = true; out.push(c); } });
+    92	        return RC.buildBlockedResult(out);
+    93	      }
+    94	      return Object.freeze({ valid: true });
+    95	    } catch (eOuter) {
+    96	      return RC.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION]);
+    97	    }
+    98	  }
+    99	
+   100	  var api = {
+   101	    OUTCOME_KEYS: OUTCOME_KEYS,
+   102	    OUTCOME_CLASS_ALLOWED: OUTCOME_CLASS_ALLOWED,
+   103	    SUPPORTED_SCHEMA_VERSION: SUPPORTED_SCHEMA_VERSION,
+   104	    validateOutcomeShape: validateOutcomeShape,
+   105	  };
+   106	  Object.freeze(api);
+   107	  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+   108	  if (root) {
+   109	    try { Object.defineProperty(root, 'R3_0E_OutcomeContract', { value: api, writable: false, enumerable: false, configurable: false }); }
+   110	    catch (e) { root.R3_0E_OutcomeContract = api; }
+   111	  }
+   112	})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+exec
+/bin/bash -lc 'nl -ba contracts/r3.0e/control-variables-contract.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+     1	/**
+     2	 * contracts/r3.0e/control-variables-contract.js — R3.0E E1 (NON-PRODUCTION).
+     3	 *
+     4	 * Defines the structural shape of a single Control Variable descriptor. Control variables
+     5	 * are things the experiment is supposed to HOLD CONSTANT (track, tyre temperature window,
+     6	 * driver session, weather). The E3 outcome classifier checks whether each declared control
+     7	 * variable held within its allowed range; out-of-range → confounder.
+     8	 */
+     9	(function (root) {
+    10	  'use strict';
+    11	  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+    12	  var RC = _req('./reason-codes.js', typeof R3_0E_ReasonCodes !== 'undefined' ? R3_0E_ReasonCodes : undefined);
+    13	  if (!RC) throw new Error('control-variables-contract.js requires reason-codes.js');
+    14	  var CODES = RC.REASON_CODES;
+    15	
+    16	  var CONTROL_VARIABLE_KEYS = Object.freeze([
+    17	    'name',
+    18	    'description',                    // i18n key
+    19	    'expectedValue',                  // number OR string OR null
+    20	    'allowedRange',                   // { min, max } OR null
+    21	    'observedValue',                  // number OR string OR null (filled at E3)
+    22	    'withinRange',                    // boolean OR null (filled at E3)
+    23	  ]);
+    24	
+    25	  function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
+    26	  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (typeof k === 'symbol') return false; if (allowed.indexOf(k) === -1) return false; } return true; }
+    27	  function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
+    28	
+    29	  function validateControlVariableShape(cIn) {
+    30	    try {
+    31	      if (!RC.isOriginalPlainObject(cIn)) return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED]);
+    32	      if (RC.hasHiddenOwnKey(cIn)) return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID, CODES.UNKNOWN_OWN_KEY]);
+    33	      var c = RC.toCleanCopy(cIn);
+    34	      if (!_isPlain(c)) return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID]);
+    35	      if (!_hasOnlyAllowedKeys(c, CONTROL_VARIABLE_KEYS)) return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID, CODES.UNKNOWN_OWN_KEY]);
+    36	
+    37	      var reasons = [];
+    38	      if (!_nonEmptyStr(c.name)) reasons.push(CODES.CONTROL_VARIABLES_INVALID);
+    39	      if (!_nonEmptyStr(c.description)) reasons.push(CODES.CONTROL_VARIABLES_INVALID);
+    40	      if (c.expectedValue !== null && typeof c.expectedValue !== 'number' && typeof c.expectedValue !== 'string') reasons.push(CODES.CONTROL_VARIABLES_INVALID);
+    41	      if (c.allowedRange !== null) {
+    42	        if (!_isPlain(c.allowedRange)
+    43	            || typeof c.allowedRange.min !== 'number' || !isFinite(c.allowedRange.min)
+    44	            || typeof c.allowedRange.max !== 'number' || !isFinite(c.allowedRange.max)
+    45	            || c.allowedRange.min > c.allowedRange.max) {
+    46	          reasons.push(CODES.CONTROL_VARIABLE_OUT_OF_RANGE);
+    47	        }
+    48	      }
+    49	      if (c.observedValue !== null && typeof c.observedValue !== 'number' && typeof c.observedValue !== 'string') reasons.push(CODES.CONTROL_VARIABLES_INVALID);
+    50	      if (c.withinRange !== null && typeof c.withinRange !== 'boolean') reasons.push(CODES.CONTROL_VARIABLES_INVALID);
+    51	
+    52	      if (reasons.length) {
+    53	        var seen = Object.create(null), out = [];
+    54	        reasons.forEach(function (k) { if (!seen[k]) { seen[k] = true; out.push(k); } });
+    55	        return RC.buildBlockedResult(out);
+    56	      }
+    57	      return Object.freeze({ valid: true });
+    58	    } catch (e) { return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION]); }
+    59	  }
+    60	
+    61	  var api = { CONTROL_VARIABLE_KEYS: CONTROL_VARIABLE_KEYS, validateControlVariableShape: validateControlVariableShape };
+    62	  Object.freeze(api);
+    63	  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+    64	  if (root) {
+    65	    try { Object.defineProperty(root, 'R3_0E_ControlVariablesContract', { value: api, writable: false, enumerable: false, configurable: false }); }
+    66	    catch (e) { root.R3_0E_ControlVariablesContract = api; }
+    67	  }
+    68	})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+exec
+/bin/bash -lc "nl -ba tests/r3.0e-contract-foundation.test.js | sed -n '1,330p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+     1	/**
+     2	 * tests/r3.0e-contract-foundation.test.js — R3.0E E1 · Contract Foundation smoke + adversarial tests.
+     3	 *
+     4	 * Mirrors the D1 contract-foundation pattern: validateExperimentShape /
+     5	 * validateOutcomeShape / validateControlVariableShape / validateCaseTimelineShape /
+     6	 * validateFollowUpLinkShape happy + adversarial paths. E1 is NON-PRODUCTION; this suite
+     7	 * validates the structural gates only.
+     8	 */
+     9	'use strict';
+    10	var fs = require('fs');
+    11	var path = require('path');
+    12	
+    13	var RC = require('../contracts/r3.0e/reason-codes.js');
+    14	var EXP = require('../contracts/r3.0e/experiment-contract.js');
+    15	var OUT = require('../contracts/r3.0e/outcome-contract.js');
+    16	var CV = require('../contracts/r3.0e/control-variables-contract.js');
+    17	var TL = require('../contracts/r3.0e/case-timeline-contract.js');
+    18	var FU = require('../contracts/r3.0e/follow-up-link-contract.js');
+    19	var INDEX = require('../contracts/r3.0e/index.js');
+    20	
+    21	var pass = 0, fail = 0;
+    22	function chk(msg, cond, detail) {
+    23	  if (cond) pass += 1;
+    24	  else { fail += 1; console.log('  FAIL ' + msg + (detail !== undefined ? '  ' + JSON.stringify(detail) : '')); }
+    25	}
+    26	
+    27	// Section A — Reason codes
+    28	console.log('Section A — reason codes');
+    29	chk('A1: REASON_CODES is frozen', Object.isFrozen(RC.REASON_CODES));
+    30	chk('A2: ALL_REASON_CODES has > 20 entries', RC.ALL_REASON_CODES.length > 20);
+    31	chk('A3: isReasonCode(EXPERIMENT_INVALID) === true', RC.isReasonCode('EXPERIMENT_INVALID') === true);
+    32	chk('A4: isReasonCode(UNKNOWN) === false', RC.isReasonCode('NOT_A_REAL_CODE') === false);
+    33	chk('A5: buildBlockedResult shape', (function () {
+    34	  var r = RC.buildBlockedResult(['EXPERIMENT_INVALID'], { detail: 'test' });
+    35	  return r.eligible === false && r.status === 'blocked' && Array.isArray(r.reasonCodes) && r.reasonCodes[0] === 'EXPERIMENT_INVALID';
+    36	})());
+    37	
+    38	// Section B — Experiment
+    39	console.log('Section B — Experiment');
+    40	var validExperiment = {
+    41	  schemaVersion: 1,
+    42	  experimentId: 'exp_0123456789abcdef',
+    43	  sourceCaseId: 'case_E1_demo',
+    44	  sourceHypothesisId: 'pri_0123456789abcdef',
+    45	  sourceRecommendationId: 'priority_E1_demo',
+    46	  targetMetric: 'roll_gradient_deg_per_g',
+    47	  baselineValue: 3.5,
+    48	  expectedDirection: 'decrease',
+    49	  expectedMagnitudeRange: { min: 0.5, max: 1.5 },
+    50	  setupChange: { component: 'front_arb', delta_nm_per_deg: 200 },
+    51	  driverInstruction: 'r3.0e.driver.brake_earlier',
+    52	  controlVariables: [],
+    53	  validationPlan: 'r3.0e.plan.controlled_repeat_lap',
+    54	  stopConditions: [{ i18nKey: 'r3.0e.stop.lap_time_increase', params: { threshold_s: 0.5 } }],
+    55	  status: 'planned',
+    56	  followUpCaseIds: [],
+    57	  outcome: null,
+    58	  createdAt: '2026-06-29T10:00:00Z',
+    59	};
+    60	chk('B1: valid experiment accepted', EXP.validateExperimentShape(validExperiment).valid === true);
+    61	chk('B2: missing experimentId rejected', (function () {
+    62	  var bad = Object.assign({}, validExperiment); delete bad.experimentId; bad.experimentId = 'wrong-format';
+    63	  return EXP.validateExperimentShape(bad).eligible === false;
+    64	})());
+    65	chk('B3: bad expectedDirection rejected', (function () {
+    66	  var bad = Object.assign({}, validExperiment, { expectedDirection: 'sideways' });
+    67	  return EXP.validateExperimentShape(bad).eligible === false;
+    68	})());
+    69	chk('B4: bad magnitudeRange (min>max) rejected', (function () {
+    70	  var bad = Object.assign({}, validExperiment, { expectedMagnitudeRange: { min: 5, max: 1 } });
+    71	  return EXP.validateExperimentShape(bad).eligible === false;
+    72	})());
+    73	chk('B5: bad status enum rejected', (function () {
+    74	  var bad = Object.assign({}, validExperiment, { status: 'in_flight' });
+    75	  return EXP.validateExperimentShape(bad).eligible === false;
+    76	})());
+    77	chk('B6: extra own key rejected', (function () {
+    78	  var bad = Object.assign({}, validExperiment, { hostileKey: 'x' });
+    79	  return EXP.validateExperimentShape(bad).eligible === false;
+    80	})());
+    81	chk('B7: empty stopConditions rejected', (function () {
+    82	  var bad = Object.assign({}, validExperiment, { stopConditions: [] });
+    83	  return EXP.validateExperimentShape(bad).eligible === false;
+    84	})());
+    85	
+    86	// Section C — Outcome
+    87	console.log('Section C — Outcome');
+    88	var validOutcome = {
+    89	  schemaVersion: 1,
+    90	  outcomeId: 'out_e1_demo',
+    91	  experimentId: 'exp_0123456789abcdef',
+    92	  'class': 'confirmed',
+    93	  observedDirection: 'decrease',
+    94	  observedMagnitude: 1.0,
+    95	  comparabilityScore: 0.9,
+    96	  confounders: [],
+    97	  driverFeedback: null,
+    98	  dataQualityIssues: [],
+    99	  sideEffects: [],
+   100	  limitations: [],
+   101	  createdAt: '2026-06-29T11:00:00Z',
+   102	};
+   103	chk('C1: valid outcome accepted', OUT.validateOutcomeShape(validOutcome).valid === true);
+   104	chk('C2: invalid class rejected', OUT.validateOutcomeShape(Object.assign({}, validOutcome, { 'class': 'mystery' })).eligible === false);
+   105	chk('C3: comparabilityScore > 1 rejected', OUT.validateOutcomeShape(Object.assign({}, validOutcome, { comparabilityScore: 1.2 })).eligible === false);
+   106	chk('C4: confounders present without inconclusive_due_to_confounders class rejected', (function () {
+   107	  var bad = Object.assign({}, validOutcome, { confounders: ['weather_change'], 'class': 'confirmed' });
+   108	  return OUT.validateOutcomeShape(bad).eligible === false;
+   109	})());
+   110	chk('C5: confounders present with inconclusive_due_to_confounders class accepted', (function () {
+   111	  var ok = Object.assign({}, validOutcome, { confounders: ['weather_change'], 'class': 'inconclusive_due_to_confounders' });
+   112	  return OUT.validateOutcomeShape(ok).valid === true;
+   113	})());
+   114	
+   115	// Section D — Control Variables
+   116	console.log('Section D — Control Variables');
+   117	var validCV = { name: 'tyre_temp_window', description: 'r3.0e.cv.tyre_temp', expectedValue: 80, allowedRange: { min: 75, max: 95 }, observedValue: null, withinRange: null };
+   118	chk('D1: valid control variable accepted', CV.validateControlVariableShape(validCV).valid === true);
+   119	chk('D2: range min>max rejected', CV.validateControlVariableShape(Object.assign({}, validCV, { allowedRange: { min: 100, max: 50 } })).eligible === false);
+   120	chk('D3: bad observed type rejected', CV.validateControlVariableShape(Object.assign({}, validCV, { observedValue: { hostile: true } })).eligible === false);
+   121	
+   122	// Section E — Case Timeline
+   123	console.log('Section E — Case Timeline');
+   124	var validTL = { schemaVersion: 1, caseId: 'case_E1_demo', events: [
+   125	  { eventId: 'ev_1', kind: 'baseline_captured', createdAt: '2026-06-29T10:00:00Z', i18nKey: 'r3.0e.tl.baseline', params: null },
+   126	  { eventId: 'ev_2', kind: 'hypothesis_recorded', createdAt: '2026-06-29T10:05:00Z', i18nKey: 'r3.0e.tl.hypothesis', params: null },
+   127	] };
+   128	chk('E1: valid timeline accepted', TL.validateCaseTimelineShape(validTL).valid === true);
+   129	chk('E2: out-of-order events rejected', (function () {
+   130	  var bad = JSON.parse(JSON.stringify(validTL));
+   131	  bad.events[1].createdAt = '2026-06-29T09:00:00Z'; // earlier than ev_1
+   132	  return TL.validateCaseTimelineShape(bad).eligible === false;
+   133	})());
+   134	chk('E3: unknown event kind rejected', (function () {
+   135	  var bad = JSON.parse(JSON.stringify(validTL));
+   136	  bad.events[0].kind = 'mystery_kind';
+   137	  return TL.validateCaseTimelineShape(bad).eligible === false;
+   138	})());
+   139	
+   140	// Section F — Follow-up Link
+   141	console.log('Section F — Follow-up Link');
+   142	var validFU = { schemaVersion: 1, linkId: 'link_e1', parentCaseId: 'case_A', followUpCaseId: 'case_B', experimentId: 'exp_e1', parentStatus: 'present', createdAt: '2026-06-29T10:00:00Z' };
+   143	chk('F1: valid linkage accepted', FU.validateFollowUpLinkShape(validFU).valid === true);
+   144	chk('F2: self-link (parent === followUp) rejected', (function () {
+   145	  var bad = Object.assign({}, validFU, { followUpCaseId: 'case_A' });
+   146	  return FU.validateFollowUpLinkShape(bad).eligible === false;
+   147	})());
+   148	chk('F3: invalid parentStatus rejected', (function () {
+   149	  var bad = Object.assign({}, validFU, { parentStatus: 'unknown' });
+   150	  return FU.validateFollowUpLinkShape(bad).eligible === false;
+   151	})());
+   152	chk('F4: missing parentCaseId rejected', (function () {
+   153	  var bad = Object.assign({}, validFU, { parentCaseId: '' });
+   154	  return FU.validateFollowUpLinkShape(bad).eligible === false;
+   155	})());
+   156	
+   157	// Section G — Aggregate index
+   158	console.log('Section G — aggregate index');
+   159	chk('G1: index re-exports all contracts', INDEX.experiment === EXP && INDEX.outcome === OUT && INDEX.controlVariables === CV && INDEX.caseTimeline === TL && INDEX.followUpLink === FU);
+   160	chk('G2: index API is frozen', Object.isFrozen(INDEX));
+   161	
+   162	// Section H — Scope (no R3.0B case-record schema EXTENSION — only refs allowed)
+   163	console.log('Section H — scope: case-record-schema.js carries refs only (no R3.0E extension)');
+   164	(function () {
+   165	  // Per SKYLINE D12/E1 ruling: R3.0E MUST NOT extend the frozen R3.0B case-record schema
+   166	  // body. The existing schema already declares `experimentId` and `followUpCaseIds` as
+   167	  // ASSOCIATION REFS (id strings only) — these are NOT extensions. The forbidden patterns
+   168	  // are: (a) embedding R3.0E experiment objects inside the case record, (b) importing
+   169	  // contracts/r3.0e/* from case-record-schema.js, (c) adding R3.0E-specific outcome
+   170	  // classifier results into the case record.
+   171	  var schemaPath = path.join(__dirname, '..', 'renderer', 'js', 'case-record-schema.js');
+   172	  var src = fs.readFileSync(schemaPath, 'utf8');
+   173	  chk('H1: case-record-schema.js does NOT require contracts/r3.0e/',
+   174	    src.indexOf('contracts/r3.0e/') === -1);
+   175	  // No nested experiment object body — only the bare experimentId ref.
+   176	  chk('H2: case-record-schema.js does NOT embed R3.0E experiment object body',
+   177	    src.indexOf('expectedDirection') === -1
+   178	      && src.indexOf('expectedMagnitudeRange') === -1
+   179	      && src.indexOf('stopConditions') === -1);
+   180	  // No outcome classifier output embedded in the case record.
+   181	  chk('H3: case-record-schema.js does NOT embed R3.0E outcome classifier output',
+   182	    src.indexOf('comparabilityScore') === -1
+   183	      && src.indexOf('confounders') === -1
+   184	      && src.indexOf('OUTCOME_CLASS_ALLOWED') === -1);
+   185	  // experimentId / followUpCaseIds ARE allowed as id-only association refs.
+   186	  chk('H4: case-record-schema.js carries experimentId + followUpCaseIds as id refs (allowed)',
+   187	    src.indexOf('experimentId') !== -1 && src.indexOf('followUpCaseIds') !== -1);
+   188	})();
+   189	
+   190	// Section I — Codex E1 R1 closures
+   191	console.log('Section I — Codex E1 R1 closures');
+   192	
+   193	// I1 — E1-R1-01 closure: nested Symbol-keyed / accessor / non-plain prototype rejected
+   194	// at deep nesting (recursive descriptor audit).
+   195	(function () {
+   196	  var deepHostile = {
+   197	    schemaVersion: 1, linkId: 'l_test', parentCaseId: 'cA', followUpCaseId: 'cB',
+   198	    experimentId: 'e1', parentStatus: 'present', createdAt: '2026-06-30T00:00:00Z',
+   199	  };
+   200	  // Add Symbol-keyed own key on nested object — must be rejected
+   201	  var nestedAttack = {};
+   202	  nestedAttack[Symbol('hostile')] = 'leak';
+   203	  deepHostile.createdAt = '2026-06-30T00:00:00Z'; // unchanged scalar
+   204	  // We embed the Symbol-bearing nested object via array (since LINK_KEYS forbids unknown
+   205	  // own keys at top; we need a way to test nested. Use a structure that the validator
+   206	  // SHOULD walk via toCleanCopy + hasNonPlainNestedObject before the closed-key check.)
+   207	  // Per the R1-01 closure, hasNonPlainNestedObject must reject hostile-nested at any depth.
+   208	  chk('I1a: hasNonPlainNestedObject rejects nested Symbol-keyed own key',
+   209	    RC.hasNonPlainNestedObject({ a: { b: nestedAttack } }) === true);
+   210	  // Accessor descriptor at nested object → rejected
+   211	  var nestedAccessor = {};
+   212	  Object.defineProperty(nestedAccessor, 'inner', { enumerable: true, get: function () { return 1; } });
+   213	  chk('I1b: hasNonPlainNestedObject rejects nested accessor descriptor',
+   214	    RC.hasNonPlainNestedObject({ wrap: nestedAccessor }) === true);
+   215	  // Class instance nested → rejected
+   216	  function FakeClass() { this.x = 1; }
+   217	  chk('I1c: hasNonPlainNestedObject rejects nested class-instance prototype',
+   218	    RC.hasNonPlainNestedObject({ wrap: new FakeClass() }) === true);
+   219	  // Non-enumerable own → rejected
+   220	  var nestedNonEnum = {};
+   221	  Object.defineProperty(nestedNonEnum, 'hidden', { enumerable: false, value: 'x' });
+   222	  chk('I1d: hasNonPlainNestedObject rejects nested non-enumerable own key',
+   223	    RC.hasNonPlainNestedObject({ wrap: nestedNonEnum }) === true);
+   224	  // Plain deeply-nested → accepted
+   225	  chk('I1e: hasNonPlainNestedObject accepts deeply-nested plain object',
+   226	    RC.hasNonPlainNestedObject({ a: { b: { c: { d: 'value' } } } }) === false);
+   227	})();
+   228	
+   229	// I2 — E1-R1-02 closure: timeline + follow-up schemaVersion>1 yields UNSUPPORTED_FUTURE_SCHEMA.
+   230	(function () {
+   231	  var futureTl = JSON.parse(JSON.stringify(validTL));
+   232	  futureTl.schemaVersion = 2;
+   233	  var rTL = TL.validateCaseTimelineShape(futureTl);
+   234	  chk('I2a: timeline schemaVersion=2 → UNSUPPORTED_FUTURE_SCHEMA (not TIMELINE_INVALID)',
+   235	    rTL.eligible === false && rTL.reasonCodes.indexOf('UNSUPPORTED_FUTURE_SCHEMA') !== -1);
+   236	
+   237	  var futureFu = Object.assign({}, validFU, { schemaVersion: 2 });
+   238	  var rFU = FU.validateFollowUpLinkShape(futureFu);
+   239	  chk('I2b: follow-up-link schemaVersion=2 → UNSUPPORTED_FUTURE_SCHEMA',
+   240	    rFU.eligible === false && rFU.reasonCodes.indexOf('UNSUPPORTED_FUTURE_SCHEMA') !== -1);
+   241	})();
+   242	
+   243	// I3 — E1-R1-03 closure: planned/draft experiments may not carry outcome.
+   244	(function () {
+   245	  var withOutcome = Object.assign({}, validExperiment, {
+   246	    status: 'planned',
+   247	    outcome: { observedResult: 'looks_good' },
+   248	  });
+   249	  var r = EXP.validateExperimentShape(withOutcome);
+   250	  chk('I3a: planned experiment with outcome rejected (OUTCOME_INVALID)',
+   251	    r.eligible === false && r.reasonCodes.indexOf('OUTCOME_INVALID') !== -1);
+   252	  // status=completed CAN carry outcome (plain object).
+   253	  var completedWithOutcome = Object.assign({}, validExperiment, {
+   254	    status: 'completed',
+   255	    outcome: { observedDirection: 'decrease' },
+   256	  });
+   257	  chk('I3b: completed experiment with plain outcome accepted',
+   258	    EXP.validateExperimentShape(completedWithOutcome).valid === true);
+   259	  // status=draft with outcome rejected.
+   260	  var draftWithOutcome = Object.assign({}, validExperiment, { status: 'draft', outcome: { x: 1 } });
+   261	  chk('I3c: draft experiment with outcome rejected',
+   262	    EXP.validateExperimentShape(draftWithOutcome).eligible === false);
+   263	})();
+   264	
+   265	// I4 — E1-R1-04 closure: stopConditions cap + element-shape enforcement.
+   266	(function () {
+   267	  // Element with unknown key → rejected
+   268	  var badElem = Object.assign({}, validExperiment, {
+   269	    stopConditions: [{ i18nKey: 'r3.0e.stop.x', params: null, hostile: 'inject' }],
+   270	  });
+   271	  chk('I4a: stopConditions with unknown element key rejected',
+   272	    EXP.validateExperimentShape(badElem).eligible === false);
+   273	  // Element missing i18nKey → rejected
+   274	  var noKey = Object.assign({}, validExperiment, { stopConditions: [{ params: { x: 1 } }] });
+   275	  chk('I4b: stopConditions element missing i18nKey rejected',
+   276	    EXP.validateExperimentShape(noKey).eligible === false);
+   277	  // List > ARRAY_CAP rejected (build 33 entries; cap is 32).
+   278	  var bigList = [];
+   279	  for (var i = 0; i < 33; i++) bigList.push({ i18nKey: 'k.' + i, params: null });
+   280	  var bigExp = Object.assign({}, validExperiment, { stopConditions: bigList });
+   281	  chk('I4c: stopConditions list > ARRAY_CAP rejected',
+   282	    EXP.validateExperimentShape(bigExp).eligible === false);
+   283	})();
+   284	
+   285	console.log('R3.0E E1 contract-foundation suite: ' + pass + ' passed, ' + fail + ' failed');
+   286	if (fail > 0) process.exit(1);
+
+exec
+/bin/bash -lc 'npm test' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ exited 1 in 3868ms:
+
+[1] 軸側傾剛性 K = k_w·t²/2 (Milliken / Suspension Secrets)
+  ✓ 前彈簧側傾剛性 = k·t²/2
+  ✓ 輪胎串聯後總剛性 < 懸吊剛性
+
+[2] Roll gradient 量級 (OptimumG: 街車 ~3-6°/g, 高下壓力賽車 0.2-0.7°/g)
+  ✓ GT3 roll gradient 在 1.5-5 °/g 合理區間
+  ✓ 軟彈簧 → roll gradient 更大
+
+[3] ARB sizing 單位一致性 (Nm/deg)
+  ✓ total_roll_needed ≈ m·g·h/target
+  ✓ front_arb_needed 在現實範圍 (< 3000 Nm/deg)
+  ✓ current_roll_gradient 在現實範圍 (< 15 °/g)
+
+[4] 線性自行車模型 (Gillespie ch.6)
+  ✓ 滑移角@1g 在 2-10° 物理範圍
+  ✓ K_us = W_f/C_f − W_r/C_r
+  ✓ 臨界速度 = √(g·L/|K_us|)
+  ✓ K_us<0 時無特徵速度
+  ✓ 超過臨界速度時 yaw gain = null
+  ✓ 50/50 車 K_us ≈ 0
+
+[5] 阻尼比 (OptimumG Tech Tip 2: 賽車 ζ ≈ 0.65-0.7)
+  ✓ heave 阻尼比在 0.2-1.2 現實範圍
+  ✓ 側傾阻尼比在 0.1-1.5 現實範圍
+  ✓ 參考速度加倍 → ζ 減半
+
+[6] 空力方向 (front-biased downforce → 高速轉向過度)
+  ✓ 前偏空力 → aero_us_shift < 0 (轉向過度)
+  ✓ 後偏空力 → aero_us_shift > 0 (轉向不足)
+
+[7] Toe 慣例 (+ = toe-in)
+  ✓ 前 toe-in → 更轉向不足
+  ✓ 後 toe-in → 更轉向不足(穩定)
+
+[8] Cross weight (FL+RR 分析對角，作者刻意設計)
+  ✓ cross = (FL+RR)/total
+
+[9] Flat ride 規則 (Olley: 後/前 ≈ 1.10-1.20)
+  ✓ 後/前比值過低觸發建議
+  ✓ 目標比值 = 1.10 (後高於前)
+  ✓ 建議調整「後」彈簧
+
+[10] 輪胎垂直彈簧率估算 (實測校準)
+  ✓ 255/40 估算 ≈ 250 N/mm (±10%)
+  ✓ 205/55 ≈ 220 N/mm 基準
+  ✓ 胎壓越高剛性越高
+  ✓ 295/30 在 250-320 N/mm 合理範圍
+
+[11] Pacejka 模型
+  ✓ C_α 峰值在 Fz = a4
+  ✓ -3° camber 降低 C_α < 3%
+  ✓ 峰值 μ 在 0.8-1.3
+
+[12] Load sensitivity 形狀
+  ✓ Fz=Fz0 時 = 1.0 (峰值)
+  ✓ Fz>Fz0 時下降
+
+[13] 縱向荷重轉移 ΔW = W·a·h/L (Gillespie)
+  ✓ 1g 煞車轉移量
+
+[14] 全車種資料庫掃描（Tier 1 輸出健全性）
+  ✓ 501 台車全部輸出在物理合理範圍
+
+[15] Pacejka 荷重敏感度膝點隨車重校準 (a4 scaling)
+  ✓ GT3 臨界速度不再低得離譜 (>90 km/h 或無)
+  ✓ 62/38 前重車 → K_us > 0 (轉向不足)
+  ✓ 有角落重量時軸荷重以磅秤值為準
+
+[16] 阻尼參考速度防呆 (0/''/負值 → 退回 0.3)
+  ✓ damper_ref_speed=0 → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed="" → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed=-1 → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed=null → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed=undefined → ζ 有限且等於 0.3 預設
+
+[17] arbSizing 輪胎柔度補償（軸級閉合）
+  ✓ series(spring+ARB, tire) 總和 = 所需總剛性
+  ✓ 無輪胎參數時維持舊行為
+
+[18] 統一機械平衡 (Tier1 understeer_gradient, deg/g) — 配重 + LLTD
+  ✓ 車頭重(62%F) → 轉向不足 (US>0)
+  ✓ 50/50 → 近中性 (|US|<0.3)
+  ✓ 車尾重(40%F) → 轉向過度 (US<0)
+  ✓ 配重單調: 62%F 比 50%F 更US, 40%F 更OS
+  ✓ US 在 deg/g 合理範圍 (|US|<8)
+  ✓ 前 ARB 硬 → 轉向不足方向
+  ✓ 後 ARB 硬 → 轉向過度方向
+  ✓ 前硬 vs 後硬 方向相反且對稱
+
+[19] 預設車庫傾向分佈合理性 (回歸「全部轉向過度」bug)
+  ✓ OS 不超過 50% (修正前幾乎全 OS)
+  ✓ 三種傾向都有合理數量(各>10%)
+  ✓ FF 前驅車 轉向不足 > 轉向過度 (物理正確)
+
+[20] 麗寶單圈模擬器 — GG 點質量 lap sim
+  ✓ 賽道段落總長 ≈ 3500m (±200)
+  ✓ 改裝 GR Yaris 圈速 ≈ 110.9s (1:50, ±6s)
+  ✓ 極速合理 (180-260 km/h)
+  ✓ 抓地↑ → 圈速更快
+  ✓ 動力↑ → 圈速更快
+  ✓ 質量↑ → 圈速更慢
+
+[21] 麗寶 stint 演化 — 胎壓甜蜜點 / 最快圈 / 退化
+  ✓ 產生 12 圈逐圈資料
+  ✓ 最快單圈時間字串格式 m:ss.mmm
+  ✓ 甜蜜點在 stint 早段 (第1-5圈)
+  ✓ 最快圈 ≈ 峰值抓地圈 (±1)
+  ✓ 第1圈(冷胎)比最快圈慢
+  ✓ 熱胎壓 > 冷胎壓 (升溫建壓)
+  ✓ 建議冷胎壓 < 熱胎甜蜜點
+  ✓ 峰值後抓地退化
+
+[22] 胎種抓地排序 — 光頭胎應比街胎快 (回歸「光頭胎變慢」bug)
+  ✓ 光頭軟胎 比 街胎(PS4S) 快
+  ✓ 光頭軟胎 比 半熱熔(A052) 快
+  ✓ 半熱熔 比 街胎 快
+  ✓ 光頭胎在熱賽道達工作窗口 (峰值抓地>85%)
+  ✓ tir: FNOMIN parsed
+  ✓ tir: vertical stiffness → N/mm
+  ✓ tir: dims (width) parsed
+  ✓ tir: lateral coeff PCY1 parsed
+  ✓ tir: comment stripped from value
+  ✓ tir: ISO sign (α>0 → Fy<0)
+  ✓ tir: Fy rises toward peak (|Fy(2°)|<|Fy(6°)|)
+  ✓ tir: peak μ ≈ PDY1 (1.3–1.7)
+  ✓ tir: optimal slip angle 3–12°
+  ✓ tir: cornering stiffness > 0
+  ✓ tir: load sensitivity (μ falls as Fz rises)
+  ✓ tir: fyCurve generated (0–15°, |Fy| rises from ~0 toward peak)
+  ✓ tir: imported tire feeds handling model (K_us shifts)
+  ✓ tir: default prediction unaffected without tireModel
+  ✓ tir: peak μ feeds lap-sim base_mu (override)
+  ✓ tir: lap sim unaffected without tirePeakMu
+  ✓ kin: roll-center height in 0–150mm
+  ✓ kin: ride height (dz=0) returns static camber
+  ✓ kin: camber gain negative (more neg camber in bump)
+  ✓ kin: camber gain magnitude sane (<0.1°/mm)
+  ✓ kin: camber curve smooth/monotonic (no branch-jump spike)
+  ✓ kin: roll center migrates with travel
+  ✓ ref: front-heavy car is more understeer (Milliken K_us)
+  ✓ ref: stiffer front ARB → more understeer
+  ✓ ref: stiffer rear ARB → less understeer (toward oversteer)
+  ✓ ref: street sports-car roll gradient in 2–6°/g
+  ✓ ref: ride frequency matches f=(1/2π)√(k_eff/m)
+  ✓ ref: stiffer springs raise ride frequency
+  ✓ trans: response is stable
+  ✓ trans: yaw response time 0.05–0.6s
+  ✓ trans: yaw-mode damping 0.3–1.2
+  ✓ trans: yaw natural frequency 0.4–3Hz
+  ✓ trans: steady yaw gain matches Gillespie V/(L+Kus·V²/g) (<5%)
+  ✓ trans: invalid input returns null
+  ✓ bms: header identifies DarabImporter
+  ✓ bms: catalog finds all 3 channels
+  ✓ bms: channel name/source/description parsed
+  ✓ bms: detects validation channels (accy/yaw/steer)
+
+[bmsid] D1-0B Bosch channel dictionary + identity card
+  ✓ bmsid: card built from synthetic Darab catalog
+  ✓ bmsid: format detected = Bosch WinDarab / DarabImporter
+  ✓ bmsid: file identity carries name + size
+  ✓ bmsid: source summary lists MS5.8 + C60
+  ✓ bmsid: speed → vehicle_speed (high)
+  ✓ bmsid: steer → steering_angle (high)
+  ✓ bmsid: accy → lateral_acceleration (high)
+  ✓ bmsid: accx → longitudinal_acceleration (high)
+  ✓ bmsid: yaw → yaw_rate (high)
+  ✓ bmsid: nmot → engine_rpm (high)
+  ✓ bmsid: pbrake_f → brake_pressure_front (high)
+  ✓ bmsid: pbrake_r → brake_pressure_rear (high)
+  ✓ bmsid: vwheel_* → wheel_speed_FL/FR/RL/RR (high)
+  ✓ bmsid: unmapped channel → unknown (no fail)
+  ✓ bmsid: ugs NOT treated as gear value
+  ✓ bmsid: ags_*_engine_speed NOT treated as engine_rpm (name-gated)
+  ✓ bmsid: R_H_Front → ride_height, low-confidence inferred
+  ✓ bmsid: Road_FL → road_suspension, low-confidence inferred
+  ✓ bmsid: coverage marks vehicle_speed/yaw_rate found
+  ✓ bmsid: coverage marks ride_height uncertain (low only)
+  ✓ bmsid: forbidden caps all false (timeSeries/physicalValues/scaling/units/modelVsActual/kus/handlingAnalysis/setupFromRaw)
+  ✓ bmsid: limitations pin presence-only / nothing decoded
+  ✓ bmsid: null input → fail-closed (format null, caps false, 0 channels)
+
+[cal] Calibration 層：常數值鎖定 (calibration.js)
+  ✓ cal: CAL.US_NEUTRAL_BAND === 0.5
+  ✓ cal: CALIBRATION.US_NEUTRAL_BAND.value 對齊 CAL.US_NEUTRAL_BAND
+  ✓ cal: CAL.US_NORM_SCALE === 4
+  ✓ cal: CALIBRATION.US_NORM_SCALE.value 對齊 CAL.US_NORM_SCALE
+  ✓ cal: CAL.CORNERING_STIFFNESS_AY_REF_G === 1
+  ✓ cal: CALIBRATION.CORNERING_STIFFNESS_AY_REF_G.value 對齊 CAL.CORNERING_STIFFNESS_AY_REF_G
+  ✓ cal: CAL.TIRE_GRIP_TO_US_GRADIENT_GAIN === 14
+  ✓ cal: CALIBRATION.TIRE_GRIP_TO_US_GRADIENT_GAIN.value 對齊 CAL.TIRE_GRIP_TO_US_GRADIENT_GAIN
+  ✓ cal: CAL.WEIGHT_SHIFT_TO_US_GRADIENT === 0.2
+  ✓ cal: CALIBRATION.WEIGHT_SHIFT_TO_US_GRADIENT.value 對齊 CAL.WEIGHT_SHIFT_TO_US_GRADIENT
+  ✓ cal: CAL.TIRE_WIDTH_GRIP_REF_MM === 245
+  ✓ cal: CALIBRATION.TIRE_WIDTH_GRIP_REF_MM.value 對齊 CAL.TIRE_WIDTH_GRIP_REF_MM
+  ✓ cal: CAL.TIRE_WIDTH_GRIP_EXPONENT === 0.5
+  ✓ cal: CALIBRATION.TIRE_WIDTH_GRIP_EXPONENT.value 對齊 CAL.TIRE_WIDTH_GRIP_EXPONENT
+  ✓ cal: CAL.PRESSURE_GRIP_LOSS_PER_BAR === 0.2
+  ✓ cal: CALIBRATION.PRESSURE_GRIP_LOSS_PER_BAR.value 對齊 CAL.PRESSURE_GRIP_LOSS_PER_BAR
+  ✓ cal: CAL.LIHPAO_RADIUS_SCALE === 1.1
+  ✓ cal: CALIBRATION.LIHPAO_RADIUS_SCALE.value 對齊 CAL.LIHPAO_RADIUS_SCALE
+  ✓ cal: CAL.TIRE_TEMP_TRACK_COEFF === 0.6
+  ✓ cal: CALIBRATION.TIRE_TEMP_TRACK_COEFF.value 對齊 CAL.TIRE_TEMP_TRACK_COEFF
+  ✓ cal: CAL.TIRE_TEMP_EQUIL_TAU_LAPS === 1.6
+  ✓ cal: CALIBRATION.TIRE_TEMP_EQUIL_TAU_LAPS.value 對齊 CAL.TIRE_TEMP_EQUIL_TAU_LAPS
+  ✓ cal: CAL.LAP_BALANCE_PENALTY_PER_DEGG === 0.012
+  ✓ cal: CALIBRATION.LAP_BALANCE_PENALTY_PER_DEGG.value 對齊 CAL.LAP_BALANCE_PENALTY_PER_DEGG
+  ✓ cal: CAL.LAP_BALANCE_PENALTY_CAP === 0.04
+  ✓ cal: CALIBRATION.LAP_BALANCE_PENALTY_CAP.value 對齊 CAL.LAP_BALANCE_PENALTY_CAP
+  ✓ cal: CAL.DRIVETRAIN_TRACTION_FRAC_2WD === 0.62
+  ✓ cal: CALIBRATION.DRIVETRAIN_TRACTION_FRAC_2WD.value 對齊 CAL.DRIVETRAIN_TRACTION_FRAC_2WD
+  ✓ cal: CALIBRATION 鍵集合 == 測試預期
+  ✓ cal: 每個常數 metadata 完整且 value 落在 validRange 內
+
+[sens] corneringStiffnessScale 鉤子
+  ✓ sens: corneringStiffnessScale 預設(=1) 不改變 understeer_gradient
+  ✓ sens: cornering stiffness ×0.8 → Kus ≈ Kus0/0.8
+
+[tmeta] 輪胎模型 metadata
+  ✓ tmeta: generic → sourceType/overallStatus generic
+  ✓ tmeta: generic → Cα = model/generic_pacejka
+  ✓ tmeta: generic → pressure/temp/width grip are heuristic
+  ✓ tmeta: generic → no fallback flags (nothing better was expected)
+  ✓ tmeta: imported → sourceType imported_tir, status valid
+  ✓ tmeta: imported → Cα & peak μ upgraded to model/imported_tir
+  ✓ tmeta: imported → pressure/temp/width/tireUsShift STILL heuristic + fallback
+  ✓ tmeta: imported → coverage lateral true; Fx/Mz/combined false
+  ✓ tmeta: imported → emits "grip still heuristic" honesty diagnostic
+  ✓ tmeta: partial .tir → overallStatus imported_partial
+  ✓ tmeta: partial .tir → camber + lateral-only warnings
+  ✓ tmeta: partial .tir → missing pressure-model diagnostic
+  ✓ tmeta: parseTIR → imported_tir descriptor
+  ✓ tmeta: descriptor is pure — no prediction drift
+
+[tval] .tir validation diagnostics
+  ✓ tval: valid → no error severity
+  ✓ tval: valid → lateral-only is a warning (not an error)
+  ✓ tval: valid → grip-still-heuristic is a warning
+  ✓ tval: valid → vertical stiffness reported as info
+  ✓ tval: valid → load-sensitivity reported as info
+  ✓ tval: valid → pressure-unused note is info (file has PPY)
+  ✓ tval: lateral-only flags combined slip + Mz + Fx
+  ✓ tval: null → error TIR_PARSE_FAILED only
+  ✓ tval: missing PCY1 → error TIR_MISSING_LATERAL (returns early)
+  ✓ tval: missing PDY1 → error TIR_NO_PEAK
+  ✓ tval: partial → no error severity
+  ✓ tval: partial → no-camber warning + no-pressure/no-vertical info
+  ✓ tval: degenerate (Fy0≡0) → error TIR_NO_EFFECTIVE_LATERAL_FORCE
+  ✓ tval: degenerate → importedTirMetadata overallStatus imported_error (never imported_valid)
+  ✓ tval: valid (non-degenerate) → NO effective-lateral-force error
+  ✓ tval: importedTirMetadata(no PDY1) → overallStatus imported_error
+  ✓ tval: buildTireModelMetadata diagnostics come from validateTirModel
+
+[telemetry] .bmsbin catalog metadata + diagnostics
+  ✓ telemetry: canonical mapping returns matched raw name
+  ✓ telemetry: maps wheel-speed / damper / ride-height
+  ✓ telemetry: valid catalog → status catalog_only
+  ✓ telemetry: capabilities — catalog true, all decoding false
+  ✓ telemetry: required channels carry raw names
+  ✓ telemetry: catalog-only emits time-series-not-decoded warning
+  ✓ telemetry: full core → validation-detected + ready-for-3B info
+  ✓ telemetry: missing yaw/steer/speed → warnings; lateral present → no lateral warning
+  ✓ telemetry: partial still catalog_only (no time-series)
+  ✓ telemetry: non-Darab → error TELEM_NOT_DARAB + decode_error
+  ✓ telemetry: zero channels → error TELEM_NO_CHANNELS
+  ✓ telemetry: consumes parseBms shape (header/channelCount/channels)
+
+[probe] .bmsbin binary sample-block probe
+  ✓ probe: empty file → error BMS_PROBE_EMPTY_FILE
+  ✓ probe: non-Darab header → error BMS_PROBE_INVALID_HEADER
+  ✓ probe: catalog-only → catalog found + no-sample-region warning + no regions
+  ✓ probe: catalog + numeric region → candidate binary region found
+  ✓ probe: numeric region → int16le encoding flagged plausible
+  ✓ probe: monotonic counter → timebase clue candidate
+  ✓ probe: random region → probe_only + scaling-not-decoded warning
+  ✓ probe: report schema stable (probe_only, arrays, unknowns)
+  ✓ probe: always honest — probe-only + time-series-not-confirmed diagnostics
+  ✓ probe→metadata: status probe_available + sampleProbe true, decoding still false
+  ✓ probe→metadata: probe summary attached (regionCount + diagnostics)
+  ✓ probe→metadata: no probe → stays catalog_only, sampleProbe false
+
+[raw] .bmsbin raw time-series candidate extraction
+  ✓ raw: no probe report → error
+  ✓ raw: no candidate region → error + no series
+  ✓ raw: numeric region → raw series candidate found
+  ✓ raw: int16le stats correct (min/max/mean of 0..999)
+  ✓ raw: series carries raw-only notes (no scaling / no mapping)
+  ✓ raw: timebase clue → candidate only (not a confirmed timestamp)
+  ✓ raw: interleaved data → interleaved layout hypothesis (≥2 channels)
+  ✓ raw: channel mapping stays not_mapped
+  ✓ raw: physicalScaling + handlingCorrelation + timeSeries stay false
+  ✓ raw: rawTimeSeriesCandidates true + status raw_candidates_only
+  ✓ raw: end-to-end probe→extract yields candidates
+  ✓ raw→metadata: status raw_candidates_only + rawTimeSeriesCandidates true; physical/handling false
+  ✓ raw→metadata: rawExtraction summary attached (seriesCount + channelMapping not_mapped)
+
+[link] .bmsbin channel-linking hypotheses
+  ✓ link: no raw extraction → error
+  ✓ link: no catalog → warning
+  ✓ link: count match → count-match info + low-confidence order hypothesis
+  ✓ link: no explicit mapping → channel identity not confirmed
+  ✓ link: explicit mapping → high-confidence identity (synthetic case only)
+  ✓ link: explicit scale → scaling hypothesis (metadata_candidate)
+  ✓ link: no scale → manual_required + physicalScaling false
+  ✓ link: canonicalPreview available only with explicit identity+scale
+  ✓ link: decode-grade capabilities stay false even with explicit mapping
+  ✓ link: timebase hypothesis formed (candidate only, sample-count match)
+  ✓ link→metadata: status linking_hypotheses_only + linking/scaling caps true; decode-grade false
+  ✓ link→metadata: linking summary attached (identity not confirmed, no canonical preview)
+
+[tool] local validation reporter — fixture-safe / sanitized output
+  ✓ tool: REPORT_FIELDS whitelist names no raw-content field
+  ✓ tool: summarizeFile emits only whitelisted REPORT_FIELDS
+  ✓ tool: summary values are scalars only (no raw arrays/objects)
+  ✓ tool: summary reflects pipeline run + claims no decode
+  ✓ tool: aggregate emits counts/ranges/histograms only (no raw arrays)
+  ✓ tool: serialized summary+aggregate names no raw-content field
+  ✓ tool: summary carries sanitized confirmation decision (catalog confirmed, structure not, no decode)
+  ✓ tool: aggregate reports confirmation counts + corpus booleans (sanitized)
+  ✓ tool: summary carries sanitized extraction eligibility (not eligible, 0 eligible, no measured values)
+  ✓ tool: summary carries sanitized measured extraction (real file blocked, 0 corners, realDataUsed false, no tendency)
+  ✓ tool: summary carries sanitized canonical-adapter eligibility (real file blocked, never ready, realDataUsed false)
+  ✓ tool: summary carries sanitized private-corpus boundary (not available on single file, realDataUsed false)
+
+[confirm] .bmsbin hypothesis→confirmed criteria
+  ✓ confirm: catalog-only → catalog confirmed, structure not, status not_confirmed
+  ✓ confirm: unstable candidate regions → sample structure not confirmed
+  ✓ confirm: stable regions + matching raw count → sample structure can be confirmed
+  ✓ confirm: explicit mapping → channel identity can be confirmed (synthetic)
+  ✓ confirm: no explicit mapping → channel identity stays false
+  ✓ confirm: monotonic counter + sample-count match → timebase can be confirmed
+  ✓ confirm: no scale table → physical scaling stays false
+  ✓ confirm: explicit scale → scaling criteria confirmed (synthetic), physicalScaling cap still false
+  ✓ confirm: real-data-like (85 ch / 2 raw, no corpus) → catalog only, status not_confirmed
+  ✓ confirm: explicit mapping but NO corpus → identity/scaling/canonical stay false (structure gates them)
+  ✓ confirm: decode-grade capabilities stay false even when structure is confirmed
+  ✓ confirm: report schema (scores + blockers + nextEvidenceNeeded + canonical blocked)
+  ✓ confirm→metadata: confirmation summary surfaced + confirmationCriteria cap true; decode-grade false
+  ✓ confirm→metadata: no confirmation → confirmationCriteria false, confirmation null
+
+[struct] .bmsbin sample-structure discovery
+  ✓ struct: catalog-only (no raw) → hypotheses-only + not converged + warning
+  ✓ struct: 85-entry in-range offset table → candidate matches catalog (targets plausible)
+  ✓ struct: offset table with out-of-file targets → not confirmed (targetsPlausible false)
+  ✓ struct: 85 length-prefixed blocks → per_channel_blocks hypothesis matching catalog
+  ✓ struct: interleaved 85-lane data → interleaved_channels hypothesis
+  ✓ struct: random region → compressed_or_sparse hypothesis
+  ✓ struct→confirm: per-channel feed but NO corpus → structure NOT confirmed, decode caps false
+  ✓ struct→confirm: per-channel feed + corpus → structure can confirm; decode-grade caps still false
+  ✓ struct: decode-grade caps false + sampleStructureDiscovery true + never converged (all fixtures)
+  ✓ struct: report never names a canonical channel / decoded series
+  ✓ struct→metadata: structure summary surfaced + sampleStructureDiscovery cap true; decode caps false
+  ✓ struct→metadata: no structure → sampleStructureDiscovery false, structure null
+  ✓ struct(R1): misaligned per-channel blocks (junk prefix) still found via full start search
+  ✓ struct(R2): sequential index run → channel_index_table, not a matches offset_table
+  ✓ struct(R3): single contiguous smooth series → NOT mislabelled interleaved_channels
+  ✓ struct(R4): random region yields no targetsPlausible offset_table candidate
+
+[raw-stream] .bmsbin raw stream confirmation criteria
+  ✓ rawstream: catalog-only → not confirmed, no confirmable stream
+  ✓ rawstream: single-file per-channel blocks → confirmable, aggregate not confirmed (corpus required)
+  ✓ rawstream: corpus + consistent per-channel blocks → confirmed_structure + raw_stream_structure_confirmed
+  ✓ rawstream: matching count but inconsistent block length → candidate_only, not confirmed
+  ✓ rawstream: corpus + interleaved layout → confirmed_structure
+  ✓ rawstream: single contiguous smooth series → no interleaved stream, not confirmed
+  ✓ rawstream: offset table → rejected as raw stream (boundary evidence), not confirmed
+  ✓ rawstream: decode-grade capabilities stay false (timeSeries/physicalScaling/handlingCorrelation)
+  ✓ rawstream: always warns identity + physical values unavailable; never names a channel/value
+  ✓ rawstream→confirm: feed WITHOUT corpus → raw streams not confirmed; decode caps false
+  ✓ rawstream→confirm: feed + corpus (fileCount≥2) → raw streams can confirm; decode caps still false
+  ✓ rawstream: real-data-like (no corpus, no clean structure) → not confirmed
+  ✓ rawstream→metadata: summary surfaced + rawStreamConfirmation cap true; decode caps false
+  ✓ rawstream→metadata: no raw stream confirmation → cap false, summary null
+  ✓ rawstream(R1): equal-prefix / variable-tail blocks → NOT confirmed_structure (whole-run length check)
+
+[channel-identity] .bmsbin channel identity confirmation criteria
+  ✓ identity(A): shape-only → hypothesis_only, not confirmed
+  ✓ identity(B): label-only → labeled_unverified, not confirmed
+  ✓ identity(C): independent mapping but raw stream not confirmed → confirmable_identity, not confirmed
+  ✓ identity(D): corpus + confirmed raw stream + independent mapping → confirmed_identity (synthetic); decode caps false
+  ✓ identity(R1): unknowns[] is consistent with the decision on both paths
+  ✓ identity(E): no corpus (single file) → never confirmed_identity
+  ✓ identity(E2): mapping depends on scaling → candidate at most, not confirmed
+  ✓ identity(F): physical/canonical/handling/setup/units caps pinned false (even confirmed_identity)
+  ✓ identity(G): real path (no evidence) → not_confirmed, 0 candidates
+  ✓ identity(G): real path never names a channel (no speed/brake/throttle/steering/accy from catalog)
+  ✓ identity→confirm: feed WITHOUT corpus → channel identity not confirmed; decode caps false
+  ✓ identity→confirm: feed + corpus → channel identity can confirm; decode caps still false
+  ✓ identity→metadata: surfaced + channelIdentityConfirmed false; physical/canonical/handling/setup caps false
+  ✓ identity→metadata: no identity → cap false, summary null
+
+[timebase] .bmsbin timebase confirmation criteria
+  ✓ timebase(A): no evidence → not_confirmed, confirmed false
+  ✓ timebase(B): sample-count only → sample_count_candidate, confirmed false
+  ✓ timebase(C): monotonic counter only → monotonic_candidate, confirmed false
+  ✓ timebase(D): delta stable, no corpus → delta_candidate, confirmed false
+  ✓ timebase(E): manual sample-rate only → fallback hint, not confirmed; units/scaling/timeSeries false
+  ✓ timebase(F): raw stream not confirmed → confirmable_timebase at most, not confirmed
+  ✓ timebase(G): corpus + confirmed raw stream + full structural → confirmed_timebase (synthetic); caps false
+  ✓ timebase(H): gaps/dropouts → not confirmed_timebase + gaps-detected diagnostic
+  ✓ timebase(H2): NaN gap/dropout count → fails closed (not confirmed), never coerced to 0
+  ✓ timebase(I): single file (no corpus) → never confirmed; no inferred Hz/rate value emitted
+  ✓ timebase(red-line): physical/units/canonical/timeSeries/handling/setup caps pinned false (all paths)
+  ✓ timebase→confirm: feed WITHOUT corpus → timebase not confirmed; decode caps false
+  ✓ timebase→confirm: feed + corpus → timebase can confirm; decode caps still false
+  ✓ timebase→metadata: summary surfaced + timebaseConfirmed false; physical/units/canonical/handling caps false
+  ✓ timebase→metadata: no timebase → cap false, summary null
+
+[physical-scaling] .bmsbin physical scaling confirmation criteria
+  ✓ scaling(A): no evidence → not_confirmed; physical/units caps false
+  ✓ scaling(B): raw stream not confirmed → not confirmed; physicalScaling false
+  ✓ scaling(C): channel identity not confirmed → identity_missing, not confirmed
+  ✓ scaling(D): timebase missing (time-indexed) → timebase_missing, not confirmed
+  ✓ scaling(E): manual scale only → scale_hint_only (fallback); not confirmed; units false
+  ✓ scaling(F): unit label only → unit_hint_only, not confirmed
+  ✓ scaling(G): plausible range only → candidate at most, not confirmed (range is supporting only)
+  ✓ scaling(H): transform proposed but not verified/stable → transform_candidate, not confirmed
+  ✓ scaling(I): all prereqs + independent scale + unit + verified transform → confirmed_scaling (synthetic); usable caps still false
+  ✓ scaling(J): synthetic confirmed → canonicalValueEligibility true but canonicalValues NOT available; no overlay
+  ✓ scaling(R1): identity status string cannot override a false aggregate decision → not confirmed
+  ✓ scaling(K): real single-file (no corpus) → never confirmed; physical/units/canonical caps false
+  ✓ scaling(L): real path + manual scale → fallback hint only; physicalScaling/units false
+  ✓ scaling(M): handling/setup/overlay/timeSeries/canonical caps pinned false (all paths)
+  ✓ scaling→confirm: feed WITHOUT corpus → physical scaling not confirmed; decode caps false
+  ✓ scaling→confirm: feed + corpus → physical scaling can confirm; decode-grade caps still false
+  ✓ scaling→metadata: summary surfaced + physicalScaling/units/canonical caps false; overlay false
+  ✓ scaling→metadata: no scaling → cap false, summary null
+
+[telemetry-readiness] .bmsbin telemetry readiness gate
+  ✓ readiness(A): no evidence → not_ready; readiness/handlingAnalysis caps false
+  ✓ readiness(B): canonical/scaling missing → insufficient_prerequisites, not ready
+  ✓ readiness(C): required channels missing → missing_required_channels, not ready
+  ✓ readiness(E): timebase missing → insufficient_prerequisites, not ready
+  ✓ readiness(F-I): sample-rate / sync / dropout / noise blocked → quality_blocked, not ready
+  ✓ readiness(H2): unknown dropout/noise quality → fail-closed, not ready
+  ✓ readiness(R1): units-only prereq → insufficient_prerequisites (ladder symmetric), still not ready
+  ✓ readiness(J): some required channels confirmed → partial_readiness, not ready
+  ✓ readiness(K): prereqs + channels met, quality not fully confirmed → confirmable_readiness, not ready
+  ✓ readiness(L): real single-file → not_ready; handlingAnalysis/overlay caps false
+  ✓ readiness(M): all prereqs + channels + quality pass → ready_for_analysis (synthetic); analysis caps false
+  ✓ readiness(N): handlingAnalysis/overlay/Kus/handling/setup caps pinned false (all paths)
+  ✓ readiness→confirm: feed WITHOUT corpus → telemetryReadyForAnalysis false; decode caps false
+  ✓ readiness→confirm: feed + full prereqs + corpus → telemetryReadyForAnalysis true; decode caps still false
+  ✓ readiness→metadata: summary surfaced + telemetryReady false; handlingAnalysis/overlay/Kus/setup caps false
+  ✓ readiness→metadata: no readiness → cap false, summary null
+
+[extract-eligibility] .bmsbin measured handling-response extraction eligibility gate
+  ✓ extract(A): real not-ready readiness → not_eligible; extraction/measuredHandlingResponse/handling caps false
+  ✓ extract(B): ready but no canonical measured series → canonical_series_unavailable, not eligible
+  ✓ extract(C): ready + canonical series but required channels absent → required_channels_unavailable
+  ✓ extract(C2): ready + canonical series + some required channels → partial_eligibility
+  ✓ extract(D): channels present but too few corner events → segmentation_prerequisites_unmet
+  ✓ extract(E): segmentation ok but windows not separable → window_prerequisites_unmet
+  ✓ extract(F): all prerequisites satisfied (synthetic) → eligible_for_extraction; extraction/analysis caps false
+  ✓ extract(F2): full evidence but no corpus → corpus_unavailable (not eligible, candidate=1, next-evidence + diag)
+  ✓ extract(G): measuredHandlingResponse/handling/overlay/Kus/modelVsActual caps pinned false (all paths)
+  ✓ extract(H): input contract names required channels (abstract) + segmentation prerequisites
+  ✓ extract(H2): output contract is measured-only proxy — not full Kus / model-vs-actual / setup
+  ✓ extract→confirm: feed WITHOUT corpus → measuredExtractionEligible false; decode caps false
+  ✓ extract→confirm: feed + full prereqs + corpus → measuredExtractionEligible true; decode caps still false
+  ✓ extract→metadata: summary surfaced + extractionEligible false; measuredHandlingResponse/handling/overlay caps false
+  ✓ extract→metadata: no extraction → cap false, summary null
+
+[measured-extraction] .bmsbin synthetic measured-extraction harness
+  ✓ measext(A): no eligibility → not_available; harness/analysis caps false; realDataUsed false
+  ✓ measext(A2): not eligible → blocked_by_eligibility; no segments/tendency; caps false
+  ✓ measext(B): eligible but not syntheticOnly (real path) → blocked_real_path; empty segments; null tendency; realDataUsed false
+  ✓ measext(C): syntheticOnly but no series → insufficient_synthetic_series; null tendency; caps false
+  ✓ measext(D): synthetic series → segmented; cornerCount>0; syntheticOnly true; realDataUsed false
+  ✓ measext(D2): full synthetic series → extracted_synthetic
+  ✓ measext(E): entry/mid/exit window counts > 0
+  ✓ measext(F): steady-state windows > 0; confidence present
+  ✓ measext(G): unstable mid → steady-state blocked (0 steady windows; not extracted_synthetic); caps false
+  ✓ measext(H): tendency proxy marked syntheticOnly/notKus/notSetupAdvice/notModelVsActual; count>0
+  ✓ measext(H2): synthetic ratio → understeer_like / oversteer_like proxy (synthetic proxy only)
+  ✓ measext(I): extracted_synthetic → measuredExtractionSynthetic true; all analysis/real caps false
+  ✓ measext(J): real/blocked path → empty segments, null tendency, syntheticOnly false
+  ✓ measext→confirm: feed WITHOUT corpus/prereqs → measuredExtractionSynthetic false; decode caps false
+  ✓ measext→confirm: feed + full prereqs + corpus → measuredExtractionSynthetic true; decode caps still false
+  ✓ measext→metadata: summary surfaced + measuredExtractionSynthetic false; harness/real/handling/overlay caps false
+  ✓ measext→metadata: no measuredExtraction → cap false, summary null
+  ✓ measext(M): prior phases real path unchanged (eligibility not_eligible, readiness not_ready)
+  ✓ measext(N): empty requiredChannels + empty series → insufficient_synthetic_series (no crash)
+  ✓ measext(O): NaN-interleaved mid speed → steady-state fail-closed (0 steady; not extracted); caps false
+  ✓ measext(P): out-of-range/negative segmentHints rejected; segments stay within bounds; realDataUsed false
+  ✓ measext(Q): extracted confidence is medium|low only
+
+[canonical-adapter] .bmsbin real canonical-series adapter boundary / eligibility gate
+  ✓ cadapter(A): no inputs → not_available; canEnter false; caps false; realDataUsed false
+  ✓ cadapter(B): real path → raw_stream_missing; not eligible; canonicalTelemetry/timeSeries/measuredExtraction false; realDataUsed false
+  ✓ cadapter(C): missing raw stream → raw_stream_missing
+  ✓ cadapter(D): missing identity → identity_missing
+  ✓ cadapter(E): missing timebase → timebase_missing
+  ✓ cadapter(F): missing scaling → scaling_missing
+  ✓ cadapter(G): missing units → units_missing
+  ✓ cadapter(H): missing cross-file corpus → corpus_missing
+  ✓ cadapter(I): all prereqs but not syntheticOnly → adapter_contract_candidate; not eligible; canonicalTelemetry false; realDataUsed false
+  ✓ cadapter(J): all prereqs + corpus + syntheticOnly → synthetic_adapter_ready; eligible true; realDataUsed false; analysis caps false
+  ✓ cadapter(K): NaN/invalid evidence → fail-closed (not synthetic_adapter_ready); caps false
+  ✓ cadapter(L): one-way feed — adapter does not mutate readiness / extraction-eligibility
+  ✓ cadapter→metadata: summary surfaced + canonicalAdapterEligible false; canonicalTelemetry/timeSeries/modelVsActual false
+  ✓ cadapter→metadata: no canonicalAdapter → cap false, summary null
+  ✓ cadapter(N): null/garbage opts → fail-closed (no throw; not synthetic_adapter_ready)
+  ✓ cadapter(O): non-numeric corpus.fileCount → not synthetic_adapter_ready; numeric still works
+
+[private-corpus] .bmsbin private real-corpus boundary / evidence-ingestion policy
+  ✓ pcorpus(A): no inputs → not_available; canUse false; caps false; realDataUsed false
+  ✓ pcorpus(B): manifest but policy disabled → private_corpus_disabled
+  ✓ pcorpus(C): policy on, no manifest → manifest_missing
+  ✓ pcorpus(D): manifest without sanitizedOnly → manifest_invalid
+  ✓ pcorpus(E): rawFilesCommitted → unsafe_manifest
+  ✓ pcorpus(F): rawBytesExposed → unsafe_manifest
+  ✓ pcorpus(G): decodedSequencesExposed → unsafe_manifest
+  ✓ pcorpus(H): fileNamesExposed → unsafe_manifest
+  ✓ pcorpus(I): offsetsExposed → unsafe_manifest
+  ✓ pcorpus(J): fingerprintsExposed → unsafe_manifest
+  ✓ pcorpus(K): fileCount<2 → insufficient_file_count
+  ✓ pcorpus(L): no sanitizedEvidence → sanitized_evidence_missing
+  ✓ pcorpus(M): partial evidence → sanitized_evidence_candidate; no confirmation; caps false
+  ✓ pcorpus(N): safe manifest + complete evidence + policy → private_corpus_boundary_ready; evidence available; ALL confirm/canonical/analysis caps false; realDataUsed false
+  ✓ pcorpus(O): hash / path / fileName / channelNames → manifest_invalid
+  ✓ pcorpus(P): NaN / non-numeric fileCount → fail-closed (not boundary_ready)
+  ✓ pcorpus(Q): one-way — does not mutate manifest / sanitized-evidence inputs
+  ✓ pcorpus→metadata: summary surfaced + privateCorpusEvidenceAvailable false; canonicalTelemetry/timeSeries/modelVsActual false
+  ✓ pcorpus→metadata: no privateCorpus → cap false, summary null
+  ✓ pcorpus(S): truthy non-boolean exposure flag (1 / "true" / {}) → unsafe_manifest
+  ✓ pcorpus(T): path / hash / file-ext in formatFamily / sourceType → manifest_invalid; plain token still ready
+
+[sanitized-evidence-adapter] .bmsbin sanitized-evidence adapter dry-run shape
+  ✓ sadapter(A): no inputs → not_available; canProvide false; caps false; realDataUsed false
+  ✓ sadapter(B): 3G-2 boundary not ready → boundary_not_ready
+  ✓ sadapter(C): boundary ready, no evidence → evidence_missing
+  ✓ sadapter(D): evidence without sanitizedOnly → evidence_invalid
+  ✓ sadapter(E): rawBytesExposed → unsafe_evidence
+  ✓ sadapter(F): decodedSequencesExposed → unsafe_evidence
+  ✓ sadapter(G): fileNamesExposed → unsafe_evidence
+  ✓ sadapter(H): pathsExposed → unsafe_evidence
+  ✓ sadapter(I): offsetsExposed → unsafe_evidence
+  ✓ sadapter(J): fingerprintsExposed → unsafe_evidence
+  ✓ sadapter(K): sampleValuesExposed → unsafe_evidence
+  ✓ sadapter(L): channelNamesExposed → unsafe_evidence
+  ✓ sadapter(M): timingExposed → unsafe_evidence
+  ✓ sadapter(N): hashesExposed → unsafe_evidence
+  ✓ sadapter(O): no scope present → insufficient_scope
+  ✓ sadapter(P): only one scope → partial_adapter_shape; no confirmation; caps false
+  ✓ sadapter(Q): core scopes present, not all → adapter_shape_candidate; no confirmation; caps false
+  ✓ sadapter(R): all scopes + safe + boundary ready → dry_run_ready; shape available; ALL confirm/canonical/analysis caps false; realDataUsed false
+  ✓ sadapter(S): hash / fileName / channelNames key OR leaky/unknown scope → evidence_invalid
+  ✓ sadapter(T): malformed evidence → fail-closed (not dry_run_ready)
+  ✓ sadapter(T2): only-status / only-feed forged boundary → boundary_not_ready (dual check)
+  ✓ sadapter(U): one-way — does not mutate boundary / sanitized-evidence inputs
+  ✓ sadapter→metadata: summary surfaced + adapterEvidenceShapeAvailable false; canonicalTelemetry/timeSeries/modelVsActual false
+  ✓ sadapter→metadata: no sanitizedEvidenceAdapter → cap false, summary null
+  ✓ sadapter(W): canonical gate shape present on every path
+  ✓ sadapter(X): all diagnostic + UI panel keys resolve in EN/繁中/JA (3 each)
+  ✓ sadapter(Y): reporter sanitized — boundary_not_ready, shape-available 0, realDataUsed false, scalar histogram
+  ✓ sadapter(Z): one-way downstream — 3G-2 boundary result unchanged after adapter runs
+
+[invariants] Phase 3 trust-chain red-line invariants
+  ✓ invariant(A): real path fail-closed (readiness not_ready / eligibility not_eligible / measext blocked / hub not_confirmed)
+  ✓ invariant(B): no gated capability true on real path (all layers + every merged-metadata red-line cap === false)
+  ✓ invariant(C): hub pins timeSeries/physicalScaling/handlingCorrelation false
+  ✓ invariant(D): bad/empty input fail-closed (no throw, no gated cap)
+  ✓ invariant(E): reporter summary key set === REPORT_FIELDS; all scalar
+  ✓ invariant(F): reporter error-fallback key set === REPORT_FIELDS (drift guard)
+  ✓ invariant(G): synthetic extracted_synthetic opens only measuredExtractionSynthetic/Harness; realDataUsed false
+  ✓ invariant(H): dual-gate — only-status/only-cap → blocked_by_eligibility; eligible+series w/o syntheticOnly → blocked_real_path
+  ✓ invariant(I): canonical gate shape on 3E-0..3G-0B (status/aggregateDecision/confirmationFeed/capabilities/diagnostics/unknowns)
+  ✓ invariant(J): no proprietary telemetry / vendor binary (.bmsbin/.tir/.pds/...) in repo tree (clean-room #5)
+
+========= 結果: 479 passed, 0 failed =========
+=== telemetry-core synthetic tests ===
+telemetry-core: 67 passed, 0 failed
+=== telemetry-view synthetic tests ===
+telemetry-view: 105 passed, 0 failed
+=== telemetry-plot geometry tests ===
+telemetry-plot: 48 passed, 0 failed
+=== telemetry-interact geometry tests ===
+telemetry-interact: 52 passed, 0 failed
+=== telemetry-yaw synthetic tests ===
+telemetry-yaw: 84 passed, 0 failed
+=== canonical-parameters schema tests ===
+canonical-parameters: 39 passed, 0 failed
+=== parameter-conversions proof tests ===
+parameter-conversions: 38 passed, 0 failed
+=== vehicle-profile-f312 fixture tests ===
+vehicle-profile-f312: 30 passed, 0 failed
+=== setup-snapshot tests ===
+setup-snapshot: 35 passed, 0 failed
+=== analysis-case tests ===
+analysis-case: 43 passed, 0 failed
+=== analysis-case adversarial tests ===
+analysis-case-adversarial: 78 passed, 0 failed
+suspension-input-normalizer: 96 passed, 0 failed
+suspension-input-equivalence: 5020 passed, 0 failed  (raw=1002, observable=501)
+suspension-input-adversarial: 54 passed, 0 failed
+canonical-model-input: 33 passed, 0 failed
+analysis-execution: 29 passed, 0 failed
+telemetry-observation: 33 passed, 0 failed
+model-telemetry-comparison: 24 passed, 0 failed
+race-engineer-insight: 26 passed, 0 failed
+driver-coach-insight: 22 passed, 0 failed
+analysis-workspace: 19 passed, 0 failed
+analysis-workspace-viewmodel: 20 passed, 0 failed
+analysis-workspace-integration: 47 passed, 0 failed
+analysis-workspace-ui: 39 passed, 0 failed
+telemetry-import-adapter: 16 passed, 0 failed
+channel-mapping: 8 passed, 0 failed
+calibration-registry: 26 passed, 0 failed
+analysis-window: 7 passed, 0 failed
+canonical-telemetry-session: 9 passed, 0 failed
+analysis-case-export: 45 passed, 0 failed
+r2.3-real-telemetry-integration: 17 passed, 0 failed
+r2.3-import-ui: 16 passed, 0 failed
+measured-metrics: 16 passed, 0 failed
+r2.4-measured-metrics-integration: 26 passed, 0 failed
+r2.4-ui: 23 passed, 0 failed
+setup-ab: 20 passed, 0 failed
+quantitative-setup-recommendation: 32 passed, 0 failed
+r2.5-setup-ab-quantitative-integration: 25 passed, 0 failed
+r2.5-ui: 36 passed, 0 failed
+track-intelligence: 30 passed, 0 failed
+r2.6-track-intelligence-integration: 22 passed, 0 failed
+r2.6-ui: 15 passed, 0 failed
+case-shell: 24 passed, 0 failed
+r3.0a-ui: 67 passed, 0 failed
+storage-backend: 15 passed, 0 failed
+schema-migration: 9 passed, 0 failed
+case-record-schema: 63 passed, 0 failed
+case-store: 36 passed, 0 failed
+session-store: 12 passed, 0 failed
+case-library-viewmodel: 16 passed, 0 failed
+r3.0b-ui: 55 passed, 0 failed
+r3.0b-persistence-integration: 16 passed, 0 failed
+feature-registry: 27 passed, 0 failed
+feature-router: 20 passed, 0 failed
+vehicle-preset-pipeline: 27 passed, 0 failed
+i18n-parity: 105 passed, 0 failed
+node:fs:3022
+  return binding.mkdtemp(prefix, options.encoding);
+                 ^
+
+Error: EPERM: operation not permitted, mkdtemp '/var/folders/bw/dy9my1ls5sz2fnpxk_yrc0k80000gn/T/r3c-cp1-XXXXXX'
+    at Object.mkdtempSync (node:fs:3022:18)
+    at runScript (/Users/SKYLINE/Claude/projects/racing-setup-analyzer/tests/r3.0c-contract-foundation.test.js:539:18)
+    at /Users/SKYLINE/Claude/projects/racing-setup-analyzer/tests/r3.0c-contract-foundation.test.js:556:20
+    at Object.<anonymous> (/Users/SKYLINE/Claude/projects/racing-setup-analyzer/tests/r3.0c-contract-foundation.test.js:556:355)
+    at Module._compile (node:internal/modules/cjs/loader:1803:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1934:10)
+    at Module.load (node:internal/modules/cjs/loader:1524:32)
+    at Module._load (node:internal/modules/cjs/loader:1326:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24) {
+  errno: -1,
+  code: 'EPERM',
+  syscall: 'mkdtemp',
+  path: '/var/folders/bw/dy9my1ls5sz2fnpxk_yrc0k80000gn/T/r3c-cp1-XXXXXX'
+}
+
+Node.js v25.5.0
+
+codex
+The full `npm test` run is blocked by the read-only sandbox when an older R3.0C test tries to create a temp directory, after many earlier suites pass. I’m running the E1 suite and targeted adversarial probes separately, which don’t need filesystem writes.
+exec
+/bin/bash -lc 'node tests/r3.0e-contract-foundation.test.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+Section A — reason codes
+Section B — Experiment
+Section C — Outcome
+Section D — Control Variables
+Section E — Case Timeline
+Section F — Follow-up Link
+Section G — aggregate index
+Section H — scope: case-record-schema.js carries refs only (no R3.0E extension)
+Section I — Codex E1 R1 closures
+R3.0E E1 contract-foundation suite: 46 passed, 0 failed
+
+codex
+The E1 regression suite passes at 46/0. One shell probe failed only because Bash here-docs create temp files in this sandbox, so I’m rerunning the same probes as a single `node -e`.
+exec
+/bin/bash -lc "node -e \"const EXP=require('./contracts/r3.0e/experiment-contract.js'),TL=require('./contracts/r3.0e/case-timeline-contract.js'),FU=require('./contracts/r3.0e/follow-up-link-contract.js'),CV=require('./contracts/r3.0e/control-variables-contract.js');const validExp={schemaVersion:1,experimentId:'exp_0123456789abcdef',sourceCaseId:'case_E1_demo',sourceHypothesisId:'pri_0123456789abcdef',sourceRecommendationId:'priority_E1_demo',targetMetric:'roll_gradient_deg_per_g',baselineValue:3.5,expectedDirection:'decrease',expectedMagnitudeRange:{min:0.5,max:1.5},setupChange:{component:'front_arb'},driverInstruction:'k',controlVariables:[],validationPlan:'plan',stopConditions:[{i18nKey:'stop',params:{threshold_s:0.5}}],status:'planned',followUpCaseIds:[],outcome:null,createdAt:'2026-06-29T10:00:00Z'};const validTL={schemaVersion:1,caseId:'case_E1_demo',events:[{eventId:'ev_1',kind:'baseline_captured',createdAt:'2026-06-29T10:00:00Z',i18nKey:'tl',params:null}]};const validFU={schemaVersion:1,linkId:'link_e1',parentCaseId:'case_A',followUpCaseId:'case_B',experimentId:'exp_e1',parentStatus:'present',createdAt:'2026-06-29T10:00:00Z'};const validCV={name:'tyre_temp_window',description:'cv',expectedValue:80,allowedRange:{min:75,max:95},observedValue:null,withinRange:null};function show(n,r){console.log(n, r.valid===true?'VALID':'BLOCK', r.reasonCodes||[])}let sym={};sym[Symbol('x')]=1;let acc={};Object.defineProperty(acc,'x',{enumerable:true,get(){return 1}});let nonenum={};Object.defineProperty(nonenum,'x',{enumerable:false,value:1});show('exp nested symbol setupChange',EXP.validateExperimentShape({...validExp,setupChange:{a:sym}}));show('exp stop params accessor',EXP.validateExperimentShape({...validExp,stopConditions:[{i18nKey:'stop',params:acc}]}));show('tl nested params symbol',TL.validateCaseTimelineShape({...validTL,events:[{...validTL.events[0],params:{a:sym}}]}));show('tl nested params accessor',TL.validateCaseTimelineShape({...validTL,events:[{...validTL.events[0],params:{a:acc}}]}));show('cv nested range nonenum',CV.validateControlVariableShape({...validCV,allowedRange:nonenum}));show('fu future schema',FU.validateFollowUpLinkShape({...validFU,schemaVersion:2}));show('applied outcome',EXP.validateExperimentShape({...validExp,status:'applied',outcome:{x:1}}));\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+exp nested symbol setupChange BLOCK [ 'EXPERIMENT_INVALID', 'PROTOTYPE_POLLUTION_REJECTED' ]
+exp stop params accessor BLOCK [ 'EXPERIMENT_INVALID', 'PROTOTYPE_POLLUTION_REJECTED' ]
+tl nested params symbol VALID []
+tl nested params accessor VALID []
+cv nested range nonenum BLOCK [ 'CONTROL_VARIABLE_OUT_OF_RANGE' ]
+fu future schema BLOCK [ 'UNSUPPORTED_FUTURE_SCHEMA' ]
+applied outcome BLOCK [ 'OUTCOME_INVALID' ]
+
+codex
+Targeted probes confirm the R1 status/outcome and future-schema checks behave as intended. The remaining issue is not in the helper itself, but in contracts that never invoke it before cloning nested structured fields.
+exec
+/bin/bash -lc 'rg -n "hasNonPlainNestedObject|toCleanCopy|SUPPORTED_SCHEMA_VERSION|var api" contracts/r3.0e/*.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+contracts/r3.0e/case-timeline-contract.js:36:  var SUPPORTED_SCHEMA_VERSION = 1;
+contracts/r3.0e/case-timeline-contract.js:47:      var t = RC.toCleanCopy(tIn);
+contracts/r3.0e/case-timeline-contract.js:53:      else if (t.schemaVersion > SUPPORTED_SCHEMA_VERSION) reasons.push(CODES.UNSUPPORTED_FUTURE_SCHEMA);
+contracts/r3.0e/case-timeline-contract.js:84:  var api = { TIMELINE_KEYS: TIMELINE_KEYS, EVENT_KIND_ALLOWED: EVENT_KIND_ALLOWED, validateCaseTimelineShape: validateCaseTimelineShape };
+contracts/r3.0e/index.js:18:  var api = {
+contracts/r3.0e/reason-codes.js:6: * RC.buildBlockedResult, RC.isOriginalPlainObject, RC.hasHiddenOwnKey, RC.toCleanCopy)
+contracts/r3.0e/reason-codes.js:109:  function hasNonPlainNestedObject(o) {
+contracts/r3.0e/reason-codes.js:153:  function toCleanCopy(o) {
+contracts/r3.0e/reason-codes.js:160:  var api = {
+contracts/r3.0e/reason-codes.js:167:    hasNonPlainNestedObject: hasNonPlainNestedObject,
+contracts/r3.0e/reason-codes.js:168:    toCleanCopy: toCleanCopy,
+contracts/r3.0e/experiment-contract.js:58:  var SUPPORTED_SCHEMA_VERSION = 1;
+contracts/r3.0e/experiment-contract.js:80:      if (RC.hasNonPlainNestedObject(eIn)) return RC.buildBlockedResult([CODES.EXPERIMENT_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED], { detail: 'experiment contains nested non-plain object' });
+contracts/r3.0e/experiment-contract.js:81:      var e = RC.toCleanCopy(eIn);
+contracts/r3.0e/experiment-contract.js:88:      else if (e.schemaVersion > SUPPORTED_SCHEMA_VERSION) reasons.push(CODES.UNSUPPORTED_FUTURE_SCHEMA);
+contracts/r3.0e/experiment-contract.js:175:  var api = {
+contracts/r3.0e/experiment-contract.js:179:    SUPPORTED_SCHEMA_VERSION: SUPPORTED_SCHEMA_VERSION,
+contracts/r3.0e/follow-up-link-contract.js:30:  var SUPPORTED_SCHEMA_VERSION = 1;
+contracts/r3.0e/follow-up-link-contract.js:40:      var l = RC.toCleanCopy(lIn);
+contracts/r3.0e/follow-up-link-contract.js:46:      else if (l.schemaVersion > SUPPORTED_SCHEMA_VERSION) reasons.push(CODES.UNSUPPORTED_FUTURE_SCHEMA);
+contracts/r3.0e/follow-up-link-contract.js:65:  var api = { LINK_KEYS: LINK_KEYS, PARENT_STATUS_ALLOWED: PARENT_STATUS_ALLOWED, validateFollowUpLinkShape: validateFollowUpLinkShape };
+contracts/r3.0e/control-variables-contract.js:33:      var c = RC.toCleanCopy(cIn);
+contracts/r3.0e/control-variables-contract.js:61:  var api = { CONTROL_VARIABLE_KEYS: CONTROL_VARIABLE_KEYS, validateControlVariableShape: validateControlVariableShape };
+contracts/r3.0e/outcome-contract.js:47:  var SUPPORTED_SCHEMA_VERSION = 1;
+contracts/r3.0e/outcome-contract.js:58:      if (RC.hasNonPlainNestedObject(oIn)) return RC.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED]);
+contracts/r3.0e/outcome-contract.js:59:      var o = RC.toCleanCopy(oIn);
+contracts/r3.0e/outcome-contract.js:65:      else if (o.schemaVersion > SUPPORTED_SCHEMA_VERSION) reasons.push(CODES.UNSUPPORTED_FUTURE_SCHEMA);
+contracts/r3.0e/outcome-contract.js:100:  var api = {
+contracts/r3.0e/outcome-contract.js:103:    SUPPORTED_SCHEMA_VERSION: SUPPORTED_SCHEMA_VERSION,
+
+exec
+/bin/bash -lc "node -e \"const RC=require('./contracts/r3.0e/reason-codes.js');let o={},cur=o;for(let i=0;i<40;i++){cur.a={};cur=cur.a;}console.log('depth40',RC.hasNonPlainNestedObject(o));let root={};for(let i=0;i<4100;i++)root['k'+i]=i;console.log('nodes4101',RC.hasNonPlainNestedObject({root}));\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+depth40 false
+nodes4101 false
+
+exec
+/bin/bash -lc "node -e \"const CV=require('./contracts/r3.0e/control-variables-contract.js');const valid={name:'tyre_temp_window',description:'cv',expectedValue:80,allowedRange:{min:75,max:95},observedValue:null,withinRange:null};let range={min:75,max:95};Object.defineProperty(range,'hidden',{enumerable:false,value:'x'});let symRange={min:75,max:95};symRange[Symbol('x')]=1;let accRange={max:95};Object.defineProperty(accRange,'min',{enumerable:true,get(){return 75}});for(const [n,r] of [['hidden',range],['symbol',symRange],['accessor',accRange]]){const out=CV.validateControlVariableShape({...valid,allowedRange:r});console.log(n,out.valid===true?'VALID':'BLOCK',out.reasonCodes||[])}\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+hidden VALID []
+symbol VALID []
+accessor VALID []
+
+exec
+/bin/bash -lc "node -e \"const RC=require('./contracts/r3.0e/reason-codes.js');let root={};for(let i=0;i<4100;i++)root['k'+String(i).padStart(4,'0')]={ok:i};let hostile={};hostile[Symbol('x')]=1;root.zzzz=hostile;console.log(RC.hasNonPlainNestedObject(root));\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+false
+
+codex
+The re-sweep found three material blockers: one in the shared recursive audit cap behavior and two validators that bypass the recursive audit. I’m doing one last check that these are not test-only artifacts, then I’ll return the terse verdict in your requested format.
+exec
+/bin/bash -lc "node -e \"const EXP=require('./contracts/r3.0e/experiment-contract.js');const v={schemaVersion:1,experimentId:'exp_0123456789abcdef',sourceCaseId:'case_E1_demo',sourceHypothesisId:'pri_0123456789abcdef',sourceRecommendationId:'priority_E1_demo',targetMetric:'roll_gradient_deg_per_g',baselineValue:3.5,expectedDirection:'decrease',expectedMagnitudeRange:{min:0.5,max:1.5},setupChange:{},driverInstruction:'k',controlVariables:[],validationPlan:'plan',stopConditions:[{i18nKey:'stop',params:null}],status:'planned',followUpCaseIds:[],outcome:null,createdAt:'2026-06-29T10:00:00Z'};let setup={};for(let i=0;i<4100;i++)setup['k'+String(i).padStart(4,'0')]={ok:i};let hostile={};hostile[Symbol('x')]=1;setup.zzzz=hostile;const out=EXP.validateExperimentShape({...v,setupChange:setup});console.log(out.valid===true?'VALID':'BLOCK',out.reasonCodes||[]);\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+VALID []
+
+codex
+Finding E1-R2-01: recursive audit returns clean when node cap is hit, allowing hostile nodes beyond 4096.
+  evidence: contracts/r3.0e/reason-codes.js:118
+  severity: BLOCK
+  proposed closure: return true on traversal overflow; enforce depth 32 explicitly; add validator-level regression.
+
+Finding E1-R2-02: timeline validator bypasses recursive audit, so hostile nested `event.params` can validate.
+  evidence: contracts/r3.0e/case-timeline-contract.js:47
+  severity: BLOCK
+  proposed closure: call `RC.hasNonPlainNestedObject(tIn)` before `toCleanCopy`.
+
+Finding E1-R2-03: control-variable validator bypasses recursive audit, so hidden/Symbol/accessor `allowedRange` validates.
+  evidence: contracts/r3.0e/control-variables-contract.js:33
+  severity: BLOCK
+  proposed closure: call `RC.hasNonPlainNestedObject(cIn)` before `toCleanCopy`.
+
+FINAL VERDICT: BLOCK
+tokens used
+107,948
+Finding E1-R2-01: recursive audit returns clean when node cap is hit, allowing hostile nodes beyond 4096.
+  evidence: contracts/r3.0e/reason-codes.js:118
+  severity: BLOCK
+  proposed closure: return true on traversal overflow; enforce depth 32 explicitly; add validator-level regression.
+
+Finding E1-R2-02: timeline validator bypasses recursive audit, so hostile nested `event.params` can validate.
+  evidence: contracts/r3.0e/case-timeline-contract.js:47
+  severity: BLOCK
+  proposed closure: call `RC.hasNonPlainNestedObject(tIn)` before `toCleanCopy`.
+
+Finding E1-R2-03: control-variable validator bypasses recursive audit, so hidden/Symbol/accessor `allowedRange` validates.
+  evidence: contracts/r3.0e/control-variables-contract.js:33
+  severity: BLOCK
+  proposed closure: call `RC.hasNonPlainNestedObject(cIn)` before `toCleanCopy`.
+
+FINAL VERDICT: BLOCK
