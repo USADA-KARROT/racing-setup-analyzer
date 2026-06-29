@@ -8,8 +8,8 @@
 
   "shaSeparation": {
     "note": "Per SKYLINE 2026-06-28 R3.0 Final Continuous Execution Directive §7 + 2026-06-29 R3.0 Continuous Resume Directive §12, every checkpoint manifest preserves the three-way SHA separation. reviewedCandidateSha is the exact SHA Codex D4 review was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD.",
-    "reviewedCandidateSha": null,
-    "reviewedCandidateNote": "Filled by a follow-up evidence-anchoring commit after Codex D4 issues PASS against the exact candidate SHA on feat/r3.0d-d4-priority-engine. Lineage at governance/r3.0d/codex-checkpoint-evidence/D4/round-{1..N}-<sha>.raw.txt.",
+    "reviewedCandidateSha": "c81a479b4ab93578a30368bf3ec712c78f67b867",
+    "reviewedCandidateNote": "Codex D4 R6 reviewed this exact SHA on feat/r3.0d-d4-priority-engine and issued FINAL VERDICT: PASS (2026-06-29). Round 1..6 lineage at governance/r3.0d/codex-checkpoint-evidence/D4/round-{1..6}-<sha>.raw.txt. 19 distinct adversarial findings closed across 6 rounds (D4-R1-01..06, D4-R2-01..05, D4-R3-01..03, D4-R4-01..03, D4-R5-01..02). Architectural milestones: layered authority (frozen-input → recursive descriptor audit → structuredClone defang → post-clone audit → WeakSet identity attestation via captured Reflect.apply on captured WeakSet.prototype methods → D2-invariant revalidation + closed schema + contentSignature recompute integrity + hypothesisSetId recompute → mandatory freshness post-clock → two-pass priority resolution with finalized kind/tier/priorityId → fixed priority ladder enforcement). Producer attestation model: D3 sole producer + D4 verifier/consumer + caller cannot forge (closure-private WeakSet, narrow verifier-only export). Clock invoked AT MOST ONCE post-authority. Array fallback removal verified via paired baseline/mutant harness.",
     "manifestCommitSha": null,
     "manifestCommitNote": "Filled by the same follow-up evidence-anchoring commit; mirrors D1/D2/D3 convention.",
     "integrationSha": null,
@@ -64,11 +64,18 @@
   "artifactBoundSha": null,
 
   "codexVerdict": {
-    "verdict": "PENDING",
-    "verdictRound": 0,
-    "reviewedCandidateSha": null,
-    "verdictEvidenceFile": null,
-    "rounds": []
+    "verdict": "PASS",
+    "verdictRound": 6,
+    "reviewedCandidateSha": "c81a479b4ab93578a30368bf3ec712c78f67b867",
+    "verdictEvidenceFile": "governance/r3.0d/codex-checkpoint-evidence/D4/round-6-c81a479.raw.txt",
+    "rounds": [
+      { "round": 1, "reviewedSha": "3a7a33e", "verdict": "BLOCK", "findings": "5 BLOCK + 1 NIT (D4-R1-01..06)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D4/round-1-3a7a33e.raw.txt" },
+      { "round": 2, "reviewedSha": "f09323d", "verdict": "BLOCK", "findings": "3 BLOCK + 2 NIT (D4-R2-01..05)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D4/round-2-f09323d.raw.txt" },
+      { "round": 3, "reviewedSha": "4ed1e35", "verdict": "BLOCK", "findings": "2 BLOCK + 1 NIT (D4-R3-01..03)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D4/round-3-4ed1e35.raw.txt" },
+      { "round": 4, "reviewedSha": "08bb063", "verdict": "BLOCK", "findings": "2 BLOCK + 1 NIT (D4-R4-01..03)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D4/round-4-08bb063.raw.txt" },
+      { "round": 5, "reviewedSha": "146ca99", "verdict": "BLOCK", "findings": "1 BLOCK + 1 NIT (D4-R5-01..02)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D4/round-5-146ca99.raw.txt" },
+      { "round": 6, "reviewedSha": "c81a479", "verdict": "PASS", "findings": "0 BLOCK + 0 NIT", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D4/round-6-c81a479.raw.txt", "summary": "Reviewed c81a479. R5-01 direct verifier returned false + zero Proxy traps in both verifier and D4 paths. R5-02 paired baseline/mutant harness: baseline rejected malformed D3 with HYPOTHESIS_INVALID; mutant accepted (proves array check is load-bearing). Order remains authority/schema → clock → freshness → computation → materialization. D3 158/0; D4 111/0. Genuine D3→D4 pipeline emitted valid PrioritySet. Stable contentSignature + hsetId. No WeakSet/register/sign/secret exports." }
+    ]
   },
 
   "scopeBoundary": {
@@ -119,7 +126,8 @@
     "governance/r3.0d/codex-checkpoint-evidence/D4/round-2-f09323d.raw.txt",
     "governance/r3.0d/codex-checkpoint-evidence/D4/round-3-4ed1e35.raw.txt",
     "governance/r3.0d/codex-checkpoint-evidence/D4/round-4-08bb063.raw.txt",
-    "governance/r3.0d/codex-checkpoint-evidence/D4/round-5-146ca99.raw.txt"
+    "governance/r3.0d/codex-checkpoint-evidence/D4/round-5-146ca99.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D4/round-6-c81a479.raw.txt"
   ],
   "changedFilesNote": "Computed from baseSha (6ab8f39, D3 merge) → D4 candidate HEAD diff. Adds: (1) renderer/js/r3-0d-priority-engine.js — production module (~600 lines, all HI-wrapped, D3 R1-R7 lessons applied proactively, layered authority + multi-set semantics consistent with D2/D3, deep-frozen output); (2) tests/r3.0d-priority-engine.test.js — 53-assertion adversarial suite (sections A-N covering functional, structural, authority, scope, ladder, blocking prereqs, primary eligibility, security, privacy, HI wrapper mutation matrix, output immutability, mandatory freshness, closed kind enum, forbidden behaviors); (3) D4.json manifest; (4) state.json + train.json transitions to D4_PRIORITY_ENGINE.",
 
