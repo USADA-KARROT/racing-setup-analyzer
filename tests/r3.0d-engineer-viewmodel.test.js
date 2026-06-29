@@ -532,6 +532,64 @@ console.log('Section N — Codex D5 R2 closures');
 })();
 
 // =============================================================================================
+// Section O — Codex D5 R3 closures
+// =============================================================================================
+console.log('Section O — Codex D5 R3 closures');
+
+// O1 — D5-R3-01 closure: a blocked prepare attempt must NOT poison `_currentToken`. If
+// prepare(A) fails (blocked), then prepare(B) succeeds, a subsequent retry of A must NOT
+// be rejected as a replay because A was never successfully published.
+(function () {
+  ORC.__test.resetForTests();
+  var fix = _buildEnvelope();
+  // Forged D3 → blocked. Token 'gen_O1_A' is attempted but never reaches a successful publish.
+  var rBlocked = ORC.prepareEngineerInsight({
+    hypothesisSet: {}, // forged
+    prioritySet: fix.ps,
+    generationToken: 'gen_O1_A',
+  }, _opts());
+  chk('O1a: forged D3 prepare returns blocked', rBlocked.valid === false);
+  // Now publish B with a different token.
+  var rB = ORC.prepareEngineerInsight({
+    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_O1_B',
+  }, _opts());
+  chk('O1b: subsequent prepare with new token publishes', rB.valid === true);
+  chk('O1c: currentState token is B', ORC.currentState().generationToken === 'gen_O1_B');
+  // Retry A with the SAME token that was previously blocked + valid inputs this time.
+  // The R2-01 retired-token gate must NOT reject it (A was never a successful publish, so
+  // it must not have been retired by the publish of B).
+  var rRetry = ORC.prepareEngineerInsight({
+    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_O1_A',
+  }, _opts());
+  chk('O1d: retry of previously-blocked token A → succeeds (NOT mis-retired)',
+    rRetry.valid === true);
+  chk('O1e: currentState token is now A (overwriting B)',
+    ORC.currentState().generationToken === 'gen_O1_A');
+})();
+
+// O2 — Blocked prepare does not retire a prior valid token either. publish A → forged B
+// (blocked) → retry valid B → currentState reflects B with no spurious retirement.
+(function () {
+  ORC.__test.resetForTests();
+  var fix = _buildEnvelope();
+  var rA = ORC.prepareEngineerInsight({
+    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_O2_A',
+  }, _opts());
+  chk('O2a: A publishes', rA.valid === true);
+  // Forged B attempt — blocked. Must not retire A.
+  var rBblocked = ORC.prepareEngineerInsight({
+    hypothesisSet: {}, prioritySet: fix.ps, generationToken: 'gen_O2_B',
+  }, _opts());
+  chk('O2b: forged B prepare returns blocked', rBblocked.valid === false);
+  // Retry valid A — must still be accepted (not retired by the blocked B attempt).
+  var rAretry = ORC.prepareEngineerInsight({
+    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_O2_A',
+  }, _opts());
+  chk('O2c: same-token A re-publish after blocked B is accepted',
+    rAretry.valid === true && ORC.currentState().generationToken === 'gen_O2_A');
+})();
+
+// =============================================================================================
 // Done
 // =============================================================================================
 console.log('R3.0D D5 viewmodel + orchestrator adversarial suite: ' + pass + ' passed, ' + fail + ' failed');

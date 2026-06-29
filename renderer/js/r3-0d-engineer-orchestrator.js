@@ -357,11 +357,19 @@
     // Blocked publication: clear authoritative envelope/viewmodel but expose the blocked
     // displayState to subscribers. The UI can render a sanitized "unavailable" / "blocked"
     // panel.
+    // Codex D5 R3-01 closure: do NOT assign `_currentToken` from a blocked prepare. Only
+    // SUCCESSFUL publishes (Step 5 of prepareEngineerInsight) own the active token. A
+    // blocked attempt must not poison `_currentToken`, because a later successful publish
+    // with a different token would then retire this blocked-attempt token, and a retry of
+    // the original token would be wrongly rejected as a replay. Leaving `_currentToken`
+    // untouched means: a blocked attempt does NOT supersede the prior valid token (if
+    // any), and does NOT itself get retired by a future supersede.
     _currentEnvelope = null;
     _currentViewModel = blockedVm;
-    _currentToken = (typeof generationToken === 'string') ? generationToken : null;
     _currentCase = association;
-    var snap = _buildSubscriberSnapshot(blockedVm, association, _currentToken);
+    // The subscriber snapshot still surfaces the blocked attempt's token for diagnostic
+    // visibility — but `_currentToken` itself does not change.
+    var snap = _buildSubscriberSnapshot(blockedVm, association, (typeof generationToken === 'string') ? generationToken : null);
     _notifySubscribers(snap);
   }
 
