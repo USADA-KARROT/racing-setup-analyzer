@@ -138,6 +138,13 @@
    *   5. Return the result either way (blocked or success).
    */
   function prepareEngineerInsight(inputIn, optsIn) {
+    // Codex D5 R1-01 closure: bump _internalSeq at the START of every prepare call so any
+    // concurrent / replayed / out-of-order prepare result whose seqAtEntry no longer matches
+    // _internalSeq is dropped at the publish gate (Step 4 below). Without this, a later
+    // prepare(token=B) could be observed BEFORE an earlier prepare(token=A) and the earlier
+    // result would still publish, overwriting the newer state. With the per-call bump, the
+    // earlier call's seqAtEntry < _internalSeq at publish time → dropped.
+    _internalSeq += 1;
     var seqAtEntry = _internalSeq;
 
     // ---- Step 1 — basic input shape ----------------------------------------------------------

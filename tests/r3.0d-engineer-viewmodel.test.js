@@ -358,6 +358,103 @@ console.log('Section L — authoritative envelope leak protection');
 })();
 
 // =============================================================================================
+// Section M — Codex D5 R1 closures
+// =============================================================================================
+console.log('Section M — Codex D5 R1 closures');
+
+// M1 — D5-R1-01 closure: bump _internalSeq at entry to prepareEngineerInsight so a stale
+// in-flight result cannot overwrite newer state. We exercise this via a hostile clock that
+// fires invalidate as a side-effect mid-build (simulating a stale async path returning after
+// the orchestrator has been invalidated by a real event).
+(function () {
+  ORC.__test.resetForTests();
+  var fix = _buildEnvelope();
+  var listenerCalls = [];
+  var unsub = ORC.subscribe(function (snap) { listenerCalls.push(snap.displayState); });
+
+  // Hostile clock that invalidates mid-build. The clock runs AFTER the authority gates and
+  // BEFORE the publish step (per the EB pipeline: freshness clock runs at Step 7, publish at
+  // Step 12). When invalidate fires, _internalSeq bumps, and the orchestrator's publish gate
+  // catches the seq mismatch (because the entry already bumped seq, and invalidate bumps
+  // again, so seqAtEntry < _internalSeq at publish time → DROP).
+  var hostileClock = function () {
+    ORC.invalidate('session_changed');
+    return '2026-06-29T01:00:00Z';
+  };
+  var r = ORC.prepareEngineerInsight({
+    hypothesisSet: fix.hs,
+    prioritySet: fix.ps,
+    generationToken: 'gen_stale_test',
+  }, { clock: hostileClock });
+
+  chk('M1a: stale prepare result is dropped (does NOT publish over invalidate)',
+    r.valid === false && r.displayState === 'stale-cleared');
+  // The orchestrator should reflect the invalidate's stale-cleared state, not the prepare's
+  // partial result. currentState() must show stale-cleared, not 'available'/'inconclusive'.
+  var snap = ORC.currentState();
+  chk('M1b: after stale drop, currentState.displayState === stale-cleared',
+    snap !== null && snap.displayState === 'stale-cleared');
+  chk('M1c: no authoritative envelope leaked (getCurrentAuthoritativeEnvelope === null)',
+    ORC.getCurrentAuthoritativeEnvelope() === null);
+  unsub();
+})();
+
+// M2 — Two prepare calls in sequence both succeed and the latter overwrites the former.
+// This is the happy path that proves the seq bump does NOT introduce a regression.
+(function () {
+  ORC.__test.resetForTests();
+  var fix = _buildEnvelope();
+  var r1 = ORC.prepareEngineerInsight({
+    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_M2_first',
+  }, _opts());
+  var r2 = ORC.prepareEngineerInsight({
+    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_M2_second',
+  }, _opts());
+  chk('M2a: first prepare publishes', r1.valid === true);
+  chk('M2b: second prepare publishes (does not stale-drop the legitimate replay)',
+    r2.valid === true);
+  chk('M2c: currentState reflects second token',
+    ORC.currentState().generationToken === 'gen_M2_second');
+})();
+
+// M3 — D5-R1-02 closure: render-only UI source has NO innerHTML assignment.
+(function () {
+  var src = fs.readFileSync(__dirname + '/../renderer/js/r3-0d-engineer-ui.js', 'utf8');
+  var nocom = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  chk('M3a: no `.innerHTML =` assignment in r3-0d-engineer-ui.js',
+    !/\.innerHTML\s*=/.test(nocom),
+    (nocom.match(/\.innerHTML\s*=[^\n]*/g) || []).slice(0, 3));
+  chk('M3b: no `.outerHTML =` assignment either',
+    !/\.outerHTML\s*=/.test(nocom));
+  chk('M3c: no `insertAdjacentHTML(`',
+    !/\.insertAdjacentHTML\(/.test(nocom));
+})();
+
+// M4 — D5-R1-03 closure: D5.json authorizedPaths is the exact superset that includes
+// feature-registry.js (required for feature_registry_active capability activation).
+(function () {
+  var fs2 = require('fs');
+  var d5 = JSON.parse(fs2.readFileSync(__dirname + '/../governance/r3.0d/checkpoints/D5.json', 'utf8'));
+  var paths = (d5.authorizedPaths || []).map(function (e) { return e.path; });
+  chk('M4a: D5.json authorizes renderer/js/feature-registry.js',
+    paths.indexOf('renderer/js/feature-registry.js') !== -1, paths);
+  chk('M4b: D5.json authorizes renderer/js/r3-0d-contracts-bundle.js',
+    paths.indexOf('renderer/js/r3-0d-contracts-bundle.js') !== -1, paths);
+  chk('M4c: D5.json authorizes all 5 D5 production modules',
+    paths.indexOf('renderer/js/r3-0d-engineer-brief.js') !== -1
+      && paths.indexOf('renderer/js/r3-0d-engineer-viewmodel.js') !== -1
+      && paths.indexOf('renderer/js/r3-0d-engineer-orchestrator.js') !== -1
+      && paths.indexOf('renderer/js/r3-0d-engineer-ui.js') !== -1
+      && paths.indexOf('renderer/js/i18n-r3-0d.js') !== -1, paths);
+  // The D5.json authorizedPaths must be a SUPERSET of state.json's authorizedProductionPaths.
+  var st = JSON.parse(fs2.readFileSync(__dirname + '/../governance/r3.0d/state.json', 'utf8'));
+  var stPaths = (st.authorizedProductionPaths || []).map(function (e) { return e.path; });
+  var stateMinusD5 = stPaths.filter(function (p) { return paths.indexOf(p) === -1; });
+  chk('M4d: every state.json authorizedProductionPath appears in D5.json authorizedPaths',
+    stateMinusD5.length === 0, stateMinusD5);
+})();
+
+// =============================================================================================
 // Done
 // =============================================================================================
 console.log('R3.0D D5 viewmodel + orchestrator adversarial suite: ' + pass + ' passed, ' + fail + ' failed');

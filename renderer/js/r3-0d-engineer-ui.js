@@ -61,7 +61,9 @@
 
     // ---------- Build inert pane skeleton --------------------------------------------------
     // Pure-DOM construction (NO innerHTML, NO arbitrary string parsing).
-    rootEl.innerHTML = '';
+    // Codex D5 R1-02 closure: directive §13.4 forbids ANY innerHTML assignment in the
+    // render-only UI surface, even a literal empty string. Clear via descendant removal.
+    while (rootEl.firstChild) rootEl.removeChild(rootEl.firstChild);
     rootEl.setAttribute('data-r3-0d-engineer-brief', 'mounted');
 
     function _el(tag, cls, textKey, params) {
@@ -261,7 +263,9 @@
     return {
       unmount: function () {
         try { unsub(); } catch (e) { /* swallow */ }
-        rootEl.innerHTML = '';
+        // Codex D5 R1-02 closure: directive §13.4 forbids ANY innerHTML assignment in the
+    // render-only UI surface, even a literal empty string. Clear via descendant removal.
+    while (rootEl.firstChild) rootEl.removeChild(rootEl.firstChild);
         rootEl.removeAttribute('data-r3-0d-engineer-brief');
       },
       render: render,
