@@ -117,8 +117,12 @@
   var _JSONStringify = JSON.stringify;
   var _JSONParse = JSON.parse;
 
-  // TextEncoder / structuredClone (modern-runtime guaranteed in our target environments)
+  // TextEncoder / structuredClone (modern-runtime guaranteed in our target environments).
+  // Codex D2 Round 16 RN-28 closure: capture TextEncoder.prototype.encode at module-init so
+  // safeUtf8ByteLength never invokes the instance's `.encode` method via ambient property
+  // lookup. A hostile TextEncoder.prototype.encode replacement is then unreachable.
   var _TextEncoderCtor = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;
+  var _TextEncoderPrototypeEncode = _TextEncoderCtor ? TextEncoder.prototype.encode : null;
   var _StructuredCloneFn = (typeof structuredClone === 'function') ? structuredClone : null;
 
   // Sentinel for failed structural reads (distinguishable from any legitimate value).
@@ -345,11 +349,15 @@
   // somehow unavailable. Lone surrogates count as 6 bytes (\uXXXX JSON escape width).
   function safeUtf8ByteLength(s) {
     if (typeof s !== 'string') return 0;
-    if (_TextEncoderCtor !== null) {
+    if (_TextEncoderCtor !== null && _TextEncoderPrototypeEncode !== null) {
       try {
         var enc = new _TextEncoderCtor();
-        var arr = enc.encode(s);
-        if (arr && typeof arr.length === 'number') return arr.length;
+        // Codex D2 Round 16 RN-28 closure: invoke captured TextEncoder.prototype.encode via
+        // captured Reflect.apply rather than the instance's `.encode` property — that ambient
+        // property lookup would invoke a rebound prototype method (or a Proxy get trap on the
+        // instance, which is what the Uint8Array adapter returns in some host implementations).
+        var arr = _apply(_TextEncoderPrototypeEncode, enc, [s]);
+        if (arr !== _SENTINEL && arr && typeof arr.length === 'number') return arr.length;
       } catch (e) { /* fall through to manual */ }
     }
     var n = 0;
