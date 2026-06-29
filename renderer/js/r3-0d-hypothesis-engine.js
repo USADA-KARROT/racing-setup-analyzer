@@ -87,18 +87,35 @@
   //
   // Lifetime: per-process; in-memory pipeline D3 → D4 only. Persistence is out of scope (would
   // require a separate signed-snapshot store at a future checkpoint).
-  var _authoritativeHypothesisSets = new WeakSet();
+  // Codex D4 R4 D4-R4-01 closure: capture WeakSet constructor + prototype methods at module
+  // init. ALL WeakSet operations dispatch through these captured references via captured
+  // Reflect.apply — never through the mutable WeakSet.prototype chain. Caller cannot defeat
+  // authority by post-load `WeakSet.prototype.has = () => true`.
+  var _WeakSetCtor = WeakSet;
+  var _WS_ADD = WeakSet.prototype.add;
+  var _WS_HAS = WeakSet.prototype.has;
+  var _CAPTURED_REFLECT_APPLY = Reflect.apply;
+  function _wsAdd(set, value) {
+    try { _CAPTURED_REFLECT_APPLY(_WS_ADD, set, [value]); return true; }
+    catch (e) { return false; }
+  }
+  function _wsHas(set, value) {
+    try { return _CAPTURED_REFLECT_APPLY(_WS_HAS, set, [value]) === true; }
+    catch (e) { return false; }
+  }
+  var _authoritativeHypothesisSets = new _WeakSetCtor();
   function _registerAuthoritative(hypothesisSet) {
-    try { _authoritativeHypothesisSets.add(hypothesisSet); } catch (e) { /* fail-closed silently */ }
+    _wsAdd(_authoritativeHypothesisSets, hypothesisSet);
   }
   function verifyAuthoritativeHypothesisSet(candidate) {
-    // Fail-closed: any throw / Proxy / hostile getter → false.
+    // Fail-closed: any throw / Proxy / hostile getter / post-load prototype rebind → false.
     try {
       if (candidate === null || typeof candidate !== 'object') return false;
-      // Membership check is the authority gate; shape checks are belt-and-suspenders.
-      if (!_authoritativeHypothesisSets.has(candidate)) return false;
-      // The set entry MUST also still be frozen + have the expected shape (defense-in-depth
-      // against any future bug that might register a partially-built snapshot).
+      // Membership check via captured Reflect.apply on captured WeakSet.prototype.has.
+      // Post-load `WeakSet.prototype.has = () => true` cannot affect this dispatch.
+      if (!_wsHas(_authoritativeHypothesisSets, candidate)) return false;
+      // Belt-and-suspenders: the set entry MUST also still be frozen + have the expected
+      // shape. Defense-in-depth against any future bug that might register a partial snapshot.
       if (_CAPTURED_OBJECT_IS_FROZEN(candidate) !== true) return false;
       if (candidate.schemaVersion !== HYPOTHESIS_SET_SCHEMA_VERSION) return false;
       if (typeof candidate.hypothesisSetId !== 'string') return false;
