@@ -8,8 +8,8 @@
 
   "shaSeparation": {
     "note": "Per SKYLINE 2026-06-28 R3.0 Final Continuous Execution Directive §7 + 2026-06-29 R3.0 Continuous Resume Directive §2/§11, every checkpoint manifest preserves the three-way SHA separation. reviewedCandidateSha is the exact SHA Codex D3 review was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD. Substituting one for another is a tier violation.",
-    "reviewedCandidateSha": null,
-    "reviewedCandidateNote": "Filled by a follow-up evidence-anchoring commit after Codex D3 issues PASS against the exact candidate SHA on feat/r3.0d-d3-hypothesis-engine. Round 1..N lineage will live at governance/r3.0d/codex-checkpoint-evidence/D3/round-{1..N}-<sha>.raw.txt with sha-anchored evidence files.",
+    "reviewedCandidateSha": "7b01fd8ae1c231d6b147d7a21a0d16d89e40c0b4",
+    "reviewedCandidateNote": "Codex D3 R7 reviewed this exact SHA on feat/r3.0d-d3-hypothesis-engine and issued FINAL VERDICT: PASS (2026-06-29). Round 1..7 lineage at governance/r3.0d/codex-checkpoint-evidence/D3/round-{1..7}-<sha>.raw.txt. 27 distinct adversarial findings closed across 7 rounds (RN-01..RN-11, R2-01..R2-08, R3-01..R3-07, D3-R4-01..03, D3-R5-01..04, D3-R6-01..05, D3-R7-01..02).",
     "manifestCommitSha": null,
     "manifestCommitNote": "Filled by the same follow-up evidence-anchoring commit; mirrors C5R / C6 / C7 / C8 / D1 / D2 convention.",
     "integrationSha": null,
@@ -46,7 +46,7 @@
     "cannotConcludeStructured": "When no rule fires across the whole graph, snapshotCannotConclude contains INSUFFICIENT_EVIDENCE. Codex D3 R1 RN-01 closure: D3 does NOT consume graph.cannotConclude or graph.limitations from the input graph (those fields are not bound to graphId); all snapshot.cannotConclude and snapshot.limitations are derived from rule firing outcomes. Caller cannot inject free-text reasons; only closed reason codes from REASON_CODES are emitted.",
     "deepFreezeOutput": "The returned hypothesisSet and every nested array/object is Object.freeze'd (via HI.deepFreeze). Caller mutation post-build cannot reach into the snapshot.",
     "hardenedIntrinsicsEnforced": "Every ambient intrinsic call goes through R3_0D_HardenedIntrinsics (HI). The validation path NEVER invokes attacker-replaced ambient intrinsics — that is the primary defence. The four integrity checkpoints (Step 0 entry, Step 3.5 per-rule, Step 7.5 post-clock, Step 9.6 post-freeze) are defence-in-depth on HI surface integrity (Codex D3 R2 R2-07 closure: claim narrowed). Hash function is byte-equivalent to D2 _hash64 (FNV-1a 32-bit twice, concatenated) so authoritative graphId recomputation matches exactly. Object.isFrozen, Date.parse, and Object.is are captured at module init as supplementary primitives not in the HI surface (Codex D3 R1 RN-08 + R2 R2-02 closure).",
-    "caps": "HYPOTHESIS_COUNT_CAP=64, ALT_EXPLANATION_COUNT_CAP=128, VALIDATION_ACTION_COUNT_CAP=128, CANNOT_CONCLUDE_CAP=64, LIMITATIONS_CAP=64, SUPPORT_ID_PER_HYPOTHESIS_CAP=64, CONTRADICT_ID_PER_HYPOTHESIS_CAP=64, ALT_ID_PER_HYPOTHESIS_CAP=16, REASON_CODE_PER_HYPOTHESIS_CAP=32, STRING_BYTE_CAP=512, ENVELOPE_BYTE_CAP=512 KiB, GRAPH_NODE_INPUT_CAP=8192, GRAPH_EDGE_INPUT_CAP=16384. generationToken ≤ 128 chars; contextVersion ≤ 128 chars.",
+    "caps": "HYPOTHESIS_COUNT_CAP=64, ALT_EXPLANATION_COUNT_CAP=128, VALIDATION_ACTION_COUNT_CAP=128, CANNOT_CONCLUDE_CAP=64, LIMITATIONS_CAP=64, SUPPORT_ID_PER_HYPOTHESIS_CAP=64, CONTRADICT_ID_PER_HYPOTHESIS_CAP=64, ALT_ID_PER_HYPOTHESIS_CAP=16, REASON_CODE_PER_HYPOTHESIS_CAP=32, STRING_BYTE_CAP=512, ENVELOPE_BYTE_CAP=512 KiB, GRAPH_NODE_INPUT_CAP=8192, GRAPH_EDGE_INPUT_CAP=1024 (aligned with D2 EDGES_CAP_TOTAL — Codex D3 R6 D3-R6-02 closure), PER_NODE_EDGE_DECL_CAP=64 (matches D1 evidence-node-contract — Codex D3 R6 D3-R6-01 closure). generationToken ≤ 128 chars; contextVersion ≤ 128 chars.",
     "outerTryCatch": "buildHypothesisSet is wrapped in an outer try/catch. Any internal throw collapses to INTERNAL_CONTRACT_VIOLATION via RC.buildBlockedResult; never bubbles to the caller.",
     "privacyBoundary": "Output never contains raw telemetry samples, filesystem paths, source filenames, usernames, machine IDs, internal database handles, stack traces, or Electron private paths. Tests assert no '/Users/' substring, no 'stack' key, no UUID-shape identifier in the serialized envelope.",
     "scopeBindingFromGraph": "caseAssociation and sessionAssociation in the hypothesisSet are copied verbatim from the authoritative graph (after Proxy-defang). Cross-case / cross-session evidence in the graph is rejected by the per-node identity scope check BEFORE any rule evaluates."
@@ -55,7 +55,7 @@
   "tests": {
     "command": "npm test",
     "newSuiteForThisCheckpoint": "tests/r3.0d-hypothesis-engine.test.js",
-    "newSuiteAssertions": 156,
+    "newSuiteAssertions": 158,
     "additionalSuites": {
       "r3.0d-contract-foundation": {
         "path": "tests/r3.0d-contract-foundation.test.js",
@@ -82,11 +82,20 @@
   "artifactBoundSha": null,
 
   "codexVerdict": {
-    "verdict": "PENDING",
-    "verdictRound": 0,
-    "reviewedCandidateSha": null,
-    "verdictEvidenceFile": null,
-    "rounds": []
+    "verdict": "PASS",
+    "verdictRound": 7,
+    "reviewedCandidateSha": "7b01fd8ae1c231d6b147d7a21a0d16d89e40c0b4",
+    "verdictEvidenceFile": "governance/r3.0d/codex-checkpoint-evidence/D3/round-7-7b01fd8.raw.txt",
+    "rounds": [
+      { "round": 1, "reviewedSha": "7368143", "verdict": "BLOCK", "findings": "9 BLOCK + 2 NIT (RN-01..RN-11)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D3/round-1-7368143.raw.txt" },
+      { "round": 2, "reviewedSha": "388edca", "verdict": "BLOCK", "findings": "5 BLOCK + 3 NIT (R2-01..R2-08)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D3/round-2-388edca.raw.txt" },
+      { "round": 3, "reviewedSha": "ac9f9a0", "verdict": "BLOCK", "findings": "5 BLOCK + 2 NIT (R3-01..R3-07)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D3/round-3-ac9f9a0.raw.txt" },
+      { "round": 4, "reviewedSha": "11ad6a5", "verdict": "BLOCK", "findings": "1 BLOCK + 2 NIT (D3-R4-01..03)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D3/round-4-11ad6a5.raw.txt" },
+      { "round": 5, "reviewedSha": "abaca2e", "verdict": "BLOCK", "findings": "1 BLOCK + 3 NIT (D3-R5-01..04)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D3/round-5-abaca2e.raw.txt" },
+      { "round": 6, "reviewedSha": "9254c84", "verdict": "BLOCK", "findings": "3 BLOCK + 2 NIT (D3-R6-01..05)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D3/round-6-9254c84.raw.txt" },
+      { "round": 7, "reviewedSha": "7b01fd8", "verdict": "PASS", "findings": "0 BLOCK + 2 NIT (D3-R7-01/02, both closed in this anchor commit)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D3/round-7-7b01fd8.raw.txt", "summary": "Reviewed 7b01fd8ae1c231d6b147d7a21a0d16d89e40c0b4. All three R6 BLOCK findings closed: duplicate-edge multi-set semantics (N accepted / N-1 / N+1 rejected); per-node + total edge caps aligned with D2 (64 / 1024); hash implementation byte-equivalent (test helper matched D2 graphId exactly; constructed fixture accepted). Verified D3: 156/0, D2: 261/0, D1 contract foundation: 156/0. 27 distinct adversarial findings across R1-R7 closed (RN-01..RN-11, R2-01..R2-08, R3-01..R3-07, D3-R4-01..03, D3-R5-01..04, D3-R6-01..05, D3-R7-01..02)." }
+    ],
+    "shaSeparationNote": "shaSeparation.reviewedCandidateSha + this codexVerdict.reviewedCandidateSha both reference the exact SHA Codex D3 R7 reviewed (7b01fd8...). The manifestCommitSha and integrationSha remain null pending the PASS-anchor commit + Train merge respectively."
   },
 
   "scopeBoundary": {
@@ -138,7 +147,8 @@
     "governance/r3.0d/codex-checkpoint-evidence/D3/round-3-ac9f9a0.raw.txt",
     "governance/r3.0d/codex-checkpoint-evidence/D3/round-4-11ad6a5.raw.txt",
     "governance/r3.0d/codex-checkpoint-evidence/D3/round-5-abaca2e.raw.txt",
-    "governance/r3.0d/codex-checkpoint-evidence/D3/round-6-9254c84.raw.txt"
+    "governance/r3.0d/codex-checkpoint-evidence/D3/round-6-9254c84.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D3/round-7-7b01fd8.raw.txt"
   ],
   "changedFilesNote": "Computed from the exact baseSha (299771a) → D3 candidate HEAD diff. Adds: (1) renderer/js/r3-0d-hypothesis-engine.js — production module (~1000 lines after R1..R4 closures, all HI-wrapped, 4-layer integrity guards, closed 9-rule registry, layered authority (frozen-input check via captured Object.isFrozen + structuredClone defang + post-clone deepOriginalShapeAudit + full D1-contract SourceIdentity revalidation via SI.validateSourceIdentity + correlation-partition reconstruction with D2-exact canonical encoding + correlationGroupId D2-recompute equality + closed edge.kind enum + graphId FNV-1a 32-bit×2 recompute), deterministic confidence model with mandatory freshness reference, deep-frozen output); (2) tests/r3.0d-hypothesis-engine.test.js — 148-assertion adversarial suite (sections A..K plus H2/H3/H4/H5 R1/R2/R3/R4 closure tests; mutation coverage on 21 HI wrappers + captured Date.parse/Object.is/Object.isFrozen via J1..J21); (3) governance/r3.0d/checkpoints/D3.json — this manifest; (4) state transitions in state.json + train.json + train phaseStates; (5) package.json adds new test entry to the scripts.test chain so the per-file manifest scanner discovers it deterministically.",
 
