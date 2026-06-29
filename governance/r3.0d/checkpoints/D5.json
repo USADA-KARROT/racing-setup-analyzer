@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0D",
+  "checkpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+  "baseSha": "f50c0bbdbe2439ba4158f7498d428750f700870f",
+  "headSha": null,
+  "previousCheckpoint": "D4_PRIORITY_ENGINE",
+
+  "shaSeparation": {
+    "note": "Per SKYLINE 2026-06-29 R3.0D D5 Continuous Resume Directive §20 + R3.0 Final Continuous Execution Directive §7, every checkpoint manifest preserves three-way SHA separation. reviewedCandidateSha is the exact SHA Codex D5 review was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD.",
+    "reviewedCandidateSha": "10f0c1e0071fc5b7cd129062560fca9c4fc5b994",
+    "reviewedCandidateNote": "Codex D5 Round 4 reviewed this exact SHA on feat/r3.0d-d5-engineer-brief-activation and issued FINAL VERDICT: PASS (2026-06-29). Round 1..4 lineage at governance/r3.0d/codex-checkpoint-evidence/D5/round-{1..4}-<sha>.raw.txt. 5 distinct adversarial findings closed across 4 rounds: R1-01 (stale generation tokens overwriting newer state — _internalSeq bump at prepare entry), R1-02 (innerHTML in render-only UI — replaced with descendant-removal loop), R1-03 (D5.json authorizedPaths missing feature-registry — added under feature_registry_active), R2-01 (older generation token replay overwriting newer publish — closure-private retired-tokens map; retire prior _currentToken on successful supersede and on invalidate), R3-01 (blocked prepare poisoning _currentToken — _maybePublishBlocked no longer mutates _currentToken; subscriber snapshot still surfaces blocked-attempt token for diagnostic visibility while closure-private state is preserved). R4 verdict PASS confirms the full 4-gate authority chain (HE WeakSet + PE WeakSet + cross-binding + identity), the retired-token semantics, and the render-only UI surface against re-sweep.",
+    "manifestCommitSha": null,
+    "manifestCommitNote": "Filled by the same follow-up evidence-anchoring commit; mirrors D1/D2/D3/D4 convention.",
+    "integrationSha": null,
+    "integrationNote": "Filled only after the D5 branch-to-branch PR merges into feat/r3.0-integrated-delivery AND the Train target-context trusted-verification PASSes."
+  },
+
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0d-evidence-graph.js", "capability": "evidence_graph_present" },
+    { "path": "renderer/js/r3-0d-hypothesis-engine.js", "capability": "hypothesis_engine_present" },
+    { "path": "renderer/js/r3-0d-priority-engine.js", "capability": "priority_engine_present" },
+    { "path": "renderer/js/r3-0d-engineer-brief.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/r3-0d-engineer-viewmodel.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/r3-0d-engineer-orchestrator.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/r3-0d-engineer-ui.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/i18n-r3-0d.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/r3-0d-contracts-bundle.js", "capability": "contract_foundation_present" },
+    { "path": "renderer/js/feature-registry.js", "capability": "feature_registry_active" }
+  ],
+  "newlyAuthorizedPaths": [
+    "renderer/js/r3-0d-engineer-brief.js",
+    "renderer/js/r3-0d-engineer-viewmodel.js",
+    "renderer/js/r3-0d-engineer-orchestrator.js",
+    "renderer/js/r3-0d-engineer-ui.js",
+    "renderer/js/i18n-r3-0d.js"
+  ],
+  "newlyEnabledCapabilities": ["engineer_brief_present", "feature_registry_active"],
+
+  "enabledCapabilitiesBefore": ["contract_foundation_present", "evidence_graph_present", "hypothesis_engine_present", "priority_engine_present"],
+  "enabledCapabilitiesAfter": ["contract_foundation_present", "evidence_graph_present", "hypothesis_engine_present", "priority_engine_present", "engineer_brief_present", "feature_registry_active"],
+  "forbiddenCapabilities": [],
+
+  "contractEnforcements": {
+    "engineerBriefScope": "renderer/js/r3-0d-engineer-brief.js consumes ONLY a D3-authoritative HypothesisSet PLUS a D4-authoritative PrioritySet snapshot validated via PRODUCER ATTESTATION across two layers: (a) HE.verifyAuthoritativeHypothesisSet (D3 closure-private WeakSet identity attestation); (b) PE.verifyAuthoritativePrioritySet (D4 closure-private WeakSet identity attestation, exposed at D5-branch as a sibling D3→D4 producer attestation upgrade); (c) cross-binding: prioritySet.sourceHypothesisSetId === hypothesisSet.hypothesisSetId AND prioritySet.sourceGraphId === hypothesisSet.sourceGraphId (the D4 output MUST have been derived from the D3 input); (d) identity binding: caseAssociation + sessionAssociation match between D3 and D4. Layered model: (e) input root frozen via captured Object.isFrozen; (f) descriptor-only input snapshot — rejects Symbol-keyed / non-enumerable / accessor / function fields on input wrapper; (g) opts descriptor snapshot — rejects unknown own keys; (h) mandatory freshness reference time (opts.clock() OR opts.referenceNowMs; clock invoked AT MOST ONCE post-authority); (i) freshness check vs hs.createdAt and ps.createdAt against opts.maxAgeMs; (j) brief composition by re-projection (NO recomputation of confidence / credibility / priority / eligibility); (k) D1 engineer-brief-contract.validateEngineerBriefShape final structural gate (mandatory-presence keys: contradictions, alternativeExplanations, cannotConcludeReasonCodes, limitations — omission triggers BRIEF_CONTRADICTION_HIDDEN / BRIEF_CANNOT_CONCLUDE_HIDDEN / BRIEF_LIMITATION_HIDDEN); (l) deep-frozen envelope registered in D5's closure-private WeakSet via captured Reflect.apply on captured WeakSet.prototype.{add,has}.",
+    "viewmodelScope": "renderer/js/r3-0d-engineer-viewmodel.js consumes ONLY a D5-authoritative Engineer Brief envelope validated via EB.verifyAuthoritativeEngineerBrief. Re-projection ONLY: NO recomputation of confidence / credibility / priority / eligibility / contradiction status. Output is deep-frozen + registered in a closure-private WeakSet via captured Reflect.apply. Public surface: { buildEngineerViewModel, buildBlockedViewModel, verifyAuthoritativeEngineerViewModel, DISPLAY_STATE_ALLOWED }. NO register/sign/secret/registry exports. Display states (closed enum): unavailable / blocked / loading / available / inconclusive / stale-cleared / error-sanitized.",
+    "orchestratorScope": "renderer/js/r3-0d-engineer-orchestrator.js maintains module-scoped current state (envelope + viewModel + caseAssociation + generationToken + monotonic seq). Stale-async drop: if internalSeq advances during prepareEngineerInsight, the result is dropped and not published. Invalidation reasons (closed enum, 13 entries): case_changed / session_changed / evidence_graph_changed / hypothesis_set_changed / priority_set_changed / mapping_changed / calibration_changed / telemetry_replaced / case_archived / case_deleted / imported_summary_opened / generation_token_changed / application_restart. Subscriber snapshots are non-authoritative deep-frozen plain objects — callers CANNOT spoof producer attestation via the snapshot. Authoritative reference accessible only via getCurrentAuthoritativeEnvelope / getCurrentAuthoritativeViewModel (host wiring).",
+    "uiScope": "renderer/js/r3-0d-engineer-ui.js is RENDER-ONLY. Pure-DOM construction (NO innerHTML, NO arbitrary string parsing). i18n keys ONLY — no localized strings constructed inside the UI. Forbidden phrases (directive §13.3, audited in tests): confirmed_cause / definitive_diagnosis / driver_fault / driver_error / guaranteed_improvement / fastest_setup / optimal_setup / theoretical_best / ai_diagnosis. Mount is idempotent and stateless.",
+    "featureRegistryActivation": "feature-registry.js registers (a) NAV_NODES['case:engineer_brief'] case subview labelKey casenav.engineer_brief order 8; (b) FEATURES.engineer_brief area=case_scoped navNodeId='case:engineer_brief' paneId='analysis' availability='available_conditional'. uiAllowed transitions to true; featureRegistryActivationAllowed transitions to true. R3.0B portable schema UNTOUCHED.",
+    "stateInvalidation": "Orchestrator invalidate() bumps internalSeq + clears authoritative envelope+viewModel + publishes a stale-cleared subscriber snapshot. Stale async callbacks are DROPPED. Generation-token mismatch is treated as stale. Listener errors are SWALLOWED (do not propagate; do not block other listeners).",
+    "privacyInvariants": "ViewModel + UI surface MUST NOT contain raw telemetry samples, file paths, machine IDs, or stack traces. Reason codes + i18n keys ONLY. Audited in tests/r3.0d-engineer-brief.test.js Section K and tests/r3.0d-engineer-viewmodel.test.js Section E.",
+    "noLLM": "Deterministic. No LLM call. No runtime config.",
+    "noAutoMode": "D5 emits descriptive engineer brief + viewmodel only. NO apply_mode field. NO auto_tuning / auto_setup / auto_calibration / auto_preset.",
+    "hardenedIntrinsicsEnforced": "All ambient calls go through HI. Module-init captures: Object.isFrozen, Date.parse, Object.is, WeakSet/WeakSet.prototype.{add,has}, Reflect.apply. No ambient .every / .forEach / .push / Object.freeze / Array.isArray / JSON.stringify outside HI namespace — audited per-module via tests Section P / F.",
+    "outerTryCatch": "buildEngineerBrief + buildEngineerViewModel + buildBlockedViewModel + prepareEngineerInsight + invalidate are wrapped in outer try/catch → sanitized error result on any uncaught throw."
+  },
+
+  "tests": {
+    "command": "npm test",
+    "newSuitesForThisCheckpoint": [
+      "tests/r3.0d-engineer-brief.test.js",
+      "tests/r3.0d-engineer-viewmodel.test.js"
+    ],
+    "extendedSuites": ["tests/r3.0d-priority-engine.test.js (Section T — D4→D5 producer-attestation regression)", "tests/i18n-parity.test.js (R3.0D i18n keys covered)"],
+    "evidenceTier": "TIER 3 — Claude-verified on D5 branch HEAD; CI re-run on integrationSha is the authority."
+  },
+
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 4,
+    "reviewedCandidateSha": "10f0c1e0071fc5b7cd129062560fca9c4fc5b994",
+    "verdictEvidenceFile": "governance/r3.0d/codex-checkpoint-evidence/D5/round-4-10f0c1e.raw.txt",
+    "rounds": [
+      { "round": 1, "reviewedSha": "0e55200", "verdict": "BLOCK", "findings": "3 BLOCK (D5-R1-01..03)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D5/round-1-0e55200.raw.txt" },
+      { "round": 2, "reviewedSha": "5e88d5b", "verdict": "BLOCK", "findings": "1 BLOCK (D5-R2-01)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D5/round-2-5e88d5b.raw.txt" },
+      { "round": 3, "reviewedSha": "cd68b75", "verdict": "BLOCK", "findings": "1 BLOCK (D5-R3-01)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D5/round-3-cd68b75.raw.txt" },
+      { "round": 4, "reviewedSha": "10f0c1e", "verdict": "PASS", "findings": "0 BLOCK + 0 NIT", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D5/round-4-10f0c1e.raw.txt", "summary": "Reviewed 10f0c1e. R1-01 (seq bump at prepare entry) verified; R1-02 (no innerHTML/outerHTML/insertAdjacentHTML in r3-0d-engineer-ui.js) verified; R1-03 (D5.json authorizedPaths includes feature-registry) verified; R2-01 (retired-tokens map; publish-B-then-replay-A drops) verified; R3-01 (_maybePublishBlocked does not mutate _currentToken; subscriber snapshot still surfaces blocked-attempt token) verified. R3.0D D5 production surface — engineer-brief / viewmodel / orchestrator / UI / i18n / contracts-bundle / priority-engine D5 attestation upgrade — re-swept; no new BLOCK / NIT findings emitted." }
+    ]
+  },
+
+  "scopeBoundary": {
+    "frozenFilesUntouched": true,
+    "r30bPersistenceUntouched": true,
+    "r30cContractsUntouched": true,
+    "r30cProductionUntouched": true,
+    "featureRegistryUnchanged": false,
+    "indexHtmlUnchanged": false,
+    "noR30dFeatureIdInRegistry": false,
+    "runtimeConsumerCount": 7,
+    "productionPathCount": 8,
+    "algorithmCount": 4,
+    "uiSurfaceCount": 1
+  },
+
+  "frozenDiff": 0,
+  "productionDiff": 5,
+  "runtimeConsumerCount": 7,
+
+  "featureRegistryState": {
+    "expectedRegisteredIds": ["engineer_brief"],
+    "expectedNavNodes": ["case:engineer_brief"],
+    "expectedRendererAdapter": true,
+    "note": "D5 DOES register feature 'engineer_brief' under NAV_NODE 'case:engineer_brief' with rendererAdapter { paneId: 'analysis' }. featureRegistryActivationAllowed transitions to true."
+  },
+
+  "crossPhaseGate": {
+    "r3cCheckpoint": "C8_ACTIVATION",
+    "requiredFor": "D5_ENGINEER_BRIEF_ACTIVATION",
+    "satisfied": true,
+    "note": "R3.0C state.currentCheckpoint === 'C8_ACTIVATION' verified."
+  },
+
+  "packageVersion": "1.4.0",
+  "createdAt": "2026-06-29T18:30:00Z",
+
+  "status": "candidate",
+  "governanceChanged": true,
+
+  "changedFiles": [
+    "renderer/js/r3-0d-engineer-brief.js",
+    "renderer/js/r3-0d-engineer-viewmodel.js",
+    "renderer/js/r3-0d-engineer-orchestrator.js",
+    "renderer/js/r3-0d-engineer-ui.js",
+    "renderer/js/i18n-r3-0d.js",
+    "renderer/js/r3-0d-priority-engine.js",
+    "renderer/js/feature-registry.js",
+    "renderer/index.html",
+    "tests/r3.0d-engineer-brief.test.js",
+    "tests/r3.0d-engineer-viewmodel.test.js",
+    "tests/r3.0d-priority-engine.test.js",
+    "tests/i18n-parity.test.js",
+    "governance/r3.0d/checkpoints/D5.json",
+    "governance/r3.0d/state.json",
+    "governance/r3.0/train.json"
+  ],
+  "changedFilesNote": "Computed from baseSha (f50c0bb, D4 merge) → D5 candidate HEAD diff. Adds: (1) renderer/js/r3-0d-engineer-brief.js — D5 service (~700 lines); (2) renderer/js/r3-0d-engineer-viewmodel.js — D5 viewmodel (~270 lines); (3) renderer/js/r3-0d-engineer-orchestrator.js — D5 orchestrator (~300 lines); (4) renderer/js/r3-0d-engineer-ui.js — render-only UI (~240 lines); (5) renderer/js/i18n-r3-0d.js — three-language dictionary; (6) tests/r3.0d-engineer-brief.test.js — adversarial suite (81 assertions across 18 sections); (7) tests/r3.0d-engineer-viewmodel.test.js — viewmodel+orchestrator suite (77 assertions across 12 sections); (8) tests/r3.0d-priority-engine.test.js — Section T D4→D5 producer-attestation regression (21 new assertions; total 132); (9) feature-registry.js — NAV_NODE case:engineer_brief + FEATURE engineer_brief; (10) index.html — script srcs + mount target + auto-mount; (11) state.json + train.json transitions to D5_ENGINEER_BRIEF_ACTIVATION; (12) D5.json manifest. D4 priority-engine.js gets +57 lines of WeakSet producer attestation as a sibling D3→D4 hardening upgrade (full mutation matrix in Section T).",
+
+  "note": "R3.0D D5_ENGINEER_BRIEF_ACTIVATION — Engineer Brief service + ViewModel + Orchestrator + render-only UI + Feature Registry activation. Capability engineer_brief_present + feature_registry_active enabled. uiAllowed=true; featureRegistryActivationAllowed=true; both scoped to engineer_brief feature only. R3.0E remains forbidden."
+}

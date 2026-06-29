@@ -34,10 +34,11 @@ chk('index.html consumes derived mainNav (no inline whitelist)', /FeatureRegistr
 chk('main nav drives setShellSection', /@click="setShellSection\(item\.id\)"/.test(html));
 chk('sidebar highlights active section', /shellSection===item\.id/.test(html));
 
-// per-case navigation (8 views) — R3-UX0: case nav is DERIVED from the registry (one list, shared with caseSubviewIds).
-const CASE_NAV_IDS = ['overview', 'setup_model', 'telemetry', 'measured_metrics', 'model_vs_actual', 'recommendations', 'corner_coaching', 'evidence_trust'];
+// per-case navigation (9 views) — R3-UX0: case nav is DERIVED from the registry (one list,
+// shared with caseSubviewIds). R3.0D D5 adds 'engineer_brief' as the 9th subview.
+const CASE_NAV_IDS = ['overview', 'setup_model', 'telemetry', 'measured_metrics', 'model_vs_actual', 'recommendations', 'corner_coaching', 'evidence_trust', 'engineer_brief'];
 const derivedCaseNav = REG.deriveCaseNav().map(function (n) { return n.id; });
-chk('case nav: 8 derived subviews', derivedCaseNav.length === 8 && CASE_NAV_IDS.every(function (id) { return derivedCaseNav.indexOf(id) !== -1; }));
+chk('case nav: 9 derived subviews', derivedCaseNav.length === 9 && CASE_NAV_IDS.every(function (id) { return derivedCaseNav.indexOf(id) !== -1; }));
 chk('caseNav === caseSubviewIds (single derived list, no divergence)', JSON.stringify(derivedCaseNav) === JSON.stringify(REG.deriveCaseSubviewIds()));
 CASE_NAV_IDS.forEach(function (id) {
   chk('case nav i18n label (en/zh/ja): ' + id, !!SHELL.en['ui.caseNav.' + id] && !!SHELL.zh['ui.caseNav.' + id] && !!SHELL.ja['ui.caseNav.' + id]);

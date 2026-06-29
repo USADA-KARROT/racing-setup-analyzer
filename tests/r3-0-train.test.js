@@ -100,13 +100,21 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
   chk('FAIL D before C8 CROSS_PHASE_PREMATURE_ADVANCE', hasViolation(r.artifact, 'CROSS_PHASE_PREMATURE_ADVANCE'));
 }
 
-// ── 2b. E current=E2 but R3.0D still at D0 ──
+// ── 2b. E current=E2 but R3.0D still at D4 (pre-D5) ──
+// Note: the real-repo governance is at D5_ENGINEER_BRIEF_ACTIVATION after activation; the
+// fixture must roll the R3.0D copy back to a pre-D5 checkpoint to recreate the "E advancing
+// before D5 reached" premise. Mirror the 2a pattern (which rolls R3.0C back to C7_UI).
 {
   const dir = buildFixture();
+  const ds = readJson(path.join(dir, 'governance', 'r3.0d', 'state.json'));
+  ds.currentCheckpoint = 'D4_PRIORITY_ENGINE'; ds.uiAllowed = false; ds.featureRegistryActivationAllowed = false;
+  writeJson(path.join(dir, 'governance', 'r3.0d', 'state.json'), ds);
   const es = readJson(path.join(dir, 'governance', 'r3.0e', 'state.json'));
   es.currentCheckpoint = 'E2_EXPERIMENT_STORE';
   writeJson(path.join(dir, 'governance', 'r3.0e', 'state.json'), es);
   const ts = readJson(path.join(dir, 'governance', 'r3.0', 'train.json'));
+  ts.phaseStates['R3.0D'].currentCheckpoint = 'D4_PRIORITY_ENGINE';
+  ts.phaseStates['R3.0D'].finalActivationReached = false;
   ts.phaseStates['R3.0E'].currentCheckpoint = 'E2_EXPERIMENT_STORE';
   writeJson(path.join(dir, 'governance', 'r3.0', 'train.json'), ts);
   const r = runValidator(dir);
@@ -351,10 +359,13 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
 }
 
 // ── 22. train state vs phase state checkpoint mismatch ──
+// Note: the real-repo R3.0D is at D5_ENGINEER_BRIEF_ACTIVATION post-activation. Inject a
+// disagreement by changing train.json's R3.0D checkpoint to something the state.json copy
+// does not match — D0_BOOTSTRAP is the canonical pre-start value.
 {
   const dir = buildFixture();
   const ts = readJson(path.join(dir, 'governance', 'r3.0', 'train.json'));
-  ts.phaseStates['R3.0D'].currentCheckpoint = 'D5_ENGINEER_BRIEF_ACTIVATION'; // disagrees with state.json D0_BOOTSTRAP
+  ts.phaseStates['R3.0D'].currentCheckpoint = 'D0_BOOTSTRAP'; // disagrees with state.json D5_ENGINEER_BRIEF_ACTIVATION
   writeJson(path.join(dir, 'governance', 'r3.0', 'train.json'), ts);
   const r = runValidator(dir);
   chk('FAIL phase checkpoint mismatch', hasViolation(r.artifact, 'TRAIN_PHASE_CHECKPOINT_MISMATCH'));

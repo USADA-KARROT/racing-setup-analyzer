@@ -1107,5 +1107,152 @@ console.log('Section S — Codex D4 R5 closures');
   }
 })();
 
+// ---------- Section T — D4→D5 producer-attestation regression -------------------------------
+// Sibling of D3→D4 producer-attestation hardening: D4 holds a closure-private WeakSet of
+// authoritative PrioritySet object references and exposes a narrow verifier-only API
+// `verifyAuthoritativePrioritySet(candidate) → boolean`. D5 (Engineer Brief) calls this
+// as its SECOND authority gate (after D3 producer attestation). Tests confirm:
+//   (1) Genuine PrioritySet → verifier returns true
+//   (2) Literal clone with matching schemaVersion/IDs → false
+//   (3) structuredClone snapshot → false (different object reference)
+//   (4) JSON round-trip clone → false
+//   (5) Two PrioritySets with identical prioritySetIds but distinct object refs → only the
+//       registered ref returns true
+//   (6) verifier itself does NOT fire Proxy traps on a forged candidate (zero [[Get]] reads
+//       before the WeakSet identity check rejects)
+//   (7) Blocked / partial results are NEVER registered (verifier returns false on them)
+//   (8) WeakSet.prototype.add post-load rebind does NOT prevent registration (captured ref)
+//   (9) WeakSet.prototype.has post-load rebind does NOT corrupt verification (captured ref)
+//   (10) Public API exposes ONLY the verifier — no register / no secret / no registry
+//   (11) verifier does NOT throw on hostile input — fail-closed boolean
+console.log('Section T — D4→D5 producer-attestation regression');
+(function () {
+  var hs = _buildHypothesisSet([_baseNode({})]);
+  var r = _pe({ hypothesisSet: hs });
+  chk('T1: genuine D4 result — verifyAuthoritativePrioritySet === true',
+    PE.verifyAuthoritativePrioritySet(r.prioritySet) === true);
+
+  // (2) literal clone
+  var litClone = {};
+  for (var k in r.prioritySet) litClone[k] = r.prioritySet[k];
+  Object.freeze(litClone);
+  chk('T2: literal-clone PrioritySet rejected (different ref)',
+    PE.verifyAuthoritativePrioritySet(litClone) === false);
+
+  // (3) structuredClone
+  if (typeof structuredClone === 'function') {
+    var sc = structuredClone(r.prioritySet);
+    chk('T3: structuredClone PrioritySet rejected (different ref)',
+      PE.verifyAuthoritativePrioritySet(sc) === false);
+  } else {
+    chk('T3: structuredClone unavailable in this runtime — skipped', true);
+  }
+
+  // (4) JSON round-trip
+  var jr = JSON.parse(JSON.stringify(r.prioritySet));
+  Object.freeze(jr);
+  chk('T4: JSON round-trip rejected', PE.verifyAuthoritativePrioritySet(jr) === false);
+
+  // (5) Two genuine PrioritySets with same input → identical prioritySetIds but distinct refs.
+  // Only ONE of them is the original object reference under verification at a time, but BOTH
+  // refs are registered (each buildPrioritySet call registers its own envelope). Confirm:
+  // a fabricated frozen object with matching prioritySetId is rejected because its ref is
+  // NOT registered.
+  var fabricated = Object.freeze({
+    schemaVersion: 1,
+    prioritySetId: r.prioritySet.prioritySetId,
+    sourceHypothesisSetId: r.prioritySet.sourceHypothesisSetId,
+    sourceGraphId: r.prioritySet.sourceGraphId,
+    priorities: Object.freeze([]),
+  });
+  chk('T5: fabricated frozen object with matching prioritySetId rejected (ref mismatch)',
+    PE.verifyAuthoritativePrioritySet(fabricated) === false);
+
+  // (6) verifier does NOT fire Proxy traps for non-members (WeakSet.has is identity-only,
+  // captured Reflect.apply bypasses prototype chain). Build a Proxy that counts [[Get]] reads.
+  var getCount = 0;
+  var proxy = new Proxy({}, {
+    get: function (target, prop) {
+      getCount += 1;
+      if (prop === 'schemaVersion') return 1;
+      if (prop === 'prioritySetId') return 'priset_0000000000000000';
+      if (prop === 'sourceHypothesisSetId') return 'h';
+      if (prop === 'sourceGraphId') return 'g';
+      if (prop === 'priorities') return [];
+      return undefined;
+    },
+  });
+  chk('T6a: Proxy non-member rejected', PE.verifyAuthoritativePrioritySet(proxy) === false);
+  chk('T6b: Proxy [[Get]] traps NEVER fire before WeakSet rejection (count===0)',
+    getCount === 0);
+
+  // (7) Blocked / partial results never registered. Build a deliberately-blocked result
+  // (missing hypothesisSet input → HYPOTHESIS_AUTHORITY_FORGED), then confirm there is NO
+  // registered prioritySet object reference reachable through the result. Blocked-result
+  // shape is { eligible:false, status:'blocked', result:null } (no prioritySet field).
+  var blockedR = _pe({}, { clock: BASE_CLOCK });
+  chk('T7a: blocked result reports eligible===false',
+    blockedR.eligible === false || blockedR.status === 'blocked');
+  chk('T7b: blocked result has no prioritySet field (or null)',
+    blockedR.prioritySet === undefined || blockedR.prioritySet === null);
+  if (blockedR.result !== undefined && blockedR.result !== null) {
+    chk('T7c: blocked result.result (if any) NOT in registry',
+      PE.verifyAuthoritativePrioritySet(blockedR.result) === false);
+  } else {
+    chk('T7c: blocked result.result is null (preferred)', blockedR.result === null);
+  }
+
+  // (8) WeakSet.prototype.add rebind — must NOT prevent NEW PrioritySet registration.
+  // Captured _WS_ADD reference at module init defeats this.
+  var origAdd = WeakSet.prototype.add;
+  WeakSet.prototype.add = function () { throw new Error('add rebound'); };
+  try {
+    var hs8 = _buildHypothesisSet([_baseNode({ nodeId: 'n_rebind_add' })]);
+    var r8 = _pe({ hypothesisSet: hs8 });
+    chk('T8a: WeakSet.prototype.add rebind — build still succeeded', r8.valid === true);
+    chk('T8b: WeakSet.prototype.add rebind — verifier still returns true (captured add)',
+      PE.verifyAuthoritativePrioritySet(r8.prioritySet) === true);
+  } finally {
+    WeakSet.prototype.add = origAdd;
+  }
+
+  // (9) WeakSet.prototype.has rebind — must NOT corrupt verification.
+  var origHas = WeakSet.prototype.has;
+  WeakSet.prototype.has = function () { return true; };
+  try {
+    var fakeRef = Object.freeze({
+      schemaVersion: 1, prioritySetId: 'priset_0000000000000000',
+      sourceHypothesisSetId: 'h', sourceGraphId: 'g', priorities: Object.freeze([]),
+    });
+    chk('T9: WeakSet.prototype.has rebind — fabricated ref still rejected (captured has bypass)',
+      PE.verifyAuthoritativePrioritySet(fakeRef) === false);
+  } finally {
+    WeakSet.prototype.has = origHas;
+  }
+
+  // (10) Public API exposes verifier only — no register / no secret / no registry leak.
+  var apiKeys = Object.keys(PE);
+  chk('T10a: PE.verifyAuthoritativePrioritySet exists',
+    typeof PE.verifyAuthoritativePrioritySet === 'function');
+  chk('T10b: PE does NOT expose any register* / sign* / secret* / registry* surface',
+    apiKeys.every(function (k) {
+      return !/^_?register/i.test(k) && !/sign/i.test(k) && !/secret/i.test(k) && !/registry/i.test(k);
+    }), apiKeys);
+
+  // (11) verifier never throws — fail-closed on hostile candidates.
+  var thrower = new Proxy({}, { get: function () { throw new Error('hostile getter'); } });
+  var threw = false;
+  try { PE.verifyAuthoritativePrioritySet(thrower); } catch (e) { threw = true; }
+  chk('T11a: verifier does NOT throw on hostile getter', threw === false);
+  chk('T11b: verifier returns false on hostile getter',
+    PE.verifyAuthoritativePrioritySet(thrower) === false);
+
+  // (12) verifier returns false on null / undefined / primitive without throwing
+  chk('T12a: verifier(null) === false', PE.verifyAuthoritativePrioritySet(null) === false);
+  chk('T12b: verifier(undefined) === false', PE.verifyAuthoritativePrioritySet(undefined) === false);
+  chk('T12c: verifier("string") === false', PE.verifyAuthoritativePrioritySet('not-an-object') === false);
+  chk('T12d: verifier(42) === false', PE.verifyAuthoritativePrioritySet(42) === false);
+})();
+
 console.log('R3.0D D4 priority-engine adversarial suite: ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);
