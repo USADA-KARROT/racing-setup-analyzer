@@ -8,8 +8,8 @@
 
   "shaSeparation": {
     "note": "Per SKYLINE 2026-06-29 R3.0D D5 Continuous Resume Directive §20 + R3.0 Final Continuous Execution Directive §7, every checkpoint manifest preserves three-way SHA separation. reviewedCandidateSha is the exact SHA Codex D5 review was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD.",
-    "reviewedCandidateSha": null,
-    "reviewedCandidateNote": "Filled after Codex D5 issues PASS verdict against a specific candidate SHA on feat/r3.0d-d5-engineer-brief-activation. Tier 1 raw evidence will be persisted under governance/r3.0d/codex-checkpoint-evidence/D5/round-N-<sha>.raw.txt.",
+    "reviewedCandidateSha": "10f0c1e0071fc5b7cd129062560fca9c4fc5b994",
+    "reviewedCandidateNote": "Codex D5 Round 4 reviewed this exact SHA on feat/r3.0d-d5-engineer-brief-activation and issued FINAL VERDICT: PASS (2026-06-29). Round 1..4 lineage at governance/r3.0d/codex-checkpoint-evidence/D5/round-{1..4}-<sha>.raw.txt. 5 distinct adversarial findings closed across 4 rounds: R1-01 (stale generation tokens overwriting newer state — _internalSeq bump at prepare entry), R1-02 (innerHTML in render-only UI — replaced with descendant-removal loop), R1-03 (D5.json authorizedPaths missing feature-registry — added under feature_registry_active), R2-01 (older generation token replay overwriting newer publish — closure-private retired-tokens map; retire prior _currentToken on successful supersede and on invalidate), R3-01 (blocked prepare poisoning _currentToken — _maybePublishBlocked no longer mutates _currentToken; subscriber snapshot still surfaces blocked-attempt token for diagnostic visibility while closure-private state is preserved). R4 verdict PASS confirms the full 4-gate authority chain (HE WeakSet + PE WeakSet + cross-binding + identity), the retired-token semantics, and the render-only UI surface against re-sweep.",
     "manifestCommitSha": null,
     "manifestCommitNote": "Filled by the same follow-up evidence-anchoring commit; mirrors D1/D2/D3/D4 convention.",
     "integrationSha": null,
@@ -70,11 +70,16 @@
   "artifactBoundSha": null,
 
   "codexVerdict": {
-    "verdict": "pending",
-    "verdictRound": 0,
-    "reviewedCandidateSha": null,
-    "verdictEvidenceFile": null,
-    "rounds": []
+    "verdict": "PASS",
+    "verdictRound": 4,
+    "reviewedCandidateSha": "10f0c1e0071fc5b7cd129062560fca9c4fc5b994",
+    "verdictEvidenceFile": "governance/r3.0d/codex-checkpoint-evidence/D5/round-4-10f0c1e.raw.txt",
+    "rounds": [
+      { "round": 1, "reviewedSha": "0e55200", "verdict": "BLOCK", "findings": "3 BLOCK (D5-R1-01..03)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D5/round-1-0e55200.raw.txt" },
+      { "round": 2, "reviewedSha": "5e88d5b", "verdict": "BLOCK", "findings": "1 BLOCK (D5-R2-01)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D5/round-2-5e88d5b.raw.txt" },
+      { "round": 3, "reviewedSha": "cd68b75", "verdict": "BLOCK", "findings": "1 BLOCK (D5-R3-01)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D5/round-3-cd68b75.raw.txt" },
+      { "round": 4, "reviewedSha": "10f0c1e", "verdict": "PASS", "findings": "0 BLOCK + 0 NIT", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D5/round-4-10f0c1e.raw.txt", "summary": "Reviewed 10f0c1e. R1-01 (seq bump at prepare entry) verified; R1-02 (no innerHTML/outerHTML/insertAdjacentHTML in r3-0d-engineer-ui.js) verified; R1-03 (D5.json authorizedPaths includes feature-registry) verified; R2-01 (retired-tokens map; publish-B-then-replay-A drops) verified; R3-01 (_maybePublishBlocked does not mutate _currentToken; subscriber snapshot still surfaces blocked-attempt token) verified. R3.0D D5 production surface — engineer-brief / viewmodel / orchestrator / UI / i18n / contracts-bundle / priority-engine D5 attestation upgrade — re-swept; no new BLOCK / NIT findings emitted." }
+    ]
   },
 
   "scopeBoundary": {
