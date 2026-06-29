@@ -44,6 +44,10 @@
     try {
       if (!RC.isOriginalPlainObject(tIn)) return RC.buildBlockedResult([CODES.TIMELINE_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED]);
       if (RC.hasHiddenOwnKey(tIn)) return RC.buildBlockedResult([CODES.TIMELINE_INVALID, CODES.UNKNOWN_OWN_KEY]);
+      // Codex E1-R2-02 closure: recursive nested-descriptor audit BEFORE toCleanCopy so
+      // hostile nested event.params (Symbol-keyed / accessor / class instance) are
+      // rejected. Previously toCleanCopy would launder them.
+      if (RC.hasNonPlainNestedObject(tIn)) return RC.buildBlockedResult([CODES.TIMELINE_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED]);
       var t = RC.toCleanCopy(tIn);
       if (!_isPlain(t)) return RC.buildBlockedResult([CODES.TIMELINE_INVALID]);
       if (!_hasOnlyAllowedKeys(t, TIMELINE_KEYS)) return RC.buildBlockedResult([CODES.TIMELINE_INVALID, CODES.UNKNOWN_OWN_KEY]);

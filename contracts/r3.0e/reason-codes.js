@@ -110,13 +110,23 @@
     // Codex E1-R1-01 closure: recursive descriptor audit. Walks every nested object/array
     // descriptor, rejecting Symbol-keyed own keys, non-enumerable own keys, accessor
     // (get/set) descriptors, non-plain prototypes (class instances / Proxy targets /
-    // arbitrary class), and sparse-array hole patterns. Bounded depth 32 + max nodes
-    // 4096 to bound traversal.
+    // arbitrary class), and sparse-array hole patterns.
+    //
+    // Codex E1-R2-01 closure: traversal overflow MUST fail closed (return true). Previous
+    // code returned false (clean) when the visit cap was hit, which let a hostile attacker
+    // hide a Symbol-keyed / accessor / non-plain object beyond node 4096. The walk now
+    // tracks both depth and node count; overflow on either dimension → reject. Depth is
+    // tracked per-node via parallel stack so depth>32 also triggers reject.
     try {
-      var stack = [o];
+      var MAX_DEPTH = 32;
+      var MAX_NODES = 4096;
+      var stack = [{ v: o, depth: 0 }];
       var visited = 0;
-      while (stack.length > 0 && visited < 4096) {
-        var v = stack.shift(); visited++;
+      while (stack.length > 0) {
+        if (visited >= MAX_NODES) return true; // fail-closed on node overflow
+        var frame = stack.shift(); visited++;
+        if (frame.depth > MAX_DEPTH) return true; // fail-closed on depth overflow
+        var v = frame.v;
         if (v === null) continue;
         var t = typeof v;
         if (t === 'function' || t === 'symbol' || t === 'bigint') return true;
@@ -144,7 +154,7 @@
           if (!d) return true;
           if (typeof d.get === 'function' || typeof d.set === 'function') return true;
           if (d.enumerable !== true) return true;
-          stack.push(d.value);
+          stack.push({ v: d.value, depth: frame.depth + 1 });
         }
       }
       return false;

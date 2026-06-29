@@ -30,6 +30,9 @@
     try {
       if (!RC.isOriginalPlainObject(cIn)) return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED]);
       if (RC.hasHiddenOwnKey(cIn)) return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID, CODES.UNKNOWN_OWN_KEY]);
+      // Codex E1-R2-03 closure: recursive nested-descriptor audit BEFORE toCleanCopy so
+      // hostile nested allowedRange (Symbol-keyed / accessor / class instance) is rejected.
+      if (RC.hasNonPlainNestedObject(cIn)) return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED]);
       var c = RC.toCleanCopy(cIn);
       if (!_isPlain(c)) return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID]);
       if (!_hasOnlyAllowedKeys(c, CONTROL_VARIABLE_KEYS)) return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID, CODES.UNKNOWN_OWN_KEY]);

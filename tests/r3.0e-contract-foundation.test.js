@@ -282,5 +282,50 @@ console.log('Section I — Codex E1 R1 closures');
     EXP.validateExperimentShape(bigExp).eligible === false);
 })();
 
+// Section J — Codex E1 R2 closures
+console.log('Section J — Codex E1 R2 closures');
+
+// J1 — E1-R2-01: recursive audit fail-closed on node/depth overflow
+(function () {
+  // Build a deep chain longer than MAX_DEPTH (32). Hostile Symbol-keyed object at depth 33.
+  var hostile = {}; hostile[Symbol('x')] = 1;
+  var deep = hostile;
+  for (var i = 0; i < 40; i++) deep = { next: deep };
+  chk('J1a: depth-overflow chain → reject (fail closed)',
+    RC.hasNonPlainNestedObject(deep) === true);
+  // Build wide structure exceeding MAX_NODES (4096). Each node plain; should reject due to count cap.
+  var wide = {};
+  for (var k = 0; k < 5000; k++) wide['k' + k] = { x: k };
+  chk('J1b: node-overflow structure → reject (fail closed)',
+    RC.hasNonPlainNestedObject(wide) === true);
+})();
+
+// J2 — E1-R2-02: timeline validator now runs recursive audit pre-clone
+(function () {
+  var hostileEvent = {
+    eventId: 'ev_1', kind: 'baseline_captured',
+    createdAt: '2026-06-30T00:00:00Z', i18nKey: 'r3.0e.tl.baseline',
+    params: {}
+  };
+  // Nest a Symbol-keyed object inside params
+  hostileEvent.params[Symbol('leak')] = 'x';
+  var bad = { schemaVersion: 1, caseId: 'case_J2', events: [hostileEvent] };
+  var r = TL.validateCaseTimelineShape(bad);
+  chk('J2: timeline with hostile nested params rejected',
+    r.eligible === false && r.reasonCodes.indexOf('PROTOTYPE_POLLUTION_REJECTED') !== -1);
+})();
+
+// J3 — E1-R2-03: control-variable validator runs recursive audit pre-clone
+(function () {
+  var allowedRangeHostile = {};
+  Object.defineProperty(allowedRangeHostile, 'min', { enumerable: true, get: function () { return 0; } });
+  Object.defineProperty(allowedRangeHostile, 'max', { enumerable: true, value: 10 });
+  var bad = { name: 'tyre_temp', description: 'r3.0e.cv.tyre_temp', expectedValue: 80,
+              allowedRange: allowedRangeHostile, observedValue: null, withinRange: null };
+  var r = CV.validateControlVariableShape(bad);
+  chk('J3: control variable with hostile accessor on allowedRange rejected',
+    r.eligible === false && r.reasonCodes.indexOf('PROTOTYPE_POLLUTION_REJECTED') !== -1);
+})();
+
 console.log('R3.0E E1 contract-foundation suite: ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);
