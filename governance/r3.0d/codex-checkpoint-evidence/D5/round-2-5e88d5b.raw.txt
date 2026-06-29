@@ -1,0 +1,2436 @@
+OpenAI Codex v0.141.0
+--------
+workdir: /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: medium
+reasoning summaries: none
+session id: 019f13f2-b880-7691-a753-d2f98f11d951
+--------
+user
+# Codex D5 Round 2 — review R1 closures + sweep again
+
+## Subject
+- Repo: USADA-KARROT/racing-setup-analyzer
+- Branch: feat/r3.0d-d5-engineer-brief-activation
+- Train base: f50c0bb (post-D4 merge)
+- D5 candidate SHA: **5e88d5b35a5a85b4a98a0d4d5e19cc65ccf404dd**
+- Previous Round 1 was on 0e55200 (CI 28381674143 SUCCESS). R1 verdict: BLOCK, 3 findings.
+
+## R1 closures applied in this candidate (commit 5e88d5b on top of 0e55200)
+
+- **D5-R1-01 closure** (Stale generation tokens):
+  - renderer/js/r3-0d-engineer-orchestrator.js: at the start of `prepareEngineerInsight`,
+    `_internalSeq += 1` is executed BEFORE `seqAtEntry = _internalSeq`. Any concurrent /
+    replayed call bumps `_internalSeq` again, so the original call's `seqAtEntry` is no
+    longer the current `_internalSeq` at publish time → DROP.
+
+- **D5-R1-02 closure** (innerHTML in render-only UI):
+  - renderer/js/r3-0d-engineer-ui.js: both `rootEl.innerHTML = ''` occurrences (mount + unmount)
+    replaced with `while (rootEl.firstChild) rootEl.removeChild(rootEl.firstChild)`.
+    Source audit: no `.innerHTML =` / `.outerHTML =` / `insertAdjacentHTML(` remains.
+
+- **D5-R1-03 closure** (D5.json authorizedPaths boundary):
+  - governance/r3.0d/checkpoints/D5.json: added
+    `{ "path": "renderer/js/feature-registry.js", "capability": "feature_registry_active" }`.
+    The D5 manifest now lists ALL paths the runtime consumes at D5 (cumulative,
+    matching the D4 convention) AND state.json.authorizedProductionPaths is a subset.
+
+## Regression coverage (new Section M in tests/r3.0d-engineer-viewmodel.test.js)
+
+- M1a/b/c — hostile clock invalidates mid-build → result dropped → currentState stale-cleared.
+- M2a/b/c — sequential prepare calls both publish; latter overwrites former (no regression).
+- M3a/b/c — source audit: no innerHTML / outerHTML / insertAdjacentHTML in r3-0d-engineer-ui.js.
+- M4a/b/c/d — D5.json authorizedPaths includes feature-registry + bundle + 5 D5 modules; superset of state.json.
+
+## CI on this candidate
+- Run 28382463859 → SUCCESS expected at review time; if you see failure, treat as BLOCK.
+
+## Local verification on 5e88d5b
+- npm test: 86 / 86 files, 0 failures, 9748+ assertions.
+- R3.0D D5 viewmodel + orchestrator: **90 / 0** (was 77 / 0 + 13 new M-section).
+- R3.0D D5 engineer-brief: 81 / 0.
+- R3.0D D4 priority-engine: 132 / 0.
+- R3.0D-NOCONSUMER: 0 violations; R3.0E + R3.0F unchanged at 0 violations.
+
+## Round 2 task
+
+Verify that R1 BLOCK findings are genuinely closed. Then re-sweep for **new** findings.
+
+Be TERSE. For each finding output ONE block:
+
+Finding D5-R2-NN: <one-line summary>
+  evidence: <file:line>
+  severity: BLOCK | NIT
+  proposed closure: <change>
+
+Maximum 12 findings. Only emit BLOCK-severity unless a NIT is materially blocking.
+
+After ALL findings, end with EXACTLY one line:
+
+FINAL VERDICT: PASS
+
+or
+
+FINAL VERDICT: BLOCK
+
+Do NOT re-explore the entire repo. Focus on:
+
+1. R1-01 closure verification — does the seq bump actually drop a stale result? (See M1a/b/c regression.) Any remaining race?
+2. R1-02 closure verification — any innerHTML / outerHTML / unsafe DOM API still in r3-0d-engineer-ui.js?
+3. R1-03 closure verification — D5.json authorizedPaths complete? state.json subset?
+4. New BLOCK-severity bugs in the D5 production surface:
+   - r3-0d-engineer-brief.js (authority chain, freshness, EBC validation, deep-freeze)
+   - r3-0d-engineer-viewmodel.js (re-projection, blocked viewmodel separation, leak protection)
+   - r3-0d-engineer-orchestrator.js (invalidate 13 reasons, subscriber snapshots non-authoritative, error isolation)
+   - r3-0d-engineer-ui.js (render-only, i18n keys only)
+   - r3-0d-contracts-bundle.js (generated; require(p) substring absent)
+   - r3-0d-priority-engine.js D5 attestation upgrade (+57 lines)
+5. Privacy (no paths / no telemetry / no stack traces in serialized output)
+6. Forbidden phrases in i18n keys (driver_fault / confirmed_cause / guaranteed_improvement / ai_diagnosis / etc.)
+
+End with FINAL VERDICT line. Nothing else after it.
+
+codex
+I’ll use the GitHub review workflow only as needed, but this looks like a local commit review. I’m going straight at the listed D5 files and tests, then I’ll report only findings in the requested format.
+exec
+/bin/bash -lc "rg -n \"innerHTML\\s*=|outerHTML\\s*=|insertAdjacentHTML\\(\" renderer/js/r3-0d-engineer-ui.js renderer/js/r3-0d-engineer-orchestrator.js renderer/js/r3-0d-engineer-viewmodel.js renderer/js/r3-0d-engineer-brief.js renderer/js/r3-0d-contracts-bundle.js renderer/js/r3-0d-priority-engine.js governance/r3.0d/checkpoints/D5.json state.json tests/r3.0d-engineer-viewmodel.test.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ exited 2 in 0ms:
+rg: state.json: No such file or directory (os error 2)
+tests/r3.0d-engineer-viewmodel.test.js:424:  chk('M3a: no `.innerHTML =` assignment in r3-0d-engineer-ui.js',
+tests/r3.0d-engineer-viewmodel.test.js:427:  chk('M3b: no `.outerHTML =` assignment either',
+tests/r3.0d-engineer-viewmodel.test.js:429:  chk('M3c: no `insertAdjacentHTML(`',
+
+exec
+/bin/bash -lc 'git status --short && git rev-parse HEAD && git branch --show-current' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-Kxh3PtEc' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-tVA8zylu' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-eYLKprv1' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-tTgRclSo' (errno=Operation not permitted)
+5e88d5b35a5a85b4a98a0d4d5e19cc65ccf404dd
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-W3y1pcFr' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-RaS75SmL' (errno=Operation not permitted)
+feat/r3.0d-d5-engineer-brief-activation
+
+exec
+/bin/bash -lc 'rg -n "driver_fault|confirmed_cause|guaranteed_improvement|ai_diagnosis|root_cause|blame|fault|guaranteed|diagnosis|telemetry|stack|path" renderer/js/r3-0d-engineer-ui.js renderer/js/r3-0d-engineer-orchestrator.js renderer/js/r3-0d-engineer-viewmodel.js renderer/js/r3-0d-engineer-brief.js renderer/js/r3-0d-contracts-bundle.js renderer/js/r3-0d-priority-engine.js governance/r3.0d/checkpoints/D5.json state.json' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ exited 2 in 0ms:
+rg: state.json: No such file or directory (os error 2)
+governance/r3.0d/checkpoints/D5.json:20:    { "path": "renderer/js/r3-0d-evidence-graph.js", "capability": "evidence_graph_present" },
+governance/r3.0d/checkpoints/D5.json:21:    { "path": "renderer/js/r3-0d-hypothesis-engine.js", "capability": "hypothesis_engine_present" },
+governance/r3.0d/checkpoints/D5.json:22:    { "path": "renderer/js/r3-0d-priority-engine.js", "capability": "priority_engine_present" },
+governance/r3.0d/checkpoints/D5.json:23:    { "path": "renderer/js/r3-0d-engineer-brief.js", "capability": "engineer_brief_present" },
+governance/r3.0d/checkpoints/D5.json:24:    { "path": "renderer/js/r3-0d-engineer-viewmodel.js", "capability": "engineer_brief_present" },
+governance/r3.0d/checkpoints/D5.json:25:    { "path": "renderer/js/r3-0d-engineer-orchestrator.js", "capability": "engineer_brief_present" },
+governance/r3.0d/checkpoints/D5.json:26:    { "path": "renderer/js/r3-0d-engineer-ui.js", "capability": "engineer_brief_present" },
+governance/r3.0d/checkpoints/D5.json:27:    { "path": "renderer/js/i18n-r3-0d.js", "capability": "engineer_brief_present" },
+governance/r3.0d/checkpoints/D5.json:28:    { "path": "renderer/js/r3-0d-contracts-bundle.js", "capability": "contract_foundation_present" },
+governance/r3.0d/checkpoints/D5.json:29:    { "path": "renderer/js/feature-registry.js", "capability": "feature_registry_active" }
+governance/r3.0d/checkpoints/D5.json:47:    "orchestratorScope": "renderer/js/r3-0d-engineer-orchestrator.js maintains module-scoped current state (envelope + viewModel + caseAssociation + generationToken + monotonic seq). Stale-async drop: if internalSeq advances during prepareEngineerInsight, the result is dropped and not published. Invalidation reasons (closed enum, 13 entries): case_changed / session_changed / evidence_graph_changed / hypothesis_set_changed / priority_set_changed / mapping_changed / calibration_changed / telemetry_replaced / case_archived / case_deleted / imported_summary_opened / generation_token_changed / application_restart. Subscriber snapshots are non-authoritative deep-frozen plain objects — callers CANNOT spoof producer attestation via the snapshot. Authoritative reference accessible only via getCurrentAuthoritativeEnvelope / getCurrentAuthoritativeViewModel (host wiring).",
+governance/r3.0d/checkpoints/D5.json:48:    "uiScope": "renderer/js/r3-0d-engineer-ui.js is RENDER-ONLY. Pure-DOM construction (NO innerHTML, NO arbitrary string parsing). i18n keys ONLY — no localized strings constructed inside the UI. Forbidden phrases (directive §13.3, audited in tests): confirmed_cause / definitive_diagnosis / driver_fault / driver_error / guaranteed_improvement / fastest_setup / optimal_setup / theoretical_best / ai_diagnosis. Mount is idempotent and stateless.",
+governance/r3.0d/checkpoints/D5.json:51:    "privacyInvariants": "ViewModel + UI surface MUST NOT contain raw telemetry samples, file paths, machine IDs, or stack traces. Reason codes + i18n keys ONLY. Audited in tests/r3.0d-engineer-brief.test.js Section K and tests/r3.0d-engineer-viewmodel.test.js Section E.",
+renderer/js/r3-0d-priority-engine.js:299:          // Array elements are enumerable by default; `length` is non-enumerable but is OK.
+renderer/js/r3-0d-priority-engine.js:712:    // Limitations (carry forward from hypothesis + add a default if heuristic / contradicted)
+renderer/js/r3-0d-priority-engine.js:807:          // (privacy — a path-like key would leak in the blocked envelope).
+renderer/js/r3-0d-engineer-orchestrator.js:20: *       priority set changed, mapping changed, calibration changed, telemetry replaced,
+renderer/js/r3-0d-engineer-orchestrator.js:24: *     'error-sanitized'}. NEVER echo caller paths / private IDs / stack traces.
+renderer/js/r3-0d-engineer-orchestrator.js:67:    'telemetry_replaced',
+renderer/js/r3-0d-engineer-brief.js:553:      // 'unverified' is the safe default — orchestrator/UI layer can attach a derived label
+renderer/js/r3-0d-engineer-viewmodel.js:18: *   • Privacy invariants: NO raw telemetry, NO file paths, NO machine IDs, NO stack traces
+renderer/js/r3-0d-engineer-viewmodel.js:123:      // NEVER echo caller content / paths / private IDs. The renderer uses displayState +
+renderer/js/r3-0d-engineer-viewmodel.js:151:      // pre-empt the default 'available' / 'inconclusive' derivation.
+renderer/js/r3-0d-engineer-viewmodel.js:249:   *   - reasonCodes (sanitized — no path / caller content)
+renderer/js/r3-0d-engineer-viewmodel.js:250:   *   - schemaVersion + viewModelId for parity with the success path
+renderer/js/r3-0d-engineer-ui.js:15: *     NO file paths, NO machine IDs, NO raw telemetry.
+renderer/js/r3-0d-engineer-ui.js:17: *     confirmed_cause / definitive_diagnosis / driver_fault / driver_error /
+renderer/js/r3-0d-engineer-ui.js:18: *     guaranteed_improvement / fastest_setup / optimal_setup / theoretical_best /
+renderer/js/r3-0d-engineer-ui.js:19: *     ai_diagnosis. Locale text is supplied by the i18n table (i18n-r3-0d.js) and
+renderer/js/r3-0d-engineer-ui.js:42:  function _defaultI18n(key, params) {
+renderer/js/r3-0d-engineer-ui.js:60:    var i18n = (typeof opts.i18n === 'function') ? opts.i18n : _defaultI18n;
+renderer/js/r3-0d-contracts-bundle.js:11: * of safe wrappers that the rest of R3.0D's contract / runtime path is permitted to use.
+renderer/js/r3-0d-contracts-bundle.js:26: * `JSON.stringify`, `Object.freeze`, etc.) is FORBIDDEN throughout the validation path.
+renderer/js/r3-0d-contracts-bundle.js:126:  // TextEncoder / structuredClone (modern-runtime guaranteed in our target environments).
+renderer/js/r3-0d-contracts-bundle.js:940:   * subtrees would itself invoke their getters). Depth cap 32 prevents pathological recursion.
+renderer/js/r3-0d-contracts-bundle.js:990: * no new measurement, reads no telemetry, makes no inference.
+renderer/js/r3-0d-contracts-bundle.js:1013: * Semantic behaviour preserved exactly: every reason code path, every validator outcome, and the
+renderer/js/r3-0d-contracts-bundle.js:1260:      // lapId is OPTIONAL — default null when omitted. The producer MAY omit it for case/session-scoped
+renderer/js/r3-0d-contracts-bundle.js:1356: * Semantic behaviour preserved exactly: every reason code path, every validator outcome, every
+renderer/js/r3-0d-contracts-bundle.js:1411:  // NodeId grammar. Directive: "no private path, no filename, no raw telemetry, deterministic / secure
+renderer/js/r3-0d-contracts-bundle.js:1435:  // path — see hardened-intrinsics.js safeUtf8ByteLength).
+renderer/js/r3-0d-contracts-bundle.js:1651: *   • exact_cause, driver_fault, setup_caused_loss, guaranteed_fix, professional_diagnosis,
+renderer/js/r3-0d-contracts-bundle.js:1725:    'driver_fault', 'driver fault', 'driver_blame', 'driver blame',
+renderer/js/r3-0d-contracts-bundle.js:1727:    'guaranteed_fix', 'guaranteed fix', 'guarantees',
+renderer/js/r3-0d-contracts-bundle.js:1728:    'professional_diagnosis', 'professional diagnosis',
+renderer/js/r3-0d-contracts-bundle.js:2120:      // guaranteed-fix-recommended, exact−cause (U+2212), exact—cause (em-dash), GUARANTEED FIX.
+
+exec
+/bin/bash -lc 'git show --stat --oneline --decorate 5e88d5b35a5a85b4a98a0d4d5e19cc65ccf404dd && git diff --stat 0e55200..5e88d5b35a5a85b4a98a0d4d5e19cc65ccf404dd' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-51BhHZLf' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-51VItFl6' (errno=Operation not permitted)
+5e88d5b (HEAD -> feat/r3.0d-d5-engineer-brief-activation, origin/feat/r3.0d-d5-engineer-brief-activation) d5(r2): close Codex D5 Round 1 — 3 BLOCK findings closed
+ governance/r3.0d/checkpoints/D5.json               |    3 +-
+ .../D5/round-1-0e55200.raw.txt                     | 3541 ++++++++++++++++++++
+ renderer/js/r3-0d-engineer-orchestrator.js         |    7 +
+ renderer/js/r3-0d-engineer-ui.js                   |    8 +-
+ tests/r3.0d-engineer-viewmodel.test.js             |   97 +
+ 5 files changed, 3653 insertions(+), 3 deletions(-)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-Wp7cWsxA' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-ZNUkHC6R' (errno=Operation not permitted)
+ governance/r3.0d/checkpoints/D5.json               |    3 +-
+ .../D5/round-1-0e55200.raw.txt                     | 3541 ++++++++++++++++++++
+ renderer/js/r3-0d-engineer-orchestrator.js         |    7 +
+ renderer/js/r3-0d-engineer-ui.js                   |    8 +-
+ tests/r3.0d-engineer-viewmodel.test.js             |   97 +
+ 5 files changed, 3653 insertions(+), 3 deletions(-)
+
+codex
+The workspace is on the requested SHA. The sandbox is read-only, so I’m doing a pure review pass; the only noise so far is macOS temp-cache warnings from `git`, not repository state.
+exec
+/bin/bash -lc "nl -ba renderer/js/r3-0d-engineer-orchestrator.js | sed -n '1,260p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+     1	/**
+     2	 * renderer/js/r3-0d-engineer-orchestrator.js — R3.0D D5 · Engineer Brief Orchestrator (PRODUCTION).
+     3	 *
+     4	 * Authoritative entry points:
+     5	 *   • prepareEngineerInsight({ hypothesisSet, prioritySet, generationToken }, opts)
+     6	 *   • currentState()
+     7	 *   • invalidate(reasonCode, contextSnapshot?)
+     8	 *   • subscribe(listener)
+     9	 *
+    10	 * Hard contract (SKYLINE 2026-06-29 R3.0D D5 directive §12):
+    11	 *   • Pipeline: authoritative D3 + D4 snapshots
+    12	 *       → EB.buildEngineerBrief() (D5 service)
+    13	 *       → VM.buildEngineerViewModel() (D5 viewmodel)
+    14	 *       → publish current state
+    15	 *   • Generation token: a caller-supplied opaque string that identifies the active D3/D4
+    16	 *     computation cohort. Stale callbacks / promises returning with an OLDER token are
+    17	 *     DROPPED (never back-fill the current viewmodel).
+    18	 *   • State invalidation events (directive §12.1) — all clear current viewmodel + bump token:
+    19	 *       case changed, session changed, evidence graph changed, hypothesis set changed,
+    20	 *       priority set changed, mapping changed, calibration changed, telemetry replaced,
+    21	 *       case archived, case deleted, imported summary opened, generation token changed.
+    22	 *   • Error handling (directive §12.2): blocked / forged / stale inputs surface as
+    23	 *     sanitized error states with displayState ∈ {'unavailable','blocked','stale-cleared',
+    24	 *     'error-sanitized'}. NEVER echo caller paths / private IDs / stack traces.
+    25	 *   • Subscribers receive a structured-clone-safe snapshot of the new viewmodel. The
+    26	 *     authoritative WeakSet identity stays inside the orchestrator; listeners get a
+    27	 *     non-authoritative shallow snapshot. (A renderer reading the snapshot CANNOT spoof
+    28	 *     the authoritative viewmodel back into another consumer.)
+    29	 *   • All ambient calls go through HI. Module-init captures.
+    30	 *
+    31	 * UMD: Node require / Electron renderer global (R3_0D_EngineerOrchestrator).
+    32	 */
+    33	(function (root) {
+    34	  'use strict';
+    35	
+    36	  // ---------- Module-init capture: dependencies ------------------------------------------------
+    37	  var HI = null, RC = null, EB = null, VM = null;
+    38	  if (typeof module !== 'undefined' && module.exports) {
+    39	    try { HI = require('../../contracts/r3.0d/hardened-intrinsics.js'); } catch (e) { HI = null; }
+    40	    try { RC = require('../../contracts/r3.0d/reason-codes.js'); } catch (e) { RC = null; }
+    41	    try { EB = require('./r3-0d-engineer-brief.js'); } catch (e) { EB = null; }
+    42	    try { VM = require('./r3-0d-engineer-viewmodel.js'); } catch (e) { VM = null; }
+    43	  }
+    44	  if (HI === null && typeof R3_0D_HardenedIntrinsics !== 'undefined') HI = R3_0D_HardenedIntrinsics;
+    45	  if (RC === null && typeof R3_0D_ReasonCodes !== 'undefined') RC = R3_0D_ReasonCodes;
+    46	  if (EB === null && typeof R3_0D_EngineerBrief !== 'undefined') EB = R3_0D_EngineerBrief;
+    47	  if (VM === null && typeof R3_0D_EngineerViewModel !== 'undefined') VM = R3_0D_EngineerViewModel;
+    48	
+    49	  if (!HI || !RC || !EB || !VM) {
+    50	    throw new Error('r3-0d-engineer-orchestrator.js: missing one or more required R3.0D dependencies');
+    51	  }
+    52	
+    53	  var CODES = RC.REASON_CODES;
+    54	
+    55	  // Module-init captures.
+    56	  var _CAPTURED_OBJECT_IS_FROZEN = Object.isFrozen;
+    57	
+    58	  // ---------- Closed enum: invalidation reasons ------------------------------------------------
+    59	  var INVALIDATION_REASONS = HI.deepFreeze([
+    60	    'case_changed',
+    61	    'session_changed',
+    62	    'evidence_graph_changed',
+    63	    'hypothesis_set_changed',
+    64	    'priority_set_changed',
+    65	    'mapping_changed',
+    66	    'calibration_changed',
+    67	    'telemetry_replaced',
+    68	    'case_archived',
+    69	    'case_deleted',
+    70	    'imported_summary_opened',
+    71	    'generation_token_changed',
+    72	    'application_restart',
+    73	  ]);
+    74	
+    75	  // ---------- Internal state ------------------------------------------------------------------
+    76	  // State is intentionally module-scoped — single Orchestrator per renderer process. Callers
+    77	  // requiring multiple independent orchestrators can build adapters; the production wiring
+    78	  // uses one global.
+    79	  var _currentEnvelope = null;   // D5 authoritative envelope (or null)
+    80	  var _currentViewModel = null;  // D5 viewModel wrapper { valid, viewModel } (or blocked vm)
+    81	  var _currentToken = null;      // Active generation token (string or null)
+    82	  var _currentCase = null;       // { caseId, sessionId, lapId } snapshot
+    83	  var _internalSeq = 0;          // Monotonic counter — prevents stale async callbacks
+    84	  var _subscribers = [];         // List of listener functions
+    85	
+    86	  // ---------- Helpers --------------------------------------------------------------------------
+    87	  function _isPlainObject(v) {
+    88	    try {
+    89	      if (v === null || typeof v !== 'object') return false;
+    90	      return HI.safeIsPlainShape(v) === 'plain-object';
+    91	    } catch (e) { return false; }
+    92	  }
+    93	  function _isFrozenSafe(v) { try { return _CAPTURED_OBJECT_IS_FROZEN(v) === true; } catch (e) { return false; } }
+    94	
+    95	  function _snapshotAssociation(ca) {
+    96	    if (!_isPlainObject(ca)) return null;
+    97	    return HI.deepFreeze({
+    98	      caseId: typeof ca.caseId === 'string' ? ca.caseId : null,
+    99	      sessionId: typeof ca.sessionId === 'string' ? ca.sessionId : null,
+   100	      lapId: typeof ca.lapId === 'string' ? ca.lapId : null,
+   101	    });
+   102	  }
+   103	
+   104	  // Build a sanitized snapshot for subscribers. The snapshot is a NEW deep-frozen object —
+   105	  // it does NOT carry the authoritative WeakSet identity. Listeners cannot use it to
+   106	  // bypass producer attestation.
+   107	  function _buildSubscriberSnapshot(viewModelResult, association, generationToken) {
+   108	    var snapshot = HI.deepFreeze({
+   109	      valid: viewModelResult.valid === true,
+   110	      displayState: viewModelResult.valid === true ? viewModelResult.viewModel.displayState : viewModelResult.displayState,
+   111	      reasonCodes: viewModelResult.valid === true ? HI.deepFreeze([]) : (viewModelResult.reasonCodes || HI.deepFreeze([])),
+   112	      sourceBriefId: viewModelResult.valid === true ? viewModelResult.viewModel.sourceBriefId : null,
+   113	      sourceHypothesisSetId: viewModelResult.valid === true ? viewModelResult.viewModel.sourceHypothesisSetId : null,
+   114	      sourcePrioritySetId: viewModelResult.valid === true ? viewModelResult.viewModel.sourcePrioritySetId : null,
+   115	      caseAssociation: association,
+   116	      generationToken: typeof generationToken === 'string' ? generationToken : null,
+   117	      activation: viewModelResult.valid === true ? viewModelResult.viewModel.activation : null,
+   118	    });
+   119	    return snapshot;
+   120	  }
+   121	
+   122	  function _notifySubscribers(snapshot) {
+   123	    // Use a snapshot copy of the subscribers array so a listener that subscribes/unsubscribes
+   124	    // during notification does NOT corrupt iteration.
+   125	    var listeners = HI.safeArraySlice(_subscribers);
+   126	    for (var i = 0; i < listeners.length; i++) {
+   127	      try { listeners[i](snapshot); } catch (e) { /* fail-closed; never let a listener throw out */ }
+   128	    }
+   129	  }
+   130	
+   131	  // ---------- Public API: prepareEngineerInsight ------------------------------------------------
+   132	  /**
+   133	   * prepareEngineerInsight({ hypothesisSet, prioritySet, generationToken }, opts) —
+   134	   *   1. Bump internal sequence + capture local snapshot ID.
+   135	   *   2. Build D5 brief envelope.
+   136	   *   3. Build D5 viewmodel.
+   137	   *   4. If still latest (no invalidation occurred mid-build), publish + notify.
+   138	   *   5. Return the result either way (blocked or success).
+   139	   */
+   140	  function prepareEngineerInsight(inputIn, optsIn) {
+   141	    // Codex D5 R1-01 closure: bump _internalSeq at the START of every prepare call so any
+   142	    // concurrent / replayed / out-of-order prepare result whose seqAtEntry no longer matches
+   143	    // _internalSeq is dropped at the publish gate (Step 4 below). Without this, a later
+   144	    // prepare(token=B) could be observed BEFORE an earlier prepare(token=A) and the earlier
+   145	    // result would still publish, overwriting the newer state. With the per-call bump, the
+   146	    // earlier call's seqAtEntry < _internalSeq at publish time → dropped.
+   147	    _internalSeq += 1;
+   148	    var seqAtEntry = _internalSeq;
+   149	
+   150	    // ---- Step 1 — basic input shape ----------------------------------------------------------
+   151	    if (!_isPlainObject(inputIn)) {
+   152	      var blocked = VM.buildBlockedViewModel('error-sanitized', [CODES.HYPOTHESIS_INVALID]);
+   153	      _maybePublishBlocked(blocked, null, null, seqAtEntry);
+   154	      return HI.deepFreeze({ valid: false, viewModel: blocked, displayState: 'error-sanitized' });
+   155	    }
+   156	    var allowedKeys = ['hypothesisSet', 'prioritySet', 'generationToken'];
+   157	    var keys = HI.safeOwnKeys(inputIn);
+   158	    for (var ki = 0; ki < keys.length; ki++) {
+   159	      if (HI.safeArrayIndexOf(allowedKeys, keys[ki]) === -1) {
+   160	        var blockedKey = VM.buildBlockedViewModel('error-sanitized', [CODES.UNKNOWN_OWN_KEY]);
+   161	        _maybePublishBlocked(blockedKey, null, null, seqAtEntry);
+   162	        return HI.deepFreeze({ valid: false, viewModel: blockedKey, displayState: 'error-sanitized' });
+   163	      }
+   164	    }
+   165	
+   166	    var hypothesisSet = inputIn.hypothesisSet;
+   167	    var prioritySet = inputIn.prioritySet;
+   168	    var generationToken = inputIn.generationToken;
+   169	
+   170	    if (typeof generationToken !== 'string' || generationToken.length === 0) {
+   171	      var blockedTok = VM.buildBlockedViewModel('error-sanitized', [CODES.HYPOTHESIS_INVALID]);
+   172	      _maybePublishBlocked(blockedTok, null, null, seqAtEntry);
+   173	      return HI.deepFreeze({ valid: false, viewModel: blockedTok, displayState: 'error-sanitized' });
+   174	    }
+   175	
+   176	    // ---- Step 2 — build D5 envelope (handles its own authority gates) -----------------------
+   177	    var ebInput = HI.deepFreeze({ hypothesisSet: hypothesisSet, prioritySet: prioritySet });
+   178	    var ebOpts = optsIn === undefined ? undefined : optsIn;
+   179	    var ebResult = EB.buildEngineerBrief(ebInput, ebOpts);
+   180	
+   181	    if (!(ebResult && ebResult.valid === true)) {
+   182	      // Brief build blocked → blocked viewmodel, no publication of an authoritative state.
+   183	      var blockedEb = VM.buildBlockedViewModel('blocked',
+   184	        (ebResult && HI.safeIsArray(ebResult.reasonCodes)) ? ebResult.reasonCodes : [CODES.HYPOTHESIS_AUTHORITY_FORGED]);
+   185	      _maybePublishBlocked(blockedEb, _associationFromInputs(hypothesisSet, prioritySet), generationToken, seqAtEntry);
+   186	      return HI.deepFreeze({ valid: false, viewModel: blockedEb, displayState: 'blocked' });
+   187	    }
+   188	
+   189	    // ---- Step 3 — build viewmodel ------------------------------------------------------------
+   190	    var vmResult = VM.buildEngineerViewModel(ebResult.engineerBrief, undefined);
+   191	    if (!(vmResult && vmResult.valid === true)) {
+   192	      var blockedVm = VM.buildBlockedViewModel('error-sanitized', [CODES.INTERNAL_CONTRACT_VIOLATION]);
+   193	      _maybePublishBlocked(blockedVm, _associationFromInputs(hypothesisSet, prioritySet), generationToken, seqAtEntry);
+   194	      return HI.deepFreeze({ valid: false, viewModel: blockedVm, displayState: 'error-sanitized' });
+   195	    }
+   196	
+   197	    // ---- Step 4 — staleness check ------------------------------------------------------------
+   198	    // If _internalSeq has advanced since we entered (e.g., invalidate() was called in between),
+   199	    // the build result is STALE — drop it on the floor. The caller still receives the result
+   200	    // (so they can log it locally), but the orchestrator state stays cleared.
+   201	    if (_internalSeq !== seqAtEntry) {
+   202	      // Stale — explicitly do NOT publish, do NOT notify subscribers.
+   203	      return HI.deepFreeze({
+   204	        valid: false,
+   205	        viewModel: VM.buildBlockedViewModel('stale-cleared', [CODES.STALE_EVIDENCE]),
+   206	        displayState: 'stale-cleared',
+   207	      });
+   208	    }
+   209	
+   210	    // ---- Step 5 — publish + notify -----------------------------------------------------------
+   211	    _currentEnvelope = ebResult.engineerBrief;
+   212	    _currentViewModel = vmResult;
+   213	    _currentToken = generationToken;
+   214	    _currentCase = HI.deepFreeze({
+   215	      caseId: ebResult.engineerBrief.brief.identity.caseId,
+   216	      sessionId: ebResult.engineerBrief.brief.identity.sessionId,
+   217	      lapId: ebResult.engineerBrief.brief.identity.lapId,
+   218	    });
+   219	
+   220	    var snapshot = _buildSubscriberSnapshot(vmResult, _currentCase, generationToken);
+   221	    _notifySubscribers(snapshot);
+   222	
+   223	    return HI.deepFreeze({ valid: true, viewModel: vmResult.viewModel, displayState: vmResult.viewModel.displayState });
+   224	  }
+   225	
+   226	  // ---------- Public API: currentState ----------------------------------------------------------
+   227	  /**
+   228	   * currentState() — returns a snapshot of the published viewmodel state, or null if nothing
+   229	   * is published. The snapshot is a deep-frozen plain object — NOT the authoritative
+   230	   * viewmodel (callers cannot use it to spoof producer attestation).
+   231	   */
+   232	  function currentState() {
+   233	    if (_currentViewModel === null) return null;
+   234	    return _buildSubscriberSnapshot(_currentViewModel, _currentCase, _currentToken);
+   235	  }
+   236	
+   237	  // ---------- Public API: getCurrentAuthoritativeEnvelope ---------------------------------------
+   238	  /**
+   239	   * getCurrentAuthoritativeEnvelope() — returns the authoritative D5 envelope (or null).
+   240	   * Used by the host wiring code that needs to pass the authoritative reference to
+   241	   * downstream R3.0E / R3.0F consumers. The returned reference IS in the D5 authoritative
+   242	   * WeakSet — caller MUST treat it as a sealed authority and NOT mutate / clone / forward
+   243	   * to untrusted consumers.
+   244	   */
+   245	  function getCurrentAuthoritativeEnvelope() {
+   246	    return _currentEnvelope;
+   247	  }
+   248	  function getCurrentAuthoritativeViewModel() {
+   249	    return (_currentViewModel && _currentViewModel.valid === true) ? _currentViewModel.viewModel : null;
+   250	  }
+   251	
+   252	  // ---------- Public API: invalidate ------------------------------------------------------------
+   253	  /**
+   254	   * invalidate(reasonCode, contextSnapshot?) — clears the published viewmodel + bumps the
+   255	   * internal sequence so any in-flight stale callback is dropped. Notifies subscribers with
+   256	   * a stale-cleared snapshot.
+   257	   */
+   258	  function invalidate(reasonCode, contextSnapshot) {
+   259	    if (typeof reasonCode !== 'string'
+   260	        || HI.safeArrayIndexOf(INVALIDATION_REASONS, reasonCode) === -1) {
+
+exec
+/bin/bash -lc "nl -ba tests/r3.0d-engineer-viewmodel.test.js | sed -n '330,470p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+exec
+/bin/bash -lc "nl -ba renderer/js/r3-0d-engineer-ui.js | sed -n '1,260p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+   330	  // K3 — unknown input own key
+   331	  var r3 = ORC.prepareEngineerInsight({ hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'g', hostile: 'x' }, _opts());
+   332	  chk('K3: unknown input key rejected', r3.valid === false);
+   333	
+   334	  // K4 — non-plain input
+   335	  var r4 = ORC.prepareEngineerInsight('not-plain', _opts());
+   336	  chk('K4: non-plain input rejected', r4.valid === false);
+   337	
+   338	  // K5 — forged D3
+   339	  var rF = ORC.prepareEngineerInsight({ hypothesisSet: {}, prioritySet: fix.ps, generationToken: 'g' }, _opts());
+   340	  chk('K5: forged D3 rejected', rF.valid === false);
+   341	})();
+   342	
+   343	// =============================================================================================
+   344	// Section L — Authoritative envelope leak protection
+   345	// =============================================================================================
+   346	console.log('Section L — authoritative envelope leak protection');
+   347	(function () {
+   348	  ORC.__test.resetForTests();
+   349	  var fix = _buildEnvelope();
+   350	  ORC.prepareEngineerInsight({ hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_L1' }, _opts());
+   351	  var snap = ORC.currentState();
+   352	  // L1 — Subscriber snapshot is NOT authoritative
+   353	  chk('L1: subscriber snapshot is NOT authoritative (different ref / not in WeakSet)',
+   354	    VM.verifyAuthoritativeEngineerViewModel(snap) === false);
+   355	  // L2 — But getCurrentAuthoritativeViewModel IS
+   356	  chk('L2: getCurrentAuthoritativeViewModel IS authoritative',
+   357	    VM.verifyAuthoritativeEngineerViewModel(ORC.getCurrentAuthoritativeViewModel()) === true);
+   358	})();
+   359	
+   360	// =============================================================================================
+   361	// Section M — Codex D5 R1 closures
+   362	// =============================================================================================
+   363	console.log('Section M — Codex D5 R1 closures');
+   364	
+   365	// M1 — D5-R1-01 closure: bump _internalSeq at entry to prepareEngineerInsight so a stale
+   366	// in-flight result cannot overwrite newer state. We exercise this via a hostile clock that
+   367	// fires invalidate as a side-effect mid-build (simulating a stale async path returning after
+   368	// the orchestrator has been invalidated by a real event).
+   369	(function () {
+   370	  ORC.__test.resetForTests();
+   371	  var fix = _buildEnvelope();
+   372	  var listenerCalls = [];
+   373	  var unsub = ORC.subscribe(function (snap) { listenerCalls.push(snap.displayState); });
+   374	
+   375	  // Hostile clock that invalidates mid-build. The clock runs AFTER the authority gates and
+   376	  // BEFORE the publish step (per the EB pipeline: freshness clock runs at Step 7, publish at
+   377	  // Step 12). When invalidate fires, _internalSeq bumps, and the orchestrator's publish gate
+   378	  // catches the seq mismatch (because the entry already bumped seq, and invalidate bumps
+   379	  // again, so seqAtEntry < _internalSeq at publish time → DROP).
+   380	  var hostileClock = function () {
+   381	    ORC.invalidate('session_changed');
+   382	    return '2026-06-29T01:00:00Z';
+   383	  };
+   384	  var r = ORC.prepareEngineerInsight({
+   385	    hypothesisSet: fix.hs,
+   386	    prioritySet: fix.ps,
+   387	    generationToken: 'gen_stale_test',
+   388	  }, { clock: hostileClock });
+   389	
+   390	  chk('M1a: stale prepare result is dropped (does NOT publish over invalidate)',
+   391	    r.valid === false && r.displayState === 'stale-cleared');
+   392	  // The orchestrator should reflect the invalidate's stale-cleared state, not the prepare's
+   393	  // partial result. currentState() must show stale-cleared, not 'available'/'inconclusive'.
+   394	  var snap = ORC.currentState();
+   395	  chk('M1b: after stale drop, currentState.displayState === stale-cleared',
+   396	    snap !== null && snap.displayState === 'stale-cleared');
+   397	  chk('M1c: no authoritative envelope leaked (getCurrentAuthoritativeEnvelope === null)',
+   398	    ORC.getCurrentAuthoritativeEnvelope() === null);
+   399	  unsub();
+   400	})();
+   401	
+   402	// M2 — Two prepare calls in sequence both succeed and the latter overwrites the former.
+   403	// This is the happy path that proves the seq bump does NOT introduce a regression.
+   404	(function () {
+   405	  ORC.__test.resetForTests();
+   406	  var fix = _buildEnvelope();
+   407	  var r1 = ORC.prepareEngineerInsight({
+   408	    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_M2_first',
+   409	  }, _opts());
+   410	  var r2 = ORC.prepareEngineerInsight({
+   411	    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_M2_second',
+   412	  }, _opts());
+   413	  chk('M2a: first prepare publishes', r1.valid === true);
+   414	  chk('M2b: second prepare publishes (does not stale-drop the legitimate replay)',
+   415	    r2.valid === true);
+   416	  chk('M2c: currentState reflects second token',
+   417	    ORC.currentState().generationToken === 'gen_M2_second');
+   418	})();
+   419	
+   420	// M3 — D5-R1-02 closure: render-only UI source has NO innerHTML assignment.
+   421	(function () {
+   422	  var src = fs.readFileSync(__dirname + '/../renderer/js/r3-0d-engineer-ui.js', 'utf8');
+   423	  var nocom = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+   424	  chk('M3a: no `.innerHTML =` assignment in r3-0d-engineer-ui.js',
+   425	    !/\.innerHTML\s*=/.test(nocom),
+   426	    (nocom.match(/\.innerHTML\s*=[^\n]*/g) || []).slice(0, 3));
+   427	  chk('M3b: no `.outerHTML =` assignment either',
+   428	    !/\.outerHTML\s*=/.test(nocom));
+   429	  chk('M3c: no `insertAdjacentHTML(`',
+   430	    !/\.insertAdjacentHTML\(/.test(nocom));
+   431	})();
+   432	
+   433	// M4 — D5-R1-03 closure: D5.json authorizedPaths is the exact superset that includes
+   434	// feature-registry.js (required for feature_registry_active capability activation).
+   435	(function () {
+   436	  var fs2 = require('fs');
+   437	  var d5 = JSON.parse(fs2.readFileSync(__dirname + '/../governance/r3.0d/checkpoints/D5.json', 'utf8'));
+   438	  var paths = (d5.authorizedPaths || []).map(function (e) { return e.path; });
+   439	  chk('M4a: D5.json authorizes renderer/js/feature-registry.js',
+   440	    paths.indexOf('renderer/js/feature-registry.js') !== -1, paths);
+   441	  chk('M4b: D5.json authorizes renderer/js/r3-0d-contracts-bundle.js',
+   442	    paths.indexOf('renderer/js/r3-0d-contracts-bundle.js') !== -1, paths);
+   443	  chk('M4c: D5.json authorizes all 5 D5 production modules',
+   444	    paths.indexOf('renderer/js/r3-0d-engineer-brief.js') !== -1
+   445	      && paths.indexOf('renderer/js/r3-0d-engineer-viewmodel.js') !== -1
+   446	      && paths.indexOf('renderer/js/r3-0d-engineer-orchestrator.js') !== -1
+   447	      && paths.indexOf('renderer/js/r3-0d-engineer-ui.js') !== -1
+   448	      && paths.indexOf('renderer/js/i18n-r3-0d.js') !== -1, paths);
+   449	  // The D5.json authorizedPaths must be a SUPERSET of state.json's authorizedProductionPaths.
+   450	  var st = JSON.parse(fs2.readFileSync(__dirname + '/../governance/r3.0d/state.json', 'utf8'));
+   451	  var stPaths = (st.authorizedProductionPaths || []).map(function (e) { return e.path; });
+   452	  var stateMinusD5 = stPaths.filter(function (p) { return paths.indexOf(p) === -1; });
+   453	  chk('M4d: every state.json authorizedProductionPath appears in D5.json authorizedPaths',
+   454	    stateMinusD5.length === 0, stateMinusD5);
+   455	})();
+   456	
+   457	// =============================================================================================
+   458	// Done
+   459	// =============================================================================================
+   460	console.log('R3.0D D5 viewmodel + orchestrator adversarial suite: ' + pass + ' passed, ' + fail + ' failed');
+   461	if (fail > 0) process.exit(1);
+
+ succeeded in 0ms:
+     1	/**
+     2	 * renderer/js/r3-0d-engineer-ui.js — R3.0D D5 · Engineer Brief UI integration (PRODUCTION, render-only).
+     3	 *
+     4	 * Authoritative entry: mountEngineerBriefPane(rootEl) — attaches the render-only Engineer Brief
+     5	 * UI to a DOM element. Subscribes to R3_0D_EngineerOrchestrator and re-renders on every
+     6	 * snapshot update.
+     7	 *
+     8	 * Hard contract (SKYLINE 2026-06-29 R3.0D D5 directive §13):
+     9	 *   • UI is RENDER-ONLY. The service decides; the viewmodel maps; the UI renders.
+    10	 *   • UI MUST NOT recompute hypothesis / confidence / credibility / priority / eligibility /
+    11	 *     contradiction status.
+    12	 *   • Display states (closed enum): unavailable / blocked / loading / available /
+    13	 *     inconclusive / stale-cleared / error-sanitized.
+    14	 *   • Safe rendering: textContent ONLY. NO innerHTML. NO arbitrary HTML from caller data.
+    15	 *     NO file paths, NO machine IDs, NO raw telemetry.
+    16	 *   • Forbidden phrases (directive §13.3) — NEVER appear in any rendered string:
+    17	 *     confirmed_cause / definitive_diagnosis / driver_fault / driver_error /
+    18	 *     guaranteed_improvement / fastest_setup / optimal_setup / theoretical_best /
+    19	 *     ai_diagnosis. Locale text is supplied by the i18n table (i18n-r3-0d.js) and
+    20	 *     audited in tests.
+    21	 *   • The mount is IDEMPOTENT and STATELESS — calling mountEngineerBriefPane on the same
+    22	 *     element multiple times is safe (each call re-binds the subscriber). The module does
+    23	 *     NOT keep any per-mount state beyond the Orchestrator subscription handle.
+    24	 *
+    25	 * UMD: Node require / Electron renderer global (R3_0D_EngineerUi).
+    26	 */
+    27	(function (root) {
+    28	  'use strict';
+    29	
+    30	  // ---------- Module-init: dependencies --------------------------------------------------------
+    31	  var ORC = null;
+    32	  if (typeof module !== 'undefined' && module.exports) {
+    33	    try { ORC = require('./r3-0d-engineer-orchestrator.js'); } catch (e) { ORC = null; }
+    34	  }
+    35	  if (ORC === null && typeof R3_0D_EngineerOrchestrator !== 'undefined') ORC = R3_0D_EngineerOrchestrator;
+    36	  if (!ORC) {
+    37	    throw new Error('r3-0d-engineer-ui.js: missing R3_0D_EngineerOrchestrator dependency');
+    38	  }
+    39	
+    40	  // i18n function — falls back to a literal-key passthrough if the host renderer has no
+    41	  // i18n shell. Renderer code is expected to override this via mountEngineerBriefPane opts.
+    42	  function _defaultI18n(key, params) {
+    43	    // Render-only fallback. Never echoes params content (params are safe-stringified upstream).
+    44	    return key;
+    45	  }
+    46	
+    47	  // ---------- Public API: mountEngineerBriefPane ----------------------------------------------
+    48	  /**
+    49	   * mountEngineerBriefPane(rootEl, opts) — attaches the render-only Engineer Brief UI.
+    50	   *
+    51	   * @param {Element} rootEl — DOM element to render into. Falsy → noop (returns null).
+    52	   * @param {Object} [opts] — { i18n: function(key, params)=>string, document: Document }
+    53	   * @returns {{ unmount: Function, render: Function }} — control handle
+    54	   */
+    55	  function mountEngineerBriefPane(rootEl, opts) {
+    56	    opts = opts || {};
+    57	    var doc = opts.document || (typeof document !== 'undefined' ? document : null);
+    58	    if (!rootEl || !doc) return null;
+    59	
+    60	    var i18n = (typeof opts.i18n === 'function') ? opts.i18n : _defaultI18n;
+    61	
+    62	    // ---------- Build inert pane skeleton --------------------------------------------------
+    63	    // Pure-DOM construction (NO innerHTML, NO arbitrary string parsing).
+    64	    // Codex D5 R1-02 closure: directive §13.4 forbids ANY innerHTML assignment in the
+    65	    // render-only UI surface, even a literal empty string. Clear via descendant removal.
+    66	    while (rootEl.firstChild) rootEl.removeChild(rootEl.firstChild);
+    67	    rootEl.setAttribute('data-r3-0d-engineer-brief', 'mounted');
+    68	
+    69	    function _el(tag, cls, textKey, params) {
+    70	      var n = doc.createElement(tag);
+    71	      if (cls) n.className = cls;
+    72	      if (textKey) n.textContent = i18n(textKey, params || {});
+    73	      return n;
+    74	    }
+    75	
+    76	    var stateBadge = _el('div', 'r3d-state-badge');
+    77	    var titleEl = _el('h3', 'r3d-title', 'r3.0d.brief.title');
+    78	    var primaryIssueEl = _el('div', 'r3d-primary-issue');
+    79	    var primaryIssueLabel = _el('div', 'r3d-section-label', 'r3.0d.brief.primary_issue.label');
+    80	    var primaryIssueText = _el('div', 'r3d-primary-text');
+    81	    primaryIssueEl.appendChild(primaryIssueLabel);
+    82	    primaryIssueEl.appendChild(primaryIssueText);
+    83	
+    84	    var secondaryIssueEl = _el('div', 'r3d-secondary-issue hidden');
+    85	    var secondaryIssueLabel = _el('div', 'r3d-section-label', 'r3.0d.brief.secondary_issue.label');
+    86	    var secondaryIssueText = _el('div', 'r3d-secondary-text');
+    87	    secondaryIssueEl.appendChild(secondaryIssueLabel);
+    88	    secondaryIssueEl.appendChild(secondaryIssueText);
+    89	
+    90	    var contradictionsEl = _el('div', 'r3d-contradictions');
+    91	    var contradictionsLabel = _el('div', 'r3d-section-label', 'r3.0d.brief.contradictions.label');
+    92	    var contradictionsList = _el('ul', 'r3d-contradictions-list');
+    93	    contradictionsEl.appendChild(contradictionsLabel);
+    94	    contradictionsEl.appendChild(contradictionsList);
+    95	
+    96	    var cannotConcludeEl = _el('div', 'r3d-cannot-conclude');
+    97	    var cannotConcludeLabel = _el('div', 'r3d-section-label', 'r3.0d.brief.cannot_conclude.label');
+    98	    var cannotConcludeList = _el('ul', 'r3d-cannot-conclude-list');
+    99	    cannotConcludeEl.appendChild(cannotConcludeLabel);
+   100	    cannotConcludeEl.appendChild(cannotConcludeList);
+   101	
+   102	    var nextActionEl = _el('div', 'r3d-next-action');
+   103	    var nextActionLabel = _el('div', 'r3d-section-label', 'r3.0d.brief.next_validation.label');
+   104	    var nextActionText = _el('div', 'r3d-next-text');
+   105	    nextActionEl.appendChild(nextActionLabel);
+   106	    nextActionEl.appendChild(nextActionText);
+   107	
+   108	    var rollbackEl = _el('div', 'r3d-rollback');
+   109	    var rollbackLabel = _el('div', 'r3d-section-label', 'r3.0d.brief.rollback.label');
+   110	    var rollbackText = _el('div', 'r3d-rollback-text');
+   111	    rollbackEl.appendChild(rollbackLabel);
+   112	    rollbackEl.appendChild(rollbackText);
+   113	
+   114	    var stopEl = _el('div', 'r3d-stop');
+   115	    var stopLabel = _el('div', 'r3d-section-label', 'r3.0d.brief.stop.label');
+   116	    var stopText = _el('div', 'r3d-stop-text');
+   117	    stopEl.appendChild(stopLabel);
+   118	    stopEl.appendChild(stopText);
+   119	
+   120	    var credibilityEl = _el('div', 'r3d-credibility');
+   121	    var credibilityLabel = _el('div', 'r3d-section-label', 'r3.0d.brief.credibility.label');
+   122	    var credibilityBadge = _el('span', 'r3d-credibility-badge');
+   123	    credibilityEl.appendChild(credibilityLabel);
+   124	    credibilityEl.appendChild(credibilityBadge);
+   125	
+   126	    var provenanceEl = _el('div', 'r3d-provenance');
+   127	    var provenanceLabel = _el('div', 'r3d-section-label', 'r3.0d.brief.provenance.label');
+   128	    var provenanceText = _el('span', 'r3d-provenance-text');
+   129	    provenanceEl.appendChild(provenanceLabel);
+   130	    provenanceEl.appendChild(provenanceText);
+   131	
+   132	    var limitationsEl = _el('div', 'r3d-limitations');
+   133	    var limitationsLabel = _el('div', 'r3d-section-label', 'r3.0d.brief.limitations.label');
+   134	    var limitationsList = _el('ul', 'r3d-limitations-list');
+   135	    limitationsEl.appendChild(limitationsLabel);
+   136	    limitationsEl.appendChild(limitationsList);
+   137	
+   138	    rootEl.appendChild(titleEl);
+   139	    rootEl.appendChild(stateBadge);
+   140	    rootEl.appendChild(primaryIssueEl);
+   141	    rootEl.appendChild(secondaryIssueEl);
+   142	    rootEl.appendChild(contradictionsEl);
+   143	    rootEl.appendChild(cannotConcludeEl);
+   144	    rootEl.appendChild(nextActionEl);
+   145	    rootEl.appendChild(stopEl);
+   146	    rootEl.appendChild(rollbackEl);
+   147	    rootEl.appendChild(credibilityEl);
+   148	    rootEl.appendChild(provenanceEl);
+   149	    rootEl.appendChild(limitationsEl);
+   150	
+   151	    function _clearList(ul) { while (ul.firstChild) ul.removeChild(ul.firstChild); }
+   152	
+   153	    // ---------- Render function ------------------------------------------------------------
+   154	    function render(snapshot) {
+   155	      try {
+   156	        // Reset all sections.
+   157	        stateBadge.setAttribute('data-state', snapshot ? snapshot.displayState : 'unavailable');
+   158	        stateBadge.textContent = i18n('r3.0d.state.' + (snapshot ? snapshot.displayState : 'unavailable'), {});
+   159	
+   160	        if (!snapshot) {
+   161	          primaryIssueText.textContent = i18n('r3.0d.brief.no_data', {});
+   162	          secondaryIssueEl.classList.add('hidden');
+   163	          _clearList(contradictionsList);
+   164	          _clearList(cannotConcludeList);
+   165	          _clearList(limitationsList);
+   166	          nextActionText.textContent = '';
+   167	          rollbackText.textContent = '';
+   168	          stopText.textContent = '';
+   169	          credibilityBadge.textContent = '';
+   170	          provenanceText.textContent = '';
+   171	          return;
+   172	        }
+   173	
+   174	        // For blocked / unavailable / stale-cleared states — show the state label only, no
+   175	        // brief content.
+   176	        var ds = snapshot.displayState;
+   177	        if (ds !== 'available' && ds !== 'inconclusive') {
+   178	          primaryIssueText.textContent = i18n('r3.0d.brief.state.' + ds, {});
+   179	          secondaryIssueEl.classList.add('hidden');
+   180	          _clearList(contradictionsList);
+   181	          _clearList(cannotConcludeList);
+   182	          _clearList(limitationsList);
+   183	          nextActionText.textContent = '';
+   184	          rollbackText.textContent = '';
+   185	          stopText.textContent = '';
+   186	          credibilityBadge.textContent = '';
+   187	          provenanceText.textContent = '';
+   188	          return;
+   189	        }
+   190	
+   191	        // For 'available' or 'inconclusive', fetch the AUTHORITATIVE viewmodel reference
+   192	        // (subscriber snapshot does NOT carry brief content; the host wiring uses
+   193	        // getCurrentAuthoritativeViewModel to obtain the deep-frozen, attested object).
+   194	        var vm = ORC.getCurrentAuthoritativeViewModel();
+   195	        if (!vm) {
+   196	          // Race window: snapshot says 'available' but viewmodel cleared between events.
+   197	          primaryIssueText.textContent = i18n('r3.0d.brief.state.stale-cleared', {});
+   198	          return;
+   199	        }
+   200	
+   201	        primaryIssueText.textContent = i18n(vm.primaryIssue.i18nKey, vm.primaryIssue.params || {});
+   202	        if (vm.secondaryIssue) {
+   203	          secondaryIssueText.textContent = i18n(vm.secondaryIssue.i18nKey, vm.secondaryIssue.params || {});
+   204	          secondaryIssueEl.classList.remove('hidden');
+   205	        } else {
+   206	          secondaryIssueEl.classList.add('hidden');
+   207	        }
+   208	
+   209	        _clearList(contradictionsList);
+   210	        for (var ci = 0; ci < vm.contradictions.length; ci++) {
+   211	          var c = vm.contradictions[ci];
+   212	          var li = doc.createElement('li');
+   213	          li.textContent = i18n(c.i18nKey, c.params || {});
+   214	          contradictionsList.appendChild(li);
+   215	        }
+   216	
+   217	        _clearList(cannotConcludeList);
+   218	        for (var cci = 0; cci < vm.cannotConcludeReasonCodes.length; cci++) {
+   219	          var ccLi = doc.createElement('li');
+   220	          ccLi.textContent = i18n('r3.0d.reason.' + vm.cannotConcludeReasonCodes[cci], {});
+   221	          cannotConcludeList.appendChild(ccLi);
+   222	        }
+   223	
+   224	        _clearList(limitationsList);
+   225	        for (var li2 = 0; li2 < vm.limitations.length; li2++) {
+   226	          var limLi = doc.createElement('li');
+   227	          limLi.textContent = i18n('r3.0d.reason.' + vm.limitations[li2], {});
+   228	          limitationsList.appendChild(limLi);
+   229	        }
+   230	
+   231	        if (vm.nextValidationAction) {
+   232	          nextActionText.textContent = i18n(vm.nextValidationAction.i18nKey, {});
+   233	        } else {
+   234	          nextActionText.textContent = i18n('r3.0d.brief.no_next_action', {});
+   235	        }
+   236	
+   237	        // Stop + rollback derive from the next-validation action's i18n family.
+   238	        if (vm.nextValidationAction) {
+   239	          stopText.textContent = i18n(vm.nextValidationAction.i18nKey + '.stop', {});
+   240	          rollbackText.textContent = i18n(vm.nextValidationAction.i18nKey + '.rollback', {});
+   241	        } else {
+   242	          stopText.textContent = '';
+   243	          rollbackText.textContent = '';
+   244	        }
+   245	
+   246	        credibilityBadge.textContent = i18n('r3.0d.credibility.' + vm.credibility, {});
+   247	        credibilityBadge.setAttribute('data-credibility', vm.credibility);
+   248	        provenanceText.textContent = i18n('r3.0d.provenance.' + vm.provenance, {});
+   249	      } catch (e) {
+   250	        // Render-only must never throw out — fail closed to a sanitized error state.
+   251	        stateBadge.setAttribute('data-state', 'error-sanitized');
+   252	        stateBadge.textContent = i18n('r3.0d.state.error-sanitized', {});
+   253	        primaryIssueText.textContent = i18n('r3.0d.brief.state.error-sanitized', {});
+   254	      }
+   255	    }
+   256	
+   257	    // Initial render with whatever the orchestrator currently has (if anything).
+   258	    render(ORC.currentState());
+   259	
+   260	    // Subscribe.
+
+exec
+/bin/bash -lc 'find . -name state.json -print' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 233ms:
+./governance/r3.0f/state.json
+./governance/r3.0d/state.json
+./governance/r3.0c/state.json
+./governance/r3.0e/state.json
+
+codex
+The R1 closure mechanisms are present: the orchestrator bumps before capture, UI unsafe clearing is gone, and the D5 manifest now includes `feature-registry.js`. I’m checking the surrounding production paths for any new blocker-level behavior now.
+exec
+/bin/bash -lc "nl -ba renderer/js/r3-0d-engineer-orchestrator.js | sed -n '252,420p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+   252	  // ---------- Public API: invalidate ------------------------------------------------------------
+   253	  /**
+   254	   * invalidate(reasonCode, contextSnapshot?) — clears the published viewmodel + bumps the
+   255	   * internal sequence so any in-flight stale callback is dropped. Notifies subscribers with
+   256	   * a stale-cleared snapshot.
+   257	   */
+   258	  function invalidate(reasonCode, contextSnapshot) {
+   259	    if (typeof reasonCode !== 'string'
+   260	        || HI.safeArrayIndexOf(INVALIDATION_REASONS, reasonCode) === -1) {
+   261	      // Unknown invalidation reason — still treat as a sanitized error to fail closed.
+   262	      reasonCode = 'application_restart';
+   263	    }
+   264	    _internalSeq += 1;
+   265	    // Drop the authoritative envelope (no producer-attestation reference survives across
+   266	    // invalidation), but keep a non-authoritative stale-cleared viewmodel so the UI shell
+   267	    // can render an explicit "cleared" state instead of going blank.
+   268	    _currentEnvelope = null;
+   269	    var staleVm = VM.buildBlockedViewModel('stale-cleared',
+   270	      _mapInvalidationReasonToCode(reasonCode));
+   271	    _currentViewModel = staleVm;
+   272	    _currentToken = null;
+   273	    _currentCase = _isPlainObject(contextSnapshot) ? _snapshotAssociation(contextSnapshot) : null;
+   274	
+   275	    var snap = _buildSubscriberSnapshot(staleVm, _currentCase, null);
+   276	    _notifySubscribers(snap);
+   277	  }
+   278	
+   279	  function _mapInvalidationReasonToCode(reason) {
+   280	    if (reason === 'imported_summary_opened') return [CODES.STALE_EVIDENCE, CODES.LIMITATION_IMPORTED_SUMMARY];
+   281	    if (reason === 'case_deleted' || reason === 'case_archived') return [CODES.STALE_EVIDENCE];
+   282	    return [CODES.STALE_EVIDENCE];
+   283	  }
+   284	
+   285	  // ---------- Public API: subscribe -------------------------------------------------------------
+   286	  /**
+   287	   * subscribe(listener) — registers a snapshot listener. Returns an unsubscribe function.
+   288	   * The listener is called synchronously after publish / invalidate. It receives a
+   289	   * deep-frozen plain-object snapshot — never the authoritative viewmodel.
+   290	   *
+   291	   * Listener errors are SWALLOWED (never propagate up). This prevents a misbehaving renderer
+   292	   * from preventing other listeners from receiving updates.
+   293	   */
+   294	  function subscribe(listener) {
+   295	    if (typeof listener !== 'function') {
+   296	      return function () { /* noop unsubscribe */ };
+   297	    }
+   298	    HI.safeArrayPush(_subscribers, listener);
+   299	    return function unsubscribe() {
+   300	      var i = HI.safeArrayIndexOf(_subscribers, listener);
+   301	      if (i !== -1) _subscribers.splice(i, 1);
+   302	    };
+   303	  }
+   304	
+   305	  // ---------- Internal helpers ------------------------------------------------------------------
+   306	  function _associationFromInputs(hs, ps) {
+   307	    // Best-effort: pull caseAssociation from the authoritative envelope if possible. Both hs
+   308	    // and ps carry caseAssociation; we prefer ps (D4 is the most recent authoritative layer).
+   309	    try {
+   310	      if (ps && _isPlainObject(ps.caseAssociation)) {
+   311	        return _snapshotAssociation(ps.caseAssociation);
+   312	      }
+   313	      if (hs && _isPlainObject(hs.caseAssociation)) {
+   314	        return _snapshotAssociation(hs.caseAssociation);
+   315	      }
+   316	    } catch (e) { /* swallow */ }
+   317	    return null;
+   318	  }
+   319	
+   320	  function _maybePublishBlocked(blockedVm, association, generationToken, seqAtEntry) {
+   321	    if (_internalSeq !== seqAtEntry) {
+   322	      // Stale — do not publish.
+   323	      return;
+   324	    }
+   325	    // Blocked publication: clear authoritative envelope/viewmodel but expose the blocked
+   326	    // displayState to subscribers. The UI can render a sanitized "unavailable" / "blocked"
+   327	    // panel.
+   328	    _currentEnvelope = null;
+   329	    _currentViewModel = blockedVm;
+   330	    _currentToken = (typeof generationToken === 'string') ? generationToken : null;
+   331	    _currentCase = association;
+   332	    var snap = _buildSubscriberSnapshot(blockedVm, association, _currentToken);
+   333	    _notifySubscribers(snap);
+   334	  }
+   335	
+   336	  // ---------- Test-only reset (gated; safe for production) -------------------------------------
+   337	  // Production builds NEVER call this. The renderer wiring uses invalidate() for state
+   338	  // changes. _resetForTests is exposed under the `__test` namespace so its mere existence
+   339	  // does NOT pollute the production API surface — Codex audit pattern.
+   340	  function _resetForTests() {
+   341	    _internalSeq += 1;
+   342	    _currentEnvelope = null;
+   343	    _currentViewModel = null;
+   344	    _currentToken = null;
+   345	    _currentCase = null;
+   346	    _subscribers = [];
+   347	  }
+   348	
+   349	  // ---------- Public API ------------------------------------------------------------------------
+   350	  var api = {
+   351	    INVALIDATION_REASONS: INVALIDATION_REASONS,
+   352	    prepareEngineerInsight: prepareEngineerInsight,
+   353	    currentState: currentState,
+   354	    getCurrentAuthoritativeEnvelope: getCurrentAuthoritativeEnvelope,
+   355	    getCurrentAuthoritativeViewModel: getCurrentAuthoritativeViewModel,
+   356	    invalidate: invalidate,
+   357	    subscribe: subscribe,
+   358	    __test: HI.deepFreeze({ resetForTests: _resetForTests }),
+   359	  };
+   360	  try { HI.deepFreeze(api); } catch (e) { /* swallow */ }
+   361	  if (typeof module !== 'undefined' && module.exports) {
+   362	    module.exports = api;
+   363	  } else if (root) {
+   364	    root.R3_0D_EngineerOrchestrator = api;
+   365	  }
+   366	})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+exec
+/bin/bash -lc 'rg -n "buildEngineerViewModel|buildBlockedViewModel|verifyAuthoritative|deepFreeze|telemetry|stack|path|i18nKey|params|displayState|reasonCodes|source" renderer/js/r3-0d-engineer-viewmodel.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+4: * Authoritative entry: buildEngineerViewModel(envelope, opts)
+8: *     EB.verifyAuthoritativeEngineerBrief(envelope) — FIRST read on caller-supplied data;
+14: *     i18n keys + safe params (no localized strings; UI host attaches locale text).
+17: *     `displayState` field consumed by the renderer.
+18: *   • Privacy invariants: NO raw telemetry, NO file paths, NO machine IDs, NO stack traces
+20: *   • Locale text is NEVER constructed inside the ViewModel — the renderer reads i18nKey
+21: *     + params and applies its own locale lookup. The ViewModel may emit a closed set of
+27: *     a closure-private WeakSet and `verifyAuthoritativeEngineerViewModel` is exposed for
+83:  function verifyAuthoritativeEngineerViewModel(candidate) {
+90:      if (typeof candidate.sourceBriefId !== 'string') return false;
+99:  // Closed enum for displayState — UI templates switch on this.
+100:  var DISPLAY_STATE_ALLOWED = HI.deepFreeze([
+117:  function _buildSanitizedError(displayState, reasonCodes) {
+118:    var codes = HI.safeIsArray(reasonCodes) ? HI.safeArraySlice(reasonCodes) : [CODES.INTERNAL_CONTRACT_VIOLATION];
+119:    return HI.deepFreeze({
+121:      displayState: displayState,
+122:      reasonCodes: HI.deepFreeze(codes),
+123:      // NEVER echo caller content / paths / private IDs. The renderer uses displayState +
+124:      // reasonCodes to pick an i18n key.
+129:  // ---------- Public API: buildEngineerViewModel ------------------------------------------------
+131:   * buildEngineerViewModel(envelope, opts) — maps an authoritative D5 EngineerBrief envelope
+135:   *   1. EB.verifyAuthoritativeEngineerBrief(envelope) — FIRST read, identity-only.
+140:  function buildEngineerViewModel(envelopeIn, optsIn) {
+143:      if (typeof EB.verifyAuthoritativeEngineerBrief !== 'function'
+144:          || EB.verifyAuthoritativeEngineerBrief(envelopeIn) !== true) {
+172:      // ---- Step 3 — derive displayState ------------------------------------------------------
+175:      var displayState;
+177:        displayState = displayHint;
+180:        displayState = 'inconclusive';
+182:        displayState = 'available';
+185:      // ---- Step 4 — derive viewModelId (deterministic from briefId + displayState) -----------
+186:      var viewModelId = 'vm_' + envelope.briefId + '__' + displayState;
+190:      //   - displayState enum
+194:      var viewModel = HI.deepFreeze({
+198:        sourceBriefId: envelope.briefId,
+199:        sourceHypothesisSetId: envelope.sourceHypothesisSetId,
+200:        sourcePrioritySetId: envelope.sourcePrioritySetId,
+201:        displayState: displayState,
+204:        primaryIssue: HI.deepFreeze({
+205:          i18nKey: brief.primaryIssueI18nKey,
+206:          params: brief.primaryIssueParams,
+209:          ? HI.deepFreeze({
+210:            i18nKey: brief.secondaryIssueI18nKey,
+211:            params: brief.secondaryIssueParams,
+220:          ? HI.deepFreeze({ i18nKey: brief.driverExperimentI18nKey })
+223:          ? HI.deepFreeze({ i18nKey: brief.setupExperimentI18nKey })
+235:      return HI.deepFreeze({ valid: true, viewModel: viewModel });
+243:   * buildBlockedViewModel(reasonCodes, opts) — produce a deep-frozen blocked viewModel WITHOUT
+248:   *   - displayState: 'blocked' | 'unavailable' | 'stale-cleared'
+249:   *   - reasonCodes (sanitized — no path / caller content)
+250:   *   - schemaVersion + viewModelId for parity with the success path
+256:  function buildBlockedViewModel(displayState, reasonCodes) {
+258:      if (typeof displayState !== 'string'
+259:          || HI.safeArrayIndexOf(DISPLAY_STATE_ALLOWED, displayState) === -1
+260:          || displayState === 'available' || displayState === 'inconclusive') {
+264:      var codes = HI.safeIsArray(reasonCodes) ? HI.safeArraySlice(reasonCodes) : [];
+269:      var vm = HI.deepFreeze({
+271:        displayState: displayState,
+272:        reasonCodes: HI.deepFreeze(sanitized),
+286:    buildEngineerViewModel: buildEngineerViewModel,
+287:    buildBlockedViewModel: buildBlockedViewModel,
+288:    verifyAuthoritativeEngineerViewModel: verifyAuthoritativeEngineerViewModel,
+290:  try { HI.deepFreeze(api); } catch (e) { /* swallow */ }
+
+exec
+/bin/bash -lc "rg -n \"verifyAuthoritative|buildEngineerBrief|Object\\.freeze|deepFreeze|fresh|clock|EBC|engineerBrief|caseAssociation|reasonCodes|stack|Error|message|path\" renderer/js/r3-0d-engineer-brief.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+4: * Authoritative entry: buildEngineerBrief(input, opts)
+10: *       (1) HE.verifyAuthoritativeHypothesisSet(hypothesisSet) — FIRST read; closure-private
+13: *       (2) PE.verifyAuthoritativePrioritySet(prioritySet) — second identity gate (D4's
+18: *       (4) Identity match: hypothesisSet.caseAssociation === prioritySet.caseAssociation
+37: *   • Mandatory freshness reference time (opts.clock() OR opts.referenceNowMs); inherits
+40: *     registers the brief in a closure-private WeakSet and exposes verifyAuthoritativeEngineerBrief.
+48:  var HI = null, RC = null, CR = null, HC = null, EN = null, SI = null, REC = null, EBC = null;
+57:    try { EBC = require('../../contracts/r3.0d/engineer-brief-contract.js'); } catch (e) { EBC = null; }
+66:  if (EBC === null && typeof R3_0D_EngineerBriefContract !== 'undefined') EBC = R3_0D_EngineerBriefContract;
+68:  // D5 depends on D3 (Hypothesis Engine) for verifyAuthoritativeHypothesisSet, AND
+69:  // on D4 (Priority Engine) for verifyAuthoritativePrioritySet.
+78:  if (!HI || !RC || !CR || !HC || !EBC || !HE || !PE) {
+79:    throw new Error('r3-0d-engineer-brief.js: missing one or more required R3.0D contracts');
+101:  // (host wiring, activation gate, R3.0E / R3.0F consumers) call verifyAuthoritativeEngineerBrief.
+118:  function verifyAuthoritativeEngineerBrief(candidate) {
+140:      'deepOriginalShapeAudit', 'deepFreeze', 'stableStringify'];
+155:    return HI.deepFreeze({
+157:      reasonCodes: HI.deepFreeze(reasonsArr),
+158:      explanationKeys: HI.deepFreeze(explanationsObj),
+178:  var INPUT_KEYS_ALLOWED = HI.deepFreeze(['hypothesisSet', 'prioritySet']);
+179:  var OPTS_KEYS_ALLOWED = HI.deepFreeze(['clock', 'referenceNowMs', 'maxAgeMs']);
+193:    if (!_isPlainObject(inputIn)) return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID], detail: 'input not plain' };
+196:      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED], detail: 'input root not frozen' };
+199:    try { names = HI.safeGetOwnPropertyNames(inputIn); } catch (e) { return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID], detail: 'descriptor read failed' }; }
+203:    if (symbols && symbols.length > 0) return { valid: false, reasonCodes: [CODES.UNKNOWN_OWN_KEY], detail: 'input has Symbol own key' };
+208:        return { valid: false, reasonCodes: [CODES.UNKNOWN_OWN_KEY], detail: 'unknown input own key' };
+211:      try { d = HI.safeGetOwnDescriptor(inputIn, k); } catch (e) { return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID], detail: 'descriptor inaccessible' }; }
+212:      if (!d || !d.enumerable) return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID], detail: 'non-enumerable input key' };
+214:        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED], detail: 'accessor input descriptor' };
+224:    if (!_isPlainObject(optsIn)) return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID], detail: 'opts not plain' };
+227:    if (symbols && symbols.length > 0) return { valid: false, reasonCodes: [CODES.UNKNOWN_OWN_KEY], detail: 'opts has Symbol own key' };
+229:    try { names = HI.safeGetOwnPropertyNames(optsIn); } catch (e) { return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID], detail: 'opts descriptor read failed' }; }
+232:      if (HI.safeArrayIndexOf(OPTS_KEYS_ALLOWED, k) === -1) return { valid: false, reasonCodes: [CODES.UNKNOWN_OWN_KEY], detail: 'unknown opts own key' };
+234:      try { d = HI.safeGetOwnDescriptor(optsIn, k); } catch (e) { return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID], detail: 'opts descriptor inaccessible' }; }
+235:      if (!d || !d.enumerable) return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID], detail: 'non-enumerable opts key' };
+236:      if (k === 'clock') {
+237:        // D4 R1 D4-R1-02 closure: opts.clock MUST be a data descriptor whose .value is either
+240:          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED], detail: 'accessor opts.clock descriptor' };
+243:          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID], detail: 'opts.clock not function' };
+248:          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED], detail: 'accessor referenceNowMs' };
+251:          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID], detail: 'referenceNowMs not number' };
+256:          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED], detail: 'accessor maxAgeMs' };
+259:          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID], detail: 'maxAgeMs invalid' };
+284:   * buildEngineerBrief({hypothesisSet, prioritySet}, opts) — produces a deep-frozen
+289:   *   2. HE.verifyAuthoritativeHypothesisSet(hypothesisSet) — FIRST authority gate
+290:   *   3. PE.verifyAuthoritativePrioritySet(prioritySet) — SECOND authority gate
+292:   *   5. Identity bindings: caseAssociation + sessionAssociation match
+294:   *   7. Resolve freshness reference time (clock invoked AT MOST ONCE post-authority)
+297:   *   10. Validate brief shape via EBC.validateEngineerBriefShape (D1 contract layer)
+301:  function buildEngineerBrief(inputIn, optsIn) {
+310:        return RC.buildBlockedResult(inSnapR.reasonCodes, { detail: inSnapR.detail });
+317:      if (typeof HE.verifyAuthoritativeHypothesisSet !== 'function'
+318:          || HE.verifyAuthoritativeHypothesisSet(inputSnap.hypothesisSet) !== true) {
+324:      if (typeof PE.verifyAuthoritativePrioritySet !== 'function'
+325:          || PE.verifyAuthoritativePrioritySet(inputSnap.prioritySet) !== true) {
+340:      var hsCA = hs.caseAssociation;
+341:      var psCA = ps.caseAssociation;
+343:        return RC.buildBlockedResult([CODES.SOURCE_IDENTITY_INVALID], { detail: 'caseAssociation shape invalid' });
+346:        return RC.buildBlockedResult([CODES.SOURCE_IDENTITY_INVALID], { detail: 'caseAssociation mismatch between D3 and D4' });
+358:        return RC.buildBlockedResult(optsSnapR.reasonCodes, { detail: optsSnapR.detail });
+362:      // ---- Step 7 — resolve freshness reference time (clock at most once, post-authority) -----
+367:      } else if (typeof optsSnap.clock === 'function') {
+368:        var clockIso = null;
+369:        try { clockIso = optsSnap.clock(); } catch (eClock) { clockIso = null; }
+370:        if (typeof clockIso === 'string' && clockIso.length > 0) {
+371:          refNowMs = _isoToMs(clockIso);
+372:          if (typeof refNowMs === 'number') resolvedClockIso = clockIso;
+380:      // ---- Step 8 — freshness check (uses hs.createdAt + ps.createdAt) ------------------------
+436:          HI.safeArrayPush(evidenceSummary, HI.deepFreeze({
+439:            params: HI.deepFreeze({ hypothesisId: hp.hypothesisId }),
+449:        HI.safeArrayPush(contradictions, HI.deepFreeze({
+451:          contradictingEvidenceIds: HI.deepFreeze(HI.safeArraySlice(hp2.contradictingEvidenceIds)),
+453:          params: HI.deepFreeze({ category: hp2.category }),
+467:          HI.safeArrayPush(alternativeExplanations, HI.deepFreeze({
+470:            params: HI.deepFreeze({ originHypothesisId: hp3.hypothesisId }),
+511:        nextValidationAction = HI.deepFreeze({
+540:      var briefConfidence = HI.deepFreeze({ state: 'not_computed' });
+559:      // SOURCE_IDENTITY_KEYS = ['caseId','sessionId','lapId','sourceId','sourceVersion','freshness']
+561:      var briefIdentity = HI.deepFreeze({
+567:        freshness: (typeof hs.createdAt === 'string') ? hs.createdAt : (resolvedClockIso || ''),
+571:      // HI.deepFreeze used for the outer wrapper (ambient Object.freeze ban per directive §9);
+573:      var brief = HI.deepFreeze({
+577:        primaryIssueParams: HI.deepFreeze({
+582:        secondaryIssueParams: secondaryHyp !== null ? HI.deepFreeze({
+586:        evidenceSummary: HI.deepFreeze(evidenceSummary),
+587:        contradictions: HI.deepFreeze(contradictions),
+588:        alternativeExplanations: HI.deepFreeze(alternativeExplanations),
+589:        cannotConcludeReasonCodes: HI.deepFreeze(cannotConcludeReasonCodes),
+596:        limitations: HI.deepFreeze(limitations),
+601:      var briefCheck = EBC.validateEngineerBriefShape(brief);
+604:          briefCheck.reasonCodes ? HI.safeArraySlice(briefCheck.reasonCodes) : [CODES.BRIEF_INVALID],
+631:      var activation = HI.deepFreeze({
+634:        deferredCapabilities: HI.deepFreeze(deferredCapabilities),
+638:        rationaleParams: HI.deepFreeze({
+645:      var envelope = HI.deepFreeze({
+670:      return HI.deepFreeze({ valid: true, engineerBrief: envelope });
+673:      return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'buildEngineerBrief threw on hostile input' });
+682:    buildEngineerBrief: buildEngineerBrief,
+684:    verifyAuthoritativeEngineerBrief: verifyAuthoritativeEngineerBrief,
+686:  try { HI.deepFreeze(api); } catch (e) { /* swallow */ }
+
+exec
+/bin/bash -lc "rg -n \"require\\(|require\\s*\\+|require\\s*\\[|eval\\(|Function\\(|innerHTML|outerHTML|insertAdjacentHTML\" renderer/js/r3-0d-contracts-bundle.js renderer/js/r3-0d-priority-engine.js renderer/js/r3-0d-engineer-brief.js renderer/js/r3-0d-engineer-viewmodel.js renderer/js/r3-0d-engineer-orchestrator.js renderer/js/r3-0d-engineer-ui.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+renderer/js/r3-0d-engineer-viewmodel.js:48:    try { HI = require('../../contracts/r3.0d/hardened-intrinsics.js'); } catch (e) { HI = null; }
+renderer/js/r3-0d-engineer-viewmodel.js:49:    try { RC = require('../../contracts/r3.0d/reason-codes.js'); } catch (e) { RC = null; }
+renderer/js/r3-0d-engineer-viewmodel.js:50:    try { EB = require('./r3-0d-engineer-brief.js'); } catch (e) { EB = null; }
+renderer/js/r3-0d-engineer-ui.js:14: *   • Safe rendering: textContent ONLY. NO innerHTML. NO arbitrary HTML from caller data.
+renderer/js/r3-0d-engineer-ui.js:33:    try { ORC = require('./r3-0d-engineer-orchestrator.js'); } catch (e) { ORC = null; }
+renderer/js/r3-0d-engineer-ui.js:63:    // Pure-DOM construction (NO innerHTML, NO arbitrary string parsing).
+renderer/js/r3-0d-engineer-ui.js:64:    // Codex D5 R1-02 closure: directive §13.4 forbids ANY innerHTML assignment in the
+renderer/js/r3-0d-engineer-ui.js:266:        // Codex D5 R1-02 closure: directive §13.4 forbids ANY innerHTML assignment in the
+renderer/js/r3-0d-engineer-brief.js:50:    try { HI = require('../../contracts/r3.0d/hardened-intrinsics.js'); } catch (e) { HI = null; }
+renderer/js/r3-0d-engineer-brief.js:51:    try { RC = require('../../contracts/r3.0d/reason-codes.js'); } catch (e) { RC = null; }
+renderer/js/r3-0d-engineer-brief.js:52:    try { CR = require('../../contracts/r3.0d/credibility-contract.js'); } catch (e) { CR = null; }
+renderer/js/r3-0d-engineer-brief.js:53:    try { HC = require('../../contracts/r3.0d/hypothesis-contract.js'); } catch (e) { HC = null; }
+renderer/js/r3-0d-engineer-brief.js:54:    try { EN = require('../../contracts/r3.0d/evidence-node-contract.js'); } catch (e) { EN = null; }
+renderer/js/r3-0d-engineer-brief.js:55:    try { SI = require('../../contracts/r3.0d/source-identity-contract.js'); } catch (e) { SI = null; }
+renderer/js/r3-0d-engineer-brief.js:56:    try { REC = require('../../contracts/r3.0d/recommendation-contract.js'); } catch (e) { REC = null; }
+renderer/js/r3-0d-engineer-brief.js:57:    try { EBC = require('../../contracts/r3.0d/engineer-brief-contract.js'); } catch (e) { EBC = null; }
+renderer/js/r3-0d-engineer-brief.js:72:    try { HE = require('./r3-0d-hypothesis-engine.js'); } catch (e) { HE = null; }
+renderer/js/r3-0d-engineer-brief.js:73:    try { PE = require('./r3-0d-priority-engine.js'); } catch (e) { PE = null; }
+renderer/js/r3-0d-priority-engine.js:47:    try { HI = require('../../contracts/r3.0d/hardened-intrinsics.js'); } catch (e) { HI = null; }
+renderer/js/r3-0d-priority-engine.js:48:    try { RC = require('../../contracts/r3.0d/reason-codes.js'); } catch (e) { RC = null; }
+renderer/js/r3-0d-priority-engine.js:49:    try { CR = require('../../contracts/r3.0d/credibility-contract.js'); } catch (e) { CR = null; }
+renderer/js/r3-0d-priority-engine.js:50:    try { HC = require('../../contracts/r3.0d/hypothesis-contract.js'); } catch (e) { HC = null; }
+renderer/js/r3-0d-priority-engine.js:51:    try { EN = require('../../contracts/r3.0d/evidence-node-contract.js'); } catch (e) { EN = null; }
+renderer/js/r3-0d-priority-engine.js:52:    try { SI = require('../../contracts/r3.0d/source-identity-contract.js'); } catch (e) { SI = null; }
+renderer/js/r3-0d-priority-engine.js:53:    try { REC = require('../../contracts/r3.0d/recommendation-contract.js'); } catch (e) { REC = null; }
+renderer/js/r3-0d-priority-engine.js:67:    try { HE = require('./r3-0d-hypothesis-engine.js'); } catch (e) { HE = null; }
+renderer/js/r3-0d-engineer-orchestrator.js:39:    try { HI = require('../../contracts/r3.0d/hardened-intrinsics.js'); } catch (e) { HI = null; }
+renderer/js/r3-0d-engineer-orchestrator.js:40:    try { RC = require('../../contracts/r3.0d/reason-codes.js'); } catch (e) { RC = null; }
+renderer/js/r3-0d-engineer-orchestrator.js:41:    try { EB = require('./r3-0d-engineer-brief.js'); } catch (e) { EB = null; }
+renderer/js/r3-0d-engineer-orchestrator.js:42:    try { VM = require('./r3-0d-engineer-viewmodel.js'); } catch (e) { VM = null; }
+renderer/js/r3-0d-contracts-bundle.js:709:    ? require('./hardened-intrinsics.js')
+
+exec
+/bin/bash -lc "nl -ba governance/r3.0d/checkpoints/D5.json | sed -n '1,120p' && nl -ba governance/r3.0d/state.json | sed -n '1,120p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+     1	{
+     2	  "schemaVersion": 1,
+     3	  "program": "R3.0D",
+     4	  "checkpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+     5	  "baseSha": "f50c0bbdbe2439ba4158f7498d428750f700870f",
+     6	  "headSha": null,
+     7	  "previousCheckpoint": "D4_PRIORITY_ENGINE",
+     8	
+     9	  "shaSeparation": {
+    10	    "note": "Per SKYLINE 2026-06-29 R3.0D D5 Continuous Resume Directive §20 + R3.0 Final Continuous Execution Directive §7, every checkpoint manifest preserves three-way SHA separation. reviewedCandidateSha is the exact SHA Codex D5 review was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD.",
+    11	    "reviewedCandidateSha": null,
+    12	    "reviewedCandidateNote": "Filled after Codex D5 issues PASS verdict against a specific candidate SHA on feat/r3.0d-d5-engineer-brief-activation. Tier 1 raw evidence will be persisted under governance/r3.0d/codex-checkpoint-evidence/D5/round-N-<sha>.raw.txt.",
+    13	    "manifestCommitSha": null,
+    14	    "manifestCommitNote": "Filled by the same follow-up evidence-anchoring commit; mirrors D1/D2/D3/D4 convention.",
+    15	    "integrationSha": null,
+    16	    "integrationNote": "Filled only after the D5 branch-to-branch PR merges into feat/r3.0-integrated-delivery AND the Train target-context trusted-verification PASSes."
+    17	  },
+    18	
+    19	  "authorizedPaths": [
+    20	    { "path": "renderer/js/r3-0d-evidence-graph.js", "capability": "evidence_graph_present" },
+    21	    { "path": "renderer/js/r3-0d-hypothesis-engine.js", "capability": "hypothesis_engine_present" },
+    22	    { "path": "renderer/js/r3-0d-priority-engine.js", "capability": "priority_engine_present" },
+    23	    { "path": "renderer/js/r3-0d-engineer-brief.js", "capability": "engineer_brief_present" },
+    24	    { "path": "renderer/js/r3-0d-engineer-viewmodel.js", "capability": "engineer_brief_present" },
+    25	    { "path": "renderer/js/r3-0d-engineer-orchestrator.js", "capability": "engineer_brief_present" },
+    26	    { "path": "renderer/js/r3-0d-engineer-ui.js", "capability": "engineer_brief_present" },
+    27	    { "path": "renderer/js/i18n-r3-0d.js", "capability": "engineer_brief_present" },
+    28	    { "path": "renderer/js/r3-0d-contracts-bundle.js", "capability": "contract_foundation_present" },
+    29	    { "path": "renderer/js/feature-registry.js", "capability": "feature_registry_active" }
+    30	  ],
+    31	  "newlyAuthorizedPaths": [
+    32	    "renderer/js/r3-0d-engineer-brief.js",
+    33	    "renderer/js/r3-0d-engineer-viewmodel.js",
+    34	    "renderer/js/r3-0d-engineer-orchestrator.js",
+    35	    "renderer/js/r3-0d-engineer-ui.js",
+    36	    "renderer/js/i18n-r3-0d.js"
+    37	  ],
+    38	  "newlyEnabledCapabilities": ["engineer_brief_present", "feature_registry_active"],
+    39	
+    40	  "enabledCapabilitiesBefore": ["contract_foundation_present", "evidence_graph_present", "hypothesis_engine_present", "priority_engine_present"],
+    41	  "enabledCapabilitiesAfter": ["contract_foundation_present", "evidence_graph_present", "hypothesis_engine_present", "priority_engine_present", "engineer_brief_present", "feature_registry_active"],
+    42	  "forbiddenCapabilities": [],
+    43	
+    44	  "contractEnforcements": {
+    45	    "engineerBriefScope": "renderer/js/r3-0d-engineer-brief.js consumes ONLY a D3-authoritative HypothesisSet PLUS a D4-authoritative PrioritySet snapshot validated via PRODUCER ATTESTATION across two layers: (a) HE.verifyAuthoritativeHypothesisSet (D3 closure-private WeakSet identity attestation); (b) PE.verifyAuthoritativePrioritySet (D4 closure-private WeakSet identity attestation, exposed at D5-branch as a sibling D3→D4 producer attestation upgrade); (c) cross-binding: prioritySet.sourceHypothesisSetId === hypothesisSet.hypothesisSetId AND prioritySet.sourceGraphId === hypothesisSet.sourceGraphId (the D4 output MUST have been derived from the D3 input); (d) identity binding: caseAssociation + sessionAssociation match between D3 and D4. Layered model: (e) input root frozen via captured Object.isFrozen; (f) descriptor-only input snapshot — rejects Symbol-keyed / non-enumerable / accessor / function fields on input wrapper; (g) opts descriptor snapshot — rejects unknown own keys; (h) mandatory freshness reference time (opts.clock() OR opts.referenceNowMs; clock invoked AT MOST ONCE post-authority); (i) freshness check vs hs.createdAt and ps.createdAt against opts.maxAgeMs; (j) brief composition by re-projection (NO recomputation of confidence / credibility / priority / eligibility); (k) D1 engineer-brief-contract.validateEngineerBriefShape final structural gate (mandatory-presence keys: contradictions, alternativeExplanations, cannotConcludeReasonCodes, limitations — omission triggers BRIEF_CONTRADICTION_HIDDEN / BRIEF_CANNOT_CONCLUDE_HIDDEN / BRIEF_LIMITATION_HIDDEN); (l) deep-frozen envelope registered in D5's closure-private WeakSet via captured Reflect.apply on captured WeakSet.prototype.{add,has}.",
+    46	    "viewmodelScope": "renderer/js/r3-0d-engineer-viewmodel.js consumes ONLY a D5-authoritative Engineer Brief envelope validated via EB.verifyAuthoritativeEngineerBrief. Re-projection ONLY: NO recomputation of confidence / credibility / priority / eligibility / contradiction status. Output is deep-frozen + registered in a closure-private WeakSet via captured Reflect.apply. Public surface: { buildEngineerViewModel, buildBlockedViewModel, verifyAuthoritativeEngineerViewModel, DISPLAY_STATE_ALLOWED }. NO register/sign/secret/registry exports. Display states (closed enum): unavailable / blocked / loading / available / inconclusive / stale-cleared / error-sanitized.",
+    47	    "orchestratorScope": "renderer/js/r3-0d-engineer-orchestrator.js maintains module-scoped current state (envelope + viewModel + caseAssociation + generationToken + monotonic seq). Stale-async drop: if internalSeq advances during prepareEngineerInsight, the result is dropped and not published. Invalidation reasons (closed enum, 13 entries): case_changed / session_changed / evidence_graph_changed / hypothesis_set_changed / priority_set_changed / mapping_changed / calibration_changed / telemetry_replaced / case_archived / case_deleted / imported_summary_opened / generation_token_changed / application_restart. Subscriber snapshots are non-authoritative deep-frozen plain objects — callers CANNOT spoof producer attestation via the snapshot. Authoritative reference accessible only via getCurrentAuthoritativeEnvelope / getCurrentAuthoritativeViewModel (host wiring).",
+    48	    "uiScope": "renderer/js/r3-0d-engineer-ui.js is RENDER-ONLY. Pure-DOM construction (NO innerHTML, NO arbitrary string parsing). i18n keys ONLY — no localized strings constructed inside the UI. Forbidden phrases (directive §13.3, audited in tests): confirmed_cause / definitive_diagnosis / driver_fault / driver_error / guaranteed_improvement / fastest_setup / optimal_setup / theoretical_best / ai_diagnosis. Mount is idempotent and stateless.",
+    49	    "featureRegistryActivation": "feature-registry.js registers (a) NAV_NODES['case:engineer_brief'] case subview labelKey casenav.engineer_brief order 8; (b) FEATURES.engineer_brief area=case_scoped navNodeId='case:engineer_brief' paneId='analysis' availability='available_conditional'. uiAllowed transitions to true; featureRegistryActivationAllowed transitions to true. R3.0B portable schema UNTOUCHED.",
+    50	    "stateInvalidation": "Orchestrator invalidate() bumps internalSeq + clears authoritative envelope+viewModel + publishes a stale-cleared subscriber snapshot. Stale async callbacks are DROPPED. Generation-token mismatch is treated as stale. Listener errors are SWALLOWED (do not propagate; do not block other listeners).",
+    51	    "privacyInvariants": "ViewModel + UI surface MUST NOT contain raw telemetry samples, file paths, machine IDs, or stack traces. Reason codes + i18n keys ONLY. Audited in tests/r3.0d-engineer-brief.test.js Section K and tests/r3.0d-engineer-viewmodel.test.js Section E.",
+    52	    "noLLM": "Deterministic. No LLM call. No runtime config.",
+    53	    "noAutoMode": "D5 emits descriptive engineer brief + viewmodel only. NO apply_mode field. NO auto_tuning / auto_setup / auto_calibration / auto_preset.",
+    54	    "hardenedIntrinsicsEnforced": "All ambient calls go through HI. Module-init captures: Object.isFrozen, Date.parse, Object.is, WeakSet/WeakSet.prototype.{add,has}, Reflect.apply. No ambient .every / .forEach / .push / Object.freeze / Array.isArray / JSON.stringify outside HI namespace — audited per-module via tests Section P / F.",
+    55	    "outerTryCatch": "buildEngineerBrief + buildEngineerViewModel + buildBlockedViewModel + prepareEngineerInsight + invalidate are wrapped in outer try/catch → sanitized error result on any uncaught throw."
+    56	  },
+    57	
+    58	  "tests": {
+    59	    "command": "npm test",
+    60	    "newSuitesForThisCheckpoint": [
+    61	      "tests/r3.0d-engineer-brief.test.js",
+    62	      "tests/r3.0d-engineer-viewmodel.test.js"
+    63	    ],
+    64	    "extendedSuites": ["tests/r3.0d-priority-engine.test.js (Section T — D4→D5 producer-attestation regression)", "tests/i18n-parity.test.js (R3.0D i18n keys covered)"],
+    65	    "evidenceTier": "TIER 3 — Claude-verified on D5 branch HEAD; CI re-run on integrationSha is the authority."
+    66	  },
+    67	
+    68	  "workflowRunId": null,
+    69	  "artifactId": null,
+    70	  "artifactBoundSha": null,
+    71	
+    72	  "codexVerdict": {
+    73	    "verdict": "pending",
+    74	    "verdictRound": 0,
+    75	    "reviewedCandidateSha": null,
+    76	    "verdictEvidenceFile": null,
+    77	    "rounds": []
+    78	  },
+    79	
+    80	  "scopeBoundary": {
+    81	    "frozenFilesUntouched": true,
+    82	    "r30bPersistenceUntouched": true,
+    83	    "r30cContractsUntouched": true,
+    84	    "r30cProductionUntouched": true,
+    85	    "featureRegistryUnchanged": false,
+    86	    "indexHtmlUnchanged": false,
+    87	    "noR30dFeatureIdInRegistry": false,
+    88	    "runtimeConsumerCount": 7,
+    89	    "productionPathCount": 8,
+    90	    "algorithmCount": 4,
+    91	    "uiSurfaceCount": 1
+    92	  },
+    93	
+    94	  "frozenDiff": 0,
+    95	  "productionDiff": 5,
+    96	  "runtimeConsumerCount": 7,
+    97	
+    98	  "featureRegistryState": {
+    99	    "expectedRegisteredIds": ["engineer_brief"],
+   100	    "expectedNavNodes": ["case:engineer_brief"],
+   101	    "expectedRendererAdapter": true,
+   102	    "note": "D5 DOES register feature 'engineer_brief' under NAV_NODE 'case:engineer_brief' with rendererAdapter { paneId: 'analysis' }. featureRegistryActivationAllowed transitions to true."
+   103	  },
+   104	
+   105	  "crossPhaseGate": {
+   106	    "r3cCheckpoint": "C8_ACTIVATION",
+   107	    "requiredFor": "D5_ENGINEER_BRIEF_ACTIVATION",
+   108	    "satisfied": true,
+   109	    "note": "R3.0C state.currentCheckpoint === 'C8_ACTIVATION' verified."
+   110	  },
+   111	
+   112	  "packageVersion": "1.4.0",
+   113	  "createdAt": "2026-06-29T18:30:00Z",
+   114	
+   115	  "status": "candidate",
+   116	  "governanceChanged": true,
+   117	
+   118	  "changedFiles": [
+   119	    "renderer/js/r3-0d-engineer-brief.js",
+   120	    "renderer/js/r3-0d-engineer-viewmodel.js",
+     1	{
+     2	  "schemaVersion": 1,
+     3	  "program": "R3.0D",
+     4	  "currentCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+     5	  "authorizedProductionPaths": [
+     6	    { "path": "renderer/js/r3-0d-evidence-graph.js", "capability": "evidence_graph_present" },
+     7	    { "path": "renderer/js/r3-0d-hypothesis-engine.js", "capability": "hypothesis_engine_present" },
+     8	    { "path": "renderer/js/r3-0d-priority-engine.js", "capability": "priority_engine_present" },
+     9	    { "path": "renderer/js/r3-0d-engineer-brief.js", "capability": "engineer_brief_present" },
+    10	    { "path": "renderer/js/r3-0d-engineer-viewmodel.js", "capability": "engineer_brief_present" },
+    11	    { "path": "renderer/js/r3-0d-engineer-orchestrator.js", "capability": "engineer_brief_present" },
+    12	    { "path": "renderer/js/r3-0d-engineer-ui.js", "capability": "engineer_brief_present" },
+    13	    { "path": "renderer/js/i18n-r3-0d.js", "capability": "engineer_brief_present" },
+    14	    { "path": "renderer/js/r3-0d-contracts-bundle.js", "capability": "contract_foundation_present" },
+    15	    { "path": "renderer/js/feature-registry.js", "capability": "feature_registry_active" }
+    16	  ],
+    17	  "enabledCapabilities": ["contract_foundation_present", "evidence_graph_present", "hypothesis_engine_present", "priority_engine_present", "engineer_brief_present", "feature_registry_active"],
+    18	  "runtimeConsumersAllowed": true,
+    19	  "uiAllowed": true,
+    20	  "featureRegistryActivationAllowed": true,
+    21	  "algorithmsAllowed": true,
+    22	  "note": "R3.0D D5_ENGINEER_BRIEF_ACTIVATION state. engineer_brief_present unlocks renderer/js/r3-0d-engineer-brief.js + r3-0d-engineer-viewmodel.js + r3-0d-engineer-orchestrator.js + r3-0d-engineer-ui.js + i18n-r3-0d.js as authorized production paths. feature_registry_active is enabled: feature-registry.js NOW carries NAV_NODE 'case:engineer_brief' + FEATURE 'engineer_brief' (case_scoped, available_conditional). uiAllowed + featureRegistryActivationAllowed transition to true — both scoped to the engineer_brief feature only. R3.0E (E1..E5) and R3.0F remain FORBIDDEN. R3.0B portable schema + R3.0C contracts/production untouched. Mutating any state field above D5 requires R3.0E E1_EXPERIMENT_CONTRACTS authorization, which itself requires D5_ENGINEER_BRIEF_ACTIVATION to be the current checkpoint AND R3.0C state.currentCheckpoint === 'C8_ACTIVATION' per cross-phase rule. The D3+D4 producer-attestation chain (closure-private WeakSet identity attestation, captured Reflect.apply on captured WeakSet.prototype methods) extends to D5 via PE.verifyAuthoritativePrioritySet + EB.verifyAuthoritativeEngineerBrief + VM.verifyAuthoritativeEngineerViewModel."
+    23	}
+
+exec
+/bin/bash -lc "nl -ba renderer/js/r3-0d-engineer-brief.js | sed -n '284,680p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+   284	   * buildEngineerBrief({hypothesisSet, prioritySet}, opts) — produces a deep-frozen
+   285	   * EngineerBrief envelope.
+   286	   *
+   287	   * Authority order (matches D4 R5-01 verifier-first ordering):
+   288	   *   1. Snapshot input descriptors (no [[Get]] reads of inner fields yet)
+   289	   *   2. HE.verifyAuthoritativeHypothesisSet(hypothesisSet) — FIRST authority gate
+   290	   *   3. PE.verifyAuthoritativePrioritySet(prioritySet) — SECOND authority gate
+   291	   *   4. Cross-binding: prioritySet.sourceHypothesisSetId === hypothesisSet.hypothesisSetId
+   292	   *   5. Identity bindings: caseAssociation + sessionAssociation match
+   293	   *   6. Snapshot opts descriptors
+   294	   *   7. Resolve freshness reference time (clock invoked AT MOST ONCE post-authority)
+   295	   *   8. Freshness check
+   296	   *   9. Compose brief (re-projection of D3 + D4 fields; contradictions visible)
+   297	   *   10. Validate brief shape via EBC.validateEngineerBriefShape (D1 contract layer)
+   298	   *   11. Build activation gate signal
+   299	   *   12. Materialize + deep-freeze + register
+   300	   */
+   301	  function buildEngineerBrief(inputIn, optsIn) {
+   302	    try {
+   303	      if (!_intrinsicsIntact()) {
+   304	        return _buildIntrinsicTamperBlock('intrinsic-tampering detected at entry');
+   305	      }
+   306	
+   307	      // ---- Step 1 — input descriptor snapshot --------------------------------------------------
+   308	      var inSnapR = _snapshotInputDescriptors(inputIn);
+   309	      if (inSnapR.valid !== true) {
+   310	        return RC.buildBlockedResult(inSnapR.reasonCodes, { detail: inSnapR.detail });
+   311	      }
+   312	      var inputSnap = inSnapR.snapshot;
+   313	
+   314	      // ---- Step 2 — D3 PRODUCER AUTHORITY (first read) -----------------------------------------
+   315	      // D4 R5-01 closure: verifier MUST be the first read on caller-supplied data. The verifier
+   316	      // itself does NOT fire Proxy traps for non-members (WeakSet.has via captured Reflect.apply).
+   317	      if (typeof HE.verifyAuthoritativeHypothesisSet !== 'function'
+   318	          || HE.verifyAuthoritativeHypothesisSet(inputSnap.hypothesisSet) !== true) {
+   319	        return RC.buildBlockedResult([CODES.HYPOTHESIS_AUTHORITY_FORGED], { detail: 'D3 hypothesisSet authority verification failed' });
+   320	      }
+   321	      var hs = inputSnap.hypothesisSet;
+   322	
+   323	      // ---- Step 3 — D4 PRODUCER AUTHORITY ------------------------------------------------------
+   324	      if (typeof PE.verifyAuthoritativePrioritySet !== 'function'
+   325	          || PE.verifyAuthoritativePrioritySet(inputSnap.prioritySet) !== true) {
+   326	        return RC.buildBlockedResult([CODES.HYPOTHESIS_AUTHORITY_FORGED], { detail: 'D4 prioritySet authority verification failed' });
+   327	      }
+   328	      var ps = inputSnap.prioritySet;
+   329	
+   330	      // ---- Step 4 — cross-binding --------------------------------------------------------------
+   331	      // The D4 PrioritySet MUST have been derived from THIS D3 HypothesisSet.
+   332	      if (ps.sourceHypothesisSetId !== hs.hypothesisSetId) {
+   333	        return RC.buildBlockedResult([CODES.HYPOTHESIS_AUTHORITY_FORGED], { detail: 'prioritySet not derived from this hypothesisSet' });
+   334	      }
+   335	      if (ps.sourceGraphId !== hs.sourceGraphId) {
+   336	        return RC.buildBlockedResult([CODES.HYPOTHESIS_AUTHORITY_FORGED], { detail: 'sourceGraphId mismatch between D3 and D4' });
+   337	      }
+   338	
+   339	      // ---- Step 5 — identity binding -----------------------------------------------------------
+   340	      var hsCA = hs.caseAssociation;
+   341	      var psCA = ps.caseAssociation;
+   342	      if (!_isPlainObject(hsCA) || !_isPlainObject(psCA)) {
+   343	        return RC.buildBlockedResult([CODES.SOURCE_IDENTITY_INVALID], { detail: 'caseAssociation shape invalid' });
+   344	      }
+   345	      if (hsCA.caseId !== psCA.caseId || hsCA.sessionId !== psCA.sessionId || hsCA.lapId !== psCA.lapId) {
+   346	        return RC.buildBlockedResult([CODES.SOURCE_IDENTITY_INVALID], { detail: 'caseAssociation mismatch between D3 and D4' });
+   347	      }
+   348	      var hsSA = hs.sessionAssociation;
+   349	      var psSA = ps.sessionAssociation;
+   350	      if (!_isPlainObject(hsSA) || !_isPlainObject(psSA)
+   351	          || hsSA.sessionId !== psSA.sessionId) {
+   352	        return RC.buildBlockedResult([CODES.SOURCE_IDENTITY_INVALID], { detail: 'sessionAssociation mismatch between D3 and D4' });
+   353	      }
+   354	
+   355	      // ---- Step 6 — opts descriptor snapshot ---------------------------------------------------
+   356	      var optsSnapR = _snapshotOptsDescriptors(optsIn);
+   357	      if (optsSnapR.valid !== true) {
+   358	        return RC.buildBlockedResult(optsSnapR.reasonCodes, { detail: optsSnapR.detail });
+   359	      }
+   360	      var optsSnap = optsSnapR.snapshot;
+   361	
+   362	      // ---- Step 7 — resolve freshness reference time (clock at most once, post-authority) -----
+   363	      var refNowMs = null;
+   364	      var resolvedClockIso = null;
+   365	      if (typeof optsSnap.referenceNowMs === 'number' && HI.safeNumberIsInteger(optsSnap.referenceNowMs) && optsSnap.referenceNowMs >= 0) {
+   366	        refNowMs = optsSnap.referenceNowMs;
+   367	      } else if (typeof optsSnap.clock === 'function') {
+   368	        var clockIso = null;
+   369	        try { clockIso = optsSnap.clock(); } catch (eClock) { clockIso = null; }
+   370	        if (typeof clockIso === 'string' && clockIso.length > 0) {
+   371	          refNowMs = _isoToMs(clockIso);
+   372	          if (typeof refNowMs === 'number') resolvedClockIso = clockIso;
+   373	        }
+   374	      }
+   375	      if (typeof refNowMs !== 'number' || refNowMs !== refNowMs) {
+   376	        return RC.buildBlockedResult([CODES.FRESHNESS_REFERENCE_MISSING], { detail: 'unable to resolve reference time' });
+   377	      }
+   378	      var maxAgeMs = (typeof optsSnap.maxAgeMs === 'number') ? optsSnap.maxAgeMs : DEFAULT_MAX_AGE_MS;
+   379	
+   380	      // ---- Step 8 — freshness check (uses hs.createdAt + ps.createdAt) ------------------------
+   381	      var hsCreatedMs = (typeof hs.createdAt === 'string') ? _isoToMs(hs.createdAt) : null;
+   382	      var psCreatedMs = (typeof ps.createdAt === 'string') ? _isoToMs(ps.createdAt) : null;
+   383	      if (hsCreatedMs !== null && (refNowMs - hsCreatedMs) > maxAgeMs) {
+   384	        return RC.buildBlockedResult([CODES.STALE_EVIDENCE], { detail: 'hypothesisSet exceeds max age' });
+   385	      }
+   386	      if (psCreatedMs !== null && (refNowMs - psCreatedMs) > maxAgeMs) {
+   387	        return RC.buildBlockedResult([CODES.STALE_EVIDENCE], { detail: 'prioritySet exceeds max age' });
+   388	      }
+   389	
+   390	      // ---- Step 9 — compose brief --------------------------------------------------------------
+   391	      // Find primary priority (by primaryActionId).
+   392	      var primaryAction = null;
+   393	      var secondaryAction = null;
+   394	      if (typeof ps.primaryActionId === 'string') {
+   395	        for (var pi = 0; pi < ps.priorities.length; pi++) {
+   396	          if (ps.priorities[pi].priorityId === ps.primaryActionId) { primaryAction = ps.priorities[pi]; break; }
+   397	        }
+   398	      }
+   399	      if (primaryAction !== null) {
+   400	        for (var si = 0; si < ps.priorities.length; si++) {
+   401	          var sp = ps.priorities[si];
+   402	          if (sp.priorityId === primaryAction.priorityId) continue;
+   403	          if (HI.safeArrayIndexOf(sp.blockingPrerequisiteIds || [], primaryAction.priorityId) !== -1) continue;
+   404	          if (sp.eligibleAsPrimary !== true) continue;
+   405	          secondaryAction = sp;
+   406	          break;
+   407	        }
+   408	      }
+   409	      // Build brief envelope. Note: the engineer-brief-contract requires:
+   410	      //   briefId, identity, primaryIssueI18nKey, primaryIssueParams,
+   411	      //   secondaryIssueI18nKey, secondaryIssueParams, evidenceSummary, contradictions,
+   412	      //   alternativeExplanations, cannotConcludeReasonCodes, nextValidationAction,
+   413	      //   driverExperimentI18nKey, setupExperimentI18nKey, confidence, credibility,
+   414	      //   provenance, limitations, schemaVersion.
+   415	      // D5 also adds (in a SEPARATE D5-internal extension envelope, NOT inside the
+   416	      // engineer-brief-contract-validated `brief` field): sourcePrioritySetId,
+   417	      // sourceHypothesisSetId, activation gate, createdAt, schemaVersion.
+   418	      var hypById = HI.safeObjectCreateNull();
+   419	      for (var hi = 0; hi < hs.hypotheses.length; hi++) {
+   420	        HI.safeDefineDataProperty(hypById, hs.hypotheses[hi].hypothesisId, hs.hypotheses[hi]);
+   421	      }
+   422	      var primaryHyp = primaryAction !== null ? hypById[primaryAction.hypothesisId] : null;
+   423	      var secondaryHyp = secondaryAction !== null ? hypById[secondaryAction.hypothesisId] : null;
+   424	
+   425	      // Compose evidenceSummary from union of supporting + contradicting nodeIds across all
+   426	      // hypotheses (deduped, capped). Use stable order based on D3 emission order.
+   427	      var evidenceSummary = [];
+   428	      var evSeen = HI.safeObjectCreateNull();
+   429	      for (var hh = 0; hh < hs.hypotheses.length && evidenceSummary.length < ARRAY_CAP; hh++) {
+   430	        var hp = hs.hypotheses[hh];
+   431	        var supEv = (hp.supportingEvidenceIds && hp.supportingEvidenceIds.length) ? hp.supportingEvidenceIds : [];
+   432	        for (var ei2 = 0; ei2 < supEv.length && evidenceSummary.length < ARRAY_CAP; ei2++) {
+   433	          var nid = supEv[ei2];
+   434	          if (HI.safeHasOwn(evSeen, nid)) continue;
+   435	          HI.safeDefineDataProperty(evSeen, nid, true);
+   436	          HI.safeArrayPush(evidenceSummary, HI.deepFreeze({
+   437	            nodeId: nid,
+   438	            i18nKey: 'r3.0d.evidence.supporting',
+   439	            params: HI.deepFreeze({ hypothesisId: hp.hypothesisId }),
+   440	          }));
+   441	        }
+   442	      }
+   443	
+   444	      // Compose contradictions array (visible per directive §10 / engineer-brief-contract).
+   445	      var contradictions = [];
+   446	      for (var hh2 = 0; hh2 < hs.hypotheses.length && contradictions.length < ARRAY_CAP; hh2++) {
+   447	        var hp2 = hs.hypotheses[hh2];
+   448	        if (hp2.status !== 'contradicted' || !hp2.contradictingEvidenceIds || hp2.contradictingEvidenceIds.length === 0) continue;
+   449	        HI.safeArrayPush(contradictions, HI.deepFreeze({
+   450	          hypothesisId: hp2.hypothesisId,
+   451	          contradictingEvidenceIds: HI.deepFreeze(HI.safeArraySlice(hp2.contradictingEvidenceIds)),
+   452	          i18nKey: hp2.i18nKey,
+   453	          params: HI.deepFreeze({ category: hp2.category }),
+   454	        }));
+   455	      }
+   456	
+   457	      // Compose alternativeExplanations (union of all hypotheses' alternativeExplanationIds, deduped).
+   458	      var alternativeExplanations = [];
+   459	      var altSeen = HI.safeObjectCreateNull();
+   460	      for (var hh3 = 0; hh3 < hs.hypotheses.length && alternativeExplanations.length < ARRAY_CAP; hh3++) {
+   461	        var hp3 = hs.hypotheses[hh3];
+   462	        var altIds = hp3.alternativeExplanationIds ? hp3.alternativeExplanationIds : [];
+   463	        for (var ai2 = 0; ai2 < altIds.length && alternativeExplanations.length < ARRAY_CAP; ai2++) {
+   464	          var aid = altIds[ai2];
+   465	          if (HI.safeHasOwn(altSeen, aid)) continue;
+   466	          HI.safeDefineDataProperty(altSeen, aid, true);
+   467	          HI.safeArrayPush(alternativeExplanations, HI.deepFreeze({
+   468	            alternativeId: aid,
+   469	            i18nKey: 'r3.0d.alternative.' + aid,
+   470	            params: HI.deepFreeze({ originHypothesisId: hp3.hypothesisId }),
+   471	          }));
+   472	        }
+   473	      }
+   474	
+   475	      // cannotConcludeReasonCodes (union across hypotheses; deduped).
+   476	      var cannotConcludeReasonCodes = [];
+   477	      var ccSeen = HI.safeObjectCreateNull();
+   478	      for (var hh4 = 0; hh4 < hs.hypotheses.length && cannotConcludeReasonCodes.length < ARRAY_CAP; hh4++) {
+   479	        var hp4 = hs.hypotheses[hh4];
+   480	        var ccs = hp4.cannotConcludeReasonCodes ? hp4.cannotConcludeReasonCodes : [];
+   481	        for (var cci = 0; cci < ccs.length && cannotConcludeReasonCodes.length < ARRAY_CAP; cci++) {
+   482	          var ccode = ccs[cci];
+   483	          if (HI.safeHasOwn(ccSeen, ccode)) continue;
+   484	          if (!RC.isReasonCode(ccode)) continue;
+   485	          HI.safeDefineDataProperty(ccSeen, ccode, true);
+   486	          HI.safeArrayPush(cannotConcludeReasonCodes, ccode);
+   487	        }
+   488	      }
+   489	
+   490	      // limitations — union of hs.limitations + every hypothesis's limitations.
+   491	      var limitations = [];
+   492	      var limSeen = HI.safeObjectCreateNull();
+   493	      function _addLim(list) {
+   494	        if (!_isPlainArray(list)) return;
+   495	        for (var li2 = 0; li2 < list.length && limitations.length < ARRAY_CAP; li2++) {
+   496	          var lc = list[li2];
+   497	          if (HI.safeHasOwn(limSeen, lc)) continue;
+   498	          if (!RC.isReasonCode(lc)) continue;
+   499	          HI.safeDefineDataProperty(limSeen, lc, true);
+   500	          HI.safeArrayPush(limitations, lc);
+   501	        }
+   502	      }
+   503	      _addLim(hs.limitations);
+   504	      for (var hh5 = 0; hh5 < hs.hypotheses.length && limitations.length < ARRAY_CAP; hh5++) {
+   505	        _addLim(hs.hypotheses[hh5].limitations);
+   506	      }
+   507	
+   508	      // nextValidationAction — FIRST validationActionIds from primary hypothesis (if any).
+   509	      var nextValidationAction = null;
+   510	      if (primaryHyp !== null && primaryHyp.validationActionIds && primaryHyp.validationActionIds.length > 0) {
+   511	        nextValidationAction = HI.deepFreeze({
+   512	          actionId: primaryHyp.validationActionIds[0],
+   513	          kind: primaryAction !== null ? primaryAction.kind : 'no_action_required',
+   514	          i18nKey: 'r3.0d.action.' + primaryHyp.validationActionIds[0],
+   515	        });
+   516	      }
+   517	
+   518	      // setupExperimentI18nKey — only if a setup_experiment priority is eligibleAsPrimary
+   519	      // (per directive §10 "unsupported setup actions" forbidden).
+   520	      var setupExperimentI18nKey = null;
+   521	      for (var spi = 0; spi < ps.priorities.length; spi++) {
+   522	        var pp = ps.priorities[spi];
+   523	        if (pp.kind === 'setup_experiment' && pp.eligibleAsPrimary === true) {
+   524	          setupExperimentI18nKey = 'r3.0d.action.setup_experiment.' + pp.priorityId;
+   525	          break;
+   526	        }
+   527	      }
+   528	      var driverExperimentI18nKey = null;
+   529	      for (var dpi = 0; dpi < ps.priorities.length; dpi++) {
+   530	        var dp = ps.priorities[dpi];
+   531	        if (dp.kind === 'driver_experiment' && dp.eligibleAsPrimary === true) {
+   532	          driverExperimentI18nKey = 'r3.0d.action.driver_experiment.' + dp.priorityId;
+   533	          break;
+   534	        }
+   535	      }
+   536	
+   537	      // confidence — D1 contract: { state: 'unresolved' | 'not_computed' } at the brief layer.
+   538	      // D5 does NOT echo D3's quantitative confidence into the brief layer (per contract).
+   539	      // The D3-internal numeric score lives in the hypothesisSet only.
+   540	      var briefConfidence = HI.deepFreeze({ state: 'not_computed' });
+   541	      // credibility — primary hypothesis's credibility from CONCLUSION_CREDIBILITY ladder
+   542	      // ('Physics' / 'Model' / 'Measured' / 'Derived' / 'Heuristic' / 'Unavailable').
+   543	      // D3 emits one of these per hypothesis via _aggregateCredibility; downgrade to
+   544	      // 'Heuristic' when no primary.
+   545	      var briefCredibility = (primaryHyp !== null && primaryHyp.credibility)
+   546	        ? primaryHyp.credibility
+   547	        : 'Heuristic';
+   548	      // provenance — D5 does NOT echo D3's hypothesis.provenance (which is an OBJECT containing
+   549	      // ruleId/ruleVersion/etc — NOT a PROVENANCE enum value). The brief PROVENANCE enum
+   550	      // (mirrors R3.0B/R3.0C) is {'synthetic','real','unverified'}. D5 is conservative: it
+   551	      // does NOT make a real/synthetic claim about evidence sources at this layer (the source
+   552	      // signal is consumed by D2 evidence nodes individually and aggregated into hypotheses).
+   553	      // 'unverified' is the safe default — orchestrator/UI layer can attach a derived label
+   554	      // based on case-record provenance (which D5 does not have authority over).
+   555	      var briefProvenance = 'unverified';
+   556	
+   557	      var briefIdStr = _briefId(hs.hypothesisSetId, ps.prioritySetId);
+   558	
+   559	      // SOURCE_IDENTITY_KEYS = ['caseId','sessionId','lapId','sourceId','sourceVersion','freshness']
+   560	      // — NO schemaVersion key. Producer attestation lives on the envelope, not on identity.
+   561	      var briefIdentity = HI.deepFreeze({
+   562	        sourceId: 'r3_0d_engineer_brief',
+   563	        sourceVersion: SERVICE_VERSION + '.0',
+   564	        caseId: hsCA.caseId,
+   565	        sessionId: hsCA.sessionId,
+   566	        lapId: hsCA.lapId,
+   567	        freshness: (typeof hs.createdAt === 'string') ? hs.createdAt : (resolvedClockIso || ''),
+   568	      });
+   569	
+   570	      // The contract-validated `brief` object — closed key set per engineer-brief-contract.
+   571	      // HI.deepFreeze used for the outer wrapper (ambient Object.freeze ban per directive §9);
+   572	      // all nested arrays/objects are already individually deep-frozen above.
+   573	      var brief = HI.deepFreeze({
+   574	        briefId: briefIdStr,
+   575	        identity: briefIdentity,
+   576	        primaryIssueI18nKey: primaryHyp !== null ? primaryHyp.i18nKey : 'r3.0d.brief.no_primary_action',
+   577	        primaryIssueParams: HI.deepFreeze({
+   578	          hypothesisId: primaryHyp !== null ? primaryHyp.hypothesisId : '',
+   579	          priorityId: primaryAction !== null ? primaryAction.priorityId : '',
+   580	        }),
+   581	        secondaryIssueI18nKey: secondaryHyp !== null ? secondaryHyp.i18nKey : null,
+   582	        secondaryIssueParams: secondaryHyp !== null ? HI.deepFreeze({
+   583	          hypothesisId: secondaryHyp.hypothesisId,
+   584	          priorityId: secondaryAction.priorityId,
+   585	        }) : null,
+   586	        evidenceSummary: HI.deepFreeze(evidenceSummary),
+   587	        contradictions: HI.deepFreeze(contradictions),
+   588	        alternativeExplanations: HI.deepFreeze(alternativeExplanations),
+   589	        cannotConcludeReasonCodes: HI.deepFreeze(cannotConcludeReasonCodes),
+   590	        nextValidationAction: nextValidationAction,
+   591	        driverExperimentI18nKey: driverExperimentI18nKey,
+   592	        setupExperimentI18nKey: setupExperimentI18nKey,
+   593	        confidence: briefConfidence,
+   594	        credibility: briefCredibility,
+   595	        provenance: briefProvenance,
+   596	        limitations: HI.deepFreeze(limitations),
+   597	        schemaVersion: 1,
+   598	      });
+   599	
+   600	      // ---- Step 10 — validate brief shape via D1 engineer-brief-contract ----------------------
+   601	      var briefCheck = EBC.validateEngineerBriefShape(brief);
+   602	      if (briefCheck.valid !== true) {
+   603	        return RC.buildBlockedResult(
+   604	          briefCheck.reasonCodes ? HI.safeArraySlice(briefCheck.reasonCodes) : [CODES.BRIEF_INVALID],
+   605	          { detail: 'engineer-brief-contract validation failed' }
+   606	        );
+   607	      }
+   608	
+   609	      // ---- Step 11 — activation gate signal ---------------------------------------------------
+   610	      // D5 EXPOSES the gating signal as a derived boolean. The UI host wiring code (separate
+   611	      // module / index.html script wiring) consumes this to decide whether to mount the
+   612	      // R3.0D UI shell. D5 does NOT touch feature-registry.js or state.json from inside this
+   613	      // module — the gate is declarative.
+   614	      // Ambient Array.prototype.every ban (§9) — use a captured for-loop.
+   615	      var allHypothesesContradicted = false;
+   616	      if (hs.hypotheses.length > 0) {
+   617	        allHypothesesContradicted = true;
+   618	        for (var hac = 0; hac < hs.hypotheses.length; hac++) {
+   619	          if (hs.hypotheses[hac].status !== 'contradicted') { allHypothesesContradicted = false; break; }
+   620	        }
+   621	      }
+   622	      var uiCapabilityReady = primaryAction !== null
+   623	        && primaryHyp !== null
+   624	        && primaryHyp.status !== 'contradicted'
+   625	        && primaryHyp.status !== 'blocked'
+   626	        && primaryAction.eligibleAsPrimary === true
+   627	        && !allHypothesesContradicted;
+   628	      var deferredCapabilities = [];
+   629	      if (!uiCapabilityReady) HI.safeArrayPush(deferredCapabilities, 'engineer_brief_present');
+   630	      if (limitations.length > 0) HI.safeArrayPush(deferredCapabilities, 'feature_registry_active');
+   631	      var activation = HI.deepFreeze({
+   632	        uiCapabilityReady: uiCapabilityReady,
+   633	        featureRegistryActivationAllowed: uiCapabilityReady && limitations.length === 0,
+   634	        deferredCapabilities: HI.deepFreeze(deferredCapabilities),
+   635	        rationaleI18nKey: uiCapabilityReady
+   636	          ? 'r3.0d.activation.ready'
+   637	          : 'r3.0d.activation.deferred',
+   638	        rationaleParams: HI.deepFreeze({
+   639	          contradictionsCount: contradictions.length,
+   640	          limitationsCount: limitations.length,
+   641	        }),
+   642	      });
+   643	
+   644	      // ---- Step 12 — materialize envelope -----------------------------------------------------
+   645	      var envelope = HI.deepFreeze({
+   646	        schemaVersion: BRIEF_SCHEMA_VERSION,
+   647	        briefId: briefIdStr,
+   648	        sourceHypothesisSetId: hs.hypothesisSetId,
+   649	        sourcePrioritySetId: ps.prioritySetId,
+   650	        brief: brief,
+   651	        activation: activation,
+   652	        createdAt: resolvedClockIso || (typeof hs.createdAt === 'string' ? hs.createdAt : ''),
+   653	      });
+   654	
+   655	      // Envelope byte cap
+   656	      var finalEnvBytes;
+   657	      try { finalEnvBytes = _byteLength(HI.stableStringify(envelope)); }
+   658	      catch (eBytes) { finalEnvBytes = Infinity; }
+   659	      if (finalEnvBytes > ENVELOPE_BYTE_CAP) {
+   660	        return RC.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'final envelope ' + finalEnvBytes + ' bytes exceeds ' + ENVELOPE_BYTE_CAP });
+   661	      }
+   662	
+   663	      if (!_intrinsicsIntact()) {
+   664	        return _buildIntrinsicTamperBlock('intrinsic-tampering detected post-freeze');
+   665	      }
+   666	
+   667	      // Register the envelope as D5-authoritative for downstream consumers.
+   668	      _registerAuthoritativeEngineerBrief(envelope);
+   669	
+   670	      return HI.deepFreeze({ valid: true, engineerBrief: envelope });
+   671	
+   672	    } catch (eOuter) {
+   673	      return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'buildEngineerBrief threw on hostile input' });
+   674	    }
+   675	  }
+   676	
+   677	  // ---------- Public API ------------------------------------------------------------------------
+   678	  var api = {
+   679	    SERVICE_VERSION: SERVICE_VERSION,
+   680	    BRIEF_SCHEMA_VERSION: BRIEF_SCHEMA_VERSION,
+
+exec
+/bin/bash -lc 'rg -n "generationToken|gen_|stale|older|replay|currentToken|generation_token_changed" tests/r3.0d-engineer-viewmodel.test.js renderer/js/r3-0d-engineer-orchestrator.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+tests/r3.0d-engineer-viewmodel.test.js:7: *   C) ViewModel — display state derivation (available / inconclusive / blocked / stale)
+tests/r3.0d-engineer-viewmodel.test.js:12: *   H) Orchestrator — generation token & stale-async drop
+tests/r3.0d-engineer-viewmodel.test.js:147:  // C3 — explicit displayHint 'stale-cleared'
+tests/r3.0d-engineer-viewmodel.test.js:148:  var rS = VM.buildEngineerViewModel(fix.eb, { displayHint: 'stale-cleared' });
+tests/r3.0d-engineer-viewmodel.test.js:149:  chk('C3: stale-cleared hint accepted', rS.valid === true && rS.viewModel.displayState === 'stale-cleared');
+tests/r3.0d-engineer-viewmodel.test.js:236:    generationToken: 'gen_001',
+tests/r3.0d-engineer-viewmodel.test.js:241:  chk('G4: currentState().generationToken === input token',
+tests/r3.0d-engineer-viewmodel.test.js:242:    ORC.currentState().generationToken === 'gen_001');
+tests/r3.0d-engineer-viewmodel.test.js:250:// Section H — Generation token & stale-async drop
+tests/r3.0d-engineer-viewmodel.test.js:252:console.log('Section H — Generation token & stale-async drop');
+tests/r3.0d-engineer-viewmodel.test.js:256:  var r1 = ORC.prepareEngineerInsight({ hypothesisSet: fix1.hs, prioritySet: fix1.ps, generationToken: 'gen_001' }, _opts());
+tests/r3.0d-engineer-viewmodel.test.js:259:  // Invalidate then attempt another prepare with stale token
+tests/r3.0d-engineer-viewmodel.test.js:261:  chk('H2: after invalidate currentState reflects stale-cleared',
+tests/r3.0d-engineer-viewmodel.test.js:262:    ORC.currentState().displayState === 'stale-cleared');
+tests/r3.0d-engineer-viewmodel.test.js:265:  var r2 = ORC.prepareEngineerInsight({ hypothesisSet: fix1.hs, prioritySet: fix1.ps, generationToken: 'gen_002' }, _opts());
+tests/r3.0d-engineer-viewmodel.test.js:267:  chk('H4: currentState token reflects gen_002', ORC.currentState().generationToken === 'gen_002');
+tests/r3.0d-engineer-viewmodel.test.js:279:    ORC.prepareEngineerInsight({ hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_' + i }, _opts());
+tests/r3.0d-engineer-viewmodel.test.js:282:    chk('I.' + reasons[i] + ': currentState displayState === "stale-cleared"',
+tests/r3.0d-engineer-viewmodel.test.js:283:      snap !== null && snap.displayState === 'stale-cleared');
+tests/r3.0d-engineer-viewmodel.test.js:296:  ORC.prepareEngineerInsight({ hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_J1' }, _opts());
+tests/r3.0d-engineer-viewmodel.test.js:299:  chk('J2: subscriber notified on invalidate', calls.length === 2 && calls[1] === 'stale-cleared');
+tests/r3.0d-engineer-viewmodel.test.js:311:  ORC.prepareEngineerInsight({ hypothesisSet: fix2.hs, prioritySet: fix2.ps, generationToken: 'gen_J4' }, _opts());
+tests/r3.0d-engineer-viewmodel.test.js:321:  // K1 — missing generationToken
+tests/r3.0d-engineer-viewmodel.test.js:324:  chk('K1: missing generationToken → blocked', r1.valid === false);
+tests/r3.0d-engineer-viewmodel.test.js:326:  // K2 — non-string generationToken
+tests/r3.0d-engineer-viewmodel.test.js:327:  var r2 = ORC.prepareEngineerInsight({ hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 42 }, _opts());
+tests/r3.0d-engineer-viewmodel.test.js:328:  chk('K2: non-string generationToken rejected', r2.valid === false);
+tests/r3.0d-engineer-viewmodel.test.js:331:  var r3 = ORC.prepareEngineerInsight({ hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'g', hostile: 'x' }, _opts());
+tests/r3.0d-engineer-viewmodel.test.js:339:  var rF = ORC.prepareEngineerInsight({ hypothesisSet: {}, prioritySet: fix.ps, generationToken: 'g' }, _opts());
+tests/r3.0d-engineer-viewmodel.test.js:350:  ORC.prepareEngineerInsight({ hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_L1' }, _opts());
+tests/r3.0d-engineer-viewmodel.test.js:365:// M1 — D5-R1-01 closure: bump _internalSeq at entry to prepareEngineerInsight so a stale
+tests/r3.0d-engineer-viewmodel.test.js:367:// fires invalidate as a side-effect mid-build (simulating a stale async path returning after
+tests/r3.0d-engineer-viewmodel.test.js:387:    generationToken: 'gen_stale_test',
+tests/r3.0d-engineer-viewmodel.test.js:390:  chk('M1a: stale prepare result is dropped (does NOT publish over invalidate)',
+tests/r3.0d-engineer-viewmodel.test.js:391:    r.valid === false && r.displayState === 'stale-cleared');
+tests/r3.0d-engineer-viewmodel.test.js:392:  // The orchestrator should reflect the invalidate's stale-cleared state, not the prepare's
+tests/r3.0d-engineer-viewmodel.test.js:393:  // partial result. currentState() must show stale-cleared, not 'available'/'inconclusive'.
+tests/r3.0d-engineer-viewmodel.test.js:395:  chk('M1b: after stale drop, currentState.displayState === stale-cleared',
+tests/r3.0d-engineer-viewmodel.test.js:396:    snap !== null && snap.displayState === 'stale-cleared');
+tests/r3.0d-engineer-viewmodel.test.js:408:    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_M2_first',
+tests/r3.0d-engineer-viewmodel.test.js:411:    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_M2_second',
+tests/r3.0d-engineer-viewmodel.test.js:414:  chk('M2b: second prepare publishes (does not stale-drop the legitimate replay)',
+tests/r3.0d-engineer-viewmodel.test.js:417:    ORC.currentState().generationToken === 'gen_M2_second');
+renderer/js/r3-0d-engineer-orchestrator.js:5: *   • prepareEngineerInsight({ hypothesisSet, prioritySet, generationToken }, opts)
+renderer/js/r3-0d-engineer-orchestrator.js:22: *   • Error handling (directive §12.2): blocked / forged / stale inputs surface as
+renderer/js/r3-0d-engineer-orchestrator.js:23: *     sanitized error states with displayState ∈ {'unavailable','blocked','stale-cleared',
+renderer/js/r3-0d-engineer-orchestrator.js:71:    'generation_token_changed',
+renderer/js/r3-0d-engineer-orchestrator.js:81:  var _currentToken = null;      // Active generation token (string or null)
+renderer/js/r3-0d-engineer-orchestrator.js:83:  var _internalSeq = 0;          // Monotonic counter — prevents stale async callbacks
+renderer/js/r3-0d-engineer-orchestrator.js:107:  function _buildSubscriberSnapshot(viewModelResult, association, generationToken) {
+renderer/js/r3-0d-engineer-orchestrator.js:116:      generationToken: typeof generationToken === 'string' ? generationToken : null,
+renderer/js/r3-0d-engineer-orchestrator.js:133:   * prepareEngineerInsight({ hypothesisSet, prioritySet, generationToken }, opts) —
+renderer/js/r3-0d-engineer-orchestrator.js:142:    // concurrent / replayed / out-of-order prepare result whose seqAtEntry no longer matches
+renderer/js/r3-0d-engineer-orchestrator.js:156:    var allowedKeys = ['hypothesisSet', 'prioritySet', 'generationToken'];
+renderer/js/r3-0d-engineer-orchestrator.js:168:    var generationToken = inputIn.generationToken;
+renderer/js/r3-0d-engineer-orchestrator.js:170:    if (typeof generationToken !== 'string' || generationToken.length === 0) {
+renderer/js/r3-0d-engineer-orchestrator.js:185:      _maybePublishBlocked(blockedEb, _associationFromInputs(hypothesisSet, prioritySet), generationToken, seqAtEntry);
+renderer/js/r3-0d-engineer-orchestrator.js:193:      _maybePublishBlocked(blockedVm, _associationFromInputs(hypothesisSet, prioritySet), generationToken, seqAtEntry);
+renderer/js/r3-0d-engineer-orchestrator.js:197:    // ---- Step 4 — staleness check ------------------------------------------------------------
+renderer/js/r3-0d-engineer-orchestrator.js:205:        viewModel: VM.buildBlockedViewModel('stale-cleared', [CODES.STALE_EVIDENCE]),
+renderer/js/r3-0d-engineer-orchestrator.js:206:        displayState: 'stale-cleared',
+renderer/js/r3-0d-engineer-orchestrator.js:213:    _currentToken = generationToken;
+renderer/js/r3-0d-engineer-orchestrator.js:220:    var snapshot = _buildSubscriberSnapshot(vmResult, _currentCase, generationToken);
+renderer/js/r3-0d-engineer-orchestrator.js:234:    return _buildSubscriberSnapshot(_currentViewModel, _currentCase, _currentToken);
+renderer/js/r3-0d-engineer-orchestrator.js:255:   * internal sequence so any in-flight stale callback is dropped. Notifies subscribers with
+renderer/js/r3-0d-engineer-orchestrator.js:256:   * a stale-cleared snapshot.
+renderer/js/r3-0d-engineer-orchestrator.js:266:    // invalidation), but keep a non-authoritative stale-cleared viewmodel so the UI shell
+renderer/js/r3-0d-engineer-orchestrator.js:269:    var staleVm = VM.buildBlockedViewModel('stale-cleared',
+renderer/js/r3-0d-engineer-orchestrator.js:271:    _currentViewModel = staleVm;
+renderer/js/r3-0d-engineer-orchestrator.js:272:    _currentToken = null;
+renderer/js/r3-0d-engineer-orchestrator.js:275:    var snap = _buildSubscriberSnapshot(staleVm, _currentCase, null);
+renderer/js/r3-0d-engineer-orchestrator.js:320:  function _maybePublishBlocked(blockedVm, association, generationToken, seqAtEntry) {
+renderer/js/r3-0d-engineer-orchestrator.js:330:    _currentToken = (typeof generationToken === 'string') ? generationToken : null;
+renderer/js/r3-0d-engineer-orchestrator.js:332:    var snap = _buildSubscriberSnapshot(blockedVm, association, _currentToken);
+renderer/js/r3-0d-engineer-orchestrator.js:344:    _currentToken = null;
+
+exec
+/bin/bash -lc "nl -ba renderer/js/r3-0d-engineer-viewmodel.js | sed -n '80,300p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+    80	  function _registerAuthoritativeViewModel(vm) {
+    81	    _wsAdd(_authoritativeViewModels, vm);
+    82	  }
+    83	  function verifyAuthoritativeEngineerViewModel(candidate) {
+    84	    try {
+    85	      if (candidate === null || typeof candidate !== 'object') return false;
+    86	      if (!_wsHas(_authoritativeViewModels, candidate)) return false;
+    87	      if (_CAPTURED_OBJECT_IS_FROZEN(candidate) !== true) return false;
+    88	      if (candidate.schemaVersion !== VIEWMODEL_SCHEMA_VERSION) return false;
+    89	      if (typeof candidate.viewModelId !== 'string') return false;
+    90	      if (typeof candidate.sourceBriefId !== 'string') return false;
+    91	      return true;
+    92	    } catch (e) { return false; }
+    93	  }
+    94	
+    95	  // ---------- Constants -------------------------------------------------------------------------
+    96	  var VIEWMODEL_SCHEMA_VERSION = 1;
+    97	  var SERVICE_VERSION = 1;
+    98	
+    99	  // Closed enum for displayState — UI templates switch on this.
+   100	  var DISPLAY_STATE_ALLOWED = HI.deepFreeze([
+   101	    'unavailable',
+   102	    'blocked',
+   103	    'loading',
+   104	    'available',
+   105	    'inconclusive',
+   106	    'stale-cleared',
+   107	    'error-sanitized',
+   108	  ]);
+   109	
+   110	  function _isPlainObject(v) {
+   111	    try {
+   112	      if (v === null || typeof v !== 'object') return false;
+   113	      return HI.safeIsPlainShape(v) === 'plain-object';
+   114	    } catch (e) { return false; }
+   115	  }
+   116	
+   117	  function _buildSanitizedError(displayState, reasonCodes) {
+   118	    var codes = HI.safeIsArray(reasonCodes) ? HI.safeArraySlice(reasonCodes) : [CODES.INTERNAL_CONTRACT_VIOLATION];
+   119	    return HI.deepFreeze({
+   120	      valid: false,
+   121	      displayState: displayState,
+   122	      reasonCodes: HI.deepFreeze(codes),
+   123	      // NEVER echo caller content / paths / private IDs. The renderer uses displayState +
+   124	      // reasonCodes to pick an i18n key.
+   125	      viewModel: null,
+   126	    });
+   127	  }
+   128	
+   129	  // ---------- Public API: buildEngineerViewModel ------------------------------------------------
+   130	  /**
+   131	   * buildEngineerViewModel(envelope, opts) — maps an authoritative D5 EngineerBrief envelope
+   132	   * into a deep-frozen, UI-safe viewModel.
+   133	   *
+   134	   * Authority order:
+   135	   *   1. EB.verifyAuthoritativeEngineerBrief(envelope) — FIRST read, identity-only.
+   136	   *   2. _isFrozenSafe(envelope.brief) — envelope must carry an already-frozen brief.
+   137	   *   3. Compose viewModel by re-projecting brief fields (NO recomputation).
+   138	   *   4. Deep-freeze + register.
+   139	   */
+   140	  function buildEngineerViewModel(envelopeIn, optsIn) {
+   141	    try {
+   142	      // ---- Step 1 — authority gate (verifier-first ordering) -------------------------------
+   143	      if (typeof EB.verifyAuthoritativeEngineerBrief !== 'function'
+   144	          || EB.verifyAuthoritativeEngineerBrief(envelopeIn) !== true) {
+   145	        return _buildSanitizedError('error-sanitized', [CODES.HYPOTHESIS_AUTHORITY_FORGED]);
+   146	      }
+   147	      var envelope = envelopeIn;
+   148	
+   149	      // ---- Step 2 — opts shape (only `displayHint` allowed) ---------------------------------
+   150	      // displayHint is OPTIONAL — orchestrator can pass 'loading' or 'stale-cleared' to
+   151	      // pre-empt the default 'available' / 'inconclusive' derivation.
+   152	      var displayHint = null;
+   153	      if (optsIn !== undefined && optsIn !== null) {
+   154	        if (!_isPlainObject(optsIn)) {
+   155	          return _buildSanitizedError('error-sanitized', [CODES.HYPOTHESIS_INVALID]);
+   156	        }
+   157	        var optKeys = HI.safeOwnKeys(optsIn);
+   158	        for (var i = 0; i < optKeys.length; i++) {
+   159	          if (optKeys[i] !== 'displayHint') {
+   160	            return _buildSanitizedError('error-sanitized', [CODES.UNKNOWN_OWN_KEY]);
+   161	          }
+   162	        }
+   163	        if (HI.safeHasOwn(optsIn, 'displayHint')) {
+   164	          var dh = optsIn.displayHint;
+   165	          if (typeof dh !== 'string' || HI.safeArrayIndexOf(DISPLAY_STATE_ALLOWED, dh) === -1) {
+   166	            return _buildSanitizedError('error-sanitized', [CODES.HYPOTHESIS_INVALID]);
+   167	          }
+   168	          displayHint = dh;
+   169	        }
+   170	      }
+   171	
+   172	      // ---- Step 3 — derive displayState ------------------------------------------------------
+   173	      var brief = envelope.brief;
+   174	      var activation = envelope.activation;
+   175	      var displayState;
+   176	      if (displayHint !== null) {
+   177	        displayState = displayHint;
+   178	      } else if (!activation.uiCapabilityReady) {
+   179	        // No primary action / all contradicted / primary blocked → inconclusive UI state.
+   180	        displayState = 'inconclusive';
+   181	      } else {
+   182	        displayState = 'available';
+   183	      }
+   184	
+   185	      // ---- Step 4 — derive viewModelId (deterministic from briefId + displayState) -----------
+   186	      var viewModelId = 'vm_' + envelope.briefId + '__' + displayState;
+   187	
+   188	      // ---- Step 5 — compose viewModel by RE-PROJECTION (NO recomputation) -------------------
+   189	      // Every field below is a faithful copy of a brief field. The ViewModel layer adds:
+   190	      //   - displayState enum
+   191	      //   - viewModelId
+   192	      //   - schemaVersion + serviceVersion for downstream consumers
+   193	      // NO confidence / credibility / priority is mutated.
+   194	      var viewModel = HI.deepFreeze({
+   195	        schemaVersion: VIEWMODEL_SCHEMA_VERSION,
+   196	        serviceVersion: SERVICE_VERSION,
+   197	        viewModelId: viewModelId,
+   198	        sourceBriefId: envelope.briefId,
+   199	        sourceHypothesisSetId: envelope.sourceHypothesisSetId,
+   200	        sourcePrioritySetId: envelope.sourcePrioritySetId,
+   201	        displayState: displayState,
+   202	        // Re-projected brief fields.
+   203	        identity: brief.identity,
+   204	        primaryIssue: HI.deepFreeze({
+   205	          i18nKey: brief.primaryIssueI18nKey,
+   206	          params: brief.primaryIssueParams,
+   207	        }),
+   208	        secondaryIssue: (brief.secondaryIssueI18nKey !== null && brief.secondaryIssueI18nKey !== undefined)
+   209	          ? HI.deepFreeze({
+   210	            i18nKey: brief.secondaryIssueI18nKey,
+   211	            params: brief.secondaryIssueParams,
+   212	          })
+   213	          : null,
+   214	        evidenceSummary: brief.evidenceSummary,
+   215	        contradictions: brief.contradictions,
+   216	        alternativeExplanations: brief.alternativeExplanations,
+   217	        cannotConcludeReasonCodes: brief.cannotConcludeReasonCodes,
+   218	        nextValidationAction: brief.nextValidationAction,
+   219	        driverExperiment: (brief.driverExperimentI18nKey !== null && brief.driverExperimentI18nKey !== undefined)
+   220	          ? HI.deepFreeze({ i18nKey: brief.driverExperimentI18nKey })
+   221	          : null,
+   222	        setupExperiment: (brief.setupExperimentI18nKey !== null && brief.setupExperimentI18nKey !== undefined)
+   223	          ? HI.deepFreeze({ i18nKey: brief.setupExperimentI18nKey })
+   224	          : null,
+   225	        confidence: brief.confidence,
+   226	        credibility: brief.credibility,
+   227	        provenance: brief.provenance,
+   228	        limitations: brief.limitations,
+   229	        // Activation gate carried through verbatim for the host wiring code.
+   230	        activation: activation,
+   231	      });
+   232	
+   233	      // ---- Step 6 — register + return --------------------------------------------------------
+   234	      _registerAuthoritativeViewModel(viewModel);
+   235	      return HI.deepFreeze({ valid: true, viewModel: viewModel });
+   236	
+   237	    } catch (eOuter) {
+   238	      return _buildSanitizedError('error-sanitized', [CODES.INTERNAL_CONTRACT_VIOLATION]);
+   239	    }
+   240	  }
+   241	
+   242	  /**
+   243	   * buildBlockedViewModel(reasonCodes, opts) — produce a deep-frozen blocked viewModel WITHOUT
+   244	   * an authoritative envelope. Used by the Orchestrator when the upstream D3/D4/D5 pipeline
+   245	   * returned a blocked result (e.g., authority verification failed, freshness exhausted).
+   246	   *
+   247	   * The blocked viewModel carries:
+   248	   *   - displayState: 'blocked' | 'unavailable' | 'stale-cleared'
+   249	   *   - reasonCodes (sanitized — no path / caller content)
+   250	   *   - schemaVersion + viewModelId for parity with the success path
+   251	   *
+   252	   * It is NOT registered in the authoritative WeakSet (the verifier returns false for blocked
+   253	   * viewModels). This lets downstream consumers reliably reject any "blocked" viewModel that
+   254	   * tries to masquerade as authoritative.
+   255	   */
+   256	  function buildBlockedViewModel(displayState, reasonCodes) {
+   257	    try {
+   258	      if (typeof displayState !== 'string'
+   259	          || HI.safeArrayIndexOf(DISPLAY_STATE_ALLOWED, displayState) === -1
+   260	          || displayState === 'available' || displayState === 'inconclusive') {
+   261	        // Cannot return success-like states from a blocked builder.
+   262	        return _buildSanitizedError('error-sanitized', [CODES.HYPOTHESIS_INVALID]);
+   263	      }
+   264	      var codes = HI.safeIsArray(reasonCodes) ? HI.safeArraySlice(reasonCodes) : [];
+   265	      var sanitized = [];
+   266	      for (var i = 0; i < codes.length; i++) {
+   267	        if (RC.isReasonCode(codes[i])) HI.safeArrayPush(sanitized, codes[i]);
+   268	      }
+   269	      var vm = HI.deepFreeze({
+   270	        valid: false,
+   271	        displayState: displayState,
+   272	        reasonCodes: HI.deepFreeze(sanitized),
+   273	        viewModel: null,
+   274	      });
+   275	      return vm;
+   276	    } catch (e) {
+   277	      return _buildSanitizedError('error-sanitized', [CODES.INTERNAL_CONTRACT_VIOLATION]);
+   278	    }
+   279	  }
+   280	
+   281	  // ---------- Public API ------------------------------------------------------------------------
+   282	  var api = {
+   283	    SERVICE_VERSION: SERVICE_VERSION,
+   284	    VIEWMODEL_SCHEMA_VERSION: VIEWMODEL_SCHEMA_VERSION,
+   285	    DISPLAY_STATE_ALLOWED: DISPLAY_STATE_ALLOWED,
+   286	    buildEngineerViewModel: buildEngineerViewModel,
+   287	    buildBlockedViewModel: buildBlockedViewModel,
+   288	    verifyAuthoritativeEngineerViewModel: verifyAuthoritativeEngineerViewModel,
+   289	  };
+   290	  try { HI.deepFreeze(api); } catch (e) { /* swallow */ }
+   291	  if (typeof module !== 'undefined' && module.exports) {
+   292	    module.exports = api;
+   293	  } else if (root) {
+   294	    root.R3_0D_EngineerViewModel = api;
+   295	  }
+   296	})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+exec
+/bin/bash -lc "nl -ba tests/r3.0d-engineer-viewmodel.test.js | sed -n '1,130p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+     1	/**
+     2	 * tests/r3.0d-engineer-viewmodel.test.js — R3.0D D5 · ViewModel + Orchestrator adversarial tests.
+     3	 *
+     4	 * Covers:
+     5	 *   A) ViewModel — functional re-projection from authoritative envelope
+     6	 *   B) ViewModel — authority gate (forged / cloned / structuredClone / JSON / null)
+     7	 *   C) ViewModel — display state derivation (available / inconclusive / blocked / stale)
+     8	 *   D) ViewModel — producer attestation (D5's own WeakSet)
+     9	 *   E) ViewModel — privacy (no path / no telemetry / no stack)
+    10	 *   F) ViewModel — closed key sets (opts shape)
+    11	 *   G) Orchestrator — pipeline (D3→D4→D5 → published snapshot)
+    12	 *   H) Orchestrator — generation token & stale-async drop
+    13	 *   I) Orchestrator — invalidate() across all 13 reasons
+    14	 *   J) Orchestrator — subscribe / unsubscribe / listener error isolation
+    15	 *   K) Orchestrator — sanitized errors
+    16	 *   L) Orchestrator — getCurrentAuthoritativeEnvelope leak protection
+    17	 */
+    18	'use strict';
+    19	
+    20	var fs = require('fs');
+    21	var EG = require('../renderer/js/r3-0d-evidence-graph.js');
+    22	var HE = require('../renderer/js/r3-0d-hypothesis-engine.js');
+    23	var PE = require('../renderer/js/r3-0d-priority-engine.js');
+    24	var EB = require('../renderer/js/r3-0d-engineer-brief.js');
+    25	var VM = require('../renderer/js/r3-0d-engineer-viewmodel.js');
+    26	var ORC = require('../renderer/js/r3-0d-engineer-orchestrator.js');
+    27	var RC = require('../contracts/r3.0d/reason-codes.js');
+    28	
+    29	var pass = 0, fail = 0;
+    30	function chk(msg, cond, detail) {
+    31	  if (cond) pass += 1;
+    32	  else { fail += 1; console.log('  FAIL ' + msg + (detail !== undefined ? '  ' + JSON.stringify(detail) : '')); }
+    33	}
+    34	
+    35	// ---------- Fixtures ---------------------------------------------------------------------
+    36	var BASE_CLOCK = function () { return '2026-06-29T01:00:00Z'; };
+    37	function _opts() { return { clock: BASE_CLOCK }; }
+    38	function _ca() { return { caseId: 'case_001', sessionId: 'sess_001', lapId: null }; }
+    39	function _baseIdentity() {
+    40	  return { caseId: 'case_001', sessionId: 'sess_001', lapId: null, sourceId: 'csv_v1', sourceVersion: '1.0', freshness: '2026-06-29T00:00:00Z' };
+    41	}
+    42	function _baseNode(overrides) {
+    43	  var n = {
+    44	    schemaVersion: 1, nodeId: 'n_default', category: 'data_quality',
+    45	    identity: _baseIdentity(), credibility: 'measured', provenance: 'real', availability: 'available',
+    46	    confidence: { state: 'not_computed' },
+    47	    observation: { kind: 'channel_missing', channel: 'brake', i18nKey: 'k', params: null },
+    48	    limitations: ['LIMITATION_MISSING_CHANNEL'], supportingEdges: [], contradictingEdges: [],
+    49	  };
+    50	  if (overrides) for (var k in overrides) n[k] = overrides[k];
+    51	  return n;
+    52	}
+    53	function _buildEnvelope(nodes) {
+    54	  var eg = EG.buildEvidenceGraph({ caseAssociation: _ca(), rawEvidence: nodes || [_baseNode({})] }, _opts());
+    55	  if (!eg.valid) throw new Error('eg failed');
+    56	  var hs = HE.buildHypothesisSet({ graph: eg.graph }, _opts());
+    57	  if (!hs.valid) throw new Error('hs failed');
+    58	  var ps = PE.buildPrioritySet({ hypothesisSet: hs.hypothesisSet }, _opts());
+    59	  if (!ps.valid) throw new Error('ps failed');
+    60	  var eb = EB.buildEngineerBrief(Object.freeze({ hypothesisSet: hs.hypothesisSet, prioritySet: ps.prioritySet }), _opts());
+    61	  if (!eb.valid) throw new Error('eb failed: ' + JSON.stringify(eb).slice(0, 200));
+    62	  return { eg: eg.graph, hs: hs.hypothesisSet, ps: ps.prioritySet, eb: eb.engineerBrief };
+    63	}
+    64	
+    65	// =============================================================================================
+    66	// Section A — ViewModel functional re-projection
+    67	// =============================================================================================
+    68	console.log('Section A — ViewModel functional re-projection');
+    69	(function () {
+    70	  var fix = _buildEnvelope();
+    71	  var r = VM.buildEngineerViewModel(fix.eb);
+    72	  chk('A1: valid viewmodel from authoritative envelope', r.valid === true);
+    73	  chk('A1: viewModel frozen', Object.isFrozen(r.viewModel));
+    74	  chk('A1: schemaVersion === 1', r.viewModel.schemaVersion === 1);
+    75	  chk('A1: viewModelId is string', typeof r.viewModel.viewModelId === 'string' && r.viewModel.viewModelId.length > 0);
+    76	  chk('A1: sourceBriefId === envelope.briefId', r.viewModel.sourceBriefId === fix.eb.briefId);
+    77	  chk('A1: sourceHypothesisSetId mirrors envelope', r.viewModel.sourceHypothesisSetId === fix.eb.sourceHypothesisSetId);
+    78	  chk('A1: sourcePrioritySetId mirrors envelope', r.viewModel.sourcePrioritySetId === fix.eb.sourcePrioritySetId);
+    79	  chk('A1: primaryIssue is a frozen { i18nKey, params }',
+    80	    Object.isFrozen(r.viewModel.primaryIssue)
+    81	      && typeof r.viewModel.primaryIssue.i18nKey === 'string');
+    82	  chk('A1: contradictions reference brief.contradictions (same ref)',
+    83	    r.viewModel.contradictions === fix.eb.brief.contradictions);
+    84	  chk('A1: cannotConcludeReasonCodes preserved (same ref)',
+    85	    r.viewModel.cannotConcludeReasonCodes === fix.eb.brief.cannotConcludeReasonCodes);
+    86	  chk('A1: credibility preserved', r.viewModel.credibility === fix.eb.brief.credibility);
+    87	  chk('A1: provenance preserved', r.viewModel.provenance === fix.eb.brief.provenance);
+    88	  chk('A1: activation reference preserved', r.viewModel.activation === fix.eb.activation);
+    89	})();
+    90	
+    91	// =============================================================================================
+    92	// Section B — ViewModel authority gate
+    93	// =============================================================================================
+    94	console.log('Section B — ViewModel authority gate');
+    95	(function () {
+    96	  var fix = _buildEnvelope();
+    97	  // B1 — null / undefined
+    98	  chk('B1a: null envelope → blocked', VM.buildEngineerViewModel(null).valid === false);
+    99	  chk('B1b: undefined envelope → blocked', VM.buildEngineerViewModel(undefined).valid === false);
+   100	  chk('B1c: primitive → blocked', VM.buildEngineerViewModel('not-an-object').valid === false);
+   101	
+   102	  // B2 — literal clone of envelope → rejected
+   103	  var clone = {};
+   104	  for (var k in fix.eb) clone[k] = fix.eb[k];
+   105	  Object.freeze(clone);
+   106	  chk('B2: cloned envelope rejected (different ref)', VM.buildEngineerViewModel(clone).valid === false);
+   107	
+   108	  // B3 — structuredClone
+   109	  if (typeof structuredClone === 'function') {
+   110	    var sc = structuredClone(fix.eb);
+   111	    chk('B3: structuredClone envelope rejected', VM.buildEngineerViewModel(sc).valid === false);
+   112	  } else {
+   113	    chk('B3: structuredClone unavailable — skipped', true);
+   114	  }
+   115	
+   116	  // B4 — JSON round-trip
+   117	  var jr = JSON.parse(JSON.stringify(fix.eb));
+   118	  Object.freeze(jr);
+   119	  chk('B4: JSON round-trip envelope rejected', VM.buildEngineerViewModel(jr).valid === false);
+   120	
+   121	  // B5 — Proxy with hostile getter (verifier should not throw / fire trap)
+   122	  var trapCount = 0;
+   123	  var hostile = new Proxy({}, { get: function () { trapCount += 1; throw new Error('hostile'); } });
+   124	  var threw = false;
+   125	  var rh;
+   126	  try { rh = VM.buildEngineerViewModel(hostile); } catch (e) { threw = true; }
+   127	  chk('B5a: hostile Proxy does NOT throw', threw === false);
+   128	  chk('B5b: hostile Proxy returns blocked', rh && rh.valid === false);
+   129	  chk('B5c: hostile Proxy [[Get]] traps NEVER fired (verifier-first)', trapCount === 0);
+   130	})();
+
+codex
+One blocker candidate is emerging: the seq fix handles overlap/invalidation, but I’m testing whether an older generation token can still replay after a newer token has already published. That is directly in the R1-01 closure area.
+codex
+The sandbox cannot create here-doc temp files, so I’m switching to `node -e` for the same check. No repo files are being modified.
+exec
+/bin/bash -lc "node -e \"const EG=require('./renderer/js/r3-0d-evidence-graph.js'),HE=require('./renderer/js/r3-0d-hypothesis-engine.js'),PE=require('./renderer/js/r3-0d-priority-engine.js'),ORC=require('./renderer/js/r3-0d-engineer-orchestrator.js'); const opts={clock:()=> '2026-06-29T01:00:00Z'}; const ca={caseId:'case_001',sessionId:'sess_001',lapId:null}; const n={schemaVersion:1,nodeId:'n_default',category:'data_quality',identity:{caseId:'case_001',sessionId:'sess_001',lapId:null,sourceId:'csv_v1',sourceVersion:'1.0',freshness:'2026-06-29T00:00:00Z'},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'not_computed'},observation:{kind:'channel_missing',channel:'brake',i18nKey:'k',params:null},limitations:['LIMITATION_MISSING_CHANNEL'],supportingEdges:[],contradictingEdges:[]}; const eg=EG.buildEvidenceGraph({caseAssociation:ca,rawEvidence:[n]},opts); const hs=HE.buildHypothesisSet({graph:eg.graph},opts); const ps=PE.buildPrioritySet({hypothesisSet:hs.hypothesisSet},opts); ORC.__test.resetForTests(); const rNew=ORC.prepareEngineerInsight({hypothesisSet:hs.hypothesisSet,prioritySet:ps.prioritySet,generationToken:'gen_new'},opts); const rOld=ORC.prepareEngineerInsight({hypothesisSet:hs.hypothesisSet,prioritySet:ps.prioritySet,generationToken:'gen_old'},opts); console.log(JSON.stringify({rNew:rNew.displayState,rOldValid:rOld.valid,rOld:rOld.displayState,currentToken:ORC.currentState()&&ORC.currentState().generationToken}));\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"rNew":"inconclusive","rOldValid":true,"rOld":"inconclusive","currentToken":"gen_old"}
+
+exec
+/bin/bash -lc "nl -ba renderer/js/r3-0d-engineer-ui.js | sed -n '257,330p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+   257	    // Initial render with whatever the orchestrator currently has (if anything).
+   258	    render(ORC.currentState());
+   259	
+   260	    // Subscribe.
+   261	    var unsub = ORC.subscribe(function (snap) { render(snap); });
+   262	
+   263	    return {
+   264	      unmount: function () {
+   265	        try { unsub(); } catch (e) { /* swallow */ }
+   266	        // Codex D5 R1-02 closure: directive §13.4 forbids ANY innerHTML assignment in the
+   267	    // render-only UI surface, even a literal empty string. Clear via descendant removal.
+   268	    while (rootEl.firstChild) rootEl.removeChild(rootEl.firstChild);
+   269	        rootEl.removeAttribute('data-r3-0d-engineer-brief');
+   270	      },
+   271	      render: render,
+   272	    };
+   273	  }
+   274	
+   275	  // ---------- Public API ------------------------------------------------------------------------
+   276	  var api = {
+   277	    mountEngineerBriefPane: mountEngineerBriefPane,
+   278	  };
+   279	  if (typeof module !== 'undefined' && module.exports) {
+   280	    module.exports = api;
+   281	  } else if (root) {
+   282	    root.R3_0D_EngineerUi = api;
+   283	  }
+   284	})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+codex
+The replay check reproduced the risk: after a newer token publishes, a later call with a different older token still publishes and replaces current state. I’m doing one final targeted scan of the attestation upgrade and contract bundle before writing the verdict.
+exec
+/bin/bash -lc "rg -n \"verifyAuthoritativePrioritySet|_authoritativePrioritySets|_registerAuthoritativePrioritySet|WeakSet|Reflect\\.apply|Object\\.isFrozen|prioritySet\" renderer/js/r3-0d-priority-engine.js | sed -n '1,140p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+8: *     (1) frozen-input requirement (captured Object.isFrozen),
+32: *   • All ambient calls go through R3_0D_HardenedIntrinsics (HI). Object.isFrozen +
+108:  var _CAPTURED_OBJECT_IS_FROZEN = Object.isFrozen;
+115:  //   deep-freeze, _registerAuthoritative() adds the prioritySet object reference to a
+116:  //   closure-private WeakSet. The exported verifyAuthoritativePrioritySet() checks
+117:  //   reference membership via captured Reflect.apply on captured WeakSet.prototype.has —
+118:  //   the closure-private WeakSet is the trust anchor. Caller cannot forge, register, or
+124:  var _WeakSetCtor = WeakSet;
+125:  var _WS_ADD = WeakSet.prototype.add;
+126:  var _WS_HAS = WeakSet.prototype.has;
+127:  var _CAPTURED_REFLECT_APPLY = Reflect.apply;
+136:  var _authoritativePrioritySets = new _WeakSetCtor();
+137:  function _registerAuthoritativePrioritySet(prioritySet) {
+138:    _wsAdd(_authoritativePrioritySets, prioritySet);
+140:  function verifyAuthoritativePrioritySet(candidate) {
+143:      // Captured Reflect.apply on captured WeakSet.prototype.has — defeats post-load
+144:      // `WeakSet.prototype.has = () => true` rebinding (the captured reference points
+145:      // at the original method; dispatch bypasses the prototype chain). Also: WeakSet.has
+148:      if (!_wsHas(_authoritativePrioritySets, candidate)) return false;
+151:      if (typeof candidate.prioritySetId !== 'string') return false;
+367:    // Codex D4 R5 D4-R5-01 closure: PRODUCER AUTHORITY via D3's closure-private WeakSet
+373:    // WeakSet.has is an identity comparison on captured Reflect.apply — it never reads
+573:      // authority lives in D3's WeakSet (already verified above). contentSignature catches
+687:  function _prioritySetId(sourceHsetId, priorities, schemaVersion) {
+875:      // (WeakSet) + recursive descriptor audit + closed-key schema + per-hypothesis content
+1102:      // ---- Step 9 — derive prioritySetId from ranked priorities ----
+1103:      var prisetId = _prioritySetId(hs.hypothesisSetId, ranked, PRIORITY_SET_SCHEMA_VERSION);
+1114:      var prioritySet = HI.deepFreeze({
+1116:        prioritySetId: prisetId,
+1138:      try { finalEnvBytes = _byteLength(HI.stableStringify(prioritySet)); }
+1148:      // D5 producer-attestation hook: ONLY a fully validated + fully deep-frozen prioritySet
+1150:      _registerAuthoritativePrioritySet(prioritySet);
+1152:      return HI.deepFreeze({ valid: true, prioritySet: prioritySet });
+1172:    // WeakSet is the trust anchor — never exposed via any other API surface. Returns boolean.
+1174:    verifyAuthoritativePrioritySet: verifyAuthoritativePrioritySet,
+
+exec
+/bin/bash -lc 'rg -n "confirmed_cause|definitive_diagnosis|driver_fault|driver_error|guaranteed_improvement|fastest_setup|optimal_setup|theoretical_best|ai_diagnosis" renderer/js/i18n-r3-0d.js renderer/js/r3-0d-engineer-ui.js renderer/js/r3-0d-engineer-viewmodel.js renderer/js/r3-0d-engineer-brief.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+renderer/js/r3-0d-engineer-ui.js:17: *     confirmed_cause / definitive_diagnosis / driver_fault / driver_error /
+renderer/js/r3-0d-engineer-ui.js:18: *     guaranteed_improvement / fastest_setup / optimal_setup / theoretical_best /
+renderer/js/r3-0d-engineer-ui.js:19: *     ai_diagnosis. Locale text is supplied by the i18n table (i18n-r3-0d.js) and
+
+exec
+/bin/bash -lc "nl -ba renderer/js/r3-0d-priority-engine.js | sed -n '80,150p' && nl -ba renderer/js/r3-0d-priority-engine.js | sed -n '890,940p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+    80	    for (var i = 0; i < HE.RULE_REGISTRY.length; i++) {
+    81	      var r = HE.RULE_REGISTRY[i];
+    82	      HI.safeDefineDataProperty(m, r.ruleId, r);
+    83	    }
+    84	    return m;
+    85	  })();
+    86	  // Closed status enum (Codex D4 R1 D4-R1-03 closure).
+    87	  var HYPOTHESIS_STATUS_ALLOWED = HI.deepFreeze(['supported', 'contradicted', 'inconclusive', 'blocked']);
+    88	  // Closed confidence state enum (matches D3 export).
+    89	  var CONFIDENCE_STATE_ALLOWED = HI.deepFreeze(['not_computed', 'insufficient_evidence', 'low', 'moderate', 'high']);
+    90	  // Closed key set for D3 hypothesis (Codex D4 R1 D4-R1-03 closure: extra keys rejected).
+    91	  // Codex D4 R2 D4-R2-03 closure: D3 now emits a contentSignature on every hypothesis (binds
+    92	  // full decision-relevant content); D4 includes it in the closed key set and recomputes it.
+    93	  var HYPOTHESIS_KEYS_ALLOWED = HI.deepFreeze([
+    94	    'hypothesisId', 'ruleId', 'ruleVersion', 'category', 'status', 'i18nKey',
+    95	    'supportingEvidenceIds', 'contradictingEvidenceIds', 'correlationGroupIds',
+    96	    'alternativeExplanationIds', 'cannotConcludeReasonCodes', 'validationActionIds',
+    97	    'credibility', 'confidence', 'limitations', 'contentSignature', 'provenance',
+    98	  ]);
+    99	  var CONFIDENCE_KEYS_ALLOWED = HI.deepFreeze(['state', 'score']);
+   100	  // Closed key set for D3 hypothesis-set top-level.
+   101	  var HSET_KEYS_ALLOWED = HI.deepFreeze([
+   102	    'schemaVersion', 'hypothesisSetId', 'sourceGraphId', 'caseAssociation', 'sessionAssociation',
+   103	    'hypotheses', 'alternativeExplanations', 'validationActions', 'cannotConclude', 'limitations',
+   104	    'provenance', 'createdAt', 'generationToken', 'contextVersion',
+   105	  ]);
+   106	
+   107	  // Module-init captures (Codex D3 R1-R5 lessons applied proactively).
+   108	  var _CAPTURED_OBJECT_IS_FROZEN = Object.isFrozen;
+   109	  var _CAPTURED_OBJECT_IS = Object.is;
+   110	  var _CAPTURED_DATE_PARSE = Date.parse;
+   111	
+   112	  // ---- D5 producer-attestation captures (mirror D3 R4-01 hardening) -------------------------
+   113	  // PRODUCER AUTHORITY MODEL (mirror of D3 → D4 pattern for D4 → D5):
+   114	  //   D4 is the SOLE PRODUCER of authoritative PrioritySets. After full validation +
+   115	  //   deep-freeze, _registerAuthoritative() adds the prioritySet object reference to a
+   116	  //   closure-private WeakSet. The exported verifyAuthoritativePrioritySet() checks
+   117	  //   reference membership via captured Reflect.apply on captured WeakSet.prototype.has —
+   118	  //   the closure-private WeakSet is the trust anchor. Caller cannot forge, register, or
+   119	  //   exfiltrate. Clones / JSON round-trips / hand-forged frozen objects all fail because
+   120	  //   their object references are not in the registry.
+   121	  //
+   122	  //   Codex D5 will verify ordering invariants: verifier MUST be the first read on input
+   123	  //   (no Proxy traps fire before rejection), clock invoked at most once post-authority.
+   124	  var _WeakSetCtor = WeakSet;
+   125	  var _WS_ADD = WeakSet.prototype.add;
+   126	  var _WS_HAS = WeakSet.prototype.has;
+   127	  var _CAPTURED_REFLECT_APPLY = Reflect.apply;
+   128	  function _wsAdd(set, value) {
+   129	    try { _CAPTURED_REFLECT_APPLY(_WS_ADD, set, [value]); return true; }
+   130	    catch (e) { return false; }
+   131	  }
+   132	  function _wsHas(set, value) {
+   133	    try { return _CAPTURED_REFLECT_APPLY(_WS_HAS, set, [value]) === true; }
+   134	    catch (e) { return false; }
+   135	  }
+   136	  var _authoritativePrioritySets = new _WeakSetCtor();
+   137	  function _registerAuthoritativePrioritySet(prioritySet) {
+   138	    _wsAdd(_authoritativePrioritySets, prioritySet);
+   139	  }
+   140	  function verifyAuthoritativePrioritySet(candidate) {
+   141	    try {
+   142	      if (candidate === null || typeof candidate !== 'object') return false;
+   143	      // Captured Reflect.apply on captured WeakSet.prototype.has — defeats post-load
+   144	      // `WeakSet.prototype.has = () => true` rebinding (the captured reference points
+   145	      // at the original method; dispatch bypasses the prototype chain). Also: WeakSet.has
+   146	      // is identity-only, so it does NOT invoke [[Get]] on the candidate — Proxy traps
+   147	      // do not fire when rejecting non-members.
+   148	      if (!_wsHas(_authoritativePrioritySets, candidate)) return false;
+   149	      if (_CAPTURED_OBJECT_IS_FROZEN(candidate) !== true) return false;
+   150	      if (candidate.schemaVersion !== PRIORITY_SET_SCHEMA_VERSION) return false;
+   890	          && HI.safeNumberIsFinite(optsSnap.referenceNowMs) === true
+   891	          && optsSnap.referenceNowMs > 0) {
+   892	        refNowMs = optsSnap.referenceNowMs;
+   893	      } else if (clockCb !== null) {
+   894	        var clockIso = null;
+   895	        try { clockIso = clockCb(); } catch (eClock) { clockIso = null; }
+   896	        if (typeof clockIso === 'string' && clockIso.length > 0 && clockIso.length <= 64
+   897	            && HI.safeRegExpTest(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:?\d{2})$/, clockIso)) {
+   898	          var parsed = _isoToMs(clockIso);
+   899	          if (parsed !== null && parsed > 0) {
+   900	            refNowMs = parsed;
+   901	            resolvedClockIso = clockIso;
+   902	          }
+   903	        }
+   904	      }
+   905	      if (refNowMs === null) {
+   906	        return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], {
+   907	          detail: 'D4 requires a reference time for freshness verification — supply opts.clock() OR opts.referenceNowMs',
+   908	        });
+   909	      }
+   910	      var maxAgeMs = DEFAULT_MAX_AGE_MS;
+   911	      if (optsSnap && typeof optsSnap.maxAgeMs === 'number'
+   912	          && HI.safeNumberIsFinite(optsSnap.maxAgeMs) === true
+   913	          && optsSnap.maxAgeMs > 0) {
+   914	        maxAgeMs = optsSnap.maxAgeMs;
+   915	      }
+   916	
+   917	      // ---- Step 3 — freshness check (post-clock) ----
+   918	      if (hs.createdAt !== null) {
+   919	        if (!_isNonEmptyString(hs.createdAt)) {
+   920	          return RC.buildBlockedResult([CODES.EVIDENCE_FRESHNESS_STALE], { detail: 'createdAt invalid' });
+   921	        }
+   922	        var hsAt = _isoToMs(hs.createdAt);
+   923	        if (hsAt === null) {
+   924	          return RC.buildBlockedResult([CODES.EVIDENCE_FRESHNESS_STALE], { detail: 'createdAt not parseable' });
+   925	        }
+   926	        if ((refNowMs - hsAt) > maxAgeMs) {
+   927	          return RC.buildBlockedResult([CODES.EVIDENCE_FRESHNESS_STALE], { detail: 'snapshot older than maxAgeMs' });
+   928	        }
+   929	        if (hsAt > (refNowMs + (5 * 60 * 1000))) {
+   930	          return RC.buildBlockedResult([CODES.EVIDENCE_FRESHNESS_STALE], { detail: 'snapshot dated >5min in the future' });
+   931	        }
+   932	      }
+   933	
+   934	      // ---- Step 2.5 — generationToken / contextVersion ----
+   935	      var generationToken = null;
+   936	      var contextVersion = null;
+   937	      if (HI.safeHasOwn(inputSnap, 'generationToken')) {
+   938	        var gt = inputSnap.generationToken;
+   939	        if (gt !== null) {
+   940	          if (!_isNonEmptyString(gt) || gt.length > 128) {
+
+exec
+/bin/bash -lc "rg -n \"path|stack|telemetry|machine|file|Error\\(|\\.message|\\.stack\" renderer/js/r3-0d-engineer-brief.js renderer/js/r3-0d-engineer-viewmodel.js renderer/js/r3-0d-engineer-orchestrator.js renderer/js/r3-0d-engineer-ui.js | sed -n '1,160p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+renderer/js/r3-0d-engineer-ui.js:15: *     NO file paths, NO machine IDs, NO raw telemetry.
+renderer/js/r3-0d-engineer-ui.js:37:    throw new Error('r3-0d-engineer-ui.js: missing R3_0D_EngineerOrchestrator dependency');
+renderer/js/r3-0d-engineer-orchestrator.js:20: *       priority set changed, mapping changed, calibration changed, telemetry replaced,
+renderer/js/r3-0d-engineer-orchestrator.js:24: *     'error-sanitized'}. NEVER echo caller paths / private IDs / stack traces.
+renderer/js/r3-0d-engineer-orchestrator.js:50:    throw new Error('r3-0d-engineer-orchestrator.js: missing one or more required R3.0D dependencies');
+renderer/js/r3-0d-engineer-orchestrator.js:67:    'telemetry_replaced',
+renderer/js/r3-0d-engineer-viewmodel.js:18: *   • Privacy invariants: NO raw telemetry, NO file paths, NO machine IDs, NO stack traces
+renderer/js/r3-0d-engineer-viewmodel.js:57:    throw new Error('r3-0d-engineer-viewmodel.js: missing one or more required R3.0D dependencies');
+renderer/js/r3-0d-engineer-viewmodel.js:117:  function _buildSanitizedError(displayState, reasonCodes) {
+renderer/js/r3-0d-engineer-viewmodel.js:123:      // NEVER echo caller content / paths / private IDs. The renderer uses displayState +
+renderer/js/r3-0d-engineer-viewmodel.js:145:        return _buildSanitizedError('error-sanitized', [CODES.HYPOTHESIS_AUTHORITY_FORGED]);
+renderer/js/r3-0d-engineer-viewmodel.js:155:          return _buildSanitizedError('error-sanitized', [CODES.HYPOTHESIS_INVALID]);
+renderer/js/r3-0d-engineer-viewmodel.js:160:            return _buildSanitizedError('error-sanitized', [CODES.UNKNOWN_OWN_KEY]);
+renderer/js/r3-0d-engineer-viewmodel.js:166:            return _buildSanitizedError('error-sanitized', [CODES.HYPOTHESIS_INVALID]);
+renderer/js/r3-0d-engineer-viewmodel.js:238:      return _buildSanitizedError('error-sanitized', [CODES.INTERNAL_CONTRACT_VIOLATION]);
+renderer/js/r3-0d-engineer-viewmodel.js:249:   *   - reasonCodes (sanitized — no path / caller content)
+renderer/js/r3-0d-engineer-viewmodel.js:250:   *   - schemaVersion + viewModelId for parity with the success path
+renderer/js/r3-0d-engineer-viewmodel.js:262:        return _buildSanitizedError('error-sanitized', [CODES.HYPOTHESIS_INVALID]);
+renderer/js/r3-0d-engineer-viewmodel.js:277:      return _buildSanitizedError('error-sanitized', [CODES.INTERNAL_CONTRACT_VIOLATION]);
+renderer/js/r3-0d-engineer-brief.js:79:    throw new Error('r3-0d-engineer-brief.js: missing one or more required R3.0D contracts');
+
+codex
+Finding D5-R2-01: Older generation tokens can still replay after a newer token publishes and overwrite current state
+  evidence: renderer/js/r3-0d-engineer-orchestrator.js:201
+  severity: BLOCK
+  proposed closure: Track retired/active generation tokens, drop any prepare whose token was superseded before publishing, and add a regression for publish(B) then replay(A) staying on B.
+
+FINAL VERDICT: BLOCK
+tokens used
+77,186
+Finding D5-R2-01: Older generation tokens can still replay after a newer token publishes and overwrite current state
+  evidence: renderer/js/r3-0d-engineer-orchestrator.js:201
+  severity: BLOCK
+  proposed closure: Track retired/active generation tokens, drop any prepare whose token was superseded before publishing, and add a regression for publish(B) then replay(A) staying on B.
+
+FINAL VERDICT: BLOCK

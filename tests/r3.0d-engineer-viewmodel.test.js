@@ -455,6 +455,83 @@ console.log('Section M — Codex D5 R1 closures');
 })();
 
 // =============================================================================================
+// Section N — Codex D5 R2 closures
+// =============================================================================================
+console.log('Section N — Codex D5 R2 closures');
+
+// N1 — D5-R2-01 closure: retired-token replay rejection. publish(B) then replay(A) must
+// stay on B; the replay returns stale-cleared and does NOT overwrite the active state.
+(function () {
+  ORC.__test.resetForTests();
+  var fix = _buildEnvelope();
+  // Publish A.
+  var rA = ORC.prepareEngineerInsight({
+    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_N1_A',
+  }, _opts());
+  // Publish B (supersedes A; A becomes retired).
+  var rB = ORC.prepareEngineerInsight({
+    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_N1_B',
+  }, _opts());
+  chk('N1a: publish A succeeded', rA.valid === true);
+  chk('N1b: publish B succeeded', rB.valid === true);
+  chk('N1c: currentState token is B (newer)',
+    ORC.currentState().generationToken === 'gen_N1_B');
+
+  // Replay A — must be rejected as stale-cleared; state stays on B.
+  var rReplay = ORC.prepareEngineerInsight({
+    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_N1_A',
+  }, _opts());
+  chk('N1d: replay of retired token A → stale-cleared (NOT publish)',
+    rReplay.valid === false && rReplay.displayState === 'stale-cleared');
+  chk('N1e: after replay attempt, currentState STILL reflects B (not overwritten)',
+    ORC.currentState().generationToken === 'gen_N1_B');
+  chk('N1f: authoritative envelope still B (not overwritten)',
+    EB.verifyAuthoritativeEngineerBrief(ORC.getCurrentAuthoritativeEnvelope()) === true
+      && ORC.getCurrentAuthoritativeEnvelope().brief.identity.caseId === 'case_001');
+})();
+
+// N2 — Token retired by invalidate cannot be reused. Calling prepare with the retired
+// token after invalidate returns stale-cleared; host MUST issue a fresh token.
+(function () {
+  ORC.__test.resetForTests();
+  var fix = _buildEnvelope();
+  ORC.prepareEngineerInsight({
+    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_N2',
+  }, _opts());
+  ORC.invalidate('session_changed');
+  // Token gen_N2 is now retired.
+  var r = ORC.prepareEngineerInsight({
+    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_N2',
+  }, _opts());
+  chk('N2a: post-invalidate replay of retired token → stale-cleared',
+    r.valid === false && r.displayState === 'stale-cleared');
+  chk('N2b: currentState remains stale-cleared from invalidate (not republished)',
+    ORC.currentState().displayState === 'stale-cleared');
+  // A FRESH token after invalidate must publish normally.
+  var rFresh = ORC.prepareEngineerInsight({
+    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_N2_fresh',
+  }, _opts());
+  chk('N2c: fresh token after invalidate publishes',
+    rFresh.valid === true && ORC.currentState().generationToken === 'gen_N2_fresh');
+})();
+
+// N3 — Same token republished WITHOUT a supersede is idempotent (host can re-issue the
+// same prepare call without triggering retired-token rejection).
+(function () {
+  ORC.__test.resetForTests();
+  var fix = _buildEnvelope();
+  var r1 = ORC.prepareEngineerInsight({
+    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_N3_same',
+  }, _opts());
+  var r2 = ORC.prepareEngineerInsight({
+    hypothesisSet: fix.hs, prioritySet: fix.ps, generationToken: 'gen_N3_same',
+  }, _opts());
+  chk('N3a: first publish succeeded', r1.valid === true);
+  chk('N3b: same-token replay (no supersede) still publishes (idempotent)',
+    r2.valid === true);
+})();
+
+// =============================================================================================
 // Done
 // =============================================================================================
 console.log('R3.0D D5 viewmodel + orchestrator adversarial suite: ' + pass + ' passed, ' + fail + ' failed');

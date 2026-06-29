@@ -82,6 +82,14 @@
   var _currentCase = null;       // { caseId, sessionId, lapId } snapshot
   var _internalSeq = 0;          // Monotonic counter — prevents stale async callbacks
   var _subscribers = [];         // List of listener functions
+  // Codex D5 R2-01 closure: retired-tokens set. Once a generation token is superseded by a
+  // newer successful publish OR by invalidate(), it is added here and any subsequent
+  // prepareEngineerInsight that re-uses the same token is REJECTED with stale-cleared. This
+  // prevents an older token from replaying after a newer one has already published —
+  // closing the "publish(B) then replay(A) overwrites B" race that the bare _internalSeq
+  // bump does not catch (the replay's seqAtEntry equals _internalSeq at the time of replay,
+  // so the seq gate alone would let it through).
+  var _retiredTokens = HI.safeObjectCreateNull();
 
   // ---------- Helpers --------------------------------------------------------------------------
   function _isPlainObject(v) {
@@ -173,6 +181,19 @@
       return HI.deepFreeze({ valid: false, viewModel: blockedTok, displayState: 'error-sanitized' });
     }
 
+    // ---- Codex D5 R2-01 closure: retired-token replay rejection -----------------------------
+    // A retired token is one that was previously the active token and has since been
+    // superseded by a newer successful publish OR by invalidate(). Re-using it would
+    // overwrite the current state with stale content. Drop with stale-cleared.
+    if (HI.safeHasOwn(_retiredTokens, generationToken)) {
+      var blockedReplay = VM.buildBlockedViewModel('stale-cleared', [CODES.STALE_EVIDENCE]);
+      // Do NOT mutate _currentEnvelope / _currentViewModel — the legitimate current state
+      // (which carries a NEWER token) must remain visible. The blocked result is returned
+      // to the caller so they can log it, but the orchestrator does NOT publish over the
+      // active state.
+      return HI.deepFreeze({ valid: false, viewModel: blockedReplay, displayState: 'stale-cleared' });
+    }
+
     // ---- Step 2 — build D5 envelope (handles its own authority gates) -----------------------
     var ebInput = HI.deepFreeze({ hypothesisSet: hypothesisSet, prioritySet: prioritySet });
     var ebOpts = optsIn === undefined ? undefined : optsIn;
@@ -208,6 +229,11 @@
     }
 
     // ---- Step 5 — publish + notify -----------------------------------------------------------
+    // Codex D5 R2-01 closure: when a NEW token supersedes the previous _currentToken, retire
+    // the old token so a future replay cannot overwrite this newer publish.
+    if (_currentToken !== null && _currentToken !== generationToken) {
+      HI.safeDefineDataProperty(_retiredTokens, _currentToken, true);
+    }
     _currentEnvelope = ebResult.engineerBrief;
     _currentViewModel = vmResult;
     _currentToken = generationToken;
@@ -262,6 +288,12 @@
       reasonCode = 'application_restart';
     }
     _internalSeq += 1;
+    // Codex D5 R2-01 closure: retire the current token on invalidate so a stale prepare
+    // (e.g., the host re-uses the previous token after a case/session switch) cannot
+    // overwrite the cleared state.
+    if (_currentToken !== null) {
+      HI.safeDefineDataProperty(_retiredTokens, _currentToken, true);
+    }
     // Drop the authoritative envelope (no producer-attestation reference survives across
     // invalidation), but keep a non-authoritative stale-cleared viewmodel so the UI shell
     // can render an explicit "cleared" state instead of going blank.
@@ -344,6 +376,10 @@
     _currentToken = null;
     _currentCase = null;
     _subscribers = [];
+    // Codex D5 R2-01 closure: tests need a clean retired-tokens map between runs so an
+    // earlier test's token reuse doesn't leak into a later test. _resetForTests is the
+    // gated test-only entry point per the existing convention.
+    _retiredTokens = HI.safeObjectCreateNull();
   }
 
   // ---------- Public API ------------------------------------------------------------------------
