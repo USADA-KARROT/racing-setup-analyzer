@@ -115,14 +115,42 @@
 
       if (!_nonEmptyStr(e.validationPlan) || _utf8Bytes(e.validationPlan) > STRING_BYTE_CAP) reasons.push(CODES.EXPERIMENT_VALIDATION_PLAN_MISSING);
 
+      // Codex E1-R1-04 closure: stopConditions array cap + element-shape enforcement.
+      // Each entry MUST be a plain { i18nKey, params } with non-empty i18nKey; arbitrary
+      // strings, accessors, or nested non-plain rejected.
       if (!Array.isArray(e.stopConditions) || e.stopConditions.length === 0) reasons.push(CODES.EXPERIMENT_STOP_CONDITIONS_MISSING);
+      else if (e.stopConditions.length > ARRAY_CAP) reasons.push(CODES.ARRAY_CAP_EXCEEDED);
+      else {
+        for (var sci = 0; sci < e.stopConditions.length; sci++) {
+          var sc = e.stopConditions[sci];
+          if (!_isPlain(sc)) { reasons.push(CODES.EXPERIMENT_STOP_CONDITIONS_MISSING); break; }
+          var scKeys; try { scKeys = Reflect.ownKeys(sc); } catch (eK) { reasons.push(CODES.EXPERIMENT_STOP_CONDITIONS_MISSING); break; }
+          var scKeyOk = true;
+          for (var sk = 0; sk < scKeys.length; sk++) {
+            if (typeof scKeys[sk] === 'symbol') { scKeyOk = false; break; }
+            if (['i18nKey', 'params'].indexOf(scKeys[sk]) === -1) { scKeyOk = false; break; }
+          }
+          if (!scKeyOk) { reasons.push(CODES.EXPERIMENT_STOP_CONDITIONS_MISSING); break; }
+          if (!_nonEmptyStr(sc.i18nKey)) { reasons.push(CODES.EXPERIMENT_STOP_CONDITIONS_MISSING); break; }
+          if (sc.params !== null && sc.params !== undefined && !_isPlain(sc.params)) { reasons.push(CODES.EXPERIMENT_STOP_CONDITIONS_MISSING); break; }
+        }
+      }
 
       if (EXPERIMENT_STATUS_ALLOWED.indexOf(e.status) === -1) reasons.push(CODES.EXPERIMENT_STATUS_INVALID);
 
       if (!Array.isArray(e.followUpCaseIds) || e.followUpCaseIds.length > ARRAY_CAP) reasons.push(CODES.LINKAGE_INVALID);
 
-      // outcome is OPTIONAL at E1 (set at E3) — null permitted; plain object when present.
-      if (e.outcome !== null && !_isPlain(e.outcome)) reasons.push(CODES.OUTCOME_INVALID);
+      // Codex E1-R1-03 closure: outcome MUST be null until E3 produces it. A draft/planned
+      // experiment cannot carry a caller-supplied outcome object — the outcome belongs to
+      // the E3 outcome classifier authority chain and arrives only AFTER status reaches a
+      // post-applied stage. We allow non-null outcome only for completed/abandoned/invalid
+      // statuses; for draft/planned/applied, outcome MUST be null. This prevents callers
+      // from laundering a "confirmed" classification past the contract layer.
+      var statusAllowsOutcome = (e.status === 'completed' || e.status === 'abandoned' || e.status === 'invalid');
+      if (e.outcome !== null) {
+        if (!statusAllowsOutcome) reasons.push(CODES.OUTCOME_INVALID);
+        else if (!_isPlain(e.outcome)) reasons.push(CODES.OUTCOME_INVALID);
+      }
 
       if (!_nonEmptyStr(e.createdAt)) reasons.push(CODES.EXPERIMENT_INVALID);
 

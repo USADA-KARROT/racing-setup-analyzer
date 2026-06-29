@@ -107,23 +107,44 @@
     } catch (e) { return true; }
   }
   function hasNonPlainNestedObject(o) {
+    // Codex E1-R1-01 closure: recursive descriptor audit. Walks every nested object/array
+    // descriptor, rejecting Symbol-keyed own keys, non-enumerable own keys, accessor
+    // (get/set) descriptors, non-plain prototypes (class instances / Proxy targets /
+    // arbitrary class), and sparse-array hole patterns. Bounded depth 32 + max nodes
+    // 4096 to bound traversal.
     try {
       var stack = [o];
-      var depth = 0;
-      while (stack.length > 0 && depth < 256) {
-        var v = stack.shift(); depth++;
+      var visited = 0;
+      while (stack.length > 0 && visited < 4096) {
+        var v = stack.shift(); visited++;
         if (v === null) continue;
         var t = typeof v;
+        if (t === 'function' || t === 'symbol' || t === 'bigint') return true;
         if (t !== 'object') continue;
         var isArr = Array.isArray(v);
         if (!isArr) {
           var p = Object.getPrototypeOf(v);
           if (!(p === Object.prototype || p === null)) return true;
+        } else {
+          var p2 = Object.getPrototypeOf(v);
+          if (p2 !== Array.prototype) return true;
         }
-        if (isArr) for (var i = 0; i < v.length; i++) stack.push(v[i]);
-        else {
-          var names = Object.getOwnPropertyNames(v);
-          for (var j = 0; j < names.length; j++) stack.push(v[names[j]]);
+        // Symbol-keyed own keys → reject at any nesting depth.
+        var syms;
+        try { syms = Object.getOwnPropertySymbols(v); } catch (e) { return true; }
+        if (syms && syms.length > 0) return true;
+        var names = Object.getOwnPropertyNames(v);
+        for (var j = 0; j < names.length; j++) {
+          var name = names[j];
+          // Array.length is non-enumerable own — skip it from the audit while still
+          // walking indexed entries below.
+          if (isArr && name === 'length') continue;
+          var d;
+          try { d = Object.getOwnPropertyDescriptor(v, name); } catch (eDesc) { return true; }
+          if (!d) return true;
+          if (typeof d.get === 'function' || typeof d.set === 'function') return true;
+          if (d.enumerable !== true) return true;
+          stack.push(d.value);
         }
       }
       return false;

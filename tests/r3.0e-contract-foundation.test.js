@@ -187,5 +187,100 @@ console.log('Section H — scope: case-record-schema.js carries refs only (no R3
     src.indexOf('experimentId') !== -1 && src.indexOf('followUpCaseIds') !== -1);
 })();
 
+// Section I — Codex E1 R1 closures
+console.log('Section I — Codex E1 R1 closures');
+
+// I1 — E1-R1-01 closure: nested Symbol-keyed / accessor / non-plain prototype rejected
+// at deep nesting (recursive descriptor audit).
+(function () {
+  var deepHostile = {
+    schemaVersion: 1, linkId: 'l_test', parentCaseId: 'cA', followUpCaseId: 'cB',
+    experimentId: 'e1', parentStatus: 'present', createdAt: '2026-06-30T00:00:00Z',
+  };
+  // Add Symbol-keyed own key on nested object — must be rejected
+  var nestedAttack = {};
+  nestedAttack[Symbol('hostile')] = 'leak';
+  deepHostile.createdAt = '2026-06-30T00:00:00Z'; // unchanged scalar
+  // We embed the Symbol-bearing nested object via array (since LINK_KEYS forbids unknown
+  // own keys at top; we need a way to test nested. Use a structure that the validator
+  // SHOULD walk via toCleanCopy + hasNonPlainNestedObject before the closed-key check.)
+  // Per the R1-01 closure, hasNonPlainNestedObject must reject hostile-nested at any depth.
+  chk('I1a: hasNonPlainNestedObject rejects nested Symbol-keyed own key',
+    RC.hasNonPlainNestedObject({ a: { b: nestedAttack } }) === true);
+  // Accessor descriptor at nested object → rejected
+  var nestedAccessor = {};
+  Object.defineProperty(nestedAccessor, 'inner', { enumerable: true, get: function () { return 1; } });
+  chk('I1b: hasNonPlainNestedObject rejects nested accessor descriptor',
+    RC.hasNonPlainNestedObject({ wrap: nestedAccessor }) === true);
+  // Class instance nested → rejected
+  function FakeClass() { this.x = 1; }
+  chk('I1c: hasNonPlainNestedObject rejects nested class-instance prototype',
+    RC.hasNonPlainNestedObject({ wrap: new FakeClass() }) === true);
+  // Non-enumerable own → rejected
+  var nestedNonEnum = {};
+  Object.defineProperty(nestedNonEnum, 'hidden', { enumerable: false, value: 'x' });
+  chk('I1d: hasNonPlainNestedObject rejects nested non-enumerable own key',
+    RC.hasNonPlainNestedObject({ wrap: nestedNonEnum }) === true);
+  // Plain deeply-nested → accepted
+  chk('I1e: hasNonPlainNestedObject accepts deeply-nested plain object',
+    RC.hasNonPlainNestedObject({ a: { b: { c: { d: 'value' } } } }) === false);
+})();
+
+// I2 — E1-R1-02 closure: timeline + follow-up schemaVersion>1 yields UNSUPPORTED_FUTURE_SCHEMA.
+(function () {
+  var futureTl = JSON.parse(JSON.stringify(validTL));
+  futureTl.schemaVersion = 2;
+  var rTL = TL.validateCaseTimelineShape(futureTl);
+  chk('I2a: timeline schemaVersion=2 → UNSUPPORTED_FUTURE_SCHEMA (not TIMELINE_INVALID)',
+    rTL.eligible === false && rTL.reasonCodes.indexOf('UNSUPPORTED_FUTURE_SCHEMA') !== -1);
+
+  var futureFu = Object.assign({}, validFU, { schemaVersion: 2 });
+  var rFU = FU.validateFollowUpLinkShape(futureFu);
+  chk('I2b: follow-up-link schemaVersion=2 → UNSUPPORTED_FUTURE_SCHEMA',
+    rFU.eligible === false && rFU.reasonCodes.indexOf('UNSUPPORTED_FUTURE_SCHEMA') !== -1);
+})();
+
+// I3 — E1-R1-03 closure: planned/draft experiments may not carry outcome.
+(function () {
+  var withOutcome = Object.assign({}, validExperiment, {
+    status: 'planned',
+    outcome: { observedResult: 'looks_good' },
+  });
+  var r = EXP.validateExperimentShape(withOutcome);
+  chk('I3a: planned experiment with outcome rejected (OUTCOME_INVALID)',
+    r.eligible === false && r.reasonCodes.indexOf('OUTCOME_INVALID') !== -1);
+  // status=completed CAN carry outcome (plain object).
+  var completedWithOutcome = Object.assign({}, validExperiment, {
+    status: 'completed',
+    outcome: { observedDirection: 'decrease' },
+  });
+  chk('I3b: completed experiment with plain outcome accepted',
+    EXP.validateExperimentShape(completedWithOutcome).valid === true);
+  // status=draft with outcome rejected.
+  var draftWithOutcome = Object.assign({}, validExperiment, { status: 'draft', outcome: { x: 1 } });
+  chk('I3c: draft experiment with outcome rejected',
+    EXP.validateExperimentShape(draftWithOutcome).eligible === false);
+})();
+
+// I4 — E1-R1-04 closure: stopConditions cap + element-shape enforcement.
+(function () {
+  // Element with unknown key → rejected
+  var badElem = Object.assign({}, validExperiment, {
+    stopConditions: [{ i18nKey: 'r3.0e.stop.x', params: null, hostile: 'inject' }],
+  });
+  chk('I4a: stopConditions with unknown element key rejected',
+    EXP.validateExperimentShape(badElem).eligible === false);
+  // Element missing i18nKey → rejected
+  var noKey = Object.assign({}, validExperiment, { stopConditions: [{ params: { x: 1 } }] });
+  chk('I4b: stopConditions element missing i18nKey rejected',
+    EXP.validateExperimentShape(noKey).eligible === false);
+  // List > ARRAY_CAP rejected (build 33 entries; cap is 32).
+  var bigList = [];
+  for (var i = 0; i < 33; i++) bigList.push({ i18nKey: 'k.' + i, params: null });
+  var bigExp = Object.assign({}, validExperiment, { stopConditions: bigList });
+  chk('I4c: stopConditions list > ARRAY_CAP rejected',
+    EXP.validateExperimentShape(bigExp).eligible === false);
+})();
+
 console.log('R3.0E E1 contract-foundation suite: ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);

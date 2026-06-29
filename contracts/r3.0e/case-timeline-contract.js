@@ -32,6 +32,8 @@
     'experiment_abandoned',
   ]);
 
+  // Codex E1-R1-02 closure: distinguish UNSUPPORTED_FUTURE_SCHEMA from TIMELINE_INVALID.
+  var SUPPORTED_SCHEMA_VERSION = 1;
   var ARRAY_CAP = 64;
 
   function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
@@ -47,7 +49,9 @@
       if (!_hasOnlyAllowedKeys(t, TIMELINE_KEYS)) return RC.buildBlockedResult([CODES.TIMELINE_INVALID, CODES.UNKNOWN_OWN_KEY]);
 
       var reasons = [];
-      if (!Number.isInteger(t.schemaVersion) || t.schemaVersion !== 1) reasons.push(CODES.TIMELINE_INVALID);
+      if (!Number.isInteger(t.schemaVersion)) reasons.push(CODES.TIMELINE_INVALID);
+      else if (t.schemaVersion > SUPPORTED_SCHEMA_VERSION) reasons.push(CODES.UNSUPPORTED_FUTURE_SCHEMA);
+      else if (t.schemaVersion < 1) reasons.push(CODES.TIMELINE_INVALID);
       if (!_nonEmptyStr(t.caseId)) reasons.push(CODES.TIMELINE_INVALID);
       if (!Array.isArray(t.events) || t.events.length > ARRAY_CAP) reasons.push(CODES.TIMELINE_INVALID);
       else {

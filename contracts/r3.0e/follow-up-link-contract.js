@@ -26,6 +26,9 @@
 
   var PARENT_STATUS_ALLOWED = Object.freeze(['present', 'archived', 'deleted']);
 
+  // Codex E1-R1-02 closure: distinguish UNSUPPORTED_FUTURE_SCHEMA from LINKAGE_INVALID.
+  var SUPPORTED_SCHEMA_VERSION = 1;
+
   function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
   function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (typeof k === 'symbol') return false; if (allowed.indexOf(k) === -1) return false; } return true; }
   function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
@@ -39,7 +42,9 @@
       if (!_hasOnlyAllowedKeys(l, LINK_KEYS)) return RC.buildBlockedResult([CODES.LINKAGE_INVALID, CODES.UNKNOWN_OWN_KEY]);
 
       var reasons = [];
-      if (!Number.isInteger(l.schemaVersion) || l.schemaVersion !== 1) reasons.push(CODES.LINKAGE_INVALID);
+      if (!Number.isInteger(l.schemaVersion)) reasons.push(CODES.LINKAGE_INVALID);
+      else if (l.schemaVersion > SUPPORTED_SCHEMA_VERSION) reasons.push(CODES.UNSUPPORTED_FUTURE_SCHEMA);
+      else if (l.schemaVersion < 1) reasons.push(CODES.LINKAGE_INVALID);
       if (!_nonEmptyStr(l.linkId)) reasons.push(CODES.LINKAGE_INVALID);
       if (!_nonEmptyStr(l.parentCaseId)) reasons.push(CODES.LINKAGE_PARENT_MISSING);
       if (!_nonEmptyStr(l.followUpCaseId)) reasons.push(CODES.LINKAGE_INVALID);
