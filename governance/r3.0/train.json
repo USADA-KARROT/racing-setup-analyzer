@@ -3,7 +3,7 @@
   "program": "R3.0",
   "phases": ["R3.0C", "R3.0D", "R3.0E", "R3.0F"],
   "currentPhase": "R3.0D",
-  "currentPhaseCheckpoint": "D3_HYPOTHESIS_ENGINE",
+  "currentPhaseCheckpoint": "D4_PRIORITY_ENGINE",
   "phaseStates": {
     "R3.0C": {
       "governanceDir": "governance/r3.0c",
@@ -14,7 +14,7 @@
     },
     "R3.0D": {
       "governanceDir": "governance/r3.0d",
-      "currentCheckpoint": "D3_HYPOTHESIS_ENGINE",
+      "currentCheckpoint": "D4_PRIORITY_ENGINE",
       "finalActivationCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
       "started": true,
       "finalActivationReached": false
