@@ -451,5 +451,154 @@ console.log('Section N — forbidden behaviors');
       || r.prioritySet.priorities.find(function (p) { return p.priorityId === r.prioritySet.primaryActionId; }).credibility !== 'Heuristic');
 })();
 
+// ---------- Section O — Codex D4 R1 closure tests (D4-R1-01..06) -----------------------
+console.log('Section O — Codex D4 R1 closures');
+
+// R1-01: tampered hypothesis content (same hsetId, mutated category/status/credibility) rejected
+(function () {
+  var hs = _buildHypothesisSet([_baseNode({})]);
+  // Take the authentic hypothesis and craft a tampered variant that keeps hypothesisId but
+  // mutates category — D4 must catch via hypothesisId recompute mismatch (hypothesisId is
+  // derived from ruleId + supportingIds + contradictingIds, NOT category — so category swap
+  // alone won't break the recompute. The rule lookup will catch the mismatch instead.).
+  var origH = hs.hypotheses[0];
+  var tampered = Object.freeze({
+    hypothesisId: origH.hypothesisId, ruleId: origH.ruleId, ruleVersion: origH.ruleVersion,
+    category: 'setup_model',  // tampered: was data_quality
+    status: origH.status, i18nKey: origH.i18nKey,
+    supportingEvidenceIds: origH.supportingEvidenceIds,
+    contradictingEvidenceIds: origH.contradictingEvidenceIds,
+    correlationGroupIds: origH.correlationGroupIds,
+    alternativeExplanationIds: origH.alternativeExplanationIds,
+    cannotConcludeReasonCodes: origH.cannotConcludeReasonCodes,
+    validationActionIds: origH.validationActionIds,
+    credibility: origH.credibility, confidence: origH.confidence,
+    limitations: origH.limitations, provenance: origH.provenance,
+  });
+  var tamperedShell = Object.freeze({
+    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+    sourceGraphId: hs.sourceGraphId, caseAssociation: hs.caseAssociation,
+    sessionAssociation: hs.sessionAssociation,
+    hypotheses: Object.freeze([tampered]),
+    alternativeExplanations: hs.alternativeExplanations, validationActions: hs.validationActions,
+    cannotConclude: hs.cannotConclude, limitations: hs.limitations,
+    provenance: hs.provenance, createdAt: hs.createdAt,
+    generationToken: hs.generationToken, contextVersion: hs.contextVersion,
+  });
+  var r = _pe({ hypothesisSet: tamperedShell });
+  chk('HRR1-01-a: mutated hypothesis.category (rule mismatch) rejected',
+    r.eligible === false);
+})();
+
+// R1-02: top-level accessor descriptor on hypothesisSet (e.g. createdAt getter) rejected pre-clone
+(function () {
+  var hs = _buildHypothesisSet([_baseNode({})]);
+  var fired = 0;
+  var hostile = Object.create(null);
+  // Set non-getter fields as data props
+  ['schemaVersion','hypothesisSetId','sourceGraphId','caseAssociation','sessionAssociation','hypotheses','alternativeExplanations','validationActions','cannotConclude','limitations','provenance','generationToken','contextVersion'].forEach(function (k) {
+    Object.defineProperty(hostile, k, { value: hs[k], enumerable: true });
+  });
+  // createdAt as a getter
+  Object.defineProperty(hostile, 'createdAt', { get: function () { fired += 1; return hs.createdAt; }, enumerable: true });
+  Object.freeze(hostile);
+  var r = _pe({ hypothesisSet: hostile });
+  chk('HRR1-02-a: accessor descriptor on input.hypothesisSet rejected pre-clone',
+    r.eligible === false);
+  chk('HRR1-02-b: hostile getter NOT invoked (rejected before clone)',
+    fired === 0);
+})();
+
+// R1-02 (cont): accessor on opts.clock rejected
+(function () {
+  var hs = _buildHypothesisSet([_baseNode({})]);
+  var hostileOpts = {};
+  Object.defineProperty(hostileOpts, 'clock', { get: function () { return BASE_CLOCK; }, enumerable: true });
+  var r = _pe({ hypothesisSet: hs }, hostileOpts);
+  chk('HRR1-02-c: accessor descriptor on opts.clock rejected',
+    r.eligible === false);
+})();
+
+// R1-03: extra hypothesis own key rejected
+(function () {
+  var hs = _buildHypothesisSet([_baseNode({})]);
+  var origH = hs.hypotheses[0];
+  var withExtra = Object.freeze(Object.assign({}, origH, { attackerKey: 'inject' }));
+  // Re-freeze nested arrays since spread creates new wrapper
+  var shell = Object.freeze({
+    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+    sourceGraphId: hs.sourceGraphId, caseAssociation: hs.caseAssociation,
+    sessionAssociation: hs.sessionAssociation,
+    hypotheses: Object.freeze([withExtra]),
+    alternativeExplanations: hs.alternativeExplanations, validationActions: hs.validationActions,
+    cannotConclude: hs.cannotConclude, limitations: hs.limitations,
+    provenance: hs.provenance, createdAt: hs.createdAt,
+    generationToken: hs.generationToken, contextVersion: hs.contextVersion,
+  });
+  var r = _pe({ hypothesisSet: shell });
+  chk('HRR1-03-a: extra hypothesis own key rejected',
+    r.eligible === false
+      && HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.UNKNOWN_OWN_KEY) !== -1);
+})();
+
+// R1-03 (cont): invalid status value rejected
+(function () {
+  var hs = _buildHypothesisSet([_baseNode({})]);
+  var origH = hs.hypotheses[0];
+  var bogusH = Object.freeze(Object.assign({}, origH, { status: 'attacker_supported' }));
+  var shell = Object.freeze({
+    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+    sourceGraphId: hs.sourceGraphId, caseAssociation: hs.caseAssociation,
+    sessionAssociation: hs.sessionAssociation,
+    hypotheses: Object.freeze([bogusH]),
+    alternativeExplanations: hs.alternativeExplanations, validationActions: hs.validationActions,
+    cannotConclude: hs.cannotConclude, limitations: hs.limitations,
+    provenance: hs.provenance, createdAt: hs.createdAt,
+    generationToken: hs.generationToken, contextVersion: hs.contextVersion,
+  });
+  var r = _pe({ hypothesisSet: shell });
+  chk('HRR1-03-b: unknown hypothesis.status value rejected (closed enum)',
+    r.eligible === false);
+})();
+
+// R1-04: two-pass priority resolution — blockingPrerequisiteIds referentially intact
+(function () {
+  // Build a graph with both data_quality (high-tier) and setup_model (low-tier). Verify any
+  // priority's blockingPrerequisiteIds reference IDs present in the final set.
+  var n_dq = _baseNode({ nodeId: 'n_dq', identity: _baseIdentity({ sourceId: 'dq_src' }) });
+  var n_sm = _baseNode({ nodeId: 'n_sm', category: 'setup_model', credibility: 'measured',
+    identity: _baseIdentity({ sourceId: 'sm_src' }),
+    observation: { kind: 'metric_value', channel: 'yaw', i18nKey: 'k', params: null },
+    limitations: [] });
+  var hs = _buildHypothesisSet([n_dq, n_sm]);
+  var r = _pe({ hypothesisSet: hs });
+  if (r.valid) {
+    var idSet = new Set(r.prioritySet.priorities.map(function (p) { return p.priorityId; }));
+    var allReferentiallyIntact = r.prioritySet.priorities.every(function (p) {
+      return p.blockingPrerequisiteIds.every(function (b) { return idSet.has(b); });
+    });
+    chk('HRR1-04-a: every blockingPrerequisiteId references a priority that EXISTS in the final set',
+      allReferentiallyIntact === true);
+  } else {
+    chk('HRR1-04-a: graph rejected by D4', false);
+  }
+})();
+
+// R1-05: caller-supplied key names NOT echoed in error detail (privacy)
+(function () {
+  var hs = _buildHypothesisSet([_baseNode({})]);
+  var pathLikeKey = '/Users/SKYLINE/private.csv';
+  var hostile = { hypothesisSet: hs };
+  hostile[pathLikeKey] = 'inject';
+  var r = _pe(hostile);
+  chk('HRR1-05-a: error detail does NOT echo path-like caller key (privacy)',
+    r.eligible === false && (!r.detail || r.detail.indexOf('/Users/') === -1));
+  var hostileOpts = { clock: BASE_CLOCK };
+  hostileOpts['/Users/SKYLINE/leak'] = 1;
+  var r2 = _pe({ hypothesisSet: hs }, hostileOpts);
+  chk('HRR1-05-b: opts error detail does NOT echo path-like caller key',
+    r2.eligible === false && (!r2.detail || r2.detail.indexOf('/Users/') === -1));
+})();
+
 console.log('R3.0D D4 priority-engine adversarial suite: ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);
