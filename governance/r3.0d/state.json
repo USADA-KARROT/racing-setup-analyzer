@@ -1,16 +1,22 @@
 {
   "schemaVersion": 1,
   "program": "R3.0D",
-  "currentCheckpoint": "D4_PRIORITY_ENGINE",
+  "currentCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
   "authorizedProductionPaths": [
     { "path": "renderer/js/r3-0d-evidence-graph.js", "capability": "evidence_graph_present" },
     { "path": "renderer/js/r3-0d-hypothesis-engine.js", "capability": "hypothesis_engine_present" },
-    { "path": "renderer/js/r3-0d-priority-engine.js", "capability": "priority_engine_present" }
+    { "path": "renderer/js/r3-0d-priority-engine.js", "capability": "priority_engine_present" },
+    { "path": "renderer/js/r3-0d-engineer-brief.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/r3-0d-engineer-viewmodel.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/r3-0d-engineer-orchestrator.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/r3-0d-engineer-ui.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/i18n-r3-0d.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/feature-registry.js", "capability": "feature_registry_active" }
   ],
-  "enabledCapabilities": ["contract_foundation_present", "evidence_graph_present", "hypothesis_engine_present", "priority_engine_present"],
+  "enabledCapabilities": ["contract_foundation_present", "evidence_graph_present", "hypothesis_engine_present", "priority_engine_present", "engineer_brief_present", "feature_registry_active"],
   "runtimeConsumersAllowed": true,
-  "uiAllowed": false,
-  "featureRegistryActivationAllowed": false,
+  "uiAllowed": true,
+  "featureRegistryActivationAllowed": true,
   "algorithmsAllowed": true,
-  "note": "R3.0D D4_PRIORITY_ENGINE state. hypothesis_engine_present unlocks renderer/js/r3-0d-hypothesis-engine.js as the second authorized production path (the Hypothesis Engine module that consumes D2 authoritative Evidence Graph snapshots and derives Hypothesis objects via a closed deterministic rule registry). The D2 module (evidence_graph_present) remains authorized. runtimeConsumersAllowed AND algorithmsAllowed remain true (the engine is a runtime consumer of contracts/r3.0d and a deterministic algorithm). uiAllowed + featureRegistryActivationAllowed remain false — UI surface and Feature Registry activation are exclusively D5_ENGINEER_BRIEF_ACTIVATION. The renderer/js/feature-registry.js is untouched (no R3.0D feature ID is registered until D5). Mutating any state field above D3 requires a separately-authorized Integrated Delivery Train checkpoint (D4 priority_engine_present / D5 engineer_brief_present + feature_registry_active) AND requires R3.0C state.currentCheckpoint === 'C8_ACTIVATION' per cross-phase rule."
+  "note": "R3.0D D5_ENGINEER_BRIEF_ACTIVATION state. engineer_brief_present unlocks renderer/js/r3-0d-engineer-brief.js + r3-0d-engineer-viewmodel.js + r3-0d-engineer-orchestrator.js + r3-0d-engineer-ui.js + i18n-r3-0d.js as authorized production paths. feature_registry_active is enabled: feature-registry.js NOW carries NAV_NODE 'case:engineer_brief' + FEATURE 'engineer_brief' (case_scoped, available_conditional). uiAllowed + featureRegistryActivationAllowed transition to true — both scoped to the engineer_brief feature only. R3.0E (E1..E5) and R3.0F remain FORBIDDEN. R3.0B portable schema + R3.0C contracts/production untouched. Mutating any state field above D5 requires R3.0E E1_EXPERIMENT_CONTRACTS authorization, which itself requires D5_ENGINEER_BRIEF_ACTIVATION to be the current checkpoint AND R3.0C state.currentCheckpoint === 'C8_ACTIVATION' per cross-phase rule. The D3+D4 producer-attestation chain (closure-private WeakSet identity attestation, captured Reflect.apply on captured WeakSet.prototype methods) extends to D5 via PE.verifyAuthoritativePrioritySet + EB.verifyAuthoritativeEngineerBrief + VM.verifyAuthoritativeEngineerViewModel."
 }

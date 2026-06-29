@@ -362,8 +362,15 @@ chk('BRIEF future schema rejected', EB.validateEngineerBriefShape(validBrief({ s
   chk('governance/r3.0d/state.json readable', st !== null);
   if (st) {
     chk('R3.0D currentCheckpoint is a known D-phase checkpoint', ['D0_BOOTSTRAP', 'D1_CONTRACT_FOUNDATION', 'D2_EVIDENCE_GRAPH', 'D3_HYPOTHESIS_ENGINE', 'D4_PRIORITY_ENGINE', 'D5_ENGINEER_BRIEF_ACTIVATION'].indexOf(st.currentCheckpoint) !== -1);
-    chk('R3.0D uiAllowed=false (until D5)', st.uiAllowed === false);
-    chk('R3.0D featureRegistryActivationAllowed=false (until D5)', st.featureRegistryActivationAllowed === false);
+    // uiAllowed / featureRegistryActivationAllowed transition at D5_ENGINEER_BRIEF_ACTIVATION.
+    // Pre-D5 they are false; at D5 both become true (scoped to the engineer_brief feature).
+    if (st.currentCheckpoint === 'D5_ENGINEER_BRIEF_ACTIVATION') {
+      chk('R3.0D D5: uiAllowed=true', st.uiAllowed === true);
+      chk('R3.0D D5: featureRegistryActivationAllowed=true', st.featureRegistryActivationAllowed === true);
+    } else {
+      chk('R3.0D pre-D5: uiAllowed=false', st.uiAllowed === false);
+      chk('R3.0D pre-D5: featureRegistryActivationAllowed=false', st.featureRegistryActivationAllowed === false);
+    }
     if (st.currentCheckpoint === 'D1_CONTRACT_FOUNDATION') {
       chk('D1: authorizedProductionPaths empty', Array.isArray(st.authorizedProductionPaths) && st.authorizedProductionPaths.length === 0);
       chk('D1: runtimeConsumersAllowed=false', st.runtimeConsumersAllowed === false);

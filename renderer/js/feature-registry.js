@@ -36,6 +36,11 @@
     'case:recommendations': { id: 'case:recommendations', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'recommendations', labelKey: 'casenav.recommendations', order: 5, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'recommendations', currentTab: 'analysis' } },
     'case:corner_coaching': { id: 'case:corner_coaching', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'corner_coaching', labelKey: 'casenav.corner_coaching', order: 6, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'corner_coaching', currentTab: 'analysis' } },
     'case:evidence_trust': { id: 'case:evidence_trust', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'evidence_trust', labelKey: 'casenav.evidence_trust', order: 7, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'evidence_trust', currentTab: 'analysis' } },
+    // R3.0D D5 — Engineer Brief subview. Mounts the render-only Engineer Brief pane wired via
+    // R3_0D_EngineerOrchestrator (case/session-scoped; cleared on case/session/mapping/calibration
+    // /telemetry change). Activation governed by governance/r3.0d/state.json
+    // (featureRegistryActivationAllowed=true at D5_ENGINEER_BRIEF_ACTIVATION).
+    'case:engineer_brief': { id: 'case:engineer_brief', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'engineer_brief', labelKey: 'casenav.engineer_brief', order: 8, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'engineer_brief', currentTab: 'analysis' } },
   };
 
   // ── FEATURES — the 23 stable Feature IDs ──
@@ -71,6 +76,10 @@
     recommendations: F('recommendations', 'case_scoped', 'case:recommendations', 'analysis', { availability: 'available_conditional' }),
     corner_coaching: F('corner_coaching', 'case_scoped', 'case:corner_coaching', 'analysis', { availability: 'available_conditional' }),
     evidence_trust: F('evidence_trust', 'case_scoped', 'case:evidence_trust', 'analysis'),
+    // R3.0D D5 — Engineer Brief feature. case_scoped; available_conditional because the
+    // pane only populates when the case carries an authoritative D3/D4/D5 chain (no
+    // hypothesis set → 'unavailable' / 'inconclusive' display state, NOT a missing feature).
+    engineer_brief: F('engineer_brief', 'case_scoped', 'case:engineer_brief', 'analysis', { availability: 'available_conditional' }),
     // R3.0C — activated at C8_ACTIVATION (governance/r3.0c/state.json featureRegistryActivationAllowed=true).
     // Pane id 'comparisons' is served by the Comparison Workspace UI (renderer/index.html data-r3c-c7-pane).
     // Same-Analysis-Case / same-session scope is enforced by the orchestrator + viewmodel; feature-router only

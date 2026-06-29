@@ -27,6 +27,7 @@ require('../renderer/js/i18n-advisor.js');
 require('../renderer/js/i18n-shell.js');
 require('../renderer/js/i18n-workspace.js');
 require('../renderer/js/i18n-comparisons.js');
+require('../renderer/js/i18n-r3-0d.js');
 const { en, zh, ja } = global.I18N;
 
 // Codex C7 finding C7-H1 closure: every key in contracts/r3.0c/framing-i18n-key-registry.js

@@ -108,6 +108,54 @@
   var _CAPTURED_OBJECT_IS_FROZEN = Object.isFrozen;
   var _CAPTURED_OBJECT_IS = Object.is;
   var _CAPTURED_DATE_PARSE = Date.parse;
+
+  // ---- D5 producer-attestation captures (mirror D3 R4-01 hardening) -------------------------
+  // PRODUCER AUTHORITY MODEL (mirror of D3 → D4 pattern for D4 → D5):
+  //   D4 is the SOLE PRODUCER of authoritative PrioritySets. After full validation +
+  //   deep-freeze, _registerAuthoritative() adds the prioritySet object reference to a
+  //   closure-private WeakSet. The exported verifyAuthoritativePrioritySet() checks
+  //   reference membership via captured Reflect.apply on captured WeakSet.prototype.has —
+  //   the closure-private WeakSet is the trust anchor. Caller cannot forge, register, or
+  //   exfiltrate. Clones / JSON round-trips / hand-forged frozen objects all fail because
+  //   their object references are not in the registry.
+  //
+  //   Codex D5 will verify ordering invariants: verifier MUST be the first read on input
+  //   (no Proxy traps fire before rejection), clock invoked at most once post-authority.
+  var _WeakSetCtor = WeakSet;
+  var _WS_ADD = WeakSet.prototype.add;
+  var _WS_HAS = WeakSet.prototype.has;
+  var _CAPTURED_REFLECT_APPLY = Reflect.apply;
+  function _wsAdd(set, value) {
+    try { _CAPTURED_REFLECT_APPLY(_WS_ADD, set, [value]); return true; }
+    catch (e) { return false; }
+  }
+  function _wsHas(set, value) {
+    try { return _CAPTURED_REFLECT_APPLY(_WS_HAS, set, [value]) === true; }
+    catch (e) { return false; }
+  }
+  var _authoritativePrioritySets = new _WeakSetCtor();
+  function _registerAuthoritativePrioritySet(prioritySet) {
+    _wsAdd(_authoritativePrioritySets, prioritySet);
+  }
+  function verifyAuthoritativePrioritySet(candidate) {
+    try {
+      if (candidate === null || typeof candidate !== 'object') return false;
+      // Captured Reflect.apply on captured WeakSet.prototype.has — defeats post-load
+      // `WeakSet.prototype.has = () => true` rebinding (the captured reference points
+      // at the original method; dispatch bypasses the prototype chain). Also: WeakSet.has
+      // is identity-only, so it does NOT invoke [[Get]] on the candidate — Proxy traps
+      // do not fire when rejecting non-members.
+      if (!_wsHas(_authoritativePrioritySets, candidate)) return false;
+      if (_CAPTURED_OBJECT_IS_FROZEN(candidate) !== true) return false;
+      if (candidate.schemaVersion !== PRIORITY_SET_SCHEMA_VERSION) return false;
+      if (typeof candidate.prioritySetId !== 'string') return false;
+      if (typeof candidate.sourceHypothesisSetId !== 'string') return false;
+      if (typeof candidate.sourceGraphId !== 'string') return false;
+      if (!Array.isArray(candidate.priorities)) return false;
+      return true;
+    } catch (e) { return false; }
+  }
+
   function _isFrozenSafe(v) { try { return _CAPTURED_OBJECT_IS_FROZEN(v) === true; } catch (e) { return false; } }
   function _exactlyEqual(a, b) { try { return _CAPTURED_OBJECT_IS(a, b) === true; } catch (e) { return false; } }
   function _isoToMs(s) {
@@ -1097,6 +1145,10 @@
         return _buildIntrinsicTamperBlock('intrinsic-tampering detected post-freeze');
       }
 
+      // D5 producer-attestation hook: ONLY a fully validated + fully deep-frozen prioritySet
+      // is registered as authoritative. Blocked / partial results never reach this line.
+      _registerAuthoritativePrioritySet(prioritySet);
+
       return HI.deepFreeze({ valid: true, prioritySet: prioritySet });
 
     } catch (eOuter) {
@@ -1115,6 +1167,11 @@
     LIMITATIONS_PER_PRIORITY_CAP: LIMITATIONS_PER_PRIORITY_CAP,
     ENVELOPE_BYTE_CAP: ENVELOPE_BYTE_CAP,
     buildPrioritySet: buildPrioritySet,
+    // D5 producer-attestation verifier. D5 (Engineer Brief) calls this to confirm an alleged
+    // D4 PrioritySet snapshot was actually produced by THIS D4 instance. The closure-private
+    // WeakSet is the trust anchor — never exposed via any other API surface. Returns boolean.
+    // NEVER throws. NEVER reveals the registry. NEVER signs caller payloads.
+    verifyAuthoritativePrioritySet: verifyAuthoritativePrioritySet,
   };
   try { HI.deepFreeze(api); } catch (e) { /* swallow */ }
 

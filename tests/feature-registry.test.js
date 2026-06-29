@@ -30,7 +30,7 @@ const ACTIVATION_ALLOWED = readGovernanceActivationAllowed();
 
 // registry self-validation
 (() => { const v = R.validateRegistry(); chk('registry validates (no errors)', v.ok === true, v.errors); })();
-chk('23 features', Object.keys(R.FEATURES).length === 23);
+chk('24 features (R3.0D D5 added engineer_brief as 24th)', Object.keys(R.FEATURES).length === 24);
 chk('all feature ids unique + self-keyed', Object.keys(R.FEATURES).every(k => R.FEATURES[k].id === k));
 
 // every non-deferred feature is reachable (no orphan / no unreachable)
@@ -45,7 +45,7 @@ if (ACTIVATION_ALLOWED) {
 } else {
   chk('mainNav comparisons is deferred R3.0C', R.deriveMainNav().find(n => n.id === 'comparisons').deferred === 'R3.0C');
 }
-chk('caseNav = 8 subviews', R.deriveCaseNav().length === 8);
+chk('caseNav = 9 subviews (R3.0D D5 added engineer_brief)', R.deriveCaseNav().length === 9);
 chk('caseSubviewIds === caseNav ids (no separate whitelist)', JSON.stringify(R.deriveCaseSubviewIds()) === JSON.stringify(R.deriveCaseNav().map(n => n.id)));
 
 // THE ORPHAN FIX: setup_library pane ids now INCLUDE 'predict'
