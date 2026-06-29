@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0D",
+  "checkpoint": "D4_PRIORITY_ENGINE",
+  "baseSha": "6ab8f390b0128bbee4df77f88fa2edd46df6b677",
+  "headSha": null,
+  "previousCheckpoint": "D3_HYPOTHESIS_ENGINE",
+
+  "shaSeparation": {
+    "note": "Per SKYLINE 2026-06-28 R3.0 Final Continuous Execution Directive §7 + 2026-06-29 R3.0 Continuous Resume Directive §12, every checkpoint manifest preserves the three-way SHA separation. reviewedCandidateSha is the exact SHA Codex D4 review was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD.",
+    "reviewedCandidateSha": null,
+    "reviewedCandidateNote": "Filled by a follow-up evidence-anchoring commit after Codex D4 issues PASS against the exact candidate SHA on feat/r3.0d-d4-priority-engine. Lineage at governance/r3.0d/codex-checkpoint-evidence/D4/round-{1..N}-<sha>.raw.txt.",
+    "manifestCommitSha": null,
+    "manifestCommitNote": "Filled by the same follow-up evidence-anchoring commit; mirrors D1/D2/D3 convention.",
+    "integrationSha": null,
+    "integrationNote": "Filled only after the D4 branch-to-branch PR merges into feat/r3.0-integrated-delivery AND the Train target-context trusted-verification PASSes."
+  },
+
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0d-evidence-graph.js", "capability": "evidence_graph_present" },
+    { "path": "renderer/js/r3-0d-hypothesis-engine.js", "capability": "hypothesis_engine_present" },
+    { "path": "renderer/js/r3-0d-priority-engine.js", "capability": "priority_engine_present" }
+  ],
+  "newlyAuthorizedPath": "renderer/js/r3-0d-priority-engine.js",
+  "newlyEnabledCapability": "priority_engine_present",
+
+  "enabledCapabilitiesBefore": ["contract_foundation_present", "evidence_graph_present", "hypothesis_engine_present"],
+  "enabledCapabilitiesAfter": ["contract_foundation_present", "evidence_graph_present", "hypothesis_engine_present", "priority_engine_present"],
+  "forbiddenCapabilities": ["engineer_brief_present", "feature_registry_active"],
+
+  "contractEnforcements": {
+    "priorityEngineScope": "renderer/js/r3-0d-priority-engine.js consumes ONLY a D3 authoritative Hypothesis Set snapshot. Authority verified via: (a) frozen-input via captured Object.isFrozen; (b) HI.safeStructuredClone defang; (c) post-clone HI.deepOriginalShapeAudit; (d) hypothesisSetId FNV-1a 32-bit×2 recompute equality (byte-equivalent to D3 hash); (e) per-hypothesis structural revalidation (hypothesisId grammar pri_<16hex>, closed category enum HC.HYPOTHESIS_CATEGORIES, closed credibility enum, confidence.state non-empty string + score integer in [0,100]); (f) mandatory freshness reference time via opts.clock() OR opts.referenceNowMs; (g) input + opts descriptor-only snapshot rejecting Symbol/non-enumerable/accessor/function fields; (h) deep-frozen output.",
+    "fixedPriorityLadder": "Hard-coded ladder: (1) fix_data_quality (tier 1) → (2) recalibrate_channel (tier 2) → (3) controlled_repeat_lap (tier 3) → (4) driver_experiment (tier 4) → (5) setup_experiment (tier 5) → collect_additional_session/lap (tier 6) → no_action_required (tier 7). Order MUST NOT be reversed. Within same tier: confidence.score desc, then hypothesisId asc.",
+    "categoryToKindMapping": "data_quality → fix_data_quality; mapping_calibration → recalibrate_channel; driver_behaviour → controlled_repeat_lap; vehicle_response → controlled_repeat_lap; setup_model → setup_experiment (with downgrade to controlled_repeat_lap if not eligibleAsSetupExperiment).",
+    "closedKindEnum": "PRIORITY_KIND_ALLOWED matches D1 hypothesis-contract.VALIDATION_ACTION_KIND_ALLOWED {fix_data_quality, recalibrate_channel, controlled_repeat_lap, driver_experiment, setup_experiment, collect_additional_session, collect_additional_lap, no_action_required}.",
+    "blockingPrerequisites": "Each priority entry lists blockingPrerequisiteIds — IDs of all higher-priority (lower tier number) priorities whose hypothesis has supportable evidence (credibility ≥ Derived AND status not contradicted/blocked). A priority with non-empty blockingPrerequisiteIds cannot become primary.",
+    "primaryEligibility": "primaryActionId points to the highest-rank priority that is eligibleAsPrimary AND has zero blocking prerequisites. eligibleAsPrimary requires: credibility ≥ Derived; status NOT contradicted/blocked; confidence.state ∈ {moderate, high}. setup_experiment additionally requires confidence.state === 'high' + zero contradictions + credibility ≥ Derived (per directive §12 'unsupported setup actions' forbidden — downgraded to controlled_repeat_lap otherwise).",
+    "rollbackRequired": "Every priority entry carries stopConditionI18nKey + rollbackConditionI18nKey. No irreversible action emitted without explicit rollback.",
+    "noAutoMode": "D4 emits descriptive priorities only. NO apply_mode field. NO auto_tuning / auto_setup / auto_calibration / auto_preset (these are D4 FORBIDDEN per directive §10/§12).",
+    "noLLM": "Deterministic. No LLM call. No runtime config.",
+    "noUI": "No DOM mutation, no Alpine binding, no index.html script src. UI is D5_ENGINEER_BRIEF_ACTIVATION.",
+    "hardenedIntrinsicsEnforced": "All ambient calls go through HI. Module-init captures: Object.isFrozen, Date.parse, Object.is. Hash byte-equivalent to D2/D3 (FNV-1a 32-bit×2). Apply D3 R1-R7 lessons proactively (27 known attack patterns avoided).",
+    "deterministicOutput": "Same input Hypothesis Set produces identical prioritySetId, identical priorityIds, identical ranks, identical limitations, identical blockingPrerequisiteIds. Clock-independent for IDs; clock-dependent only for createdAt.",
+    "caps": "PRIORITY_COUNT_CAP=128, PREREQ_ID_PER_PRIORITY_CAP=32, LIMITATIONS_PER_PRIORITY_CAP=32, SNAPSHOT_LIMITATIONS_CAP=64, SNAPSHOT_CANNOT_CONCLUDE_CAP=64, ENVELOPE_BYTE_CAP=512 KiB, INPUT_HYPOTHESES_INPUT_CAP=64 (mirror D3 HYPOTHESIS_COUNT_CAP). generationToken ≤ 128 chars; contextVersion ≤ 128 chars.",
+    "outerTryCatch": "buildPrioritySet wrapped in outer try/catch → INTERNAL_CONTRACT_VIOLATION on any uncaught throw."
+  },
+
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3.0d-priority-engine.test.js",
+    "newSuiteAssertions": 53,
+    "additionalSuites": {
+      "r3.0d-contract-foundation": { "path": "tests/r3.0d-contract-foundation.test.js", "assertions": 160, "purpose": "D1 contract foundation (unchanged at D4)" },
+      "r3.0d-hardened-intrinsics": { "path": "tests/r3.0d-hardened-intrinsics.test.js", "assertions": 75, "purpose": "HI wrappers (unchanged at D4)" },
+      "r3.0d-evidence-graph": { "path": "tests/r3.0d-evidence-graph.test.js", "assertions": 261, "purpose": "D2 evidence graph (unchanged at D4)" },
+      "r3.0d-hypothesis-engine": { "path": "tests/r3.0d-hypothesis-engine.test.js", "assertions": 158, "purpose": "D3 hypothesis engine (unchanged at D4)" }
+    },
+    "evidenceTier": "TIER 3 — Claude-verified on D4 branch HEAD; CI re-run on integrationSha is the authority."
+  },
+
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+
+  "codexVerdict": {
+    "verdict": "PENDING",
+    "verdictRound": 0,
+    "reviewedCandidateSha": null,
+    "verdictEvidenceFile": null,
+    "rounds": []
+  },
+
+  "scopeBoundary": {
+    "frozenFilesUntouched": true,
+    "r30bPersistenceUntouched": true,
+    "r30cContractsUntouched": true,
+    "r30cProductionUntouched": true,
+    "featureRegistryUnchanged": true,
+    "indexHtmlUnchanged": true,
+    "noR30dFeatureIdInRegistry": true,
+    "runtimeConsumerCount": 3,
+    "productionPathCount": 3,
+    "algorithmCount": 3,
+    "uiSurfaceCount": 0
+  },
+
+  "frozenDiff": 0,
+  "productionDiff": 1,
+  "runtimeConsumerCount": 3,
+
+  "featureRegistryState": {
+    "expectedDeferredIds": ["decision_engine", "hypothesis", "engineer_brief"],
+    "expectedRendererAdapter": false,
+    "note": "D4 does NOT register any R3.0D feature ID. Feature Registry activation is exclusively D5_ENGINEER_BRIEF_ACTIVATION."
+  },
+
+  "crossPhaseGate": {
+    "r3cCheckpoint": "C8_ACTIVATION",
+    "requiredFor": "D4_PRIORITY_ENGINE",
+    "satisfied": true,
+    "note": "R3.0C state.currentCheckpoint === 'C8_ACTIVATION' verified."
+  },
+
+  "packageVersion": "1.4.0",
+  "createdAt": "2026-06-29T07:50:00Z",
+
+  "status": "candidate",
+  "governanceChanged": true,
+
+  "changedFiles": [
+    "renderer/js/r3-0d-priority-engine.js",
+    "tests/r3.0d-priority-engine.test.js",
+    "governance/r3.0d/checkpoints/D4.json",
+    "governance/r3.0d/state.json",
+    "governance/r3.0/train.json",
+    "package.json"
+  ],
+  "changedFilesNote": "Computed from baseSha (6ab8f39, D3 merge) → D4 candidate HEAD diff. Adds: (1) renderer/js/r3-0d-priority-engine.js — production module (~600 lines, all HI-wrapped, D3 R1-R7 lessons applied proactively, layered authority + multi-set semantics consistent with D2/D3, deep-frozen output); (2) tests/r3.0d-priority-engine.test.js — 53-assertion adversarial suite (sections A-N covering functional, structural, authority, scope, ladder, blocking prereqs, primary eligibility, security, privacy, HI wrapper mutation matrix, output immutability, mandatory freshness, closed kind enum, forbidden behaviors); (3) D4.json manifest; (4) state.json + train.json transitions to D4_PRIORITY_ENGINE.",
+
+  "note": "R3.0D D4_PRIORITY_ENGINE — Priority Engine module consumes D3 Hypothesis Set and emits deep-frozen Priority Set with fixed ladder (data_quality → mapping → driver_experiment → setup_experiment). Capability priority_engine_present is enabled; uiAllowed + featureRegistryActivationAllowed remain false (D5)."
+}
