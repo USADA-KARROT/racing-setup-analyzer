@@ -346,5 +346,103 @@ function runRebind(container, key, hostileImpl, action) {
     Object.keys(HI).every(k => !k.startsWith('_')));
 })();
 
+// ── Group 9 — coverage gap fix (Codex Round 17 RN-31 closure) ───────────────────
+// The original 25 wrappers cover the primary attack surface; these 5 helpers were left
+// untested in the initial pass. Codex Round 17 mutation-tested by rewriting each helper
+// to call ambient and observed the suite still passed — proving they were unprotected.
+// Each test below now follows the same pattern: rebind the ambient method the helper
+// uses internally and assert (a) hits === 0 (b) wrapper output correct.
+(function group9_coverageGap() {
+  // safeStringToLowerCase — uses captured String.prototype.toLowerCase via Reflect.apply.
+  (function () {
+    const r = runRebind(String.prototype, 'toLowerCase', function () { return 'POISONED'; }, function () {
+      return HI.safeStringToLowerCase('HELLO') === 'hello' && HI.safeStringToLowerCase('R3_0D') === 'r3_0d';
+    });
+    chk('safeStringToLowerCase: hostile String.prototype.toLowerCase never invoked', r.hits === 0);
+    chk('safeStringToLowerCase: output correct ("HELLO"→"hello", "R3_0D"→"r3_0d")', r.result === true);
+  })();
+
+  // safeIsArray — uses captured Array.isArray via Reflect.apply.
+  (function () {
+    const r = runRebind(Array, 'isArray', function () { return true; }, function () {
+      return HI.safeIsArray([]) === true && HI.safeIsArray({}) === false && HI.safeIsArray('x') === false;
+    });
+    chk('safeIsArray: hostile Array.isArray never invoked', r.hits === 0);
+    chk('safeIsArray: output correct ([]→true, {}→false, "x"→false)', r.result === true);
+  })();
+
+  // safeIsPlainShape — uses captured Array.isArray + Object.getPrototypeOf via Reflect.apply.
+  // Test rebinding each separately.
+  (function () {
+    const r1 = runRebind(Array, 'isArray', function () { return true; }, function () {
+      return HI.safeIsPlainShape({ a: 1 }) === 'plain-object'
+        && HI.safeIsPlainShape([1, 2]) === 'plain-array'
+        && HI.safeIsPlainShape(new class {}()) === 'reject';
+    });
+    chk('safeIsPlainShape: hostile Array.isArray never invoked', r1.hits === 0);
+    chk('safeIsPlainShape: output correct under Array.isArray rebind', r1.result === true);
+
+    const r2 = runRebind(Object, 'getPrototypeOf', function () { return null; }, function () {
+      return HI.safeIsPlainShape({ a: 1 }) === 'plain-object'
+        && HI.safeIsPlainShape([1, 2]) === 'plain-array'
+        && HI.safeIsPlainShape(new class {}()) === 'reject';
+    });
+    chk('safeIsPlainShape: hostile Object.getPrototypeOf never invoked', r2.hits === 0);
+    chk('safeIsPlainShape: output correct under Object.getPrototypeOf rebind', r2.result === true);
+  })();
+
+  // safeObjectCreateNull — uses captured Object.create via Reflect.apply.
+  (function () {
+    const r = runRebind(Object, 'create', function () { return { tampered: true }; }, function () {
+      const obj = HI.safeObjectCreateNull();
+      return obj !== null
+        && typeof obj === 'object'
+        && Object.getPrototypeOf(obj) === null
+        && Object.keys(obj).length === 0
+        && obj.tampered === undefined;
+    });
+    chk('safeObjectCreateNull: hostile Object.create never invoked', r.hits === 0);
+    chk('safeObjectCreateNull: output correct (null-proto, empty, no tampered key)', r.result === true);
+  })();
+
+  // safeObjectAssign — uses safeKeys / safeGetOwnDescriptor / safeDefineDataProperty internally
+  // (no direct call to Object.assign). The most likely confusion is callers expecting ambient
+  // Object.assign semantics. Rebinding Object.assign must have no effect on the wrapper.
+  (function () {
+    const r = runRebind(Object, 'assign', function () { return { tampered: true }; }, function () {
+      const target = {};
+      const source = { a: 1, b: 2, c: 3 };
+      const ret = HI.safeObjectAssign(target, source);
+      return ret === target
+        && target.a === 1 && target.b === 2 && target.c === 3
+        && target.tampered === undefined
+        && Object.keys(target).length === 3;
+    });
+    chk('safeObjectAssign: hostile Object.assign never invoked', r.hits === 0);
+    chk('safeObjectAssign: output correct (own-keys shallow copy, no tampered key)', r.result === true);
+  })();
+
+  // Also verify safeObjectAssign defends against Object.prototype setter installation
+  // (the underlying defineProperty path bypasses [[Set]]).
+  (function () {
+    const setterDesc = Object.getOwnPropertyDescriptor(Object.prototype, 'tampered');
+    let setterHits = 0;
+    Object.defineProperty(Object.prototype, 'tampered', {
+      configurable: true, enumerable: false,
+      set: function (v) { setterHits++; },
+    });
+    let ok;
+    try {
+      const target = {};
+      HI.safeObjectAssign(target, { tampered: 'real' });
+      ok = target.tampered === 'real' && setterHits === 0;
+    } finally {
+      if (setterDesc) Object.defineProperty(Object.prototype, 'tampered', setterDesc);
+      else delete Object.prototype.tampered;
+    }
+    chk('safeObjectAssign: bypasses Object.prototype.tampered setter via defineProperty', ok === true);
+  })();
+})();
+
 console.log('R3.0D hardened-intrinsics direct-test suite: ' + pass + ' pass, ' + fail + ' fail');
 if (fail > 0) process.exit(1);
