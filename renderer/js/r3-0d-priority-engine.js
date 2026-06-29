@@ -581,11 +581,12 @@
       return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
     }
 
-    // Freshness — D3 already enforced node freshness, but D4 ALSO checks the snapshot's
-    // createdAt is not stale (so a snapshot kept indefinitely cannot drive priorities).
-    // hs.createdAt may be null (referenceNowMs-supplied path) — in that case D4 trusts the
-    // D3 freshness gate already passed and uses refNowMs as effective now.
-    if (hs.createdAt !== null) {
+    // Codex D4 R4 D4-R4-02 closure: freshness moved POST-CLOCK in buildPrioritySet (the
+    // validator now runs BEFORE clock invocation). When refNowMs is null the freshness check
+    // is intentionally skipped here — the caller (buildPrioritySet Step 3) re-runs the
+    // freshness check after the clock has produced refNowMs. This keeps the validator
+    // clock-independent so a hostile clock cannot fire on rejected authority.
+    if (refNowMs !== null && hs.createdAt !== null) {
       if (!_isNonEmptyString(hs.createdAt)) {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_FRESHNESS_STALE] };
       }
@@ -817,7 +818,20 @@
         }
       }
 
-      // ---- Step 1.5 — resolve freshness reference time ----
+      // ---- Step 1 — AUTHORITY + SCHEMA verify BEFORE clock invocation ----
+      // Codex D4 R4 D4-R4-02 closure: clock MUST NOT fire for forged input. Authority
+      // (WeakSet) + recursive descriptor audit + closed-key schema + per-hypothesis content
+      // validation are all clock-independent. Move them BEFORE clock invocation. Clock fires
+      // only after the input is proven to be a genuine D3-produced snapshot.
+      // Pass refNowMs=null + maxAgeMs=0 — the validator will SKIP freshness check when
+      // refNowMs is null. Freshness is then enforced separately in Step 4 (post-clock).
+      var authority = _validateAuthoritativeHypothesisSet(inputSnap.hypothesisSet, null, 0);
+      if (authority.valid !== true) {
+        return RC.buildBlockedResult(authority.reasonCodes, { detail: 'hypothesis set authority verification failed' });
+      }
+      var hs = authority.hypothesisSet;
+
+      // ---- Step 2 — resolve freshness reference time (clock invoked AT MOST ONCE, post-authority) ----
       var refNowMs = null;
       var resolvedClockIso = null;
       if (optsSnap && typeof optsSnap.referenceNowMs === 'number'
@@ -848,12 +862,22 @@
         maxAgeMs = optsSnap.maxAgeMs;
       }
 
-      // ---- Step 2 — authority verify the input Hypothesis Set ----
-      var authority = _validateAuthoritativeHypothesisSet(inputSnap.hypothesisSet, refNowMs, maxAgeMs);
-      if (authority.valid !== true) {
-        return RC.buildBlockedResult(authority.reasonCodes, { detail: 'hypothesis set authority verification failed' });
+      // ---- Step 3 — freshness check (post-clock) ----
+      if (hs.createdAt !== null) {
+        if (!_isNonEmptyString(hs.createdAt)) {
+          return RC.buildBlockedResult([CODES.EVIDENCE_FRESHNESS_STALE], { detail: 'createdAt invalid' });
+        }
+        var hsAt = _isoToMs(hs.createdAt);
+        if (hsAt === null) {
+          return RC.buildBlockedResult([CODES.EVIDENCE_FRESHNESS_STALE], { detail: 'createdAt not parseable' });
+        }
+        if ((refNowMs - hsAt) > maxAgeMs) {
+          return RC.buildBlockedResult([CODES.EVIDENCE_FRESHNESS_STALE], { detail: 'snapshot older than maxAgeMs' });
+        }
+        if (hsAt > (refNowMs + (5 * 60 * 1000))) {
+          return RC.buildBlockedResult([CODES.EVIDENCE_FRESHNESS_STALE], { detail: 'snapshot dated >5min in the future' });
+        }
       }
-      var hs = authority.hypothesisSet;
 
       // ---- Step 2.5 — generationToken / contextVersion ----
       var generationToken = null;

@@ -49,7 +49,7 @@
   "tests": {
     "command": "npm test",
     "newSuiteForThisCheckpoint": "tests/r3.0d-priority-engine.test.js",
-    "newSuiteAssertions": 97,
+    "newSuiteAssertions": 104,
     "additionalSuites": {
       "r3.0d-contract-foundation": { "path": "tests/r3.0d-contract-foundation.test.js", "assertions": 160, "purpose": "D1 contract foundation (unchanged at D4)" },
       "r3.0d-hardened-intrinsics": { "path": "tests/r3.0d-hardened-intrinsics.test.js", "assertions": 75, "purpose": "HI wrappers (unchanged at D4)" },
@@ -117,7 +117,8 @@
     "package.json",
     "governance/r3.0d/codex-checkpoint-evidence/D4/round-1-3a7a33e.raw.txt",
     "governance/r3.0d/codex-checkpoint-evidence/D4/round-2-f09323d.raw.txt",
-    "governance/r3.0d/codex-checkpoint-evidence/D4/round-3-4ed1e35.raw.txt"
+    "governance/r3.0d/codex-checkpoint-evidence/D4/round-3-4ed1e35.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D4/round-4-08bb063.raw.txt"
   ],
   "changedFilesNote": "Computed from baseSha (6ab8f39, D3 merge) → D4 candidate HEAD diff. Adds: (1) renderer/js/r3-0d-priority-engine.js — production module (~600 lines, all HI-wrapped, D3 R1-R7 lessons applied proactively, layered authority + multi-set semantics consistent with D2/D3, deep-frozen output); (2) tests/r3.0d-priority-engine.test.js — 53-assertion adversarial suite (sections A-N covering functional, structural, authority, scope, ladder, blocking prereqs, primary eligibility, security, privacy, HI wrapper mutation matrix, output immutability, mandatory freshness, closed kind enum, forbidden behaviors); (3) D4.json manifest; (4) state.json + train.json transitions to D4_PRIORITY_ENGINE.",
 
