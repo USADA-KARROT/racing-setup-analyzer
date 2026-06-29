@@ -444,5 +444,41 @@ function runRebind(container, key, hostileImpl, action) {
   })();
 })();
 
+// ── Group 10 — deepOriginalShapeAudit mutation-protection (Codex Round 18 closure) ─
+// Codex Round 18 mutation-tested deepOriginalShapeAudit by regressing its internal
+// safeGetPrototypeOf(v) call to ambient Object.getPrototypeOf(v); the prior suite still
+// passed 71/71. This test below closes that gap — under a hostile Object.getPrototypeOf
+// that lies (returns null for everything), the audit MUST still reject a class instance
+// (via captured _ObjectGetPrototypeOf) AND must NOT have invoked the hostile.
+(function group10_deepOriginalShapeAuditMutationProtection() {
+  class HostileClass { constructor() { this.x = 1; } }
+  const classInstance = new HostileClass();
+
+  const r = runRebind(Object, 'getPrototypeOf', function () { return null; }, function () {
+    // If deepOriginalShapeAudit uses captured _ObjectGetPrototypeOf (via safeGetPrototypeOf),
+    //   then proto for classInstance is HostileClass.prototype !== Object.prototype → reject (false).
+    // If it regresses to ambient Object.getPrototypeOf, the hostile returns null → audit treats
+    //   as Object.create(null) plain object → wrong (returns true).
+    const classRejected = HI.deepOriginalShapeAudit(classInstance) === false;
+    const plainAccepted = HI.deepOriginalShapeAudit({ a: 1, b: [1, 2] }) === true;
+    return classRejected && plainAccepted;
+  });
+  chk('deepOriginalShapeAudit: hostile Object.getPrototypeOf never invoked', r.hits === 0);
+  chk('deepOriginalShapeAudit: class instance still rejected under hostile Object.getPrototypeOf', r.result === true);
+
+  // Additional mutation-protection: regress safeIsArray to ambient. If the audit uses captured
+  // safeIsArray (via _ArrayIsArray Reflect.apply), an Array subclass should still be detected
+  // correctly. If it regresses to ambient Array.isArray, the same hostile would intercept.
+  class SubArr extends Array {}
+  const subArrInstance = new SubArr();
+  const r2 = runRebind(Array, 'isArray', function () { return false; }, function () {
+    // Even with Array.isArray rebound to return false, deepOriginalShapeAudit must still
+    // detect a class instance via the prototype check and reject it.
+    return HI.deepOriginalShapeAudit(subArrInstance) === false;
+  });
+  chk('deepOriginalShapeAudit: hostile Array.isArray never invoked', r2.hits === 0);
+  chk('deepOriginalShapeAudit: Array subclass still rejected under hostile Array.isArray', r2.result === true);
+})();
+
 console.log('R3.0D hardened-intrinsics direct-test suite: ' + pass + ' pass, ' + fail + ' fail');
 if (fail > 0) process.exit(1);

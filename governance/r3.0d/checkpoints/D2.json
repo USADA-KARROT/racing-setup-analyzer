@@ -96,7 +96,7 @@
     "additionalSuites": {
       "r3.0d-hardened-intrinsics": {
         "path": "tests/r3.0d-hardened-intrinsics.test.js",
-        "assertions": 71,
+        "assertions": 75,
         "purpose": "Direct adversarial proof of each HI.* wrapper. For every captured intrinsic, asserts BOTH (hostile invocation count === 0 AND wrapper output correct). Independent of renderer entry guard — proves the wrapper architecture itself, not just guard short-circuit. Codex D2 Round 16 RN-31 closure."
       }
     },
@@ -351,6 +351,18 @@
           "RN-31": "STILL-OPEN (coverage gap). Direct-test suite covers 25/30 HI.* wrappers; missing safeStringToLowerCase / safeIsArray / safeIsPlainShape / safeObjectCreateNull / safeObjectAssign. Codex mutation-tested by regressing safeStringToLowerCase to ambient `s.toLowerCase()` — suite still passed 58/58, proving these 5 wrappers have no regression protection."
         },
         "evidence": "governance/r3.0d/codex-checkpoint-evidence/D2/round-17-8cb28b5.raw.txt"
+      },
+      {
+        "round": 18,
+        "reviewedSha": "70a4f036f10bc9c0cb22e9589c4fca61dbdc4369",
+        "verdict": "BLOCK",
+        "closed": [],
+        "stillOpen": ["RN-31"],
+        "newFindings": [],
+        "findingDetail": {
+          "RN-31": "STILL-OPEN (last coverage gap). 29/30 HI.* wrappers mutation-protected, but deepOriginalShapeAudit's internal safeGetPrototypeOf(v) call was uncovered — regressing to ambient Object.getPrototypeOf(v) still passed 71/71 EXIT 0."
+        },
+        "evidence": "governance/r3.0d/codex-checkpoint-evidence/D2/round-18-70a4f03.raw.txt"
       }
     ],
     "tierDisclosure": "Codex D2 Round 1 BLOCK on 10766c0 (12 findings); Round 2 BLOCK on ad6474a (closed 6 / 6 still-open); Round 3 BLOCK on 63ecf69 (closed 5 + RN-13/RN-14 NEW + RN-09 partial); Round 4 BLOCK on e84d22c (closed RN-09 + RN-14 + RN-15 NEW + RN-13 still partial); Round 5 BLOCK on ec00b88 (RN-13 round-4 + RN-15 round-4 STILL-OPEN); Round 6 BLOCK on d7c045f (RN-15 round-4 CLOSED; RN-13 round-4 STILL-OPEN via Array.prototype['0'] setter; RN-16 + RN-17 NEW); Round 7 BLOCK on 90bf868 (RN-13 round-4 + RN-17 CLOSED; RN-16 STILL-OPEN via same-source 595-edge); Round 8 BLOCK on 497c143 (RN-16 CLOSED via Step 11.5 exact preview; RN-18 NEW — Object.prototype.toJSON hook invoked by _JSONStringify can mutate shared edges array OR return stateful different sizes between Step 11.5 and Step 17). Round 9 candidate switches Step 4.5 (per-node estimator) + Step 11.5 (preview check) + Step 17 (belt-and-suspenders) from _JSONStringify to _stableStringify. _stableStringify walks via captured _ObjectKeys + manual indexed array recursion + direct primitive encoding — it NEVER performs a [[Get]] for the toJSON property anywhere in the value tree, foreclosing both the mutation vector (toJSON cannot fire on the previewIdPayload reference holding the shared `edges` array) AND the stateful-size vector (toJSON is not invoked, so any installed hook is benign for byte cap purposes). _stableStringify also patched to use captured _ObjectKeys / _ArrayIsArray / _JSONStringify (the only _JSONStringify call left is on primitive strings, where ES Quote runs without any toJSON [[Get]]). Adversarial regressions added in Section T (Object.prototype.toJSON mutation / stateful-size / Array.prototype.toJSON / throwing toJSON — all fail-closed without hook firing). Tier 1 raw stdout for all eight rounds at round-{1..8}-<sha>.raw.txt."
@@ -413,6 +425,7 @@
     "governance/r3.0d/codex-checkpoint-evidence/D2/round-15-764ae80.raw.txt",
     "governance/r3.0d/codex-checkpoint-evidence/D2/round-16-181c7d8.raw.txt",
     "governance/r3.0d/codex-checkpoint-evidence/D2/round-17-8cb28b5.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D2/round-18-70a4f03.raw.txt",
     "contracts/r3.0d/hardened-intrinsics.js",
     "tests/r3.0d-hardened-intrinsics.test.js",
     "contracts/r3.0d/credibility-contract.js",
@@ -434,7 +447,7 @@
     "tests/r3.0d-contract-foundation.test.js",
     "tests/r3.0d-evidence-graph.test.js"
   ],
-  "changedFilesNote": "Computed from the exact baseSha (f8a598b) → Round 18 candidate HEAD diff. Includes the Round 16 architectural convergence: contracts/r3.0d/hardened-intrinsics.js (new shared utility, closure-private intrinsic captures + narrow safe wrappers) PLUS refactor of the four D1 contract modules (credibility/source-identity/evidence-node/reason-codes) + renderer to call ONLY safe wrappers (no ambient prototype method invocation anywhere in the validation path). Hardened-intrinsics is a SHARED tooling utility consumed by both D1 contracts and D2 renderer — no schema/contract semantic change (D1 + D2 test suites pass identical to pre-refactor baseline). Includes the cross-phase rename commit (governance/r3.0e files + docs/r3-0-train-governance.md), the state-aware guard-enhancement commit (scripts/check-r3-phase-no-consumer.js + tests/r3-0-phase-no-consumer.test.js), every Codex evidence file from Round 1 through Round 10 (so the candidate carries its own evidence lineage), plus all D2 production / test / governance artifacts. RN-12 closure.",
+  "changedFilesNote": "Computed from the exact baseSha (f8a598b) → Round 19 candidate HEAD diff. Includes the Round 16 architectural convergence: contracts/r3.0d/hardened-intrinsics.js (new shared utility, closure-private intrinsic captures + narrow safe wrappers) PLUS refactor of the four D1 contract modules (credibility/source-identity/evidence-node/reason-codes) + renderer to call ONLY safe wrappers (no ambient prototype method invocation anywhere in the validation path). Hardened-intrinsics is a SHARED tooling utility consumed by both D1 contracts and D2 renderer — no schema/contract semantic change (D1 + D2 test suites pass identical to pre-refactor baseline). Includes the cross-phase rename commit (governance/r3.0e files + docs/r3-0-train-governance.md), the state-aware guard-enhancement commit (scripts/check-r3-phase-no-consumer.js + tests/r3-0-phase-no-consumer.test.js), every Codex evidence file from Round 1 through Round 10 (so the candidate carries its own evidence lineage), plus all D2 production / test / governance artifacts. RN-12 closure.",
 
   "note": "D2_EVIDENCE_GRAPH — the first non-bootstrap R3.0D PRODUCTION checkpoint. Lifts ONE production capability (evidence_graph_present); enables runtimeConsumersAllowed=true + algorithmsAllowed=true; introduces renderer/js/r3-0d-evidence-graph.js as the single new authorized production path; keeps uiAllowed=false + featureRegistryActivationAllowed=false (D5 only). The 5-phase D-flow is renamed atomically alongside this checkpoint per the directive; the rename is recorded in governanceRename above with full lineage. C-B Codex review runs against the exact D2 candidate SHA; tier-1 raw stdout to be persisted under governance/r3.0d/codex-checkpoint-evidence/D2/."
 }

@@ -1,0 +1,3020 @@
+Reading prompt from stdin...
+OpenAI Codex v0.141.0
+--------
+workdir: /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 019f10c2-4cb6-7332-b662-e17b6a53131f
+--------
+user
+# Codex D2 Checkpoint Adversarial Review — Round 18
+
+Round history:
+- Round 1..16: see prior evidence files
+- Round 17 (8cb28b5) → BLOCK; RN-28 CLOSED via captured TextEncoder.prototype.encode; RN-31
+  STILL-OPEN (5 wrappers in direct-test suite uncovered, proven by mutation test)
+
+## Round 18 target
+
+- Round 18 candidate SHA: **`70a4f036f10bc9c0cb22e9589c4fca61dbdc4369`**
+- Train base: `feat/r3.0-integrated-delivery` HEAD = `f8a598b84c19517fe55b77877b91462e295f27ed`
+
+Round 18 candidate commit: `70a4f03 cp17r(d2): close Codex D2 Round 17 — RN-31 coverage gap`
+
+Round 17 evidence at `governance/r3.0d/codex-checkpoint-evidence/D2/round-17-8cb28b5.raw.txt` (Tier 1).
+
+## Round 18 closure
+
+**RN-31 (coverage gap)**: tests/r3.0d-hardened-intrinsics.test.js extended with direct-tests
+for the 5 wrappers Codex Round 17 identified as uncovered:
+  - safeStringToLowerCase   (rebind String.prototype.toLowerCase)
+  - safeIsArray             (rebind Array.isArray)
+  - safeIsPlainShape        (rebind Array.isArray + Object.getPrototypeOf separately)
+  - safeObjectCreateNull    (rebind Object.create)
+  - safeObjectAssign        (rebind Object.assign + Object.prototype setter installation)
+
+Each test asserts BOTH (hostile invocation count === 0) AND (wrapper output correct).
+Suite assertions 58 → 71.
+
+Mutation-test verification per Codex Round 17 methodology — for each of 4 wrappers, regressing
+the captured-intrinsic call back to ambient causes the suite to fail (exit 1):
+  safeStringToLowerCase → s.toLowerCase()     → EXIT 1 (caught)
+  safeIsArray           → Array.isArray(v)    → EXIT 1 (caught)
+  safeIsPlainShape      → Array.isArray(v)    → EXIT 1 (caught)
+  safeObjectCreateNull  → Object.create(null) → EXIT 1 (caught)
+
+All 30 of HI's exported wrappers now have direct mutation-protected test coverage.
+
+## Adversarial sweep — your task
+
+For RN-31:
+```
+D2-RN-NN: CLOSED | STILL-OPEN
+  evidence: <one-line proof or surviving attack vector>
+```
+
+Plus:
+
+1. **Verify the 5 new tests catch regression** — repeat your Round 17 mutation methodology:
+   - Regress safeStringToLowerCase to `s.toLowerCase()` → expect suite EXIT 1
+   - Regress safeIsArray to `Array.isArray(v)` → expect suite EXIT 1
+   - Regress safeIsPlainShape's internal call to ambient `Array.isArray(v)` → expect EXIT 1
+   - Regress safeObjectCreateNull to `Object.create(null)` → expect EXIT 1
+   - Regress safeObjectAssign to `Object.assign(target, source)` → expect EXIT 1
+2. **Full coverage audit** — enumerate ALL 30 wrappers exported by hardened-intrinsics.js. For
+   EACH, confirm there is at least one direct-test assertion that mutation-protects it (i.e.
+   regressing the wrapper to ambient causes a test failure).
+3. **Cross-confirm prior closures** — every RN-01..RN-30 attack still BLOCKs or produces no
+   admitted attacker content.
+4. **Browser/Node compat + frozen api unchanged** — no regression in UMD wrapper or capture
+   privacy.
+
+## Output format
+
+```
+FINAL VERDICT: PASS | BLOCK
+
+D2-RN-31: CLOSED | STILL-OPEN
+  evidence: ...
+
+<For each NEW finding (if any):>
+Finding D2-RN-NN (NEW): ...
+```
+
+`FINAL VERDICT: PASS` only if RN-31 is CLOSED and no NEW finding is introduced.
+
+codex
+I’ll inspect the candidate versus the train base, then run the direct suite, five independent mutations, a 30-export coverage audit, and the prior adversarial/compatibility suites. The workspace is read-only, so mutation runs may require temporary copies outside the workspace if permitted.
+exec
+/bin/bash -lc 'git status --short && git rev-parse HEAD && git show --stat --oneline --decorate --no-renames 70a4f036f10bc9c0cb22e9589c4fca61dbdc4369 && git diff --no-ext-diff --unified=80 f8a598b84c19517fe55b77877b91462e295f27ed..70a4f036f10bc9c0cb22e9589c4fca61dbdc4369 -- tests/r3.0d-hardened-intrinsics.test.js src/hardened-intrinsics.js hardened-intrinsics.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-E2TDv8gE' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-BSUyUscu' (errno=Operation not permitted)
+?? governance/r3.0d/codex-checkpoint-evidence/D2/round-18-70a4f03.raw.txt
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-rulnjhko' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-wYQ7qkv2' (errno=Operation not permitted)
+70a4f036f10bc9c0cb22e9589c4fca61dbdc4369
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-FjSjJCxD' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-U8wCyw5L' (errno=Operation not permitted)
+70a4f03 (HEAD -> feat/r3.0d-d2-evidence-graph, origin/feat/r3.0d-d2-evidence-graph) cp17r(d2): close Codex D2 Round 17 — RN-31 coverage gap (5 missing wrapper direct-tests)
+ governance/r3.0d/checkpoints/D2.json               |   18 +-
+ .../D2/round-17-8cb28b5.raw.txt                    | 4538 ++++++++++++++++++++
+ tests/r3.0d-hardened-intrinsics.test.js            |   98 +
+ 3 files changed, 4652 insertions(+), 2 deletions(-)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-ZEDPux60' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-Qn3hnfoj' (errno=Operation not permitted)
+diff --git a/tests/r3.0d-hardened-intrinsics.test.js b/tests/r3.0d-hardened-intrinsics.test.js
+new file mode 100644
+index 0000000..3dba5d2
+--- /dev/null
++++ b/tests/r3.0d-hardened-intrinsics.test.js
+@@ -0,0 +1,448 @@
++/**
++ * tests/r3.0d-hardened-intrinsics.test.js — adversarial direct-test of every HI.* wrapper.
++ *
++ * Codex D2 Round 16 RN-31 closure: Section AA in tests/r3.0d-evidence-graph.test.js asserts
++ * `hostileInvocationCount === 0` but most assertions pass because the renderer's Step 0 entry
++ * intrinsic guard BLOCKs the build before any wrapper is reached. That short-circuit masks the
++ * architectural claim — we have not directly proven that the WRAPPER itself bypasses the ambient
++ * method.
++ *
++ * This suite exercises each HI.* wrapper DIRECTLY (no renderer, no entry guard). For every
++ * wrapper we install a hostile self-restoring replacement of an ambient intrinsic, invoke the
++ * wrapper, and assert TWO independent properties:
++ *
++ *   1. hostileInvocationCount === 0 — the wrapper did not call the rebound ambient method.
++ *   2. wrapper output is correct — the wrapper produced the same result as if no rebind
++ *      had happened (i.e. it used the closure-captured pristine reference).
++ *
++ * If BOTH hold for every wrapper, the architectural claim ("the validation path never invokes
++ * ambient intrinsics") is independently verified.
++ *
++ * Node CLI: `node tests/r3.0d-hardened-intrinsics.test.js`, exit 1 on any failure.
++ */
++'use strict';
++
++const HI = require('../contracts/r3.0d/hardened-intrinsics.js');
++
++// Capture our own pristine intrinsic refs at THIS module's init (before any test rebind).
++// These are used by the runRebind harness to install + restore the hostile binding without
++// depending on the (potentially-rebound) ambient Object.defineProperty.
++const _origObjectDefineProperty = Object.defineProperty;
++const _origReflectApply = Reflect.apply;
++
++let pass = 0, fail = 0;
++function chk(name, cond, detail) {
++  if (cond) pass++;
++  else {
++    fail++;
++    console.log('  ✗ ' + name + (detail !== undefined ? '  ' + (typeof detail === 'string' ? detail : JSON.stringify(detail)) : ''));
++  }
++}
++
++// runRebind(container, key, hostileImpl, action)
++//   container: the object to rebind on (e.g. Array.prototype, Object, Reflect)
++//   key:       the property name to rebind
++//   hostileImpl: function to install (its body counts hits + may self-restore)
++//   action:    () => result — the wrapper invocation to test under the rebind
++// Returns: { result, hits } where hits is the count of hostile invocations.
++//
++// IMPORTANT: install + restore use the captured _origObjectDefineProperty via captured
++// _origReflectApply so the harness itself never invokes the (potentially-rebound) ambient
++// Object.defineProperty. Otherwise rebinding Object.defineProperty would cause the harness
++// to invoke its own hostile during install/restore, corrupting subsequent tests.
++function runRebind(container, key, hostileImpl, action) {
++  const orig = container[key];
++  let hits = 0;
++  const hostile = function () {
++    hits++;
++    return hostileImpl.apply(this, arguments);
++  };
++  let result;
++  try {
++    _origReflectApply(_origObjectDefineProperty, Object, [container, key, { value: hostile, writable: true, enumerable: true, configurable: true }]);
++    result = action();
++  } finally {
++    try { _origReflectApply(_origObjectDefineProperty, Object, [container, key, { value: orig, writable: true, enumerable: true, configurable: true }]); }
++    catch (e) { container[key] = orig; }
++  }
++  return { result: result, hits: hits };
++}
++
++// ── Group 1 — Array.prototype methods ────────────────────────────────────────────
++(function group1_arrayPrototype() {
++  // safeArrayPush — must use _ObjectDefineProperty, not .push
++  (function () {
++    const arr = [];
++    const r = runRebind(Array.prototype, 'push', function () { return 0; }, function () {
++      HI.safeArrayPush(arr, 'value');
++      return arr.length === 1 && arr[0] === 'value';
++    });
++    chk('safeArrayPush: hostile Array.prototype.push never invoked', r.hits === 0);
++    chk('safeArrayPush: output correct (length=1, [0]="value")', r.result === true);
++  })();
++
++  // safeArrayIndexOf — must use direct loop, not .indexOf
++  (function () {
++    const arr = ['a', 'b', 'c'];
++    const r = runRebind(Array.prototype, 'indexOf', function () { return -1; }, function () {
++      return HI.safeArrayIndexOf(arr, 'b');
++    });
++    chk('safeArrayIndexOf: hostile Array.prototype.indexOf never invoked', r.hits === 0);
++    chk('safeArrayIndexOf: output correct (returns 1)', r.result === 1);
++  })();
++
++  // safeArrayForEach — must use direct loop
++  (function () {
++    const arr = [1, 2, 3];
++    let sum = 0;
++    const r = runRebind(Array.prototype, 'forEach', function () { /* skip all */ }, function () {
++      HI.safeArrayForEach(arr, function (v) { sum += v; });
++      return sum;
++    });
++    chk('safeArrayForEach: hostile Array.prototype.forEach never invoked', r.hits === 0);
++    chk('safeArrayForEach: output correct (sum=6)', r.result === 6);
++  })();
++
++  // safeArrayMap — must use direct loop with defineProperty
++  (function () {
++    const r = runRebind(Array.prototype, 'map', function () { return []; }, function () {
++      const out = HI.safeArrayMap([1, 2, 3], function (v) { return v * 2; });
++      return out.length === 3 && out[0] === 2 && out[1] === 4 && out[2] === 6;
++    });
++    chk('safeArrayMap: hostile Array.prototype.map never invoked', r.hits === 0);
++    chk('safeArrayMap: output correct ([2,4,6])', r.result === true);
++  })();
++
++  // safeArraySlice — must use direct loop
++  (function () {
++    const r = runRebind(Array.prototype, 'slice', function () { return []; }, function () {
++      const out = HI.safeArraySlice(['x', 'y', 'z']);
++      return out.length === 3 && out[0] === 'x' && out[2] === 'z';
++    });
++    chk('safeArraySlice: hostile Array.prototype.slice never invoked', r.hits === 0);
++    chk('safeArraySlice: output correct (copy of ["x","y","z"])', r.result === true);
++  })();
++
++  // safeArraySort — uses Reflect.apply on captured Array.prototype.sort
++  (function () {
++    const r = runRebind(Array.prototype, 'sort', function () { return this; }, function () {
++      const arr = [3, 1, 2];
++      HI.safeArraySort(arr);
++      return arr[0] === 1 && arr[1] === 2 && arr[2] === 3;
++    });
++    chk('safeArraySort: hostile Array.prototype.sort never invoked', r.hits === 0);
++    chk('safeArraySort: output correct (sorted [1,2,3])', r.result === true);
++  })();
++})();
++
++// ── Group 2 — Object.* statics ────────────────────────────────────────────────────
++(function group2_objectStatics() {
++  // safeKeys
++  (function () {
++    const r = runRebind(Object, 'keys', function () { return []; }, function () {
++      const keys = HI.safeKeys({ a: 1, b: 2 });
++      return keys.length === 2 && keys.indexOf('a') !== -1 && keys.indexOf('b') !== -1;
++    });
++    chk('safeKeys: hostile Object.keys never invoked', r.hits === 0);
++    chk('safeKeys: output correct ([a,b])', r.result === true);
++  })();
++
++  // safeGetOwnDescriptor
++  (function () {
++    const r = runRebind(Object, 'getOwnPropertyDescriptor', function () { return undefined; }, function () {
++      const d = HI.safeGetOwnDescriptor({ a: 42 }, 'a');
++      return d && d.value === 42;
++    });
++    chk('safeGetOwnDescriptor: hostile Object.getOwnPropertyDescriptor never invoked', r.hits === 0);
++    chk('safeGetOwnDescriptor: output correct (value=42)', r.result === true);
++  })();
++
++  // safeGetOwnPropertyNames
++  (function () {
++    const r = runRebind(Object, 'getOwnPropertyNames', function () { return []; }, function () {
++      const names = HI.safeGetOwnPropertyNames({ a: 1, b: 2 });
++      return names.length === 2;
++    });
++    chk('safeGetOwnPropertyNames: hostile Object.getOwnPropertyNames never invoked', r.hits === 0);
++    chk('safeGetOwnPropertyNames: output correct (length=2)', r.result === true);
++  })();
++
++  // safeGetPrototypeOf
++  (function () {
++    const r = runRebind(Object, 'getPrototypeOf', function () { return null; }, function () {
++      const proto = HI.safeGetPrototypeOf({});
++      return proto === Object.prototype;
++    });
++    chk('safeGetPrototypeOf: hostile Object.getPrototypeOf never invoked', r.hits === 0);
++    chk('safeGetPrototypeOf: output correct (Object.prototype)', r.result === true);
++  })();
++
++  // safeDefineDataProperty (vs Object.defineProperty rebind)
++  (function () {
++    const r = runRebind(Object, 'defineProperty', function () { return arguments[0]; }, function () {
++      const obj = {};
++      const ok = HI.safeDefineDataProperty(obj, 'x', 99);
++      return ok && obj.x === 99;
++    });
++    chk('safeDefineDataProperty: hostile Object.defineProperty never invoked', r.hits === 0);
++    chk('safeDefineDataProperty: output correct (own data prop installed)', r.result === true);
++  })();
++
++  // safeHasOwn (vs hasOwnProperty.call rebind)
++  (function () {
++    const r = runRebind(Object.prototype, 'hasOwnProperty', function () { return false; }, function () {
++      return HI.safeHasOwn({ a: 1 }, 'a') === true && HI.safeHasOwn({ a: 1 }, 'b') === false;
++    });
++    chk('safeHasOwn: hostile Object.prototype.hasOwnProperty never invoked', r.hits === 0);
++    chk('safeHasOwn: output correct (true for present, false for absent)', r.result === true);
++  })();
++
++  // deepFreeze (vs Object.freeze rebind)
++  (function () {
++    const obj = { a: 1, nested: { b: 2 } };
++    const r = runRebind(Object, 'freeze', function (o) { return o; }, function () {
++      HI.deepFreeze(obj);
++      return Object.isFrozen(obj) && Object.isFrozen(obj.nested);
++    });
++    chk('deepFreeze: hostile Object.freeze never invoked', r.hits === 0);
++    chk('deepFreeze: output correct (recursively frozen)', r.result === true);
++  })();
++})();
++
++// ── Group 3 — Reflect ────────────────────────────────────────────────────────────
++(function group3_reflect() {
++  // safeOwnKeys (uses Reflect.ownKeys via Reflect.apply)
++  (function () {
++    const r = runRebind(Reflect, 'ownKeys', function () { return []; }, function () {
++      const keys = HI.safeOwnKeys({ a: 1, b: 2 });
++      return keys.length === 2;
++    });
++    chk('safeOwnKeys: hostile Reflect.ownKeys never invoked', r.hits === 0);
++    chk('safeOwnKeys: output correct (length=2)', r.result === true);
++  })();
++})();
++
++// ── Group 4 — Number / Math / RegExp ────────────────────────────────────────────
++(function group4_numberMathRegex() {
++  (function () {
++    const r = runRebind(Number, 'isInteger', function () { return true; }, function () {
++      return HI.safeNumberIsInteger(1.5) === false && HI.safeNumberIsInteger(2) === true;
++    });
++    chk('safeNumberIsInteger: hostile Number.isInteger never invoked', r.hits === 0);
++    chk('safeNumberIsInteger: output correct (1.5→false, 2→true)', r.result === true);
++  })();
++
++  (function () {
++    const r = runRebind(Number, 'isFinite', function () { return true; }, function () {
++      return HI.safeNumberIsFinite(Infinity) === false && HI.safeNumberIsFinite(42) === true;
++    });
++    chk('safeNumberIsFinite: hostile Number.isFinite never invoked', r.hits === 0);
++    chk('safeNumberIsFinite: output correct (Infinity→false, 42→true)', r.result === true);
++  })();
++
++  (function () {
++    const r = runRebind(Math, 'floor', function (n) { return n; }, function () {
++      return HI.safeMathFloor(3.7) === 3 && HI.safeMathFloor(-1.2) === -2;
++    });
++    chk('safeMathFloor: hostile Math.floor never invoked', r.hits === 0);
++    chk('safeMathFloor: output correct (3.7→3, -1.2→-2)', r.result === true);
++  })();
++
++  (function () {
++    const r = runRebind(RegExp.prototype, 'test', function () { return true; }, function () {
++      return HI.safeRegExpTest(/^[a-z]+$/, 'abc') === true && HI.safeRegExpTest(/^[a-z]+$/, '123') === false;
++    });
++    chk('safeRegExpTest: hostile RegExp.prototype.test never invoked', r.hits === 0);
++    chk('safeRegExpTest: output correct ("abc"→true, "123"→false)', r.result === true);
++  })();
++})();
++
++// ── Group 5 — String / global functions ─────────────────────────────────────────
++(function group5_stringGlobals() {
++  // safeStringCoerce (vs global String rebind)
++  (function () {
++    const r = runRebind(globalThis, 'String', function () { return 'constant'; }, function () {
++      return HI.safeStringCoerce(42) === '42' && HI.safeStringCoerce(true) === 'true';
++    });
++    chk('safeStringCoerce: hostile global String never invoked', r.hits === 0);
++    chk('safeStringCoerce: output correct (42→"42", true→"true")', r.result === true);
++  })();
++
++  // safeStringSlice (vs String.prototype.slice rebind)
++  (function () {
++    const r = runRebind(String.prototype, 'slice', function () { return ''; }, function () {
++      return HI.safeStringSlice('abcdef', 1, 4) === 'bcd' && HI.safeStringSlice('xy', -2) === 'xy';
++    });
++    chk('safeStringSlice: hostile String.prototype.slice never invoked', r.hits === 0);
++    chk('safeStringSlice: output correct ("abcdef".slice(1,4)→"bcd")', r.result === true);
++  })();
++
++  // safeStringCharCodeAt (vs String.prototype.charCodeAt rebind)
++  (function () {
++    const r = runRebind(String.prototype, 'charCodeAt', function () { return 0; }, function () {
++      return HI.safeStringCharCodeAt('A', 0) === 65 && HI.safeStringCharCodeAt('z', 0) === 122;
++    });
++    chk('safeStringCharCodeAt: hostile String.prototype.charCodeAt never invoked', r.hits === 0);
++    chk('safeStringCharCodeAt: output correct ("A"→65, "z"→122)', r.result === true);
++  })();
++})();
++
++// ── Group 6 — TextEncoder + structuredClone ─────────────────────────────────────
++(function group6_textEncoderStructuredClone() {
++  // safeUtf8ByteLength via captured TextEncoder.prototype.encode (Codex Round 16 RN-28)
++  (function () {
++    const r = runRebind(TextEncoder.prototype, 'encode', function () { return { length: 0 }; }, function () {
++      return HI.safeUtf8ByteLength('hello') === 5 && HI.safeUtf8ByteLength('é') === 2 && HI.safeUtf8ByteLength('🚀') === 4;
++    });
++    chk('safeUtf8ByteLength: hostile TextEncoder.prototype.encode never invoked', r.hits === 0);
++    chk('safeUtf8ByteLength: output correct ("hello"→5, "é"→2, "🚀"→4)', r.result === true);
++  })();
++
++  // safeStructuredClone (vs globalThis.structuredClone rebind)
++  (function () {
++    const r = runRebind(globalThis, 'structuredClone', function (v) { return v; }, function () {
++      const orig = { a: 1, b: { c: 2 } };
++      const cloned = HI.safeStructuredClone(orig);
++      // structuredClone should produce a separate object (identity differs) with same data
++      return cloned !== orig && cloned !== null && cloned.a === 1 && cloned.b.c === 2 && cloned.b !== orig.b;
++    });
++    chk('safeStructuredClone: hostile globalThis.structuredClone never invoked', r.hits === 0);
++    chk('safeStructuredClone: output correct (deep clone, separate identity)', r.result === true);
++  })();
++})();
++
++// ── Group 7 — JSON / stableStringify ────────────────────────────────────────────
++(function group7_jsonStableStringify() {
++  // stableStringify must NOT invoke ambient JSON.stringify on objects (it walks manually).
++  // It DOES invoke captured _JSONStringify on primitive strings, which doesn't trigger toJSON.
++  (function () {
++    const r = runRebind(JSON, 'stringify', function () { return '"poisoned"'; }, function () {
++      const s = HI.stableStringify({ b: 2, a: 1, c: [3, 4] });
++      // canonical: sorted keys, no spaces, primitive strings quoted via captured JSON.stringify
++      return s === '{"a":1,"b":2,"c":[3,4]}';
++    });
++    chk('stableStringify: hostile JSON.stringify never invoked at the object/array level', r.hits === 0);
++    chk('stableStringify: output correct (canonical sorted-keys JSON)', r.result === true);
++  })();
++})();
++
++// ── Group 8 — deep audit + edge cases ────────────────────────────────────────────
++(function group8_deepAudit() {
++  // deepOriginalShapeAudit rejects class instances
++  chk('deepOriginalShapeAudit: rejects class instance', HI.deepOriginalShapeAudit(new class {}()) === false);
++  chk('deepOriginalShapeAudit: rejects Symbol key', HI.deepOriginalShapeAudit({ [Symbol('s')]: 1 }) === false);
++  chk('deepOriginalShapeAudit: rejects non-enumerable extra',
++    HI.deepOriginalShapeAudit(Object.defineProperty({}, 'h', { value: 1, enumerable: false })) === false);
++  chk('deepOriginalShapeAudit: rejects accessor descriptor',
++    HI.deepOriginalShapeAudit(Object.defineProperty({}, 'x', { get: function () { return 1; }, enumerable: true, configurable: true })) === false);
++  chk('deepOriginalShapeAudit: accepts plain object + array', HI.deepOriginalShapeAudit({ a: 1, b: [1, 2] }) === true);
++  chk('deepOriginalShapeAudit: rejects Infinity', HI.deepOriginalShapeAudit({ n: Infinity }) === false);
++  chk('deepOriginalShapeAudit: rejects NaN', HI.deepOriginalShapeAudit({ n: NaN }) === false);
++  chk('deepOriginalShapeAudit: rejects function value', HI.deepOriginalShapeAudit({ f: function () {} }) === false);
++
++  // Frozen api guarantees
++  chk('HI.api is frozen', Object.isFrozen(HI));
++  chk('HI does NOT expose _ObjectFreeze (or any underscored private)',
++    Object.keys(HI).every(k => !k.startsWith('_')));
++})();
++
++// ── Group 9 — coverage gap fix (Codex Round 17 RN-31 closure) ───────────────────
++// The original 25 wrappers cover the primary attack surface; these 5 helpers were left
++// untested in the initial pass. Codex Round 17 mutation-tested by rewriting each helper
++// to call ambient and observed the suite still passed — proving they were unprotected.
++// Each test below now follows the same pattern: rebind the ambient method the helper
++// uses internally and assert (a) hits === 0 (b) wrapper output correct.
++(function group9_coverageGap() {
++  // safeStringToLowerCase — uses captured String.prototype.toLowerCase via Reflect.apply.
++  (function () {
++    const r = runRebind(String.prototype, 'toLowerCase', function () { return 'POISONED'; }, function () {
++      return HI.safeStringToLowerCase('HELLO') === 'hello' && HI.safeStringToLowerCase('R3_0D') === 'r3_0d';
++    });
++    chk('safeStringToLowerCase: hostile String.prototype.toLowerCase never invoked', r.hits === 0);
++    chk('safeStringToLowerCase: output correct ("HELLO"→"hello", "R3_0D"→"r3_0d")', r.result === true);
++  })();
++
++  // safeIsArray — uses captured Array.isArray via Reflect.apply.
++  (function () {
++    const r = runRebind(Array, 'isArray', function () { return true; }, function () {
++      return HI.safeIsArray([]) === true && HI.safeIsArray({}) === false && HI.safeIsArray('x') === false;
++    });
++    chk('safeIsArray: hostile Array.isArray never invoked', r.hits === 0);
++    chk('safeIsArray: output correct ([]→true, {}→false, "x"→false)', r.result === true);
++  })();
++
++  // safeIsPlainShape — uses captured Array.isArray + Object.getPrototypeOf via Reflect.apply.
++  // Test rebinding each separately.
++  (function () {
++    const r1 = runRebind(Array, 'isArray', function () { return true; }, function () {
++      return HI.safeIsPlainShape({ a: 1 }) === 'plain-object'
++        && HI.safeIsPlainShape([1, 2]) === 'plain-array'
++        && HI.safeIsPlainShape(new class {}()) === 'reject';
++    });
++    chk('safeIsPlainShape: hostile Array.isArray never invoked', r1.hits === 0);
++    chk('safeIsPlainShape: output correct under Array.isArray rebind', r1.result === true);
++
++    const r2 = runRebind(Object, 'getPrototypeOf', function () { return null; }, function () {
++      return HI.safeIsPlainShape({ a: 1 }) === 'plain-object'
++        && HI.safeIsPlainShape([1, 2]) === 'plain-array'
++        && HI.safeIsPlainShape(new class {}()) === 'reject';
++    });
++    chk('safeIsPlainShape: hostile Object.getPrototypeOf never invoked', r2.hits === 0);
++    chk('safeIsPlainShape: output correct under Object.getPrototypeOf rebind', r2.result === true);
++  })();
++
++  // safeObjectCreateNull — uses captured Object.create via Reflect.apply.
++  (function () {
++    const r = runRebind(Object, 'create', function () { return { tampered: true }; }, function () {
++      const obj = HI.safeObjectCreateNull();
++      return obj !== null
++        && typeof obj === 'object'
++        && Object.getPrototypeOf(obj) === null
++        && Object.keys(obj).length === 0
++        && obj.tampered === undefined;
++    });
++    chk('safeObjectCreateNull: hostile Object.create never invoked', r.hits === 0);
++    chk('safeObjectCreateNull: output correct (null-proto, empty, no tampered key)', r.result === true);
++  })();
++
++  // safeObjectAssign — uses safeKeys / safeGetOwnDescriptor / safeDefineDataProperty internally
++  // (no direct call to Object.assign). The most likely confusion is callers expecting ambient
++  // Object.assign semantics. Rebinding Object.assign must have no effect on the wrapper.
++  (function () {
++    const r = runRebind(Object, 'assign', function () { return { tampered: true }; }, function () {
++      const target = {};
++      const source = { a: 1, b: 2, c: 3 };
++      const ret = HI.safeObjectAssign(target, source);
++      return ret === target
++        && target.a === 1 && target.b === 2 && target.c === 3
++        && target.tampered === undefined
++        && Object.keys(target).length === 3;
++    });
++    chk('safeObjectAssign: hostile Object.assign never invoked', r.hits === 0);
++    chk('safeObjectAssign: output correct (own-keys shallow copy, no tampered key)', r.result === true);
++  })();
++
++  // Also verify safeObjectAssign defends against Object.prototype setter installation
++  // (the underlying defineProperty path bypasses [[Set]]).
++  (function () {
++    const setterDesc = Object.getOwnPropertyDescriptor(Object.prototype, 'tampered');
++    let setterHits = 0;
++    Object.defineProperty(Object.prototype, 'tampered', {
++      configurable: true, enumerable: false,
++      set: function (v) { setterHits++; },
++    });
++    let ok;
++    try {
++      const target = {};
++      HI.safeObjectAssign(target, { tampered: 'real' });
++      ok = target.tampered === 'real' && setterHits === 0;
++    } finally {
++      if (setterDesc) Object.defineProperty(Object.prototype, 'tampered', setterDesc);
++      else delete Object.prototype.tampered;
++    }
++    chk('safeObjectAssign: bypasses Object.prototype.tampered setter via defineProperty', ok === true);
++  })();
++})();
++
++console.log('R3.0D hardened-intrinsics direct-test suite: ' + pass + ' pass, ' + fail + ' fail');
++if (fail > 0) process.exit(1);
+
+exec
+/bin/bash -lc 'git show --format=fuller --no-patch 70a4f036f10bc9c0cb22e9589c4fca61dbdc4369 && git diff --stat 70a4f036f10bc9c0cb22e9589c4fca61dbdc4369''^..70a4f036f10bc9c0cb22e9589c4fca61dbdc4369 && git diff --unified=30 70a4f036f10bc9c0cb22e9589c4fca61dbdc4369''^..70a4f036f10bc9c0cb22e9589c4fca61dbdc4369 -- tests/r3.0d-hardened-intrinsics.test.js && sed -n '"'1,260p' contracts/r3.0d/hardened-intrinsics.js && find tests -maxdepth 1 -type f -name '*r3.0d*' -print | sort" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-RglN8ItI' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-yh4okKsV' (errno=Operation not permitted)
+commit 70a4f036f10bc9c0cb22e9589c4fca61dbdc4369
+Author:     USADA-KARROT <skyline.fkd@gmail.com>
+AuthorDate: Mon Jun 29 08:22:00 2026 +0800
+Commit:     USADA-KARROT <skyline.fkd@gmail.com>
+CommitDate: Mon Jun 29 08:22:00 2026 +0800
+
+    cp17r(d2): close Codex D2 Round 17 — RN-31 coverage gap (5 missing wrapper direct-tests)
+    
+    Round 17 BLOCK on 8cb28b5: RN-28 CLOSED. RN-31 STILL-OPEN — Codex mutation-tested the
+    direct-test suite by regressing safeStringToLowerCase to `s.toLowerCase()` and observed
+    the suite still passed 58/58, proving 5 wrappers (safeStringToLowerCase, safeIsArray,
+    safeIsPlainShape, safeObjectCreateNull, safeObjectAssign) had no regression protection.
+    
+    Round 18 fix: extend tests/r3.0d-hardened-intrinsics.test.js with direct-tests for those
+    5 wrappers (+13 assertions, 58 to 71). Each test:
+      - Rebinds the ambient intrinsic the wrapper uses internally to a hostile replacement
+      - Invokes the wrapper
+      - Asserts BOTH (hostile invocation count === 0) AND (wrapper output is correct)
+    
+    Plus a bonus assertion for safeObjectAssign defending against Object.prototype.tampered
+    setter installation (proves the defineProperty-based copy bypasses [[Set]]).
+    
+    Mutation-test verification (mirrors Codex Round 17 methodology):
+      - safeStringToLowerCase regressed to s.toLowerCase()   → suite EXIT 1 (catches)
+      - safeIsArray regressed to Array.isArray(v)            → suite EXIT 1 (catches)
+      - safeIsPlainShape regressed to Array.isArray(v)       → suite EXIT 1 (catches)
+      - safeObjectCreateNull regressed to Object.create(null) → suite EXIT 1 (catches)
+    
+    Manifest:
+      - governance/r3.0d/checkpoints/D2.json: Round 17 BLOCK entry with per-finding detail;
+        additionalSuites hardened-intrinsics assertions 58 → 71; changedFiles extended with
+        round-17 evidence file
+      - governance/r3.0d/codex-checkpoint-evidence/D2/round-17-8cb28b5.raw.txt: Tier 1 raw
+        Codex stdout persisted (4,538 lines)
+    
+    Local verification: npm test EXIT=0 (81 test files, 0 failures); D2 suite 261 / 0;
+    D1 suite 160 / 0; hardened-intrinsics direct-test 71 / 0; 3 R3.0D governance scripts
+    violations=0 / ok=true. Total 492 assertions across 3 R3.0D suites.
+    
+    Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-ZBPP7xrh' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-iq5RYLT0' (errno=Operation not permitted)
+ governance/r3.0d/checkpoints/D2.json               |   18 +-
+ .../D2/round-17-8cb28b5.raw.txt                    | 4538 ++++++++++++++++++++
+ tests/r3.0d-hardened-intrinsics.test.js            |   98 +
+ 3 files changed, 4652 insertions(+), 2 deletions(-)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-DSPmxaQY' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-PpQiHgtB' (errno=Operation not permitted)
+diff --git a/tests/r3.0d-hardened-intrinsics.test.js b/tests/r3.0d-hardened-intrinsics.test.js
+index 73d3467..3dba5d2 100644
+--- a/tests/r3.0d-hardened-intrinsics.test.js
++++ b/tests/r3.0d-hardened-intrinsics.test.js
+@@ -319,32 +319,130 @@ function runRebind(container, key, hostileImpl, action) {
+     const r = runRebind(JSON, 'stringify', function () { return '"poisoned"'; }, function () {
+       const s = HI.stableStringify({ b: 2, a: 1, c: [3, 4] });
+       // canonical: sorted keys, no spaces, primitive strings quoted via captured JSON.stringify
+       return s === '{"a":1,"b":2,"c":[3,4]}';
+     });
+     chk('stableStringify: hostile JSON.stringify never invoked at the object/array level', r.hits === 0);
+     chk('stableStringify: output correct (canonical sorted-keys JSON)', r.result === true);
+   })();
+ })();
+ 
+ // ── Group 8 — deep audit + edge cases ────────────────────────────────────────────
+ (function group8_deepAudit() {
+   // deepOriginalShapeAudit rejects class instances
+   chk('deepOriginalShapeAudit: rejects class instance', HI.deepOriginalShapeAudit(new class {}()) === false);
+   chk('deepOriginalShapeAudit: rejects Symbol key', HI.deepOriginalShapeAudit({ [Symbol('s')]: 1 }) === false);
+   chk('deepOriginalShapeAudit: rejects non-enumerable extra',
+     HI.deepOriginalShapeAudit(Object.defineProperty({}, 'h', { value: 1, enumerable: false })) === false);
+   chk('deepOriginalShapeAudit: rejects accessor descriptor',
+     HI.deepOriginalShapeAudit(Object.defineProperty({}, 'x', { get: function () { return 1; }, enumerable: true, configurable: true })) === false);
+   chk('deepOriginalShapeAudit: accepts plain object + array', HI.deepOriginalShapeAudit({ a: 1, b: [1, 2] }) === true);
+   chk('deepOriginalShapeAudit: rejects Infinity', HI.deepOriginalShapeAudit({ n: Infinity }) === false);
+   chk('deepOriginalShapeAudit: rejects NaN', HI.deepOriginalShapeAudit({ n: NaN }) === false);
+   chk('deepOriginalShapeAudit: rejects function value', HI.deepOriginalShapeAudit({ f: function () {} }) === false);
+ 
+   // Frozen api guarantees
+   chk('HI.api is frozen', Object.isFrozen(HI));
+   chk('HI does NOT expose _ObjectFreeze (or any underscored private)',
+     Object.keys(HI).every(k => !k.startsWith('_')));
+ })();
+ 
++// ── Group 9 — coverage gap fix (Codex Round 17 RN-31 closure) ───────────────────
++// The original 25 wrappers cover the primary attack surface; these 5 helpers were left
++// untested in the initial pass. Codex Round 17 mutation-tested by rewriting each helper
++// to call ambient and observed the suite still passed — proving they were unprotected.
++// Each test below now follows the same pattern: rebind the ambient method the helper
++// uses internally and assert (a) hits === 0 (b) wrapper output correct.
++(function group9_coverageGap() {
++  // safeStringToLowerCase — uses captured String.prototype.toLowerCase via Reflect.apply.
++  (function () {
++    const r = runRebind(String.prototype, 'toLowerCase', function () { return 'POISONED'; }, function () {
++      return HI.safeStringToLowerCase('HELLO') === 'hello' && HI.safeStringToLowerCase('R3_0D') === 'r3_0d';
++    });
++    chk('safeStringToLowerCase: hostile String.prototype.toLowerCase never invoked', r.hits === 0);
++    chk('safeStringToLowerCase: output correct ("HELLO"→"hello", "R3_0D"→"r3_0d")', r.result === true);
++  })();
++
++  // safeIsArray — uses captured Array.isArray via Reflect.apply.
++  (function () {
++    const r = runRebind(Array, 'isArray', function () { return true; }, function () {
++      return HI.safeIsArray([]) === true && HI.safeIsArray({}) === false && HI.safeIsArray('x') === false;
++    });
++    chk('safeIsArray: hostile Array.isArray never invoked', r.hits === 0);
++    chk('safeIsArray: output correct ([]→true, {}→false, "x"→false)', r.result === true);
++  })();
++
++  // safeIsPlainShape — uses captured Array.isArray + Object.getPrototypeOf via Reflect.apply.
++  // Test rebinding each separately.
++  (function () {
++    const r1 = runRebind(Array, 'isArray', function () { return true; }, function () {
++      return HI.safeIsPlainShape({ a: 1 }) === 'plain-object'
++        && HI.safeIsPlainShape([1, 2]) === 'plain-array'
++        && HI.safeIsPlainShape(new class {}()) === 'reject';
++    });
++    chk('safeIsPlainShape: hostile Array.isArray never invoked', r1.hits === 0);
++    chk('safeIsPlainShape: output correct under Array.isArray rebind', r1.result === true);
++
++    const r2 = runRebind(Object, 'getPrototypeOf', function () { return null; }, function () {
++      return HI.safeIsPlainShape({ a: 1 }) === 'plain-object'
++        && HI.safeIsPlainShape([1, 2]) === 'plain-array'
++        && HI.safeIsPlainShape(new class {}()) === 'reject';
++    });
++    chk('safeIsPlainShape: hostile Object.getPrototypeOf never invoked', r2.hits === 0);
++    chk('safeIsPlainShape: output correct under Object.getPrototypeOf rebind', r2.result === true);
++  })();
++
++  // safeObjectCreateNull — uses captured Object.create via Reflect.apply.
++  (function () {
++    const r = runRebind(Object, 'create', function () { return { tampered: true }; }, function () {
++      const obj = HI.safeObjectCreateNull();
++      return obj !== null
++        && typeof obj === 'object'
++        && Object.getPrototypeOf(obj) === null
++        && Object.keys(obj).length === 0
++        && obj.tampered === undefined;
++    });
++    chk('safeObjectCreateNull: hostile Object.create never invoked', r.hits === 0);
++    chk('safeObjectCreateNull: output correct (null-proto, empty, no tampered key)', r.result === true);
++  })();
++
++  // safeObjectAssign — uses safeKeys / safeGetOwnDescriptor / safeDefineDataProperty internally
++  // (no direct call to Object.assign). The most likely confusion is callers expecting ambient
++  // Object.assign semantics. Rebinding Object.assign must have no effect on the wrapper.
++  (function () {
++    const r = runRebind(Object, 'assign', function () { return { tampered: true }; }, function () {
++      const target = {};
++      const source = { a: 1, b: 2, c: 3 };
++      const ret = HI.safeObjectAssign(target, source);
++      return ret === target
++        && target.a === 1 && target.b === 2 && target.c === 3
++        && target.tampered === undefined
++        && Object.keys(target).length === 3;
++    });
++    chk('safeObjectAssign: hostile Object.assign never invoked', r.hits === 0);
++    chk('safeObjectAssign: output correct (own-keys shallow copy, no tampered key)', r.result === true);
++  })();
++
++  // Also verify safeObjectAssign defends against Object.prototype setter installation
++  // (the underlying defineProperty path bypasses [[Set]]).
++  (function () {
++    const setterDesc = Object.getOwnPropertyDescriptor(Object.prototype, 'tampered');
++    let setterHits = 0;
++    Object.defineProperty(Object.prototype, 'tampered', {
++      configurable: true, enumerable: false,
++      set: function (v) { setterHits++; },
++    });
++    let ok;
++    try {
++      const target = {};
++      HI.safeObjectAssign(target, { tampered: 'real' });
++      ok = target.tampered === 'real' && setterHits === 0;
++    } finally {
++      if (setterDesc) Object.defineProperty(Object.prototype, 'tampered', setterDesc);
++      else delete Object.prototype.tampered;
++    }
++    chk('safeObjectAssign: bypasses Object.prototype.tampered setter via defineProperty', ok === true);
++  })();
++})();
++
+ console.log('R3.0D hardened-intrinsics direct-test suite: ' + pass + ' pass, ' + fail + ' fail');
+ if (fail > 0) process.exit(1);
+/**
+ * contracts/r3.0d/hardened-intrinsics.js — R3.0D Hardened Intrinsics Toolkit.
+ *
+ * Single source of truth for closure-captured pristine intrinsic references and the narrow set
+ * of safe wrappers that the rest of R3.0D's contract / runtime path is permitted to use.
+ *
+ * Codex D2 Round 15 architectural convergence (per SKYLINE directive 2026-06-29):
+ *
+ *   "只要內部不再執行ambient lookup ... 而只使用module-init捕獲、closure-private的pristine
+ *    references，攻擊者替換ambient method後自我還原也沒有意義，因為hostile replacement根本不會
+ *    被呼叫。"
+ *
+ * Rounds 1-15 demonstrated that any defence-in-depth that lets validation code call an AMBIENT
+ * prototype method (`arr.push`, `Object.keys`, `String(x)`, `Number.isInteger`, …) is defeated by
+ * a hostile replacement that self-restores on its own invocation. The integrity guard then sees
+ * a clean state at the next checkpoint, but the validator already used the rebound binding.
+ *
+ * This module is the FOUNDATION layer. Every other R3.0D contract + the renderer must call ONLY
+ * the safe wrappers exported here. Direct ambient property access (`Array.isArray`, `obj.length`,
+ * `JSON.stringify`, `Object.freeze`, etc.) is FORBIDDEN throughout the validation path.
+ *
+ * The wrappers themselves capture pristine intrinsic references at module-init time (BEFORE any
+ * caller code can run) and invoke them via captured `Reflect.apply`. They NEVER:
+ *   - Use `.call`, `.apply`, or `.bind` on captured methods (those go through
+ *     Function.prototype.* which is rebindable).
+ *   - Use ambient property lookup on the captured object (which would fire prototype-chain
+ *     accessors installed after import).
+ *   - Fall back to JSON-round-trip for cloning (which invokes hostile toJSON / drops Symbols
+ *     non-deterministically).
+ *   - Invoke caller toJSON / Proxy traps / accessor descriptors (`.value` reads on a
+ *     `_ObjectGetOwnPropertyDescriptor` result avoid `[[Get]]` semantics).
+ *
+ * Inputs that carry an accessor descriptor, a Symbol-keyed own property, a non-enumerable own
+ * property, a non-Object.prototype prototype, an Array subclass, a mutated Array prototype, or
+ * a class instance fail-closed at the structural audit (`deepOriginalShapeAudit`).
+ *
+ * UMD: Node require / Electron renderer global (R3_0D_HardenedIntrinsics).
+ */
+(function (root) {
+  'use strict';
+
+  // ─── PHASE 1 — closure-private intrinsic captures ────────────────────────────
+  // Every primitive method we may directly or indirectly depend on. References are taken at
+  // module evaluation time, BEFORE any external caller code runs. The captured refs are kept
+  // in IIFE-local variables and NEVER exposed to the api object.
+
+  // Container globals
+  var _Object = Object;
+  var _Array = Array;
+  var _String_ctor = String;
+  var _Number = Number;
+  var _Function = Function;
+  var _JSON = JSON;
+  var _Reflect = (typeof Reflect !== 'undefined') ? Reflect : null;
+  var _Math = Math;
+  var _RegExp = RegExp;
+
+  // Object.* statics
+  var _ObjectCreate = Object.create;
+  var _ObjectFreeze = Object.freeze;
+  var _ObjectIsFrozen = Object.isFrozen;
+  var _ObjectKeys = Object.keys;
+  var _ObjectAssign = Object.assign;
+  var _ObjectGetPrototypeOf = Object.getPrototypeOf;
+  var _ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+  var _ObjectGetOwnPropertyDescriptors = Object.getOwnPropertyDescriptors;
+  var _ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
+  var _ObjectDefineProperty = Object.defineProperty;
+
+  // Object.prototype
+  var _ObjectPrototypeHasOwnProperty = Object.prototype.hasOwnProperty;
+
+  // Array.* statics
+  var _ArrayIsArray = Array.isArray;
+
+  // Array.prototype
+  var _ArrayPrototypePush = Array.prototype.push;
+  var _ArrayPrototypeIndexOf = Array.prototype.indexOf;
+  var _ArrayPrototypeForEach = Array.prototype.forEach;
+  var _ArrayPrototypeMap = Array.prototype.map;
+  var _ArrayPrototypeSlice = Array.prototype.slice;
+  var _ArrayPrototypeSort = Array.prototype.sort;
+  var _ArrayPrototypeJoin = Array.prototype.join;
+  var _ArrayPrototypeConcat = Array.prototype.concat;
+  var _ArrayPrototypeShift = Array.prototype.shift;
+  // Array prototype reference itself for prototype-identity checks
+  var _ArrayPrototype = Array.prototype;
+  var _ObjectPrototype = Object.prototype;
+
+  // Reflect
+  var _ReflectApply = _Reflect ? Reflect.apply : null;
+  var _ReflectOwnKeys = _Reflect ? Reflect.ownKeys : null;
+
+  // String global function (number-to-string + general value coercion)
+  var _StringCoerce = String;
+
+  // String.prototype
+  var _StringPrototypeCharAt = String.prototype.charAt;
+  var _StringPrototypeCharCodeAt = String.prototype.charCodeAt;
+  var _StringPrototypeSlice = String.prototype.slice;
+  var _StringPrototypeNormalize = String.prototype.normalize;
+  var _StringPrototypeToLowerCase = String.prototype.toLowerCase;
+
+  // Number.* statics + prototype
+  var _NumberIsFinite = Number.isFinite;
+  var _NumberIsInteger = Number.isInteger;
+  var _NumberIsNaN = Number.isNaN;
+  var _NumberPrototypeToString = Number.prototype.toString;
+
+  // Math
+  var _MathFloor = Math.floor;
+
+  // RegExp.prototype
+  var _RegExpPrototypeTest = RegExp.prototype.test;
+
+  // JSON
+  var _JSONStringify = JSON.stringify;
+  var _JSONParse = JSON.parse;
+
+  // TextEncoder / structuredClone (modern-runtime guaranteed in our target environments).
+  // Codex D2 Round 16 RN-28 closure: capture TextEncoder.prototype.encode at module-init so
+  // safeUtf8ByteLength never invokes the instance's `.encode` method via ambient property
+  // lookup. A hostile TextEncoder.prototype.encode replacement is then unreachable.
+  var _TextEncoderCtor = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;
+  var _TextEncoderPrototypeEncode = _TextEncoderCtor ? TextEncoder.prototype.encode : null;
+  var _StructuredCloneFn = (typeof structuredClone === 'function') ? structuredClone : null;
+
+  // Sentinel for failed structural reads (distinguishable from any legitimate value).
+  var _SENTINEL = _ObjectFreeze({ __hardenedIntrinsicsSentinel__: true });
+
+  // ─── PHASE 2 — safe wrappers (the ONLY public surface) ───────────────────────
+  // Every wrapper uses captured refs + captured Reflect.apply. None invoke any ambient
+  // method, .call, .apply, .bind, JSON fallback, toJSON, or getter/accessor.
+
+  // _apply(fn, thisArg, argsArray) — invoke a captured function via captured Reflect.apply.
+  // Reflect.apply uses the function's [[Call]] internal slot directly, bypassing
+  // Function.prototype.call (which is rebindable).
+  function _apply(fn, thisArg, argsArray) {
+    if (_ReflectApply === null) {
+      // Modern runtimes (Node 17+, browsers ~2022+) guarantee Reflect.apply. Fail-closed
+      // rather than fall back to .call which is itself rebindable.
+      return _SENTINEL;
+    }
+    try { return _ReflectApply(fn, thisArg, argsArray); }
+    catch (e) { return _SENTINEL; }
+  }
+
+  // safeOwnKeys(obj) — Reflect.ownKeys via captured Reflect.apply. Returns an array of
+  // string and symbol keys, or null on failure.
+  function safeOwnKeys(obj) {
+    if (obj === null || obj === undefined) return null;
+    if (typeof obj !== 'object' && typeof obj !== 'function') return null;
+    var r = _apply(_ReflectOwnKeys, _Reflect, [obj]);
+    if (r === _SENTINEL) return null;
+    return r;
+  }
+
+  // safeKeys(obj) — Object.keys (enumerable string keys only).
+  function safeKeys(obj) {
+    if (obj === null || obj === undefined) return null;
+    if (typeof obj !== 'object') return null;
+    var r = _apply(_ObjectKeys, _Object, [obj]);
+    if (r === _SENTINEL) return null;
+    return r;
+  }
+
+  // safeGetOwnDescriptor(obj, key) — structural descriptor read (no [[Get]] invocation,
+  // so a Proxy's get trap / a value accessor does NOT fire). Returns the descriptor record
+  // or null. Note that returning an accessor descriptor (no `value` field) signals
+  // tampering / accessor presence — callers MUST check `'value' in d`.
+  function safeGetOwnDescriptor(obj, key) {
+    if (obj === null || obj === undefined) return null;
+    var r = _apply(_ObjectGetOwnPropertyDescriptor, _Object, [obj, key]);
+    if (r === _SENTINEL) return null;
+    return r;
+  }
+
+  // safeGetOwnPropertyNames(obj) — Object.getOwnPropertyNames via captured ref. Returns ALL
+  // own string keys (enumerable AND non-enumerable), or null on failure.
+  function safeGetOwnPropertyNames(obj) {
+    if (obj === null || obj === undefined) return null;
+    if (typeof obj !== 'object') return null;
+    var r = _apply(_ObjectGetOwnPropertyNames, _Object, [obj]);
+    if (r === _SENTINEL) return null;
+    return r;
+  }
+
+  // safeGetPrototypeOf(obj) — Object.getPrototypeOf via captured ref. Returns the prototype
+  // (for a Proxy this invokes the getPrototypeOf trap, which is the spec behaviour — callers
+  // must handle Proxy-lying via deepOriginalShapeAudit at the boundary).
+  function safeGetPrototypeOf(obj) {
+    if (obj === null || obj === undefined) return null;
+    var r = _apply(_ObjectGetPrototypeOf, _Object, [obj]);
+    if (r === _SENTINEL) return null;
+    return r;
+  }
+
+  // safeDefineDataProperty(obj, key, value) — install an own data descriptor via
+  // [[DefineOwnProperty]] (bypasses [[Set]] / setters on Object.prototype or Array.prototype).
+  // Returns true on success, false on failure.
+  function safeDefineDataProperty(obj, key, value) {
+    if (obj === null || obj === undefined) return false;
+    var r = _apply(_ObjectDefineProperty, _Object, [obj, key, { value: value, writable: true, enumerable: true, configurable: true }]);
+    return r !== _SENTINEL;
+  }
+
+  // safeHasOwn(obj, key) — own-property check via descriptor read (avoids
+  // Object.prototype.hasOwnProperty.call rebinding AND Function.prototype.call rebinding).
+  function safeHasOwn(obj, key) {
+    var d = safeGetOwnDescriptor(obj, key);
+    return d !== null && d !== undefined;
+  }
+
+  // safeArrayPush(arr, value) — install an own data descriptor at arr.length. Bypasses
+  // Array.prototype.push rebinding AND any Array.prototype["N"] setter installation.
+  function safeArrayPush(arr, value) {
+    if (arr === null || arr === undefined) return false;
+    var len;
+    try { len = arr.length; } catch (e) { return false; }
+    if (typeof len !== 'number') return false;
+    return safeDefineDataProperty(arr, len, value);
+  }
+
+  // safeArrayIndexOf(arr, target) — direct equality search via own-indexed reads.
+  // Returns -1 on failure or absence.
+  function safeArrayIndexOf(arr, target) {
+    if (arr === null || arr === undefined) return -1;
+    var len;
+    try { len = arr.length; } catch (e) { return -1; }
+    if (typeof len !== 'number') return -1;
+    len = len | 0;
+    for (var i = 0; i < len; i++) {
+      var v;
+      try { v = arr[i]; } catch (e) { return -1; }
+      if (v === target) return i;
+    }
+    return -1;
+  }
+
+  // safeArrayForEach(arr, fn) — direct-loop forEach. fn is a closure provided by the
+  // CONTRACT module (trusted), not the caller. Returns undefined.
+  function safeArrayForEach(arr, fn) {
+    if (arr === null || arr === undefined) return;
+    var len;
+    try { len = arr.length; } catch (e) { return; }
+    if (typeof len !== 'number') return;
+    len = len | 0;
+    for (var i = 0; i < len; i++) {
+      try { fn(arr[i], i); } catch (e) { /* fn is trusted but defensive */ }
+    }
+  }
+
+  // safeArrayMap(arr, fn) — direct-loop map. fn is a trusted closure. Returns a new array
+  // with elements written via defineProperty (bypasses prototype setters).
+  function safeArrayMap(arr, fn) {
+    var out = [];
+    if (arr === null || arr === undefined) return out;
+    var len;
+    try { len = arr.length; } catch (e) { return out; }
+    if (typeof len !== 'number') return out;
+tests/r3.0d-contract-foundation.test.js
+tests/r3.0d-evidence-graph.test.js
+tests/r3.0d-hardened-intrinsics.test.js
+
+exec
+/bin/bash -lc "sed -n '240,620p' contracts/r3.0d/hardened-intrinsics.js && git log --oneline --decorate --graph --max-count=25 && rg -n \"RN-(0[1-9]|[12][0-9]|30)|Round [0-9]+|adversarial\" governance/r3.0d/codex-checkpoint-evidence/D2/round-17-8cb28b5.raw.txt | tail -120" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+  // safeArrayForEach(arr, fn) — direct-loop forEach. fn is a closure provided by the
+  // CONTRACT module (trusted), not the caller. Returns undefined.
+  function safeArrayForEach(arr, fn) {
+    if (arr === null || arr === undefined) return;
+    var len;
+    try { len = arr.length; } catch (e) { return; }
+    if (typeof len !== 'number') return;
+    len = len | 0;
+    for (var i = 0; i < len; i++) {
+      try { fn(arr[i], i); } catch (e) { /* fn is trusted but defensive */ }
+    }
+  }
+
+  // safeArrayMap(arr, fn) — direct-loop map. fn is a trusted closure. Returns a new array
+  // with elements written via defineProperty (bypasses prototype setters).
+  function safeArrayMap(arr, fn) {
+    var out = [];
+    if (arr === null || arr === undefined) return out;
+    var len;
+    try { len = arr.length; } catch (e) { return out; }
+    if (typeof len !== 'number') return out;
+    len = len | 0;
+    for (var i = 0; i < len; i++) {
+      var mapped;
+      try { mapped = fn(arr[i], i); } catch (e) { continue; }
+      safeDefineDataProperty(out, i, mapped);
+    }
+    return out;
+  }
+
+  // safeArraySlice(arr) — direct-loop copy via defineProperty.
+  function safeArraySlice(arr) {
+    var out = [];
+    if (arr === null || arr === undefined) return out;
+    var len;
+    try { len = arr.length; } catch (e) { return out; }
+    if (typeof len !== 'number') return out;
+    len = len | 0;
+    for (var i = 0; i < len; i++) safeDefineDataProperty(out, i, arr[i]);
+    return out;
+  }
+
+  // safeArraySort(arr, cmp) — Reflect.apply on captured Array.prototype.sort, with a manual
+  // insertion-sort fallback if Reflect.apply is unavailable (fallback never rebound).
+  function safeArraySort(arr, cmp) {
+    if (arr === null || arr === undefined) return arr;
+    var args = cmp ? [cmp] : [];
+    var r = _apply(_ArrayPrototypeSort, arr, args);
+    if (r !== _SENTINEL) return r;
+    // Manual insertion sort fallback
+    var len;
+    try { len = arr.length; } catch (e) { return arr; }
+    if (typeof len !== 'number') return arr;
+    for (var s = 1; s < len; s++) {
+      var cur = arr[s];
+      var k = s - 1;
+      while (k >= 0 && (cmp ? cmp(arr[k], cur) > 0 : arr[k] > cur)) { arr[k + 1] = arr[k]; k--; }
+      arr[k + 1] = cur;
+    }
+    return arr;
+  }
+
+  // safeStringSlice(s, start, end) — Reflect.apply on captured String.prototype.slice.
+  function safeStringSlice(s, start, end) {
+    if (typeof s !== 'string') return '';
+    var args = (end === undefined) ? [start] : [start, end];
+    var r = _apply(_StringPrototypeSlice, s, args);
+    if (r === _SENTINEL || typeof r !== 'string') return '';
+    return r;
+  }
+
+  // safeStringCharCodeAt(s, i) — Reflect.apply on captured charCodeAt.
+  function safeStringCharCodeAt(s, i) {
+    if (typeof s !== 'string') return NaN;
+    var r = _apply(_StringPrototypeCharCodeAt, s, [i]);
+    if (r === _SENTINEL) return NaN;
+    return r;
+  }
+
+  // safeRegExpTest(re, s) — Reflect.apply on captured RegExp.prototype.test.
+  function safeRegExpTest(re, s) {
+    var r = _apply(_RegExpPrototypeTest, re, [s]);
+    if (r === _SENTINEL) return false;
+    return r === true;
+  }
+
+  // safeNumberIsInteger(n) — captured Number.isInteger.
+  function safeNumberIsInteger(n) {
+    var r = _apply(_NumberIsInteger, _Number, [n]);
+    if (r === _SENTINEL) return false;
+    return r === true;
+  }
+
+  // safeNumberIsFinite(n) — captured Number.isFinite.
+  function safeNumberIsFinite(n) {
+    var r = _apply(_NumberIsFinite, _Number, [n]);
+    if (r === _SENTINEL) return false;
+    return r === true;
+  }
+
+  // safeMathFloor(n) — captured Math.floor.
+  function safeMathFloor(n) {
+    var r = _apply(_MathFloor, _Math, [n]);
+    if (r === _SENTINEL) return NaN;
+    return r;
+  }
+
+  // safeUtf8ByteLength(s) — UTF-8 byte width via captured TextEncoder constructor. Falls back
+  // to manual char-code summation (using safeStringCharCodeAt, all captured) if TextEncoder is
+  // somehow unavailable. Lone surrogates count as 6 bytes (\uXXXX JSON escape width).
+  function safeUtf8ByteLength(s) {
+    if (typeof s !== 'string') return 0;
+    if (_TextEncoderCtor !== null && _TextEncoderPrototypeEncode !== null) {
+      try {
+        var enc = new _TextEncoderCtor();
+        // Codex D2 Round 16 RN-28 closure: invoke captured TextEncoder.prototype.encode via
+        // captured Reflect.apply rather than the instance's `.encode` property — that ambient
+        // property lookup would invoke a rebound prototype method (or a Proxy get trap on the
+        // instance, which is what the Uint8Array adapter returns in some host implementations).
+        var arr = _apply(_TextEncoderPrototypeEncode, enc, [s]);
+        if (arr !== _SENTINEL && arr && typeof arr.length === 'number') return arr.length;
+      } catch (e) { /* fall through to manual */ }
+    }
+    var n = 0;
+    var len = s.length;
+    for (var i = 0; i < len; i++) {
+      var c = safeStringCharCodeAt(s, i);
+      if (c < 0x80) n += 1;
+      else if (c < 0x800) n += 2;
+      else if (c >= 0xDC00 && c <= 0xDFFF) n += 6; // lone low surrogate -> \uXXXX
+      else if (c >= 0xD800 && c <= 0xDBFF) {       // high surrogate
+        if (i + 1 < len) {
+          var c2 = safeStringCharCodeAt(s, i + 1);
+          if (c2 >= 0xDC00 && c2 <= 0xDFFF) { n += 4; i++; continue; } // valid pair = 4-byte UTF-8
+        }
+        n += 6; // lone high -> \uXXXX
+      }
+      else n += 3;
+    }
+    return n;
+  }
+
+  // safeStructuredClone(v) — captured structuredClone. Returns null on failure (DataCloneError
+  // / unavailable runtime). Note: structuredClone DOES invoke Proxy [[Get]] / [[OwnPropertyKeys]]
+  // traps during the clone — callers that need full immunity from Proxy traps should do a
+  // deepOriginalShapeAudit on the original BEFORE invoking structuredClone.
+  function safeStructuredClone(v) {
+    if (_StructuredCloneFn === null) return null;
+    var r = _apply(_StructuredCloneFn, undefined, [v]);
+    if (r === _SENTINEL) return null;
+    return r;
+  }
+
+  // safeStringCoerce(v) — global String(v) for non-string primitives. Captures the global
+  // function reference so rebinding globalThis.String has no effect.
+  function safeStringCoerce(v) {
+    var r = _apply(_StringCoerce, undefined, [v]);
+    if (r === _SENTINEL) return '';
+    return r;
+  }
+
+  // safeStringToLowerCase(s) — Reflect.apply on captured String.prototype.toLowerCase. Required
+  // by reason-codes.js when computing per-code i18n explanation keys from UPPER_SNAKE constants
+  // (e.g. 'EVIDENCE_NODE_INVALID' -> 'r3_0d.reason.evidence_node_invalid'). Without a wrapper the
+  // ambient `str.toLowerCase()` call would route through a rebindable prototype method.
+  function safeStringToLowerCase(s) {
+    if (typeof s !== 'string') return '';
+    var r = _apply(_StringPrototypeToLowerCase, s, []);
+    if (r === _SENTINEL || typeof r !== 'string') return '';
+    return r;
+  }
+
+  // safeIsArray(v) — captured Array.isArray invocation. The standalone replacement for ambient
+  // `Array.isArray(v)`. Note: a hostile Proxy can lie about being an array (its [[OwnPropertyKeys]]
+  // makes Array.isArray return true) — callers needing full integrity must additionally validate
+  // via deepOriginalShapeAudit (which also confirms Array.prototype identity).
+  function safeIsArray(v) {
+    var r = _apply(_ArrayIsArray, _Array, [v]);
+    if (r === _SENTINEL) return false;
+    return r === true;
+  }
+
+  // safeIsPlainShape(v) — TOP-LEVEL (non-recursive) plain-shape classification. Returns one of:
+  //   'plain-object' — v is a non-null, non-array object whose prototype is exactly
+  //                    Object.prototype or null. Class instances are rejected.
+  //   'plain-array'  — v passes Array.isArray AND its prototype is exactly Array.prototype.
+  //                    Array subclasses and arrays with mutated prototypes are rejected.
+  //   'reject'       — anything else (null, primitive, function, class instance, Array subclass,
+  //                    or any prototype-of access failure).
+  // Required by reason-codes.js helpers (_isOriginalPlainObject, _hasNonPlainNestedObject) so
+  // they can perform the prototype-identity check WITHOUT exposing the captured Object.prototype
+  // / Array.prototype references to callers. The check itself uses captured intrinsics only.
+  function safeIsPlainShape(v) {
+    if (v === null || typeof v !== 'object') return 'reject';
+    var isArr = safeIsArray(v);
+    var proto = safeGetPrototypeOf(v);
+    if (isArr) {
+      if (proto !== _ArrayPrototype) return 'reject';
+      return 'plain-array';
+    }
+    if (proto === _ObjectPrototype || proto === null) return 'plain-object';
+    return 'reject';
+  }
+
+  // deepOriginalShapeAudit(v, depth) — recursive structural validator. Returns true ONLY if v
+  // is composed exclusively of plain objects (Object.prototype proto), plain arrays
+  // (Array.prototype proto, NOT subclass), strings, finite numbers, booleans, null. Rejects:
+  //   - class instances (non-Object.prototype proto)
+  //   - Array subclasses (non-Array.prototype proto)
+  //   - Proxies that lie about their prototype (lying still produces a wrong proto here)
+  //   - Symbol-keyed own properties at any depth
+  //   - Non-enumerable own properties at any depth
+  //   - Accessor descriptors at any depth
+  //   - Function values
+  //   - Infinity / NaN numbers
+  //   - Recursion past depth cap (32)
+  // Calls captured intrinsics only; the audit itself never invokes a [[Get]] on the input
+  // (uses descriptor reads exclusively).
+  function deepOriginalShapeAudit(v, depth) {
+    if (depth === undefined) depth = 0;
+    if (depth > 32) return false;
+    if (v === null) return true;
+    var t = typeof v;
+    if (t === 'string' || t === 'boolean') return true;
+    if (t === 'number') return safeNumberIsFinite(v);
+    if (t === 'function' || t === 'symbol' || t === 'undefined') return false;
+    if (t !== 'object') return false;
+    // prototype check
+    var proto = safeGetPrototypeOf(v);
+    var isPlainArray = false;
+    if (proto === null) {
+      // Object.create(null) — accept; treated as plain object with null proto
+    } else if (proto === _ObjectPrototype) {
+      // plain object
+    } else if (proto === _ArrayPrototype) {
+      // plain array — additional check: Array.isArray must agree
+      var isArr = _apply(_ArrayIsArray, _Array, [v]);
+      if (isArr !== true) return false;
+      isPlainArray = true;
+    } else {
+      return false; // class instance / Array subclass / mutated prototype
+    }
+    // structural key audit (own keys, including non-enumerable, including Symbol)
+    var allKeys = safeOwnKeys(v);
+    if (allKeys === null) return false;
+    var enumKeysOnly = safeKeys(v);
+    if (enumKeysOnly === null) return false;
+    // For plain Array: an extra non-enumerable own property "length" is intrinsic (every
+    // Array has it by spec). Accept exactly that one extra. Any OTHER non-enumerable or
+    // Symbol key is a rejection signal.
+    var allowedExtra = isPlainArray ? 1 : 0;
+    if (allKeys.length !== enumKeysOnly.length + allowedExtra) return false;
+    var len = allKeys.length;
+    for (var i = 0; i < len; i++) {
+      var k = allKeys[i];
+      if (typeof k === 'symbol') return false;
+      var d = safeGetOwnDescriptor(v, k);
+      if (d === null || d === undefined) return false;
+      if (!('value' in d)) return false; // accessor descriptor
+      // Allow the intrinsic Array length (non-enumerable). For all other keys, must be enumerable.
+      if (d.enumerable !== true) {
+        if (!(isPlainArray && k === 'length')) return false;
+      }
+      // Recurse into nested
+      var child = d.value;
+      if (typeof child === 'object' && child !== null) {
+        if (!deepOriginalShapeAudit(child, depth + 1)) return false;
+      }
+      else if (typeof child === 'number') {
+        if (!safeNumberIsFinite(child)) return false;
+      }
+      else if (typeof child === 'function' || typeof child === 'symbol' || typeof child === 'undefined') {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // safeObjectCreateNull() — return a fresh object with a NULL prototype using the captured
+  // Object.create reference invoked via Reflect.apply. Added 2026-06-29 for the renderer
+  // evidence-graph builder which uses `_ObjectCreate(null)` as a Map-shaped sentinel (proto-null
+  // bag where attacker-controlled nodeIds like 'constructor' / '__proto__' cannot collide with
+  // Object.prototype keys). Without this wrapper the caller would need its own captured
+  // reference, fragmenting the single-source-of-truth invariant. No-arg only — the wrapper does
+  // not accept a custom prototype because every R3.0D caller wants the null-proto case.
+  function safeObjectCreateNull() {
+    var r = _apply(_ObjectCreate, _Object, [null]);
+    if (r === _SENTINEL) return null;
+    return r;
+  }
+
+  // safeObjectAssign(target, source) — shallow-copy `source`'s own enumerable string-keyed
+  // properties into `target` using captured intrinsics ONLY. NEVER invokes Object.assign
+  // (which routes through ambient [[Get]] / Proxy traps and Object.prototype setters). Each
+  // copied key goes through safeDefineDataProperty so prototype setters are bypassed. Values
+  // are read via descriptor access (no [[Get]] trap fires). Returns target.
+  //
+  // Added 2026-06-29 for evidence-node-contract.js per-node sanitized-output construction
+  // (replaces `Object.freeze(Object.assign({}, n.observation.params))`). Single-purpose
+  // narrow helper: callers that need a more elaborate merge / multi-source assign should
+  // compose this with safeKeys themselves rather than expand the helper surface here.
+  function safeObjectAssign(target, source) {
+    if (target === null || target === undefined) return target;
+    if (source === null || source === undefined) return target;
+    if (typeof source !== 'object') return target;
+    var keys = safeKeys(source);
+    if (keys === null) return target;
+    var len = keys.length;
+    for (var i = 0; i < len; i++) {
+      var k = keys[i];
+      var d = safeGetOwnDescriptor(source, k);
+      if (d === null || d === undefined) continue;
+      if (!('value' in d)) continue; // accessor descriptor — skip rather than fire its getter
+      safeDefineDataProperty(target, k, d.value);
+    }
+    return target;
+  }
+
+  // deepFreeze(v) — recursive Object.freeze via captured _ObjectFreeze. Skips primitives,
+  // freezes both arrays and plain objects + their reachable subtree. Returns v.
+  function deepFreeze(v) {
+    if (v === null || typeof v !== 'object') return v;
+    var keys = safeKeys(v);
+    if (keys !== null) {
+      var len = keys.length;
+      for (var i = 0; i < len; i++) {
+        var nested = v[keys[i]];
+        if (typeof nested === 'object' && nested !== null) deepFreeze(nested);
+      }
+    }
+    _apply(_ObjectFreeze, _Object, [v]);
+    return v;
+  }
+
+  // stableStringify(value) — canonical JSON serializer, sorted keys at every depth, NO toJSON
+  // invocation anywhere. Walks via safeKeys + manual recursion + direct primitive encoding.
+  // Used for canonical bytes (graphId / dedup) AND envelope byte cap measurement.
+  function stableStringify(value) {
+    if (value === null) return 'null';
+    var t = typeof value;
+    if (t === 'string') {
+      // Captured _JSONStringify on a PRIMITIVE string never invokes toJSON (per ES
+      // §25.5.2.2 SerializeJSONProperty: toJSON is only consulted when Type(value) is Object).
+      var r = _apply(_JSONStringify, _JSON, [value]);
+      if (r === _SENTINEL || typeof r !== 'string') return '""';
+      return r;
+    }
+    if (t === 'number') {
+      if (!safeNumberIsFinite(value)) return 'null';
+      return safeStringCoerce(value);
+    }
+    if (t === 'boolean') return value ? 'true' : 'false';
+    if (t === 'undefined') return 'null';
+    var isArr = _apply(_ArrayIsArray, _Array, [value]);
+    if (isArr === true) {
+      var result = '[';
+      var len;
+      try { len = value.length; } catch (e) { return 'null'; }
+      if (typeof len !== 'number') return 'null';
+      for (var i = 0; i < len; i++) {
+        if (i > 0) result += ',';
+        result += stableStringify(value[i]);
+      }
+      return result + ']';
+    }
+    if (t === 'object') {
+      var keys = safeKeys(value);
+      if (keys === null) return 'null';
+      // Manual insertion sort — no .sort dependency.
+      var sortLen = keys.length;
+      for (var s = 1; s < sortLen; s++) {
+        var cur = keys[s];
+        var k = s - 1;
+        while (k >= 0 && keys[k] > cur) { keys[k + 1] = keys[k]; k--; }
+        keys[k + 1] = cur;
+      }
+      var obj = '{';
+      for (var j = 0; j < sortLen; j++) {
+        if (j > 0) obj += ',';
+        var key = keys[j];
+        var qkey = _apply(_JSONStringify, _JSON, [key]);
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-cdh6Ariz' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-24qCLTdv' (errno=Operation not permitted)
+* 70a4f03 (HEAD -> feat/r3.0d-d2-evidence-graph, origin/feat/r3.0d-d2-evidence-graph) cp17r(d2): close Codex D2 Round 17 — RN-31 coverage gap (5 missing wrapper direct-tests)
+* 8cb28b5 cp16r(d2): close Codex D2 Round 16 — RN-28 encode capture + RN-31 direct-test suite
+* 181c7d8 cp15r(d2): close Codex D2 Round 15 — architectural convergence via hardened-intrinsics
+* 764ae80 cp14r(d2): close Codex D2 Round 14 — per-iteration guard + Object.getOwnPropertyNames
+* 092f262 cp13r(d2): close Codex D2 Round 13 — RN-21/27 Proxy length-trap + RN-28/29 TextEncoder/structuredClone
+* 2f0e588 cp12r(d2): close Codex D2 Round 12 — RN-21 container variant + RN-27 (Math/Number/RegExp)
+* 0a61f06 cp11r(d2): close Codex D2 Round 11 — RN-21 TOCTOU via descriptor read + RN-26 Function.prototype
+* e0882a4 cp10r(d2): close Codex D2 Round 10 — RN-21..RN-25 via intrinsic integrity guard
+* 4928a5e cp9r(d2): close Codex D2 Round 9 — RN-19 (intrinsic rebinding) + RN-20 (ambient Object.freeze)
+* 6392196 cp8r(d2): close Codex D2 Round 8 — RN-18 via _stableStringify (no toJSON callback)
+* 497c143 cp7r(d2): close Codex D2 Round 7 — RN-16 final via Step 11.5 exact idPayload preview
+* 90bf868 cp6r(d2): close Codex D2 Round 6 — RN-13 round-4 final (defineProperty) + RN-16 (estimator) + RN-17 (DEL)
+* d7c045f cp5r(d2): close Codex D2 Round 5 — RN-13 round-4 (Function.prototype.call) + RN-15 round-4 (lone surrogate)
+* ec00b88 cp4r(d2): close Codex D2 Round 4 — RN-13 round-3 (Array.proto) + RN-15 (JSON escape)
+* e84d22c cp3r(d2): close Codex D2 Round 3 — RN-09 (UTF-8) + RN-13 (intrinsics) + RN-14 (estimator)
+* 63ecf69 cp2r(d2): close Codex D2 Round 2 — RN-01/03/06/09/10/11 round-2 hardening + Tier-1 evidence
+* ad6474a cp1r(d2): close Codex D2 Round 1 — RN-01..RN-12 hardening + Tier-1 evidence
+* 10766c0 chore(r3.0): rename leftover D5_ACTIVATION cross-phase text references to D5_ENGINEER_BRIEF_ACTIVATION
+* a348f7d feat(r3.0d): D2_EVIDENCE_GRAPH — Evidence Graph service + atomic D-phase rename
+* 51155b3 chore(r3.0): state-aware production-consumer authorization in check-r3-phase-no-consumer.js
+*   f8a598b (origin/feat/r3.0-integrated-delivery, feat/r3.0-integrated-delivery) Merge pull request #21 from USADA-KARROT/feat/r3.0d-d1-evidence-decision-contracts
+|\  
+| * 206a3f1 (origin/feat/r3.0d-d1-evidence-decision-contracts, feat/r3.0d-d1-evidence-decision-contracts) cp1r(d1): anchor Codex D1 Round 7 PASS verdict — R3.0D D1_CONTRACT_FOUNDATION ready for Train integration
+| * 870e757 cp1r(d1): close Codex D1 Round 6 — Array.prototype identity check rejects Array subclasses + mutated-prototype arrays
+| * b8fc10f cp1r(d1): close Codex D1 Round 5 — recursive prototype check rejects nested class instances pre-clone
+| * b7717f5 cp1r(d1): close Codex D1 Round 4 — pre-clone prototype check rejects populated class instances
+322:+  // Codex D2 Round 16 RN-28 closure: capture TextEncoder.prototype.encode at module-init so
+494:+        // Codex D2 Round 16 RN-28 closure: invoke captured TextEncoder.prototype.encode via
+592:-    "test": "node tests/verify-dynamics.js && node tests/telemetry-core.test.js && node tests/telemetry-view.test.js && node tests/telemetry-plot.test.js && node tests/telemetry-interact.test.js && node tests/telemetry-yaw.test.js && node tests/canonical-parameters.test.js && node tests/parameter-conversions.test.js && node tests/vehicle-profile-f312.test.js && node tests/setup-snapshot.test.js && node tests/analysis-case.test.js && node tests/analysis-case-adversarial.test.js && node tests/suspension-input-normalizer.test.js && node tests/suspension-input-equivalence.test.js && node tests/suspension-input-adversarial.test.js && node tests/canonical-model-input.test.js && node tests/analysis-execution.test.js && node tests/telemetry-observation.test.js && node tests/model-telemetry-comparison.test.js && node tests/race-engineer-insight.test.js && node tests/driver-coach-insight.test.js && node tests/analysis-workspace.test.js && node tests/analysis-workspace-viewmodel.test.js && node tests/analysis-workspace-integration.test.js && node tests/analysis-workspace-ui.test.js && node tests/telemetry-import-adapter.test.js && node tests/channel-mapping.test.js && node tests/calibration-registry.test.js && node tests/analysis-window.test.js && node tests/canonical-telemetry-session.test.js && node tests/analysis-case-export.test.js && node tests/r2.3-real-telemetry-integration.test.js && node tests/r2.3-import-ui.test.js && node tests/measured-metrics.test.js && node tests/r2.4-measured-metrics-integration.test.js && node tests/r2.4-ui.test.js && node tests/setup-ab.test.js && node tests/quantitative-setup-recommendation.test.js && node tests/r2.5-setup-ab-quantitative-integration.test.js && node tests/r2.5-ui.test.js && node tests/track-intelligence.test.js && node tests/r2.6-track-intelligence-integration.test.js && node tests/r2.6-ui.test.js && node tests/case-shell.test.js && node tests/r3.0a-ui.test.js && node tests/storage-backend.test.js && node tests/schema-migration.test.js && node tests/case-record-schema.test.js && node tests/case-store.test.js && node tests/session-store.test.js && node tests/case-library-viewmodel.test.js && node tests/r3.0b-ui.test.js && node tests/r3.0b-persistence-integration.test.js && node tests/feature-registry.test.js && node tests/feature-router.test.js && node tests/vehicle-preset-pipeline.test.js && node tests/i18n-parity.test.js && node tests/r3.0c-contract-foundation.test.js && node tests/r3-0c-comparison-adapter.test.js && node tests/r3-0c-lap-authority.test.js && node tests/r3-0c-track-identity.test.js && node tests/r3-0c-distance-authority.test.js && node tests/r3-0c-normalized-distance.test.js && node tests/r3-0c-reference-selection.test.js && node tests/r3-0c-corner-segmentation.test.js && node tests/r3-0c-corner-pairing.test.js && node tests/r3-0c-delta-metrics.test.js && node tests/r3-0c-comparison-export.test.js && node tests/r3-0c-comparison-workspace.test.js && node tests/r3-0c-contracts-bundle-equivalence.test.js && node tests/r3-0c-activation.test.js && node tests/r3.0d-contract-foundation.test.js && node tests/r3.0d-evidence-graph.test.js && node tests/r3-0c-governance.test.js && node tests/r3-0c-no-consumer.test.js && node tests/r3-0c-governance-integrity.test.js && node tests/r3-0-phase-governance.test.js && node tests/r3-0-phase-no-consumer.test.js && node tests/r3-0-phase-governance-integrity.test.js && node tests/r3-0-train.test.js && node tools/validate-against-telemetry.js --selftest",
+593:+    "test": "node tests/verify-dynamics.js && node tests/telemetry-core.test.js && node tests/telemetry-view.test.js && node tests/telemetry-plot.test.js && node tests/telemetry-interact.test.js && node tests/telemetry-yaw.test.js && node tests/canonical-parameters.test.js && node tests/parameter-conversions.test.js && node tests/vehicle-profile-f312.test.js && node tests/setup-snapshot.test.js && node tests/analysis-case.test.js && node tests/analysis-case-adversarial.test.js && node tests/suspension-input-normalizer.test.js && node tests/suspension-input-equivalence.test.js && node tests/suspension-input-adversarial.test.js && node tests/canonical-model-input.test.js && node tests/analysis-execution.test.js && node tests/telemetry-observation.test.js && node tests/model-telemetry-comparison.test.js && node tests/race-engineer-insight.test.js && node tests/driver-coach-insight.test.js && node tests/analysis-workspace.test.js && node tests/analysis-workspace-viewmodel.test.js && node tests/analysis-workspace-integration.test.js && node tests/analysis-workspace-ui.test.js && node tests/telemetry-import-adapter.test.js && node tests/channel-mapping.test.js && node tests/calibration-registry.test.js && node tests/analysis-window.test.js && node tests/canonical-telemetry-session.test.js && node tests/analysis-case-export.test.js && node tests/r2.3-real-telemetry-integration.test.js && node tests/r2.3-import-ui.test.js && node tests/measured-metrics.test.js && node tests/r2.4-measured-metrics-integration.test.js && node tests/r2.4-ui.test.js && node tests/setup-ab.test.js && node tests/quantitative-setup-recommendation.test.js && node tests/r2.5-setup-ab-quantitative-integration.test.js && node tests/r2.5-ui.test.js && node tests/track-intelligence.test.js && node tests/r2.6-track-intelligence-integration.test.js && node tests/r2.6-ui.test.js && node tests/case-shell.test.js && node tests/r3.0a-ui.test.js && node tests/storage-backend.test.js && node tests/schema-migration.test.js && node tests/case-record-schema.test.js && node tests/case-store.test.js && node tests/session-store.test.js && node tests/case-library-viewmodel.test.js && node tests/r3.0b-ui.test.js && node tests/r3.0b-persistence-integration.test.js && node tests/feature-registry.test.js && node tests/feature-router.test.js && node tests/vehicle-preset-pipeline.test.js && node tests/i18n-parity.test.js && node tests/r3.0c-contract-foundation.test.js && node tests/r3-0c-comparison-adapter.test.js && node tests/r3-0c-lap-authority.test.js && node tests/r3-0c-track-identity.test.js && node tests/r3-0c-distance-authority.test.js && node tests/r3-0c-normalized-distance.test.js && node tests/r3-0c-reference-selection.test.js && node tests/r3-0c-corner-segmentation.test.js && node tests/r3-0c-corner-pairing.test.js && node tests/r3-0c-delta-metrics.test.js && node tests/r3-0c-comparison-export.test.js && node tests/r3-0c-comparison-workspace.test.js && node tests/r3-0c-contracts-bundle-equivalence.test.js && node tests/r3-0c-activation.test.js && node tests/r3.0d-contract-foundation.test.js && node tests/r3.0d-hardened-intrinsics.test.js && node tests/r3.0d-evidence-graph.test.js && node tests/r3-0c-governance.test.js && node tests/r3-0c-no-consumer.test.js && node tests/r3-0c-governance-integrity.test.js && node tests/r3-0-phase-governance.test.js && node tests/r3-0-phase-no-consumer.test.js && node tests/r3-0-phase-governance-integrity.test.js && node tests/r3-0-train.test.js && node tools/validate-against-telemetry.js --selftest",
+644:+ * tests/r3.0d-hardened-intrinsics.test.js — adversarial direct-test of every HI.* wrapper.
+646:+ * Codex D2 Round 16 RN-31 closure: Section AA in tests/r3.0d-evidence-graph.test.js asserts
+934:+  // safeUtf8ByteLength via captured TextEncoder.prototype.encode (Codex Round 16 RN-28)
+994: * tests/r3.0d-hardened-intrinsics.test.js — adversarial direct-test of every HI.* wrapper.
+996: * Codex D2 Round 16 RN-31 closure: Section AA in tests/r3.0d-evidence-graph.test.js asserts
+1284:  // safeUtf8ByteLength via captured TextEncoder.prototype.encode (Codex Round 16 RN-28)
+1349: * Codex D2 Round 15 architectural convergence (per SKYLINE directive 2026-06-29):
+1463:  // Codex D2 Round 16 RN-28 closure: capture TextEncoder.prototype.encode at module-init so
+1697:        // Codex D2 Round 16 RN-28 closure: invoke captured TextEncoder.prototype.encode via
+1705:/bin/bash -lc "sed -n '1,220p' tests/r3.0d-hardened-intrinsics.test.js; sed -n '221,420p' tests/r3.0d-hardened-intrinsics.test.js; sed -n '330,760p' contracts/r3.0d/hardened-intrinsics.js; rg -n \"Section (S|T|U|V|W|X|Y|Z|AA)|RN-28|TextEncoder|forbidden i18n|oversized|persistent|graphId|determin\" tests/r3.0d-evidence-graph.test.js tests/r3.0d-hardened-intrinsics.test.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+1708: * tests/r3.0d-hardened-intrinsics.test.js — adversarial direct-test of every HI.* wrapper.
+1710: * Codex D2 Round 16 RN-31 closure: Section AA in tests/r3.0d-evidence-graph.test.js asserts
+1998:  // safeUtf8ByteLength via captured TextEncoder.prototype.encode (Codex Round 16 RN-28)
+2082:        // Codex D2 Round 16 RN-28 closure: invoke captured TextEncoder.prototype.encode via
+2400:tests/r3.0d-hardened-intrinsics.test.js:4: * Codex D2 Round 16 RN-31 closure: Section AA in tests/r3.0d-evidence-graph.test.js asserts
+2402:tests/r3.0d-hardened-intrinsics.test.js:292:  // safeUtf8ByteLength via captured TextEncoder.prototype.encode (Codex Round 16 RN-28)
+2506:623-  chk('RN-03 dedup outcome independent of caller permutation', sameOutcome);
+2508:625:    chk('RN-03 same graphId across permutations', r1.graph.graphId === r2.graph.graphId);
+2512:630-  // RN-04 — semantic dedup map keyed by full canonical string, not hash. Two completely different
+2517:635-  chk('RN-04 distinct param values both kept (no hash collision data loss)', r.valid === true && r.graph.nodes.length === 2);
+2519:639-  // RN-05 — correlationGroup.memberNodeIds must be frozen.
+2523:643-  chk('RN-05 group object frozen', r.valid === true && Object.isFrozen(r.graph.correlationGroups[0]));
+2532:712-  // RN-03 round-2: two same-nodeId candidates differing only by confidence.state must sort
+2538:718-  chk('RN-03 r2: same dedup outcome regardless of permutation (confidence-distinct)', r1.valid === true && r2.valid === true && r1.graph.nodes[0].confidence.state === r2.graph.nodes[0].confidence.state);
+2539:719:  chk('RN-03 r2: same graphId regardless of permutation', r1.valid === true && r2.valid === true && r1.graph.graphId === r2.graph.graphId);
+2543:723:  chk('RN-03 r2: confidence-distinct singletons produce distinct graphId', onlyUnresolved.graph.graphId !== onlyNotComputed.graph.graphId);
+2547:741-  // RN-09 round-2: PARAM_KEY_BYTE_CAP enforced — a single param KEY exceeding 64 bytes → rejected.
+2615:1226:// ── Section S — Codex D2 Round 7 finding closure (RN-16 same-source correlation explosion) ──
+2617:1228-  // RN-16 STILL-OPEN at Round 7 (Codex evidence on 90bf868): 35 same-source nodes share one
+2639:1271:// ── Section T — Codex D2 Round 8 finding closure (RN-18 inherited toJSON hook) ──────
+2641:1273-  // RN-18 NEW at Round 8 (Codex evidence on 497c143): a hostile `Object.prototype.toJSON`
+2663:1379:// ── Section U — Codex D2 Round 9 finding closures (RN-19 + RN-20) ──────
+2665:1381-  // RN-19 NEW at Round 9 (Codex evidence on 6392196): the previous _stableStringify implementation
+2684:1477:    chk('RN-19: hostile Array.prototype.sort does not falsify deterministic node ordering', r.graph.nodes[0].nodeId === 'ev_a' && r.graph.nodes[1].nodeId === 'ev_b' && r.graph.nodes[2].nodeId === 'ev_c');
+2686:1479-    chk('RN-19: entry guard caught Array.prototype.sort rebinding (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+2690:1499:// ── Section V — Codex D2 Round 10 finding closures (RN-21..RN-25 via intrinsic guard) ──────
+2692:1501-  // RN-21..RN-25 closure: the Step 0 intrinsic integrity guard at the entry of
+2695:1594-  chk('RN-21..25 intact: legitimate build returns valid graph', r.valid === true && r.graph.nodes.length === 1 && r.graph.nodes[0].nodeId === 'ev_001');
+2696:1595:  chk('RN-21..25 intact: graphId is deterministic content-hash', r.valid === true && typeof r.graph.graphId === 'string' && /^graph_[0-9a-f]+$/.test(r.graph.graphId));
+2699:1598:// ── Section W — Codex D2 Round 11 finding closures (RN-21 TOCTOU + RN-26 Function.prototype) ──
+2701:1600-  // RN-21 STILL-OPEN at Round 11 (Codex evidence on e0882a4): the entry guard's direct property
+2705:1698:// ── Section X — Codex D2 Round 12 finding closures (RN-21 container + RN-27 Math/Number/RegExp) ──
+2707:1700-  // RN-21 STILL-OPEN at Round 12 (container variant): the property-level accessor on
+2711:1792:// ── Section Y — Codex D2 Round 13 finding closures (RN-21/27 Proxy + RN-28/29 globals) ──
+2713:1794-  // RN-21/27 STILL-OPEN at Round 13 (Codex evidence on 2f0e588): a Proxy on rawEvidence with a
+2717:1847:  // RN-28 NEW at Round 13: ambient TextEncoder used by contract byte-length validation.
+2718:1848:  // Rebinding admits oversized i18nKey. Round 14 closure: entry guard checks
+2726:1856:  chk('RN-28: TextEncoder rebinding caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+2732:1882:// ── Section Z — Codex D2 Round 14 finding closures (self-restoring trap + Object.getOwnPropertyNames) ──
+2734:1884-  // RN-21 STILL-OPEN at Round 14 (Codex evidence on 092f262): a Proxy on rawEvidence with a
+2753:1959:  chk('RN-28 self-restoring: TextEncoder mid-iter rebind caught (BLOCK)', attacked.eligible === false && Array.isArray(attacked.reasonCodes) && attacked.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+2759:1975:// ── Section AA — Codex D2 Round 15 architectural convergence (hardened-intrinsics) ───────
+2765:2049:  // Group 7 — TextEncoder + structuredClone (round 13 RN-28/29)
+2772:2057:// Section AA-2 — Object.prototype.toJSON hook (round 8 RN-18). Installed AS A PROPERTY (not
+2983:contracts/r3.0d/hardened-intrinsics.js:121:  // Codex D2 Round 16 RN-28 closure: capture TextEncoder.prototype.encode at module-init so
+3002:contracts/r3.0d/hardened-intrinsics.js:355:        // Codex D2 Round 16 RN-28 closure: invoke captured TextEncoder.prototype.encode via
+3056:contracts/r3.0d/reason-codes.js:204:    // Codex D1 R3 Finding RN-11 closure: NO JSON.stringify fallback. HI.safeStructuredClone
+3073:renderer/js/r3-0d-evidence-graph.js:56: *   RN-05: correlationGroup.memberNodeIds is Object.freeze'd before its enclosing group object.
+3074:renderer/js/r3-0d-evidence-graph.js:57: *   RN-06: opts.clock() is invoked AFTER input envelope validation succeeds, via a descriptor-safe
+3095:renderer/js/r3-0d-evidence-graph.js:159:  // Codex D2 Round 9 RN-19 closure additional captures: every Array.prototype method touched in
+3107:renderer/js/r3-0d-evidence-graph.js:193:  // Codex D2 Round 12 RN-27 closure: additional method captures (Math.floor for integer-check
+3114:renderer/js/r3-0d-evidence-graph.js:201:  // Codex D2 Round 13 RN-29 closure: structuredClone is reachable from the contract module
+3116:renderer/js/r3-0d-evidence-graph.js:205:  // Codex D2 Round 13 RN-28 closure: TextEncoder is already captured below as _TextEncoder
+3117:renderer/js/r3-0d-evidence-graph.js:215:  // RN-21 (ambient .push/.indexOf in contract validators), RN-22 (ambient JSON.stringify in
+3118:renderer/js/r3-0d-evidence-graph.js:216:  // correlation key), RN-23 (ambient Object.getOwnPropertyDescriptor in Step 3), RN-24 (ambient
+3119:renderer/js/r3-0d-evidence-graph.js:217:  // global String() function), RN-25 (Number.prototype.toString / String.prototype.charAt in
+3123:renderer/js/r3-0d-evidence-graph.js:229:  // is an attack signal. RN-26 closure: add Function.prototype.call / .apply / .bind to the
+3124:renderer/js/r3-0d-evidence-graph.js:275:        // Codex D2 Round 11 RN-26 closure: Function.prototype.call / .apply / .bind are critical
+3125:renderer/js/r3-0d-evidence-graph.js:283:        // Codex D2 Round 12 RN-27 closure: Math.floor (envelope length-integer check), Number
+3127:renderer/js/r3-0d-evidence-graph.js:291:        // Codex D2 Round 13 RN-28 + RN-29 closure: TextEncoder + structuredClone integrity.
+3134:renderer/js/r3-0d-evidence-graph.js:381:  var ENVELOPE_BYTE_CAP = 256 * 1024;  // 256 KiB post-sanitization JSON.stringify cap (RN-09 / RN-14)
+3175:renderer/js/r3-0d-evidence-graph.js:608:  // rationales (RN-18 toJSON hook, RN-19 Array.prototype rebinding) are structurally closed by
+3232:renderer/js/r3-0d-evidence-graph.js:882:  // RN-13 closure (defineProperty bypass of Object.prototype setters) is now structurally enforced
+3270:renderer/js/r3-0d-evidence-graph.js:1104:      // Step 6 — duplicate-ID dedup (HI.safeObjectCreateNull() map — RN-08 closure). First by sort
+3345:217:  // global String() function), RN-25 (Number.prototype.toString / String.prototype.charAt in
+3347:229:  // is an attack signal. RN-26 closure: add Function.prototype.call / .apply / .bind to the
+3348:275:        // Codex D2 Round 11 RN-26 closure: Function.prototype.call / .apply / .bind are critical
+3349:283:        // Codex D2 Round 12 RN-27 closure: Math.floor (envelope length-integer check), Number
+3512:  // Round 14 fix: (a) envelope validation reads rawEvidence.length via captured
+3534:  chk('RN-21 Proxy: length descriptor read does NOT fire Proxy get trap (lengthHits=0)', lengthHits === 0);
+3535:  chk('RN-21 Proxy: forbidden_category does NOT enter the graph', !(attacked.valid === true && attacked.graph.nodes.some(n => n.category === 'forbidden_category')));
+3555:  chk('RN-27 Proxy: Math.floor rebind via Proxy length trap never fires (build succeeds normally)', attacked.valid === true && attacked.graph.nodes.length === 1);
+3559:  // RN-28 NEW at Round 13: ambient TextEncoder used by contract byte-length validation.
+3560:  // Rebinding admits oversized i18nKey. Round 14 closure: entry guard checks
+3568:  chk('RN-28: TextEncoder rebinding caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+3572:  // RN-29 NEW at Round 13: ambient structuredClone used by contract Proxy cleansing. Rebinding
+3573:  // defeats Proxy cleansing. Round 14 closure: entry guard checks globalThis.structuredClone
+3581:  chk('RN-29: structuredClone rebinding caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+3591:  chk('RN-27 post-clock: in-clock Math.floor rebind caught by Step 17.6', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+3594:// ── Section Z — Codex D2 Round 14 finding closures (self-restoring trap + Object.getOwnPropertyNames) ──
+3596:  // RN-21 STILL-OPEN at Round 14 (Codex evidence on 092f262): a Proxy on rawEvidence with a
+3602:  // Round 15 fix: per-iteration integrity check INSIDE the loop, after each per-rawEvidence
+3627:  chk('RN-21 self-restoring: per-iteration guard catches mid-iter rebind (BLOCK)', attacked.eligible === false && Array.isArray(attacked.reasonCodes) && attacked.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+3628:  chk('RN-21 self-restoring: detail mentions mid-iteration', typeof attacked.detail === 'string' && /mid-iteration/.test(attacked.detail));
+3629:  chk('RN-21 self-restoring: no graph leaked', attacked.result === null);
+3650:  chk('RN-27 self-restoring: Number.isInteger mid-iter rebind caught (BLOCK)', attacked.eligible === false && Array.isArray(attacked.reasonCodes) && attacked.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+3671:  chk('RN-28 self-restoring: TextEncoder mid-iter rebind caught (BLOCK)', attacked.eligible === false && Array.isArray(attacked.reasonCodes) && attacked.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+3675:  // RN-30 NEW at Round 14: Object.getOwnPropertyNames used by contract for hidden-key
+3677:  // rejection. Round 15 closure: add to integrity guard.
+3684:  chk('RN-30: Object.getOwnPropertyNames rebinding caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+3687:// ── Section AA — Codex D2 Round 15 architectural convergence (hardened-intrinsics) ───────
+3688:// ── Section AA — Codex D2 Round 15 architectural convergence (hardened-intrinsics) ───────
+3702:      // self-restore on invocation (most adversarial: corrupts THIS call, then disappears)
+3738:  // Group 2 — Function.prototype methods (round 11 RN-26)
+3743:  // Group 3 — Object.* statics (rounds 10/14 RN-23/30)
+3752:  // Group 5 — Number / Math / RegExp (round 12 RN-27)
+3757:  // Group 6 — global String + Number/String prototype (rounds 10/12 RN-24/25)
+3762:  // Group 7 — TextEncoder + structuredClone (round 13 RN-28/29)
+3766:  // Group 8 — JSON (round 10 RN-22)
+3770:// Section AA-2 — Object.prototype.toJSON hook (round 8 RN-18). Installed AS A PROPERTY (not
+4394:=== analysis-case adversarial tests ===
+4395:analysis-case-adversarial: 78 passed, 0 failed
+4398:suspension-input-adversarial: 54 passed, 0 failed
+4506:The RN-28 direct and integration attacks both hold: UTF-8 widths were `[5,2,4]`, hostile encode hits stayed `0`, and a 513-byte proxied `i18nKey` was not admitted. An in-memory mutant changing `safeUtf8ByteLength` back to `enc.encode(s)` made the direct suite fail 2 assertions, confirming that specific regression is detected. I found a separate proof-coverage gap in RN-31 and am validating whether it is verdict-relevant.
+4521:D2-RN-28: CLOSED  
+4532:D2-RN-28: CLOSED  
+
+codex
+The candidate changes only the direct-test suite and governance evidence; production code is unchanged from Round 17. The five added blocks do test both hostile-call avoidance and output, including separate `Array.isArray` and `Object.getPrototypeOf` attacks for `safeIsPlainShape`. I’m now checking whether those assertions are genuinely mutation-sensitive rather than merely present.
+exec
+/bin/bash -lc "node tests/r3.0d-hardened-intrinsics.test.js; printf 'direct_exit=%s\\n' \""'$?"
+node tests/r3.0d-contract-foundation.test.js; printf '"'foundation_exit=%s\\n' \""'$?"
+node tests/r3.0d-evidence-graph.test.js; printf '"'graph_exit=%s\\n' \""'$?"' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 189ms:
+R3.0D D2 evidence-graph suite: 261 pass, 0 fail
+graph_exit=0
+
+exec
+/bin/bash -lc 'tail -100 contracts/r3.0d/hardened-intrinsics.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+
+  // stableStringify(value) — canonical JSON serializer, sorted keys at every depth, NO toJSON
+  // invocation anywhere. Walks via safeKeys + manual recursion + direct primitive encoding.
+  // Used for canonical bytes (graphId / dedup) AND envelope byte cap measurement.
+  function stableStringify(value) {
+    if (value === null) return 'null';
+    var t = typeof value;
+    if (t === 'string') {
+      // Captured _JSONStringify on a PRIMITIVE string never invokes toJSON (per ES
+      // §25.5.2.2 SerializeJSONProperty: toJSON is only consulted when Type(value) is Object).
+      var r = _apply(_JSONStringify, _JSON, [value]);
+      if (r === _SENTINEL || typeof r !== 'string') return '""';
+      return r;
+    }
+    if (t === 'number') {
+      if (!safeNumberIsFinite(value)) return 'null';
+      return safeStringCoerce(value);
+    }
+    if (t === 'boolean') return value ? 'true' : 'false';
+    if (t === 'undefined') return 'null';
+    var isArr = _apply(_ArrayIsArray, _Array, [value]);
+    if (isArr === true) {
+      var result = '[';
+      var len;
+      try { len = value.length; } catch (e) { return 'null'; }
+      if (typeof len !== 'number') return 'null';
+      for (var i = 0; i < len; i++) {
+        if (i > 0) result += ',';
+        result += stableStringify(value[i]);
+      }
+      return result + ']';
+    }
+    if (t === 'object') {
+      var keys = safeKeys(value);
+      if (keys === null) return 'null';
+      // Manual insertion sort — no .sort dependency.
+      var sortLen = keys.length;
+      for (var s = 1; s < sortLen; s++) {
+        var cur = keys[s];
+        var k = s - 1;
+        while (k >= 0 && keys[k] > cur) { keys[k + 1] = keys[k]; k--; }
+        keys[k + 1] = cur;
+      }
+      var obj = '{';
+      for (var j = 0; j < sortLen; j++) {
+        if (j > 0) obj += ',';
+        var key = keys[j];
+        var qkey = _apply(_JSONStringify, _JSON, [key]);
+        if (qkey === _SENTINEL || typeof qkey !== 'string') return 'null';
+        obj += qkey + ':' + stableStringify(value[key]);
+      }
+      return obj + '}';
+    }
+    return 'null';
+  }
+
+  // ─── Public API (the ONLY exported surface) ──────────────────────────────────
+  // Captured intrinsics are NOT exported. The capture refs are deliberately kept in IIFE-local
+  // variables to prevent the caller from substituting them. Even the api object itself is
+  // frozen so callers can't replace wrapper bindings.
+  var api = {
+    safeOwnKeys: safeOwnKeys,
+    safeKeys: safeKeys,
+    safeGetOwnDescriptor: safeGetOwnDescriptor,
+    safeGetOwnPropertyNames: safeGetOwnPropertyNames,
+    safeGetPrototypeOf: safeGetPrototypeOf,
+    safeDefineDataProperty: safeDefineDataProperty,
+    safeHasOwn: safeHasOwn,
+    safeArrayPush: safeArrayPush,
+    safeArrayIndexOf: safeArrayIndexOf,
+    safeArrayForEach: safeArrayForEach,
+    safeArrayMap: safeArrayMap,
+    safeArraySlice: safeArraySlice,
+    safeArraySort: safeArraySort,
+    safeStringSlice: safeStringSlice,
+    safeStringCharCodeAt: safeStringCharCodeAt,
+    safeRegExpTest: safeRegExpTest,
+    safeNumberIsInteger: safeNumberIsInteger,
+    safeNumberIsFinite: safeNumberIsFinite,
+    safeMathFloor: safeMathFloor,
+    safeUtf8ByteLength: safeUtf8ByteLength,
+    safeStructuredClone: safeStructuredClone,
+    safeStringCoerce: safeStringCoerce,
+    safeStringToLowerCase: safeStringToLowerCase,
+    safeIsArray: safeIsArray,
+    safeIsPlainShape: safeIsPlainShape,
+    safeObjectCreateNull: safeObjectCreateNull,
+    safeObjectAssign: safeObjectAssign,
+    deepOriginalShapeAudit: deepOriginalShapeAudit,
+    deepFreeze: deepFreeze,
+    stableStringify: stableStringify,
+  };
+  _ObjectFreeze(api);
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (root) {
+    try { _ObjectDefineProperty(root, 'R3_0D_HardenedIntrinsics', { value: api, writable: false, enumerable: false, configurable: false }); }
+    catch (e) { root.R3_0D_HardenedIntrinsics = api; }
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+exec
+/bin/bash -lc 'for mutation in lower isarray plainshape createnull assign; do
+  echo "MUTATION=$mutation"
+  node - "$mutation" <<'"'NODE'
+const fs = require('fs');
+const path = require('path');
+const Module = require('module');
+const mutation = process.argv[2];
+const root = process.cwd();
+const hiPath = path.join(root, 'contracts/r3.0d/hardened-intrinsics.js');
+let src = fs.readFileSync(hiPath, 'utf8');
+const edits = {
+  lower: [\"var r = _apply(_StringPrototypeToLowerCase, s, []);\", \"var r = s.toLowerCase();\"],
+  isarray: [\"var r = _apply(_ArrayIsArray, _Array, [v]);\", \"var r = Array.isArray(v);\"],
+  plainshape: [\"var isArr = safeIsArray(v);\", \"var isArr = Array.isArray(v);\"],
+  createnull: [\"var r = _apply(_ObjectCreate, _Object, [null]);\", \"var r = Object.create(null);\"],
+  assign: [\"var keys = safeKeys(source);\", \"return Object.assign(target, source);\\n    var keys = safeKeys(source);\"],
+};
+const [from, to] = edits[mutation];
+const hits = src.split(from).length - 1;
+if (hits "'!== 1) throw new Error(`expected one mutation site, got ${hits}`);
+src = src.replace(from, to);
+const mutant = new Module(hiPath, module);
+mutant.filename = hiPath;
+mutant.paths = Module._nodeModulePaths(path.dirname(hiPath));
+mutant._compile(src, hiPath);
+const origLoad = Module._load;
+Module._load = function(request, parent, isMain) {
+  let resolved;
+  try { resolved = Module._resolveFilename(request, parent, isMain); } catch (_) {}
+  if (resolved === hiPath) return mutant.exports;
+  return origLoad.apply(this, arguments);
+};
+require(path.join(root, '"'tests/r3.0d-hardened-intrinsics.test.js'));
+NODE
+  echo \"mutation_exit="'$?"
+done' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+MUTATION=lower
+/bin/bash: line 2: cannot create temp file for here document: Operation not permitted
+mutation_exit=1
+MUTATION=isarray
+/bin/bash: line 2: cannot create temp file for here document: Operation not permitted
+mutation_exit=1
+MUTATION=plainshape
+/bin/bash: line 2: cannot create temp file for here document: Operation not permitted
+mutation_exit=1
+MUTATION=createnull
+/bin/bash: line 2: cannot create temp file for here document: Operation not permitted
+mutation_exit=1
+MUTATION=assign
+/bin/bash: line 2: cannot create temp file for here document: Operation not permitted
+mutation_exit=1
+
+codex
+The first mutation harness attempt was blocked because this sandbox cannot create the shell’s temporary heredoc file; those exit codes are not valid evidence. I’m rerunning the same in-memory mutations through `node -e`, which requires no filesystem writes.
+exec
+/bin/bash -lc 'for mutation in lower isarray plainshape createnull assign; do
+  echo "MUTATION=$mutation"
+  node -e '"'
+const fs=require(\"fs\"),path=require(\"path\"),Module=require(\"module\");
+const mutation=process.argv[1],root=process.cwd(),hiPath=path.join(root,\"contracts/r3.0d/hardened-intrinsics.js\");
+let src=fs.readFileSync(hiPath,\"utf8\");
+const edits={
+lower:[\"var r = _apply(_StringPrototypeToLowerCase, s, []);\",\"var r = s.toLowerCase();\"],
+isarray:[\"var r = _apply(_ArrayIsArray, _Array, [v]);\",\"var r = Array.isArray(v);\"],
+plainshape:[\"var isArr = safeIsArray(v);\",\"var isArr = Array.isArray(v);\"],
+createnull:[\"var r = _apply(_ObjectCreate, _Object, [null]);\",\"var r = Object.create(null);\"],
+assign:[\"var keys = safeKeys(source);\",\"return Object.assign(target, source);\\n    var keys = safeKeys(source);\"]};
+const pair=edits[mutation],count=src.split(pair[0]).length-1;
+if(count"'!==1)throw new Error("expected one mutation site, got "+count);
+src=src.replace(pair[0],pair[1]);
+const mutant=new Module(hiPath,module);mutant.filename=hiPath;mutant.paths=Module._nodeModulePaths(path.dirname(hiPath));mutant._compile(src,hiPath);
+const origLoad=Module._load;
+Module._load=function(request,parent,isMain){let resolved;try{resolved=Module._resolveFilename(request,parent,isMain)}catch(e){}if(resolved===hiPath)return mutant.exports;return Reflect.apply(origLoad,this,arguments)};
+require(path.join(root,"tests/r3.0d-hardened-intrinsics.test.js"));
+'"' \""'$mutation"
+  echo "mutation_exit=$?"
+done' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 192ms:
+  ✗ safeIsPlainShape: hostile Array.isArray never invoked
+  ✗ safeIsPlainShape: output correct under Array.isArray rebind
+R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+mutation_exit=1
+MUTATION=createnull
+  ✗ safeObjectCreateNull: hostile Object.create never invoked
+  ✗ safeObjectCreateNull: output correct (null-proto, empty, no tampered key)
+R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+mutation_exit=1
+MUTATION=assign
+  ✗ safeObjectAssign: hostile Object.assign never invoked
+  ✗ safeObjectAssign: output correct (own-keys shallow copy, no tampered key)
+  ✗ safeObjectAssign: bypasses Object.prototype.tampered setter via defineProperty
+R3.0D hardened-intrinsics direct-test suite: 68 pass, 3 fail
+mutation_exit=1
+
+codex
+The five requested mutations are all caught (exit 1, with 2–4 assertion failures each). The broader 30-export audit has exposed a likely surviving gap: `deepOriginalShapeAudit` has functional edge-case assertions, but no hostile-rebind invocation around the audit itself. I’m mutation-testing that exact export now and checking UMD/frozen/privacy coverage before fixing the verdict.
+exec
+/bin/bash -lc "node -e '
+const fs=require(\"fs\"),path=require(\"path\"),Module=require(\"module\");
+const root=process.cwd(),hiPath=path.join(root,\"contracts/r3.0d/hardened-intrinsics.js\");let src=fs.readFileSync(hiPath,\"utf8\");
+const begin=src.indexOf(\"function deepOriginalShapeAudit(v, depth)\");const end=src.indexOf(\"function safeObjectCreateNull()\",begin);if(begin<0||end<0)throw new Error(\"scope not found\");
+const chunk=src.slice(begin,end),from=\"var proto = safeGetPrototypeOf(v);\",to=\"var proto = Object.getPrototypeOf(v);\",count=chunk.split(from).length-1;if(count"'!==1)throw new Error("expected one scoped site, got "+count);
+src=src.slice(0,begin)+chunk.replace(from,to)+src.slice(end);
+const mutant=new Module(hiPath,module);mutant.filename=hiPath;mutant.paths=Module._nodeModulePaths(path.dirname(hiPath));mutant._compile(src,hiPath);
+const origLoad=Module._load;Module._load=function(request,parent,isMain){let resolved;try{resolved=Module._resolveFilename(request,parent,isMain)}catch(e){}if(resolved===hiPath)return mutant.exports;return Reflect.apply(origLoad,this,arguments)};
+require(path.join(root,"tests/r3.0d-hardened-intrinsics.test.js"));
+'"'; printf 'deepOriginalShapeAudit_Object_getPrototypeOf_mutation_exit=%s\\n' \""'$?"
+rg -n "hardened-intrinsics|R3_0D_HardenedIntrinsics|Object'"\\.isFrozen\\(HI\\)|underscored|UMD|browser|vm\\.\" tests contracts/r3.0d governance/r3.0d/checkpoints/D2.json | head -240" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+R3.0D hardened-intrinsics direct-test suite: 71 pass, 0 fail
+deepOriginalShapeAudit_Object_getPrototypeOf_mutation_exit=0
+governance/r3.0d/checkpoints/D2.json:97:      "r3.0d-hardened-intrinsics": {
+governance/r3.0d/checkpoints/D2.json:98:        "path": "tests/r3.0d-hardened-intrinsics.test.js",
+governance/r3.0d/checkpoints/D2.json:321:          "architecturalImpact": "Confirmed: integrity-guard-based defence has reached its limit. Round 16 architectural convergence per SKYLINE 2026-06-29 directive: refactor ENTIRE D2 validation path to use ONLY closure-captured pristine intrinsics via contracts/r3.0d/hardened-intrinsics.js. If validation code never calls an ambient method, the hostile replacement is never invoked — and self-restoring tampering becomes pointless."
+governance/r3.0d/checkpoints/D2.json:379:    "note": "D2 introduces the Evidence Graph service module renderer/js/r3-0d-evidence-graph.js as a Node-pure UMD module, NOT a feature-registered surface. No R3.0D feature ID is added to renderer/js/feature-registry.js. The D5_ENGINEER_BRIEF_ACTIVATION checkpoint is the only authorised point to add R3.0D feature IDs."
+governance/r3.0d/checkpoints/D2.json:416:    "contracts/r3.0d/hardened-intrinsics.js",
+governance/r3.0d/checkpoints/D2.json:417:    "tests/r3.0d-hardened-intrinsics.test.js",
+governance/r3.0d/checkpoints/D2.json:437:  "changedFilesNote": "Computed from the exact baseSha (f8a598b) → Round 18 candidate HEAD diff. Includes the Round 16 architectural convergence: contracts/r3.0d/hardened-intrinsics.js (new shared utility, closure-private intrinsic captures + narrow safe wrappers) PLUS refactor of the four D1 contract modules (credibility/source-identity/evidence-node/reason-codes) + renderer to call ONLY safe wrappers (no ambient prototype method invocation anywhere in the validation path). Hardened-intrinsics is a SHARED tooling utility consumed by both D1 contracts and D2 renderer — no schema/contract semantic change (D1 + D2 test suites pass identical to pre-refactor baseline). Includes the cross-phase rename commit (governance/r3.0e files + docs/r3-0-train-governance.md), the state-aware guard-enhancement commit (scripts/check-r3-phase-no-consumer.js + tests/r3-0-phase-no-consumer.test.js), every Codex evidence file from Round 1 through Round 10 (so the candidate carries its own evidence lineage), plus all D2 production / test / governance artifacts. RN-12 closure.",
+tests/r2.4-measured-metrics-integration.test.js:23:const ctx = {}; vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'r24' });
+contracts/r3.0d/evidence-node-contract.js:14: * hardened-intrinsics.js safe wrappers. Replaced:
+contracts/r3.0d/evidence-node-contract.js:37: * UMD: Node require / Electron renderer global (R3_0D_EvidenceNodeContract).
+contracts/r3.0d/evidence-node-contract.js:47:  var HI = _req('./hardened-intrinsics.js', typeof R3_0D_HardenedIntrinsics !== 'undefined' ? R3_0D_HardenedIntrinsics : undefined);
+contracts/r3.0d/evidence-node-contract.js:48:  if (!HI) throw new Error('evidence-node-contract.js requires hardened-intrinsics.js');
+contracts/r3.0d/evidence-node-contract.js:95:  // hardened-intrinsics' captured _ObjectPrototype reference (no ambient lookup).
+contracts/r3.0d/evidence-node-contract.js:112:  // path — see hardened-intrinsics.js safeUtf8ByteLength).
+contracts/r3.0d/source-identity-contract.js:21: * safe wrapper from hardened-intrinsics.js. Hostile ambient rebinding cannot affect the validator
+contracts/r3.0d/source-identity-contract.js:24: * UMD: Node require / Electron renderer global (R3_0D_SourceIdentityContract).
+contracts/r3.0d/source-identity-contract.js:32:  var HI = _req('./hardened-intrinsics.js', typeof R3_0D_HardenedIntrinsics !== 'undefined' ? R3_0D_HardenedIntrinsics : undefined);
+contracts/r3.0d/source-identity-contract.js:33:  if (!HI) throw new Error('source-identity-contract.js requires hardened-intrinsics.js');
+contracts/r3.0d/hardened-intrinsics.js:2: * contracts/r3.0d/hardened-intrinsics.js — R3.0D Hardened Intrinsics Toolkit.
+contracts/r3.0d/hardened-intrinsics.js:37: * UMD: Node require / Electron renderer global (R3_0D_HardenedIntrinsics).
+contracts/r3.0d/hardened-intrinsics.js:140:      // Modern runtimes (Node 17+, browsers ~2022+) guarantee Reflect.apply. Fail-closed
+contracts/r3.0d/hardened-intrinsics.js:669:    try { _ObjectDefineProperty(root, 'R3_0D_HardenedIntrinsics', { value: api, writable: false, enumerable: false, configurable: false }); }
+contracts/r3.0d/hardened-intrinsics.js:670:    catch (e) { root.R3_0D_HardenedIntrinsics = api; }
+contracts/r3.0d/decision-input-contract.js:23: * UMD: Node require / Electron renderer global (R3_0D_DecisionInputContract).
+contracts/r3.0d/reason-codes.js:14: * R3.0D hardened-intrinsics refactor: every ambient intrinsic call routed through the
+contracts/r3.0d/reason-codes.js:15: * closure-captured wrappers in contracts/r3.0d/hardened-intrinsics.js. No direct ambient
+contracts/r3.0d/reason-codes.js:19: * UMD: Node require / Electron renderer global (R3_0D_ReasonCodes). (Global export is for symmetry with the
+contracts/r3.0d/reason-codes.js:20: * codebase UMD convention; nothing in renderer/js/ requires it — D1 wires no consumer.)
+contracts/r3.0d/reason-codes.js:29:    ? require('./hardened-intrinsics.js')
+contracts/r3.0d/reason-codes.js:30:    : (root && root.R3_0D_HardenedIntrinsics);
+tests/r3-0c-comparison-adapter.test.js:200:// ── I. UMD shape ──
+contracts/r3.0d/credibility-contract.js:22: * hardened-intrinsics.js safe wrappers. Replaced:
+contracts/r3.0d/credibility-contract.js:34: * UMD: Node require / Electron renderer global (R3_0D_CredibilityContract).
+contracts/r3.0d/credibility-contract.js:42:  var HI = _req('./hardened-intrinsics.js', typeof R3_0D_HardenedIntrinsics !== 'undefined' ? R3_0D_HardenedIntrinsics : undefined);
+contracts/r3.0d/credibility-contract.js:43:  if (!HI) throw new Error('credibility-contract.js requires hardened-intrinsics.js');
+contracts/r3.0d/credibility-contract.js:68:  // inside hardened-intrinsics (which holds the captured _ObjectPrototype reference). Avoids any
+contracts/r3.0d/index.js:8: * UMD: Node require / Electron renderer global (R3_0D_Contracts).
+contracts/r3.0d/engineer-brief-contract.js:15: * UMD: Node require / Electron renderer global (R3_0D_EngineerBriefContract).
+tests/setup-ab.test.js:14:const ctx = {}; vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'ab' });
+contracts/r3.0d/hypothesis-contract.js:26: * UMD: Node require / Electron renderer global (R3_0D_HypothesisContract).
+tests/r2.5-setup-ab-quantitative-integration.test.js:19:const ctx = {}; vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'r25' });
+contracts/r3.0d/recommendation-contract.js:17: * UMD: Node require / Electron renderer global (R3_0D_RecommendationContract).
+tests/feature-router.test.js:20:(() => { const r = Rt.navigateToFeature('vehicle_presets'); chk('vehicle_presets → setup_library/predict (orphan fixed)', r && r.shellSection === 'setup_library' && r.currentTab === 'predict'); chk('carries focusTarget', r.focusTarget === 'vp-browser'); })();
+tests/analysis-execution.test.js:25:const ctx = {}; vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'exec-bundle.js' });
+tests/vehicle-preset-pipeline.test.js:51:  const ctx = { console }; ctx.window = ctx; vm.createContext(ctx);
+tests/vehicle-preset-pipeline.test.js:52:  vm.runInContext(fs.readFileSync(__dirname + '/../renderer/js/car-presets.js', 'utf8') + '\n' + fs.readFileSync(__dirname + '/../renderer/js/api.js', 'utf8') + '\n; ctx_api=(typeof api!=="undefined")?api:null; ctx_presets=CAR_PRESETS;', ctx, { filename: 'real' });
+tests/r2.6-track-intelligence-integration.test.js:21:const ctx = {}; vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'r26' });
+tests/analysis-workspace-integration.test.js:21:const ctx = {}; vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'integ' });
+tests/i18n-parity.test.js:3: * Builds the merged dictionary exactly as the browser does, then asserts:
+tests/i18n-parity.test.js:21:// build the merged dictionary exactly as the browser loads it
+tests/r3.0d-contract-foundation.test.js:328://     UMD via require, never page-loaded as scripts — D5_ENGINEER_BRIEF_ACTIVATION is the earliest
+tests/suspension-input-equivalence.test.js:35:vm.createContext(ctx);
+tests/suspension-input-equivalence.test.js:36:vm.runInContext(src, ctx, { filename: 'equivalence-bundle.js' });
+tests/storage-backend.test.js:2: * tests/storage-backend.test.js — R3.0B storage backend (MemoryBackend; IndexedDB is browser-only).
+tests/r3-0c-activation.test.js:398:  // Codex C-B Finding C8-CB-RN-06 closure — selectors + export button have @-handlers wired through vm.
+tests/r3-0c-activation.test.js:453:  vm.setAssociation({
+tests/r3-0c-activation.test.js:457:  vm.setChannelMapping({ pairing: { pairs: [] } });
+tests/r3-0c-activation.test.js:458:  vm.setReference({ lapId: 'lap_R', lapTimeMs: 90000 });
+tests/r3-0c-activation.test.js:459:  vm.setComparison({ lapId: 'lap_C', lapTimeMs: 90100 });
+tests/r3-0c-activation.test.js:492:// contains `function app(`) and inject minimal stubs for the UMD globals the block depends on.
+tests/r3-0c-activation.test.js:500:  // Stub the modules the block touches at top-level (UMD globals from other <script src> tags).
+tests/r3-0c-activation.test.js:529:  const ctx = vm.createContext(realm);
+tests/r3-0c-activation.test.js:532:  try { vm.runInContext(code, ctx, { filename: 'renderer/index.html (extracted script block)', timeout: 5000 }); runOk = true; } catch (e) { chk('renderer script executes in vm context', false, String(e).slice(0, 200)); }
+tests/r3-0c-activation.test.js:538:  // Errors thrown inside vm.runInContext live in the vm realm; instanceof Error from the parent realm
+tests/r3-0c-activation.test.js:546:  try { vm.runInContext('void r3cC8Authority;', ctx); } catch (e) { refErr = e; }
+tests/r3-0c-activation.test.js:549:  let refErrForCS = null; try { vm.runInContext('void forCaseStore;', ctx); } catch (e) { refErrForCS = e; }
+tests/r3-0c-activation.test.js:551:  let refErrForDemo = null; try { vm.runInContext('void forDemo;', ctx); } catch (e) { refErrForDemo = e; }
+tests/r3-0c-activation.test.js:554:  let refErrCDH = null; try { vm.runInContext('void caseDataHolder;', ctx); } catch (e) { refErrCDH = e; }
+tests/r3-0c-activation.test.js:556:  let refErrSA = null; try { vm.runInContext('void r3cC8SessionAuthority;', ctx); } catch (e) { refErrSA = e; }
+tests/r3-0c-activation.test.js:605:  const ctx = vm.createContext(realm);
+tests/r3-0c-activation.test.js:607:  try { vm.runInContext(code, ctx, { filename: 'renderer/index.html (sec11)', timeout: 5000 }); runOk = true; } catch (e) { chk('renderer script executes (Section 11)', false, String(e).slice(0, 200)); }
+tests/r3-0c-activation.test.js:610:  const inst = vm.runInContext('app()', ctx);
+tests/r3-0c-activation.test.js:697:  const ctx = vm.createContext(realm);
+tests/r3-0c-activation.test.js:699:  try { vm.runInContext(code, ctx, { filename: 'renderer/index.html (sec12)', timeout: 5000 }); runOk = true; } catch (e) { chk('renderer script executes (Section 12)', false, String(e).slice(0, 200)); }
+tests/r3-0c-activation.test.js:706:  const inst = vm.runInContext('app()', ctx);
+tests/r3-0c-comparison-workspace.test.js:330:  vm.setAssociation(assoc);
+tests/r3-0c-comparison-workspace.test.js:331:  vm.setChannelMapping({ pairing: deltaMetricsRequest().pairing });
+tests/r3-0c-comparison-workspace.test.js:332:  vm.setReference({ lapId: 'lap_3', lapTimeMs: 90000, lapAuthority: { lapIdentity: { satisfied: true }, completeness: { satisfied: true }, timingValidity: { satisfied: true }, trackIdentity: { satisfied: true }, sampleContinuity: { satisfied: true } }, normalizationAuthority: { basis: 'lap_distance', distanceAuthority: { satisfied: true }, positionUnit: 'm' } });
+tests/r3-0c-comparison-workspace.test.js:333:  vm.setComparison({ lapId: 'lap_5', lapTimeMs: 89500, lapAuthority: { lapIdentity: { satisfied: true }, completeness: { satisfied: true }, timingValidity: { satisfied: true }, trackIdentity: { satisfied: true }, sampleContinuity: { satisfied: true } }, normalizationAuthority: { basis: 'lap_distance', distanceAuthority: { satisfied: true }, positionUnit: 'm' } });
+tests/r3-0c-comparison-workspace.test.js:334:  const s = vm.getState();
+tests/r3-0c-comparison-workspace.test.js:382:    const s = vm.getState();
+tests/r3-0c-comparison-workspace.test.js:437:  const s = vm.getState();
+tests/r3-0c-comparison-workspace.test.js:449:  vm.setAssociation(association());
+tests/r3-0c-comparison-workspace.test.js:450:  vm.setChannelMapping({ pairing: deltaMetricsRequest().pairing });
+tests/r3-0c-comparison-workspace.test.js:451:  vm.setReference({ lapId: 'lap_3', lapTimeMs: 90000, lapAuthority: { lapIdentity: { satisfied: true }, completeness: { satisfied: true }, timingValidity: { satisfied: true }, trackIdentity: { satisfied: true }, sampleContinuity: { satisfied: true } }, normalizationAuthority: { basis: 'lap_distance', distanceAuthority: { satisfied: true }, positionUnit: 'm' } });
+tests/r3-0c-comparison-workspace.test.js:452:  vm.setComparison({ lapId: 'lap_5', lapTimeMs: 89500, lapAuthority: { lapIdentity: { satisfied: true }, completeness: { satisfied: true }, timingValidity: { satisfied: true }, trackIdentity: { satisfied: true }, sampleContinuity: { satisfied: true } }, normalizationAuthority: { basis: 'lap_distance', distanceAuthority: { satisfied: true }, positionUnit: 'm' } });
+tests/r3-0c-comparison-workspace.test.js:453:  const beforeState = vm.getState();
+tests/r3-0c-comparison-workspace.test.js:455:  if (triggerFn === 'setReference') vm.setReference({ lapId: 'lap_new', lapTimeMs: 91000 });
+tests/r3-0c-comparison-workspace.test.js:456:  else if (triggerFn === 'setComparison') vm.setComparison({ lapId: 'lap_new2', lapTimeMs: 91000 });
+tests/r3-0c-comparison-workspace.test.js:457:  else if (triggerFn === 'setAssociation') vm.setAssociation(association());
+tests/r3-0c-comparison-workspace.test.js:458:  else if (triggerFn === 'setChannelMapping') vm.setChannelMapping({ pairing: deltaMetricsRequest().pairing });
+tests/r3-0c-comparison-workspace.test.js:459:  else if (triggerFn === 'notifyCaseReopen') vm.notifyCaseReopen();
+tests/r3-0c-comparison-workspace.test.js:460:  else if (triggerFn === 'notifyAuthorityRevoked') vm.notifyAuthorityRevoked();
+tests/r3-0c-comparison-workspace.test.js:461:  else if (triggerFn === 'notifyEligibilityRevoked') vm.notifyEligibilityRevoked();
+tests/r3-0c-comparison-workspace.test.js:462:  const afterState = vm.getState();
+tests/r3-0c-comparison-workspace.test.js:471:  vm.setAssociation(association());
+tests/r3-0c-comparison-workspace.test.js:472:  vm.setChannelMapping({ pairing: deltaMetricsRequest().pairing });
+tests/r3-0c-comparison-workspace.test.js:473:  vm.setReference({ lapId: 'lap_3', lapTimeMs: 90000, lapAuthority: { lapIdentity: { satisfied: true }, completeness: { satisfied: true }, timingValidity: { satisfied: true }, trackIdentity: { satisfied: true }, sampleContinuity: { satisfied: true } }, normalizationAuthority: { basis: 'lap_distance', distanceAuthority: { satisfied: true }, positionUnit: 'm' } });
+tests/r3-0c-comparison-workspace.test.js:474:  vm.setComparison({ lapId: 'lap_5', lapTimeMs: 89500, lapAuthority: { lapIdentity: { satisfied: true }, completeness: { satisfied: true }, timingValidity: { satisfied: true }, trackIdentity: { satisfied: true }, sampleContinuity: { satisfied: true } }, normalizationAuthority: { basis: 'lap_distance', distanceAuthority: { satisfied: true }, positionUnit: 'm' } });
+tests/r3-0c-comparison-workspace.test.js:475:  const s = vm.getState();
+tests/r3-0c-contracts-bundle-equivalence.test.js:5: * The browser loads contracts via renderer/js/r3-0c-contracts-bundle.js, an auto-generated
+tests/r3-0c-contracts-bundle-equivalence.test.js:7: * contract source file is edited but the bundle is not regenerated, the browser sees stale
+tests/r3-0c-contracts-bundle-equivalence.test.js:62:vm.createContext(sandbox);
+tests/r3-0c-contracts-bundle-equivalence.test.js:64:try { vm.runInContext(expected, sandbox); } catch (e) { evalErr = e; }
+tests/r3-0c-contracts-bundle-equivalence.test.js:65:chk('D1 bundle evaluates cleanly in a browser-like sandbox (no module/exports)', evalErr === null, evalErr && String(evalErr));
+tests/quantitative-setup-recommendation.test.js:15:const ctx = {}; vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'qr' });
+tests/r3.0d-hardened-intrinsics.test.js:2: * tests/r3.0d-hardened-intrinsics.test.js — adversarial direct-test of every HI.* wrapper.
+tests/r3.0d-hardened-intrinsics.test.js:21: * Node CLI: `node tests/r3.0d-hardened-intrinsics.test.js`, exit 1 on any failure.
+tests/r3.0d-hardened-intrinsics.test.js:25:const HI = require('../contracts/r3.0d/hardened-intrinsics.js');
+tests/r3.0d-hardened-intrinsics.test.js:344:  chk('HI.api is frozen', Object.isFrozen(HI));
+tests/r3.0d-hardened-intrinsics.test.js:345:  chk('HI does NOT expose _ObjectFreeze (or any underscored private)',
+tests/r3.0d-hardened-intrinsics.test.js:447:console.log('R3.0D hardened-intrinsics direct-test suite: ' + pass + ' pass, ' + fail + ' fail');
+tests/verify-dynamics.js:61:vm.createContext(ctx);
+tests/verify-dynamics.js:62:vm.runInContext(src, ctx, { filename: 'combined.js' });
+tests/verify-dynamics.js:272:  vm.createContext(pctx);
+tests/verify-dynamics.js:273:  vm.runInContext(presetsSrc, pctx, { filename: 'car-presets.js' });
+tests/verify-dynamics.js:376:  const pctx = {}; vm.createContext(pctx); vm.runInContext(presetsSrc, pctx);
+tests/analysis-workspace-viewmodel.test.js:19:const ctx = {}; vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'vmtest' });
+tests/r2.3-real-telemetry-integration.test.js:24:const ctx = {}; vm.createContext(ctx); vm.runInContext(src, ctx, { filename: 'r23' });
+
+exec
+/bin/bash -lc "sed -n '4480,4545p' governance/r3.0d/codex-checkpoint-evidence/D2/round-17-8cb28b5.raw.txt && sed -n '300,370p' tests/r3.0d-hardened-intrinsics.test.js && sed -n '1960,2180p' tests/r3.0d-evidence-graph.test.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+    ObjectSetPrototypeOf(
+    ^
+
+TypeError: #<Object> is not extensible
+    at setPrototypeOf (<anonymous>)
+    at getExportsForCircularRequire (node:internal/modules/cjs/loader:1024:5)
+    at Module._load (node:internal/modules/cjs/loader:1269:16)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.require (node:internal/modules/cjs/loader:1547:12)
+    at require (node:internal/modules/helpers:152:16)
+    at Object.<anonymous> (/Users/SKYLINE/Claude/projects/racing-setup-analyzer/tests/r3.0d-hardened-intrinsics.test.js:25:12)
+    at Module._compile (node:internal/modules/cjs/loader:1803:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1934:10)
+
+Node.js v25.5.0
+
+exec
+/bin/bash -lc "node -e 'const fs=require(\"fs\"),Module=require(\"module\"),path=require(\"path\"); const file=require.resolve(\"./contracts/r3.0d/hardened-intrinsics.js\"); let src=fs.readFileSync(file,\"utf8\"); const pristine=\"var arr = _apply(_TextEncoderPrototypeEncode, enc, [s]);\"; if("'!src.includes(pristine))throw new Error("mutation target missing"); src=src.replace(pristine,"var arr = enc.encode(s);"); const m=new Module(file,module); m.filename=file; m.paths=Module._nodeModulePaths(path.dirname(file)); Module._cache[file]=m; m._compile(src,file); m.loaded=true; const originalExit=process.exit; let observed=null; process.exit=function(code){observed=code;}; require("./tests/r3.0d-hardened-intrinsics.test.js"); process.exit=originalExit; console.log("mutant expected test exit="+observed); if(observed!==1)originalExit(1);'"'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+  ✗ safeUtf8ByteLength: hostile TextEncoder.prototype.encode never invoked
+  ✗ safeUtf8ByteLength: output correct ("hello"→5, "é"→2, "🚀"→4)
+R3.0D hardened-intrinsics direct-test suite: 56 pass, 2 fail
+mutant expected test exit=1
+
+codex
+The RN-28 direct and integration attacks both hold: UTF-8 widths were `[5,2,4]`, hostile encode hits stayed `0`, and a 513-byte proxied `i18nKey` was not admitted. An in-memory mutant changing `safeUtf8ByteLength` back to `enc.encode(s)` made the direct suite fail 2 assertions, confirming that specific regression is detected. I found a separate proof-coverage gap in RN-31 and am validating whether it is verdict-relevant.
+exec
+/bin/bash -lc "node -e 'const fs=require(\"fs\"),Module=require(\"module\"),path=require(\"path\"); const file=require.resolve(\"./contracts/r3.0d/hardened-intrinsics.js\"); let src=fs.readFileSync(file,\"utf8\"); const pristine=\"var r = _apply(_StringPrototypeToLowerCase, s, []);\"; if("'!src.includes(pristine))throw new Error("mutation target missing"); src=src.replace(pristine,"var r = s.toLowerCase();"); const m=new Module(file,module); m.filename=file; m.paths=Module._nodeModulePaths(path.dirname(file)); Module._cache[file]=m; m._compile(src,file); m.loaded=true; const originalExit=process.exit; let observed=null; process.exit=function(code){observed=code;}; require("./tests/r3.0d-hardened-intrinsics.test.js"); process.exit=originalExit; console.log("untested-wrapper mutant exit="+observed); if(observed!==null)originalExit(1);'"'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+R3.0D hardened-intrinsics direct-test suite: 58 pass, 0 fail
+untested-wrapper mutant exit=null
+
+exec
+/bin/bash -lc "node -e 'const HI=require(\"./contracts/r3.0d/hardened-intrinsics.js\"); const keys=Reflect.ownKeys(HI); console.log(JSON.stringify({frozen:Object.isFrozen(HI),count:keys.length,keys,underscored:keys.filter(k=>typeof k===\"string\"&&k.startsWith(\"_\")),allFunctions:keys.every(k=>typeof HI[k]===\"function\")}));'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"frozen":true,"count":30,"keys":["safeOwnKeys","safeKeys","safeGetOwnDescriptor","safeGetOwnPropertyNames","safeGetPrototypeOf","safeDefineDataProperty","safeHasOwn","safeArrayPush","safeArrayIndexOf","safeArrayForEach","safeArrayMap","safeArraySlice","safeArraySort","safeStringSlice","safeStringCharCodeAt","safeRegExpTest","safeNumberIsInteger","safeNumberIsFinite","safeMathFloor","safeUtf8ByteLength","safeStructuredClone","safeStringCoerce","safeStringToLowerCase","safeIsArray","safeIsPlainShape","safeObjectCreateNull","safeObjectAssign","deepOriginalShapeAudit","deepFreeze","stableStringify"],"underscored":[],"allFunctions":true}
+
+codex
+FINAL VERDICT: BLOCK
+
+D2-RN-28: CLOSED  
+  evidence: Self-restoring `TextEncoder.prototype.encode` recorded 0 hits; byte lengths were `[5,2,4]`, and the proxied oversized `i18nKey` was rejected.
+
+D2-RN-31: STILL-OPEN  
+  evidence: The suite never invokes 5 of 30 exports: `safeStringToLowerCase`, `safeIsArray`, `safeIsPlainShape`, `safeObjectCreateNull`, and `safeObjectAssign`; mutating `safeStringToLowerCase` to ambient `s.toLowerCase()` still produced 58/0.
+
+No new finding; RN-31 remains unresolved.
+tokens used
+124,763
+FINAL VERDICT: BLOCK
+
+D2-RN-28: CLOSED  
+  evidence: Self-restoring `TextEncoder.prototype.encode` recorded 0 hits; byte lengths were `[5,2,4]`, and the proxied oversized `i18nKey` was rejected.
+
+D2-RN-31: STILL-OPEN  
+  evidence: The suite never invokes 5 of 30 exports: `safeStringToLowerCase`, `safeIsArray`, `safeIsPlainShape`, `safeObjectCreateNull`, and `safeObjectAssign`; mutating `safeStringToLowerCase` to ambient `s.toLowerCase()` still produced 58/0.
+
+No new finding; RN-31 remains unresolved.
+
+  // safeStructuredClone (vs globalThis.structuredClone rebind)
+  (function () {
+    const r = runRebind(globalThis, 'structuredClone', function (v) { return v; }, function () {
+      const orig = { a: 1, b: { c: 2 } };
+      const cloned = HI.safeStructuredClone(orig);
+      // structuredClone should produce a separate object (identity differs) with same data
+      return cloned !== orig && cloned !== null && cloned.a === 1 && cloned.b.c === 2 && cloned.b !== orig.b;
+    });
+    chk('safeStructuredClone: hostile globalThis.structuredClone never invoked', r.hits === 0);
+    chk('safeStructuredClone: output correct (deep clone, separate identity)', r.result === true);
+  })();
+})();
+
+// ── Group 7 — JSON / stableStringify ────────────────────────────────────────────
+(function group7_jsonStableStringify() {
+  // stableStringify must NOT invoke ambient JSON.stringify on objects (it walks manually).
+  // It DOES invoke captured _JSONStringify on primitive strings, which doesn't trigger toJSON.
+  (function () {
+    const r = runRebind(JSON, 'stringify', function () { return '"poisoned"'; }, function () {
+      const s = HI.stableStringify({ b: 2, a: 1, c: [3, 4] });
+      // canonical: sorted keys, no spaces, primitive strings quoted via captured JSON.stringify
+      return s === '{"a":1,"b":2,"c":[3,4]}';
+    });
+    chk('stableStringify: hostile JSON.stringify never invoked at the object/array level', r.hits === 0);
+    chk('stableStringify: output correct (canonical sorted-keys JSON)', r.result === true);
+  })();
+})();
+
+// ── Group 8 — deep audit + edge cases ────────────────────────────────────────────
+(function group8_deepAudit() {
+  // deepOriginalShapeAudit rejects class instances
+  chk('deepOriginalShapeAudit: rejects class instance', HI.deepOriginalShapeAudit(new class {}()) === false);
+  chk('deepOriginalShapeAudit: rejects Symbol key', HI.deepOriginalShapeAudit({ [Symbol('s')]: 1 }) === false);
+  chk('deepOriginalShapeAudit: rejects non-enumerable extra',
+    HI.deepOriginalShapeAudit(Object.defineProperty({}, 'h', { value: 1, enumerable: false })) === false);
+  chk('deepOriginalShapeAudit: rejects accessor descriptor',
+    HI.deepOriginalShapeAudit(Object.defineProperty({}, 'x', { get: function () { return 1; }, enumerable: true, configurable: true })) === false);
+  chk('deepOriginalShapeAudit: accepts plain object + array', HI.deepOriginalShapeAudit({ a: 1, b: [1, 2] }) === true);
+  chk('deepOriginalShapeAudit: rejects Infinity', HI.deepOriginalShapeAudit({ n: Infinity }) === false);
+  chk('deepOriginalShapeAudit: rejects NaN', HI.deepOriginalShapeAudit({ n: NaN }) === false);
+  chk('deepOriginalShapeAudit: rejects function value', HI.deepOriginalShapeAudit({ f: function () {} }) === false);
+
+  // Frozen api guarantees
+  chk('HI.api is frozen', Object.isFrozen(HI));
+  chk('HI does NOT expose _ObjectFreeze (or any underscored private)',
+    Object.keys(HI).every(k => !k.startsWith('_')));
+})();
+
+// ── Group 9 — coverage gap fix (Codex Round 17 RN-31 closure) ───────────────────
+// The original 25 wrappers cover the primary attack surface; these 5 helpers were left
+// untested in the initial pass. Codex Round 17 mutation-tested by rewriting each helper
+// to call ambient and observed the suite still passed — proving they were unprotected.
+// Each test below now follows the same pattern: rebind the ambient method the helper
+// uses internally and assert (a) hits === 0 (b) wrapper output correct.
+(function group9_coverageGap() {
+  // safeStringToLowerCase — uses captured String.prototype.toLowerCase via Reflect.apply.
+  (function () {
+    const r = runRebind(String.prototype, 'toLowerCase', function () { return 'POISONED'; }, function () {
+      return HI.safeStringToLowerCase('HELLO') === 'hello' && HI.safeStringToLowerCase('R3_0D') === 'r3_0d';
+    });
+    chk('safeStringToLowerCase: hostile String.prototype.toLowerCase never invoked', r.hits === 0);
+    chk('safeStringToLowerCase: output correct ("HELLO"→"hello", "R3_0D"→"r3_0d")', r.result === true);
+  })();
+
+  // safeIsArray — uses captured Array.isArray via Reflect.apply.
+  (function () {
+    const r = runRebind(Array, 'isArray', function () { return true; }, function () {
+      return HI.safeIsArray([]) === true && HI.safeIsArray({}) === false && HI.safeIsArray('x') === false;
+    });
+    chk('safeIsArray: hostile Array.isArray never invoked', r.hits === 0);
+})();
+
+(function sectionZ_RN30_objectGetOwnPropertyNames() {
+  // RN-30 NEW at Round 14: Object.getOwnPropertyNames used by contract for hidden-key
+  // detection. Rebinding to Object.keys (which skips non-enumerable) bypasses hidden-key
+  // rejection. Round 15 closure: add to integrity guard.
+  const origGOPN = Object.getOwnPropertyNames;
+  let r;
+  try {
+    Object.getOwnPropertyNames = Object.keys;
+    r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK });
+  } finally { Object.getOwnPropertyNames = origGOPN; }
+  chk('RN-30: Object.getOwnPropertyNames rebinding caught by entry guard (BLOCK)', r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf(CODES.INTERNAL_CONTRACT_VIOLATION) !== -1);
+})();
+
+// ── Section AA — Codex D2 Round 15 architectural convergence (hardened-intrinsics) ───────
+// Per SKYLINE 2026-06-29 directive: validate that NO ambient intrinsic call is invoked during
+// validation. Each test installs a hostile replacement of a global primitive method, runs the
+// build, and asserts the hostile method was NEVER CALLED (hostileInvocationCount === 0).
+// Because the validation path now uses ONLY closure-captured pristine references via
+// contracts/r3.0d/hardened-intrinsics.js, every attempt to corrupt validation by replacing an
+// ambient method becomes a no-op: the hostile replacement is never reached.
+(function sectionAA_hostileInvocationCorpus() {
+  function runWithRebind(name, container, key, mkHostile, payloadFactory) {
+    var hits = 0;
+    var orig = container[key];
+    var desc = Object.getOwnPropertyDescriptor(container, key);
+    function hostile() {
+      hits++;
+      // self-restore on invocation (most adversarial: corrupts THIS call, then disappears)
+      try { Object.defineProperty(container, key, desc || { value: orig, writable: true, enumerable: true, configurable: true }); }
+      catch (e) { container[key] = orig; }
+      var ret = mkHostile.apply(this, arguments);
+      return ret;
+    }
+    try { Object.defineProperty(container, key, { value: hostile, writable: true, enumerable: true, configurable: true }); }
+    catch (e) { container[key] = hostile; }
+    var input = payloadFactory ? payloadFactory() : freshInput();
+    var r;
+    try { r = EG.buildEvidenceGraph(input, { clock: CLOCK }); }
+    finally {
+      try { Object.defineProperty(container, key, desc || { value: orig, writable: true, enumerable: true, configurable: true }); }
+      catch (e) { container[key] = orig; }
+    }
+    return { name: name, hits: hits, valid: r && r.valid, eligible: r && r.eligible, reasonCodes: r && r.reasonCodes };
+  }
+
+  function assertHostileNotCalled(name, container, key, mkHostile, payloadFactory) {
+    var result = runWithRebind(name, container, key, mkHostile, payloadFactory);
+    // Primary assertion: hostile invocation count === 0.
+    // The hardened-intrinsics wrappers use closure-captured pristine references via
+    // Reflect.apply, so the hostile replacement is never invoked.
+    chk('AA ' + name + ': hostile invocation count === 0', result.hits === 0);
+  }
+
+  // Group 1 — Array.prototype methods (rounds 9/10/14 attack surface)
+  assertHostileNotCalled('Array.prototype.push self-restoring', Array.prototype, 'push', function () { return 0; });
+  assertHostileNotCalled('Array.prototype.indexOf self-restoring', Array.prototype, 'indexOf', function () { return -1; });
+  assertHostileNotCalled('Array.prototype.forEach self-restoring', Array.prototype, 'forEach', function () { return; });
+  assertHostileNotCalled('Array.prototype.sort self-restoring', Array.prototype, 'sort', function () { return this; });
+  assertHostileNotCalled('Array.prototype.join self-restoring', Array.prototype, 'join', function () { return ''; });
+  assertHostileNotCalled('Array.prototype.slice self-restoring', Array.prototype, 'slice', function () { return []; });
+  assertHostileNotCalled('Array.prototype.map self-restoring', Array.prototype, 'map', function () { return []; });
+  assertHostileNotCalled('Array.prototype.concat self-restoring', Array.prototype, 'concat', function () { return []; });
+
+  // Group 2 — Function.prototype methods (round 11 RN-26)
+  assertHostileNotCalled('Function.prototype.call self-restoring', Function.prototype, 'call', function () { return undefined; });
+  assertHostileNotCalled('Function.prototype.apply self-restoring', Function.prototype, 'apply', function () { return undefined; });
+  assertHostileNotCalled('Function.prototype.bind self-restoring', Function.prototype, 'bind', function () { return function () {}; });
+
+  // Group 3 — Object.* statics (rounds 10/14 RN-23/30)
+  assertHostileNotCalled('Object.getOwnPropertyDescriptor self-restoring', Object, 'getOwnPropertyDescriptor', function () { return { value: undefined }; });
+  assertHostileNotCalled('Object.getOwnPropertyNames self-restoring', Object, 'getOwnPropertyNames', function () { return []; });
+  assertHostileNotCalled('Object.keys self-restoring', Object, 'keys', function () { return []; });
+  assertHostileNotCalled('Object.freeze self-restoring', Object, 'freeze', function (o) { return o; });
+
+  // Group 4 — Reflect (round 11)
+  assertHostileNotCalled('Reflect.ownKeys self-restoring', Reflect, 'ownKeys', function () { return []; });
+
+  // Group 5 — Number / Math / RegExp (round 12 RN-27)
+  assertHostileNotCalled('Number.isInteger self-restoring', Number, 'isInteger', function () { return true; });
+  assertHostileNotCalled('Math.floor self-restoring', Math, 'floor', function (n) { return n; });
+  assertHostileNotCalled('RegExp.prototype.test self-restoring', RegExp.prototype, 'test', function () { return true; });
+
+  // Group 6 — global String + Number/String prototype (rounds 10/12 RN-24/25)
+  assertHostileNotCalled('global String self-restoring', globalThis, 'String', function () { return 'constant'; });
+  assertHostileNotCalled('Number.prototype.toString self-restoring', Number.prototype, 'toString', function () { return '0'; });
+  assertHostileNotCalled('String.prototype.charCodeAt self-restoring', String.prototype, 'charCodeAt', function () { return 0; });
+
+  // Group 7 — TextEncoder + structuredClone (round 13 RN-28/29)
+  assertHostileNotCalled('TextEncoder self-restoring', globalThis, 'TextEncoder', function () { return { encode: function () { return { length: 0 }; } }; });
+  assertHostileNotCalled('structuredClone self-restoring', globalThis, 'structuredClone', function (v) { return v; });
+
+  // Group 8 — JSON (round 10 RN-22)
+  assertHostileNotCalled('JSON.stringify self-restoring', JSON, 'stringify', function () { return '""'; });
+})();
+
+// Section AA-2 — Object.prototype.toJSON hook (round 8 RN-18). Installed AS A PROPERTY (not
+// via rebinding an existing intrinsic), so it doesn't fit the runWithRebind template.
+(function sectionAA2_objectPrototypeToJsonNeverInvoked() {
+  let fired = 0;
+  Object.defineProperty(Object.prototype, 'toJSON', {
+    configurable: true, enumerable: false,
+    value: function () { fired++; return this; },
+  });
+  let r;
+  try { r = EG.buildEvidenceGraph(freshInput(), { clock: CLOCK }); }
+  finally { delete Object.prototype.toJSON; }
+  chk('AA-2: Object.prototype.toJSON hook NEVER invoked during build', fired === 0);
+  chk('AA-2: build still produces a valid graph (resilient)', r.valid === true);
+})();
+
+// Section AA-3 — Proxy on rawEvidence: trap-invocation count may be > 0 (envelope validation
+// reads descriptor structurally) but the final graph contains no attacker-controlled content.
+(function sectionAA3_proxyTrapsDoNotProduceAttackerContent() {
+  const realArr = [freshNode()];
+  const trapped = new Proxy(realArr, {
+    get(t, k, r) { return Reflect.get(t, k, r); },
+    getOwnPropertyDescriptor(t, k) { return Reflect.getOwnPropertyDescriptor(t, k); },
+    ownKeys(t) { return Reflect.ownKeys(t); },
+    has(t, k) { return Reflect.has(t, k); },
+    getPrototypeOf(t) { return Reflect.getPrototypeOf(t); },
+  });
+  const r = EG.buildEvidenceGraph(freshInput({ rawEvidence: trapped }), { clock: CLOCK });
+  // No attacker-controlled fields ever appear (no nodes with forged shape).
+  if (r.valid === true) {
+    chk('AA-3: Proxy-trapped rawEvidence — graph nodes only carry legitimate field shapes',
+      r.graph.nodes.every(n => typeof n.nodeId === 'string' && typeof n.category === 'string'));
+  } else {
+    chk('AA-3: Proxy-trapped rawEvidence — build fails-closed cleanly', r.eligible === false);
+  }
+})();
+
+console.log('R3.0D D2 evidence-graph suite: ' + pass + ' pass, ' + fail + ' fail');
+if (fail > 0) process.exit(1);
+
+exec
+/bin/bash -lc 'set -o pipefail
+for mutation in safeOwnKeys safeKeys safeGetOwnDescriptor safeGetOwnPropertyNames safeGetPrototypeOf safeDefineDataProperty safeHasOwn safeArrayPush safeArrayIndexOf safeArrayForEach safeArrayMap safeArraySlice safeArraySort safeStringSlice safeStringCharCodeAt safeRegExpTest safeNumberIsInteger safeNumberIsFinite safeMathFloor safeUtf8ByteLength safeStructuredClone safeStringCoerce safeStringToLowerCase safeIsArray safeIsPlainShape safeObjectCreateNull safeObjectAssign deepOriginalShapeAudit deepFreeze stableStringify; do
+  out=$(node -e '"'
+const fs=require(\"fs\"),path=require(\"path\"),Module=require(\"module\");const n=process.argv[1],root=process.cwd(),p=path.join(root,\"contracts/r3.0d/hardened-intrinsics.js\");let s=fs.readFileSync(p,\"utf8\");
+const E={
+safeOwnKeys:[\"var r = _apply(_ReflectOwnKeys, _Reflect, [obj]);\",\"var r = Reflect.ownKeys(obj);\"],
+safeKeys:[\"var r = _apply(_ObjectKeys, _Object, [obj]);\",\"var r = Object.keys(obj);\"],
+safeGetOwnDescriptor:[\"var r = _apply(_ObjectGetOwnPropertyDescriptor, _Object, [obj, key]);\",\"var r = Object.getOwnPropertyDescriptor(obj, key);\"],
+safeGetOwnPropertyNames:[\"var r = _apply(_ObjectGetOwnPropertyNames, _Object, [obj]);\",\"var r = Object.getOwnPropertyNames(obj);\"],
+safeGetPrototypeOf:[\"var r = _apply(_ObjectGetPrototypeOf, _Object, [obj]);\",\"var r = Object.getPrototypeOf(obj);\"],
+safeDefineDataProperty:[\"var r = _apply(_ObjectDefineProperty, _Object, [obj, key, { value: value, writable: true, enumerable: true, configurable: true }]);\",\"var r = Object.defineProperty(obj, key, { value: value, writable: true, enumerable: true, configurable: true });\"],
+safeHasOwn:[\"var d = safeGetOwnDescriptor(obj, key);\",\"return obj.hasOwnProperty(key);\\n    var d = safeGetOwnDescriptor(obj, key);\"],
+safeArrayPush:[\"if (arr === null || arr === undefined) return false;\",\"if (arr === null || arr === undefined) return false;\\n    arr.push(value); return true;\"],
+safeArrayIndexOf:[\"var len;\",\"return arr.indexOf(target);\\n    var len;\"],
+safeArrayForEach:[\"var len;\",\"arr.forEach(fn); return;\\n    var len;\"],
+safeArrayMap:[\"var out = [];\",\"return arr.map(fn);\\n    var out = [];\"],
+safeArraySlice:[\"var out = [];\",\"return arr.slice();\\n    var out = [];\"],
+safeArraySort:[\"var r = _apply(_ArrayPrototypeSort, arr, args);\",\"arr.sort(cmp); return arr;\\n    var r = _apply(_ArrayPrototypeSort, arr, args);\"],
+safeStringSlice:[\"var r = _apply(_StringPrototypeSlice, s, args);\",\"var r = s.slice(start, end);\"],
+safeStringCharCodeAt:[\"var r = _apply(_StringPrototypeCharCodeAt, s, [i]);\",\"var r = s.charCodeAt(i);\"],
+safeRegExpTest:[\"var r = _apply(_RegExpPrototypeTest, re, [s]);\",\"var r = re.test(s);\"],
+safeNumberIsInteger:[\"var r = _apply(_NumberIsInteger, _Number, [n]);\",\"var r = Number.isInteger(n);\"],
+safeNumberIsFinite:[\"var r = _apply(_NumberIsFinite, _Number, [n]);\",\"var r = Number.isFinite(n);\"],
+safeMathFloor:[\"var r = _apply(_MathFloor, _Math, [n]);\",\"var r = Math.floor(n);\"],
+safeUtf8ByteLength:[\"var arr = _apply(_TextEncoderPrototypeEncode, enc, [s]);\",\"var arr = enc.encode(s);\"],
+safeStructuredClone:[\"var r = _apply(_StructuredCloneFn, undefined, [v]);\",\"var r = structuredClone(v);\"],
+safeStringCoerce:[\"var r = _apply(_StringCoerce, undefined, [v]);\",\"var r = String(v);\"],
+safeStringToLowerCase:[\"var r = _apply(_StringPrototypeToLowerCase, s, []);\",\"var r = s.toLowerCase();\"],
+safeIsArray:[\"var r = _apply(_ArrayIsArray, _Array, [v]);\",\"var r = Array.isArray(v);\"],
+safeIsPlainShape:[\"var isArr = safeIsArray(v);\",\"var isArr = Array.isArray(v);\"],
+safeObjectCreateNull:[\"var r = _apply(_ObjectCreate, _Object, [null]);\",\"var r = Object.create(null);\"],
+safeObjectAssign:[\"var keys = safeKeys(source);\",\"return Object.assign(target, source);\\n    var keys = safeKeys(source);\"],
+deepOriginalShapeAudit:[\"var proto = safeGetPrototypeOf(v);\",\"var proto = Object.getPrototypeOf(v);\"],
+deepFreeze:[\"_apply(_ObjectFreeze, _Object, [v]);\",\"Object.freeze(v);\"],
+stableStringify:[\"if (value === null) return \\\"null\\\";\",\"return JSON.stringify(value);\\n    if (value === null) return \\\"null\\\";\"]};
+const b=s.indexOf(\"function \"+n+\"(\");if(b<0)throw new Error(\"function missing \"+n);let e=s.indexOf(\"\\n  function \",b+10);if(e<0)e=s.indexOf(\"\\n  // ─── Public API\",b);const chunk=s.slice(b,e),pair=E[n],count=chunk.split(pair[0]).length-1;if(count"'!==1)throw new Error(n+" site count "+count);s=s.slice(0,b)+chunk.replace(pair[0],pair[1])+s.slice(e);
+const m=new Module(p,module);m.filename=p;m.paths=Module._nodeModulePaths(path.dirname(p));m._compile(s,p);const ol=Module._load;Module._load=function(q,parent,isMain){let r;try{r=Module._resolveFilename(q,parent,isMain)}catch(x){}if(r===p)return m.exports;return Reflect.apply(ol,this,arguments)};require(path.join(root,"tests/r3.0d-hardened-intrinsics.test.js"));
+'"' \""'$mutation" 2>&1)
+  code=$?
+  summary=$(printf '"'%s\\n' \""'$out" | tail -1)
+  printf '"'%-28s exit=%s  %s\\n' \""'$mutation" "$code" "$summary"
+done' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 1343ms:
+safeGetOwnDescriptor         exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeGetOwnPropertyNames      exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeGetPrototypeOf           exit=1  R3.0D hardened-intrinsics direct-test suite: 67 pass, 4 fail
+safeDefineDataProperty       exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeHasOwn                   exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeArrayPush                exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeArrayIndexOf             exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeArrayForEach             exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeArrayMap                 exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeArraySlice               exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeArraySort                exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeStringSlice              exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeStringCharCodeAt         exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeRegExpTest               exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeNumberIsInteger          exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeNumberIsFinite           exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeMathFloor                exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeUtf8ByteLength           exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeStructuredClone          exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeStringCoerce             exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeStringToLowerCase        exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeIsArray                  exit=1  R3.0D hardened-intrinsics direct-test suite: 67 pass, 4 fail
+safeIsPlainShape             exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeObjectCreateNull         exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+safeObjectAssign             exit=1  R3.0D hardened-intrinsics direct-test suite: 68 pass, 3 fail
+deepOriginalShapeAudit       exit=0  R3.0D hardened-intrinsics direct-test suite: 71 pass, 0 fail
+deepFreeze                   exit=1  R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+stableStringify              exit=1  Node.js v25.5.0
+
+exec
+/bin/bash -lc "node -e '
+const fs=require(\"fs\"),path=require(\"path\"),Module=require(\"module\"),n=\"stableStringify\",root=process.cwd(),p=path.join(root,\"contracts/r3.0d/hardened-intrinsics.js\");let s=fs.readFileSync(p,\"utf8\");const b=s.indexOf(\"function stableStringify(\"),e=s.indexOf(\"\\n  // ─── Public API\",b),c=s.slice(b,e),f=\"if (value === null) return \\u0027null\\u0027;\",t=\"return JSON.stringify(value);\\n    \"+f;if(c.split(f).length-1"'!==1)throw new Error("site");s=s.slice(0,b)+c.replace(f,t)+s.slice(e);const m=new Module(p,module);m.filename=p;m.paths=Module._nodeModulePaths(path.dirname(p));m._compile(s,p);const ol=Module._load;Module._load=function(q,parent,isMain){let r;try{r=Module._resolveFilename(q,parent,isMain)}catch(x){}if(r===p)return m.exports;return Reflect.apply(ol,this,arguments)};require(path.join(root,"tests/r3.0d-hardened-intrinsics.test.js"));
+'"'; printf 'stable_exit=%s\\n' \""'$?"' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+  ✗ stableStringify: hostile JSON.stringify never invoked at the object/array level
+  ✗ stableStringify: output correct (canonical sorted-keys JSON)
+R3.0D hardened-intrinsics direct-test suite: 69 pass, 2 fail
+stable_exit=1
+
+exec
+/bin/bash -lc "node -e '
+const fs=require(\"fs\"),vm=require(\"vm\");const src=fs.readFileSync(\"contracts/r3.0d/hardened-intrinsics.js\",\"utf8\");const sandbox={};vm.createContext(sandbox);vm.runInContext(src,sandbox,{filename:\"hardened-intrinsics.browser.js\"});const result=vm.runInContext("'`(()=>{const a=R3_0D_HardenedIntrinsics,d=Object.getOwnPropertyDescriptor(globalThis,"R3_0D_HardenedIntrinsics"),k=Reflect.ownKeys(a);return {count:k.length,frozen:Object.isFrozen(a),allFunctions:k.every(x=>typeof a[x]==="function"),underscored:k.filter(x=>typeof x==="string"&&x.startsWith("_")),globalDescriptor:{writable:d.writable,enumerable:d.enumerable,configurable:d.configurable}}})()`,sandbox);console.log("browser_umd="+JSON.stringify(result));
+const HI=require("./contracts/r3.0d/hardened-intrinsics.js");const keys=Reflect.ownKeys(HI);console.log("node_cjs="+JSON.stringify({count:keys.length,frozen:Object.isFrozen(HI),allFunctions:keys.every(k=>typeof HI[k]==="function"),underscored:keys.filter(k=>typeof k==="string"&&k.startsWith("_"))}));
+'"'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+browser_umd={"count":30,"frozen":true,"allFunctions":true,"underscored":[],"globalDescriptor":{"writable":false,"enumerable":false,"configurable":false}}
+node_cjs={"count":30,"frozen":true,"allFunctions":true,"underscored":[]}
+
+codex
+The complete mutation matrix is decisive: 29 exports fail under an ambient regression, but `deepOriginalShapeAudit` does not. Replacing its captured `safeGetPrototypeOf(v)` path with ambient `Object.getPrototypeOf(v)` still yields 71/0 and exit 0. Browser UMD and Node CommonJS both still expose exactly 30 frozen functions with no private captures; I’m completing the repository-wide regression run for RN-01..RN-30.
+exec
+/bin/bash -lc 'npm test' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ exited 1 in 3892ms:
+
+[1] 軸側傾剛性 K = k_w·t²/2 (Milliken / Suspension Secrets)
+  ✓ 前彈簧側傾剛性 = k·t²/2
+  ✓ 輪胎串聯後總剛性 < 懸吊剛性
+
+[2] Roll gradient 量級 (OptimumG: 街車 ~3-6°/g, 高下壓力賽車 0.2-0.7°/g)
+  ✓ GT3 roll gradient 在 1.5-5 °/g 合理區間
+  ✓ 軟彈簧 → roll gradient 更大
+
+[3] ARB sizing 單位一致性 (Nm/deg)
+  ✓ total_roll_needed ≈ m·g·h/target
+  ✓ front_arb_needed 在現實範圍 (< 3000 Nm/deg)
+  ✓ current_roll_gradient 在現實範圍 (< 15 °/g)
+
+[4] 線性自行車模型 (Gillespie ch.6)
+  ✓ 滑移角@1g 在 2-10° 物理範圍
+  ✓ K_us = W_f/C_f − W_r/C_r
+  ✓ 臨界速度 = √(g·L/|K_us|)
+  ✓ K_us<0 時無特徵速度
+  ✓ 超過臨界速度時 yaw gain = null
+  ✓ 50/50 車 K_us ≈ 0
+
+[5] 阻尼比 (OptimumG Tech Tip 2: 賽車 ζ ≈ 0.65-0.7)
+  ✓ heave 阻尼比在 0.2-1.2 現實範圍
+  ✓ 側傾阻尼比在 0.1-1.5 現實範圍
+  ✓ 參考速度加倍 → ζ 減半
+
+[6] 空力方向 (front-biased downforce → 高速轉向過度)
+  ✓ 前偏空力 → aero_us_shift < 0 (轉向過度)
+  ✓ 後偏空力 → aero_us_shift > 0 (轉向不足)
+
+[7] Toe 慣例 (+ = toe-in)
+  ✓ 前 toe-in → 更轉向不足
+  ✓ 後 toe-in → 更轉向不足(穩定)
+
+[8] Cross weight (FL+RR 分析對角，作者刻意設計)
+  ✓ cross = (FL+RR)/total
+
+[9] Flat ride 規則 (Olley: 後/前 ≈ 1.10-1.20)
+  ✓ 後/前比值過低觸發建議
+  ✓ 目標比值 = 1.10 (後高於前)
+  ✓ 建議調整「後」彈簧
+
+[10] 輪胎垂直彈簧率估算 (實測校準)
+  ✓ 255/40 估算 ≈ 250 N/mm (±10%)
+  ✓ 205/55 ≈ 220 N/mm 基準
+  ✓ 胎壓越高剛性越高
+  ✓ 295/30 在 250-320 N/mm 合理範圍
+
+[11] Pacejka 模型
+  ✓ C_α 峰值在 Fz = a4
+  ✓ -3° camber 降低 C_α < 3%
+  ✓ 峰值 μ 在 0.8-1.3
+
+[12] Load sensitivity 形狀
+  ✓ Fz=Fz0 時 = 1.0 (峰值)
+  ✓ Fz>Fz0 時下降
+
+[13] 縱向荷重轉移 ΔW = W·a·h/L (Gillespie)
+  ✓ 1g 煞車轉移量
+
+[14] 全車種資料庫掃描（Tier 1 輸出健全性）
+  ✓ 501 台車全部輸出在物理合理範圍
+
+[15] Pacejka 荷重敏感度膝點隨車重校準 (a4 scaling)
+  ✓ GT3 臨界速度不再低得離譜 (>90 km/h 或無)
+  ✓ 62/38 前重車 → K_us > 0 (轉向不足)
+  ✓ 有角落重量時軸荷重以磅秤值為準
+
+[16] 阻尼參考速度防呆 (0/''/負值 → 退回 0.3)
+  ✓ damper_ref_speed=0 → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed="" → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed=-1 → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed=null → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed=undefined → ζ 有限且等於 0.3 預設
+
+[17] arbSizing 輪胎柔度補償（軸級閉合）
+  ✓ series(spring+ARB, tire) 總和 = 所需總剛性
+  ✓ 無輪胎參數時維持舊行為
+
+[18] 統一機械平衡 (Tier1 understeer_gradient, deg/g) — 配重 + LLTD
+  ✓ 車頭重(62%F) → 轉向不足 (US>0)
+  ✓ 50/50 → 近中性 (|US|<0.3)
+  ✓ 車尾重(40%F) → 轉向過度 (US<0)
+  ✓ 配重單調: 62%F 比 50%F 更US, 40%F 更OS
+  ✓ US 在 deg/g 合理範圍 (|US|<8)
+  ✓ 前 ARB 硬 → 轉向不足方向
+  ✓ 後 ARB 硬 → 轉向過度方向
+  ✓ 前硬 vs 後硬 方向相反且對稱
+
+[19] 預設車庫傾向分佈合理性 (回歸「全部轉向過度」bug)
+  ✓ OS 不超過 50% (修正前幾乎全 OS)
+  ✓ 三種傾向都有合理數量(各>10%)
+  ✓ FF 前驅車 轉向不足 > 轉向過度 (物理正確)
+
+[20] 麗寶單圈模擬器 — GG 點質量 lap sim
+  ✓ 賽道段落總長 ≈ 3500m (±200)
+  ✓ 改裝 GR Yaris 圈速 ≈ 110.9s (1:50, ±6s)
+  ✓ 極速合理 (180-260 km/h)
+  ✓ 抓地↑ → 圈速更快
+  ✓ 動力↑ → 圈速更快
+  ✓ 質量↑ → 圈速更慢
+
+[21] 麗寶 stint 演化 — 胎壓甜蜜點 / 最快圈 / 退化
+  ✓ 產生 12 圈逐圈資料
+  ✓ 最快單圈時間字串格式 m:ss.mmm
+  ✓ 甜蜜點在 stint 早段 (第1-5圈)
+  ✓ 最快圈 ≈ 峰值抓地圈 (±1)
+  ✓ 第1圈(冷胎)比最快圈慢
+  ✓ 熱胎壓 > 冷胎壓 (升溫建壓)
+  ✓ 建議冷胎壓 < 熱胎甜蜜點
+  ✓ 峰值後抓地退化
+
+[22] 胎種抓地排序 — 光頭胎應比街胎快 (回歸「光頭胎變慢」bug)
+  ✓ 光頭軟胎 比 街胎(PS4S) 快
+  ✓ 光頭軟胎 比 半熱熔(A052) 快
+  ✓ 半熱熔 比 街胎 快
+  ✓ 光頭胎在熱賽道達工作窗口 (峰值抓地>85%)
+  ✓ tir: FNOMIN parsed
+  ✓ tir: vertical stiffness → N/mm
+  ✓ tir: dims (width) parsed
+  ✓ tir: lateral coeff PCY1 parsed
+  ✓ tir: comment stripped from value
+  ✓ tir: ISO sign (α>0 → Fy<0)
+  ✓ tir: Fy rises toward peak (|Fy(2°)|<|Fy(6°)|)
+  ✓ tir: peak μ ≈ PDY1 (1.3–1.7)
+  ✓ tir: optimal slip angle 3–12°
+  ✓ tir: cornering stiffness > 0
+  ✓ tir: load sensitivity (μ falls as Fz rises)
+  ✓ tir: fyCurve generated (0–15°, |Fy| rises from ~0 toward peak)
+  ✓ tir: imported tire feeds handling model (K_us shifts)
+  ✓ tir: default prediction unaffected without tireModel
+  ✓ tir: peak μ feeds lap-sim base_mu (override)
+  ✓ tir: lap sim unaffected without tirePeakMu
+  ✓ kin: roll-center height in 0–150mm
+  ✓ kin: ride height (dz=0) returns static camber
+  ✓ kin: camber gain negative (more neg camber in bump)
+  ✓ kin: camber gain magnitude sane (<0.1°/mm)
+  ✓ kin: camber curve smooth/monotonic (no branch-jump spike)
+  ✓ kin: roll center migrates with travel
+  ✓ ref: front-heavy car is more understeer (Milliken K_us)
+  ✓ ref: stiffer front ARB → more understeer
+  ✓ ref: stiffer rear ARB → less understeer (toward oversteer)
+  ✓ ref: street sports-car roll gradient in 2–6°/g
+  ✓ ref: ride frequency matches f=(1/2π)√(k_eff/m)
+  ✓ ref: stiffer springs raise ride frequency
+  ✓ trans: response is stable
+  ✓ trans: yaw response time 0.05–0.6s
+  ✓ trans: yaw-mode damping 0.3–1.2
+  ✓ trans: yaw natural frequency 0.4–3Hz
+  ✓ trans: steady yaw gain matches Gillespie V/(L+Kus·V²/g) (<5%)
+  ✓ trans: invalid input returns null
+  ✓ bms: header identifies DarabImporter
+  ✓ bms: catalog finds all 3 channels
+  ✓ bms: channel name/source/description parsed
+  ✓ bms: detects validation channels (accy/yaw/steer)
+
+[bmsid] D1-0B Bosch channel dictionary + identity card
+  ✓ bmsid: card built from synthetic Darab catalog
+  ✓ bmsid: format detected = Bosch WinDarab / DarabImporter
+  ✓ bmsid: file identity carries name + size
+  ✓ bmsid: source summary lists MS5.8 + C60
+  ✓ bmsid: speed → vehicle_speed (high)
+  ✓ bmsid: steer → steering_angle (high)
+  ✓ bmsid: accy → lateral_acceleration (high)
+  ✓ bmsid: accx → longitudinal_acceleration (high)
+  ✓ bmsid: yaw → yaw_rate (high)
+  ✓ bmsid: nmot → engine_rpm (high)
+  ✓ bmsid: pbrake_f → brake_pressure_front (high)
+  ✓ bmsid: pbrake_r → brake_pressure_rear (high)
+  ✓ bmsid: vwheel_* → wheel_speed_FL/FR/RL/RR (high)
+  ✓ bmsid: unmapped channel → unknown (no fail)
+  ✓ bmsid: ugs NOT treated as gear value
+  ✓ bmsid: ags_*_engine_speed NOT treated as engine_rpm (name-gated)
+  ✓ bmsid: R_H_Front → ride_height, low-confidence inferred
+  ✓ bmsid: Road_FL → road_suspension, low-confidence inferred
+  ✓ bmsid: coverage marks vehicle_speed/yaw_rate found
+  ✓ bmsid: coverage marks ride_height uncertain (low only)
+  ✓ bmsid: forbidden caps all false (timeSeries/physicalValues/scaling/units/modelVsActual/kus/handlingAnalysis/setupFromRaw)
+  ✓ bmsid: limitations pin presence-only / nothing decoded
+  ✓ bmsid: null input → fail-closed (format null, caps false, 0 channels)
+
+[cal] Calibration 層：常數值鎖定 (calibration.js)
+  ✓ cal: CAL.US_NEUTRAL_BAND === 0.5
+  ✓ cal: CALIBRATION.US_NEUTRAL_BAND.value 對齊 CAL.US_NEUTRAL_BAND
+  ✓ cal: CAL.US_NORM_SCALE === 4
+  ✓ cal: CALIBRATION.US_NORM_SCALE.value 對齊 CAL.US_NORM_SCALE
+  ✓ cal: CAL.CORNERING_STIFFNESS_AY_REF_G === 1
+  ✓ cal: CALIBRATION.CORNERING_STIFFNESS_AY_REF_G.value 對齊 CAL.CORNERING_STIFFNESS_AY_REF_G
+  ✓ cal: CAL.TIRE_GRIP_TO_US_GRADIENT_GAIN === 14
+  ✓ cal: CALIBRATION.TIRE_GRIP_TO_US_GRADIENT_GAIN.value 對齊 CAL.TIRE_GRIP_TO_US_GRADIENT_GAIN
+  ✓ cal: CAL.WEIGHT_SHIFT_TO_US_GRADIENT === 0.2
+  ✓ cal: CALIBRATION.WEIGHT_SHIFT_TO_US_GRADIENT.value 對齊 CAL.WEIGHT_SHIFT_TO_US_GRADIENT
+  ✓ cal: CAL.TIRE_WIDTH_GRIP_REF_MM === 245
+  ✓ cal: CALIBRATION.TIRE_WIDTH_GRIP_REF_MM.value 對齊 CAL.TIRE_WIDTH_GRIP_REF_MM
+  ✓ cal: CAL.TIRE_WIDTH_GRIP_EXPONENT === 0.5
+  ✓ cal: CALIBRATION.TIRE_WIDTH_GRIP_EXPONENT.value 對齊 CAL.TIRE_WIDTH_GRIP_EXPONENT
+  ✓ cal: CAL.PRESSURE_GRIP_LOSS_PER_BAR === 0.2
+  ✓ cal: CALIBRATION.PRESSURE_GRIP_LOSS_PER_BAR.value 對齊 CAL.PRESSURE_GRIP_LOSS_PER_BAR
+  ✓ cal: CAL.LIHPAO_RADIUS_SCALE === 1.1
+  ✓ cal: CALIBRATION.LIHPAO_RADIUS_SCALE.value 對齊 CAL.LIHPAO_RADIUS_SCALE
+  ✓ cal: CAL.TIRE_TEMP_TRACK_COEFF === 0.6
+  ✓ cal: CALIBRATION.TIRE_TEMP_TRACK_COEFF.value 對齊 CAL.TIRE_TEMP_TRACK_COEFF
+  ✓ cal: CAL.TIRE_TEMP_EQUIL_TAU_LAPS === 1.6
+  ✓ cal: CALIBRATION.TIRE_TEMP_EQUIL_TAU_LAPS.value 對齊 CAL.TIRE_TEMP_EQUIL_TAU_LAPS
+  ✓ cal: CAL.LAP_BALANCE_PENALTY_PER_DEGG === 0.012
+  ✓ cal: CALIBRATION.LAP_BALANCE_PENALTY_PER_DEGG.value 對齊 CAL.LAP_BALANCE_PENALTY_PER_DEGG
+  ✓ cal: CAL.LAP_BALANCE_PENALTY_CAP === 0.04
+  ✓ cal: CALIBRATION.LAP_BALANCE_PENALTY_CAP.value 對齊 CAL.LAP_BALANCE_PENALTY_CAP
+  ✓ cal: CAL.DRIVETRAIN_TRACTION_FRAC_2WD === 0.62
+  ✓ cal: CALIBRATION.DRIVETRAIN_TRACTION_FRAC_2WD.value 對齊 CAL.DRIVETRAIN_TRACTION_FRAC_2WD
+  ✓ cal: CALIBRATION 鍵集合 == 測試預期
+  ✓ cal: 每個常數 metadata 完整且 value 落在 validRange 內
+
+[sens] corneringStiffnessScale 鉤子
+  ✓ sens: corneringStiffnessScale 預設(=1) 不改變 understeer_gradient
+  ✓ sens: cornering stiffness ×0.8 → Kus ≈ Kus0/0.8
+
+[tmeta] 輪胎模型 metadata
+  ✓ tmeta: generic → sourceType/overallStatus generic
+  ✓ tmeta: generic → Cα = model/generic_pacejka
+  ✓ tmeta: generic → pressure/temp/width grip are heuristic
+  ✓ tmeta: generic → no fallback flags (nothing better was expected)
+  ✓ tmeta: imported → sourceType imported_tir, status valid
+  ✓ tmeta: imported → Cα & peak μ upgraded to model/imported_tir
+  ✓ tmeta: imported → pressure/temp/width/tireUsShift STILL heuristic + fallback
+  ✓ tmeta: imported → coverage lateral true; Fx/Mz/combined false
+  ✓ tmeta: imported → emits "grip still heuristic" honesty diagnostic
+  ✓ tmeta: partial .tir → overallStatus imported_partial
+  ✓ tmeta: partial .tir → camber + lateral-only warnings
+  ✓ tmeta: partial .tir → missing pressure-model diagnostic
+  ✓ tmeta: parseTIR → imported_tir descriptor
+  ✓ tmeta: descriptor is pure — no prediction drift
+
+[tval] .tir validation diagnostics
+  ✓ tval: valid → no error severity
+  ✓ tval: valid → lateral-only is a warning (not an error)
+  ✓ tval: valid → grip-still-heuristic is a warning
+  ✓ tval: valid → vertical stiffness reported as info
+  ✓ tval: valid → load-sensitivity reported as info
+  ✓ tval: valid → pressure-unused note is info (file has PPY)
+  ✓ tval: lateral-only flags combined slip + Mz + Fx
+  ✓ tval: null → error TIR_PARSE_FAILED only
+  ✓ tval: missing PCY1 → error TIR_MISSING_LATERAL (returns early)
+  ✓ tval: missing PDY1 → error TIR_NO_PEAK
+  ✓ tval: partial → no error severity
+  ✓ tval: partial → no-camber warning + no-pressure/no-vertical info
+  ✓ tval: degenerate (Fy0≡0) → error TIR_NO_EFFECTIVE_LATERAL_FORCE
+  ✓ tval: degenerate → importedTirMetadata overallStatus imported_error (never imported_valid)
+  ✓ tval: valid (non-degenerate) → NO effective-lateral-force error
+  ✓ tval: importedTirMetadata(no PDY1) → overallStatus imported_error
+  ✓ tval: buildTireModelMetadata diagnostics come from validateTirModel
+
+[telemetry] .bmsbin catalog metadata + diagnostics
+  ✓ telemetry: canonical mapping returns matched raw name
+  ✓ telemetry: maps wheel-speed / damper / ride-height
+  ✓ telemetry: valid catalog → status catalog_only
+  ✓ telemetry: capabilities — catalog true, all decoding false
+  ✓ telemetry: required channels carry raw names
+  ✓ telemetry: catalog-only emits time-series-not-decoded warning
+  ✓ telemetry: full core → validation-detected + ready-for-3B info
+  ✓ telemetry: missing yaw/steer/speed → warnings; lateral present → no lateral warning
+  ✓ telemetry: partial still catalog_only (no time-series)
+  ✓ telemetry: non-Darab → error TELEM_NOT_DARAB + decode_error
+  ✓ telemetry: zero channels → error TELEM_NO_CHANNELS
+  ✓ telemetry: consumes parseBms shape (header/channelCount/channels)
+
+[probe] .bmsbin binary sample-block probe
+  ✓ probe: empty file → error BMS_PROBE_EMPTY_FILE
+  ✓ probe: non-Darab header → error BMS_PROBE_INVALID_HEADER
+  ✓ probe: catalog-only → catalog found + no-sample-region warning + no regions
+  ✓ probe: catalog + numeric region → candidate binary region found
+  ✓ probe: numeric region → int16le encoding flagged plausible
+  ✓ probe: monotonic counter → timebase clue candidate
+  ✓ probe: random region → probe_only + scaling-not-decoded warning
+  ✓ probe: report schema stable (probe_only, arrays, unknowns)
+  ✓ probe: always honest — probe-only + time-series-not-confirmed diagnostics
+  ✓ probe→metadata: status probe_available + sampleProbe true, decoding still false
+  ✓ probe→metadata: probe summary attached (regionCount + diagnostics)
+  ✓ probe→metadata: no probe → stays catalog_only, sampleProbe false
+
+[raw] .bmsbin raw time-series candidate extraction
+  ✓ raw: no probe report → error
+  ✓ raw: no candidate region → error + no series
+  ✓ raw: numeric region → raw series candidate found
+  ✓ raw: int16le stats correct (min/max/mean of 0..999)
+  ✓ raw: series carries raw-only notes (no scaling / no mapping)
+  ✓ raw: timebase clue → candidate only (not a confirmed timestamp)
+  ✓ raw: interleaved data → interleaved layout hypothesis (≥2 channels)
+  ✓ raw: channel mapping stays not_mapped
+  ✓ raw: physicalScaling + handlingCorrelation + timeSeries stay false
+  ✓ raw: rawTimeSeriesCandidates true + status raw_candidates_only
+  ✓ raw: end-to-end probe→extract yields candidates
+  ✓ raw→metadata: status raw_candidates_only + rawTimeSeriesCandidates true; physical/handling false
+  ✓ raw→metadata: rawExtraction summary attached (seriesCount + channelMapping not_mapped)
+
+[link] .bmsbin channel-linking hypotheses
+  ✓ link: no raw extraction → error
+  ✓ link: no catalog → warning
+  ✓ link: count match → count-match info + low-confidence order hypothesis
+  ✓ link: no explicit mapping → channel identity not confirmed
+  ✓ link: explicit mapping → high-confidence identity (synthetic case only)
+  ✓ link: explicit scale → scaling hypothesis (metadata_candidate)
+  ✓ link: no scale → manual_required + physicalScaling false
+  ✓ link: canonicalPreview available only with explicit identity+scale
+  ✓ link: decode-grade capabilities stay false even with explicit mapping
+  ✓ link: timebase hypothesis formed (candidate only, sample-count match)
+  ✓ link→metadata: status linking_hypotheses_only + linking/scaling caps true; decode-grade false
+  ✓ link→metadata: linking summary attached (identity not confirmed, no canonical preview)
+
+[tool] local validation reporter — fixture-safe / sanitized output
+  ✓ tool: REPORT_FIELDS whitelist names no raw-content field
+  ✓ tool: summarizeFile emits only whitelisted REPORT_FIELDS
+  ✓ tool: summary values are scalars only (no raw arrays/objects)
+  ✓ tool: summary reflects pipeline run + claims no decode
+  ✓ tool: aggregate emits counts/ranges/histograms only (no raw arrays)
+  ✓ tool: serialized summary+aggregate names no raw-content field
+  ✓ tool: summary carries sanitized confirmation decision (catalog confirmed, structure not, no decode)
+  ✓ tool: aggregate reports confirmation counts + corpus booleans (sanitized)
+  ✓ tool: summary carries sanitized extraction eligibility (not eligible, 0 eligible, no measured values)
+  ✓ tool: summary carries sanitized measured extraction (real file blocked, 0 corners, realDataUsed false, no tendency)
+  ✓ tool: summary carries sanitized canonical-adapter eligibility (real file blocked, never ready, realDataUsed false)
+  ✓ tool: summary carries sanitized private-corpus boundary (not available on single file, realDataUsed false)
+
+[confirm] .bmsbin hypothesis→confirmed criteria
+  ✓ confirm: catalog-only → catalog confirmed, structure not, status not_confirmed
+  ✓ confirm: unstable candidate regions → sample structure not confirmed
+  ✓ confirm: stable regions + matching raw count → sample structure can be confirmed
+  ✓ confirm: explicit mapping → channel identity can be confirmed (synthetic)
+  ✓ confirm: no explicit mapping → channel identity stays false
+  ✓ confirm: monotonic counter + sample-count match → timebase can be confirmed
+  ✓ confirm: no scale table → physical scaling stays false
+  ✓ confirm: explicit scale → scaling criteria confirmed (synthetic), physicalScaling cap still false
+  ✓ confirm: real-data-like (85 ch / 2 raw, no corpus) → catalog only, status not_confirmed
+  ✓ confirm: explicit mapping but NO corpus → identity/scaling/canonical stay false (structure gates them)
+  ✓ confirm: decode-grade capabilities stay false even when structure is confirmed
+  ✓ confirm: report schema (scores + blockers + nextEvidenceNeeded + canonical blocked)
+  ✓ confirm→metadata: confirmation summary surfaced + confirmationCriteria cap true; decode-grade false
+  ✓ confirm→metadata: no confirmation → confirmationCriteria false, confirmation null
+
+[struct] .bmsbin sample-structure discovery
+  ✓ struct: catalog-only (no raw) → hypotheses-only + not converged + warning
+  ✓ struct: 85-entry in-range offset table → candidate matches catalog (targets plausible)
+  ✓ struct: offset table with out-of-file targets → not confirmed (targetsPlausible false)
+  ✓ struct: 85 length-prefixed blocks → per_channel_blocks hypothesis matching catalog
+  ✓ struct: interleaved 85-lane data → interleaved_channels hypothesis
+  ✓ struct: random region → compressed_or_sparse hypothesis
+  ✓ struct→confirm: per-channel feed but NO corpus → structure NOT confirmed, decode caps false
+  ✓ struct→confirm: per-channel feed + corpus → structure can confirm; decode-grade caps still false
+  ✓ struct: decode-grade caps false + sampleStructureDiscovery true + never converged (all fixtures)
+  ✓ struct: report never names a canonical channel / decoded series
+  ✓ struct→metadata: structure summary surfaced + sampleStructureDiscovery cap true; decode caps false
+  ✓ struct→metadata: no structure → sampleStructureDiscovery false, structure null
+  ✓ struct(R1): misaligned per-channel blocks (junk prefix) still found via full start search
+  ✓ struct(R2): sequential index run → channel_index_table, not a matches offset_table
+  ✓ struct(R3): single contiguous smooth series → NOT mislabelled interleaved_channels
+  ✓ struct(R4): random region yields no targetsPlausible offset_table candidate
+
+[raw-stream] .bmsbin raw stream confirmation criteria
+  ✓ rawstream: catalog-only → not confirmed, no confirmable stream
+  ✓ rawstream: single-file per-channel blocks → confirmable, aggregate not confirmed (corpus required)
+  ✓ rawstream: corpus + consistent per-channel blocks → confirmed_structure + raw_stream_structure_confirmed
+  ✓ rawstream: matching count but inconsistent block length → candidate_only, not confirmed
+  ✓ rawstream: corpus + interleaved layout → confirmed_structure
+  ✓ rawstream: single contiguous smooth series → no interleaved stream, not confirmed
+  ✓ rawstream: offset table → rejected as raw stream (boundary evidence), not confirmed
+  ✓ rawstream: decode-grade capabilities stay false (timeSeries/physicalScaling/handlingCorrelation)
+  ✓ rawstream: always warns identity + physical values unavailable; never names a channel/value
+  ✓ rawstream→confirm: feed WITHOUT corpus → raw streams not confirmed; decode caps false
+  ✓ rawstream→confirm: feed + corpus (fileCount≥2) → raw streams can confirm; decode caps still false
+  ✓ rawstream: real-data-like (no corpus, no clean structure) → not confirmed
+  ✓ rawstream→metadata: summary surfaced + rawStreamConfirmation cap true; decode caps false
+  ✓ rawstream→metadata: no raw stream confirmation → cap false, summary null
+  ✓ rawstream(R1): equal-prefix / variable-tail blocks → NOT confirmed_structure (whole-run length check)
+
+[channel-identity] .bmsbin channel identity confirmation criteria
+  ✓ identity(A): shape-only → hypothesis_only, not confirmed
+  ✓ identity(B): label-only → labeled_unverified, not confirmed
+  ✓ identity(C): independent mapping but raw stream not confirmed → confirmable_identity, not confirmed
+  ✓ identity(D): corpus + confirmed raw stream + independent mapping → confirmed_identity (synthetic); decode caps false
+  ✓ identity(R1): unknowns[] is consistent with the decision on both paths
+  ✓ identity(E): no corpus (single file) → never confirmed_identity
+  ✓ identity(E2): mapping depends on scaling → candidate at most, not confirmed
+  ✓ identity(F): physical/canonical/handling/setup/units caps pinned false (even confirmed_identity)
+  ✓ identity(G): real path (no evidence) → not_confirmed, 0 candidates
+  ✓ identity(G): real path never names a channel (no speed/brake/throttle/steering/accy from catalog)
+  ✓ identity→confirm: feed WITHOUT corpus → channel identity not confirmed; decode caps false
+  ✓ identity→confirm: feed + corpus → channel identity can confirm; decode caps still false
+  ✓ identity→metadata: surfaced + channelIdentityConfirmed false; physical/canonical/handling/setup caps false
+  ✓ identity→metadata: no identity → cap false, summary null
+
+[timebase] .bmsbin timebase confirmation criteria
+  ✓ timebase(A): no evidence → not_confirmed, confirmed false
+  ✓ timebase(B): sample-count only → sample_count_candidate, confirmed false
+  ✓ timebase(C): monotonic counter only → monotonic_candidate, confirmed false
+  ✓ timebase(D): delta stable, no corpus → delta_candidate, confirmed false
+  ✓ timebase(E): manual sample-rate only → fallback hint, not confirmed; units/scaling/timeSeries false
+  ✓ timebase(F): raw stream not confirmed → confirmable_timebase at most, not confirmed
+  ✓ timebase(G): corpus + confirmed raw stream + full structural → confirmed_timebase (synthetic); caps false
+  ✓ timebase(H): gaps/dropouts → not confirmed_timebase + gaps-detected diagnostic
+  ✓ timebase(H2): NaN gap/dropout count → fails closed (not confirmed), never coerced to 0
+  ✓ timebase(I): single file (no corpus) → never confirmed; no inferred Hz/rate value emitted
+  ✓ timebase(red-line): physical/units/canonical/timeSeries/handling/setup caps pinned false (all paths)
+  ✓ timebase→confirm: feed WITHOUT corpus → timebase not confirmed; decode caps false
+  ✓ timebase→confirm: feed + corpus → timebase can confirm; decode caps still false
+  ✓ timebase→metadata: summary surfaced + timebaseConfirmed false; physical/units/canonical/handling caps false
+  ✓ timebase→metadata: no timebase → cap false, summary null
+
+[physical-scaling] .bmsbin physical scaling confirmation criteria
+  ✓ scaling(A): no evidence → not_confirmed; physical/units caps false
+  ✓ scaling(B): raw stream not confirmed → not confirmed; physicalScaling false
+  ✓ scaling(C): channel identity not confirmed → identity_missing, not confirmed
+  ✓ scaling(D): timebase missing (time-indexed) → timebase_missing, not confirmed
+  ✓ scaling(E): manual scale only → scale_hint_only (fallback); not confirmed; units false
+  ✓ scaling(F): unit label only → unit_hint_only, not confirmed
+  ✓ scaling(G): plausible range only → candidate at most, not confirmed (range is supporting only)
+  ✓ scaling(H): transform proposed but not verified/stable → transform_candidate, not confirmed
+  ✓ scaling(I): all prereqs + independent scale + unit + verified transform → confirmed_scaling (synthetic); usable caps still false
+  ✓ scaling(J): synthetic confirmed → canonicalValueEligibility true but canonicalValues NOT available; no overlay
+  ✓ scaling(R1): identity status string cannot override a false aggregate decision → not confirmed
+  ✓ scaling(K): real single-file (no corpus) → never confirmed; physical/units/canonical caps false
+  ✓ scaling(L): real path + manual scale → fallback hint only; physicalScaling/units false
+  ✓ scaling(M): handling/setup/overlay/timeSeries/canonical caps pinned false (all paths)
+  ✓ scaling→confirm: feed WITHOUT corpus → physical scaling not confirmed; decode caps false
+  ✓ scaling→confirm: feed + corpus → physical scaling can confirm; decode-grade caps still false
+  ✓ scaling→metadata: summary surfaced + physicalScaling/units/canonical caps false; overlay false
+  ✓ scaling→metadata: no scaling → cap false, summary null
+
+[telemetry-readiness] .bmsbin telemetry readiness gate
+  ✓ readiness(A): no evidence → not_ready; readiness/handlingAnalysis caps false
+  ✓ readiness(B): canonical/scaling missing → insufficient_prerequisites, not ready
+  ✓ readiness(C): required channels missing → missing_required_channels, not ready
+  ✓ readiness(E): timebase missing → insufficient_prerequisites, not ready
+  ✓ readiness(F-I): sample-rate / sync / dropout / noise blocked → quality_blocked, not ready
+  ✓ readiness(H2): unknown dropout/noise quality → fail-closed, not ready
+  ✓ readiness(R1): units-only prereq → insufficient_prerequisites (ladder symmetric), still not ready
+  ✓ readiness(J): some required channels confirmed → partial_readiness, not ready
+  ✓ readiness(K): prereqs + channels met, quality not fully confirmed → confirmable_readiness, not ready
+  ✓ readiness(L): real single-file → not_ready; handlingAnalysis/overlay caps false
+  ✓ readiness(M): all prereqs + channels + quality pass → ready_for_analysis (synthetic); analysis caps false
+  ✓ readiness(N): handlingAnalysis/overlay/Kus/handling/setup caps pinned false (all paths)
+  ✓ readiness→confirm: feed WITHOUT corpus → telemetryReadyForAnalysis false; decode caps false
+  ✓ readiness→confirm: feed + full prereqs + corpus → telemetryReadyForAnalysis true; decode caps still false
+  ✓ readiness→metadata: summary surfaced + telemetryReady false; handlingAnalysis/overlay/Kus/setup caps false
+  ✓ readiness→metadata: no readiness → cap false, summary null
+
+[extract-eligibility] .bmsbin measured handling-response extraction eligibility gate
+  ✓ extract(A): real not-ready readiness → not_eligible; extraction/measuredHandlingResponse/handling caps false
+  ✓ extract(B): ready but no canonical measured series → canonical_series_unavailable, not eligible
+  ✓ extract(C): ready + canonical series but required channels absent → required_channels_unavailable
+  ✓ extract(C2): ready + canonical series + some required channels → partial_eligibility
+  ✓ extract(D): channels present but too few corner events → segmentation_prerequisites_unmet
+  ✓ extract(E): segmentation ok but windows not separable → window_prerequisites_unmet
+  ✓ extract(F): all prerequisites satisfied (synthetic) → eligible_for_extraction; extraction/analysis caps false
+  ✓ extract(F2): full evidence but no corpus → corpus_unavailable (not eligible, candidate=1, next-evidence + diag)
+  ✓ extract(G): measuredHandlingResponse/handling/overlay/Kus/modelVsActual caps pinned false (all paths)
+  ✓ extract(H): input contract names required channels (abstract) + segmentation prerequisites
+  ✓ extract(H2): output contract is measured-only proxy — not full Kus / model-vs-actual / setup
+  ✓ extract→confirm: feed WITHOUT corpus → measuredExtractionEligible false; decode caps false
+  ✓ extract→confirm: feed + full prereqs + corpus → measuredExtractionEligible true; decode caps still false
+  ✓ extract→metadata: summary surfaced + extractionEligible false; measuredHandlingResponse/handling/overlay caps false
+  ✓ extract→metadata: no extraction → cap false, summary null
+
+[measured-extraction] .bmsbin synthetic measured-extraction harness
+  ✓ measext(A): no eligibility → not_available; harness/analysis caps false; realDataUsed false
+  ✓ measext(A2): not eligible → blocked_by_eligibility; no segments/tendency; caps false
+  ✓ measext(B): eligible but not syntheticOnly (real path) → blocked_real_path; empty segments; null tendency; realDataUsed false
+  ✓ measext(C): syntheticOnly but no series → insufficient_synthetic_series; null tendency; caps false
+  ✓ measext(D): synthetic series → segmented; cornerCount>0; syntheticOnly true; realDataUsed false
+  ✓ measext(D2): full synthetic series → extracted_synthetic
+  ✓ measext(E): entry/mid/exit window counts > 0
+  ✓ measext(F): steady-state windows > 0; confidence present
+  ✓ measext(G): unstable mid → steady-state blocked (0 steady windows; not extracted_synthetic); caps false
+  ✓ measext(H): tendency proxy marked syntheticOnly/notKus/notSetupAdvice/notModelVsActual; count>0
+  ✓ measext(H2): synthetic ratio → understeer_like / oversteer_like proxy (synthetic proxy only)
+  ✓ measext(I): extracted_synthetic → measuredExtractionSynthetic true; all analysis/real caps false
+  ✓ measext(J): real/blocked path → empty segments, null tendency, syntheticOnly false
+  ✓ measext→confirm: feed WITHOUT corpus/prereqs → measuredExtractionSynthetic false; decode caps false
+  ✓ measext→confirm: feed + full prereqs + corpus → measuredExtractionSynthetic true; decode caps still false
+  ✓ measext→metadata: summary surfaced + measuredExtractionSynthetic false; harness/real/handling/overlay caps false
+  ✓ measext→metadata: no measuredExtraction → cap false, summary null
+  ✓ measext(M): prior phases real path unchanged (eligibility not_eligible, readiness not_ready)
+  ✓ measext(N): empty requiredChannels + empty series → insufficient_synthetic_series (no crash)
+  ✓ measext(O): NaN-interleaved mid speed → steady-state fail-closed (0 steady; not extracted); caps false
+  ✓ measext(P): out-of-range/negative segmentHints rejected; segments stay within bounds; realDataUsed false
+  ✓ measext(Q): extracted confidence is medium|low only
+
+[canonical-adapter] .bmsbin real canonical-series adapter boundary / eligibility gate
+  ✓ cadapter(A): no inputs → not_available; canEnter false; caps false; realDataUsed false
+  ✓ cadapter(B): real path → raw_stream_missing; not eligible; canonicalTelemetry/timeSeries/measuredExtraction false; realDataUsed false
+  ✓ cadapter(C): missing raw stream → raw_stream_missing
+  ✓ cadapter(D): missing identity → identity_missing
+  ✓ cadapter(E): missing timebase → timebase_missing
+  ✓ cadapter(F): missing scaling → scaling_missing
+  ✓ cadapter(G): missing units → units_missing
+  ✓ cadapter(H): missing cross-file corpus → corpus_missing
+  ✓ cadapter(I): all prereqs but not syntheticOnly → adapter_contract_candidate; not eligible; canonicalTelemetry false; realDataUsed false
+  ✓ cadapter(J): all prereqs + corpus + syntheticOnly → synthetic_adapter_ready; eligible true; realDataUsed false; analysis caps false
+  ✓ cadapter(K): NaN/invalid evidence → fail-closed (not synthetic_adapter_ready); caps false
+  ✓ cadapter(L): one-way feed — adapter does not mutate readiness / extraction-eligibility
+  ✓ cadapter→metadata: summary surfaced + canonicalAdapterEligible false; canonicalTelemetry/timeSeries/modelVsActual false
+  ✓ cadapter→metadata: no canonicalAdapter → cap false, summary null
+  ✓ cadapter(N): null/garbage opts → fail-closed (no throw; not synthetic_adapter_ready)
+  ✓ cadapter(O): non-numeric corpus.fileCount → not synthetic_adapter_ready; numeric still works
+
+[private-corpus] .bmsbin private real-corpus boundary / evidence-ingestion policy
+  ✓ pcorpus(A): no inputs → not_available; canUse false; caps false; realDataUsed false
+  ✓ pcorpus(B): manifest but policy disabled → private_corpus_disabled
+  ✓ pcorpus(C): policy on, no manifest → manifest_missing
+  ✓ pcorpus(D): manifest without sanitizedOnly → manifest_invalid
+  ✓ pcorpus(E): rawFilesCommitted → unsafe_manifest
+  ✓ pcorpus(F): rawBytesExposed → unsafe_manifest
+  ✓ pcorpus(G): decodedSequencesExposed → unsafe_manifest
+  ✓ pcorpus(H): fileNamesExposed → unsafe_manifest
+  ✓ pcorpus(I): offsetsExposed → unsafe_manifest
+  ✓ pcorpus(J): fingerprintsExposed → unsafe_manifest
+  ✓ pcorpus(K): fileCount<2 → insufficient_file_count
+  ✓ pcorpus(L): no sanitizedEvidence → sanitized_evidence_missing
+  ✓ pcorpus(M): partial evidence → sanitized_evidence_candidate; no confirmation; caps false
+  ✓ pcorpus(N): safe manifest + complete evidence + policy → private_corpus_boundary_ready; evidence available; ALL confirm/canonical/analysis caps false; realDataUsed false
+  ✓ pcorpus(O): hash / path / fileName / channelNames → manifest_invalid
+  ✓ pcorpus(P): NaN / non-numeric fileCount → fail-closed (not boundary_ready)
+  ✓ pcorpus(Q): one-way — does not mutate manifest / sanitized-evidence inputs
+  ✓ pcorpus→metadata: summary surfaced + privateCorpusEvidenceAvailable false; canonicalTelemetry/timeSeries/modelVsActual false
+  ✓ pcorpus→metadata: no privateCorpus → cap false, summary null
+  ✓ pcorpus(S): truthy non-boolean exposure flag (1 / "true" / {}) → unsafe_manifest
+  ✓ pcorpus(T): path / hash / file-ext in formatFamily / sourceType → manifest_invalid; plain token still ready
+
+[sanitized-evidence-adapter] .bmsbin sanitized-evidence adapter dry-run shape
+  ✓ sadapter(A): no inputs → not_available; canProvide false; caps false; realDataUsed false
+  ✓ sadapter(B): 3G-2 boundary not ready → boundary_not_ready
+  ✓ sadapter(C): boundary ready, no evidence → evidence_missing
+  ✓ sadapter(D): evidence without sanitizedOnly → evidence_invalid
+  ✓ sadapter(E): rawBytesExposed → unsafe_evidence
+  ✓ sadapter(F): decodedSequencesExposed → unsafe_evidence
+  ✓ sadapter(G): fileNamesExposed → unsafe_evidence
+  ✓ sadapter(H): pathsExposed → unsafe_evidence
+  ✓ sadapter(I): offsetsExposed → unsafe_evidence
+  ✓ sadapter(J): fingerprintsExposed → unsafe_evidence
+  ✓ sadapter(K): sampleValuesExposed → unsafe_evidence
+  ✓ sadapter(L): channelNamesExposed → unsafe_evidence
+  ✓ sadapter(M): timingExposed → unsafe_evidence
+  ✓ sadapter(N): hashesExposed → unsafe_evidence
+  ✓ sadapter(O): no scope present → insufficient_scope
+  ✓ sadapter(P): only one scope → partial_adapter_shape; no confirmation; caps false
+  ✓ sadapter(Q): core scopes present, not all → adapter_shape_candidate; no confirmation; caps false
+  ✓ sadapter(R): all scopes + safe + boundary ready → dry_run_ready; shape available; ALL confirm/canonical/analysis caps false; realDataUsed false
+  ✓ sadapter(S): hash / fileName / channelNames key OR leaky/unknown scope → evidence_invalid
+  ✓ sadapter(T): malformed evidence → fail-closed (not dry_run_ready)
+  ✓ sadapter(T2): only-status / only-feed forged boundary → boundary_not_ready (dual check)
+  ✓ sadapter(U): one-way — does not mutate boundary / sanitized-evidence inputs
+  ✓ sadapter→metadata: summary surfaced + adapterEvidenceShapeAvailable false; canonicalTelemetry/timeSeries/modelVsActual false
+  ✓ sadapter→metadata: no sanitizedEvidenceAdapter → cap false, summary null
+  ✓ sadapter(W): canonical gate shape present on every path
+  ✓ sadapter(X): all diagnostic + UI panel keys resolve in EN/繁中/JA (3 each)
+  ✓ sadapter(Y): reporter sanitized — boundary_not_ready, shape-available 0, realDataUsed false, scalar histogram
+  ✓ sadapter(Z): one-way downstream — 3G-2 boundary result unchanged after adapter runs
+
+[invariants] Phase 3 trust-chain red-line invariants
+  ✓ invariant(A): real path fail-closed (readiness not_ready / eligibility not_eligible / measext blocked / hub not_confirmed)
+  ✓ invariant(B): no gated capability true on real path (all layers + every merged-metadata red-line cap === false)
+  ✓ invariant(C): hub pins timeSeries/physicalScaling/handlingCorrelation false
+  ✓ invariant(D): bad/empty input fail-closed (no throw, no gated cap)
+  ✓ invariant(E): reporter summary key set === REPORT_FIELDS; all scalar
+  ✓ invariant(F): reporter error-fallback key set === REPORT_FIELDS (drift guard)
+  ✓ invariant(G): synthetic extracted_synthetic opens only measuredExtractionSynthetic/Harness; realDataUsed false
+  ✓ invariant(H): dual-gate — only-status/only-cap → blocked_by_eligibility; eligible+series w/o syntheticOnly → blocked_real_path
+  ✓ invariant(I): canonical gate shape on 3E-0..3G-0B (status/aggregateDecision/confirmationFeed/capabilities/diagnostics/unknowns)
+  ✓ invariant(J): no proprietary telemetry / vendor binary (.bmsbin/.tir/.pds/...) in repo tree (clean-room #5)
+
+========= 結果: 479 passed, 0 failed =========
+=== telemetry-core synthetic tests ===
+telemetry-core: 67 passed, 0 failed
+=== telemetry-view synthetic tests ===
+telemetry-view: 105 passed, 0 failed
+=== telemetry-plot geometry tests ===
+telemetry-plot: 48 passed, 0 failed
+=== telemetry-interact geometry tests ===
+telemetry-interact: 52 passed, 0 failed
+=== telemetry-yaw synthetic tests ===
+telemetry-yaw: 84 passed, 0 failed
+=== canonical-parameters schema tests ===
+canonical-parameters: 39 passed, 0 failed
+=== parameter-conversions proof tests ===
+parameter-conversions: 38 passed, 0 failed
+=== vehicle-profile-f312 fixture tests ===
+vehicle-profile-f312: 30 passed, 0 failed
+=== setup-snapshot tests ===
+setup-snapshot: 35 passed, 0 failed
+=== analysis-case tests ===
+analysis-case: 43 passed, 0 failed
+=== analysis-case adversarial tests ===
+analysis-case-adversarial: 78 passed, 0 failed
+suspension-input-normalizer: 96 passed, 0 failed
+suspension-input-equivalence: 5020 passed, 0 failed  (raw=1002, observable=501)
+suspension-input-adversarial: 54 passed, 0 failed
+canonical-model-input: 33 passed, 0 failed
+analysis-execution: 29 passed, 0 failed
+telemetry-observation: 33 passed, 0 failed
+model-telemetry-comparison: 24 passed, 0 failed
+race-engineer-insight: 26 passed, 0 failed
+driver-coach-insight: 22 passed, 0 failed
+analysis-workspace: 19 passed, 0 failed
+analysis-workspace-viewmodel: 20 passed, 0 failed
+analysis-workspace-integration: 47 passed, 0 failed
+analysis-workspace-ui: 39 passed, 0 failed
+telemetry-import-adapter: 16 passed, 0 failed
+channel-mapping: 8 passed, 0 failed
+calibration-registry: 26 passed, 0 failed
+analysis-window: 7 passed, 0 failed
+canonical-telemetry-session: 9 passed, 0 failed
+analysis-case-export: 45 passed, 0 failed
+r2.3-real-telemetry-integration: 17 passed, 0 failed
+r2.3-import-ui: 16 passed, 0 failed
+measured-metrics: 16 passed, 0 failed
+r2.4-measured-metrics-integration: 26 passed, 0 failed
+r2.4-ui: 23 passed, 0 failed
+setup-ab: 20 passed, 0 failed
+quantitative-setup-recommendation: 32 passed, 0 failed
+r2.5-setup-ab-quantitative-integration: 25 passed, 0 failed
+r2.5-ui: 36 passed, 0 failed
+track-intelligence: 30 passed, 0 failed
+r2.6-track-intelligence-integration: 22 passed, 0 failed
+r2.6-ui: 15 passed, 0 failed
+case-shell: 24 passed, 0 failed
+r3.0a-ui: 66 passed, 0 failed
+storage-backend: 15 passed, 0 failed
+schema-migration: 9 passed, 0 failed
+case-record-schema: 63 passed, 0 failed
+case-store: 36 passed, 0 failed
+session-store: 12 passed, 0 failed
+case-library-viewmodel: 16 passed, 0 failed
+r3.0b-ui: 55 passed, 0 failed
+r3.0b-persistence-integration: 16 passed, 0 failed
+feature-registry: 27 passed, 0 failed
+feature-router: 20 passed, 0 failed
+vehicle-preset-pipeline: 27 passed, 0 failed
+i18n-parity: 105 passed, 0 failed
+node:fs:3022
+  return binding.mkdtemp(prefix, options.encoding);
+                 ^
+
+Error: EPERM: operation not permitted, mkdtemp '/var/folders/bw/dy9my1ls5sz2fnpxk_yrc0k80000gn/T/r3c-cp1-XXXXXX'
+    at Object.mkdtempSync (node:fs:3022:18)
+    at runScript (/Users/SKYLINE/Claude/projects/racing-setup-analyzer/tests/r3.0c-contract-foundation.test.js:539:18)
+    at /Users/SKYLINE/Claude/projects/racing-setup-analyzer/tests/r3.0c-contract-foundation.test.js:556:20
+    at Object.<anonymous> (/Users/SKYLINE/Claude/projects/racing-setup-analyzer/tests/r3.0c-contract-foundation.test.js:556:355)
+    at Module._compile (node:internal/modules/cjs/loader:1803:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1934:10)
+    at Module.load (node:internal/modules/cjs/loader:1524:32)
+    at Module._load (node:internal/modules/cjs/loader:1326:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24) {
+  errno: -1,
+  code: 'EPERM',
+  syscall: 'mkdtemp',
+  path: '/var/folders/bw/dy9my1ls5sz2fnpxk_yrc0k80000gn/T/r3c-cp1-XXXXXX'
+}
+
+Node.js v25.5.0
+
+exec
+/bin/bash -lc "rg -o \"RN-[0-9]{2}\" tests/r3.0d-evidence-graph.test.js tests/r3.0d-contract-foundation.test.js tests/r3.0d-hardened-intrinsics.test.js | sed 's/.*://' | sort -u | paste -sd ' ' -
+git diff --name-only 70a4f036f10bc9c0cb22e9589c4fca61dbdc4369"'^..70a4f036f10bc9c0cb22e9589c4fca61dbdc4369
+node scripts/check-r3-phase-governance.js --phase r3.0d 2>&1; printf '"'governance_exit=%s\\n' \""'$?"
+node scripts/check-r3-phase-no-consumer.js --phase r3.0d 2>&1; printf '"'no_consumer_exit=%s\\n' \""'$?"
+node scripts/check-r3-phase-governance-integrity.js --phase r3.0d 2>&1; printf '"'integrity_exit=%s\\n' \""'$?"' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 118ms:
+node:fs:2397
+    return binding.writeFileUtf8(
+                   ^
+
+Error: EPERM: operation not permitted, open '/Users/SKYLINE/Claude/projects/racing-setup-analyzer/artifacts/r3-phase-governance-integrity.json'
+    at Object.writeFileSync (node:fs:2397:20)
+    at Object.<anonymous> (/Users/SKYLINE/Claude/projects/racing-setup-analyzer/scripts/check-r3-phase-governance-integrity.js:122:4)
+    at Module._compile (node:internal/modules/cjs/loader:1803:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1934:10)
+    at Module.load (node:internal/modules/cjs/loader:1524:32)
+    at Module._load (node:internal/modules/cjs/loader:1326:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  errno: -1,
+  code: 'EPERM',
+  syscall: 'open',
+  path: '/Users/SKYLINE/Claude/projects/racing-setup-analyzer/artifacts/r3-phase-governance-integrity.json'
+}
+
+Node.js v25.5.0
+integrity_exit=1
+
+exec
+/bin/bash -lc "rg -a -o \"RN-[0-9]{2}\" tests/r3.0d-evidence-graph.test.js tests/r3.0d-contract-foundation.test.js tests/r3.0d-hardened-intrinsics.test.js | sed 's/.*://' | sort -u | paste -sd ' ' -
+rg -a -n \"RN-(0[1-9]|1[0-9]|2[0-9]|30)\" tests/r3.0d-evidence-graph.test.js | wc -l" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+RN-01 RN-02 RN-03 RN-04 RN-05 RN-06 RN-07 RN-08 RN-09 RN-11 RN-13 RN-14 RN-15 RN-16 RN-17 RN-18 RN-19 RN-20 RN-21 RN-22 RN-23 RN-24 RN-25 RN-26 RN-27 RN-28 RN-29 RN-30 RN-31
+     232
+
+codex
+FINAL VERDICT: BLOCK
+
+D2-RN-31: STILL-OPEN  
+  evidence: `deepOriginalShapeAudit` remains mutation-unprotected. Regressing its captured `safeGetPrototypeOf(v)` call to ambient `Object.getPrototypeOf(v)` still passes 71/71, EXIT 0.
+
+Five requested mutations were correctly caught:
+
+- `safeStringToLowerCase`: EXIT 1
+- `safeIsArray`: EXIT 1
+- `safeIsPlainShape`: EXIT 1
+- `safeObjectCreateNull`: EXIT 1
+- `safeObjectAssign`: EXIT 1
+
+Full audit: 29/30 exports produced EXIT 1 under ambient regression. The sole survivor was `deepOriginalShapeAudit`.
+
+RN-01..RN-30 cross-checks passed: D2 261/261 and foundation 160/160. Round 18 contains no production-code changes.
+
+Browser UMD and Node CommonJS both expose exactly 30 frozen functions, no underscored/private captures; browser global is non-writable, non-enumerable, and non-configurable.
+
+No separate NEW finding; this is a surviving RN-31 coverage gap.
+tokens used
+105,331
+FINAL VERDICT: BLOCK
+
+D2-RN-31: STILL-OPEN  
+  evidence: `deepOriginalShapeAudit` remains mutation-unprotected. Regressing its captured `safeGetPrototypeOf(v)` call to ambient `Object.getPrototypeOf(v)` still passes 71/71, EXIT 0.
+
+Five requested mutations were correctly caught:
+
+- `safeStringToLowerCase`: EXIT 1
+- `safeIsArray`: EXIT 1
+- `safeIsPlainShape`: EXIT 1
+- `safeObjectCreateNull`: EXIT 1
+- `safeObjectAssign`: EXIT 1
+
+Full audit: 29/30 exports produced EXIT 1 under ambient regression. The sole survivor was `deepOriginalShapeAudit`.
+
+RN-01..RN-30 cross-checks passed: D2 261/261 and foundation 160/160. Round 18 contains no production-code changes.
+
+Browser UMD and Node CommonJS both expose exactly 30 frozen functions, no underscored/private captures; browser global is non-writable, non-enumerable, and non-configurable.
+
+No separate NEW finding; this is a surviving RN-31 coverage gap.
