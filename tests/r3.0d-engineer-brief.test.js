@@ -610,6 +610,61 @@ console.log('Section R — forbidden output behaviors');
 })();
 
 // ============================================================================================
+// Section S — Formal Codex D Phase Gate closures (D-GATE-01 / D-GATE-02 / D-GATE-03)
+// ============================================================================================
+console.log('Section S — Formal Codex D Phase Gate closures');
+
+// S1 — D-GATE-02 closure: imported_summary path is rejected at D5 brief composition.
+// Build a graph that includes an imported_summary node (at credibility='derived' so D2 allows
+// it); the resulting hs carries LIMITATION_IMPORTED_SUMMARY; D5 brief composition rejects.
+(function () {
+  var ca = { caseId: 'case_S1', sessionId: 'sess_S1', lapId: null };
+  // imported_summary node — D2 allows credibility 'derived' (max for this source per the
+  // IMPORTED_SUMMARY_MAX_CREDIBILITY policy).
+  var n = {
+    schemaVersion: 1, nodeId: 'n_S1_imported', category: 'data_quality',
+    identity: { caseId: 'case_S1', sessionId: 'sess_S1', lapId: null, sourceId: 'imported_summary', sourceVersion: '1.0', freshness: '2026-06-29T00:00:00Z' },
+    credibility: 'derived', provenance: 'unverified', availability: 'available',
+    confidence: { state: 'not_computed' },
+    observation: { kind: 'channel_missing', channel: 'brake', i18nKey: 'k', params: null },
+    limitations: ['LIMITATION_MISSING_CHANNEL'], supportingEdges: [], contradictingEdges: [],
+  };
+  var eg = EG.buildEvidenceGraph({ caseAssociation: ca, rawEvidence: [n] }, { clock: BASE_CLOCK });
+  chk('S1a: D2 accepts imported_summary at credibility=derived', eg.valid === true);
+  // Graph should carry LIMITATION_IMPORTED_SUMMARY.
+  chk('S1b: graph.limitations contains LIMITATION_IMPORTED_SUMMARY',
+    eg.graph.limitations.indexOf('LIMITATION_IMPORTED_SUMMARY') !== -1);
+  // D3 should propagate that limitation into hs.limitations.
+  var hsR = HE.buildHypothesisSet({ graph: eg.graph }, { clock: BASE_CLOCK });
+  chk('S1c: D3 builds; hs.limitations carries LIMITATION_IMPORTED_SUMMARY',
+    hsR.valid === true
+      && hsR.hypothesisSet.limitations.indexOf('LIMITATION_IMPORTED_SUMMARY') !== -1);
+  // D4 should still build (the rejection happens at D5, not earlier).
+  var psR = PE.buildPrioritySet({ hypothesisSet: hsR.hypothesisSet }, { clock: BASE_CLOCK });
+  chk('S1d: D4 builds (no rejection yet)', psR.valid === true);
+  // D5 brief composition MUST reject.
+  var ebR = EB.buildEngineerBrief(Object.freeze({ hypothesisSet: hsR.hypothesisSet, prioritySet: psR.prioritySet }), { clock: BASE_CLOCK });
+  chk('S1e: D5 rejects imported-summary-derived brief composition',
+    ebR.valid !== true);
+  chk('S1f: D5 rejection reasonCodes includes LIMITATION_IMPORTED_SUMMARY',
+    Array.isArray(ebR.reasonCodes) && ebR.reasonCodes.indexOf('LIMITATION_IMPORTED_SUMMARY') !== -1);
+})();
+
+// S2 — D-GATE-01 closure: D3 calls EG.verifyAuthoritativeGraph verifier-first.
+// A hand-crafted (non-WeakSet) graph is rejected by D3 even if its structure is otherwise
+// plausible. The D3 test suite covers this; here we simply prove D5 cannot be tricked by
+// constructing a fake hs (since D5's own verifyAuthoritativeHypothesisSet gate already
+// rejects non-WeakSet hypothesisSets — this is the multi-layer authority chain in action).
+(function () {
+  var pair = _buildDriverHsPs([_baseNode({})]);
+  var fakeHs = {};
+  for (var k in pair.hypothesisSet) fakeHs[k] = pair.hypothesisSet[k];
+  Object.freeze(fakeHs);
+  var r = EB.buildEngineerBrief(Object.freeze({ hypothesisSet: fakeHs, prioritySet: pair.prioritySet }), _opts());
+  chk('S2: cloned hs (non-WeakSet) rejected by D5 verifier-first', r.valid !== true);
+})();
+
+// ============================================================================================
 // Done
 // ============================================================================================
 console.log('R3.0D D5 engineer-brief adversarial suite: ' + pass + ' passed, ' + fail + ' failed');

@@ -387,6 +387,22 @@
         return RC.buildBlockedResult([CODES.STALE_EVIDENCE], { detail: 'prioritySet exceeds max age' });
       }
 
+      // ---- Codex D-GATE-02 closure: reject any imported-summary derived input ----------------
+      // D2 tags graph.limitations with LIMITATION_IMPORTED_SUMMARY when ANY sanitized node
+      // has sourceId === 'imported_summary'. D3 unions per-hypothesis limitations into
+      // hs.limitations. Here at D5 brief composition, we block before producing a brief —
+      // the imported-summary path can never yield an authoritative engineer brief, even at
+      // low credibility, because the engineer brief is a definitive race-engineering
+      // diagnosis surface and an imported summary lacks the raw-evidence chain needed to
+      // make that claim. Per directive §13 (state.imported_summary_opens → blocks).
+      if (HI.safeIsArray(hs.limitations)) {
+        for (var liIS = 0; liIS < hs.limitations.length; liIS++) {
+          if (hs.limitations[liIS] === CODES.LIMITATION_IMPORTED_SUMMARY) {
+            return RC.buildBlockedResult([CODES.LIMITATION_IMPORTED_SUMMARY], { detail: 'imported-summary path cannot yield engineer brief' });
+          }
+        }
+      }
+
       // ---- Step 9 — compose brief --------------------------------------------------------------
       // Find primary priority (by primaryActionId).
       var primaryAction = null;
