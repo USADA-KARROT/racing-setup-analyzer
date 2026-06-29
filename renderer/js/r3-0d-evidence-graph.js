@@ -173,6 +173,51 @@
   var _FunctionPrototypeApply = Function.prototype.apply;
   var _FunctionPrototypeBind = Function.prototype.bind;
   var _ReflectApply = (typeof Reflect !== 'undefined' && Reflect.apply) ? Reflect.apply : null;
+
+  // Codex D-GATE-01 closure: D2 producer-attestation WeakSet (matches D3/D4/D5 pattern).
+  // The graph object reference is registered ONLY at the very last line of buildEvidenceGraph,
+  // AFTER full validation + deep-freeze. The narrow verifier `verifyAuthoritativeGraph`
+  // is exposed as the trust anchor for D3 (replacing the public graphId-recompute
+  // authentication that Codex flagged as forgeable when the hash is also public).
+  var _WeakSetCtorEG = WeakSet;
+  var _WS_ADD_EG = WeakSet.prototype.add;
+  var _WS_HAS_EG = WeakSet.prototype.has;
+  function _wsAddEG(set, value) {
+    try {
+      if (_ReflectApply) _ReflectApply(_WS_ADD_EG, set, [value]);
+      else set.add(value);
+      return true;
+    } catch (e) { return false; }
+  }
+  function _wsHasEG(set, value) {
+    try {
+      if (_ReflectApply) return _ReflectApply(_WS_HAS_EG, set, [value]) === true;
+      return set.has(value) === true;
+    } catch (e) { return false; }
+  }
+  var _authoritativeGraphs = new _WeakSetCtorEG();
+  function _registerAuthoritativeGraph(graph) { _wsAddEG(_authoritativeGraphs, graph); }
+  function verifyAuthoritativeGraph(candidate) {
+    // Fail-closed identity-only verifier. Captured WeakSet.prototype.has + captured
+    // Reflect.apply defeat post-load `WeakSet.prototype.has = () => true` AND
+    // `Reflect.apply = ...` rebinds. Identity-only membership → no [[Get]] traps on
+    // a Proxy candidate before rejection.
+    try {
+      if (candidate === null || typeof candidate !== 'object') return false;
+      if (!_wsHasEG(_authoritativeGraphs, candidate)) return false;
+      if (_ObjectFreeze !== Object.freeze) { /* defense-in-depth: continue using captured */ }
+      // Belt-and-suspenders structural integrity.
+      var isFrozen;
+      try { isFrozen = Object.isFrozen(candidate); } catch (e) { isFrozen = false; }
+      if (isFrozen !== true) return false;
+      if (candidate.schemaVersion !== GRAPH_SCHEMA_VERSION) return false;
+      if (typeof candidate.graphId !== 'string') return false;
+      if (!(_ReflectApply
+            ? _ReflectApply(_ArrayIsArray, null, [candidate.nodes]) === true
+            : _ArrayIsArray(candidate.nodes) === true)) return false;
+      return true;
+    } catch (e) { return false; }
+  }
   var _ReflectOwnKeys = (typeof Reflect !== 'undefined' && Reflect.ownKeys) ? Reflect.ownKeys : null;
   var _JSONStringify = JSON.stringify;
   var _GlobalThis = (typeof globalThis !== 'undefined') ? globalThis : (typeof root !== 'undefined' ? root : (typeof window !== 'undefined' ? window : null));
@@ -1291,6 +1336,20 @@
           if (!limSeen[lims[lj]]) { limSeen[lims[lj]] = true; _arrPush(limitations, lims[lj]); }
         }
       }
+      // Codex D-GATE-02 closure: if ANY sanitized node references the imported_summary
+      // source, propagate LIMITATION_IMPORTED_SUMMARY into graph.limitations. D3 carries
+      // it into hypothesisSet.limitations; D5 rejects the brief at composition time so
+      // the imported-summary path never yields an authoritative engineer brief.
+      for (var liIs = 0; liIs < nodesOut.length; liIs++) {
+        var nIs = nodesOut[liIs];
+        if (nIs && nIs.identity && nIs.identity.sourceId === IMPORTED_SUMMARY_SOURCE_ID) {
+          if (!limSeen[CODES.LIMITATION_IMPORTED_SUMMARY]) {
+            limSeen[CODES.LIMITATION_IMPORTED_SUMMARY] = true;
+            _arrPush(limitations, CODES.LIMITATION_IMPORTED_SUMMARY);
+          }
+          break;
+        }
+      }
       if (nodesOut.length === 0) {
         if (_arrIndexOf(cannotConclude, CODES.INSUFFICIENT_EVIDENCE) === -1) _arrPush(cannotConclude, CODES.INSUFFICIENT_EVIDENCE);
       }
@@ -1396,6 +1455,10 @@
         contextVersion: contextVersion,
       });
 
+      // Codex D-GATE-01 closure: register the fully-validated + deep-frozen graph as
+      // D2-authoritative. Blocked / partial results never reach this line.
+      _registerAuthoritativeGraph(graph);
+
       return HI.deepFreeze({ valid: true, graph: graph });
     } catch (e) {
       return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'buildEvidenceGraph threw on hostile input' });
@@ -1419,7 +1482,20 @@
     IMPORTED_SUMMARY_SOURCE_ID: IMPORTED_SUMMARY_SOURCE_ID,
     IMPORTED_SUMMARY_MAX_CREDIBILITY: IMPORTED_SUMMARY_MAX_CREDIBILITY,
     buildEvidenceGraph: buildEvidenceGraph,
+    // Codex D-GATE-01 closure: narrow producer-attestation verifier for D3 (and any future
+    // consumer) to verify a D2 graph snapshot identity. WeakSet-based; identity-only;
+    // never throws; never reveals the registry.
+    verifyAuthoritativeGraph: verifyAuthoritativeGraph,
   };
+  // Codex D-GATE-04 closure: freeze the exported API so a post-load attacker cannot
+  // replace `verifyAuthoritativeGraph` with `() => true` to bypass D3's verifier-first
+  // check. Combined with D3 capturing the function reference at its module init, this
+  // gives end-to-end producer-attestation guarantees that survive ambient rebind attacks.
+  try { _ObjectFreeze(api); } catch (e) { /* swallow */ }
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  if (root) root.R3_0D_EvidenceGraph = api;
+  if (root) {
+    try {
+      _ObjectDefineProperty(root, 'R3_0D_EvidenceGraph', { value: api, writable: false, enumerable: false, configurable: false });
+    } catch (e) { root.R3_0D_EvidenceGraph = api; }
+  }
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -134,6 +134,10 @@
     catch (e) { return false; }
   }
   var _authoritativePrioritySets = new _WeakSetCtor();
+  // Codex D-GATE-03 closure: capture Array.isArray at module init so post-load rebinds
+  // cannot affect the verifier.
+  var _CAPTURED_ARRAY_IS_ARRAY = Array.isArray;
+  function _isArraySafePE(v) { try { return _CAPTURED_ARRAY_IS_ARRAY(v) === true; } catch (e) { return false; } }
   function _registerAuthoritativePrioritySet(prioritySet) {
     _wsAdd(_authoritativePrioritySets, prioritySet);
   }
@@ -151,7 +155,8 @@
       if (typeof candidate.prioritySetId !== 'string') return false;
       if (typeof candidate.sourceHypothesisSetId !== 'string') return false;
       if (typeof candidate.sourceGraphId !== 'string') return false;
-      if (!Array.isArray(candidate.priorities)) return false;
+      // Codex D-GATE-03 closure: captured Array.isArray defeats ambient rebind.
+      if (!_isArraySafePE(candidate.priorities)) return false;
       return true;
     } catch (e) { return false; }
   }

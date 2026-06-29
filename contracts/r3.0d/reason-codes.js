@@ -101,6 +101,12 @@
     // Limitations (bounded honesty)
     LIMITATION_MISSING_CHANNEL: 'LIMITATION_MISSING_CHANNEL',
     LIMITATION_SYNTHETIC_ONLY: 'LIMITATION_SYNTHETIC_ONLY',
+    // Codex D-GATE-02 closure: D2 propagates this limitation whenever the sanitized graph
+    // contains ANY node with sourceId === 'imported_summary'; D3 carries it into the
+    // hypothesisSet.limitations union; D5 service rejects the brief at composition time
+    // (the imported-summary path can never produce an authoritative engineer brief, even
+    // if its credibility is below 'measured').
+    LIMITATION_IMPORTED_SUMMARY: 'LIMITATION_IMPORTED_SUMMARY',
     LIMITATION_UNCALIBRATED_INPUT: 'LIMITATION_UNCALIBRATED_INPUT',
     LIMITATION_HEURISTIC_ONLY: 'LIMITATION_HEURISTIC_ONLY',
     LIMITATION_SINGLE_LAP_SAMPLE: 'LIMITATION_SINGLE_LAP_SAMPLE',

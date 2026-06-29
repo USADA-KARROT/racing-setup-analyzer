@@ -37,7 +37,7 @@
   // ---------- Module-init capture: hardened intrinsics ------------------------------------------
   // UMD imports use literal-string specifiers below so the no-consumer scanner can statically
   // discover all dependencies.
-  var HI = null, RC = null, CR = null, HC = null, EN = null, SI = null;
+  var HI = null, RC = null, CR = null, HC = null, EN = null, SI = null, EG = null;
   if (typeof module !== 'undefined' && module.exports) {
     try { HI = require('../../contracts/r3.0d/hardened-intrinsics.js'); } catch (e) { HI = null; }
     try { RC = require('../../contracts/r3.0d/reason-codes.js'); } catch (e) { RC = null; }
@@ -45,6 +45,11 @@
     try { HC = require('../../contracts/r3.0d/hypothesis-contract.js'); } catch (e) { HC = null; }
     try { EN = require('../../contracts/r3.0d/evidence-node-contract.js'); } catch (e) { EN = null; }
     try { SI = require('../../contracts/r3.0d/source-identity-contract.js'); } catch (e) { SI = null; }
+    // Codex D-GATE-01 closure: D3 must consume D2 producer attestation via
+    // EG.verifyAuthoritativeGraph. Optional require — the verifier-first call below
+    // is the load-bearing change; if EG is somehow unavailable the existing
+    // structural validation continues to apply as defense-in-depth.
+    try { EG = require('./r3-0d-evidence-graph.js'); } catch (e) { EG = null; }
   }
   if (HI === null && typeof R3_0D_HardenedIntrinsics !== 'undefined') HI = R3_0D_HardenedIntrinsics;
   if (RC === null && typeof R3_0D_ReasonCodes !== 'undefined') RC = R3_0D_ReasonCodes;
@@ -52,10 +57,21 @@
   if (HC === null && typeof R3_0D_HypothesisContract !== 'undefined') HC = R3_0D_HypothesisContract;
   if (EN === null && typeof R3_0D_EvidenceNodeContract !== 'undefined') EN = R3_0D_EvidenceNodeContract;
   if (SI === null && typeof R3_0D_SourceIdentityContract !== 'undefined') SI = R3_0D_SourceIdentityContract;
+  if (EG === null && typeof R3_0D_EvidenceGraph !== 'undefined') EG = R3_0D_EvidenceGraph;
 
   if (!HI || !RC || !CR || !HC || !EN || !SI) {
     throw new Error('r3-0d-hypothesis-engine.js: missing one or more required R3.0D contracts');
   }
+  // Codex D-GATE-04 closure: EG.verifyAuthoritativeGraph is MANDATORY, and the function
+  // reference is captured at D3 module init so a post-load rebind of the EG export cannot
+  // bypass the verifier-first gate. D2's API is deep-frozen and (in the browser) installed
+  // via defineProperty with writable=false, configurable=false. If the verifier is not a
+  // function at D3 load time, this throws — the engine refuses to operate without an
+  // authoritative D2 attestation path.
+  if (!EG || typeof EG.verifyAuthoritativeGraph !== 'function') {
+    throw new Error('r3-0d-hypothesis-engine.js: requires r3-0d-evidence-graph.js with verifyAuthoritativeGraph');
+  }
+  var _CAPTURED_EG_VERIFY_GRAPH = EG.verifyAuthoritativeGraph;
 
   var CODES = RC.REASON_CODES;
 
@@ -104,6 +120,10 @@
     catch (e) { return false; }
   }
   var _authoritativeHypothesisSets = new _WeakSetCtor();
+  // Codex D-GATE-03 closure: capture Array.isArray at module init so post-load rebinds
+  // (Array.isArray = () => true / Array.isArray = () => false) cannot affect the verifier.
+  var _CAPTURED_ARRAY_IS_ARRAY = Array.isArray;
+  function _isArraySafe(v) { try { return _CAPTURED_ARRAY_IS_ARRAY(v) === true; } catch (e) { return false; } }
   function _registerAuthoritative(hypothesisSet) {
     _wsAdd(_authoritativeHypothesisSets, hypothesisSet);
   }
@@ -120,7 +140,8 @@
       if (candidate.schemaVersion !== HYPOTHESIS_SET_SCHEMA_VERSION) return false;
       if (typeof candidate.hypothesisSetId !== 'string') return false;
       if (typeof candidate.sourceGraphId !== 'string') return false;
-      if (!Array.isArray(candidate.hypotheses)) return false;
+      // Codex D-GATE-03 closure: use captured Array.isArray to defeat ambient rebind.
+      if (!_isArraySafe(candidate.hypotheses)) return false;
       return true;
     } catch (e) { return false; }
   }
@@ -1635,6 +1656,23 @@
       }
 
       // ---- Step 2 — graph authority verification ----
+      // Codex D-GATE-01 closure: verifier-first ordering. Before any structural clone or
+      // graphId recompute reads the candidate's properties, ask D2 whether THIS object
+      // reference is in its closure-private WeakSet. Identity-only check; no [[Get]]
+      // traps fire on a hostile Proxy non-member. If EG is unavailable (extremely
+      // narrow path: EG module didn't load) the legacy structural validation is the
+      // fallback — it still catches forged graphs via structuredClone + audit + graphId
+      // recompute, just without the producer-attestation gate.
+      // Codex D-GATE-04 closure: call the captured verifier (not EG.verifyAuthoritativeGraph
+      // looked up via ambient EG). A post-load rebind of the EG export cannot reach this
+      // captured reference. The verifier itself uses captured Reflect.apply on captured
+      // WeakSet.prototype.has, so prototype rebinding is also defeated.
+      if (_CAPTURED_EG_VERIFY_GRAPH(inputSnap.graph) !== true) {
+        // Use HYPOTHESIS_AUTHORITY_FORGED — same reason code D4→D5 uses for failed
+        // producer-attestation. Existing D3 tests already expect this code for
+        // fabricated / tampered graph scenarios.
+        return RC.buildBlockedResult([CODES.HYPOTHESIS_AUTHORITY_FORGED], { detail: 'D2 graph producer-attestation failed' });
+      }
       var authority = _validateAuthoritativeGraph(inputSnap.graph, refNowMs, maxAgeMs);
       if (authority.valid !== true) {
         return RC.buildBlockedResult(authority.reasonCodes, { detail: 'authority verification failed' });
@@ -1742,6 +1780,24 @@
       if (rulesFired === 0 && !_setHas(ccSeen, CODES.INSUFFICIENT_EVIDENCE)) {
         _setAdd(ccSeen, CODES.INSUFFICIENT_EVIDENCE);
         _arrPush(snapshotCannotConclude, CODES.INSUFFICIENT_EVIDENCE);
+      }
+
+      // Codex D-GATE-02 closure: D3 derives LIMITATION_IMPORTED_SUMMARY from graph.nodes
+      // (NOT graph.limitations, which RN-01 forbids trusting). The presence of an
+      // imported_summary sourceId on ANY node IS bound to graphId (via the node hash
+      // projection in D2's idPayload), so this signal is authority-bound and safe to
+      // consume. D5 brief composition rejects any envelope whose hs.limitations carries
+      // this code.
+      if (CODES.LIMITATION_IMPORTED_SUMMARY
+          && !_setHas(limSeen, CODES.LIMITATION_IMPORTED_SUMMARY)) {
+        for (var nIdx = 0; nIdx < graph.nodes.length; nIdx++) {
+          var nrec = graph.nodes[nIdx];
+          if (nrec && nrec.identity && nrec.identity.sourceId === 'imported_summary') {
+            _setAdd(limSeen, CODES.LIMITATION_IMPORTED_SUMMARY);
+            _arrPush(snapshotLimitations, CODES.LIMITATION_IMPORTED_SUMMARY);
+            break;
+          }
+        }
       }
 
       // ---- Step 4 — caps & sort ----
