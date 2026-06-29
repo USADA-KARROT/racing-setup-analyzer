@@ -1238,13 +1238,52 @@
     var hash = _hashFNV64Hex('actionid|v1|' + hypothesisId + '|' + suffix);
     return 'act_' + hash;
   }
+  // Codex D4 R2 D4-R2-01 closure: per-hypothesis CONTENT SIGNATURE binding ALL decision-relevant
+  // fields. D3 emits this signature on every hypothesis; D4 recomputes it on the cloned snapshot
+  // and verifies equality, plus uses it in hypothesisSetId so the snapshot identity binds full
+  // content (not just rule + evidence IDs). The hypothesisId continues to bind only the
+  // (ruleId, supportingEvidenceIds, contradictingEvidenceIds) tuple — that's its semantic role
+  // (a stable identity across re-derivations from the same evidence). The contentSignature is
+  // the integrity proof that the rest of the fields were emitted by D3, not mutated by a caller.
+  function _contentSignature(hypothesisObj, schemaVersion) {
+    var contentMaterial = {
+      v: schemaVersion,
+      hid: hypothesisObj.hypothesisId,
+      ruleId: hypothesisObj.ruleId,
+      ruleVersion: hypothesisObj.ruleVersion,
+      category: hypothesisObj.category,
+      status: hypothesisObj.status,
+      i18nKey: hypothesisObj.i18nKey,
+      credibility: hypothesisObj.credibility,
+      conf: {
+        state: hypothesisObj.confidence && hypothesisObj.confidence.state,
+        score: hypothesisObj.confidence && hypothesisObj.confidence.score,
+      },
+      sup: hypothesisObj.supportingEvidenceIds,
+      con: hypothesisObj.contradictingEvidenceIds,
+      corr: hypothesisObj.correlationGroupIds,
+      alts: hypothesisObj.alternativeExplanationIds,
+      cc: hypothesisObj.cannotConcludeReasonCodes,
+      acts: hypothesisObj.validationActionIds,
+      lims: hypothesisObj.limitations,
+    };
+    return 'csig_' + _hashFNV64Hex('contentsig|v' + schemaVersion + '|' + HI.stableStringify(contentMaterial));
+  }
+
   function _hypothesisSetId(graphId, hypotheses, schemaVersion) {
+    // hsetId now binds BOTH hypothesisId AND contentSignature (Codex D4 R2 D4-R2-01 closure).
+    // A caller mutating any decision-relevant field on a hypothesis (status, credibility,
+    // confidence, ruleVersion, ...) changes that hypothesis's contentSignature, which changes
+    // hsetId. D4 can detect this by recomputing hsetId from the cloned hypothesisSet's content.
+    var pairs = HI.safeArrayMap(hypotheses, function (h) {
+      return { hid: h.hypothesisId, csig: h.contentSignature };
+    });
+    HI.safeArraySort(pairs, function (a, b) { return _strcmp(a.hid, b.hid); });
     var hashMaterial = {
       v: schemaVersion,
       graphId: graphId,
-      hyps: HI.safeArrayMap(hypotheses, function (h) { return h.hypothesisId; }),
+      pairs: pairs,
     };
-    HI.safeArraySort(hashMaterial.hyps, _strcmp);
     var hash = _hashFNV64Hex('hypothesissetid|v' + schemaVersion + '|' + HI.stableStringify(hashMaterial));
     return 'hset_' + hash;
   }
@@ -1295,6 +1334,40 @@
       ? _truncSortedCopy(altIds, ALT_ID_PER_HYPOTHESIS_CAP)
       : HI.safeArraySlice(altIds);
 
+    var supportingFrozen = HI.deepFreeze(supportingCapped);
+    var contradictingFrozen = HI.deepFreeze(contradictingCapped);
+    var corrGroupFrozen = HI.deepFreeze(HI.safeArraySlice(evalResult.correlationGroupIds));
+    var altIdsFrozen = HI.deepFreeze(altIdsCapped);
+    var cannotConcludeFrozen = HI.deepFreeze([]);
+    var actIdsFrozen = HI.deepFreeze(HI.safeArraySlice(actIds));
+    var confidenceFrozen = HI.deepFreeze({
+      state: evalResult.confidenceState,
+      score: evalResult.confidenceScore,
+    });
+    var limitationsFrozen = HI.deepFreeze(HI.safeArraySlice(evalResult.limitations));
+
+    // Codex D4 R2 D4-R2-01 closure: compute contentSignature over the full hypothesis content
+    // BEFORE freezing the envelope. The signature binds all decision-relevant fields so a
+    // caller cannot mutate any of them without changing the signature (and thus hsetId).
+    var draftForSig = {
+      hypothesisId: hid,
+      ruleId: rule.ruleId,
+      ruleVersion: rule.ruleVersion,
+      category: rule.category,
+      status: evalResult.status,
+      i18nKey: rule.i18nKey,
+      supportingEvidenceIds: supportingFrozen,
+      contradictingEvidenceIds: contradictingFrozen,
+      correlationGroupIds: corrGroupFrozen,
+      alternativeExplanationIds: altIdsFrozen,
+      cannotConcludeReasonCodes: cannotConcludeFrozen,
+      validationActionIds: actIdsFrozen,
+      credibility: evalResult.aggregateCredibility,
+      confidence: confidenceFrozen,
+      limitations: limitationsFrozen,
+    };
+    var contentSig = _contentSignature(draftForSig, HYPOTHESIS_SET_SCHEMA_VERSION);
+
     var hyp = HI.deepFreeze({
       hypothesisId: hid,
       ruleId: rule.ruleId,
@@ -1302,18 +1375,16 @@
       category: rule.category,
       status: evalResult.status,
       i18nKey: rule.i18nKey,
-      supportingEvidenceIds: HI.deepFreeze(supportingCapped),
-      contradictingEvidenceIds: HI.deepFreeze(contradictingCapped),
-      correlationGroupIds: HI.deepFreeze(HI.safeArraySlice(evalResult.correlationGroupIds)),
-      alternativeExplanationIds: HI.deepFreeze(altIdsCapped),
-      cannotConcludeReasonCodes: HI.deepFreeze([]),
-      validationActionIds: HI.deepFreeze(HI.safeArraySlice(actIds)),
+      supportingEvidenceIds: supportingFrozen,
+      contradictingEvidenceIds: contradictingFrozen,
+      correlationGroupIds: corrGroupFrozen,
+      alternativeExplanationIds: altIdsFrozen,
+      cannotConcludeReasonCodes: cannotConcludeFrozen,
+      validationActionIds: actIdsFrozen,
       credibility: evalResult.aggregateCredibility,
-      confidence: HI.deepFreeze({
-        state: evalResult.confidenceState,
-        score: evalResult.confidenceScore,
-      }),
-      limitations: HI.deepFreeze(HI.safeArraySlice(evalResult.limitations)),
+      confidence: confidenceFrozen,
+      limitations: limitationsFrozen,
+      contentSignature: contentSig,
       provenance: HI.deepFreeze({
         ruleId: rule.ruleId,
         ruleVersion: rule.ruleVersion,
@@ -1752,6 +1823,12 @@
   // intrinsic) for consistency with every other freeze in this module — no ambient calls.
   try { HI.deepFreeze(api); } catch (e) { /* swallow — best-effort */ }
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  if (root) root.R3_0D_HypothesisEngine = api;
+  // Codex D4 R2 D4-R2-05 closure: under CommonJS (Node test runners, Electron renderer
+  // require), expose ONLY via module.exports — avoid polluting globalThis. The renderer
+  // browser path (no module.exports) still gets the global for ad-hoc script-tag loading.
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = api;
+  } else if (root) {
+    root.R3_0D_HypothesisEngine = api;
+  }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
