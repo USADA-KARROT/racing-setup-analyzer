@@ -88,12 +88,15 @@
   // Closed confidence state enum (matches D3 export).
   var CONFIDENCE_STATE_ALLOWED = HI.deepFreeze(['not_computed', 'insufficient_evidence', 'low', 'moderate', 'high']);
   // Closed key set for D3 hypothesis (Codex D4 R1 D4-R1-03 closure: extra keys rejected).
+  // Codex D4 R2 D4-R2-03 closure: D3 now emits a contentSignature on every hypothesis (binds
+  // full decision-relevant content); D4 includes it in the closed key set and recomputes it.
   var HYPOTHESIS_KEYS_ALLOWED = HI.deepFreeze([
     'hypothesisId', 'ruleId', 'ruleVersion', 'category', 'status', 'i18nKey',
     'supportingEvidenceIds', 'contradictingEvidenceIds', 'correlationGroupIds',
     'alternativeExplanationIds', 'cannotConcludeReasonCodes', 'validationActionIds',
-    'credibility', 'confidence', 'limitations', 'provenance',
+    'credibility', 'confidence', 'limitations', 'contentSignature', 'provenance',
   ]);
+  var CONFIDENCE_KEYS_ALLOWED = HI.deepFreeze(['state', 'score']);
   // Closed key set for D3 hypothesis-set top-level.
   var HSET_KEYS_ALLOWED = HI.deepFreeze([
     'schemaVersion', 'hypothesisSetId', 'sourceGraphId', 'caseAssociation', 'sessionAssociation',
@@ -213,6 +216,55 @@
 
   // ---------- Helpers (HI-only) -----------------------------------------------------------------
   function _isNonEmptyString(v) { return typeof v === 'string' && v.length > 0; }
+  // Codex D4 R2 D4-R2-02 closure: recursive descriptor audit. Walks the object/array tree
+  // via descriptor reads only — never invokes a [[Get]] trap. Rejects any non-data
+  // descriptor (accessor with get/set), any Symbol-keyed own property, any non-enumerable
+  // own property, any non-plain nested value (class instance, Proxy presents with prototype
+  // != Object.prototype or Array.prototype). Bounded depth=32 + total nodes=4096.
+  var _MAX_AUDIT_DEPTH = 32;
+  var _MAX_AUDIT_NODES = 4096;
+  function _recursiveDescriptorAudit(rootValue) {
+    var visited = 0;
+    function _walk(v, depth) {
+      if (depth > _MAX_AUDIT_DEPTH) return false;
+      visited += 1;
+      if (visited > _MAX_AUDIT_NODES) return false;
+      if (v === null) return true;
+      var t = typeof v;
+      if (t === 'string' || t === 'boolean') return true;
+      if (t === 'number') return HI.safeNumberIsFinite(v) === true;
+      if (t === 'undefined') return true;
+      if (t === 'function' || t === 'symbol' || t === 'bigint') return false;
+      if (t !== 'object') return false;
+      // Must be plain object or plain array (proto = Object.prototype / Array.prototype / null).
+      var shape = HI.safeIsPlainShape(v);
+      if (shape === 'reject') return false;
+      var keys = HI.safeOwnKeys(v);
+      if (keys === null) return false;
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        if (typeof k === 'symbol') return false;
+        var d = HI.safeGetOwnDescriptor(v, k);
+        if (!d) return false;
+        if (!('value' in d)) return false;  // accessor descriptor (get/set)
+        if (shape === 'plain-array') {
+          // Array elements are enumerable by default; `length` is non-enumerable but is OK.
+          if (k === 'length') {
+            // Array.length is a data descriptor; allow.
+          } else if (!d.enumerable) {
+            return false;
+          }
+        } else {
+          if (!d.enumerable) return false;
+        }
+        if (!_walk(d.value, depth + 1)) return false;
+      }
+      return true;
+    }
+    var ok = false;
+    try { ok = _walk(rootValue, 0); } catch (e) { ok = false; }
+    return { ok: ok, visited: visited };
+  }
   function _isFiniteNumber(v) { return typeof v === 'number' && HI.safeNumberIsFinite(v) === true; }
   function _isInteger(v) { return HI.safeNumberIsInteger(v) === true; }
   function _isPlainObject(v) { return HI.safeIsPlainShape(v) === 'plain-object'; }
@@ -248,12 +300,18 @@
 
   // ---------- D3 Hypothesis Set authority verification -----------------------------------------
   function _recomputeHypothesisSetId(hsetClone) {
+    // Codex D4 R2 D4-R2-01 closure: mirror D3's NEW hsetId formula which binds (hid, csig)
+    // pairs sorted by hid. Caller mutating any decision-relevant field on any hypothesis
+    // changes that hypothesis's contentSignature, which changes hsetId.
+    var pairs = HI.safeArrayMap(hsetClone.hypotheses, function (h) {
+      return { hid: h.hypothesisId, csig: h.contentSignature };
+    });
+    HI.safeArraySort(pairs, function (a, b) { return _strcmp(a.hid, b.hid); });
     var hashMaterial = {
       v: hsetClone.schemaVersion,
       graphId: hsetClone.sourceGraphId,
-      hyps: HI.safeArrayMap(hsetClone.hypotheses, function (h) { return h.hypothesisId; }),
+      pairs: pairs,
     };
-    HI.safeArraySort(hashMaterial.hyps, _strcmp);
     return 'hset_' + _hashFNV64Hex('hypothesissetid|v' + hsetClone.schemaVersion + '|' + HI.stableStringify(hashMaterial));
   }
 
@@ -264,26 +322,17 @@
     if (!_isFrozenSafe(hsIn)) {
       return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
     }
-    // Codex D4 R1 D4-R1-02 closure: top-level descriptor audit BEFORE clone — rejects
-    // accessor descriptors on any of hsIn's top-level fields (e.g. createdAt getter).
-    // structuredClone fires accessor [[Get]] traps; pre-clone rejection prevents that.
-    var hsInOwn = HI.safeOwnKeys(hsIn);
-    if (hsInOwn === null) {
+    // Codex D4 R2 D4-R2-02 closure: RECURSIVE descriptor audit BEFORE clone. The previous
+    // top-level audit missed nested accessors (e.g. a getter on a hypothesis's status field
+    // would fire during structuredClone before the post-clone audit could see anything).
+    // The recursive audit walks every nested plain object / array via descriptor reads ONLY
+    // (no value-coerced reads on accessors). Any accessor descriptor / Symbol key /
+    // non-enumerable own key / non-plain object encountered → reject. The walk is bounded
+    // by depth (32 levels) and total node count (4096) to defend against deep/wide hostile
+    // inputs.
+    var recursiveAudit = _recursiveDescriptorAudit(hsIn);
+    if (!recursiveAudit.ok) {
       return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
-    }
-    for (var hsi = 0; hsi < hsInOwn.length; hsi++) {
-      var hsk = hsInOwn[hsi];
-      if (typeof hsk === 'symbol') {
-        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
-      }
-      var hsDesc = HI.safeGetOwnDescriptor(hsIn, hsk);
-      if (!hsDesc) continue;
-      if (!('value' in hsDesc)) {
-        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
-      }
-      if (!hsDesc.enumerable) {
-        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
-      }
     }
     var hs = HI.safeStructuredClone(hsIn);
     if (hs === null || !_isPlainObject(hs)) {
@@ -401,7 +450,11 @@
       if (expectedHid !== h.hypothesisId) {
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
       }
-      // Cross-field consistency with rule (Codex D4 R1 D4-R1-01 closure continued).
+      // Cross-field consistency with rule (Codex D4 R1 D4-R1-01 + R2 D4-R2-03 closure).
+      // ruleVersion MUST match rule registry (Codex D4 R2 D4-R2-03 closure: previously not validated).
+      if (h.ruleVersion !== rule.ruleVersion) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      }
       if (h.category !== rule.category) {
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_CATEGORY_UNKNOWN] };
       }
@@ -416,8 +469,16 @@
         // Credibility weaker than rule allows → invalid (D3 wouldn't have emitted this)
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
       }
+      // Confidence: closed key set + closed state enum + integer score (Codex D4 R2 D4-R2-03 closure).
       if (!_isPlainObject(h.confidence)) {
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      }
+      var confKeys = HI.safeOwnKeys(h.confidence);
+      if (confKeys === null) return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      for (var cki = 0; cki < confKeys.length; cki++) {
+        if (HI.safeArrayIndexOf(CONFIDENCE_KEYS_ALLOWED, confKeys[cki]) === -1) {
+          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY] };
+        }
       }
       if (HI.safeArrayIndexOf(CONFIDENCE_STATE_ALLOWED, h.confidence.state) === -1) {
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
@@ -427,6 +488,41 @@
           || h.confidence.score < 0
           || h.confidence.score > 100) {
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      }
+      // correlationGroupIds: plain array of strings (Codex D4 R2 D4-R2-03 closure).
+      if (!_isPlainArray(h.correlationGroupIds)) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      }
+      // contentSignature: present, well-formed string, and EQUAL to D3's recomputed signature
+      // (Codex D4 R2 D4-R2-01 closure). This binds ALL decision-relevant fields.
+      if (!_isNonEmptyString(h.contentSignature)
+          || !HI.safeRegExpTest(/^csig_[0-9a-f]{16}$/, h.contentSignature)) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+      }
+      var sigMaterial = {
+        v: hs.schemaVersion,
+        hid: h.hypothesisId,
+        ruleId: h.ruleId,
+        ruleVersion: h.ruleVersion,
+        category: h.category,
+        status: h.status,
+        i18nKey: h.i18nKey,
+        credibility: h.credibility,
+        conf: {
+          state: h.confidence && h.confidence.state,
+          score: h.confidence && h.confidence.score,
+        },
+        sup: h.supportingEvidenceIds,
+        con: h.contradictingEvidenceIds,
+        corr: h.correlationGroupIds,
+        alts: _isPlainArray(h.alternativeExplanationIds) ? h.alternativeExplanationIds : [],
+        cc: _isPlainArray(h.cannotConcludeReasonCodes) ? h.cannotConcludeReasonCodes : [],
+        acts: _isPlainArray(h.validationActionIds) ? h.validationActionIds : [],
+        lims: h.limitations,
+      };
+      var expectedSig = 'csig_' + _hashFNV64Hex('contentsig|v' + hs.schemaVersion + '|' + HI.stableStringify(sigMaterial));
+      if (expectedSig !== h.contentSignature) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
       }
       if (HI.safeArrayIndexOf(HYPOTHESIS_STATUS_ALLOWED, h.status) === -1) {
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
@@ -969,6 +1065,10 @@
   };
   try { HI.deepFreeze(api); } catch (e) { /* swallow */ }
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  if (root) root.R3_0D_PriorityEngine = api;
+  // Codex D4 R2 D4-R2-05 closure: under CommonJS, expose ONLY via module.exports.
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = api;
+  } else if (root) {
+    root.R3_0D_PriorityEngine = api;
+  }
 })(typeof globalThis !== 'undefined' ? globalThis : this);

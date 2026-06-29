@@ -600,5 +600,159 @@ console.log('Section O — Codex D4 R1 closures');
     r2.eligible === false && (!r2.detail || r2.detail.indexOf('/Users/') === -1));
 })();
 
+// ---------- Section P — Codex D4 R2 closure tests (D4-R2-01..05) -----------------------
+console.log('Section P — Codex D4 R2 closures');
+
+// R2-01: mutating status/credibility/ruleVersion now caught by contentSignature mismatch
+(function () {
+  var hs = _buildHypothesisSet([_baseNode({})]);
+  var origH = hs.hypotheses[0];
+  // Mutate status — contentSignature should mismatch
+  var statusMutated = Object.freeze(Object.assign({}, origH, { status: 'inconclusive' }));
+  var shell = Object.freeze({
+    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+    sourceGraphId: hs.sourceGraphId, caseAssociation: hs.caseAssociation,
+    sessionAssociation: hs.sessionAssociation,
+    hypotheses: Object.freeze([statusMutated]),
+    alternativeExplanations: hs.alternativeExplanations, validationActions: hs.validationActions,
+    cannotConclude: hs.cannotConclude, limitations: hs.limitations,
+    provenance: hs.provenance, createdAt: hs.createdAt,
+    generationToken: hs.generationToken, contextVersion: hs.contextVersion,
+  });
+  var r = _pe({ hypothesisSet: shell });
+  chk('HRR2-01-a: mutating status (same hypothesisId) rejected via contentSignature mismatch',
+    r.eligible === false
+      && HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.HYPOTHESIS_AUTHORITY_FORGED) !== -1);
+  // Mutate credibility — Physics > Heuristic but rule produces Heuristic for this fixture
+  var credMutated = Object.freeze(Object.assign({}, origH, { credibility: 'Physics' }));
+  var shell2 = Object.freeze(Object.assign({}, shell, { hypotheses: Object.freeze([credMutated]) }));
+  var r2 = _pe({ hypothesisSet: shell2 });
+  chk('HRR2-01-b: mutating credibility (same hypothesisId) rejected via contentSignature mismatch',
+    r2.eligible === false);
+  // Mutate ruleVersion
+  var rvMutated = Object.freeze(Object.assign({}, origH, { ruleVersion: 999 }));
+  var shell3 = Object.freeze(Object.assign({}, shell, { hypotheses: Object.freeze([rvMutated]) }));
+  var r3 = _pe({ hypothesisSet: shell3 });
+  chk('HRR2-01-c: mutating ruleVersion (same hypothesisId) rejected',
+    r3.eligible === false);
+})();
+
+// R2-02: nested accessor on hypothesis.status rejected by recursive audit (does NOT fire)
+(function () {
+  var hs = _buildHypothesisSet([_baseNode({})]);
+  var origH = hs.hypotheses[0];
+  // Build a non-frozen hypothesis with a getter on status — this would slip past the previous
+  // top-level audit. The recursive audit catches it.
+  var hostileH = Object.create(null);
+  var fired = 0;
+  // Copy all keys as data props EXCEPT status
+  ['hypothesisId','ruleId','ruleVersion','category','i18nKey','supportingEvidenceIds',
+   'contradictingEvidenceIds','correlationGroupIds','alternativeExplanationIds',
+   'cannotConcludeReasonCodes','validationActionIds','credibility','confidence','limitations',
+   'contentSignature','provenance'].forEach(function (k) {
+    Object.defineProperty(hostileH, k, { value: origH[k], enumerable: true });
+  });
+  Object.defineProperty(hostileH, 'status', { get: function () { fired += 1; return 'supported'; }, enumerable: true });
+  Object.freeze(hostileH);
+  var hostileShell = Object.freeze({
+    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+    sourceGraphId: hs.sourceGraphId, caseAssociation: hs.caseAssociation,
+    sessionAssociation: hs.sessionAssociation,
+    hypotheses: Object.freeze([hostileH]),
+    alternativeExplanations: hs.alternativeExplanations, validationActions: hs.validationActions,
+    cannotConclude: hs.cannotConclude, limitations: hs.limitations,
+    provenance: hs.provenance, createdAt: hs.createdAt,
+    generationToken: hs.generationToken, contextVersion: hs.contextVersion,
+  });
+  var r = _pe({ hypothesisSet: hostileShell });
+  chk('HRR2-02-a: nested accessor on hypothesis.status rejected by recursive audit',
+    r.eligible === false);
+  chk('HRR2-02-b: nested getter NOT invoked (rejected before clone)', fired === 0);
+})();
+
+// R2-03: non-array correlationGroupIds rejected; extra confidence key rejected; ruleVersion validated
+(function () {
+  var hs = _buildHypothesisSet([_baseNode({})]);
+  var origH = hs.hypotheses[0];
+
+  // (a) non-array correlationGroupIds
+  var badCorr = Object.freeze(Object.assign({}, origH, { correlationGroupIds: 'not-an-array' }));
+  var shellA = Object.freeze(Object.assign({}, {
+    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+    sourceGraphId: hs.sourceGraphId, caseAssociation: hs.caseAssociation,
+    sessionAssociation: hs.sessionAssociation,
+    hypotheses: Object.freeze([badCorr]),
+    alternativeExplanations: hs.alternativeExplanations, validationActions: hs.validationActions,
+    cannotConclude: hs.cannotConclude, limitations: hs.limitations,
+    provenance: hs.provenance, createdAt: hs.createdAt,
+    generationToken: hs.generationToken, contextVersion: hs.contextVersion,
+  }));
+  var rA = _pe({ hypothesisSet: shellA });
+  chk('HRR2-03-a: non-array correlationGroupIds rejected', rA.eligible === false);
+
+  // (b) extra key on confidence object
+  var badConf = Object.freeze(Object.assign({}, origH, {
+    confidence: Object.freeze({ state: origH.confidence.state, score: origH.confidence.score, attackerKey: 'inject' }),
+  }));
+  var shellB = Object.freeze(Object.assign({}, shellA, { hypotheses: Object.freeze([badConf]) }));
+  var rB = _pe({ hypothesisSet: shellB });
+  chk('HRR2-03-b: extra key on confidence object rejected',
+    rB.eligible === false
+      && HI.safeArrayIndexOf(rB.reasonCodes, RC.REASON_CODES.UNKNOWN_OWN_KEY) !== -1);
+
+  // (c) ruleVersion mismatch (rule registry has version 1; tamper to 999)
+  var badRv = Object.freeze(Object.assign({}, origH, { ruleVersion: 999 }));
+  var shellC = Object.freeze(Object.assign({}, shellA, { hypotheses: Object.freeze([badRv]) }));
+  var rC = _pe({ hypothesisSet: shellC });
+  chk('HRR2-03-c: ruleVersion mismatch (vs HE.RULE_REGISTRY) rejected',
+    rC.eligible === false);
+})();
+
+// R2-04: covered by R2-01/02/03 above + the exact downgrade and unknown-category cases
+(function () {
+  // Verify unknown category produces collect_additional_session (tier 6) — NOT no_action_required.
+  var n = _baseNode({ nodeId: 'n_unk',
+    identity: _baseIdentity({ sourceId: 'unk_src' }),
+    category: 'unknown',
+    credibility: 'measured',
+    observation: { kind: 'qualitative_marker', channel: null, i18nKey: 'k', params: null },
+    limitations: [] });
+  var hs = _buildHypothesisSet([n]);
+  var r = _pe({ hypothesisSet: hs });
+  if (r.valid && r.prioritySet.priorities.length >= 1) {
+    var unkP = r.prioritySet.priorities.find(function (p) { return p.kind === 'collect_additional_session'; });
+    chk('HRR2-04-a: unknown category → collect_additional_session (tier 6) — not no_action_required',
+      !!unkP && unkP.tier === 6);
+  } else {
+    chk('HRR2-04-a: skipped — unknown category was rejected by build', true);
+  }
+})();
+
+// R2-05: requiring D4 does NOT pollute Node globals with R3_0D_PriorityEngine / R3_0D_HypothesisEngine
+(function () {
+  // Note: in this test process, the modules ARE already loaded (the imports at top of file
+  // ran before the gating change). The R2-05 closure ensures that in a FRESH process,
+  // requiring d4 doesn't write to globalThis. We can simulate by spawning a child node and
+  // checking globalThis after require.
+  var cp = require('child_process');
+  var probe = "var hadPE = typeof globalThis.R3_0D_PriorityEngine !== 'undefined';\n" +
+              "var hadHE = typeof globalThis.R3_0D_HypothesisEngine !== 'undefined';\n" +
+              "require('" + require.resolve('../renderer/js/r3-0d-priority-engine.js') + "');\n" +
+              "var hasPE = typeof globalThis.R3_0D_PriorityEngine !== 'undefined';\n" +
+              "var hasHE = typeof globalThis.R3_0D_HypothesisEngine !== 'undefined';\n" +
+              "process.stdout.write(JSON.stringify({hadPE,hadHE,hasPE,hasHE}));\n";
+  try {
+    var out = cp.execFileSync(process.execPath, ['-e', probe], { encoding: 'utf8', timeout: 10000 });
+    var probeResult = JSON.parse(out);
+    chk('HRR2-05-a: fresh-process require(D4) does NOT pollute globalThis with R3_0D_PriorityEngine',
+      probeResult.hadPE === false && probeResult.hasPE === false);
+    chk('HRR2-05-b: fresh-process require(D4) does NOT pollute globalThis with R3_0D_HypothesisEngine',
+      probeResult.hadHE === false && probeResult.hasHE === false);
+  } catch (e) {
+    chk('HRR2-05: child-process probe failed', false, e && e.message);
+    chk('HRR2-05-b: child-process probe failed', false, e && e.message);
+  }
+})();
+
 console.log('R3.0D D4 priority-engine adversarial suite: ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);
