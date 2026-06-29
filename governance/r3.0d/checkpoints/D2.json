@@ -425,7 +425,7 @@
 
   "packageVersion": "1.4.0",
   "createdAt": "2026-06-28T00:00:00Z",
-  "status": "passed-ready-to-integrate",
+  "status": "candidate",
   "governanceChanged": true,
   "changedFiles": [
     "contracts/r3.0d/credibility-contract.js",
