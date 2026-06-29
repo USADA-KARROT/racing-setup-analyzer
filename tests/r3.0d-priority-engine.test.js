@@ -996,5 +996,116 @@ console.log('Section R — Codex D4 R4 closures');
   }
 })();
 
+// ---------- Section S — Codex D4 R5 closure tests -----------------------------------------
+console.log('Section S — Codex D4 R5 closures');
+
+// R5-01: WeakSet authority MUST be the first read — zero Proxy traps fire before rejection
+(function () {
+  var hs = _buildHypothesisSet([_baseNode({})]);  // genuine (only used for shape; not passed to D4)
+  // Build a fully Proxy-trapped object that mimics hypothesisSet shape but is not in WeakSet.
+  var trapsFired = [];
+  var underlying = {
+    schemaVersion: 1, hypothesisSetId: 'hset_0000000000000000',
+    sourceGraphId: 'graph_0000000000000000',
+    caseAssociation: { caseId: 'c', sessionId: 's', lapId: null },
+    sessionAssociation: { sessionId: 's' },
+    hypotheses: [], cannotConclude: [], limitations: [],
+    provenance: {}, createdAt: null, generationToken: null, contextVersion: null,
+  };
+  Object.freeze(underlying);
+  var trappedProxy = new Proxy(underlying, {
+    getPrototypeOf: function (t) { trapsFired.push('getPrototypeOf'); return Reflect.getPrototypeOf(t); },
+    isExtensible: function (t) { trapsFired.push('isExtensible'); return Reflect.isExtensible(t); },
+    ownKeys: function (t) { trapsFired.push('ownKeys'); return Reflect.ownKeys(t); },
+    getOwnPropertyDescriptor: function (t, k) { trapsFired.push('getOwnPropertyDescriptor:' + k); return Reflect.getOwnPropertyDescriptor(t, k); },
+    get: function (t, k) { trapsFired.push('get:' + k); return Reflect.get(t, k); },
+    has: function (t, k) { trapsFired.push('has:' + k); return Reflect.has(t, k); },
+  });
+  // The Proxy is NOT in D3's WeakSet → verifier must reject it.
+  // The verifier itself MUST NOT fire any Proxy trap.
+  var verifierResult = HE.verifyAuthoritativeHypothesisSet(trappedProxy);
+  var trapsAfterDirectVerifier = trapsFired.slice();
+  chk('HRR5-01-a: verifier(Proxy) === false',
+    verifierResult === false);
+  chk('HRR5-01-b: verifier did NOT fire any Proxy trap when rejecting non-member',
+    trapsAfterDirectVerifier.length === 0);
+  // Now run D4: it should call the verifier FIRST and reject. Traps may fire later
+  // if D4 reads .schemaVersion in fail-closed paths — but the AUTHORITY decision must
+  // happen with zero traps.
+  trapsFired.length = 0;
+  var d4Result = _pe({ hypothesisSet: trappedProxy });
+  chk('HRR5-01-c: D4 rejects Proxy with HYPOTHESIS_AUTHORITY_FORGED',
+    d4Result.eligible === false
+      && HI.safeArrayIndexOf(d4Result.reasonCodes, RC.REASON_CODES.HYPOTHESIS_AUTHORITY_FORGED) !== -1);
+  chk('HRR5-01-d: D4 fires ZERO Proxy traps before rejecting forged Proxy (authority is FIRST)',
+    trapsFired.length === 0);
+})();
+
+// R5-02 NIT: paired baseline/mutant harness — patched D3 emits non-array → baseline rejects, mutant accepts
+(function () {
+  var cp = require('child_process');
+  var fs = require('fs');
+  var path = require('path');
+  var os = require('os');
+  // Write the probe to a temp file to avoid shell-quoting hazards. The probe patches D3 to
+  // emit a non-array `cannotConcludeReasonCodes` (the producer is genuine — so the WeakSet
+  // check passes), then runs both the baseline D4 (with array check intact) and a mutant D4
+  // (with array check regressed to `false`). The mutation test proves the baseline check is
+  // load-bearing.
+  var d3resolved = require.resolve('../renderer/js/r3-0d-hypothesis-engine.js');
+  var d4resolved = require.resolve('../renderer/js/r3-0d-priority-engine.js');
+  var egresolved = require.resolve('../renderer/js/r3-0d-evidence-graph.js');
+  var probeFile = path.join(os.tmpdir(), 'd4-r5-02-probe-' + Date.now() + '.js');
+  var probeBody = [
+    "var fs=require('fs'),Module=require('module'),path=require('path');",
+    "var d3file=" + JSON.stringify(d3resolved) + ";",
+    "var d4file=" + JSON.stringify(d4resolved) + ";",
+    "var d3src=fs.readFileSync(d3file,'utf8');",
+    "d3src=d3src.replace(\"var cannotConcludeFrozen = HI.deepFreeze([]);\", \"var cannotConcludeFrozen = 'string';\");",
+    "var d4src=fs.readFileSync(d4file,'utf8');",
+    "function buildModule(file, src) {",
+    "  var m=new Module(file,module);m.filename=file;m.paths=Module._nodeModulePaths(path.dirname(file));m._compile(src,file);m.loaded=true;Module._cache[file]=m;return m.exports;",
+    "}",
+    "var d3=buildModule(d3file,d3src);",
+    "var d4Baseline=buildModule(d4file,d4src);",
+    "var d4MutSrc=d4src.replace(\"!_isPlainArray(h.cannotConcludeReasonCodes)\", \"false\");",
+    "var d4Mutant=buildModule(d4file,d4MutSrc);",
+    "var eg=require(" + JSON.stringify(egresolved) + ");",
+    "var ca={caseId:'c',sessionId:'s',lapId:null};",
+    "var n={schemaVersion:1,nodeId:'n',category:'data_quality',identity:{caseId:'c',sessionId:'s',lapId:null,sourceId:'src',sourceVersion:'1',freshness:'2026-06-29T00:00:00Z'},credibility:'measured',provenance:'real',availability:'available',confidence:{state:'not_computed'},observation:{kind:'channel_missing',channel:'b',i18nKey:'k',params:null},limitations:['LIMITATION_MISSING_CHANNEL'],supportingEdges:[],contradictingEdges:[]};",
+    "var clock=function(){return '2026-06-29T01:00:00Z'};",
+    "var g=eg.buildEvidenceGraph({caseAssociation:ca,rawEvidence:[n]},{clock}).graph;",
+    "var hs=d3.buildHypothesisSet({graph:g},{clock}).hypothesisSet;",
+    "var rBase=d4Baseline.buildPrioritySet({hypothesisSet:hs},{clock});",
+    "var rMut=d4Mutant.buildPrioritySet({hypothesisSet:hs},{clock});",
+    "process.stdout.write(JSON.stringify({",
+    "  d3EmittedField:typeof hs.hypotheses[0].cannotConcludeReasonCodes,",
+    "  baselineEligible:rBase.eligible,",
+    "  baselineValid:rBase.valid === true,",
+    "  baselineReasons:rBase.reasonCodes,",
+    "  mutantEligible:rMut.eligible,",
+    "  mutantValid:rMut.valid === true,",
+    "  mutantReasons:rMut.reasonCodes",
+    "}));",
+  ].join('\n');
+  try {
+    fs.writeFileSync(probeFile, probeBody);
+    var out = cp.execFileSync(process.execPath, [probeFile], { encoding: 'utf8', timeout: 30000 });
+    var pr = JSON.parse(out);
+    chk('HRR5-02-a: patched D3 emits non-array cannotConcludeReasonCodes (type=string)',
+      pr.d3EmittedField === 'string');
+    chk('HRR5-02-b: BASELINE D4 (with array check) REJECTS the malformed-D3 input',
+      pr.baselineEligible === false && pr.baselineValid === false);
+    chk('HRR5-02-c: MUTANT D4 (array check regressed) ACCEPTS the same malformed input — proving the check is load-bearing',
+      pr.mutantValid === true);
+  } catch (e) {
+    chk('HRR5-02-a: paired baseline/mutant harness failed', false, e && e.message);
+    chk('HRR5-02-b: paired harness baseline failed', false, e && e.message);
+    chk('HRR5-02-c: paired harness mutant failed', false, e && e.message);
+  } finally {
+    try { fs.unlinkSync(probeFile); } catch (e) { /* ignore */ }
+  }
+})();
+
 console.log('R3.0D D4 priority-engine adversarial suite: ' + pass + ' passed, ' + fail + ' failed');
 if (fail > 0) process.exit(1);
