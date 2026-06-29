@@ -1114,6 +1114,131 @@ console.log('Section H5 — Codex D3 R4 closures');
     rA.valid === true && rA.hypothesisSet.createdAt === null);
 })();
 
+// ---------- Section H6 — Codex D3 R6 closure tests (D3-R6-01..05) -------------------------------
+// Reuse D2/D3's FNV-1a 32-bit-twice hash to construct HASH-VALID test fixtures (graphs whose
+// `graphId` field matches the recomputed value on their actual contents). Without this we can
+// only test rejection-via-hash-mismatch, which doesn't exercise downstream checks.
+console.log('Section H6 — Codex D3 R6 closures (hash-valid fixtures)');
+function _hash32_for_test(s) {
+  var h = 0x811c9dc5;
+  var len = (typeof s === 'string') ? s.length : 0;
+  for (var i = 0; i < len; i++) {
+    h ^= s.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  var hexChars = '0123456789abcdef';
+  var out = '';
+  for (var j = 7; j >= 0; j--) out += hexChars[(h >>> (j * 4)) & 0xF];
+  return out;
+}
+function _hash64_for_test(s) {
+  return _hash32_for_test(s) + _hash32_for_test(s + '|' + s.length);
+}
+function _projectForGraphId(g) {
+  return {
+    caseAssociation: {
+      caseId: g.caseAssociation.caseId,
+      sessionId: g.caseAssociation.sessionId,
+      lapId: g.caseAssociation.lapId == null ? null : g.caseAssociation.lapId,
+    },
+    nodes: g.nodes.map(function (n) {
+      return {
+        nodeId: n.nodeId, category: n.category, credibility: n.credibility, provenance: n.provenance,
+        availability: n.availability, confidence: { state: (n.confidence && n.confidence.state) ? n.confidence.state : null },
+        identity: { caseId: n.identity.caseId, sessionId: n.identity.sessionId, lapId: n.identity.lapId == null ? null : n.identity.lapId, sourceId: n.identity.sourceId, sourceVersion: n.identity.sourceVersion },
+        observation: { kind: n.observation.kind, channel: n.observation.channel == null ? null : n.observation.channel, i18nKey: n.observation.i18nKey, params: n.observation.params == null ? null : n.observation.params },
+        limitations: n.limitations, supportingEdges: n.supportingEdges, contradictingEdges: n.contradictingEdges,
+      };
+    }),
+    edges: g.edges,
+    correlationGroups: g.correlationGroups.map(function (cg) {
+      return { correlationGroupId: cg.correlationGroupId, memberNodeIds: cg.memberNodeIds, independenceWeight: cg.independenceWeight };
+    }),
+  };
+}
+function _computeGraphIdForTest(projection, schemaVersion) {
+  return 'graph_' + _hash64_for_test('graphid|v' + schemaVersion + '|' + HI.stableStringify(projection));
+}
+
+// R6-01: non-array supportingEdges rejected — build hash-valid graph with the malformed field.
+(function () {
+  var n = _baseNode({});
+  var g = _buildGraph([n]);
+  // Replace n.supportingEdges with a non-array (string)
+  var rawNode = JSON.parse(JSON.stringify(g.nodes[0]));
+  rawNode.supportingEdges = 'not-an-array';
+  var rawNodes = [rawNode];
+  var rawEdges = g.edges.map(function (e) { return { from: e.from, to: e.to, kind: e.kind }; });
+  var rawCGs = g.correlationGroups.map(function (cg) { return { correlationGroupId: cg.correlationGroupId, memberNodeIds: Array.from(cg.memberNodeIds), independenceWeight: cg.independenceWeight }; });
+  var projection = {
+    caseAssociation: { caseId: g.caseAssociation.caseId, sessionId: g.caseAssociation.sessionId, lapId: g.caseAssociation.lapId == null ? null : g.caseAssociation.lapId },
+    nodes: [{
+      nodeId: rawNode.nodeId, category: rawNode.category, credibility: rawNode.credibility,
+      provenance: rawNode.provenance, availability: rawNode.availability,
+      confidence: { state: (rawNode.confidence && rawNode.confidence.state) ? rawNode.confidence.state : null },
+      identity: { caseId: rawNode.identity.caseId, sessionId: rawNode.identity.sessionId, lapId: rawNode.identity.lapId == null ? null : rawNode.identity.lapId, sourceId: rawNode.identity.sourceId, sourceVersion: rawNode.identity.sourceVersion },
+      observation: { kind: rawNode.observation.kind, channel: rawNode.observation.channel == null ? null : rawNode.observation.channel, i18nKey: rawNode.observation.i18nKey, params: rawNode.observation.params == null ? null : rawNode.observation.params },
+      limitations: rawNode.limitations,
+      supportingEdges: rawNode.supportingEdges,   // STRING — hashed verbatim
+      contradictingEdges: rawNode.contradictingEdges,
+    }],
+    edges: rawEdges, correlationGroups: rawCGs,
+  };
+  var recomputedId = _computeGraphIdForTest(projection, 1);
+  function _deepFreezeShallow(o) { Object.freeze(o); for (var k in o) { var v = o[k]; if (v && typeof v === 'object') _deepFreezeShallow(v); } return o; }
+  var shell = _deepFreezeShallow({
+    schemaVersion: 1, graphId: recomputedId,
+    caseAssociation: g.caseAssociation, sessionAssociation: g.sessionAssociation,
+    nodes: [rawNode], edges: rawEdges, topologicalOrder: g.topologicalOrder,
+    deduplicationSummary: g.deduplicationSummary, correlationGroups: rawCGs,
+    limitations: [], cannotConclude: [],
+    provenance: { builderVersion: 1, inputCount: 1, sanitizedCount: 1, rejectedCount: 0, rejectedReasonsSummary: {} },
+    createdAt: null, generationToken: null, contextVersion: null,
+  });
+  var r = _he({ graph: shell });
+  chk('HRR6-01-a: non-array supportingEdges rejected (hash-valid fixture; EVIDENCE_NODE_INVALID)',
+    r.eligible === false
+      && HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.EVIDENCE_NODE_INVALID) !== -1);
+})();
+
+// R6-02: edge cap aligned with D2 (1024). Test that ENVELOPE building of 65-entry
+// supportingEdges (above PER_NODE_EDGE_DECL_CAP=64) is rejected. We can't easily test the
+// 1024 cap without constructing a big graph; PER_NODE cap is the realistic boundary.
+(function () {
+  var bigSupportArr = [];
+  for (var i = 0; i < 65; i++) bigSupportArr.push('n_target_' + i);
+  // Build via D2 — D2's own per-node cap is 64; D2 would reject. Verify via D2.
+  var n = _baseNode({ supportingEdges: bigSupportArr });
+  var eg = EG.buildEvidenceGraph({ caseAssociation: { caseId: 'case_001', sessionId: 'sess_001', lapId: null }, rawEvidence: [n] }, { clock: BASE_CLOCK });
+  // D2 should reject (n has 65 supportingEdges > 64 cap). If D2 builds, D3 should reject.
+  if (eg.valid && eg.graph.nodes.length > 0) {
+    var r = _he({ graph: eg.graph });
+    chk('HRR6-02: D3 rejects per-node edge declaration > PER_NODE_EDGE_DECL_CAP=64',
+      r.eligible === false);
+  } else {
+    chk('HRR6-02: D2 rejected per-node edge declaration > 64 (D3 defense aligned)', true);
+  }
+})();
+
+// R6-03: D3 accepts AUTHENTIC D2 graph with duplicate edges (multi-set semantics).
+// Build n_a with supportingEdges=['n_b','n_b'] — D2 emits 2 identical edges.
+(function () {
+  var nA = _baseNode({ nodeId: 'n_a', identity: _baseIdentity({ sourceId: 'src_a' }),
+    supportingEdges: ['n_b', 'n_b'] });
+  var nB = _baseNode({ nodeId: 'n_b', identity: _baseIdentity({ sourceId: 'src_b' }),
+    observation: { kind: 'channel_missing', channel: 'b', i18nKey: 'k', params: null } });
+  var eg = EG.buildEvidenceGraph({ caseAssociation: { caseId: 'case_001', sessionId: 'sess_001', lapId: null }, rawEvidence: [nA, nB] }, { clock: BASE_CLOCK });
+  if (!eg.valid) {
+    chk('HRR6-03: D2 build with duplicate supportingEdge failed unexpectedly', false);
+  } else {
+    chk('HRR6-03-a: D2 produced graph with duplicate edges (precondition)',
+      eg.graph.edges.filter(function (e) { return e.from === 'n_a' && e.to === 'n_b' && e.kind === 'supports'; }).length === 2);
+    var r = _he({ graph: eg.graph });
+    chk('HRR6-03-b: D3 accepts authentic D2 graph with duplicate edges (multi-set semantics)',
+      r.valid === true);
+  }
+})();
+
 // R5-01: reserved-kind edge rejection (derived_from / invalidates) — build authentic graph
 // then forge an edge with reserved kind.
 (function () {

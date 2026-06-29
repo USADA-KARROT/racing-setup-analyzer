@@ -160,7 +160,11 @@
   var STRING_BYTE_CAP = HC.STRING_BYTE_CAP || 512;
   var ENVELOPE_BYTE_CAP = 512 * 1024;        // 512 KiB envelope ceiling.
   var GRAPH_NODE_INPUT_CAP = 8192;
-  var GRAPH_EDGE_INPUT_CAP = 16384;
+  // Codex D3 R6 D3-R6-02 closure: align with D2's EDGES_CAP_TOTAL (1024). A D2-authored graph
+  // cannot exceed this; D3 rejects any graph asserting more.
+  var GRAPH_EDGE_INPUT_CAP = 1024;
+  // Per D1 evidence-node-contract: supporting/contradictingEdges arrays each cap at 64.
+  var PER_NODE_EDGE_DECL_CAP = 64;
   // Codex D3 R2 R2-03 closure: directive §5.18 mandates staleness-based invalidation.
   // Default cutoff is 30 days. Caller can override via opts.maxAgeMs; reference time MUST
   // be supplied via opts.clock() returning ISO 8601 (preferred) or opts.referenceNowMs.
@@ -637,41 +641,55 @@
     // RESERVED — no D2 producer emits them. D3 rejects any graph claiming a reserved kind
     // because such a graph cannot have come from D2.
     var EDGE_KIND_EMITTED = ['supports', 'contradicts', 'correlated_with'];
-    var expectedEdgeSet = HI.safeObjectCreateNull();
-    var expectedEdgeCount = 0;
+    // Codex D3 R6 D3-R6-03 closure: D2 emits edges WITHOUT deduplication — a node declaring
+    // the same id twice in supportingEdges produces 2 identical {from,to,supports} edges in
+    // graph.edges. D3 was strictly set-equal which would reject authentic D2 output. Switch
+    // to MULTI-SET (count-based) tracking: each declared edge increments expected count;
+    // each actual edge decrements; final counts must all be zero.
+    var expectedEdgeCount = HI.safeObjectCreateNull();
     function _expectedEdgeKey(from, to, kind) { return from + '|' + to + '|' + kind; }
     function _addExpectedEdge(from, to, kind) {
       var k = _expectedEdgeKey(from, to, kind);
-      if (HI.safeGetOwnDescriptor(expectedEdgeSet, k)) return;
-      HI.safeDefineDataProperty(expectedEdgeSet, k, true);
-      expectedEdgeCount += 1;
+      var d = HI.safeGetOwnDescriptor(expectedEdgeCount, k);
+      var cur = (d && typeof d.value === 'number') ? d.value : 0;
+      HI.safeDefineDataProperty(expectedEdgeCount, k, cur + 1);
     }
-    // supports + contradicts from node declarations
+    // supports + contradicts from node declarations.
+    // Codex D3 R6 D3-R6-01 closure: each declaration field MUST be a plain array with bounded
+    // string entries; silent skip on non-array was an authority bypass.
     for (var nei = 0; nei < g.nodes.length; nei++) {
       var ne = g.nodes[nei];
-      if (_isPlainArray(ne.supportingEdges)) {
-        for (var sj = 0; sj < ne.supportingEdges.length; sj++) {
-          var sId = ne.supportingEdges[sj];
-          if (!_isNonEmptyString(sId) || !HI.safeGetOwnDescriptor(nodeIdSet, sId)) {
-            return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_ORPHAN] };
-          }
-          if (sId === ne.nodeId) {
-            return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_SELF_REFERENCE] };
-          }
-          _addExpectedEdge(ne.nodeId, sId, 'supports');
-        }
+      if (!_isPlainArray(ne.supportingEdges)) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
       }
-      if (_isPlainArray(ne.contradictingEdges)) {
-        for (var cj = 0; cj < ne.contradictingEdges.length; cj++) {
-          var cId = ne.contradictingEdges[cj];
-          if (!_isNonEmptyString(cId) || !HI.safeGetOwnDescriptor(nodeIdSet, cId)) {
-            return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_ORPHAN] };
-          }
-          if (cId === ne.nodeId) {
-            return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_SELF_REFERENCE] };
-          }
-          _addExpectedEdge(ne.nodeId, cId, 'contradicts');
+      if (ne.supportingEdges.length > PER_NODE_EDGE_DECL_CAP) {
+        return { valid: false, reasonCodes: [CODES.ARRAY_CAP_EXCEEDED] };
+      }
+      for (var sj = 0; sj < ne.supportingEdges.length; sj++) {
+        var sId = ne.supportingEdges[sj];
+        if (!_isNonEmptyString(sId) || !HI.safeGetOwnDescriptor(nodeIdSet, sId)) {
+          return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_ORPHAN] };
         }
+        if (sId === ne.nodeId) {
+          return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_SELF_REFERENCE] };
+        }
+        _addExpectedEdge(ne.nodeId, sId, 'supports');
+      }
+      if (!_isPlainArray(ne.contradictingEdges)) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
+      }
+      if (ne.contradictingEdges.length > PER_NODE_EDGE_DECL_CAP) {
+        return { valid: false, reasonCodes: [CODES.ARRAY_CAP_EXCEEDED] };
+      }
+      for (var cj = 0; cj < ne.contradictingEdges.length; cj++) {
+        var cId = ne.contradictingEdges[cj];
+        if (!_isNonEmptyString(cId) || !HI.safeGetOwnDescriptor(nodeIdSet, cId)) {
+          return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_ORPHAN] };
+        }
+        if (cId === ne.nodeId) {
+          return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_SELF_REFERENCE] };
+        }
+        _addExpectedEdge(ne.nodeId, cId, 'contradicts');
       }
     }
     // correlated_with from groups with ≥2 members (pairwise lo→hi)
@@ -686,9 +704,9 @@
         }
       }
     }
-    // Verify g.edges matches the expected set EXACTLY (no extras, no missing, no reserved kinds).
-    var seenActual = HI.safeObjectCreateNull();
-    var seenActualCount = 0;
+    // Verify g.edges matches the expected MULTI-SET — every actual edge consumes one count;
+    // any reserved kind / orphan / not-in-expected / over-consumed → reject; final counts
+    // must all be zero (no missing expected edge).
     for (var ei = 0; ei < g.edges.length; ei++) {
       var e = g.edges[ei];
       if (!_isPlainObject(e) || !_isNonEmptyString(e.from) || !_isNonEmptyString(e.to) || !_isNonEmptyString(e.kind)) {
@@ -702,17 +720,20 @@
         return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_ORPHAN] };
       }
       var eKey = _expectedEdgeKey(e.from, e.to, e.kind);
-      if (!HI.safeGetOwnDescriptor(expectedEdgeSet, eKey)) {
+      var eDesc = HI.safeGetOwnDescriptor(expectedEdgeCount, eKey);
+      var eCur = (eDesc && typeof eDesc.value === 'number') ? eDesc.value : 0;
+      if (eCur <= 0) {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
       }
-      if (HI.safeGetOwnDescriptor(seenActual, eKey)) {
-        return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
-      }
-      HI.safeDefineDataProperty(seenActual, eKey, true);
-      seenActualCount += 1;
+      HI.safeDefineDataProperty(expectedEdgeCount, eKey, eCur - 1);
     }
-    if (seenActualCount !== expectedEdgeCount) {
-      return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
+    // Any expected edge not consumed → caller stripped an edge D2 would emit.
+    var remainingKeys = HI.safeOwnKeys(expectedEdgeCount) || [];
+    for (var rki = 0; rki < remainingKeys.length; rki++) {
+      var rkDesc = HI.safeGetOwnDescriptor(expectedEdgeCount, remainingKeys[rki]);
+      if (rkDesc && typeof rkDesc.value === 'number' && rkDesc.value > 0) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
+      }
     }
     // Preserve original endpoint-existence check (defensive):
     for (var lei = 0; lei < g.edges.length; lei++) {
@@ -1060,7 +1081,9 @@
   function _classifyConfidence(supportingGroups, soloCount, contradictionCount, supportCount, aggregateCred, rule) {
     // Determine state:
     var totalIndependent = supportingGroups + soloCount;
-    var staleContribution = 0;  // (no freshness yet — graph has no per-node freshness check)
+    // Freshness is handled separately at authority verification (stale nodes rejected via
+    // EVIDENCE_FRESHNESS_STALE) and is NOT a confidence-score input (Codex D3 R5 D3-R5-03
+    // closure). Any node reaching this function is already fresh-enough per policy.
     var contradictionRatio = (supportCount === 0) ? 0 : (contradictionCount / (supportCount + contradictionCount));
 
     // Block if cannotConclude reasons present at the graph level; engine adds it externally.
