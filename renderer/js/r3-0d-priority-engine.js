@@ -60,11 +60,46 @@
   if (SI === null && typeof R3_0D_SourceIdentityContract !== 'undefined') SI = R3_0D_SourceIdentityContract;
   if (REC === null && typeof R3_0D_RecommendationContract !== 'undefined') REC = R3_0D_RecommendationContract;
 
-  if (!HI || !RC || !CR || !HC) {
+  // D4 also depends on R3_0D_HypothesisEngine for the canonical rule registry used in
+  // cross-field validation (category + i18nKey + allowedCredibility binding).
+  var HE = null;
+  if (typeof module !== 'undefined' && module.exports) {
+    try { HE = require('./r3-0d-hypothesis-engine.js'); } catch (e) { HE = null; }
+  }
+  if (HE === null && typeof R3_0D_HypothesisEngine !== 'undefined') HE = R3_0D_HypothesisEngine;
+
+  if (!HI || !RC || !CR || !HC || !HE) {
     throw new Error('r3-0d-priority-engine.js: missing one or more required R3.0D contracts');
   }
 
   var CODES = RC.REASON_CODES;
+
+  // Build a quick lookup map: ruleId → rule object — used by per-hypothesis cross-field validation.
+  var _RULE_BY_ID = (function () {
+    var m = HI.safeObjectCreateNull();
+    for (var i = 0; i < HE.RULE_REGISTRY.length; i++) {
+      var r = HE.RULE_REGISTRY[i];
+      HI.safeDefineDataProperty(m, r.ruleId, r);
+    }
+    return m;
+  })();
+  // Closed status enum (Codex D4 R1 D4-R1-03 closure).
+  var HYPOTHESIS_STATUS_ALLOWED = HI.deepFreeze(['supported', 'contradicted', 'inconclusive', 'blocked']);
+  // Closed confidence state enum (matches D3 export).
+  var CONFIDENCE_STATE_ALLOWED = HI.deepFreeze(['not_computed', 'insufficient_evidence', 'low', 'moderate', 'high']);
+  // Closed key set for D3 hypothesis (Codex D4 R1 D4-R1-03 closure: extra keys rejected).
+  var HYPOTHESIS_KEYS_ALLOWED = HI.deepFreeze([
+    'hypothesisId', 'ruleId', 'ruleVersion', 'category', 'status', 'i18nKey',
+    'supportingEvidenceIds', 'contradictingEvidenceIds', 'correlationGroupIds',
+    'alternativeExplanationIds', 'cannotConcludeReasonCodes', 'validationActionIds',
+    'credibility', 'confidence', 'limitations', 'provenance',
+  ]);
+  // Closed key set for D3 hypothesis-set top-level.
+  var HSET_KEYS_ALLOWED = HI.deepFreeze([
+    'schemaVersion', 'hypothesisSetId', 'sourceGraphId', 'caseAssociation', 'sessionAssociation',
+    'hypotheses', 'alternativeExplanations', 'validationActions', 'cannotConclude', 'limitations',
+    'provenance', 'createdAt', 'generationToken', 'contextVersion',
+  ]);
 
   // Module-init captures (Codex D3 R1-R5 lessons applied proactively).
   var _CAPTURED_OBJECT_IS_FROZEN = Object.isFrozen;
@@ -229,12 +264,43 @@
     if (!_isFrozenSafe(hsIn)) {
       return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
     }
+    // Codex D4 R1 D4-R1-02 closure: top-level descriptor audit BEFORE clone — rejects
+    // accessor descriptors on any of hsIn's top-level fields (e.g. createdAt getter).
+    // structuredClone fires accessor [[Get]] traps; pre-clone rejection prevents that.
+    var hsInOwn = HI.safeOwnKeys(hsIn);
+    if (hsInOwn === null) {
+      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+    }
+    for (var hsi = 0; hsi < hsInOwn.length; hsi++) {
+      var hsk = hsInOwn[hsi];
+      if (typeof hsk === 'symbol') {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+      }
+      var hsDesc = HI.safeGetOwnDescriptor(hsIn, hsk);
+      if (!hsDesc) continue;
+      if (!('value' in hsDesc)) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+      }
+      if (!hsDesc.enumerable) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+      }
+    }
     var hs = HI.safeStructuredClone(hsIn);
     if (hs === null || !_isPlainObject(hs)) {
       return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
     }
     if (HI.deepOriginalShapeAudit(hs) !== true) {
       return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+    }
+    // Closed key set check on the clone.
+    var hsCloneKeys = HI.safeOwnKeys(hs);
+    if (hsCloneKeys === null) {
+      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+    }
+    for (var hcki = 0; hcki < hsCloneKeys.length; hcki++) {
+      if (HI.safeArrayIndexOf(HSET_KEYS_ALLOWED, hsCloneKeys[hcki]) === -1) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY] };
+      }
     }
     if (hs.schemaVersion !== 1) {
       return { valid: false, reasonCodes: [CODES.UNSUPPORTED_FUTURE_SCHEMA] };
@@ -268,13 +334,22 @@
     if (!_isPlainArray(hs.limitations)) {
       return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
     }
-    // Per-hypothesis structural validation
+    // ---- Per-hypothesis structural + cross-field validation (Codex D4 R1 D4-R1-01/03 closure) ----
     var seenHypIds = HI.safeObjectCreateNull();
     for (var hi = 0; hi < hs.hypotheses.length; hi++) {
       var h = hs.hypotheses[hi];
       if (!_isPlainObject(h)) {
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
       }
+      // Closed key set
+      var hKeys = HI.safeOwnKeys(h);
+      if (hKeys === null) return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      for (var hki = 0; hki < hKeys.length; hki++) {
+        if (HI.safeArrayIndexOf(HYPOTHESIS_KEYS_ALLOWED, hKeys[hki]) === -1) {
+          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY] };
+        }
+      }
+      // hypothesisId grammar + uniqueness
       if (!_isNonEmptyString(h.hypothesisId)
           || HI.safeRegExpTest(ID_FORBIDDEN_RE, h.hypothesisId)
           || !HI.safeRegExpTest(/^hyp_[0-9a-f]{16}$/, h.hypothesisId)) {
@@ -284,13 +359,67 @@
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
       }
       HI.safeDefineDataProperty(seenHypIds, h.hypothesisId, true);
-      if (HI.safeArrayIndexOf(HC.HYPOTHESIS_CATEGORIES, h.category) === -1) {
+      // ruleId required + must be in HE.RULE_REGISTRY
+      if (!_isNonEmptyString(h.ruleId)) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      }
+      var rDesc = HI.safeGetOwnDescriptor(_RULE_BY_ID, h.ruleId);
+      if (!rDesc) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      }
+      var rule = rDesc.value;
+      // Codex D4 R1 D4-R1-01 closure: hypothesisId recompute equality binds (ruleId,
+      // supportingEvidenceIds, contradictingEvidenceIds) per D3's _hypothesisId. Caller can no
+      // longer keep IDs while mutating those fields.
+      if (!_isPlainArray(h.supportingEvidenceIds)) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_EVIDENCE_LINK_INVALID] };
+      }
+      if (!_isPlainArray(h.contradictingEvidenceIds)) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_CONTRADICTION_INVALID] };
+      }
+      // All evidence IDs must be non-empty strings + cap
+      if (h.supportingEvidenceIds.length > 64 || h.contradictingEvidenceIds.length > 64) {
+        return { valid: false, reasonCodes: [CODES.ARRAY_CAP_EXCEEDED] };
+      }
+      for (var sei = 0; sei < h.supportingEvidenceIds.length; sei++) {
+        if (!_isNonEmptyString(h.supportingEvidenceIds[sei])) {
+          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_EVIDENCE_LINK_INVALID] };
+        }
+      }
+      for (var cei = 0; cei < h.contradictingEvidenceIds.length; cei++) {
+        if (!_isNonEmptyString(h.contradictingEvidenceIds[cei])) {
+          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_CONTRADICTION_INVALID] };
+        }
+      }
+      var idMaterial = {
+        v: hs.schemaVersion,
+        ruleId: h.ruleId,
+        supportingEvidenceIds: HI.safeArraySlice(h.supportingEvidenceIds),
+        contradictingEvidenceIds: HI.safeArraySlice(h.contradictingEvidenceIds),
+      };
+      var expectedHid = 'hyp_' + _hashFNV64Hex('hypothesisid|v' + hs.schemaVersion + '|' + HI.stableStringify(idMaterial));
+      if (expectedHid !== h.hypothesisId) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+      }
+      // Cross-field consistency with rule (Codex D4 R1 D4-R1-01 closure continued).
+      if (h.category !== rule.category) {
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_CATEGORY_UNKNOWN] };
       }
+      if (h.i18nKey !== rule.i18nKey) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      }
+      // Credibility / confidence / status — closed enums
       if (HI.safeArrayIndexOf(CONCLUSION_CREDIBILITY_ORDER, h.credibility) === -1) {
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
       }
-      if (!_isPlainObject(h.confidence) || typeof h.confidence.state !== 'string') {
+      if (!_crAtLeast(h.credibility, rule.minConclusionCredibility)) {
+        // Credibility weaker than rule allows → invalid (D3 wouldn't have emitted this)
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      }
+      if (!_isPlainObject(h.confidence)) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      }
+      if (HI.safeArrayIndexOf(CONFIDENCE_STATE_ALLOWED, h.confidence.state) === -1) {
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
       }
       if (typeof h.confidence.score !== 'number'
@@ -299,14 +428,27 @@
           || h.confidence.score > 100) {
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
       }
-      if (!_isNonEmptyString(h.status)) {
+      if (HI.safeArrayIndexOf(HYPOTHESIS_STATUS_ALLOWED, h.status) === -1) {
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
       }
-      if (!_isPlainArray(h.contradictingEvidenceIds)) {
-        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_CONTRADICTION_INVALID] };
+      // Cross-field: status='contradicted' ⟹ contradictingEvidenceIds.length > 0
+      if (h.status === 'contradicted' && h.contradictingEvidenceIds.length === 0) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      }
+      // status='supported' ⟹ supportingEvidenceIds.length > 0
+      if (h.status === 'supported' && h.supportingEvidenceIds.length === 0) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
       }
       if (!_isPlainArray(h.limitations)) {
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      }
+      if (h.limitations.length > 32) {
+        return { valid: false, reasonCodes: [CODES.ARRAY_CAP_EXCEEDED] };
+      }
+      for (var lhi = 0; lhi < h.limitations.length; lhi++) {
+        if (!RC.isReasonCode(h.limitations[lhi])) {
+          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+        }
       }
     }
 
@@ -476,7 +618,7 @@
         var idDesc = HI.safeGetOwnDescriptor(inputIn, idName);
         if (!idDesc) continue;
         if (!('value' in idDesc) || !idDesc.enumerable) {
-          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'input non-data/non-enumerable own key: ' + idName });
+          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'input non-data/non-enumerable own key' });
         }
         HI.safeDefineDataProperty(inputSnap, idName, idDesc.value);
       }
@@ -487,7 +629,9 @@
       }
       for (var ik = 0; ik < inputSnapKeys.length; ik++) {
         if (HI.safeArrayIndexOf(allowedInputKeys, inputSnapKeys[ik]) === -1) {
-          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'unknown input key: ' + inputSnapKeys[ik] });
+          // Codex D4 R1 D4-R1-05 closure: never echo caller-supplied key NAMES in detail
+          // (privacy — a path-like key would leak in the blocked envelope).
+          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'unknown input own key' });
         }
       }
 
@@ -498,11 +642,18 @@
           return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts not plain object' });
         }
         var clockDesc = HI.safeGetOwnDescriptor(optsIn, 'clock');
-        if (clockDesc && typeof clockDesc.value === 'function') {
+        if (clockDesc) {
+          // Codex D4 R1 D4-R1-02 closure: opts.clock MUST be a data descriptor (not accessor).
+          // Accessor descriptors can fire on read; we never read them.
+          if (!('value' in clockDesc)) {
+            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts.clock accessor descriptor not allowed' });
+          }
           if (!clockDesc.enumerable) {
             return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'opts.clock must be enumerable' });
           }
-          clockCb = clockDesc.value;
+          if (typeof clockDesc.value === 'function') {
+            clockCb = clockDesc.value;
+          }
         }
         var optsData = HI.safeObjectCreateNull();
         var optsOwnNames = HI.safeOwnKeys(optsIn);
@@ -517,14 +668,15 @@
           var od = HI.safeGetOwnDescriptor(optsIn, on);
           if (!od) continue;
           if (!od.enumerable) {
-            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'opts non-enumerable own key: ' + on });
+            // Codex D4 R1 D4-R1-05 closure: never echo caller-supplied key name in detail.
+            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'opts non-enumerable own key' });
           }
-          if (on === 'clock') continue;
-          if (typeof od.value === 'function') {
-            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts function field not allowed: ' + on });
-          }
+          if (on === 'clock') continue;  // clock handled above with explicit accessor rejection
           if (!('value' in od)) {
-            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts accessor descriptor not allowed: ' + on });
+            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts accessor descriptor not allowed' });
+          }
+          if (typeof od.value === 'function') {
+            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts function field not allowed' });
           }
           HI.safeDefineDataProperty(optsData, on, od.value);
         }
@@ -539,7 +691,7 @@
         }
         for (var oki = 0; oki < optsSnapKeys.length; oki++) {
           if (HI.safeArrayIndexOf(allowedOptsKeys, optsSnapKeys[oki]) === -1) {
-            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'unknown opts key: ' + optsSnapKeys[oki] });
+            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'unknown opts own key' });
           }
         }
       }
@@ -604,47 +756,54 @@
         }
       }
 
-      // ---- Step 3 — build candidate priority entries (one per eligible hypothesis) ----
-      // First pass: compute kind + tier for each hypothesis without blocking IDs yet.
-      var rawEntries = [];
+      // ---- Step 3 — finalize kind + tier + priorityId for each hypothesis (PASS 1) ----
+      // Codex D4 R1 D4-R1-04 closure: apply downgrade FIRST (e.g. setup_experiment that fails
+      // eligibleAsSetupExperiment → controlled_repeat_lap), THEN compute blocking prerequisites
+      // against the FINAL priorityIds. Previously preliminary IDs reflected the pre-downgrade
+      // kind, so blockingPrerequisiteIds could reference IDs absent from the final set.
+      var finalized = [];
       for (var hi2 = 0; hi2 < hs.hypotheses.length; hi2++) {
         var h2 = hs.hypotheses[hi2];
-        // Skip hypotheses that should not produce a priority at all (status blocked).
         if (h2.status === 'blocked') continue;
-        var kind = _kindForCategory(h2.category);
-        var tier = PRIORITY_KIND_TIER[kind];
-        if (typeof tier !== 'number') {
-          // Unknown category mapping — defensive: skip.
-          continue;
+        var fkind = _kindForCategory(h2.category);
+        if (fkind === 'setup_experiment' && !_eligibleAsSetupExperiment(h2)) {
+          fkind = 'controlled_repeat_lap';
         }
-        _arrPush(rawEntries, { hypothesis: h2, kind: kind, tier: tier });
+        if (HI.safeArrayIndexOf(PRIORITY_KIND_ALLOWED, fkind) === -1) {
+          fkind = 'no_action_required';
+        }
+        var ftier = PRIORITY_KIND_TIER[fkind];
+        if (typeof ftier !== 'number') continue;
+        var fpid = _priorityId(h2.hypothesisId, fkind, PRIORITY_SET_SCHEMA_VERSION);
+        _arrPush(finalized, { hyp: h2, kind: fkind, tier: ftier, priorityId: fpid });
       }
 
-      // ---- Step 4 — compute blocking prerequisites per priority -----------------------------
-      // A priority is BLOCKED by any priority in a strictly lower tier (=higher priority)
-      // that has any supportable evidence (i.e., its hypothesis is not in 'contradicted'
-      // status and credibility >= Derived). We compute prerequisite IDs from priorityIds
-      // which depend only on (hypothesisId, kind) — so we can derive them deterministically
-      // before final assembly.
-      var preliminary = HI.safeArrayMap(rawEntries, function (re) {
-        return { hyp: re.hypothesis, kind: re.kind, tier: re.tier,
-          priorityId: _priorityId(re.hypothesis.hypothesisId, re.kind, PRIORITY_SET_SCHEMA_VERSION) };
-      });
-
+      // ---- Step 4 — compute blocking prerequisites per FINAL priorityId (PASS 2) ----
+      // Verify referential integrity: every blockingPrerequisiteId MUST exist in finalized[].
+      var finalIdSet = HI.safeObjectCreateNull();
+      for (var fii = 0; fii < finalized.length; fii++) {
+        HI.safeDefineDataProperty(finalIdSet, finalized[fii].priorityId, true);
+      }
       var built = [];
-      for (var bi2 = 0; bi2 < preliminary.length; bi2++) {
-        var cur = preliminary[bi2];
+      for (var bi2 = 0; bi2 < finalized.length; bi2++) {
+        var cur = finalized[bi2];
         var blockingIds = [];
-        for (var bj = 0; bj < preliminary.length; bj++) {
+        for (var bj = 0; bj < finalized.length; bj++) {
           if (bj === bi2) continue;
-          var other = preliminary[bj];
-          if (other.tier >= cur.tier) continue;  // only strictly higher priority (lower tier number)
-          // Other is supportable: not contradicted + credibility ≥ Derived (per directive
-          // §12 "FORBIDDEN: Low-credibility hypothesis as primary").
+          var other = finalized[bj];
+          if (other.tier >= cur.tier) continue;
           if (other.hyp.status === 'contradicted' || other.hyp.status === 'blocked') continue;
           if (!_crAtLeast(other.hyp.credibility, 'Derived')) continue;
+          // Defensive referential check (Codex D4 R1 D4-R1-04 closure): prerequisite priorityId
+          // must exist in the final set.
+          if (!HI.safeGetOwnDescriptor(finalIdSet, other.priorityId)) continue;
           _arrPush(blockingIds, other.priorityId);
         }
+        // _buildPriorityEntry would re-derive kind for setup downgrade — pass the already-finalized
+        // values via a wrapper hypothesis that pre-sets the kind/tier intent. To keep
+        // _buildPriorityEntry stable, we still call it; the kind it computes will MATCH cur.kind
+        // (since we applied the same downgrade logic above), and the priorityId it computes will
+        // MATCH cur.priorityId (since both use _priorityId(hypothesisId, kind, schemaVersion)).
         var entry = _buildPriorityEntry(cur.hyp, cur.tier, blockingIds, PRIORITY_SET_SCHEMA_VERSION);
         _arrPush(built, entry);
       }
