@@ -39,7 +39,7 @@
     "noCausalOverclaim": "All hypothesis i18nKeys and alternative explanation i18nKeys live in the rule registry and are pre-vetted. The 6-category enum is preserved verbatim (data_quality / mapping_calibration / driver_behaviour / vehicle_response / setup_model / unknown). No driver_fault / guaranteed_fix / professional_diagnosis / fastest_setup / theoretical_best vocabulary appears anywhere.",
     "closedRuleRegistry": "RULE_REGISTRY is a deep-frozen array of rule objects declared at module init. No runtime registration; no string-eval; no Function constructor; no caller-supplied rule. New rules require a new module load and a new D-checkpoint Codex review.",
     "deterministicOutput": "Same authoritative graph (regardless of clock) → identical hypothesisSetId, identical hypothesis IDs, identical confidence states + scores, identical sorted order. Clock is INJECTABLE via opts.clock(); createdAt depends on the clock; hypothesisSetId is INDEPENDENT of the clock.",
-    "confidenceModel": "Confidence state enum {not_computed, insufficient_evidence, low, moderate, high}. Auxiliary integer score 0..100 derived deterministically from independent supporting groups (with correlation-group dedup), aggregate credibility, contradictions, freshness. Caller cannot supply confidence; engine ignores any caller value. Duplicate evidence in the same correlation group counts ONCE.",
+    "confidenceModel": "Confidence state enum {not_computed, insufficient_evidence, low, moderate, high}. Auxiliary integer score 0..100 derived deterministically from independent supporting groups (with correlation-group dedup), aggregate credibility, and contradictions. Caller cannot supply confidence; engine ignores any caller value. Duplicate evidence in the same correlation group counts ONCE. Codex D3 R5 D3-R5-03 closure: freshness is used SOLELY as an eligibility/staleness gate at authority verification (stale nodes rejected with EVIDENCE_FRESHNESS_STALE) — it does NOT contribute to the confidence score.",
     "credibilityLadder": "Aggregate credibility uses CONCLUSION_CREDIBILITY ladder ['Physics','Model','Measured','Derived','Heuristic','Unavailable']. measured evidence → 'Measured'; derived → 'Derived'; heuristic/synthetic → 'Heuristic'/'Heuristic'; none → 'Unavailable'. Heuristic/synthetic credibility forces LIMITATION_HEURISTIC_ONLY / LIMITATION_SYNTHETIC_ONLY into the hypothesis limitations.",
     "validationActionsClosedEnum": "Closed kind enum from D1 hypothesis-contract.VALIDATION_ACTION_KIND_ALLOWED: {fix_data_quality, recalibrate_channel, controlled_repeat_lap, driver_experiment, setup_experiment, collect_additional_session, collect_additional_lap, no_action_required}.",
     "alternativeExplanationsRequired": "Every fired rule contributes at least one alternativeExplanation entry (closed per-rule list). Alternative IDs are content-derived (hypothesisId + altSuffix hash), deterministic, deep-frozen.",
@@ -55,7 +55,7 @@
   "tests": {
     "command": "npm test",
     "newSuiteForThisCheckpoint": "tests/r3.0d-hypothesis-engine.test.js",
-    "newSuiteAssertions": 148,
+    "newSuiteAssertions": 152,
     "additionalSuites": {
       "r3.0d-contract-foundation": {
         "path": "tests/r3.0d-contract-foundation.test.js",
@@ -136,7 +136,8 @@
     "governance/r3.0d/codex-checkpoint-evidence/D3/round-1-7368143.raw.txt",
     "governance/r3.0d/codex-checkpoint-evidence/D3/round-2-388edca.raw.txt",
     "governance/r3.0d/codex-checkpoint-evidence/D3/round-3-ac9f9a0.raw.txt",
-    "governance/r3.0d/codex-checkpoint-evidence/D3/round-4-11ad6a5.raw.txt"
+    "governance/r3.0d/codex-checkpoint-evidence/D3/round-4-11ad6a5.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D3/round-5-abaca2e.raw.txt"
   ],
   "changedFilesNote": "Computed from the exact baseSha (299771a) → D3 candidate HEAD diff. Adds: (1) renderer/js/r3-0d-hypothesis-engine.js — production module (~1000 lines after R1..R4 closures, all HI-wrapped, 4-layer integrity guards, closed 9-rule registry, layered authority (frozen-input check via captured Object.isFrozen + structuredClone defang + post-clone deepOriginalShapeAudit + full D1-contract SourceIdentity revalidation via SI.validateSourceIdentity + correlation-partition reconstruction with D2-exact canonical encoding + correlationGroupId D2-recompute equality + closed edge.kind enum + graphId FNV-1a 32-bit×2 recompute), deterministic confidence model with mandatory freshness reference, deep-frozen output); (2) tests/r3.0d-hypothesis-engine.test.js — 148-assertion adversarial suite (sections A..K plus H2/H3/H4/H5 R1/R2/R3/R4 closure tests; mutation coverage on 21 HI wrappers + captured Date.parse/Object.is/Object.isFrozen via J1..J21); (3) governance/r3.0d/checkpoints/D3.json — this manifest; (4) state transitions in state.json + train.json + train phaseStates; (5) package.json adds new test entry to the scripts.test chain so the per-file manifest scanner discovers it deterministically.",
 

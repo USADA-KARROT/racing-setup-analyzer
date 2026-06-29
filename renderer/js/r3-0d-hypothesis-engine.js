@@ -16,8 +16,10 @@
  *   • Confidence is computed by D3 from evidence weighting; caller-supplied confidence is
  *     rejected. State enum {not_computed, insufficient_evidence, low, moderate, high}; numeric
  *     score is bounded integer 0..100 derived deterministically from independent supporting
- *     groups + credibility + contradictions + freshness. Score is auxiliary; state is the
- *     semantic primary.
+ *     groups + aggregate credibility + contradictions. Score is auxiliary; state is the
+ *     semantic primary. Freshness is used SOLELY as an eligibility / staleness gate (stale
+ *     nodes are rejected at authority verification) — it does NOT contribute to the
+ *     confidence score (Codex D3 R5 D3-R5-03 closure).
  *   • All ambient intrinsic calls go through R3_0D_HardenedIntrinsics (HI). Mutation-tested
  *     coverage proves regressions are caught. The validation path NEVER invokes
  *     attacker-replaced ambient intrinsics — that is the primary defence; the four integrity
@@ -624,17 +626,98 @@
       }
     }
 
-    // Codex D3 R3 R3-03 closure: enforce D2's closed edge.kind enum.
-    var EDGE_KIND_ALLOWED = ['supports', 'contradicts', 'derived_from', 'correlated_with', 'invalidates'];
+    // Codex D3 R5 D3-R5-01 closure: reconstruct the EXACT edge set D2 emits from the
+    // sanitized node fields + correlation groups, then require g.edges to match it as a
+    // set. D2 emits exactly three edge kinds:
+    //   - 'supports'         from each node.supportingEdges entry
+    //   - 'contradicts'      from each node.contradictingEdges entry
+    //   - 'correlated_with'  from pairs of correlation-group members (sorted lo→hi)
+    // The closed enum {supports, contradicts, derived_from, correlated_with, invalidates}
+    // describes the universe of LEGAL kinds, but `derived_from` and `invalidates` are
+    // RESERVED — no D2 producer emits them. D3 rejects any graph claiming a reserved kind
+    // because such a graph cannot have come from D2.
+    var EDGE_KIND_EMITTED = ['supports', 'contradicts', 'correlated_with'];
+    var expectedEdgeSet = HI.safeObjectCreateNull();
+    var expectedEdgeCount = 0;
+    function _expectedEdgeKey(from, to, kind) { return from + '|' + to + '|' + kind; }
+    function _addExpectedEdge(from, to, kind) {
+      var k = _expectedEdgeKey(from, to, kind);
+      if (HI.safeGetOwnDescriptor(expectedEdgeSet, k)) return;
+      HI.safeDefineDataProperty(expectedEdgeSet, k, true);
+      expectedEdgeCount += 1;
+    }
+    // supports + contradicts from node declarations
+    for (var nei = 0; nei < g.nodes.length; nei++) {
+      var ne = g.nodes[nei];
+      if (_isPlainArray(ne.supportingEdges)) {
+        for (var sj = 0; sj < ne.supportingEdges.length; sj++) {
+          var sId = ne.supportingEdges[sj];
+          if (!_isNonEmptyString(sId) || !HI.safeGetOwnDescriptor(nodeIdSet, sId)) {
+            return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_ORPHAN] };
+          }
+          if (sId === ne.nodeId) {
+            return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_SELF_REFERENCE] };
+          }
+          _addExpectedEdge(ne.nodeId, sId, 'supports');
+        }
+      }
+      if (_isPlainArray(ne.contradictingEdges)) {
+        for (var cj = 0; cj < ne.contradictingEdges.length; cj++) {
+          var cId = ne.contradictingEdges[cj];
+          if (!_isNonEmptyString(cId) || !HI.safeGetOwnDescriptor(nodeIdSet, cId)) {
+            return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_ORPHAN] };
+          }
+          if (cId === ne.nodeId) {
+            return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_SELF_REFERENCE] };
+          }
+          _addExpectedEdge(ne.nodeId, cId, 'contradicts');
+        }
+      }
+    }
+    // correlated_with from groups with ≥2 members (pairwise lo→hi)
+    for (var cgj = 0; cgj < g.correlationGroups.length; cgj++) {
+      var cgM = g.correlationGroups[cgj].memberNodeIds;
+      if (!_isPlainArray(cgM) || cgM.length < 2) continue;
+      var sortedM = HI.safeArraySlice(cgM);
+      HI.safeArraySort(sortedM, _strcmp);
+      for (var mai = 0; mai < sortedM.length; mai++) {
+        for (var mbj = mai + 1; mbj < sortedM.length; mbj++) {
+          _addExpectedEdge(sortedM[mai], sortedM[mbj], 'correlated_with');
+        }
+      }
+    }
+    // Verify g.edges matches the expected set EXACTLY (no extras, no missing, no reserved kinds).
+    var seenActual = HI.safeObjectCreateNull();
+    var seenActualCount = 0;
     for (var ei = 0; ei < g.edges.length; ei++) {
       var e = g.edges[ei];
       if (!_isPlainObject(e) || !_isNonEmptyString(e.from) || !_isNonEmptyString(e.to) || !_isNonEmptyString(e.kind)) {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
       }
-      if (HI.safeArrayIndexOf(EDGE_KIND_ALLOWED, e.kind) === -1) {
+      if (HI.safeArrayIndexOf(EDGE_KIND_EMITTED, e.kind) === -1) {
+        // Reserved kind (derived_from / invalidates) OR unknown kind — rejected.
         return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
       }
       if (!HI.safeGetOwnDescriptor(nodeIdSet, e.from) || !HI.safeGetOwnDescriptor(nodeIdSet, e.to)) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_ORPHAN] };
+      }
+      var eKey = _expectedEdgeKey(e.from, e.to, e.kind);
+      if (!HI.safeGetOwnDescriptor(expectedEdgeSet, eKey)) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
+      }
+      if (HI.safeGetOwnDescriptor(seenActual, eKey)) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
+      }
+      HI.safeDefineDataProperty(seenActual, eKey, true);
+      seenActualCount += 1;
+    }
+    if (seenActualCount !== expectedEdgeCount) {
+      return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
+    }
+    // Preserve original endpoint-existence check (defensive):
+    for (var lei = 0; lei < g.edges.length; lei++) {
+      var le = g.edges[lei];
+      if (!HI.safeGetOwnDescriptor(nodeIdSet, le.from) || !HI.safeGetOwnDescriptor(nodeIdSet, le.to)) {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_ORPHAN] };
       }
     }

@@ -1054,10 +1054,10 @@ console.log('Section H5 — Codex D3 R4 closures');
     generationToken: g.generationToken, contextVersion: g.contextVersion,
   });
   var r = _he({ graph: shell });
-  chk('HRR4-01-a: identity with extra own key rejected (SI.validateSourceIdentity allowlist)',
+  // Codex D3 R5 D3-R5-04 closure: lock exact reason-code array (not "either of two codes").
+  chk('HRR4-01-a: identity with extra own key rejected — exact reasonCodes ["SOURCE_IDENTITY_INVALID","UNKNOWN_OWN_KEY"]',
     r.eligible === false
-      && (HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.SOURCE_IDENTITY_INVALID) !== -1
-          || HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.UNKNOWN_OWN_KEY) !== -1));
+      && JSON.stringify(r.reasonCodes) === JSON.stringify(['SOURCE_IDENTITY_INVALID', 'UNKNOWN_OWN_KEY']));
 
   // (b) oversize caseId (>STRING_BYTE_CAP) → caught by SI byte cap
   var bigCase = ''; while (bigCase.length < 513) bigCase += 'x';
@@ -1076,8 +1076,9 @@ console.log('Section H5 — Codex D3 R4 closures');
     generationToken: g.generationToken, contextVersion: g.contextVersion,
   });
   var r2 = _he({ graph: shell2 });
-  chk('HRR4-01-b: identity caseId >STRING_BYTE_CAP rejected (SI byte cap)',
-    r2.eligible === false);
+  chk('HRR4-01-b: identity caseId >STRING_BYTE_CAP rejected — exact reasonCodes ["BYTE_CAP_EXCEEDED"]',
+    r2.eligible === false
+      && JSON.stringify(r2.reasonCodes) === JSON.stringify(['BYTE_CAP_EXCEEDED']));
 
   // (c) freshness without proper ISO offset notation `+0000` (must be `+00:00` or `Z`)
   var badFreshNode = HI.safeStructuredClone(g.nodes[0]);
@@ -1095,8 +1096,57 @@ console.log('Section H5 — Codex D3 R4 closures');
     generationToken: g.generationToken, contextVersion: g.contextVersion,
   });
   var r3 = _he({ graph: shell3 });
-  chk('HRR4-01-c: freshness with non-strict-ISO offset (`+0000` instead of `+00:00`) rejected (SI ISO regex)',
-    r3.eligible === false);
+  chk('HRR4-01-c: freshness with non-strict-ISO offset (`+0000` instead of `+00:00`) rejected — exact reasonCodes ["SOURCE_IDENTITY_INVALID"]',
+    r3.eligible === false
+      && JSON.stringify(r3.reasonCodes) === JSON.stringify(['SOURCE_IDENTITY_INVALID']));
+})();
+
+// R5-02 NIT closure: referenceNowMs path — clock NOT invoked, createdAt === null
+(function () {
+  var g = _buildGraph([_baseNode({})]);
+  var clockCalls = 0;
+  var rA = HE.buildHypothesisSet({ graph: g }, {
+    clock: function () { clockCalls += 1; return '2026-06-29T05:00:00Z'; },
+    referenceNowMs: Date.parse('2026-06-29T05:00:00Z'),  // AFTER fixture freshness (2026-06-29T00:00:00Z)
+  });
+  chk('HRR5-02-a: opts.referenceNowMs takes precedence → clock NOT invoked', clockCalls === 0);
+  chk('HRR5-02-b: when reference time comes from referenceNowMs (not clock), snapshot.createdAt === null',
+    rA.valid === true && rA.hypothesisSet.createdAt === null);
+})();
+
+// R5-01: reserved-kind edge rejection (derived_from / invalidates) — build authentic graph
+// then forge an edge with reserved kind.
+(function () {
+  var n = _baseNode({});
+  var g = _buildGraph([n]);
+  var bogusEdge = Object.freeze({ from: n.nodeId, to: n.nodeId, kind: 'derived_from' });
+  var bad = Object.freeze({
+    schemaVersion: 1, graphId: g.graphId,
+    caseAssociation: g.caseAssociation, sessionAssociation: g.sessionAssociation,
+    nodes: g.nodes, edges: Object.freeze([bogusEdge]),
+    topologicalOrder: g.topologicalOrder, deduplicationSummary: g.deduplicationSummary,
+    correlationGroups: g.correlationGroups,
+    limitations: g.limitations, cannotConclude: g.cannotConclude,
+    provenance: g.provenance, createdAt: g.createdAt,
+    generationToken: g.generationToken, contextVersion: g.contextVersion,
+  });
+  var r = _he({ graph: bad });
+  chk('HRR5-01-a: reserved edge.kind=derived_from rejected (D2 never emits this kind)',
+    r.eligible === false);
+  var bogusEdge2 = Object.freeze({ from: n.nodeId, to: n.nodeId, kind: 'invalidates' });
+  var bad2 = Object.freeze({
+    schemaVersion: 1, graphId: g.graphId,
+    caseAssociation: g.caseAssociation, sessionAssociation: g.sessionAssociation,
+    nodes: g.nodes, edges: Object.freeze([bogusEdge2]),
+    topologicalOrder: g.topologicalOrder, deduplicationSummary: g.deduplicationSummary,
+    correlationGroups: g.correlationGroups,
+    limitations: g.limitations, cannotConclude: g.cannotConclude,
+    provenance: g.provenance, createdAt: g.createdAt,
+    generationToken: g.generationToken, contextVersion: g.contextVersion,
+  });
+  var r2 = _he({ graph: bad2 });
+  chk('HRR5-01-b: reserved edge.kind=invalidates rejected',
+    r2.eligible === false);
 })();
 
 // R4-02 (NIT): coverage gaps — positive boundary tests for all 5 edge kinds, duplicate group ID,
