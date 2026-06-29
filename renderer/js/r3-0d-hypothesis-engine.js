@@ -69,6 +69,44 @@
   var _CAPTURED_OBJECT_IS_FROZEN = Object.isFrozen;
   var _CAPTURED_OBJECT_IS = Object.is;
   var _CAPTURED_DATE_PARSE = Date.parse;
+
+  // ---------- Codex D4 R3 D4-R3-02 closure: WeakSet identity attestation ----------------------
+  // Per SKYLINE 2026-06-29 architectural directive on Producer Attestation:
+  //   D3 = sole producer authority
+  //   D4 = verifier/consumer only
+  //   caller = cannot forge identity
+  // Implementation: closure-private WeakSet holds references to D3's authentic final snapshots.
+  // After full deep-freeze + complete snapshot validation, _registerAuthoritative() adds the
+  // hypothesisSet object reference. The exported verifyAuthoritativeHypothesisSet() checks
+  // BOTH shape AND WeakSet membership — clones / JSON round-trips / hand-forged frozen objects
+  // all lose authority because they're different references not in the set.
+  //
+  // The WeakSet is NEVER exposed via any API. No register / sign / extract surface. Only the
+  // narrow `verifyAuthoritativeHypothesisSet(candidate) → boolean` is exported. Same trust
+  // model as C8's r3cC8Authority / r3cC8SessionAuthority WeakSets.
+  //
+  // Lifetime: per-process; in-memory pipeline D3 → D4 only. Persistence is out of scope (would
+  // require a separate signed-snapshot store at a future checkpoint).
+  var _authoritativeHypothesisSets = new WeakSet();
+  function _registerAuthoritative(hypothesisSet) {
+    try { _authoritativeHypothesisSets.add(hypothesisSet); } catch (e) { /* fail-closed silently */ }
+  }
+  function verifyAuthoritativeHypothesisSet(candidate) {
+    // Fail-closed: any throw / Proxy / hostile getter → false.
+    try {
+      if (candidate === null || typeof candidate !== 'object') return false;
+      // Membership check is the authority gate; shape checks are belt-and-suspenders.
+      if (!_authoritativeHypothesisSets.has(candidate)) return false;
+      // The set entry MUST also still be frozen + have the expected shape (defense-in-depth
+      // against any future bug that might register a partially-built snapshot).
+      if (_CAPTURED_OBJECT_IS_FROZEN(candidate) !== true) return false;
+      if (candidate.schemaVersion !== HYPOTHESIS_SET_SCHEMA_VERSION) return false;
+      if (typeof candidate.hypothesisSetId !== 'string') return false;
+      if (typeof candidate.sourceGraphId !== 'string') return false;
+      if (!Array.isArray(candidate.hypotheses)) return false;
+      return true;
+    } catch (e) { return false; }
+  }
   function _isFrozenSafe(v) {
     try { return _CAPTURED_OBJECT_IS_FROZEN(v) === true; }
     catch (e) { return false; }
@@ -1238,13 +1276,12 @@
     var hash = _hashFNV64Hex('actionid|v1|' + hypothesisId + '|' + suffix);
     return 'act_' + hash;
   }
-  // Codex D4 R2 D4-R2-01 closure: per-hypothesis CONTENT SIGNATURE binding ALL decision-relevant
-  // fields. D3 emits this signature on every hypothesis; D4 recomputes it on the cloned snapshot
-  // and verifies equality, plus uses it in hypothesisSetId so the snapshot identity binds full
-  // content (not just rule + evidence IDs). The hypothesisId continues to bind only the
-  // (ruleId, supportingEvidenceIds, contradictingEvidenceIds) tuple — that's its semantic role
-  // (a stable identity across re-derivations from the same evidence). The contentSignature is
-  // the integrity proof that the rest of the fields were emitted by D3, not mutated by a caller.
+  // Codex D4 R2 D4-R2-01 closure: per-hypothesis contentSignature binds the decision-relevant
+  // fields. This is an INTEGRITY / DETERMINISM proof (caller mutation flips the signature), NOT
+  // a producer attestation (the hash is publicly recomputable). Producer authority lives in
+  // the closure-private WeakSet `_authoritativeHypothesisSets` (see Codex D4 R3 D4-R3-02 closure
+  // above). D4 must call `verifyAuthoritativeHypothesisSet()` first — contentSignature equality
+  // alone is NOT sufficient authority.
   function _contentSignature(hypothesisObj, schemaVersion) {
     var contentMaterial = {
       v: schemaVersion,
@@ -1791,6 +1828,10 @@
         return _buildIntrinsicTamperBlock('intrinsic-tampering detected post-freeze');
       }
 
+      // Codex D4 R3 D4-R3-02 closure: ONLY a fully validated + fully deep-frozen snapshot is
+      // registered as authoritative. Blocked / partial results never reach this line.
+      _registerAuthoritative(hypothesisSet);
+
       return HI.deepFreeze({ valid: true, hypothesisSet: hypothesisSet });
 
     } catch (eOuter) {
@@ -1818,6 +1859,11 @@
     LIMITATIONS_CAP: LIMITATIONS_CAP,
     ENVELOPE_BYTE_CAP: ENVELOPE_BYTE_CAP,
     buildHypothesisSet: buildHypothesisSet,
+    // Codex D4 R3 D4-R3-02 closure: narrow producer-authority verifier. Consumers (D4) call
+    // this to confirm an alleged D3 snapshot was actually produced by THIS D3 instance. The
+    // closure-private WeakSet is the trust anchor — never exposed via any other API surface.
+    // Returns boolean. NEVER throws. NEVER reveals the registry. NEVER signs caller payloads.
+    verifyAuthoritativeHypothesisSet: verifyAuthoritativeHypothesisSet,
   };
   // Freeze the api object so callers cannot replace exports. Uses HI.deepFreeze (captured
   // intrinsic) for consistency with every other freeze in this module — no ambient calls.

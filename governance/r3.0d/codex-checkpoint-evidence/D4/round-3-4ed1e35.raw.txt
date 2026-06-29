@@ -1,0 +1,2944 @@
+Reading prompt from stdin...
+OpenAI Codex v0.141.0
+--------
+workdir: /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: high
+reasoning summaries: none
+session id: 019f1273-d070-7253-8f0b-4f7579fc88b1
+--------
+user
+# Codex D4_PRIORITY_ENGINE Checkpoint Adversarial Review — Round 3
+
+## Round history
+- R1 (3a7a33e): BLOCK — 5 BLOCK + 1 NIT
+- R2 (f09323d): BLOCK — 3 BLOCK + 2 NIT (D4-R2-01..05)
+
+## Round 3 target
+
+- Branch: `feat/r3.0d-d4-priority-engine`
+- R3 candidate SHA: **`4ed1e358ebc49a7f287649ea39b6c8e46770fcd7`**
+- Train base: `feat/r3.0-integrated-delivery` HEAD = `6ab8f39`
+- R2 evidence at `governance/r3.0d/codex-checkpoint-evidence/D4/round-2-f09323d.raw.txt`
+
+## R3 closures
+
+### D4-R2-01 (content not bound to hypothesisId)
+Introduced **per-hypothesis `contentSignature`** that binds the full decision-relevant
+content. D3 (`r3-0d-hypothesis-engine.js`) emits `csig_<16hex>` on every hypothesis; D3's
+hypothesisSetId hash material now binds `[{hid, csig}]` pairs sorted by hid. D4 recomputes
+both `contentSignature` and `hypothesisSetId` and requires exact equality. Mutating any of
+{ruleVersion, category, status, i18nKey, credibility, confidence.state, confidence.score,
+supporting/contradicting/correlation/alt/cannotConclude/validationAction IDs, limitations}
+changes the recomputed csig → mismatch → HYPOTHESIS_AUTHORITY_FORGED.
+
+### D4-R2-02 (nested accessors fire before audit)
+Added `_recursiveDescriptorAudit(rootValue)` that walks the entire object/array tree via
+descriptor reads only (never invokes [[Get]] traps). Rejects any accessor descriptor /
+Symbol key / non-enumerable own property / non-plain object. Bounded depth=32 + nodes=4096.
+Runs BEFORE structuredClone.
+
+### D4-R2-03 (per-hypothesis schema open)
+- `correlationGroupIds` MUST be plain array
+- `confidence` closed key set `CONFIDENCE_KEYS_ALLOWED = ['state', 'score']`
+- `ruleVersion === rule.ruleVersion` (from HE.RULE_REGISTRY lookup)
+- HYPOTHESIS_KEYS_ALLOWED extended with `contentSignature`
+
+### D4-R2-04 NIT (test coverage)
+Section P added (11 new assertions):
+  HRR2-01-a/b/c: status / credibility / ruleVersion mutation → contentSignature mismatch
+  HRR2-02-a/b: nested accessor on hypothesis.status → recursive audit rejects pre-clone
+  HRR2-03-a/b/c: non-array correlationGroupIds / extra confidence key / ruleVersion mismatch
+  HRR2-04-a: unknown category → collect_additional_session (tier 6)
+  HRR2-05-a/b: fresh-process require(D4) does NOT pollute globalThis
+
+Suite: 62 → 73.
+
+### D4-R2-05 NIT (global pollution)
+Both D3 and D4 UMD footers now gate global assignment under CommonJS:
+  `if (typeof module !== 'undefined' && module.exports) { module.exports = api; }`
+  `else if (root) { root.R3_0D_X = api; }`
+
+In Node (CommonJS) require returns api via module.exports; globalThis is NEVER touched.
+In browser script-tag load, globalThis still receives the API.
+
+## Local verification on R3
+- npm test EXIT=0 (84 test files; 0 failures)
+- R3.0D D3 suite: 158 / 0 (unchanged — contentSignature is additive)
+- R3.0D D4 suite: 73 / 0
+- R3.0D-GOV: violations=0, ok=true
+
+## R3 task
+
+Reproduce all R2 findings and verify closure:
+
+1. **R2-01 closure**: mutate status / credibility / ruleVersion / confidence.score on a
+   genuine D3-produced hypothesis (keep hypothesisId) → MUST reject (csig mismatch).
+2. **R2-02 closure**: insert a nested accessor on `hypothesis.status` of an otherwise
+   genuine HSET → MUST reject; getter MUST NOT fire.
+3. **R2-03 closure**: try `correlationGroupIds: "string"`; extra confidence key; ruleVersion=999.
+4. **R2-05 closure**: fresh `node -e "require('./r3-0d-priority-engine.js'); console.log(typeof globalThis.R3_0D_PriorityEngine)"` → output should be `'undefined'`.
+
+Then sweep for new vectors introduced by R3:
+
+a. **contentSignature recompute** — is the hash formula EXACTLY the same in D3 emit and
+   D4 verify? Test independently.
+b. **hypothesisSetId formula** — D3 emits hsetId based on (hid, csig) pairs; D4 recomputes
+   the same way. Confirm hashes match for a fresh D3 graph.
+c. **D3 backward compat** — D3 tests (158/0) still pass; existing D3 graphs still produce
+   stable hsetId given same input.
+d. **Recursive audit bounds** — depth-32 + nodes-4096 caps reasonable? Could a deep but
+   legitimate graph exceed? (Typical D3 set: 64 hypotheses × ~20 fields each ≈ 1280 nodes —
+   well under 4096.)
+e. **opts.clock still works** — data descriptor preserved.
+f. **Hash byte equivalence D3 vs D4** — independent recompute of contentSignature on
+   an authentic D3 hypothesis matches D3's emitted value.
+
+For each finding return:
+```
+Finding D4-R3-NN: <one-line summary>
+  evidence: <file:line + reproduction note>
+  severity: BLOCK | NIT
+  proposed closure: <change>
+```
+
+End with `FINAL VERDICT: PASS | BLOCK`.
+
+codex
+I’ll perform a read-only adversarial review of the exact candidate SHA, first checking repository state and the R2 evidence, then reproducing the required mutations and independently auditing both hash formulas and recursive-audit behavior.
+exec
+/bin/bash -lc "git status --short --branch && git rev-parse HEAD && git rev-parse feat/r3.0-integrated-delivery && git show --stat --oneline --decorate --no-renames 4ed1e358ebc49a7f287649ea39b6c8e46770fcd7 && rg --files | rg 'r3-0d-(hypothesis|priority)-engine|round-2-f09323d|r3.0d.*(hypothesis|priority)'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-ORokRf07' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-zXGk5ReE' (errno=Operation not permitted)
+## feat/r3.0d-d4-priority-engine...origin/feat/r3.0d-d4-priority-engine
+?? governance/r3.0d/codex-checkpoint-evidence/D4/round-3-4ed1e35.raw.txt
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-9iNBsLpN' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-9Mo90niA' (errno=Operation not permitted)
+4ed1e358ebc49a7f287649ea39b6c8e46770fcd7
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-jlFGgNpk' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-mRSktaf7' (errno=Operation not permitted)
+6ab8f390b0128bbee4df77f88fa2edd46df6b677
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-J3kdQ1M0' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-V5YRdSsK' (errno=Operation not permitted)
+4ed1e35 (HEAD -> feat/r3.0d-d4-priority-engine, origin/feat/r3.0d-d4-priority-engine) d4(r3): close Codex D4 Round 2 — 3 BLOCK + 2 NIT closures (D3 contentSignature + recursive audit + schema tighten + global gate)
+ governance/r3.0d/checkpoints/D4.json               |    5 +-
+ .../D4/round-2-f09323d.raw.txt                     | 5277 ++++++++++++++++++++
+ renderer/js/r3-0d-hypothesis-engine.js             |  107 +-
+ renderer/js/r3-0d-priority-engine.js               |  150 +-
+ tests/r3.0d-priority-engine.test.js                |  154 +
+ 5 files changed, 5651 insertions(+), 42 deletions(-)
+governance/r3.0d/codex-checkpoint-evidence/D4/round-2-f09323d.raw.txt
+tests/r3.0d-hypothesis-engine.test.js
+tests/r3.0d-priority-engine.test.js
+contracts/r3.0d/hypothesis-contract.js
+renderer/js/r3-0d-priority-engine.js
+renderer/js/r3-0d-hypothesis-engine.js
+
+codex
+The worktree is at the requested SHA and the train base resolves to `6ab8f39`. There is one pre-existing untracked Round 3 evidence file; I will not modify it. I’m now tracing the exact signing, verification, schema, and audit code before running focused reproducers.
+exec
+/bin/bash -lc 'rg -n "D4-R2-|Finding D4-R2|FINAL VERDICT" governance/r3.0d/codex-checkpoint-evidence/D4/round-2-f09323d.raw.txt | tail -80
+rg -n "contentSignature|hypothesisSetId|recursiveDescriptorAudit|CONFIDENCE_KEYS_ALLOWED|correlationGroupIds|ruleVersion|structuredClone|opts.clock|module.exports|globalThis" renderer/js/r3-0d-hypothesis-engine.js renderer/js/r3-0d-priority-engine.js tests/r3.0d-priority-engine.test.js tests/r3.0d-hypothesis-engine.test.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+91:Finding D4-R2-NN: <one-line summary>
+97:End with `FINAL VERDICT: PASS | BLOCK`.
+3143:  3067	FINAL VERDICT: BLOCK
+3176:  3100	FINAL VERDICT: BLOCK
+5207:Finding D4-R2-01: Hypothesis identity still does not authenticate most decision-relevant content
+5212:Finding D4-R2-02: Nested accessors execute before authority auditing
+5217:Finding D4-R2-03: Per-hypothesis D3 schema remains structurally open
+5222:Finding D4-R2-04: Round-2 tests do not cover the claimed closure matrix
+5227:Finding D4-R2-05: Importing D4 pollutes Node global scope with D3 API
+5234:FINAL VERDICT: BLOCK
+5250:Finding D4-R2-01: Hypothesis identity still does not authenticate most decision-relevant content
+5255:Finding D4-R2-02: Nested accessors execute before authority auditing
+5260:Finding D4-R2-03: Per-hypothesis D3 schema remains structurally open
+5265:Finding D4-R2-04: Round-2 tests do not cover the claimed closure matrix
+5270:Finding D4-R2-05: Importing D4 pollutes Node global scope with D3 API
+5277:FINAL VERDICT: BLOCK
+tests/r3.0d-priority-engine.test.js:7: *   C) Authority — hypothesisSetId recompute, frozen requirement, fabricated rejection
+tests/r3.0d-priority-engine.test.js:17: *   L) Mandatory freshness — opts.clock or opts.referenceNowMs required
+tests/r3.0d-priority-engine.test.js:81:  chk('A1: sourceHypothesisSetId mirrors input hsetId', r.prioritySet.sourceHypothesisSetId === hs.hypothesisSetId);
+tests/r3.0d-priority-engine.test.js:143:    schemaVersion: 1, hypothesisSetId: 'hset_0000000000000000', sourceGraphId: 'graph_0000000000000000',
+tests/r3.0d-priority-engine.test.js:174:    schemaVersion: 1, hypothesisSetId: 'hset_ffffffffffffffff', sourceGraphId: hs.sourceGraphId,
+tests/r3.0d-priority-engine.test.js:466:    hypothesisId: origH.hypothesisId, ruleId: origH.ruleId, ruleVersion: origH.ruleVersion,
+tests/r3.0d-priority-engine.test.js:471:    correlationGroupIds: origH.correlationGroupIds,
+tests/r3.0d-priority-engine.test.js:479:    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+tests/r3.0d-priority-engine.test.js:499:  ['schemaVersion','hypothesisSetId','sourceGraphId','caseAssociation','sessionAssociation','hypotheses','alternativeExplanations','validationActions','cannotConclude','limitations','provenance','generationToken','contextVersion'].forEach(function (k) {
+tests/r3.0d-priority-engine.test.js:512:// R1-02 (cont): accessor on opts.clock rejected
+tests/r3.0d-priority-engine.test.js:518:  chk('HRR1-02-c: accessor descriptor on opts.clock rejected',
+tests/r3.0d-priority-engine.test.js:529:    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+tests/r3.0d-priority-engine.test.js:550:    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+tests/r3.0d-priority-engine.test.js:606:// R2-01: mutating status/credibility/ruleVersion now caught by contentSignature mismatch
+tests/r3.0d-priority-engine.test.js:610:  // Mutate status — contentSignature should mismatch
+tests/r3.0d-priority-engine.test.js:613:    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+tests/r3.0d-priority-engine.test.js:623:  chk('HRR2-01-a: mutating status (same hypothesisId) rejected via contentSignature mismatch',
+tests/r3.0d-priority-engine.test.js:630:  chk('HRR2-01-b: mutating credibility (same hypothesisId) rejected via contentSignature mismatch',
+tests/r3.0d-priority-engine.test.js:632:  // Mutate ruleVersion
+tests/r3.0d-priority-engine.test.js:633:  var rvMutated = Object.freeze(Object.assign({}, origH, { ruleVersion: 999 }));
+tests/r3.0d-priority-engine.test.js:636:  chk('HRR2-01-c: mutating ruleVersion (same hypothesisId) rejected',
+tests/r3.0d-priority-engine.test.js:649:  ['hypothesisId','ruleId','ruleVersion','category','i18nKey','supportingEvidenceIds',
+tests/r3.0d-priority-engine.test.js:650:   'contradictingEvidenceIds','correlationGroupIds','alternativeExplanationIds',
+tests/r3.0d-priority-engine.test.js:652:   'contentSignature','provenance'].forEach(function (k) {
+tests/r3.0d-priority-engine.test.js:658:    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+tests/r3.0d-priority-engine.test.js:673:// R2-03: non-array correlationGroupIds rejected; extra confidence key rejected; ruleVersion validated
+tests/r3.0d-priority-engine.test.js:678:  // (a) non-array correlationGroupIds
+tests/r3.0d-priority-engine.test.js:679:  var badCorr = Object.freeze(Object.assign({}, origH, { correlationGroupIds: 'not-an-array' }));
+tests/r3.0d-priority-engine.test.js:681:    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+tests/r3.0d-priority-engine.test.js:691:  chk('HRR2-03-a: non-array correlationGroupIds rejected', rA.eligible === false);
+tests/r3.0d-priority-engine.test.js:703:  // (c) ruleVersion mismatch (rule registry has version 1; tamper to 999)
+tests/r3.0d-priority-engine.test.js:704:  var badRv = Object.freeze(Object.assign({}, origH, { ruleVersion: 999 }));
+tests/r3.0d-priority-engine.test.js:707:  chk('HRR2-03-c: ruleVersion mismatch (vs HE.RULE_REGISTRY) rejected',
+tests/r3.0d-priority-engine.test.js:735:  // requiring d4 doesn't write to globalThis. We can simulate by spawning a child node and
+tests/r3.0d-priority-engine.test.js:736:  // checking globalThis after require.
+tests/r3.0d-priority-engine.test.js:738:  var probe = "var hadPE = typeof globalThis.R3_0D_PriorityEngine !== 'undefined';\n" +
+tests/r3.0d-priority-engine.test.js:739:              "var hadHE = typeof globalThis.R3_0D_HypothesisEngine !== 'undefined';\n" +
+tests/r3.0d-priority-engine.test.js:741:              "var hasPE = typeof globalThis.R3_0D_PriorityEngine !== 'undefined';\n" +
+tests/r3.0d-priority-engine.test.js:742:              "var hasHE = typeof globalThis.R3_0D_HypothesisEngine !== 'undefined';\n" +
+tests/r3.0d-priority-engine.test.js:747:    chk('HRR2-05-a: fresh-process require(D4) does NOT pollute globalThis with R3_0D_PriorityEngine',
+tests/r3.0d-priority-engine.test.js:749:    chk('HRR2-05-b: fresh-process require(D4) does NOT pollute globalThis with R3_0D_HypothesisEngine',
+tests/r3.0d-hypothesis-engine.test.js:148:  chk('A3: same graph → same hypothesisSetId', r1.hypothesisSet.hypothesisSetId === r2.hypothesisSet.hypothesisSetId);
+tests/r3.0d-hypothesis-engine.test.js:188:  chk('B8: hypothesisSetId matches hset_<16-hex>', /^hset_[0-9a-f]{16}$/.test(hs.hypothesisSetId));
+tests/r3.0d-hypothesis-engine.test.js:284:  // D2: hypothesisSetId is independent of caller-supplied generationToken (token IS persisted but
+tests/r3.0d-hypothesis-engine.test.js:290:    rA.hypothesisSet.hypothesisSetId === rB.hypothesisSet.hypothesisSetId);
+tests/r3.0d-hypothesis-engine.test.js:693:  // and gave false security claims). New posture: hostile getter MAY fire during structuredClone
+tests/r3.0d-hypothesis-engine.test.js:701:  chk('HR07-2: hostile getter fired (it ran during structuredClone, but its effect is bounded to the clone)',
+tests/r3.0d-hypothesis-engine.test.js:985:  chk('HRR3-05-b: non-enumerable opts.clock rejected',
+tests/r3.0d-hypothesis-engine.test.js:995:  chk('HRR3-06-a: opts.clock invoked at most once per buildHypothesisSet call', calls <= 1);
+tests/r3.0d-hypothesis-engine.test.js:1374:  chk('HRR4-02-c: opts.clock invoked EXACTLY once per buildHypothesisSet call', clockCalls === 1);
+tests/r3.0d-hypothesis-engine.test.js:1524:    /^hset_[0-9a-f]{16}$/.test(r.result.hypothesisSet.hypothesisSetId));
+tests/r3.0d-hypothesis-engine.test.js:1595:  // J18: structuredClone — engine uses HI.safeStructuredClone
+tests/r3.0d-hypothesis-engine.test.js:1596:  if (typeof structuredClone === 'function') {
+tests/r3.0d-hypothesis-engine.test.js:1598:    var origSC = structuredClone;
+tests/r3.0d-hypothesis-engine.test.js:1601:    _origObjectDefineProperty(globalThis, 'structuredClone', { value: wrapped, configurable: true, writable: true });
+tests/r3.0d-hypothesis-engine.test.js:1604:      chk('J18: hostile global structuredClone never invoked', hits === 0);
+tests/r3.0d-hypothesis-engine.test.js:1607:      _origObjectDefineProperty(globalThis, 'structuredClone', { value: origSC, configurable: true, writable: true });
+tests/r3.0d-hypothesis-engine.test.js:1610:    chk('J18: structuredClone test skipped (no global structuredClone)', true);
+tests/r3.0d-hypothesis-engine.test.js:1611:    chk('J18: structuredClone test skipped (no global structuredClone)', true);
+tests/r3.0d-hypothesis-engine.test.js:1651:    r.hypothesisSet.hypothesisSetId = 'modified';
+tests/r3.0d-hypothesis-engine.test.js:1653:  chk('K2: cannot reassign hypothesisSetId (frozen)', threw2 === true || r.hypothesisSet.hypothesisSetId !== 'modified');
+renderer/js/r3-0d-priority-engine.js:11: *     (4) hypothesisSetId recompute equality with asserted hsetId,
+renderer/js/r3-0d-priority-engine.js:34: *   • Mandatory freshness reference time (opts.clock() OR opts.referenceNowMs); inherits
+renderer/js/r3-0d-priority-engine.js:46:  if (typeof module !== 'undefined' && module.exports) {
+renderer/js/r3-0d-priority-engine.js:66:  if (typeof module !== 'undefined' && module.exports) {
+renderer/js/r3-0d-priority-engine.js:91:  // Codex D4 R2 D4-R2-03 closure: D3 now emits a contentSignature on every hypothesis (binds
+renderer/js/r3-0d-priority-engine.js:94:    'hypothesisId', 'ruleId', 'ruleVersion', 'category', 'status', 'i18nKey',
+renderer/js/r3-0d-priority-engine.js:95:    'supportingEvidenceIds', 'contradictingEvidenceIds', 'correlationGroupIds',
+renderer/js/r3-0d-priority-engine.js:97:    'credibility', 'confidence', 'limitations', 'contentSignature', 'provenance',
+renderer/js/r3-0d-priority-engine.js:99:  var CONFIDENCE_KEYS_ALLOWED = HI.deepFreeze(['state', 'score']);
+renderer/js/r3-0d-priority-engine.js:102:    'schemaVersion', 'hypothesisSetId', 'sourceGraphId', 'caseAssociation', 'sessionAssociation',
+renderer/js/r3-0d-priority-engine.js:226:  function _recursiveDescriptorAudit(rootValue) {
+renderer/js/r3-0d-priority-engine.js:305:    // changes that hypothesis's contentSignature, which changes hsetId.
+renderer/js/r3-0d-priority-engine.js:307:      return { hid: h.hypothesisId, csig: h.contentSignature };
+renderer/js/r3-0d-priority-engine.js:327:    // would fire during structuredClone before the post-clone audit could see anything).
+renderer/js/r3-0d-priority-engine.js:333:    var recursiveAudit = _recursiveDescriptorAudit(hsIn);
+renderer/js/r3-0d-priority-engine.js:357:    if (!_isNonEmptyString(hs.hypothesisSetId)
+renderer/js/r3-0d-priority-engine.js:358:        || !HI.safeRegExpTest(/^hset_[0-9a-f]{16}$/, hs.hypothesisSetId)) {
+renderer/js/r3-0d-priority-engine.js:454:      // ruleVersion MUST match rule registry (Codex D4 R2 D4-R2-03 closure: previously not validated).
+renderer/js/r3-0d-priority-engine.js:455:      if (h.ruleVersion !== rule.ruleVersion) {
+renderer/js/r3-0d-priority-engine.js:479:        if (HI.safeArrayIndexOf(CONFIDENCE_KEYS_ALLOWED, confKeys[cki]) === -1) {
+renderer/js/r3-0d-priority-engine.js:492:      // correlationGroupIds: plain array of strings (Codex D4 R2 D4-R2-03 closure).
+renderer/js/r3-0d-priority-engine.js:493:      if (!_isPlainArray(h.correlationGroupIds)) {
+renderer/js/r3-0d-priority-engine.js:496:      // contentSignature: present, well-formed string, and EQUAL to D3's recomputed signature
+renderer/js/r3-0d-priority-engine.js:498:      if (!_isNonEmptyString(h.contentSignature)
+renderer/js/r3-0d-priority-engine.js:499:          || !HI.safeRegExpTest(/^csig_[0-9a-f]{16}$/, h.contentSignature)) {
+renderer/js/r3-0d-priority-engine.js:506:        ruleVersion: h.ruleVersion,
+renderer/js/r3-0d-priority-engine.js:517:        corr: h.correlationGroupIds,
+renderer/js/r3-0d-priority-engine.js:524:      if (expectedSig !== h.contentSignature) {
+renderer/js/r3-0d-priority-engine.js:551:    // Recompute hypothesisSetId — independent authority verification.
+renderer/js/r3-0d-priority-engine.js:555:    if (recomputed !== hs.hypothesisSetId) {
+renderer/js/r3-0d-priority-engine.js:742:          // Codex D4 R1 D4-R1-02 closure: opts.clock MUST be a data descriptor (not accessor).
+renderer/js/r3-0d-priority-engine.js:745:            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts.clock accessor descriptor not allowed' });
+renderer/js/r3-0d-priority-engine.js:748:            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'opts.clock must be enumerable' });
+renderer/js/r3-0d-priority-engine.js:816:          detail: 'D4 requires a reference time for freshness verification — supply opts.clock() OR opts.referenceNowMs',
+renderer/js/r3-0d-priority-engine.js:1002:      var prisetId = _prioritySetId(hs.hypothesisSetId, ranked, PRIORITY_SET_SCHEMA_VERSION);
+renderer/js/r3-0d-priority-engine.js:1016:        sourceHypothesisSetId: hs.hypothesisSetId,
+renderer/js/r3-0d-priority-engine.js:1068:  // Codex D4 R2 D4-R2-05 closure: under CommonJS, expose ONLY via module.exports.
+renderer/js/r3-0d-priority-engine.js:1069:  if (typeof module !== 'undefined' && module.exports) {
+renderer/js/r3-0d-priority-engine.js:1070:    module.exports = api;
+renderer/js/r3-0d-priority-engine.js:1074:})(typeof globalThis !== 'undefined' ? globalThis : this);
+renderer/js/r3-0d-hypothesis-engine.js:41:  if (typeof module !== 'undefined' && module.exports) {
+renderer/js/r3-0d-hypothesis-engine.js:170:  // be supplied via opts.clock() returning ISO 8601 (preferred) or opts.referenceNowMs.
+renderer/js/r3-0d-hypothesis-engine.js:345:    //   1. structuredClone produces a brand-new plain-object tree. The clone process invokes
+renderer/js/r3-0d-hypothesis-engine.js:367:    // smuggling through structuredClone's permissive deep-clone semantics.
+renderer/js/r3-0d-hypothesis-engine.js:514:      // available (resolved from opts.clock or opts.referenceNowMs). maxAgeMs has a default
+renderer/js/r3-0d-hypothesis-engine.js:771:      ruleVersion: 1,
+renderer/js/r3-0d-hypothesis-engine.js:795:      ruleVersion: 1,
+renderer/js/r3-0d-hypothesis-engine.js:818:      ruleVersion: 1,
+renderer/js/r3-0d-hypothesis-engine.js:841:      ruleVersion: 1,
+renderer/js/r3-0d-hypothesis-engine.js:865:      ruleVersion: 1,
+renderer/js/r3-0d-hypothesis-engine.js:890:      ruleVersion: 1,
+renderer/js/r3-0d-hypothesis-engine.js:915:      ruleVersion: 1,
+renderer/js/r3-0d-hypothesis-engine.js:940:      ruleVersion: 1,
+renderer/js/r3-0d-hypothesis-engine.js:961:      ruleVersion: 1,
+renderer/js/r3-0d-hypothesis-engine.js:1205:      ruleVersion: rule.ruleVersion,
+renderer/js/r3-0d-hypothesis-engine.js:1212:      correlationGroupIds: groups.groupIds,
+renderer/js/r3-0d-hypothesis-engine.js:1243:  // and verifies equality, plus uses it in hypothesisSetId so the snapshot identity binds full
+renderer/js/r3-0d-hypothesis-engine.js:1246:  // (a stable identity across re-derivations from the same evidence). The contentSignature is
+renderer/js/r3-0d-hypothesis-engine.js:1248:  function _contentSignature(hypothesisObj, schemaVersion) {
+renderer/js/r3-0d-hypothesis-engine.js:1253:      ruleVersion: hypothesisObj.ruleVersion,
+renderer/js/r3-0d-hypothesis-engine.js:1264:      corr: hypothesisObj.correlationGroupIds,
+renderer/js/r3-0d-hypothesis-engine.js:1273:  function _hypothesisSetId(graphId, hypotheses, schemaVersion) {
+renderer/js/r3-0d-hypothesis-engine.js:1274:    // hsetId now binds BOTH hypothesisId AND contentSignature (Codex D4 R2 D4-R2-01 closure).
+renderer/js/r3-0d-hypothesis-engine.js:1276:    // confidence, ruleVersion, ...) changes that hypothesis's contentSignature, which changes
+renderer/js/r3-0d-hypothesis-engine.js:1279:      return { hid: h.hypothesisId, csig: h.contentSignature };
+renderer/js/r3-0d-hypothesis-engine.js:1339:    var corrGroupFrozen = HI.deepFreeze(HI.safeArraySlice(evalResult.correlationGroupIds));
+renderer/js/r3-0d-hypothesis-engine.js:1349:    // Codex D4 R2 D4-R2-01 closure: compute contentSignature over the full hypothesis content
+renderer/js/r3-0d-hypothesis-engine.js:1355:      ruleVersion: rule.ruleVersion,
+renderer/js/r3-0d-hypothesis-engine.js:1361:      correlationGroupIds: corrGroupFrozen,
+renderer/js/r3-0d-hypothesis-engine.js:1369:    var contentSig = _contentSignature(draftForSig, HYPOTHESIS_SET_SCHEMA_VERSION);
+renderer/js/r3-0d-hypothesis-engine.js:1374:      ruleVersion: rule.ruleVersion,
+renderer/js/r3-0d-hypothesis-engine.js:1380:      correlationGroupIds: corrGroupFrozen,
+renderer/js/r3-0d-hypothesis-engine.js:1387:      contentSignature: contentSig,
+renderer/js/r3-0d-hypothesis-engine.js:1390:        ruleVersion: rule.ruleVersion,
+renderer/js/r3-0d-hypothesis-engine.js:1391:        supportingGroupCount: evalResult.correlationGroupIds.length,
+renderer/js/r3-0d-hypothesis-engine.js:1392:        soloSupportCount: evalResult.supportingIds.length - evalResult.correlationGroupIds.length >= 0
+renderer/js/r3-0d-hypothesis-engine.js:1393:          ? (evalResult.supportingIds.length - evalResult.correlationGroupIds.length)
+renderer/js/r3-0d-hypothesis-engine.js:1409:    if (!opts || typeof opts.clock !== 'function') return null;
+renderer/js/r3-0d-hypothesis-engine.js:1411:      var v = opts.clock();
+renderer/js/r3-0d-hypothesis-engine.js:1431:      // structuredClone produces a brand-new plain-object tree, neutralising any caller
+renderer/js/r3-0d-hypothesis-engine.js:1442:      // and force a double-clone pass through structuredClone). The authority verifier does its
+renderer/js/r3-0d-hypothesis-engine.js:1443:      // own structuredClone defang on input.graph downstream — that's the only place where the
+renderer/js/r3-0d-hypothesis-engine.js:1469:      // Opts snapshot (may be undefined / null). structuredClone rejects functions, so we
+renderer/js/r3-0d-hypothesis-engine.js:1549:      //   2. opts.clock() returning a valid ISO 8601 string — parsed to ms via captured Date.parse
+renderer/js/r3-0d-hypothesis-engine.js:1573:          detail: 'D3 requires a reference time for mandatory freshness enforcement — supply opts.clock() returning ISO 8601 OR opts.referenceNowMs (positive finite number)',
+renderer/js/r3-0d-hypothesis-engine.js:1713:      // ---- Step 5 — top-level hypothesisSetId (content-only deterministic) ----
+renderer/js/r3-0d-hypothesis-engine.js:1714:      var hsetId = _hypothesisSetId(graph.graphId, hypotheses, HYPOTHESIS_SET_SCHEMA_VERSION);
+renderer/js/r3-0d-hypothesis-engine.js:1761:        hypothesisSetId: hsetId,
+renderer/js/r3-0d-hypothesis-engine.js:1827:  // require), expose ONLY via module.exports — avoid polluting globalThis. The renderer
+renderer/js/r3-0d-hypothesis-engine.js:1828:  // browser path (no module.exports) still gets the global for ad-hoc script-tag loading.
+renderer/js/r3-0d-hypothesis-engine.js:1829:  if (typeof module !== 'undefined' && module.exports) {
+renderer/js/r3-0d-hypothesis-engine.js:1830:    module.exports = api;
+renderer/js/r3-0d-hypothesis-engine.js:1834:})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+exec
+/bin/bash -lc "nl -ba renderer/js/r3-0d-hypothesis-engine.js | sed -n '1180,1410p'
+nl -ba renderer/js/r3-0d-priority-engine.js | sed -n '200,570p'
+nl -ba renderer/js/r3-0d-priority-engine.js | sed -n '700,840p'
+nl -ba renderer/js/r3-0d-priority-engine.js | sed -n '1045,1080p'
+nl -ba renderer/js/r3-0d-hypothesis-engine.js | sed -n '1815,1840p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+  1180	
+  1181	    var supportingIds = [];
+  1182	    HI.safeArrayForEach(matched, function (n) { _arrPush(supportingIds, n.nodeId); });
+  1183	    HI.safeArraySort(supportingIds, _strcmp);
+  1184	
+  1185	    var contradictingIds = _findContradictionsForMatched(graph, matched);
+  1186	
+  1187	    var groups = _countIndependentGroups(matched, graph);
+  1188	
+  1189	    var aggCred = _aggregateCredibility(matched);
+  1190	    var classification = _classifyConfidence(
+  1191	      groups.groupIds.length,
+  1192	      groups.soloCount,
+  1193	      contradictingIds.length,
+  1194	      supportingIds.length,
+  1195	      aggCred,
+  1196	      rule
+  1197	    );
+  1198	
+  1199	    var score = _computeConfidenceScore(matched, contradictingIds.length, groups.total);
+  1200	
+  1201	    var limitations = _aggregateLimitations(matched, rule);
+  1202	
+  1203	    return {
+  1204	      ruleId: rule.ruleId,
+  1205	      ruleVersion: rule.ruleVersion,
+  1206	      category: rule.category,
+  1207	      i18nKey: rule.i18nKey,
+  1208	      fired: true,
+  1209	      matched: matched,
+  1210	      supportingIds: supportingIds,
+  1211	      contradictingIds: contradictingIds,
+  1212	      correlationGroupIds: groups.groupIds,
+  1213	      aggregateCredibility: aggCred,
+  1214	      confidenceState: classification.state,
+  1215	      status: classification.status,
+  1216	      confidenceScore: score,
+  1217	      limitations: limitations,
+  1218	      ruleObject: rule,
+  1219	    };
+  1220	  }
+  1221	
+  1222	  // ---------- ID generators ---------------------------------------------------------------------
+  1223	  function _hypothesisId(ruleId, supportingIds, contradictingIds, schemaVersion) {
+  1224	    var idMaterial = {
+  1225	      v: schemaVersion,
+  1226	      ruleId: ruleId,
+  1227	      supportingEvidenceIds: supportingIds,
+  1228	      contradictingEvidenceIds: contradictingIds,
+  1229	    };
+  1230	    var hash = _hashFNV64Hex('hypothesisid|v' + schemaVersion + '|' + HI.stableStringify(idMaterial));
+  1231	    return 'hyp_' + hash;
+  1232	  }
+  1233	  function _altId(hypothesisId, suffix) {
+  1234	    var hash = _hashFNV64Hex('altid|v1|' + hypothesisId + '|' + suffix);
+  1235	    return 'alt_' + hash;
+  1236	  }
+  1237	  function _actionId(hypothesisId, suffix) {
+  1238	    var hash = _hashFNV64Hex('actionid|v1|' + hypothesisId + '|' + suffix);
+  1239	    return 'act_' + hash;
+  1240	  }
+  1241	  // Codex D4 R2 D4-R2-01 closure: per-hypothesis CONTENT SIGNATURE binding ALL decision-relevant
+  1242	  // fields. D3 emits this signature on every hypothesis; D4 recomputes it on the cloned snapshot
+  1243	  // and verifies equality, plus uses it in hypothesisSetId so the snapshot identity binds full
+  1244	  // content (not just rule + evidence IDs). The hypothesisId continues to bind only the
+  1245	  // (ruleId, supportingEvidenceIds, contradictingEvidenceIds) tuple — that's its semantic role
+  1246	  // (a stable identity across re-derivations from the same evidence). The contentSignature is
+  1247	  // the integrity proof that the rest of the fields were emitted by D3, not mutated by a caller.
+  1248	  function _contentSignature(hypothesisObj, schemaVersion) {
+  1249	    var contentMaterial = {
+  1250	      v: schemaVersion,
+  1251	      hid: hypothesisObj.hypothesisId,
+  1252	      ruleId: hypothesisObj.ruleId,
+  1253	      ruleVersion: hypothesisObj.ruleVersion,
+  1254	      category: hypothesisObj.category,
+  1255	      status: hypothesisObj.status,
+  1256	      i18nKey: hypothesisObj.i18nKey,
+  1257	      credibility: hypothesisObj.credibility,
+  1258	      conf: {
+  1259	        state: hypothesisObj.confidence && hypothesisObj.confidence.state,
+  1260	        score: hypothesisObj.confidence && hypothesisObj.confidence.score,
+  1261	      },
+  1262	      sup: hypothesisObj.supportingEvidenceIds,
+  1263	      con: hypothesisObj.contradictingEvidenceIds,
+  1264	      corr: hypothesisObj.correlationGroupIds,
+  1265	      alts: hypothesisObj.alternativeExplanationIds,
+  1266	      cc: hypothesisObj.cannotConcludeReasonCodes,
+  1267	      acts: hypothesisObj.validationActionIds,
+  1268	      lims: hypothesisObj.limitations,
+  1269	    };
+  1270	    return 'csig_' + _hashFNV64Hex('contentsig|v' + schemaVersion + '|' + HI.stableStringify(contentMaterial));
+  1271	  }
+  1272	
+  1273	  function _hypothesisSetId(graphId, hypotheses, schemaVersion) {
+  1274	    // hsetId now binds BOTH hypothesisId AND contentSignature (Codex D4 R2 D4-R2-01 closure).
+  1275	    // A caller mutating any decision-relevant field on a hypothesis (status, credibility,
+  1276	    // confidence, ruleVersion, ...) changes that hypothesis's contentSignature, which changes
+  1277	    // hsetId. D4 can detect this by recomputing hsetId from the cloned hypothesisSet's content.
+  1278	    var pairs = HI.safeArrayMap(hypotheses, function (h) {
+  1279	      return { hid: h.hypothesisId, csig: h.contentSignature };
+  1280	    });
+  1281	    HI.safeArraySort(pairs, function (a, b) { return _strcmp(a.hid, b.hid); });
+  1282	    var hashMaterial = {
+  1283	      v: schemaVersion,
+  1284	      graphId: graphId,
+  1285	      pairs: pairs,
+  1286	    };
+  1287	    var hash = _hashFNV64Hex('hypothesissetid|v' + schemaVersion + '|' + HI.stableStringify(hashMaterial));
+  1288	    return 'hset_' + hash;
+  1289	  }
+  1290	
+  1291	  // ---------- Build hypotheses / alts / actions -------------------------------------------------
+  1292	  function _buildHypothesisRecord(evalResult, schemaVersion) {
+  1293	    var rule = evalResult.ruleObject;
+  1294	    var hid = _hypothesisId(rule.ruleId, evalResult.supportingIds, evalResult.contradictingIds, schemaVersion);
+  1295	
+  1296	    // Build per-hypothesis alternative explanations
+  1297	    var alts = [];
+  1298	    var altIds = [];
+  1299	    for (var ai = 0; ai < rule.alternativeExplanations.length; ai++) {
+  1300	      var a = rule.alternativeExplanations[ai];
+  1301	      var altId = _altId(hid, a.altSuffix);
+  1302	      _arrPush(altIds, altId);
+  1303	      _arrPush(alts, HI.deepFreeze({
+  1304	        alternativeId: altId,
+  1305	        hypothesisId: hid,
+  1306	        ruleId: rule.ruleId,
+  1307	        i18nKey: a.i18nKey,
+  1308	      }));
+  1309	    }
+  1310	    HI.safeArraySort(altIds, _strcmp);
+  1311	    HI.safeArraySort(alts, function (x, y) { return _strcmp(x.alternativeId, y.alternativeId); });
+  1312	
+  1313	    // Build validation action
+  1314	    var actId = _actionId(hid, rule.validationAction.kind);
+  1315	    var actions = [HI.deepFreeze({
+  1316	      actionId: actId,
+  1317	      hypothesisId: hid,
+  1318	      kind: rule.validationAction.kind,
+  1319	      i18nKey: rule.validationAction.i18nKey,
+  1320	      requiresControlledVariables: rule.validationAction.requiresControlledVariables === true,
+  1321	      expectedObservationI18nKey: rule.validationAction.expectedObservationI18nKey,
+  1322	      prerequisiteIds: HI.deepFreeze([]),
+  1323	    })];
+  1324	    var actIds = [actId];
+  1325	
+  1326	    // Cap caps caps
+  1327	    var supportingCapped = evalResult.supportingIds.length > SUPPORT_ID_PER_HYPOTHESIS_CAP
+  1328	      ? _truncSortedCopy(evalResult.supportingIds, SUPPORT_ID_PER_HYPOTHESIS_CAP)
+  1329	      : HI.safeArraySlice(evalResult.supportingIds);
+  1330	    var contradictingCapped = evalResult.contradictingIds.length > CONTRADICT_ID_PER_HYPOTHESIS_CAP
+  1331	      ? _truncSortedCopy(evalResult.contradictingIds, CONTRADICT_ID_PER_HYPOTHESIS_CAP)
+  1332	      : HI.safeArraySlice(evalResult.contradictingIds);
+  1333	    var altIdsCapped = altIds.length > ALT_ID_PER_HYPOTHESIS_CAP
+  1334	      ? _truncSortedCopy(altIds, ALT_ID_PER_HYPOTHESIS_CAP)
+  1335	      : HI.safeArraySlice(altIds);
+  1336	
+  1337	    var supportingFrozen = HI.deepFreeze(supportingCapped);
+  1338	    var contradictingFrozen = HI.deepFreeze(contradictingCapped);
+  1339	    var corrGroupFrozen = HI.deepFreeze(HI.safeArraySlice(evalResult.correlationGroupIds));
+  1340	    var altIdsFrozen = HI.deepFreeze(altIdsCapped);
+  1341	    var cannotConcludeFrozen = HI.deepFreeze([]);
+  1342	    var actIdsFrozen = HI.deepFreeze(HI.safeArraySlice(actIds));
+  1343	    var confidenceFrozen = HI.deepFreeze({
+  1344	      state: evalResult.confidenceState,
+  1345	      score: evalResult.confidenceScore,
+  1346	    });
+  1347	    var limitationsFrozen = HI.deepFreeze(HI.safeArraySlice(evalResult.limitations));
+  1348	
+  1349	    // Codex D4 R2 D4-R2-01 closure: compute contentSignature over the full hypothesis content
+  1350	    // BEFORE freezing the envelope. The signature binds all decision-relevant fields so a
+  1351	    // caller cannot mutate any of them without changing the signature (and thus hsetId).
+  1352	    var draftForSig = {
+  1353	      hypothesisId: hid,
+  1354	      ruleId: rule.ruleId,
+  1355	      ruleVersion: rule.ruleVersion,
+  1356	      category: rule.category,
+  1357	      status: evalResult.status,
+  1358	      i18nKey: rule.i18nKey,
+  1359	      supportingEvidenceIds: supportingFrozen,
+  1360	      contradictingEvidenceIds: contradictingFrozen,
+  1361	      correlationGroupIds: corrGroupFrozen,
+  1362	      alternativeExplanationIds: altIdsFrozen,
+  1363	      cannotConcludeReasonCodes: cannotConcludeFrozen,
+  1364	      validationActionIds: actIdsFrozen,
+  1365	      credibility: evalResult.aggregateCredibility,
+  1366	      confidence: confidenceFrozen,
+  1367	      limitations: limitationsFrozen,
+  1368	    };
+  1369	    var contentSig = _contentSignature(draftForSig, HYPOTHESIS_SET_SCHEMA_VERSION);
+  1370	
+  1371	    var hyp = HI.deepFreeze({
+  1372	      hypothesisId: hid,
+  1373	      ruleId: rule.ruleId,
+  1374	      ruleVersion: rule.ruleVersion,
+  1375	      category: rule.category,
+  1376	      status: evalResult.status,
+  1377	      i18nKey: rule.i18nKey,
+  1378	      supportingEvidenceIds: supportingFrozen,
+  1379	      contradictingEvidenceIds: contradictingFrozen,
+  1380	      correlationGroupIds: corrGroupFrozen,
+  1381	      alternativeExplanationIds: altIdsFrozen,
+  1382	      cannotConcludeReasonCodes: cannotConcludeFrozen,
+  1383	      validationActionIds: actIdsFrozen,
+  1384	      credibility: evalResult.aggregateCredibility,
+  1385	      confidence: confidenceFrozen,
+  1386	      limitations: limitationsFrozen,
+  1387	      contentSignature: contentSig,
+  1388	      provenance: HI.deepFreeze({
+  1389	        ruleId: rule.ruleId,
+  1390	        ruleVersion: rule.ruleVersion,
+  1391	        supportingGroupCount: evalResult.correlationGroupIds.length,
+  1392	        soloSupportCount: evalResult.supportingIds.length - evalResult.correlationGroupIds.length >= 0
+  1393	          ? (evalResult.supportingIds.length - evalResult.correlationGroupIds.length)
+  1394	          : 0,
+  1395	        contradictionCount: evalResult.contradictingIds.length,
+  1396	        supportCount: evalResult.supportingIds.length,
+  1397	      }),
+  1398	    });
+  1399	    return { hypothesis: hyp, alts: alts, actions: actions };
+  1400	  }
+  1401	  function _truncSortedCopy(sortedArr, cap) {
+  1402	    var out = [];
+  1403	    var limit = HI.safeMathFloor(cap);
+  1404	    for (var i = 0; i < sortedArr.length && i < limit; i++) _arrPush(out, sortedArr[i]);
+  1405	    return out;
+  1406	  }
+  1407	
+  1408	  function _resolveClock(opts) {
+  1409	    if (!opts || typeof opts.clock !== 'function') return null;
+  1410	    try {
+   200	    if (cat === 'data_quality') return 'fix_data_quality';
+   201	    if (cat === 'mapping_calibration') return 'recalibrate_channel';
+   202	    if (cat === 'driver_behaviour') return 'controlled_repeat_lap';
+   203	    if (cat === 'vehicle_response') return 'controlled_repeat_lap';
+   204	    if (cat === 'setup_model') return 'setup_experiment';
+   205	    return 'collect_additional_session';
+   206	  }
+   207	
+   208	  // Conclusion credibility ladder (lower index = stronger).
+   209	  var CONCLUSION_CREDIBILITY_ORDER = HI.deepFreeze(['Physics', 'Model', 'Measured', 'Derived', 'Heuristic', 'Unavailable']);
+   210	  function _crIndex(c) { return HI.safeArrayIndexOf(CONCLUSION_CREDIBILITY_ORDER, c); }
+   211	  function _crAtLeast(a, b) {
+   212	    var ia = _crIndex(a); var ib = _crIndex(b);
+   213	    if (ia === -1 || ib === -1) return false;
+   214	    return ia <= ib;
+   215	  }
+   216	
+   217	  // ---------- Helpers (HI-only) -----------------------------------------------------------------
+   218	  function _isNonEmptyString(v) { return typeof v === 'string' && v.length > 0; }
+   219	  // Codex D4 R2 D4-R2-02 closure: recursive descriptor audit. Walks the object/array tree
+   220	  // via descriptor reads only — never invokes a [[Get]] trap. Rejects any non-data
+   221	  // descriptor (accessor with get/set), any Symbol-keyed own property, any non-enumerable
+   222	  // own property, any non-plain nested value (class instance, Proxy presents with prototype
+   223	  // != Object.prototype or Array.prototype). Bounded depth=32 + total nodes=4096.
+   224	  var _MAX_AUDIT_DEPTH = 32;
+   225	  var _MAX_AUDIT_NODES = 4096;
+   226	  function _recursiveDescriptorAudit(rootValue) {
+   227	    var visited = 0;
+   228	    function _walk(v, depth) {
+   229	      if (depth > _MAX_AUDIT_DEPTH) return false;
+   230	      visited += 1;
+   231	      if (visited > _MAX_AUDIT_NODES) return false;
+   232	      if (v === null) return true;
+   233	      var t = typeof v;
+   234	      if (t === 'string' || t === 'boolean') return true;
+   235	      if (t === 'number') return HI.safeNumberIsFinite(v) === true;
+   236	      if (t === 'undefined') return true;
+   237	      if (t === 'function' || t === 'symbol' || t === 'bigint') return false;
+   238	      if (t !== 'object') return false;
+   239	      // Must be plain object or plain array (proto = Object.prototype / Array.prototype / null).
+   240	      var shape = HI.safeIsPlainShape(v);
+   241	      if (shape === 'reject') return false;
+   242	      var keys = HI.safeOwnKeys(v);
+   243	      if (keys === null) return false;
+   244	      for (var i = 0; i < keys.length; i++) {
+   245	        var k = keys[i];
+   246	        if (typeof k === 'symbol') return false;
+   247	        var d = HI.safeGetOwnDescriptor(v, k);
+   248	        if (!d) return false;
+   249	        if (!('value' in d)) return false;  // accessor descriptor (get/set)
+   250	        if (shape === 'plain-array') {
+   251	          // Array elements are enumerable by default; `length` is non-enumerable but is OK.
+   252	          if (k === 'length') {
+   253	            // Array.length is a data descriptor; allow.
+   254	          } else if (!d.enumerable) {
+   255	            return false;
+   256	          }
+   257	        } else {
+   258	          if (!d.enumerable) return false;
+   259	        }
+   260	        if (!_walk(d.value, depth + 1)) return false;
+   261	      }
+   262	      return true;
+   263	    }
+   264	    var ok = false;
+   265	    try { ok = _walk(rootValue, 0); } catch (e) { ok = false; }
+   266	    return { ok: ok, visited: visited };
+   267	  }
+   268	  function _isFiniteNumber(v) { return typeof v === 'number' && HI.safeNumberIsFinite(v) === true; }
+   269	  function _isInteger(v) { return HI.safeNumberIsInteger(v) === true; }
+   270	  function _isPlainObject(v) { return HI.safeIsPlainShape(v) === 'plain-object'; }
+   271	  function _isPlainArray(v) { return HI.safeIsPlainShape(v) === 'plain-array'; }
+   272	  function _byteLength(s) { if (typeof s !== 'string') return 0; return HI.safeUtf8ByteLength(s); }
+   273	  function _strcmp(a, b) { if (a < b) return -1; if (a > b) return 1; return 0; }
+   274	  function _arrPush(arr, v) { HI.safeArrayPush(arr, v); }
+   275	
+   276	  // ---------- FNV-1a 32-bit×2 hash (byte-equivalent to D2 / D3) ---------------------------------
+   277	  function _toHex8(h) {
+   278	    var hexChars = '0123456789abcdef';
+   279	    var out = '';
+   280	    var x = h >>> 0;
+   281	    for (var i = 7; i >= 0; i--) {
+   282	      var nibble = (x >>> (i * 4)) & 0xF;
+   283	      out += hexChars[nibble];
+   284	    }
+   285	    return out;
+   286	  }
+   287	  function _hash32(s) {
+   288	    var h = 0x811c9dc5;
+   289	    var len = (typeof s === 'string') ? s.length : 0;
+   290	    for (var i = 0; i < len; i++) {
+   291	      h ^= HI.safeStringCharCodeAt(s, i);
+   292	      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+   293	    }
+   294	    return _toHex8(h);
+   295	  }
+   296	  function _hashFNV64Hex(s) {
+   297	    var slen = (typeof s === 'string') ? s.length : 0;
+   298	    return _hash32(s) + _hash32(s + '|' + slen);
+   299	  }
+   300	
+   301	  // ---------- D3 Hypothesis Set authority verification -----------------------------------------
+   302	  function _recomputeHypothesisSetId(hsetClone) {
+   303	    // Codex D4 R2 D4-R2-01 closure: mirror D3's NEW hsetId formula which binds (hid, csig)
+   304	    // pairs sorted by hid. Caller mutating any decision-relevant field on any hypothesis
+   305	    // changes that hypothesis's contentSignature, which changes hsetId.
+   306	    var pairs = HI.safeArrayMap(hsetClone.hypotheses, function (h) {
+   307	      return { hid: h.hypothesisId, csig: h.contentSignature };
+   308	    });
+   309	    HI.safeArraySort(pairs, function (a, b) { return _strcmp(a.hid, b.hid); });
+   310	    var hashMaterial = {
+   311	      v: hsetClone.schemaVersion,
+   312	      graphId: hsetClone.sourceGraphId,
+   313	      pairs: pairs,
+   314	    };
+   315	    return 'hset_' + _hashFNV64Hex('hypothesissetid|v' + hsetClone.schemaVersion + '|' + HI.stableStringify(hashMaterial));
+   316	  }
+   317	
+   318	  function _validateAuthoritativeHypothesisSet(hsIn, refNowMs, maxAgeMs) {
+   319	    if (!_isPlainObject(hsIn)) {
+   320	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   321	    }
+   322	    if (!_isFrozenSafe(hsIn)) {
+   323	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+   324	    }
+   325	    // Codex D4 R2 D4-R2-02 closure: RECURSIVE descriptor audit BEFORE clone. The previous
+   326	    // top-level audit missed nested accessors (e.g. a getter on a hypothesis's status field
+   327	    // would fire during structuredClone before the post-clone audit could see anything).
+   328	    // The recursive audit walks every nested plain object / array via descriptor reads ONLY
+   329	    // (no value-coerced reads on accessors). Any accessor descriptor / Symbol key /
+   330	    // non-enumerable own key / non-plain object encountered → reject. The walk is bounded
+   331	    // by depth (32 levels) and total node count (4096) to defend against deep/wide hostile
+   332	    // inputs.
+   333	    var recursiveAudit = _recursiveDescriptorAudit(hsIn);
+   334	    if (!recursiveAudit.ok) {
+   335	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+   336	    }
+   337	    var hs = HI.safeStructuredClone(hsIn);
+   338	    if (hs === null || !_isPlainObject(hs)) {
+   339	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+   340	    }
+   341	    if (HI.deepOriginalShapeAudit(hs) !== true) {
+   342	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+   343	    }
+   344	    // Closed key set check on the clone.
+   345	    var hsCloneKeys = HI.safeOwnKeys(hs);
+   346	    if (hsCloneKeys === null) {
+   347	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+   348	    }
+   349	    for (var hcki = 0; hcki < hsCloneKeys.length; hcki++) {
+   350	      if (HI.safeArrayIndexOf(HSET_KEYS_ALLOWED, hsCloneKeys[hcki]) === -1) {
+   351	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY] };
+   352	      }
+   353	    }
+   354	    if (hs.schemaVersion !== 1) {
+   355	      return { valid: false, reasonCodes: [CODES.UNSUPPORTED_FUTURE_SCHEMA] };
+   356	    }
+   357	    if (!_isNonEmptyString(hs.hypothesisSetId)
+   358	        || !HI.safeRegExpTest(/^hset_[0-9a-f]{16}$/, hs.hypothesisSetId)) {
+   359	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+   360	    }
+   361	    if (!_isNonEmptyString(hs.sourceGraphId)
+   362	        || !HI.safeRegExpTest(/^graph_[0-9a-f]{16}$/, hs.sourceGraphId)) {
+   363	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+   364	    }
+   365	    if (!_isPlainObject(hs.caseAssociation)
+   366	        || !_isNonEmptyString(hs.caseAssociation.caseId)
+   367	        || !_isNonEmptyString(hs.caseAssociation.sessionId)) {
+   368	      return { valid: false, reasonCodes: [CODES.SOURCE_IDENTITY_INVALID] };
+   369	    }
+   370	    if (!_isPlainObject(hs.sessionAssociation)
+   371	        || hs.sessionAssociation.sessionId !== hs.caseAssociation.sessionId) {
+   372	      return { valid: false, reasonCodes: [CODES.SOURCE_IDENTITY_SESSION_MISMATCH] };
+   373	    }
+   374	    if (!_isPlainArray(hs.hypotheses)) {
+   375	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   376	    }
+   377	    if (hs.hypotheses.length > INPUT_HYPOTHESES_INPUT_CAP) {
+   378	      return { valid: false, reasonCodes: [CODES.GRAPH_CAP_EXCEEDED] };
+   379	    }
+   380	    if (!_isPlainArray(hs.cannotConclude)) {
+   381	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   382	    }
+   383	    if (!_isPlainArray(hs.limitations)) {
+   384	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   385	    }
+   386	    // ---- Per-hypothesis structural + cross-field validation (Codex D4 R1 D4-R1-01/03 closure) ----
+   387	    var seenHypIds = HI.safeObjectCreateNull();
+   388	    for (var hi = 0; hi < hs.hypotheses.length; hi++) {
+   389	      var h = hs.hypotheses[hi];
+   390	      if (!_isPlainObject(h)) {
+   391	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   392	      }
+   393	      // Closed key set
+   394	      var hKeys = HI.safeOwnKeys(h);
+   395	      if (hKeys === null) return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   396	      for (var hki = 0; hki < hKeys.length; hki++) {
+   397	        if (HI.safeArrayIndexOf(HYPOTHESIS_KEYS_ALLOWED, hKeys[hki]) === -1) {
+   398	          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY] };
+   399	        }
+   400	      }
+   401	      // hypothesisId grammar + uniqueness
+   402	      if (!_isNonEmptyString(h.hypothesisId)
+   403	          || HI.safeRegExpTest(ID_FORBIDDEN_RE, h.hypothesisId)
+   404	          || !HI.safeRegExpTest(/^hyp_[0-9a-f]{16}$/, h.hypothesisId)) {
+   405	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   406	      }
+   407	      if (HI.safeGetOwnDescriptor(seenHypIds, h.hypothesisId)) {
+   408	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   409	      }
+   410	      HI.safeDefineDataProperty(seenHypIds, h.hypothesisId, true);
+   411	      // ruleId required + must be in HE.RULE_REGISTRY
+   412	      if (!_isNonEmptyString(h.ruleId)) {
+   413	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   414	      }
+   415	      var rDesc = HI.safeGetOwnDescriptor(_RULE_BY_ID, h.ruleId);
+   416	      if (!rDesc) {
+   417	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   418	      }
+   419	      var rule = rDesc.value;
+   420	      // Codex D4 R1 D4-R1-01 closure: hypothesisId recompute equality binds (ruleId,
+   421	      // supportingEvidenceIds, contradictingEvidenceIds) per D3's _hypothesisId. Caller can no
+   422	      // longer keep IDs while mutating those fields.
+   423	      if (!_isPlainArray(h.supportingEvidenceIds)) {
+   424	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_EVIDENCE_LINK_INVALID] };
+   425	      }
+   426	      if (!_isPlainArray(h.contradictingEvidenceIds)) {
+   427	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_CONTRADICTION_INVALID] };
+   428	      }
+   429	      // All evidence IDs must be non-empty strings + cap
+   430	      if (h.supportingEvidenceIds.length > 64 || h.contradictingEvidenceIds.length > 64) {
+   431	        return { valid: false, reasonCodes: [CODES.ARRAY_CAP_EXCEEDED] };
+   432	      }
+   433	      for (var sei = 0; sei < h.supportingEvidenceIds.length; sei++) {
+   434	        if (!_isNonEmptyString(h.supportingEvidenceIds[sei])) {
+   435	          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_EVIDENCE_LINK_INVALID] };
+   436	        }
+   437	      }
+   438	      for (var cei = 0; cei < h.contradictingEvidenceIds.length; cei++) {
+   439	        if (!_isNonEmptyString(h.contradictingEvidenceIds[cei])) {
+   440	          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_CONTRADICTION_INVALID] };
+   441	        }
+   442	      }
+   443	      var idMaterial = {
+   444	        v: hs.schemaVersion,
+   445	        ruleId: h.ruleId,
+   446	        supportingEvidenceIds: HI.safeArraySlice(h.supportingEvidenceIds),
+   447	        contradictingEvidenceIds: HI.safeArraySlice(h.contradictingEvidenceIds),
+   448	      };
+   449	      var expectedHid = 'hyp_' + _hashFNV64Hex('hypothesisid|v' + hs.schemaVersion + '|' + HI.stableStringify(idMaterial));
+   450	      if (expectedHid !== h.hypothesisId) {
+   451	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+   452	      }
+   453	      // Cross-field consistency with rule (Codex D4 R1 D4-R1-01 + R2 D4-R2-03 closure).
+   454	      // ruleVersion MUST match rule registry (Codex D4 R2 D4-R2-03 closure: previously not validated).
+   455	      if (h.ruleVersion !== rule.ruleVersion) {
+   456	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   457	      }
+   458	      if (h.category !== rule.category) {
+   459	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_CATEGORY_UNKNOWN] };
+   460	      }
+   461	      if (h.i18nKey !== rule.i18nKey) {
+   462	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   463	      }
+   464	      // Credibility / confidence / status — closed enums
+   465	      if (HI.safeArrayIndexOf(CONCLUSION_CREDIBILITY_ORDER, h.credibility) === -1) {
+   466	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   467	      }
+   468	      if (!_crAtLeast(h.credibility, rule.minConclusionCredibility)) {
+   469	        // Credibility weaker than rule allows → invalid (D3 wouldn't have emitted this)
+   470	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   471	      }
+   472	      // Confidence: closed key set + closed state enum + integer score (Codex D4 R2 D4-R2-03 closure).
+   473	      if (!_isPlainObject(h.confidence)) {
+   474	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   475	      }
+   476	      var confKeys = HI.safeOwnKeys(h.confidence);
+   477	      if (confKeys === null) return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   478	      for (var cki = 0; cki < confKeys.length; cki++) {
+   479	        if (HI.safeArrayIndexOf(CONFIDENCE_KEYS_ALLOWED, confKeys[cki]) === -1) {
+   480	          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY] };
+   481	        }
+   482	      }
+   483	      if (HI.safeArrayIndexOf(CONFIDENCE_STATE_ALLOWED, h.confidence.state) === -1) {
+   484	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   485	      }
+   486	      if (typeof h.confidence.score !== 'number'
+   487	          || !_isInteger(h.confidence.score)
+   488	          || h.confidence.score < 0
+   489	          || h.confidence.score > 100) {
+   490	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   491	      }
+   492	      // correlationGroupIds: plain array of strings (Codex D4 R2 D4-R2-03 closure).
+   493	      if (!_isPlainArray(h.correlationGroupIds)) {
+   494	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   495	      }
+   496	      // contentSignature: present, well-formed string, and EQUAL to D3's recomputed signature
+   497	      // (Codex D4 R2 D4-R2-01 closure). This binds ALL decision-relevant fields.
+   498	      if (!_isNonEmptyString(h.contentSignature)
+   499	          || !HI.safeRegExpTest(/^csig_[0-9a-f]{16}$/, h.contentSignature)) {
+   500	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+   501	      }
+   502	      var sigMaterial = {
+   503	        v: hs.schemaVersion,
+   504	        hid: h.hypothesisId,
+   505	        ruleId: h.ruleId,
+   506	        ruleVersion: h.ruleVersion,
+   507	        category: h.category,
+   508	        status: h.status,
+   509	        i18nKey: h.i18nKey,
+   510	        credibility: h.credibility,
+   511	        conf: {
+   512	          state: h.confidence && h.confidence.state,
+   513	          score: h.confidence && h.confidence.score,
+   514	        },
+   515	        sup: h.supportingEvidenceIds,
+   516	        con: h.contradictingEvidenceIds,
+   517	        corr: h.correlationGroupIds,
+   518	        alts: _isPlainArray(h.alternativeExplanationIds) ? h.alternativeExplanationIds : [],
+   519	        cc: _isPlainArray(h.cannotConcludeReasonCodes) ? h.cannotConcludeReasonCodes : [],
+   520	        acts: _isPlainArray(h.validationActionIds) ? h.validationActionIds : [],
+   521	        lims: h.limitations,
+   522	      };
+   523	      var expectedSig = 'csig_' + _hashFNV64Hex('contentsig|v' + hs.schemaVersion + '|' + HI.stableStringify(sigMaterial));
+   524	      if (expectedSig !== h.contentSignature) {
+   525	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+   526	      }
+   527	      if (HI.safeArrayIndexOf(HYPOTHESIS_STATUS_ALLOWED, h.status) === -1) {
+   528	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   529	      }
+   530	      // Cross-field: status='contradicted' ⟹ contradictingEvidenceIds.length > 0
+   531	      if (h.status === 'contradicted' && h.contradictingEvidenceIds.length === 0) {
+   532	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   533	      }
+   534	      // status='supported' ⟹ supportingEvidenceIds.length > 0
+   535	      if (h.status === 'supported' && h.supportingEvidenceIds.length === 0) {
+   536	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   537	      }
+   538	      if (!_isPlainArray(h.limitations)) {
+   539	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   540	      }
+   541	      if (h.limitations.length > 32) {
+   542	        return { valid: false, reasonCodes: [CODES.ARRAY_CAP_EXCEEDED] };
+   543	      }
+   544	      for (var lhi = 0; lhi < h.limitations.length; lhi++) {
+   545	        if (!RC.isReasonCode(h.limitations[lhi])) {
+   546	          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   547	        }
+   548	      }
+   549	    }
+   550	
+   551	    // Recompute hypothesisSetId — independent authority verification.
+   552	    var recomputed;
+   553	    try { recomputed = _recomputeHypothesisSetId(hs); }
+   554	    catch (e) { return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] }; }
+   555	    if (recomputed !== hs.hypothesisSetId) {
+   556	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+   557	    }
+   558	
+   559	    // Freshness — D3 already enforced node freshness, but D4 ALSO checks the snapshot's
+   560	    // createdAt is not stale (so a snapshot kept indefinitely cannot drive priorities).
+   561	    // hs.createdAt may be null (referenceNowMs-supplied path) — in that case D4 trusts the
+   562	    // D3 freshness gate already passed and uses refNowMs as effective now.
+   563	    if (hs.createdAt !== null) {
+   564	      if (!_isNonEmptyString(hs.createdAt)) {
+   565	        return { valid: false, reasonCodes: [CODES.EVIDENCE_FRESHNESS_STALE] };
+   566	      }
+   567	      var hsAt = _isoToMs(hs.createdAt);
+   568	      if (hsAt === null) {
+   569	        return { valid: false, reasonCodes: [CODES.EVIDENCE_FRESHNESS_STALE] };
+   570	      }
+   700	      // ---- Step 0.5 — input + opts descriptor snapshot ----
+   701	      if (!_isPlainObject(inputIn)) {
+   702	        return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'input not plain object' });
+   703	      }
+   704	      var inputSnap = HI.safeObjectCreateNull();
+   705	      var inputDescNames = HI.safeOwnKeys(inputIn);
+   706	      if (inputDescNames === null) {
+   707	        return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'cannot read input own keys' });
+   708	      }
+   709	      for (var idi = 0; idi < inputDescNames.length; idi++) {
+   710	        var idName = inputDescNames[idi];
+   711	        if (typeof idName === 'symbol') {
+   712	          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'input has symbol key' });
+   713	        }
+   714	        var idDesc = HI.safeGetOwnDescriptor(inputIn, idName);
+   715	        if (!idDesc) continue;
+   716	        if (!('value' in idDesc) || !idDesc.enumerable) {
+   717	          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'input non-data/non-enumerable own key' });
+   718	        }
+   719	        HI.safeDefineDataProperty(inputSnap, idName, idDesc.value);
+   720	      }
+   721	      var allowedInputKeys = ['hypothesisSet', 'generationToken', 'contextVersion'];
+   722	      var inputSnapKeys = HI.safeKeys(inputSnap);
+   723	      if (inputSnapKeys === null) {
+   724	        return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'cannot read inputSnap own keys' });
+   725	      }
+   726	      for (var ik = 0; ik < inputSnapKeys.length; ik++) {
+   727	        if (HI.safeArrayIndexOf(allowedInputKeys, inputSnapKeys[ik]) === -1) {
+   728	          // Codex D4 R1 D4-R1-05 closure: never echo caller-supplied key NAMES in detail
+   729	          // (privacy — a path-like key would leak in the blocked envelope).
+   730	          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'unknown input own key' });
+   731	        }
+   732	      }
+   733	
+   734	      var optsSnap = null;
+   735	      var clockCb = null;
+   736	      if (optsIn !== null && optsIn !== undefined) {
+   737	        if (!_isPlainObject(optsIn)) {
+   738	          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts not plain object' });
+   739	        }
+   740	        var clockDesc = HI.safeGetOwnDescriptor(optsIn, 'clock');
+   741	        if (clockDesc) {
+   742	          // Codex D4 R1 D4-R1-02 closure: opts.clock MUST be a data descriptor (not accessor).
+   743	          // Accessor descriptors can fire on read; we never read them.
+   744	          if (!('value' in clockDesc)) {
+   745	            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts.clock accessor descriptor not allowed' });
+   746	          }
+   747	          if (!clockDesc.enumerable) {
+   748	            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'opts.clock must be enumerable' });
+   749	          }
+   750	          if (typeof clockDesc.value === 'function') {
+   751	            clockCb = clockDesc.value;
+   752	          }
+   753	        }
+   754	        var optsData = HI.safeObjectCreateNull();
+   755	        var optsOwnNames = HI.safeOwnKeys(optsIn);
+   756	        if (optsOwnNames === null) {
+   757	          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'cannot read opts own keys' });
+   758	        }
+   759	        for (var oi = 0; oi < optsOwnNames.length; oi++) {
+   760	          var on = optsOwnNames[oi];
+   761	          if (typeof on === 'symbol') {
+   762	            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'opts symbol key' });
+   763	          }
+   764	          var od = HI.safeGetOwnDescriptor(optsIn, on);
+   765	          if (!od) continue;
+   766	          if (!od.enumerable) {
+   767	            // Codex D4 R1 D4-R1-05 closure: never echo caller-supplied key name in detail.
+   768	            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'opts non-enumerable own key' });
+   769	          }
+   770	          if (on === 'clock') continue;  // clock handled above with explicit accessor rejection
+   771	          if (!('value' in od)) {
+   772	            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts accessor descriptor not allowed' });
+   773	          }
+   774	          if (typeof od.value === 'function') {
+   775	            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts function field not allowed' });
+   776	          }
+   777	          HI.safeDefineDataProperty(optsData, on, od.value);
+   778	        }
+   779	        optsSnap = HI.safeStructuredClone(optsData);
+   780	        if (optsSnap === null) {
+   781	          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts data not cloneable' });
+   782	        }
+   783	        var allowedOptsKeys = ['clock', 'maxAgeMs', 'referenceNowMs'];
+   784	        var optsSnapKeys = HI.safeKeys(optsSnap);
+   785	        if (optsSnapKeys === null) {
+   786	          return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'cannot read optsSnap keys' });
+   787	        }
+   788	        for (var oki = 0; oki < optsSnapKeys.length; oki++) {
+   789	          if (HI.safeArrayIndexOf(allowedOptsKeys, optsSnapKeys[oki]) === -1) {
+   790	            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'unknown opts own key' });
+   791	          }
+   792	        }
+   793	      }
+   794	
+   795	      // ---- Step 1.5 — resolve freshness reference time ----
+   796	      var refNowMs = null;
+   797	      var resolvedClockIso = null;
+   798	      if (optsSnap && typeof optsSnap.referenceNowMs === 'number'
+   799	          && HI.safeNumberIsFinite(optsSnap.referenceNowMs) === true
+   800	          && optsSnap.referenceNowMs > 0) {
+   801	        refNowMs = optsSnap.referenceNowMs;
+   802	      } else if (clockCb !== null) {
+   803	        var clockIso = null;
+   804	        try { clockIso = clockCb(); } catch (eClock) { clockIso = null; }
+   805	        if (typeof clockIso === 'string' && clockIso.length > 0 && clockIso.length <= 64
+   806	            && HI.safeRegExpTest(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,9})?(Z|[+-]\d{2}:?\d{2})$/, clockIso)) {
+   807	          var parsed = _isoToMs(clockIso);
+   808	          if (parsed !== null && parsed > 0) {
+   809	            refNowMs = parsed;
+   810	            resolvedClockIso = clockIso;
+   811	          }
+   812	        }
+   813	      }
+   814	      if (refNowMs === null) {
+   815	        return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], {
+   816	          detail: 'D4 requires a reference time for freshness verification — supply opts.clock() OR opts.referenceNowMs',
+   817	        });
+   818	      }
+   819	      var maxAgeMs = DEFAULT_MAX_AGE_MS;
+   820	      if (optsSnap && typeof optsSnap.maxAgeMs === 'number'
+   821	          && HI.safeNumberIsFinite(optsSnap.maxAgeMs) === true
+   822	          && optsSnap.maxAgeMs > 0) {
+   823	        maxAgeMs = optsSnap.maxAgeMs;
+   824	      }
+   825	
+   826	      // ---- Step 2 — authority verify the input Hypothesis Set ----
+   827	      var authority = _validateAuthoritativeHypothesisSet(inputSnap.hypothesisSet, refNowMs, maxAgeMs);
+   828	      if (authority.valid !== true) {
+   829	        return RC.buildBlockedResult(authority.reasonCodes, { detail: 'hypothesis set authority verification failed' });
+   830	      }
+   831	      var hs = authority.hypothesisSet;
+   832	
+   833	      // ---- Step 2.5 — generationToken / contextVersion ----
+   834	      var generationToken = null;
+   835	      var contextVersion = null;
+   836	      if (HI.safeHasOwn(inputSnap, 'generationToken')) {
+   837	        var gt = inputSnap.generationToken;
+   838	        if (gt !== null) {
+   839	          if (!_isNonEmptyString(gt) || gt.length > 128) {
+   840	            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'generationToken must be non-empty string ≤128 chars or null' });
+  1045	      }
+  1046	
+  1047	      return HI.deepFreeze({ valid: true, prioritySet: prioritySet });
+  1048	
+  1049	    } catch (eOuter) {
+  1050	      return RC.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'buildPrioritySet threw on hostile input' });
+  1051	    }
+  1052	  }
+  1053	
+  1054	  // ---------- Public API ------------------------------------------------------------------------
+  1055	  var api = {
+  1056	    SERVICE_VERSION: SERVICE_VERSION,
+  1057	    PRIORITY_SET_SCHEMA_VERSION: PRIORITY_SET_SCHEMA_VERSION,
+  1058	    PRIORITY_KIND_ALLOWED: PRIORITY_KIND_ALLOWED,
+  1059	    PRIORITY_KIND_TIER: PRIORITY_KIND_TIER,
+  1060	    PRIORITY_COUNT_CAP: PRIORITY_COUNT_CAP,
+  1061	    PREREQ_ID_PER_PRIORITY_CAP: PREREQ_ID_PER_PRIORITY_CAP,
+  1062	    LIMITATIONS_PER_PRIORITY_CAP: LIMITATIONS_PER_PRIORITY_CAP,
+  1063	    ENVELOPE_BYTE_CAP: ENVELOPE_BYTE_CAP,
+  1064	    buildPrioritySet: buildPrioritySet,
+  1065	  };
+  1066	  try { HI.deepFreeze(api); } catch (e) { /* swallow */ }
+  1067	
+  1068	  // Codex D4 R2 D4-R2-05 closure: under CommonJS, expose ONLY via module.exports.
+  1069	  if (typeof module !== 'undefined' && module.exports) {
+  1070	    module.exports = api;
+  1071	  } else if (root) {
+  1072	    root.R3_0D_PriorityEngine = api;
+  1073	  }
+  1074	})(typeof globalThis !== 'undefined' ? globalThis : this);
+  1815	    ALT_EXPLANATION_COUNT_CAP: ALT_EXPLANATION_COUNT_CAP,
+  1816	    VALIDATION_ACTION_COUNT_CAP: VALIDATION_ACTION_COUNT_CAP,
+  1817	    CANNOT_CONCLUDE_CAP: CANNOT_CONCLUDE_CAP,
+  1818	    LIMITATIONS_CAP: LIMITATIONS_CAP,
+  1819	    ENVELOPE_BYTE_CAP: ENVELOPE_BYTE_CAP,
+  1820	    buildHypothesisSet: buildHypothesisSet,
+  1821	  };
+  1822	  // Freeze the api object so callers cannot replace exports. Uses HI.deepFreeze (captured
+  1823	  // intrinsic) for consistency with every other freeze in this module — no ambient calls.
+  1824	  try { HI.deepFreeze(api); } catch (e) { /* swallow — best-effort */ }
+  1825	
+  1826	  // Codex D4 R2 D4-R2-05 closure: under CommonJS (Node test runners, Electron renderer
+  1827	  // require), expose ONLY via module.exports — avoid polluting globalThis. The renderer
+  1828	  // browser path (no module.exports) still gets the global for ad-hoc script-tag loading.
+  1829	  if (typeof module !== 'undefined' && module.exports) {
+  1830	    module.exports = api;
+  1831	  } else if (root) {
+  1832	    root.R3_0D_HypothesisEngine = api;
+  1833	  }
+  1834	})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+exec
+/bin/bash -lc "node tests/r3.0d-hypothesis-engine.test.js
+node tests/r3.0d-priority-engine.test.js
+node -e \"require('./renderer/js/r3-0d-priority-engine.js'); console.log(typeof globalThis.R3_0D_PriorityEngine)\"
+node -e \"require('./renderer/js/r3-0d-priority-engine.js'); console.log(typeof globalThis.R3_0D_HypothesisEngine)\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 249ms:
+Section F — blocking prerequisites
+Section G — primary eligibility
+Section H — security
+Section I — privacy
+Section J — HI wrapper mutation resilience
+Section K — output immutability
+Section L — mandatory freshness reference
+Section M — closed kind enum
+Section N — forbidden behaviors
+Section O — Codex D4 R1 closures
+Section P — Codex D4 R2 closures
+R3.0D D4 priority-engine adversarial suite: 73 passed, 0 failed
+undefined
+undefined
+
+codex
+The focused suites reproduce at 158/0 and 73/0, and fresh-process CommonJS imports leave both D4 and its D3 dependency absent from `globalThis`. I’m moving beyond the supplied assertions now: independent hash implementation, direct mutation matrix including `confidence.score`, getter non-execution, and boundary/clock probes.
+exec
+/bin/bash -lc "nl -ba tests/r3.0d-priority-engine.test.js | sed -n '1,125p'
+nl -ba tests/r3.0d-priority-engine.test.js | sed -n '590,760p'
+nl -ba tests/r3.0d-hypothesis-engine.test.js | sed -n '1,170p'
+rg -n \"function make|function build|baseGraph|buildGraph|freshGraph|sampleGraph|graph =\" tests/r3.0d-priority-engine.test.js tests/r3.0d-hypothesis-engine.test.js | head -100" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+     1	/**
+     2	 * tests/r3.0d-priority-engine.test.js — R3.0D D4 · Priority Engine adversarial tests.
+     3	 *
+     4	 * Built proactively from D3 R1-R7 lessons (27 distinct findings closed across 7 Codex rounds):
+     5	 *   A) Functional happy paths — D3→D4 pipeline
+     6	 *   B) Structural — output schema, deep-freeze, IDs, sort order, ranks
+     7	 *   C) Authority — hypothesisSetId recompute, frozen requirement, fabricated rejection
+     8	 *   D) Scope — schema, generationToken/contextVersion, unknown input key
+     9	 *   E) Priority ladder — data_quality before mapping, mapping before driver, driver before
+    10	 *      setup. Setup never primary without high confidence + ≥Derived + no contradictions.
+    11	 *   F) Blocking prerequisites — setup_experiment blocked by pending data_quality + mapping
+    12	 *   G) Primary eligibility — low confidence / Heuristic / contradicted cannot be primary
+    13	 *   H) Security — Proxy, class instance, Symbol key, non-enumerable, hostile clock
+    14	 *   I) Privacy — no raw samples, no /Users/, no stack traces
+    15	 *   J) HI wrapper mutation resilience — ambient rebind never invoked
+    16	 *   K) Output immutability — frozen, no caller mutation
+    17	 *   L) Mandatory freshness — opts.clock or opts.referenceNowMs required
+    18	 *   M) Edge enum — closed kind enum, reserved kinds rejected
+    19	 *   N) Forbidden behaviors per directive §12 — setup before data_quality / contradicted
+    20	 *      hypothesis as primary / setup without evidence
+    21	 */
+    22	'use strict';
+    23	
+    24	var HE = require('../renderer/js/r3-0d-hypothesis-engine.js');
+    25	var EG = require('../renderer/js/r3-0d-evidence-graph.js');
+    26	var PE = require('../renderer/js/r3-0d-priority-engine.js');
+    27	var RC = require('../contracts/r3.0d/reason-codes.js');
+    28	var HC = require('../contracts/r3.0d/hypothesis-contract.js');
+    29	var HI = require('../contracts/r3.0d/hardened-intrinsics.js');
+    30	
+    31	var pass = 0, fail = 0;
+    32	function chk(msg, cond, detail) {
+    33	  if (cond) pass += 1;
+    34	  else { fail += 1; console.log('  FAIL ' + msg + (detail !== undefined ? '  ' + JSON.stringify(detail) : '')); }
+    35	}
+    36	
+    37	// ---------- Fixtures ---------------------------------------------------------------------
+    38	var BASE_CLOCK = function () { return '2026-06-29T01:00:00Z'; };
+    39	function _opts(extra) {
+    40	  var o = { clock: BASE_CLOCK };
+    41	  if (extra) for (var k in extra) o[k] = extra[k];
+    42	  return o;
+    43	}
+    44	function _pe(input, customOpts) { return PE.buildPrioritySet(input, customOpts === undefined ? _opts() : customOpts); }
+    45	
+    46	var _origObjectDefineProperty = Object.defineProperty;
+    47	var _origReflectApply = Reflect.apply;
+    48	
+    49	function _baseIdentity(overrides) {
+    50	  var b = { caseId: 'case_001', sessionId: 'sess_001', lapId: null, sourceId: 'csv_v1', sourceVersion: '1.0', freshness: '2026-06-29T00:00:00Z' };
+    51	  if (overrides) for (var k in overrides) b[k] = overrides[k];
+    52	  return b;
+    53	}
+    54	function _baseNode(overrides) {
+    55	  var n = {
+    56	    schemaVersion: 1, nodeId: 'n_default', category: 'data_quality',
+    57	    identity: _baseIdentity(), credibility: 'measured', provenance: 'real', availability: 'available',
+    58	    confidence: { state: 'not_computed' },
+    59	    observation: { kind: 'channel_missing', channel: 'brake', i18nKey: 'k', params: null },
+    60	    limitations: ['LIMITATION_MISSING_CHANNEL'], supportingEdges: [], contradictingEdges: [],
+    61	  };
+    62	  if (overrides) for (var k in overrides) n[k] = overrides[k];
+    63	  return n;
+    64	}
+    65	function _buildHypothesisSet(nodes) {
+    66	  var ca = { caseId: 'case_001', sessionId: 'sess_001', lapId: null };
+    67	  var eg = EG.buildEvidenceGraph({ caseAssociation: ca, rawEvidence: nodes }, { clock: BASE_CLOCK });
+    68	  if (!eg.valid) throw new Error('eg build failed: ' + JSON.stringify(eg).slice(0, 200));
+    69	  var hs = HE.buildHypothesisSet({ graph: eg.graph }, { clock: BASE_CLOCK });
+    70	  if (!hs.valid) throw new Error('hs build failed: ' + JSON.stringify(hs).slice(0, 200));
+    71	  return hs.hypothesisSet;
+    72	}
+    73	
+    74	// ---------- Section A — Functional happy paths -----------------------------------------
+    75	console.log('Section A — functional happy paths');
+    76	(function () {
+    77	  var hs = _buildHypothesisSet([_baseNode({})]);
+    78	  var r = _pe({ hypothesisSet: hs });
+    79	  chk('A1: valid envelope', r.valid === true);
+    80	  chk('A1: prioritySetId matches priset_<16hex>', /^priset_[0-9a-f]{16}$/.test(r.prioritySet.prioritySetId));
+    81	  chk('A1: sourceHypothesisSetId mirrors input hsetId', r.prioritySet.sourceHypothesisSetId === hs.hypothesisSetId);
+    82	  chk('A1: sourceGraphId mirrors input sourceGraphId', r.prioritySet.sourceGraphId === hs.sourceGraphId);
+    83	  chk('A1: case+session association preserved',
+    84	    r.prioritySet.caseAssociation.caseId === 'case_001'
+    85	      && r.prioritySet.sessionAssociation.sessionId === 'sess_001');
+    86	})();
+    87	
+    88	(function () {
+    89	  // A2: determinism — same input + different clock → same prisetId
+    90	  var hs = _buildHypothesisSet([_baseNode({})]);
+    91	  var r1 = _pe({ hypothesisSet: hs }, { clock: BASE_CLOCK });
+    92	  var r2 = _pe({ hypothesisSet: hs }, { clock: function () { return '2026-06-29T05:00:00Z'; } });
+    93	  chk('A2: determinism — same input → same prioritySetId across different clocks',
+    94	    r1.prioritySet.prioritySetId === r2.prioritySet.prioritySetId);
+    95	  chk('A2: createdAt differs (clock-dependent)', r1.prioritySet.createdAt !== r2.prioritySet.createdAt);
+    96	})();
+    97	
+    98	// ---------- Section B — Structural -----------------------------------------------------
+    99	console.log('Section B — structural');
+   100	(function () {
+   101	  var hs = _buildHypothesisSet([_baseNode({})]);
+   102	  var r = _pe({ hypothesisSet: hs });
+   103	  var ps = r.prioritySet;
+   104	
+   105	  chk('B1: top-level result frozen', Object.isFrozen(r));
+   106	  chk('B2: prioritySet frozen', Object.isFrozen(ps));
+   107	  chk('B3: priorities array frozen', Object.isFrozen(ps.priorities));
+   108	  chk('B4: each priority is frozen', ps.priorities.every(function (p) { return Object.isFrozen(p); }));
+   109	  chk('B5: schemaVersion === 1', ps.schemaVersion === 1);
+   110	  chk('B6: prioritySetId pattern', /^priset_[0-9a-f]{16}$/.test(ps.prioritySetId));
+   111	
+   112	  // Priorities sorted by tier asc, then score desc, then hypothesisId asc
+   113	  var prevTier = -1, prevScore = Infinity, prevId = '';
+   114	  var sortOk = true;
+   115	  for (var i = 0; i < ps.priorities.length; i++) {
+   116	    var p = ps.priorities[i];
+   117	    if (p.tier < prevTier) { sortOk = false; break; }
+   118	    if (p.tier === prevTier) {
+   119	      if (p.confidence.score > prevScore) { sortOk = false; break; }
+   120	      if (p.confidence.score === prevScore && p.hypothesisId < prevId) { sortOk = false; break; }
+   121	    }
+   122	    prevTier = p.tier; prevScore = p.confidence.score; prevId = p.hypothesisId;
+   123	  }
+   124	  chk('B7: priorities sorted by tier asc, then score desc, then hypothesisId asc', sortOk);
+   125	
+   590	  var pathLikeKey = '/Users/SKYLINE/private.csv';
+   591	  var hostile = { hypothesisSet: hs };
+   592	  hostile[pathLikeKey] = 'inject';
+   593	  var r = _pe(hostile);
+   594	  chk('HRR1-05-a: error detail does NOT echo path-like caller key (privacy)',
+   595	    r.eligible === false && (!r.detail || r.detail.indexOf('/Users/') === -1));
+   596	  var hostileOpts = { clock: BASE_CLOCK };
+   597	  hostileOpts['/Users/SKYLINE/leak'] = 1;
+   598	  var r2 = _pe({ hypothesisSet: hs }, hostileOpts);
+   599	  chk('HRR1-05-b: opts error detail does NOT echo path-like caller key',
+   600	    r2.eligible === false && (!r2.detail || r2.detail.indexOf('/Users/') === -1));
+   601	})();
+   602	
+   603	// ---------- Section P — Codex D4 R2 closure tests (D4-R2-01..05) -----------------------
+   604	console.log('Section P — Codex D4 R2 closures');
+   605	
+   606	// R2-01: mutating status/credibility/ruleVersion now caught by contentSignature mismatch
+   607	(function () {
+   608	  var hs = _buildHypothesisSet([_baseNode({})]);
+   609	  var origH = hs.hypotheses[0];
+   610	  // Mutate status — contentSignature should mismatch
+   611	  var statusMutated = Object.freeze(Object.assign({}, origH, { status: 'inconclusive' }));
+   612	  var shell = Object.freeze({
+   613	    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+   614	    sourceGraphId: hs.sourceGraphId, caseAssociation: hs.caseAssociation,
+   615	    sessionAssociation: hs.sessionAssociation,
+   616	    hypotheses: Object.freeze([statusMutated]),
+   617	    alternativeExplanations: hs.alternativeExplanations, validationActions: hs.validationActions,
+   618	    cannotConclude: hs.cannotConclude, limitations: hs.limitations,
+   619	    provenance: hs.provenance, createdAt: hs.createdAt,
+   620	    generationToken: hs.generationToken, contextVersion: hs.contextVersion,
+   621	  });
+   622	  var r = _pe({ hypothesisSet: shell });
+   623	  chk('HRR2-01-a: mutating status (same hypothesisId) rejected via contentSignature mismatch',
+   624	    r.eligible === false
+   625	      && HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.HYPOTHESIS_AUTHORITY_FORGED) !== -1);
+   626	  // Mutate credibility — Physics > Heuristic but rule produces Heuristic for this fixture
+   627	  var credMutated = Object.freeze(Object.assign({}, origH, { credibility: 'Physics' }));
+   628	  var shell2 = Object.freeze(Object.assign({}, shell, { hypotheses: Object.freeze([credMutated]) }));
+   629	  var r2 = _pe({ hypothesisSet: shell2 });
+   630	  chk('HRR2-01-b: mutating credibility (same hypothesisId) rejected via contentSignature mismatch',
+   631	    r2.eligible === false);
+   632	  // Mutate ruleVersion
+   633	  var rvMutated = Object.freeze(Object.assign({}, origH, { ruleVersion: 999 }));
+   634	  var shell3 = Object.freeze(Object.assign({}, shell, { hypotheses: Object.freeze([rvMutated]) }));
+   635	  var r3 = _pe({ hypothesisSet: shell3 });
+   636	  chk('HRR2-01-c: mutating ruleVersion (same hypothesisId) rejected',
+   637	    r3.eligible === false);
+   638	})();
+   639	
+   640	// R2-02: nested accessor on hypothesis.status rejected by recursive audit (does NOT fire)
+   641	(function () {
+   642	  var hs = _buildHypothesisSet([_baseNode({})]);
+   643	  var origH = hs.hypotheses[0];
+   644	  // Build a non-frozen hypothesis with a getter on status — this would slip past the previous
+   645	  // top-level audit. The recursive audit catches it.
+   646	  var hostileH = Object.create(null);
+   647	  var fired = 0;
+   648	  // Copy all keys as data props EXCEPT status
+   649	  ['hypothesisId','ruleId','ruleVersion','category','i18nKey','supportingEvidenceIds',
+   650	   'contradictingEvidenceIds','correlationGroupIds','alternativeExplanationIds',
+   651	   'cannotConcludeReasonCodes','validationActionIds','credibility','confidence','limitations',
+   652	   'contentSignature','provenance'].forEach(function (k) {
+   653	    Object.defineProperty(hostileH, k, { value: origH[k], enumerable: true });
+   654	  });
+   655	  Object.defineProperty(hostileH, 'status', { get: function () { fired += 1; return 'supported'; }, enumerable: true });
+   656	  Object.freeze(hostileH);
+   657	  var hostileShell = Object.freeze({
+   658	    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+   659	    sourceGraphId: hs.sourceGraphId, caseAssociation: hs.caseAssociation,
+   660	    sessionAssociation: hs.sessionAssociation,
+   661	    hypotheses: Object.freeze([hostileH]),
+   662	    alternativeExplanations: hs.alternativeExplanations, validationActions: hs.validationActions,
+   663	    cannotConclude: hs.cannotConclude, limitations: hs.limitations,
+   664	    provenance: hs.provenance, createdAt: hs.createdAt,
+   665	    generationToken: hs.generationToken, contextVersion: hs.contextVersion,
+   666	  });
+   667	  var r = _pe({ hypothesisSet: hostileShell });
+   668	  chk('HRR2-02-a: nested accessor on hypothesis.status rejected by recursive audit',
+   669	    r.eligible === false);
+   670	  chk('HRR2-02-b: nested getter NOT invoked (rejected before clone)', fired === 0);
+   671	})();
+   672	
+   673	// R2-03: non-array correlationGroupIds rejected; extra confidence key rejected; ruleVersion validated
+   674	(function () {
+   675	  var hs = _buildHypothesisSet([_baseNode({})]);
+   676	  var origH = hs.hypotheses[0];
+   677	
+   678	  // (a) non-array correlationGroupIds
+   679	  var badCorr = Object.freeze(Object.assign({}, origH, { correlationGroupIds: 'not-an-array' }));
+   680	  var shellA = Object.freeze(Object.assign({}, {
+   681	    schemaVersion: hs.schemaVersion, hypothesisSetId: hs.hypothesisSetId,
+   682	    sourceGraphId: hs.sourceGraphId, caseAssociation: hs.caseAssociation,
+   683	    sessionAssociation: hs.sessionAssociation,
+   684	    hypotheses: Object.freeze([badCorr]),
+   685	    alternativeExplanations: hs.alternativeExplanations, validationActions: hs.validationActions,
+   686	    cannotConclude: hs.cannotConclude, limitations: hs.limitations,
+   687	    provenance: hs.provenance, createdAt: hs.createdAt,
+   688	    generationToken: hs.generationToken, contextVersion: hs.contextVersion,
+   689	  }));
+   690	  var rA = _pe({ hypothesisSet: shellA });
+   691	  chk('HRR2-03-a: non-array correlationGroupIds rejected', rA.eligible === false);
+   692	
+   693	  // (b) extra key on confidence object
+   694	  var badConf = Object.freeze(Object.assign({}, origH, {
+   695	    confidence: Object.freeze({ state: origH.confidence.state, score: origH.confidence.score, attackerKey: 'inject' }),
+   696	  }));
+   697	  var shellB = Object.freeze(Object.assign({}, shellA, { hypotheses: Object.freeze([badConf]) }));
+   698	  var rB = _pe({ hypothesisSet: shellB });
+   699	  chk('HRR2-03-b: extra key on confidence object rejected',
+   700	    rB.eligible === false
+   701	      && HI.safeArrayIndexOf(rB.reasonCodes, RC.REASON_CODES.UNKNOWN_OWN_KEY) !== -1);
+   702	
+   703	  // (c) ruleVersion mismatch (rule registry has version 1; tamper to 999)
+   704	  var badRv = Object.freeze(Object.assign({}, origH, { ruleVersion: 999 }));
+   705	  var shellC = Object.freeze(Object.assign({}, shellA, { hypotheses: Object.freeze([badRv]) }));
+   706	  var rC = _pe({ hypothesisSet: shellC });
+   707	  chk('HRR2-03-c: ruleVersion mismatch (vs HE.RULE_REGISTRY) rejected',
+   708	    rC.eligible === false);
+   709	})();
+   710	
+   711	// R2-04: covered by R2-01/02/03 above + the exact downgrade and unknown-category cases
+   712	(function () {
+   713	  // Verify unknown category produces collect_additional_session (tier 6) — NOT no_action_required.
+   714	  var n = _baseNode({ nodeId: 'n_unk',
+   715	    identity: _baseIdentity({ sourceId: 'unk_src' }),
+   716	    category: 'unknown',
+   717	    credibility: 'measured',
+   718	    observation: { kind: 'qualitative_marker', channel: null, i18nKey: 'k', params: null },
+   719	    limitations: [] });
+   720	  var hs = _buildHypothesisSet([n]);
+   721	  var r = _pe({ hypothesisSet: hs });
+   722	  if (r.valid && r.prioritySet.priorities.length >= 1) {
+   723	    var unkP = r.prioritySet.priorities.find(function (p) { return p.kind === 'collect_additional_session'; });
+   724	    chk('HRR2-04-a: unknown category → collect_additional_session (tier 6) — not no_action_required',
+   725	      !!unkP && unkP.tier === 6);
+   726	  } else {
+   727	    chk('HRR2-04-a: skipped — unknown category was rejected by build', true);
+   728	  }
+   729	})();
+   730	
+   731	// R2-05: requiring D4 does NOT pollute Node globals with R3_0D_PriorityEngine / R3_0D_HypothesisEngine
+   732	(function () {
+   733	  // Note: in this test process, the modules ARE already loaded (the imports at top of file
+   734	  // ran before the gating change). The R2-05 closure ensures that in a FRESH process,
+   735	  // requiring d4 doesn't write to globalThis. We can simulate by spawning a child node and
+   736	  // checking globalThis after require.
+   737	  var cp = require('child_process');
+   738	  var probe = "var hadPE = typeof globalThis.R3_0D_PriorityEngine !== 'undefined';\n" +
+   739	              "var hadHE = typeof globalThis.R3_0D_HypothesisEngine !== 'undefined';\n" +
+   740	              "require('" + require.resolve('../renderer/js/r3-0d-priority-engine.js') + "');\n" +
+   741	              "var hasPE = typeof globalThis.R3_0D_PriorityEngine !== 'undefined';\n" +
+   742	              "var hasHE = typeof globalThis.R3_0D_HypothesisEngine !== 'undefined';\n" +
+   743	              "process.stdout.write(JSON.stringify({hadPE,hadHE,hasPE,hasHE}));\n";
+   744	  try {
+   745	    var out = cp.execFileSync(process.execPath, ['-e', probe], { encoding: 'utf8', timeout: 10000 });
+   746	    var probeResult = JSON.parse(out);
+   747	    chk('HRR2-05-a: fresh-process require(D4) does NOT pollute globalThis with R3_0D_PriorityEngine',
+   748	      probeResult.hadPE === false && probeResult.hasPE === false);
+   749	    chk('HRR2-05-b: fresh-process require(D4) does NOT pollute globalThis with R3_0D_HypothesisEngine',
+   750	      probeResult.hadHE === false && probeResult.hasHE === false);
+   751	  } catch (e) {
+   752	    chk('HRR2-05: child-process probe failed', false, e && e.message);
+   753	    chk('HRR2-05-b: child-process probe failed', false, e && e.message);
+   754	  }
+   755	})();
+   756	
+   757	console.log('R3.0D D4 priority-engine adversarial suite: ' + pass + ' passed, ' + fail + ' failed');
+   758	if (fail > 0) process.exit(1);
+     1	/**
+     2	 * tests/r3.0d-hypothesis-engine.test.js — R3.0D D3 · Hypothesis Engine adversarial tests.
+     3	 *
+     4	 * Sections (per SKYLINE Continuous Resume Directive §7):
+     5	 *   A) Functional happy paths — valid graph → hypothesis set; multiple hypotheses; determinism.
+     6	 *   B) Structural — output schema, deep-freeze, ID stability, sort order, cap enforcement.
+     7	 *   C) Authority — graphId recomputation, deep-frozen requirement, fabricated graph rejection.
+     8	 *   D) Scope — wrong case / wrong session, future schema, stale generation token, identity forged.
+     9	 *   E) Confidence — duplicate evidence not double-counted, correlation dedup, contradiction
+    10	 *      lowers confidence, stale doesn't support, heuristic ≠ measured, low credibility floor.
+    11	 *   F) Limitations & cannotConclude — heuristic must declare LIMITATION_HEURISTIC_ONLY; synthetic
+    12	 *      must declare LIMITATION_SYNTHETIC_ONLY; empty rule set produces structured cannotConclude.
+    13	 *   G) Validation actions + alternative explanations — fixed enum, structured, linked to hyp.
+    14	 *   H) Security — Proxy / getter / accessor / Symbol key / non-enumerable / class instance /
+    15	 *      nested class / Array subclass / mutated Array.prototype / cyclic object / prototype
+    16	 *      pollution / hostile clock / oversized strings / oversized lists / oversized snapshot.
+    17	 *   I) Privacy — output contains no raw samples, no paths, no filenames, no private identifiers,
+    18	 *      no stack traces.
+    19	 *   J) Mutation coverage — each HI.* wrapper used by D3 has a mutation-protected direct test.
+    20	 *   K) HI-only audit — output structure does not depend on caller's ambient prototypes.
+    21	 *
+    22	 * Style: tests print `<message>: <ok|FAIL>` lines so the per-file manifest scanner parses
+    23	 * "N passed, M failed" at the bottom (parseAssertions regex in scripts/run-tests-manifest.js).
+    24	 */
+    25	'use strict';
+    26	
+    27	var HE = require('../renderer/js/r3-0d-hypothesis-engine.js');
+    28	var EG = require('../renderer/js/r3-0d-evidence-graph.js');
+    29	var CR = require('../contracts/r3.0d/credibility-contract.js');
+    30	var HC = require('../contracts/r3.0d/hypothesis-contract.js');
+    31	var RC = require('../contracts/r3.0d/reason-codes.js');
+    32	var HI = require('../contracts/r3.0d/hardened-intrinsics.js');
+    33	
+    34	var pass = 0, fail = 0;
+    35	function chk(msg, cond, detail) {
+    36	  if (cond) { pass += 1; }
+    37	  else { fail += 1; console.log('  FAIL ' + msg + (detail !== undefined ? '  ' + JSON.stringify(detail) : '')); }
+    38	}
+    39	
+    40	// ---------- Fixtures -------------------------------------------------------------------------
+    41	var BASE_CLOCK = function () { return '2026-06-29T01:00:00Z'; };
+    42	// Default test opts always supply the clock so D3's mandatory freshness policy has a
+    43	// reference time. Tests that need to override should construct their own opts.
+    44	function _opts(extra) {
+    45	  var o = { clock: BASE_CLOCK };
+    46	  if (extra) for (var k in extra) o[k] = extra[k];
+    47	  return o;
+    48	}
+    49	// Wrapper so tests get the freshness reference for free; if a test passes its own opts it
+    50	// overrides. Use `_he(input, customOpts)` to invoke the engine via the wrapper.
+    51	function _he(input, customOpts) {
+    52	  return HE.buildHypothesisSet(input, customOpts === undefined ? _opts() : customOpts);
+    53	}
+    54	
+    55	// Captured ambient primitives — used by mutation-test harness so the rebind/restore mechanics
+    56	// don't fall victim to the very rebinding they're testing.
+    57	var _origObjectDefineProperty = Object.defineProperty;
+    58	var _origReflectApply = Reflect.apply;
+    59	
+    60	function _baseIdentity(overrides) {
+    61	  var base = {
+    62	    caseId: 'case_001',
+    63	    sessionId: 'sess_001',
+    64	    lapId: null,
+    65	    sourceId: 'csv_import_v1',
+    66	    sourceVersion: '1.0',
+    67	    freshness: '2026-06-29T00:00:00Z',
+    68	  };
+    69	  if (overrides) {
+    70	    for (var k in overrides) base[k] = overrides[k];
+    71	  }
+    72	  return base;
+    73	}
+    74	function _baseNode(overrides) {
+    75	  var n = {
+    76	    schemaVersion: 1,
+    77	    nodeId: 'n_default',
+    78	    category: 'data_quality',
+    79	    identity: _baseIdentity(),
+    80	    credibility: 'measured',
+    81	    provenance: 'real',
+    82	    availability: 'available',
+    83	    confidence: { state: 'not_computed' },
+    84	    observation: { kind: 'channel_missing', channel: 'brake_pressure', i18nKey: 'r3.0d.obs.cm.bp', params: null },
+    85	    limitations: ['LIMITATION_MISSING_CHANNEL'],
+    86	    supportingEdges: [],
+    87	    contradictingEdges: [],
+    88	  };
+    89	  if (overrides) for (var k in overrides) n[k] = overrides[k];
+    90	  return n;
+    91	}
+    92	function _buildGraph(nodes, caseAss) {
+    93	  var ca = caseAss || { caseId: 'case_001', sessionId: 'sess_001', lapId: null };
+    94	  var eg = EG.buildEvidenceGraph({ caseAssociation: ca, rawEvidence: nodes }, { clock: BASE_CLOCK });
+    95	  if (!eg.valid) throw new Error('fixture build failed: ' + JSON.stringify(eg).slice(0, 200));
+    96	  return eg.graph;
+    97	}
+    98	
+    99	// ---------- Section A — Functional happy paths --------------------------------------------------
+   100	console.log('Section A — functional happy paths');
+   101	(function () {
+   102	  // A1: single channel_missing → 1 hypothesis from rule_dq_channel_missing
+   103	  var g = _buildGraph([_baseNode({})]);
+   104	  var r = _he({ graph: g }, { clock: BASE_CLOCK });
+   105	  chk('A1: valid envelope returned for single channel_missing node', r.valid === true);
+   106	  chk('A1: exactly one hypothesis emitted', r.hypothesisSet && r.hypothesisSet.hypotheses.length === 1);
+   107	  chk('A1: hypothesis ruleId is rule_dq_channel_missing', r.hypothesisSet.hypotheses[0].ruleId === 'rule_dq_channel_missing');
+   108	  chk('A1: hypothesis category is data_quality', r.hypothesisSet.hypotheses[0].category === 'data_quality');
+   109	  chk('A1: status is supported (1 group, no contradiction)', r.hypothesisSet.hypotheses[0].status === 'supported');
+   110	  chk('A1: confidence.state is in CONFIDENCE_STATES', HI.safeArrayIndexOf(HE.CONFIDENCE_STATES, r.hypothesisSet.hypotheses[0].confidence.state) !== -1);
+   111	  chk('A1: confidence.score is integer in [0,100]',
+   112	    HI.safeNumberIsInteger(r.hypothesisSet.hypotheses[0].confidence.score) === true
+   113	      && r.hypothesisSet.hypotheses[0].confidence.score >= 0
+   114	      && r.hypothesisSet.hypotheses[0].confidence.score <= 100);
+   115	})();
+   116	
+   117	(function () {
+   118	  // A2: multiple categories → multiple hypotheses
+   119	  var n1 = _baseNode({ nodeId: 'n_dq_miss', observation: { kind: 'channel_missing', channel: 'brake', i18nKey: 'x', params: null } });
+   120	  var n2 = _baseNode({
+   121	    nodeId: 'n_dr_marker',
+   122	    category: 'driver_behaviour',
+   123	    identity: _baseIdentity({ sourceId: 'driver_input_v1' }),
+   124	    observation: { kind: 'qualitative_marker', channel: null, i18nKey: 'r3.0d.obs.driver_var', params: null },
+   125	    limitations: [],
+   126	  });
+   127	  var n3 = _baseNode({
+   128	    nodeId: 'n_dr_marker2',
+   129	    category: 'driver_behaviour',
+   130	    identity: _baseIdentity({ sourceId: 'driver_input_v2' }),
+   131	    observation: { kind: 'qualitative_marker', channel: null, i18nKey: 'r3.0d.obs.driver_var2', params: null },
+   132	    limitations: [],
+   133	  });
+   134	  var g = _buildGraph([n1, n2, n3]);
+   135	  var r = _he({ graph: g }, { clock: BASE_CLOCK });
+   136	  chk('A2: valid envelope with multi-category input', r.valid === true);
+   137	  chk('A2: ≥2 hypotheses emitted', r.hypothesisSet.hypotheses.length >= 2);
+   138	  var cats = HI.safeArrayMap(r.hypothesisSet.hypotheses, function (h) { return h.category; });
+   139	  chk('A2: data_quality hypothesis present', HI.safeArrayIndexOf(cats, 'data_quality') !== -1);
+   140	  chk('A2: driver_behaviour hypothesis present', HI.safeArrayIndexOf(cats, 'driver_behaviour') !== -1);
+   141	})();
+   142	
+   143	(function () {
+   144	  // A3: determinism — same graph, two calls → identical hsetId, identical hypothesis IDs
+   145	  var g = _buildGraph([_baseNode({})]);
+   146	  var r1 = _he({ graph: g }, { clock: BASE_CLOCK });
+   147	  var r2 = _he({ graph: g }, { clock: function () { return '2026-06-29T02:00:00Z'; } });
+   148	  chk('A3: same graph → same hypothesisSetId', r1.hypothesisSet.hypothesisSetId === r2.hypothesisSet.hypothesisSetId);
+   149	  chk('A3: same graph → same hypothesis count', r1.hypothesisSet.hypotheses.length === r2.hypothesisSet.hypotheses.length);
+   150	  chk('A3: same graph → same hypothesisId of first hyp',
+   151	    r1.hypothesisSet.hypotheses[0].hypothesisId === r2.hypothesisSet.hypotheses[0].hypothesisId);
+   152	  chk('A3: createdAt differs (clock-dependent)', r1.hypothesisSet.createdAt !== r2.hypothesisSet.createdAt);
+   153	})();
+   154	
+   155	(function () {
+   156	  // A4: no triggering evidence — engine returns valid empty hypothesisSet
+   157	  var n = _baseNode({
+   158	    nodeId: 'n_irrelevant',
+   159	    category: 'vehicle_response',
+   160	    identity: _baseIdentity({ sourceId: 'src_vr_only' }),
+   161	    credibility: 'heuristic',
+   162	    observation: { kind: 'qualitative_marker', channel: null, i18nKey: 'x', params: null },
+   163	    limitations: ['LIMITATION_HEURISTIC_ONLY'],
+   164	  });
+   165	  var g = _buildGraph([n]);
+   166	  var r = _he({ graph: g });
+   167	  chk('A4: graph with non-triggering evidence still returns valid envelope', r.valid === true);
+   168	  chk('A4: no hypotheses for irrelevant evidence', r.hypothesisSet.hypotheses.length === 0);
+   169	  chk('A4: cannotConclude includes INSUFFICIENT_EVIDENCE (graph cannot conclude)',
+   170	    HI.safeArrayIndexOf(r.hypothesisSet.cannotConclude, 'INSUFFICIENT_EVIDENCE') !== -1
+tests/r3.0d-hypothesis-engine.test.js:92:function _buildGraph(nodes, caseAss) {
+tests/r3.0d-hypothesis-engine.test.js:103:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:134:  var g = _buildGraph([n1, n2, n3]);
+tests/r3.0d-hypothesis-engine.test.js:145:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:165:  var g = _buildGraph([n]);
+tests/r3.0d-hypothesis-engine.test.js:177:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:243:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:266:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:286:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:297:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:304:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:320:  var g = _buildGraph([n1, n2]);
+tests/r3.0d-hypothesis-engine.test.js:337:  var g = _buildGraph([n]);
+tests/r3.0d-hypothesis-engine.test.js:347:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:361:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:378:  var g = _buildGraph([n]);
+tests/r3.0d-hypothesis-engine.test.js:388:  var g = _buildGraph([n]);
+tests/r3.0d-hypothesis-engine.test.js:396:  var g = _buildGraph([_baseNode({ nodeId: 'n_qual', category: 'vehicle_response', credibility: 'heuristic',
+tests/r3.0d-hypothesis-engine.test.js:407:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:434:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:462:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:471:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:480:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:504:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:512:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:533:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:586:  var g = _buildGraph([n]);
+tests/r3.0d-hypothesis-engine.test.js:640:  var g = _buildGraph([n]);
+tests/r3.0d-hypothesis-engine.test.js:680:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:726:    var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:747:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:763:  var g = _buildGraph([n1, n2]);
+tests/r3.0d-hypothesis-engine.test.js:786:  var g = _buildGraph([n]);
+tests/r3.0d-hypothesis-engine.test.js:812:  var g = _buildGraph([n1, n2]);
+tests/r3.0d-hypothesis-engine.test.js:847:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:895:  var g = _buildGraph([n]);
+tests/r3.0d-hypothesis-engine.test.js:943:  var g = _buildGraph([n1, n2]);
+tests/r3.0d-hypothesis-engine.test.js:975:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:991:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1002:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1018:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1041:  var g = _buildGraph([n]);
+tests/r3.0d-hypothesis-engine.test.js:1106:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1166:  var g = _buildGraph([n]);
+tests/r3.0d-hypothesis-engine.test.js:1294:  var g = _buildGraph([n]);
+tests/r3.0d-hypothesis-engine.test.js:1333:  var g = _buildGraph([n1, n2]);
+tests/r3.0d-hypothesis-engine.test.js:1346:  var g2 = _buildGraph([sgA, sgB]);
+tests/r3.0d-hypothesis-engine.test.js:1371:  var g3 = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1393:  var g = _buildGraph([nA, nB]);
+tests/r3.0d-hypothesis-engine.test.js:1407:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1438:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1447:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1456:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1465:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1473:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1481:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1490:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1499:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1510:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1518:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1528:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1537:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1546:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1555:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1564:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1579:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1588:  var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1597:    var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1617:    var g = _buildGraph([_baseNode({})]);
+tests/r3.0d-hypothesis-engine.test.js:1638:  var g = _buildGraph([_baseNode({})]);
+
+exec
+/bin/bash -lc "rg -n \"function stableStringify|stableStringify\" contracts/r3.0d/hardened-intrinsics.js | head -20
+nl -ba contracts/r3.0d/hardened-intrinsics.js | sed -n '690,780p'
+rg -n \"HYPOTHESIS_COUNT_CAP|RULE_REGISTRY|RULES\" renderer/js/r3-0d-hypothesis-engine.js | head -40
+nl -ba renderer/js/r3-0d-priority-engine.js | sed -n '380,425p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+574:  // stableStringify(value) — canonical JSON serializer, sorted keys at every depth, NO toJSON
+577:  function stableStringify(value) {
+601:        result += stableStringify(value[i]);
+622:        obj += qkey + ':' + stableStringify(value[key]);
+663:    stableStringify: stableStringify,
+150:  var HYPOTHESIS_COUNT_CAP = 64;
+768:  var RULE_REGISTRY = HI.deepFreeze([
+1634:      for (var ri = 0; ri < RULE_REGISTRY.length; ri++) {
+1636:        var rule = RULE_REGISTRY[ri];
+1694:      if (hypotheses.length > HYPOTHESIS_COUNT_CAP) {
+1695:        return RC.buildBlockedResult([CODES.GRAPH_CAP_EXCEEDED], { detail: 'hypothesis count exceeds HYPOTHESIS_COUNT_CAP=' + HYPOTHESIS_COUNT_CAP });
+1813:    RULE_REGISTRY: RULE_REGISTRY,
+1814:    HYPOTHESIS_COUNT_CAP: HYPOTHESIS_COUNT_CAP,
+   380	    if (!_isPlainArray(hs.cannotConclude)) {
+   381	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   382	    }
+   383	    if (!_isPlainArray(hs.limitations)) {
+   384	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   385	    }
+   386	    // ---- Per-hypothesis structural + cross-field validation (Codex D4 R1 D4-R1-01/03 closure) ----
+   387	    var seenHypIds = HI.safeObjectCreateNull();
+   388	    for (var hi = 0; hi < hs.hypotheses.length; hi++) {
+   389	      var h = hs.hypotheses[hi];
+   390	      if (!_isPlainObject(h)) {
+   391	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   392	      }
+   393	      // Closed key set
+   394	      var hKeys = HI.safeOwnKeys(h);
+   395	      if (hKeys === null) return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   396	      for (var hki = 0; hki < hKeys.length; hki++) {
+   397	        if (HI.safeArrayIndexOf(HYPOTHESIS_KEYS_ALLOWED, hKeys[hki]) === -1) {
+   398	          return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY] };
+   399	        }
+   400	      }
+   401	      // hypothesisId grammar + uniqueness
+   402	      if (!_isNonEmptyString(h.hypothesisId)
+   403	          || HI.safeRegExpTest(ID_FORBIDDEN_RE, h.hypothesisId)
+   404	          || !HI.safeRegExpTest(/^hyp_[0-9a-f]{16}$/, h.hypothesisId)) {
+   405	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   406	      }
+   407	      if (HI.safeGetOwnDescriptor(seenHypIds, h.hypothesisId)) {
+   408	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   409	      }
+   410	      HI.safeDefineDataProperty(seenHypIds, h.hypothesisId, true);
+   411	      // ruleId required + must be in HE.RULE_REGISTRY
+   412	      if (!_isNonEmptyString(h.ruleId)) {
+   413	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   414	      }
+   415	      var rDesc = HI.safeGetOwnDescriptor(_RULE_BY_ID, h.ruleId);
+   416	      if (!rDesc) {
+   417	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   418	      }
+   419	      var rule = rDesc.value;
+   420	      // Codex D4 R1 D4-R1-01 closure: hypothesisId recompute equality binds (ruleId,
+   421	      // supportingEvidenceIds, contradictingEvidenceIds) per D3's _hypothesisId. Caller can no
+   422	      // longer keep IDs while mutating those fields.
+   423	      if (!_isPlainArray(h.supportingEvidenceIds)) {
+   424	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_EVIDENCE_LINK_INVALID] };
+   425	      }
+
+exec
+/bin/bash -lc "nl -ba contracts/r3.0d/hardened-intrinsics.js | sed -n '560,635p'
+nl -ba renderer/js/r3-0d-priority-engine.js | sed -n '85,130p'
+nl -ba renderer/js/r3-0d-priority-engine.js | sed -n '350,390p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+   560	  function deepFreeze(v) {
+   561	    if (v === null || typeof v !== 'object') return v;
+   562	    var keys = safeKeys(v);
+   563	    if (keys !== null) {
+   564	      var len = keys.length;
+   565	      for (var i = 0; i < len; i++) {
+   566	        var nested = v[keys[i]];
+   567	        if (typeof nested === 'object' && nested !== null) deepFreeze(nested);
+   568	      }
+   569	    }
+   570	    _apply(_ObjectFreeze, _Object, [v]);
+   571	    return v;
+   572	  }
+   573	
+   574	  // stableStringify(value) — canonical JSON serializer, sorted keys at every depth, NO toJSON
+   575	  // invocation anywhere. Walks via safeKeys + manual recursion + direct primitive encoding.
+   576	  // Used for canonical bytes (graphId / dedup) AND envelope byte cap measurement.
+   577	  function stableStringify(value) {
+   578	    if (value === null) return 'null';
+   579	    var t = typeof value;
+   580	    if (t === 'string') {
+   581	      // Captured _JSONStringify on a PRIMITIVE string never invokes toJSON (per ES
+   582	      // §25.5.2.2 SerializeJSONProperty: toJSON is only consulted when Type(value) is Object).
+   583	      var r = _apply(_JSONStringify, _JSON, [value]);
+   584	      if (r === _SENTINEL || typeof r !== 'string') return '""';
+   585	      return r;
+   586	    }
+   587	    if (t === 'number') {
+   588	      if (!safeNumberIsFinite(value)) return 'null';
+   589	      return safeStringCoerce(value);
+   590	    }
+   591	    if (t === 'boolean') return value ? 'true' : 'false';
+   592	    if (t === 'undefined') return 'null';
+   593	    var isArr = _apply(_ArrayIsArray, _Array, [value]);
+   594	    if (isArr === true) {
+   595	      var result = '[';
+   596	      var len;
+   597	      try { len = value.length; } catch (e) { return 'null'; }
+   598	      if (typeof len !== 'number') return 'null';
+   599	      for (var i = 0; i < len; i++) {
+   600	        if (i > 0) result += ',';
+   601	        result += stableStringify(value[i]);
+   602	      }
+   603	      return result + ']';
+   604	    }
+   605	    if (t === 'object') {
+   606	      var keys = safeKeys(value);
+   607	      if (keys === null) return 'null';
+   608	      // Manual insertion sort — no .sort dependency.
+   609	      var sortLen = keys.length;
+   610	      for (var s = 1; s < sortLen; s++) {
+   611	        var cur = keys[s];
+   612	        var k = s - 1;
+   613	        while (k >= 0 && keys[k] > cur) { keys[k + 1] = keys[k]; k--; }
+   614	        keys[k + 1] = cur;
+   615	      }
+   616	      var obj = '{';
+   617	      for (var j = 0; j < sortLen; j++) {
+   618	        if (j > 0) obj += ',';
+   619	        var key = keys[j];
+   620	        var qkey = _apply(_JSONStringify, _JSON, [key]);
+   621	        if (qkey === _SENTINEL || typeof qkey !== 'string') return 'null';
+   622	        obj += qkey + ':' + stableStringify(value[key]);
+   623	      }
+   624	      return obj + '}';
+   625	    }
+   626	    return 'null';
+   627	  }
+   628	
+   629	  // ─── Public API (the ONLY exported surface) ──────────────────────────────────
+   630	  // Captured intrinsics are NOT exported. The capture refs are deliberately kept in IIFE-local
+   631	  // variables to prevent the caller from substituting them. Even the api object itself is
+   632	  // frozen so callers can't replace wrapper bindings.
+   633	  var api = {
+   634	    safeOwnKeys: safeOwnKeys,
+   635	    safeKeys: safeKeys,
+    85	  })();
+    86	  // Closed status enum (Codex D4 R1 D4-R1-03 closure).
+    87	  var HYPOTHESIS_STATUS_ALLOWED = HI.deepFreeze(['supported', 'contradicted', 'inconclusive', 'blocked']);
+    88	  // Closed confidence state enum (matches D3 export).
+    89	  var CONFIDENCE_STATE_ALLOWED = HI.deepFreeze(['not_computed', 'insufficient_evidence', 'low', 'moderate', 'high']);
+    90	  // Closed key set for D3 hypothesis (Codex D4 R1 D4-R1-03 closure: extra keys rejected).
+    91	  // Codex D4 R2 D4-R2-03 closure: D3 now emits a contentSignature on every hypothesis (binds
+    92	  // full decision-relevant content); D4 includes it in the closed key set and recomputes it.
+    93	  var HYPOTHESIS_KEYS_ALLOWED = HI.deepFreeze([
+    94	    'hypothesisId', 'ruleId', 'ruleVersion', 'category', 'status', 'i18nKey',
+    95	    'supportingEvidenceIds', 'contradictingEvidenceIds', 'correlationGroupIds',
+    96	    'alternativeExplanationIds', 'cannotConcludeReasonCodes', 'validationActionIds',
+    97	    'credibility', 'confidence', 'limitations', 'contentSignature', 'provenance',
+    98	  ]);
+    99	  var CONFIDENCE_KEYS_ALLOWED = HI.deepFreeze(['state', 'score']);
+   100	  // Closed key set for D3 hypothesis-set top-level.
+   101	  var HSET_KEYS_ALLOWED = HI.deepFreeze([
+   102	    'schemaVersion', 'hypothesisSetId', 'sourceGraphId', 'caseAssociation', 'sessionAssociation',
+   103	    'hypotheses', 'alternativeExplanations', 'validationActions', 'cannotConclude', 'limitations',
+   104	    'provenance', 'createdAt', 'generationToken', 'contextVersion',
+   105	  ]);
+   106	
+   107	  // Module-init captures (Codex D3 R1-R5 lessons applied proactively).
+   108	  var _CAPTURED_OBJECT_IS_FROZEN = Object.isFrozen;
+   109	  var _CAPTURED_OBJECT_IS = Object.is;
+   110	  var _CAPTURED_DATE_PARSE = Date.parse;
+   111	  function _isFrozenSafe(v) { try { return _CAPTURED_OBJECT_IS_FROZEN(v) === true; } catch (e) { return false; } }
+   112	  function _exactlyEqual(a, b) { try { return _CAPTURED_OBJECT_IS(a, b) === true; } catch (e) { return false; } }
+   113	  function _isoToMs(s) {
+   114	    try {
+   115	      if (typeof s !== 'string' || s.length === 0) return null;
+   116	      var n = _CAPTURED_DATE_PARSE(s);
+   117	      if (typeof n !== 'number' || n !== n) return null;
+   118	      return n;
+   119	    } catch (e) { return null; }
+   120	  }
+   121	
+   122	  var _HI_API_FROZEN_AT_LOAD = (function () {
+   123	    try { return _CAPTURED_OBJECT_IS_FROZEN(HI); } catch (e) { return false; }
+   124	  })();
+   125	  var _HI_HAS = (function () {
+   126	    var required = ['safeOwnKeys', 'safeKeys', 'safeGetOwnDescriptor', 'safeHasOwn', 'safeArrayPush',
+   127	      'safeArrayIndexOf', 'safeArrayForEach', 'safeArrayMap', 'safeArraySlice', 'safeArraySort',
+   128	      'safeStringSlice', 'safeStringCharCodeAt', 'safeStringCoerce', 'safeIsArray', 'safeIsPlainShape',
+   129	      'safeNumberIsInteger', 'safeNumberIsFinite', 'safeMathFloor', 'safeRegExpTest',
+   130	      'safeUtf8ByteLength', 'safeStructuredClone', 'safeObjectCreateNull', 'safeObjectAssign',
+   350	      if (HI.safeArrayIndexOf(HSET_KEYS_ALLOWED, hsCloneKeys[hcki]) === -1) {
+   351	        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY] };
+   352	      }
+   353	    }
+   354	    if (hs.schemaVersion !== 1) {
+   355	      return { valid: false, reasonCodes: [CODES.UNSUPPORTED_FUTURE_SCHEMA] };
+   356	    }
+   357	    if (!_isNonEmptyString(hs.hypothesisSetId)
+   358	        || !HI.safeRegExpTest(/^hset_[0-9a-f]{16}$/, hs.hypothesisSetId)) {
+   359	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+   360	    }
+   361	    if (!_isNonEmptyString(hs.sourceGraphId)
+   362	        || !HI.safeRegExpTest(/^graph_[0-9a-f]{16}$/, hs.sourceGraphId)) {
+   363	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+   364	    }
+   365	    if (!_isPlainObject(hs.caseAssociation)
+   366	        || !_isNonEmptyString(hs.caseAssociation.caseId)
+   367	        || !_isNonEmptyString(hs.caseAssociation.sessionId)) {
+   368	      return { valid: false, reasonCodes: [CODES.SOURCE_IDENTITY_INVALID] };
+   369	    }
+   370	    if (!_isPlainObject(hs.sessionAssociation)
+   371	        || hs.sessionAssociation.sessionId !== hs.caseAssociation.sessionId) {
+   372	      return { valid: false, reasonCodes: [CODES.SOURCE_IDENTITY_SESSION_MISMATCH] };
+   373	    }
+   374	    if (!_isPlainArray(hs.hypotheses)) {
+   375	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   376	    }
+   377	    if (hs.hypotheses.length > INPUT_HYPOTHESES_INPUT_CAP) {
+   378	      return { valid: false, reasonCodes: [CODES.GRAPH_CAP_EXCEEDED] };
+   379	    }
+   380	    if (!_isPlainArray(hs.cannotConclude)) {
+   381	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   382	    }
+   383	    if (!_isPlainArray(hs.limitations)) {
+   384	      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+   385	    }
+   386	    // ---- Per-hypothesis structural + cross-field validation (Codex D4 R1 D4-R1-01/03 closure) ----
+   387	    var seenHypIds = HI.safeObjectCreateNull();
+   388	    for (var hi = 0; hi < hs.hypotheses.length; hi++) {
+   389	      var h = hs.hypotheses[hi];
+   390	      if (!_isPlainObject(h)) {
+
+exec
+/bin/bash -lc "nl -ba renderer/js/r3-0d-priority-engine.js | sed -n '570,700p'
+rg -n \"alternativeExplanationIds|cannotConcludeReasonCodes|validationActionIds|correlationGroupIds\" renderer/js/r3-0d-priority-engine.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+   570	      }
+   571	      if ((refNowMs - hsAt) > maxAgeMs) {
+   572	        return { valid: false, reasonCodes: [CODES.EVIDENCE_FRESHNESS_STALE] };
+   573	      }
+   574	      if (hsAt > (refNowMs + (5 * 60 * 1000))) {
+   575	        return { valid: false, reasonCodes: [CODES.EVIDENCE_FRESHNESS_STALE] };
+   576	      }
+   577	    }
+   578	
+   579	    return { valid: true, hypothesisSet: HI.deepFreeze(hs) };
+   580	  }
+   581	
+   582	  // ---------- Eligibility checks (per directive §12 FORBIDDEN list) ----------------------------
+   583	  /**
+   584	   * A hypothesis is eligible to become PRIMARY only if:
+   585	   *   - credibility >= Derived (not Heuristic / Unavailable)
+   586	   *   - status NOT 'contradicted' or 'blocked'
+   587	   *   - confidence.state ∈ {moderate, high}
+   588	   * setup_experiment additionally requires: zero contradicting evidence + confidence high
+   589	   * (per directive: "unsupported setup actions" forbidden).
+   590	   */
+   591	  function _eligibleAsPrimary(h) {
+   592	    if (!_crAtLeast(h.credibility, 'Derived')) return false;
+   593	    if (h.status === 'contradicted' || h.status === 'blocked') return false;
+   594	    if (h.confidence.state !== 'moderate' && h.confidence.state !== 'high') return false;
+   595	    return true;
+   596	  }
+   597	  function _eligibleAsSetupExperiment(h) {
+   598	    if (h.contradictingEvidenceIds && h.contradictingEvidenceIds.length > 0) return false;
+   599	    if (h.confidence.state !== 'high') return false;
+   600	    if (!_crAtLeast(h.credibility, 'Derived')) return false;
+   601	    return true;
+   602	  }
+   603	
+   604	  // ---------- Priority ID generators -----------------------------------------------------------
+   605	  function _priorityId(hypothesisId, kind, schemaVersion) {
+   606	    var hash = _hashFNV64Hex('priorityid|v' + schemaVersion + '|' + hypothesisId + '|' + kind);
+   607	    return 'pri_' + hash;
+   608	  }
+   609	  function _prioritySetId(sourceHsetId, priorities, schemaVersion) {
+   610	    var hashMaterial = {
+   611	      v: schemaVersion,
+   612	      hsetId: sourceHsetId,
+   613	      priIds: HI.safeArrayMap(priorities, function (p) { return p.priorityId; }),
+   614	    };
+   615	    HI.safeArraySort(hashMaterial.priIds, _strcmp);
+   616	    return 'priset_' + _hashFNV64Hex('prioritysetid|v' + schemaVersion + '|' + HI.stableStringify(hashMaterial));
+   617	  }
+   618	
+   619	  // ---------- Build one priority entry ---------------------------------------------------------
+   620	  function _buildPriorityEntry(h, tier, blockingIds, schemaVersion) {
+   621	    var kind = _kindForCategory(h.category);
+   622	    // For setup_experiment, additional eligibility gate
+   623	    if (kind === 'setup_experiment' && !_eligibleAsSetupExperiment(h)) {
+   624	      // Downgrade to controlled_repeat_lap (still actionable, but doesn't claim setup causation)
+   625	      kind = 'controlled_repeat_lap';
+   626	      tier = PRIORITY_KIND_TIER[kind];
+   627	    }
+   628	    if (HI.safeArrayIndexOf(PRIORITY_KIND_ALLOWED, kind) === -1) {
+   629	      kind = 'no_action_required';
+   630	      tier = PRIORITY_KIND_TIER[kind];
+   631	    }
+   632	    var pid = _priorityId(h.hypothesisId, kind, schemaVersion);
+   633	
+   634	    // Limitations (carry forward from hypothesis + add a default if heuristic / contradicted)
+   635	    var lims = HI.safeArraySlice(_isPlainArray(h.limitations) ? h.limitations : []);
+   636	    if (!_crAtLeast(h.credibility, 'Derived')
+   637	        && HI.safeArrayIndexOf(lims, CODES.LIMITATION_HEURISTIC_ONLY) === -1) {
+   638	      _arrPush(lims, CODES.LIMITATION_HEURISTIC_ONLY);
+   639	    }
+   640	    if (h.contradictingEvidenceIds && h.contradictingEvidenceIds.length > 0
+   641	        && HI.safeArrayIndexOf(lims, CODES.LIMITATION_NO_CONTROLLED_REPEAT) === -1) {
+   642	      _arrPush(lims, CODES.LIMITATION_NO_CONTROLLED_REPEAT);
+   643	    }
+   644	    HI.safeArraySort(lims, _strcmp);
+   645	    if (lims.length > LIMITATIONS_PER_PRIORITY_CAP) {
+   646	      var trimmed = [];
+   647	      for (var li = 0; li < LIMITATIONS_PER_PRIORITY_CAP; li++) _arrPush(trimmed, lims[li]);
+   648	      lims = trimmed;
+   649	    }
+   650	
+   651	    var sortedBlocking = HI.safeArraySlice(blockingIds);
+   652	    HI.safeArraySort(sortedBlocking, _strcmp);
+   653	    if (sortedBlocking.length > PREREQ_ID_PER_PRIORITY_CAP) {
+   654	      var blkTrimmed = [];
+   655	      for (var bi = 0; bi < PREREQ_ID_PER_PRIORITY_CAP; bi++) _arrPush(blkTrimmed, sortedBlocking[bi]);
+   656	      sortedBlocking = blkTrimmed;
+   657	    }
+   658	
+   659	    // i18nKey for the priority itself, sourced deterministically from the kind.
+   660	    var i18nKey = 'r3.0d.priority.' + kind;
+   661	    var whyNowI18nKey = 'r3.0d.priority.why_now.' + kind;
+   662	    var expectedObsKey = 'r3.0d.priority.expected.' + kind;
+   663	    var stopKey = 'r3.0d.priority.stop.' + kind;
+   664	    var rollbackKey = 'r3.0d.priority.rollback.' + kind;
+   665	
+   666	    return HI.deepFreeze({
+   667	      priorityId: pid,
+   668	      hypothesisId: h.hypothesisId,
+   669	      rank: 0,  // assigned post-sort
+   670	      tier: tier,
+   671	      kind: kind,
+   672	      category: h.category,
+   673	      i18nKey: i18nKey,
+   674	      whyNowI18nKey: whyNowI18nKey,
+   675	      blockingPrerequisiteIds: HI.deepFreeze(sortedBlocking),
+   676	      expectedObservationI18nKey: expectedObsKey,
+   677	      stopConditionI18nKey: stopKey,
+   678	      rollbackConditionI18nKey: rollbackKey,
+   679	      credibility: h.credibility,
+   680	      confidence: HI.deepFreeze({ state: h.confidence.state, score: h.confidence.score }),
+   681	      eligibleAsPrimary: _eligibleAsPrimary(h),
+   682	      contradictionCount: h.contradictingEvidenceIds ? h.contradictingEvidenceIds.length : 0,
+   683	      limitations: HI.deepFreeze(lims),
+   684	      provenance: HI.deepFreeze({
+   685	        sourceHypothesisId: h.hypothesisId,
+   686	        sourceCategory: h.category,
+   687	        sourceStatus: h.status,
+   688	        builderVersion: SERVICE_VERSION,
+   689	      }),
+   690	    });
+   691	  }
+   692	
+   693	  // ---------- Public entry: buildPrioritySet ---------------------------------------------------
+   694	  function buildPrioritySet(inputIn, optsIn) {
+   695	    try {
+   696	      if (!_intrinsicsIntact()) {
+   697	        return _buildIntrinsicTamperBlock('intrinsic-tampering detected at entry to buildPrioritySet');
+   698	      }
+   699	
+   700	      // ---- Step 0.5 — input + opts descriptor snapshot ----
+95:    'supportingEvidenceIds', 'contradictingEvidenceIds', 'correlationGroupIds',
+96:    'alternativeExplanationIds', 'cannotConcludeReasonCodes', 'validationActionIds',
+492:      // correlationGroupIds: plain array of strings (Codex D4 R2 D4-R2-03 closure).
+493:      if (!_isPlainArray(h.correlationGroupIds)) {
+517:        corr: h.correlationGroupIds,
+518:        alts: _isPlainArray(h.alternativeExplanationIds) ? h.alternativeExplanationIds : [],
+519:        cc: _isPlainArray(h.cannotConcludeReasonCodes) ? h.cannotConcludeReasonCodes : [],
+520:        acts: _isPlainArray(h.validationActionIds) ? h.validationActionIds : [],
+
+exec
+/bin/bash -lc "sed -n '5195,5238p' governance/r3.0d/codex-checkpoint-evidence/D4/round-2-f09323d.raw.txt
+sed -n '5240,5278p' governance/r3.0d/codex-checkpoint-evidence/D4/round-2-f09323d.raw.txt" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+
+Requested probes:
+
+- Same-ID mutations to rule/support/contradiction IDs: rejected.
+- Unknown rule, category/i18n/credibility mismatch: rejected.
+- Extra hypothesis/HSET keys, invalid enums, status implications: rejected.
+- Top-level HSET and clock accessors: rejected without firing.
+- Two-pass downgrade: correct final tier-3 ID; tier-6 dependent references that final ID.
+- Error-detail privacy: path not echoed.
+- Unknown category: genuine D3 hypothesis becomes `collect_additional_session`, tier 6—not tier 7.
+- Requiring D4 introduces D3 globals.
+
+Finding D4-R2-01: Hypothesis identity still does not authenticate most decision-relevant content
+  evidence: [r3-0d-priority-engine.js:394](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-priority-engine.js:394) binds only rule and evidence IDs. Keeping both IDs unchanged while changing `status` to `inconclusive`, credibility to `Physics`, or `ruleVersion` to `999` returned `valid:true`.
+  severity: BLOCK
+  proposed closure: authenticate the complete canonical D3 hypothesis content, or require producer attestation; also bind `ruleVersion` to the registry.
+
+Finding D4-R2-02: Nested accessors execute before authority auditing
+  evidence: [r3-0d-priority-engine.js:267](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-priority-engine.js:267) audits only HSET top-level descriptors before cloning at line 288. A nested hypothesis `status` getter fired once and D4 returned `valid:true`.
+  severity: BLOCK
+  proposed closure: recursively descriptor-audit the original HSET before structured cloning.
+
+Finding D4-R2-03: Per-hypothesis D3 schema remains structurally open
+  evidence: [r3-0d-priority-engine.js:337](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-priority-engine.js:337). `correlationGroupIds: "not-an-array"` and an extra confidence key were accepted; `ruleVersion` is neither validated nor cross-bound.
+  severity: BLOCK
+  proposed closure: enforce exact recursive D3 shapes and validate every field, array grammar/cap, nested key set, and registry-bound version.
+
+Finding D4-R2-04: Round-2 tests do not cover the claimed closure matrix
+  evidence: [r3.0d-priority-engine.test.js:454](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/tests/r3.0d-priority-engine.test.js:454) adds nine assertions but omits direct rule/evidence-ID mutation, rule-binding fields, confidence enum, status implications, HSET extras, exact downgrade semantics, nested accessors, and global pollution.
+  severity: NIT
+  proposed closure: add exact assertions for all Round-2 probes and the reproductions above.
+
+Finding D4-R2-05: Importing D4 pollutes Node global scope with D3 API
+  evidence: D4 requires D3 at [r3-0d-priority-engine.js:67](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-priority-engine.js:67), whose UMD footer writes globally at [r3-0d-hypothesis-engine.js:1756](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-hypothesis-engine.js:1756). Fresh-process reproduction changed both globals from absent to present.
+  severity: NIT
+  proposed closure: avoid global assignment under CommonJS and expose the registry through a side-effect-free contract module.
+
+The D4 suite passed 62/62. Full `npm test` could not complete in this read-only environment because an earlier R3.0C test requires `mkdtemp`.
+
+FINAL VERDICT: BLOCK
+tokens used
+108,052
+R1-01, R1-02, R1-03, and R1-06 remain incompletely closed.
+
+
+- Same-ID mutations to rule/support/contradiction IDs: rejected.
+- Unknown rule, category/i18n/credibility mismatch: rejected.
+- Extra hypothesis/HSET keys, invalid enums, status implications: rejected.
+- Top-level HSET and clock accessors: rejected without firing.
+- Two-pass downgrade: correct final tier-3 ID; tier-6 dependent references that final ID.
+- Error-detail privacy: path not echoed.
+- Unknown category: genuine D3 hypothesis becomes `collect_additional_session`, tier 6—not tier 7.
+- Requiring D4 introduces D3 globals.
+
+Finding D4-R2-01: Hypothesis identity still does not authenticate most decision-relevant content
+  evidence: [r3-0d-priority-engine.js:394](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-priority-engine.js:394) binds only rule and evidence IDs. Keeping both IDs unchanged while changing `status` to `inconclusive`, credibility to `Physics`, or `ruleVersion` to `999` returned `valid:true`.
+  severity: BLOCK
+  proposed closure: authenticate the complete canonical D3 hypothesis content, or require producer attestation; also bind `ruleVersion` to the registry.
+
+Finding D4-R2-02: Nested accessors execute before authority auditing
+  evidence: [r3-0d-priority-engine.js:267](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-priority-engine.js:267) audits only HSET top-level descriptors before cloning at line 288. A nested hypothesis `status` getter fired once and D4 returned `valid:true`.
+  severity: BLOCK
+  proposed closure: recursively descriptor-audit the original HSET before structured cloning.
+
+Finding D4-R2-03: Per-hypothesis D3 schema remains structurally open
+  evidence: [r3-0d-priority-engine.js:337](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-priority-engine.js:337). `correlationGroupIds: "not-an-array"` and an extra confidence key were accepted; `ruleVersion` is neither validated nor cross-bound.
+  severity: BLOCK
+  proposed closure: enforce exact recursive D3 shapes and validate every field, array grammar/cap, nested key set, and registry-bound version.
+
+Finding D4-R2-04: Round-2 tests do not cover the claimed closure matrix
+  evidence: [r3.0d-priority-engine.test.js:454](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/tests/r3.0d-priority-engine.test.js:454) adds nine assertions but omits direct rule/evidence-ID mutation, rule-binding fields, confidence enum, status implications, HSET extras, exact downgrade semantics, nested accessors, and global pollution.
+  severity: NIT
+  proposed closure: add exact assertions for all Round-2 probes and the reproductions above.
+
+Finding D4-R2-05: Importing D4 pollutes Node global scope with D3 API
+  evidence: D4 requires D3 at [r3-0d-priority-engine.js:67](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-priority-engine.js:67), whose UMD footer writes globally at [r3-0d-hypothesis-engine.js:1756](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-hypothesis-engine.js:1756). Fresh-process reproduction changed both globals from absent to present.
+  severity: NIT
+  proposed closure: avoid global assignment under CommonJS and expose the registry through a side-effect-free contract module.
+
+The D4 suite passed 62/62. Full `npm test` could not complete in this read-only environment because an earlier R3.0C test requires `mkdtemp`.
+
+FINAL VERDICT: BLOCK
+
+codex
+The first combined probe hit the environment’s read-only temporary-file restriction because Bash implements heredocs through a temp file. No repository state changed. I’m rerunning it as an inline Node program.
+exec
+/bin/bash -lc "node -e '
+\"use strict\";
+const HE=require(\"./renderer/js/r3-0d-hypothesis-engine.js\"),EG=require(\"./renderer/js/r3-0d-evidence-graph.js\"),PE=require(\"./renderer/js/r3-0d-priority-engine.js\");
+const clock=()=>\"2026-06-29T01:00:00Z\";
+const identity={caseId:\"case_001\",sessionId:\"sess_001\",lapId:null,sourceId:\"csv_v1\",sourceVersion:\"1.0\",freshness:\"2026-06-29T00:00:00Z\"};
+const node={schemaVersion:1,nodeId:\"n_default\",category:\"data_quality\",identity,credibility:\"measured\",provenance:\"real\",availability:\"available\",confidence:{state:\"not_computed\"},observation:{kind:\"channel_missing\",channel:\"brake\",i18nKey:\"k\",params:null},limitations:[\"LIMITATION_MISSING_CHANNEL\"],supportingEdges:[],contradictingEdges:[]};
+const eg=EG.buildEvidenceGraph({caseAssociation:{caseId:\"case_001\",sessionId:\"sess_001\",lapId:null},rawEvidence:[node]},{clock});
+const hs=HE.buildHypothesisSet({graph:eg.graph},{clock}).hypothesisSet;
+function stable(v){if(v===null)return \"null\";switch(typeof v){case \"string\":return JSON.stringify(v);case \"number\":return Number.isFinite(v)?String(v):\"null\";case \"boolean\":return v?\"true\":\"false\";case \"undefined\":return \"null\";case \"object\":if(Array.isArray(v)){let a=\"[\";for(let i=0;i<v.length;i++){if(i)a+=\",\";a+=stable(v[i])}return a+\"]\"}return \"{\"+Object.keys(v).sort().map(k=>JSON.stringify(k)+\":\"+stable(v[k])).join(\",\")+\"}\";default:return \"null\"}}
+function hex8(h){return (h>>>0).toString(16).padStart(8,\"0\")}
+function hash32(s){let h=0x811c9dc5;for(let i=0;i<s.length;i++){h"'^=s.charCodeAt(i);h=(h+((h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24)))>>>0}return hex8(h)}
+function hash64(s){return hash32(s)+hash32(s+"|"+s.length)}
+function csig(h,v){const m={v,hid:h.hypothesisId,ruleId:h.ruleId,ruleVersion:h.ruleVersion,category:h.category,status:h.status,i18nKey:h.i18nKey,credibility:h.credibility,conf:{state:h.confidence&&h.confidence.state,score:h.confidence&&h.confidence.score},sup:h.supportingEvidenceIds,con:h.contradictingEvidenceIds,corr:h.correlationGroupIds,alts:h.alternativeExplanationIds,cc:h.cannotConcludeReasonCodes,acts:h.validationActionIds,lims:h.limitations};return "csig_"+hash64("contentsig|v"+v+"|"+stable(m))}
+function hsetid(x){const pairs=x.hypotheses.map(h=>({hid:h.hypothesisId,csig:h.contentSignature})).sort((a,b)=>a.hid<b.hid?-1:a.hid>b.hid?1:0),m={v:x.schemaVersion,graphId:x.sourceGraphId,pairs};return "hset_"+hash64("hypothesissetid|v"+x.schemaVersion+"|"+stable(m))}
+function deepFreeze(v){if(v&&typeof v==="object"){Reflect.ownKeys(v).forEach(k=>{const d=Object.getOwnPropertyDescriptor(v,k);if(d&&"value" in d)deepFreeze(d.value)});Object.freeze(v)}return v}
+function rebuild(mutator,rehash){const x=structuredClone(hs);mutator(x.hypotheses[0]);if(rehash){x.hypotheses[0].contentSignature=csig(x.hypotheses[0],x.schemaVersion);x.hypothesisSetId=hsetid(x)}return deepFreeze(x)}
+const h=hs.hypotheses[0];console.log("authentic",JSON.stringify({emittedCsig:h.contentSignature,independentCsig:csig(h,hs.schemaVersion),emittedHset:hs.hypothesisSetId,independentHset:hsetid(hs)}));
+for(const [name,fn] of [["status",h=>h.status="inconclusive"],["credibility",h=>h.credibility="Physics"],["ruleVersion",h=>h.ruleVersion=999],["confidence.score",h=>h.confidence.score=(h.confidence.score+1)%101],["correlationGroupIds",h=>h.correlationGroupIds="string"],["confidence.extra",h=>h.confidence.extra=true]]){const out=PE.buildPrioritySet({hypothesisSet:rebuild(fn,false)},{clock});console.log(name,"stale-signature",JSON.stringify({valid:out.valid,eligible:out.eligible,codes:out.reasonCodes}))}
+let fired=0;const acc=structuredClone(hs),replacement={};for(const k of Object.keys(acc.hypotheses[0]))if(k!=="status")replacement[k]=acc.hypotheses[0][k];Object.defineProperty(replacement,"status",{enumerable:true,get(){fired++;return "supported"}});Object.freeze(replacement);acc.hypotheses=Object.freeze([replacement]);deepFreeze(acc);const ao=PE.buildPrioritySet({hypothesisSet:acc},{clock});console.log("nested-accessor",JSON.stringify({valid:ao.valid,eligible:ao.eligible,codes:ao.reasonCodes,fired}));
+const forged=rebuild(h=>{h.status="inconclusive";h.credibility="Physics";h.confidence.score=Math.min(100,h.confidence.score+17)},true),fo=PE.buildPrioritySet({hypothesisSet:forged},{clock});console.log("rehash-forgery",JSON.stringify({valid:fo.valid,eligible:fo.eligible,codes:fo.reasonCodes,newCsig:forged.hypotheses[0].contentSignature,newHset:forged.hypothesisSetId,priority:fo.prioritySet&&fo.prioritySet.priorities[0]&&{credibility:fo.prioritySet.priorities[0].credibility,score:fo.prioritySet.priorities[0].confidence.score,status:fo.prioritySet.priorities[0].provenance.sourceStatus}}));
+let clockCalls=0;const co=PE.buildPrioritySet({hypothesisSet:hs},{clock:()=>{clockCalls++;return "2026-06-29T01:00:00Z"}});console.log("clock-data-descriptor",JSON.stringify({valid:co.valid,clockCalls}));
+function countAudit(v,depth=0){let n=1,max=depth;if(v&&typeof v==="object")for(const k of Reflect.ownKeys(v)){const d=Object.getOwnPropertyDescriptor(v,k),z=countAudit(d.value,depth+1);n+=z.n;max=Math.max(max,z.max)}return {n,max}}
+console.log("authentic-audit-size",JSON.stringify(countAudit(hs)));
+'"'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+authentic {"emittedCsig":"csig_ddcd813ba12e796d","independentCsig":"csig_ddcd813ba12e796d","emittedHset":"hset_53c31d4bbbfe10da","independentHset":"hset_53c31d4bbbfe10da"}
+status stale-signature {"eligible":false,"codes":["HYPOTHESIS_AUTHORITY_FORGED"]}
+credibility stale-signature {"eligible":false,"codes":["HYPOTHESIS_AUTHORITY_FORGED"]}
+ruleVersion stale-signature {"eligible":false,"codes":["HYPOTHESIS_INVALID"]}
+confidence.score stale-signature {"eligible":false,"codes":["HYPOTHESIS_AUTHORITY_FORGED"]}
+correlationGroupIds stale-signature {"eligible":false,"codes":["HYPOTHESIS_INVALID"]}
+confidence.extra stale-signature {"eligible":false,"codes":["HYPOTHESIS_INVALID","UNKNOWN_OWN_KEY"]}
+nested-accessor {"eligible":false,"codes":["HYPOTHESIS_AUTHORITY_FORGED"],"fired":0}
+rehash-forgery {"valid":true,"newCsig":"csig_60ed590657cec72e","newHset":"hset_f35aa7271b629d5e","priority":{"credibility":"Physics","score":47,"status":"inconclusive"}}
+clock-data-descriptor {"valid":true,"clockCalls":1}
+authentic-audit-size {"n":89,"max":4}
+
+codex
+The stale-signature closure works for every requested mutation, and the nested getter is rejected with `fired=0`. Independent canonicalization reproduces both emitted hashes byte-for-byte. However, the new signatures expose a trust-boundary defect: because both are public unkeyed hashes, a caller can mutate decision fields, recompute `contentSignature` and `hypothesisSetId`, and D4 accepts the forged set as valid. I reproduced acceptance with altered status, credibility, and score; I’m checking the full suite and surrounding contract claims before assigning final severity.
+exec
+/bin/bash -lc 'npm test' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ exited 1 in 3959ms:
+
+[1] 軸側傾剛性 K = k_w·t²/2 (Milliken / Suspension Secrets)
+  ✓ 前彈簧側傾剛性 = k·t²/2
+  ✓ 輪胎串聯後總剛性 < 懸吊剛性
+
+[2] Roll gradient 量級 (OptimumG: 街車 ~3-6°/g, 高下壓力賽車 0.2-0.7°/g)
+  ✓ GT3 roll gradient 在 1.5-5 °/g 合理區間
+  ✓ 軟彈簧 → roll gradient 更大
+
+[3] ARB sizing 單位一致性 (Nm/deg)
+  ✓ total_roll_needed ≈ m·g·h/target
+  ✓ front_arb_needed 在現實範圍 (< 3000 Nm/deg)
+  ✓ current_roll_gradient 在現實範圍 (< 15 °/g)
+
+[4] 線性自行車模型 (Gillespie ch.6)
+  ✓ 滑移角@1g 在 2-10° 物理範圍
+  ✓ K_us = W_f/C_f − W_r/C_r
+  ✓ 臨界速度 = √(g·L/|K_us|)
+  ✓ K_us<0 時無特徵速度
+  ✓ 超過臨界速度時 yaw gain = null
+  ✓ 50/50 車 K_us ≈ 0
+
+[5] 阻尼比 (OptimumG Tech Tip 2: 賽車 ζ ≈ 0.65-0.7)
+  ✓ heave 阻尼比在 0.2-1.2 現實範圍
+  ✓ 側傾阻尼比在 0.1-1.5 現實範圍
+  ✓ 參考速度加倍 → ζ 減半
+
+[6] 空力方向 (front-biased downforce → 高速轉向過度)
+  ✓ 前偏空力 → aero_us_shift < 0 (轉向過度)
+  ✓ 後偏空力 → aero_us_shift > 0 (轉向不足)
+
+[7] Toe 慣例 (+ = toe-in)
+  ✓ 前 toe-in → 更轉向不足
+  ✓ 後 toe-in → 更轉向不足(穩定)
+
+[8] Cross weight (FL+RR 分析對角，作者刻意設計)
+  ✓ cross = (FL+RR)/total
+
+[9] Flat ride 規則 (Olley: 後/前 ≈ 1.10-1.20)
+  ✓ 後/前比值過低觸發建議
+  ✓ 目標比值 = 1.10 (後高於前)
+  ✓ 建議調整「後」彈簧
+
+[10] 輪胎垂直彈簧率估算 (實測校準)
+  ✓ 255/40 估算 ≈ 250 N/mm (±10%)
+  ✓ 205/55 ≈ 220 N/mm 基準
+  ✓ 胎壓越高剛性越高
+  ✓ 295/30 在 250-320 N/mm 合理範圍
+
+[11] Pacejka 模型
+  ✓ C_α 峰值在 Fz = a4
+  ✓ -3° camber 降低 C_α < 3%
+  ✓ 峰值 μ 在 0.8-1.3
+
+[12] Load sensitivity 形狀
+  ✓ Fz=Fz0 時 = 1.0 (峰值)
+  ✓ Fz>Fz0 時下降
+
+[13] 縱向荷重轉移 ΔW = W·a·h/L (Gillespie)
+  ✓ 1g 煞車轉移量
+
+[14] 全車種資料庫掃描（Tier 1 輸出健全性）
+  ✓ 501 台車全部輸出在物理合理範圍
+
+[15] Pacejka 荷重敏感度膝點隨車重校準 (a4 scaling)
+  ✓ GT3 臨界速度不再低得離譜 (>90 km/h 或無)
+  ✓ 62/38 前重車 → K_us > 0 (轉向不足)
+  ✓ 有角落重量時軸荷重以磅秤值為準
+
+[16] 阻尼參考速度防呆 (0/''/負值 → 退回 0.3)
+  ✓ damper_ref_speed=0 → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed="" → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed=-1 → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed=null → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed=undefined → ζ 有限且等於 0.3 預設
+
+[17] arbSizing 輪胎柔度補償（軸級閉合）
+  ✓ series(spring+ARB, tire) 總和 = 所需總剛性
+  ✓ 無輪胎參數時維持舊行為
+
+[18] 統一機械平衡 (Tier1 understeer_gradient, deg/g) — 配重 + LLTD
+  ✓ 車頭重(62%F) → 轉向不足 (US>0)
+  ✓ 50/50 → 近中性 (|US|<0.3)
+  ✓ 車尾重(40%F) → 轉向過度 (US<0)
+  ✓ 配重單調: 62%F 比 50%F 更US, 40%F 更OS
+  ✓ US 在 deg/g 合理範圍 (|US|<8)
+  ✓ 前 ARB 硬 → 轉向不足方向
+  ✓ 後 ARB 硬 → 轉向過度方向
+  ✓ 前硬 vs 後硬 方向相反且對稱
+
+[19] 預設車庫傾向分佈合理性 (回歸「全部轉向過度」bug)
+  ✓ OS 不超過 50% (修正前幾乎全 OS)
+  ✓ 三種傾向都有合理數量(各>10%)
+  ✓ FF 前驅車 轉向不足 > 轉向過度 (物理正確)
+
+[20] 麗寶單圈模擬器 — GG 點質量 lap sim
+  ✓ 賽道段落總長 ≈ 3500m (±200)
+  ✓ 改裝 GR Yaris 圈速 ≈ 110.9s (1:50, ±6s)
+  ✓ 極速合理 (180-260 km/h)
+  ✓ 抓地↑ → 圈速更快
+  ✓ 動力↑ → 圈速更快
+  ✓ 質量↑ → 圈速更慢
+
+[21] 麗寶 stint 演化 — 胎壓甜蜜點 / 最快圈 / 退化
+  ✓ 產生 12 圈逐圈資料
+  ✓ 最快單圈時間字串格式 m:ss.mmm
+  ✓ 甜蜜點在 stint 早段 (第1-5圈)
+  ✓ 最快圈 ≈ 峰值抓地圈 (±1)
+  ✓ 第1圈(冷胎)比最快圈慢
+  ✓ 熱胎壓 > 冷胎壓 (升溫建壓)
+  ✓ 建議冷胎壓 < 熱胎甜蜜點
+  ✓ 峰值後抓地退化
+
+[22] 胎種抓地排序 — 光頭胎應比街胎快 (回歸「光頭胎變慢」bug)
+  ✓ 光頭軟胎 比 街胎(PS4S) 快
+  ✓ 光頭軟胎 比 半熱熔(A052) 快
+  ✓ 半熱熔 比 街胎 快
+  ✓ 光頭胎在熱賽道達工作窗口 (峰值抓地>85%)
+  ✓ tir: FNOMIN parsed
+  ✓ tir: vertical stiffness → N/mm
+  ✓ tir: dims (width) parsed
+  ✓ tir: lateral coeff PCY1 parsed
+  ✓ tir: comment stripped from value
+  ✓ tir: ISO sign (α>0 → Fy<0)
+  ✓ tir: Fy rises toward peak (|Fy(2°)|<|Fy(6°)|)
+  ✓ tir: peak μ ≈ PDY1 (1.3–1.7)
+  ✓ tir: optimal slip angle 3–12°
+  ✓ tir: cornering stiffness > 0
+  ✓ tir: load sensitivity (μ falls as Fz rises)
+  ✓ tir: fyCurve generated (0–15°, |Fy| rises from ~0 toward peak)
+  ✓ tir: imported tire feeds handling model (K_us shifts)
+  ✓ tir: default prediction unaffected without tireModel
+  ✓ tir: peak μ feeds lap-sim base_mu (override)
+  ✓ tir: lap sim unaffected without tirePeakMu
+  ✓ kin: roll-center height in 0–150mm
+  ✓ kin: ride height (dz=0) returns static camber
+  ✓ kin: camber gain negative (more neg camber in bump)
+  ✓ kin: camber gain magnitude sane (<0.1°/mm)
+  ✓ kin: camber curve smooth/monotonic (no branch-jump spike)
+  ✓ kin: roll center migrates with travel
+  ✓ ref: front-heavy car is more understeer (Milliken K_us)
+  ✓ ref: stiffer front ARB → more understeer
+  ✓ ref: stiffer rear ARB → less understeer (toward oversteer)
+  ✓ ref: street sports-car roll gradient in 2–6°/g
+  ✓ ref: ride frequency matches f=(1/2π)√(k_eff/m)
+  ✓ ref: stiffer springs raise ride frequency
+  ✓ trans: response is stable
+  ✓ trans: yaw response time 0.05–0.6s
+  ✓ trans: yaw-mode damping 0.3–1.2
+  ✓ trans: yaw natural frequency 0.4–3Hz
+  ✓ trans: steady yaw gain matches Gillespie V/(L+Kus·V²/g) (<5%)
+  ✓ trans: invalid input returns null
+  ✓ bms: header identifies DarabImporter
+  ✓ bms: catalog finds all 3 channels
+  ✓ bms: channel name/source/description parsed
+  ✓ bms: detects validation channels (accy/yaw/steer)
+
+[bmsid] D1-0B Bosch channel dictionary + identity card
+  ✓ bmsid: card built from synthetic Darab catalog
+  ✓ bmsid: format detected = Bosch WinDarab / DarabImporter
+  ✓ bmsid: file identity carries name + size
+  ✓ bmsid: source summary lists MS5.8 + C60
+  ✓ bmsid: speed → vehicle_speed (high)
+  ✓ bmsid: steer → steering_angle (high)
+  ✓ bmsid: accy → lateral_acceleration (high)
+  ✓ bmsid: accx → longitudinal_acceleration (high)
+  ✓ bmsid: yaw → yaw_rate (high)
+  ✓ bmsid: nmot → engine_rpm (high)
+  ✓ bmsid: pbrake_f → brake_pressure_front (high)
+  ✓ bmsid: pbrake_r → brake_pressure_rear (high)
+  ✓ bmsid: vwheel_* → wheel_speed_FL/FR/RL/RR (high)
+  ✓ bmsid: unmapped channel → unknown (no fail)
+  ✓ bmsid: ugs NOT treated as gear value
+  ✓ bmsid: ags_*_engine_speed NOT treated as engine_rpm (name-gated)
+  ✓ bmsid: R_H_Front → ride_height, low-confidence inferred
+  ✓ bmsid: Road_FL → road_suspension, low-confidence inferred
+  ✓ bmsid: coverage marks vehicle_speed/yaw_rate found
+  ✓ bmsid: coverage marks ride_height uncertain (low only)
+  ✓ bmsid: forbidden caps all false (timeSeries/physicalValues/scaling/units/modelVsActual/kus/handlingAnalysis/setupFromRaw)
+  ✓ bmsid: limitations pin presence-only / nothing decoded
+  ✓ bmsid: null input → fail-closed (format null, caps false, 0 channels)
+
+[cal] Calibration 層：常數值鎖定 (calibration.js)
+  ✓ cal: CAL.US_NEUTRAL_BAND === 0.5
+  ✓ cal: CALIBRATION.US_NEUTRAL_BAND.value 對齊 CAL.US_NEUTRAL_BAND
+  ✓ cal: CAL.US_NORM_SCALE === 4
+  ✓ cal: CALIBRATION.US_NORM_SCALE.value 對齊 CAL.US_NORM_SCALE
+  ✓ cal: CAL.CORNERING_STIFFNESS_AY_REF_G === 1
+  ✓ cal: CALIBRATION.CORNERING_STIFFNESS_AY_REF_G.value 對齊 CAL.CORNERING_STIFFNESS_AY_REF_G
+  ✓ cal: CAL.TIRE_GRIP_TO_US_GRADIENT_GAIN === 14
+  ✓ cal: CALIBRATION.TIRE_GRIP_TO_US_GRADIENT_GAIN.value 對齊 CAL.TIRE_GRIP_TO_US_GRADIENT_GAIN
+  ✓ cal: CAL.WEIGHT_SHIFT_TO_US_GRADIENT === 0.2
+  ✓ cal: CALIBRATION.WEIGHT_SHIFT_TO_US_GRADIENT.value 對齊 CAL.WEIGHT_SHIFT_TO_US_GRADIENT
+  ✓ cal: CAL.TIRE_WIDTH_GRIP_REF_MM === 245
+  ✓ cal: CALIBRATION.TIRE_WIDTH_GRIP_REF_MM.value 對齊 CAL.TIRE_WIDTH_GRIP_REF_MM
+  ✓ cal: CAL.TIRE_WIDTH_GRIP_EXPONENT === 0.5
+  ✓ cal: CALIBRATION.TIRE_WIDTH_GRIP_EXPONENT.value 對齊 CAL.TIRE_WIDTH_GRIP_EXPONENT
+  ✓ cal: CAL.PRESSURE_GRIP_LOSS_PER_BAR === 0.2
+  ✓ cal: CALIBRATION.PRESSURE_GRIP_LOSS_PER_BAR.value 對齊 CAL.PRESSURE_GRIP_LOSS_PER_BAR
+  ✓ cal: CAL.LIHPAO_RADIUS_SCALE === 1.1
+  ✓ cal: CALIBRATION.LIHPAO_RADIUS_SCALE.value 對齊 CAL.LIHPAO_RADIUS_SCALE
+  ✓ cal: CAL.TIRE_TEMP_TRACK_COEFF === 0.6
+  ✓ cal: CALIBRATION.TIRE_TEMP_TRACK_COEFF.value 對齊 CAL.TIRE_TEMP_TRACK_COEFF
+  ✓ cal: CAL.TIRE_TEMP_EQUIL_TAU_LAPS === 1.6
+  ✓ cal: CALIBRATION.TIRE_TEMP_EQUIL_TAU_LAPS.value 對齊 CAL.TIRE_TEMP_EQUIL_TAU_LAPS
+  ✓ cal: CAL.LAP_BALANCE_PENALTY_PER_DEGG === 0.012
+  ✓ cal: CALIBRATION.LAP_BALANCE_PENALTY_PER_DEGG.value 對齊 CAL.LAP_BALANCE_PENALTY_PER_DEGG
+  ✓ cal: CAL.LAP_BALANCE_PENALTY_CAP === 0.04
+  ✓ cal: CALIBRATION.LAP_BALANCE_PENALTY_CAP.value 對齊 CAL.LAP_BALANCE_PENALTY_CAP
+  ✓ cal: CAL.DRIVETRAIN_TRACTION_FRAC_2WD === 0.62
+  ✓ cal: CALIBRATION.DRIVETRAIN_TRACTION_FRAC_2WD.value 對齊 CAL.DRIVETRAIN_TRACTION_FRAC_2WD
+  ✓ cal: CALIBRATION 鍵集合 == 測試預期
+  ✓ cal: 每個常數 metadata 完整且 value 落在 validRange 內
+
+[sens] corneringStiffnessScale 鉤子
+  ✓ sens: corneringStiffnessScale 預設(=1) 不改變 understeer_gradient
+  ✓ sens: cornering stiffness ×0.8 → Kus ≈ Kus0/0.8
+
+[tmeta] 輪胎模型 metadata
+  ✓ tmeta: generic → sourceType/overallStatus generic
+  ✓ tmeta: generic → Cα = model/generic_pacejka
+  ✓ tmeta: generic → pressure/temp/width grip are heuristic
+  ✓ tmeta: generic → no fallback flags (nothing better was expected)
+  ✓ tmeta: imported → sourceType imported_tir, status valid
+  ✓ tmeta: imported → Cα & peak μ upgraded to model/imported_tir
+  ✓ tmeta: imported → pressure/temp/width/tireUsShift STILL heuristic + fallback
+  ✓ tmeta: imported → coverage lateral true; Fx/Mz/combined false
+  ✓ tmeta: imported → emits "grip still heuristic" honesty diagnostic
+  ✓ tmeta: partial .tir → overallStatus imported_partial
+  ✓ tmeta: partial .tir → camber + lateral-only warnings
+  ✓ tmeta: partial .tir → missing pressure-model diagnostic
+  ✓ tmeta: parseTIR → imported_tir descriptor
+  ✓ tmeta: descriptor is pure — no prediction drift
+
+[tval] .tir validation diagnostics
+  ✓ tval: valid → no error severity
+  ✓ tval: valid → lateral-only is a warning (not an error)
+  ✓ tval: valid → grip-still-heuristic is a warning
+  ✓ tval: valid → vertical stiffness reported as info
+  ✓ tval: valid → load-sensitivity reported as info
+  ✓ tval: valid → pressure-unused note is info (file has PPY)
+  ✓ tval: lateral-only flags combined slip + Mz + Fx
+  ✓ tval: null → error TIR_PARSE_FAILED only
+  ✓ tval: missing PCY1 → error TIR_MISSING_LATERAL (returns early)
+  ✓ tval: missing PDY1 → error TIR_NO_PEAK
+  ✓ tval: partial → no error severity
+  ✓ tval: partial → no-camber warning + no-pressure/no-vertical info
+  ✓ tval: degenerate (Fy0≡0) → error TIR_NO_EFFECTIVE_LATERAL_FORCE
+  ✓ tval: degenerate → importedTirMetadata overallStatus imported_error (never imported_valid)
+  ✓ tval: valid (non-degenerate) → NO effective-lateral-force error
+  ✓ tval: importedTirMetadata(no PDY1) → overallStatus imported_error
+  ✓ tval: buildTireModelMetadata diagnostics come from validateTirModel
+
+[telemetry] .bmsbin catalog metadata + diagnostics
+  ✓ telemetry: canonical mapping returns matched raw name
+  ✓ telemetry: maps wheel-speed / damper / ride-height
+  ✓ telemetry: valid catalog → status catalog_only
+  ✓ telemetry: capabilities — catalog true, all decoding false
+  ✓ telemetry: required channels carry raw names
+  ✓ telemetry: catalog-only emits time-series-not-decoded warning
+  ✓ telemetry: full core → validation-detected + ready-for-3B info
+  ✓ telemetry: missing yaw/steer/speed → warnings; lateral present → no lateral warning
+  ✓ telemetry: partial still catalog_only (no time-series)
+  ✓ telemetry: non-Darab → error TELEM_NOT_DARAB + decode_error
+  ✓ telemetry: zero channels → error TELEM_NO_CHANNELS
+  ✓ telemetry: consumes parseBms shape (header/channelCount/channels)
+
+[probe] .bmsbin binary sample-block probe
+  ✓ probe: empty file → error BMS_PROBE_EMPTY_FILE
+  ✓ probe: non-Darab header → error BMS_PROBE_INVALID_HEADER
+  ✓ probe: catalog-only → catalog found + no-sample-region warning + no regions
+  ✓ probe: catalog + numeric region → candidate binary region found
+  ✓ probe: numeric region → int16le encoding flagged plausible
+  ✓ probe: monotonic counter → timebase clue candidate
+  ✓ probe: random region → probe_only + scaling-not-decoded warning
+  ✓ probe: report schema stable (probe_only, arrays, unknowns)
+  ✓ probe: always honest — probe-only + time-series-not-confirmed diagnostics
+  ✓ probe→metadata: status probe_available + sampleProbe true, decoding still false
+  ✓ probe→metadata: probe summary attached (regionCount + diagnostics)
+  ✓ probe→metadata: no probe → stays catalog_only, sampleProbe false
+
+[raw] .bmsbin raw time-series candidate extraction
+  ✓ raw: no probe report → error
+  ✓ raw: no candidate region → error + no series
+  ✓ raw: numeric region → raw series candidate found
+  ✓ raw: int16le stats correct (min/max/mean of 0..999)
+  ✓ raw: series carries raw-only notes (no scaling / no mapping)
+  ✓ raw: timebase clue → candidate only (not a confirmed timestamp)
+  ✓ raw: interleaved data → interleaved layout hypothesis (≥2 channels)
+  ✓ raw: channel mapping stays not_mapped
+  ✓ raw: physicalScaling + handlingCorrelation + timeSeries stay false
+  ✓ raw: rawTimeSeriesCandidates true + status raw_candidates_only
+  ✓ raw: end-to-end probe→extract yields candidates
+  ✓ raw→metadata: status raw_candidates_only + rawTimeSeriesCandidates true; physical/handling false
+  ✓ raw→metadata: rawExtraction summary attached (seriesCount + channelMapping not_mapped)
+
+[link] .bmsbin channel-linking hypotheses
+  ✓ link: no raw extraction → error
+  ✓ link: no catalog → warning
+  ✓ link: count match → count-match info + low-confidence order hypothesis
+  ✓ link: no explicit mapping → channel identity not confirmed
+  ✓ link: explicit mapping → high-confidence identity (synthetic case only)
+  ✓ link: explicit scale → scaling hypothesis (metadata_candidate)
+  ✓ link: no scale → manual_required + physicalScaling false
+  ✓ link: canonicalPreview available only with explicit identity+scale
+  ✓ link: decode-grade capabilities stay false even with explicit mapping
+  ✓ link: timebase hypothesis formed (candidate only, sample-count match)
+  ✓ link→metadata: status linking_hypotheses_only + linking/scaling caps true; decode-grade false
+  ✓ link→metadata: linking summary attached (identity not confirmed, no canonical preview)
+
+[tool] local validation reporter — fixture-safe / sanitized output
+  ✓ tool: REPORT_FIELDS whitelist names no raw-content field
+  ✓ tool: summarizeFile emits only whitelisted REPORT_FIELDS
+  ✓ tool: summary values are scalars only (no raw arrays/objects)
+  ✓ tool: summary reflects pipeline run + claims no decode
+  ✓ tool: aggregate emits counts/ranges/histograms only (no raw arrays)
+  ✓ tool: serialized summary+aggregate names no raw-content field
+  ✓ tool: summary carries sanitized confirmation decision (catalog confirmed, structure not, no decode)
+  ✓ tool: aggregate reports confirmation counts + corpus booleans (sanitized)
+  ✓ tool: summary carries sanitized extraction eligibility (not eligible, 0 eligible, no measured values)
+  ✓ tool: summary carries sanitized measured extraction (real file blocked, 0 corners, realDataUsed false, no tendency)
+  ✓ tool: summary carries sanitized canonical-adapter eligibility (real file blocked, never ready, realDataUsed false)
+  ✓ tool: summary carries sanitized private-corpus boundary (not available on single file, realDataUsed false)
+
+[confirm] .bmsbin hypothesis→confirmed criteria
+  ✓ confirm: catalog-only → catalog confirmed, structure not, status not_confirmed
+  ✓ confirm: unstable candidate regions → sample structure not confirmed
+  ✓ confirm: stable regions + matching raw count → sample structure can be confirmed
+  ✓ confirm: explicit mapping → channel identity can be confirmed (synthetic)
+  ✓ confirm: no explicit mapping → channel identity stays false
+  ✓ confirm: monotonic counter + sample-count match → timebase can be confirmed
+  ✓ confirm: no scale table → physical scaling stays false
+  ✓ confirm: explicit scale → scaling criteria confirmed (synthetic), physicalScaling cap still false
+  ✓ confirm: real-data-like (85 ch / 2 raw, no corpus) → catalog only, status not_confirmed
+  ✓ confirm: explicit mapping but NO corpus → identity/scaling/canonical stay false (structure gates them)
+  ✓ confirm: decode-grade capabilities stay false even when structure is confirmed
+  ✓ confirm: report schema (scores + blockers + nextEvidenceNeeded + canonical blocked)
+  ✓ confirm→metadata: confirmation summary surfaced + confirmationCriteria cap true; decode-grade false
+  ✓ confirm→metadata: no confirmation → confirmationCriteria false, confirmation null
+
+[struct] .bmsbin sample-structure discovery
+  ✓ struct: catalog-only (no raw) → hypotheses-only + not converged + warning
+  ✓ struct: 85-entry in-range offset table → candidate matches catalog (targets plausible)
+  ✓ struct: offset table with out-of-file targets → not confirmed (targetsPlausible false)
+  ✓ struct: 85 length-prefixed blocks → per_channel_blocks hypothesis matching catalog
+  ✓ struct: interleaved 85-lane data → interleaved_channels hypothesis
+  ✓ struct: random region → compressed_or_sparse hypothesis
+  ✓ struct→confirm: per-channel feed but NO corpus → structure NOT confirmed, decode caps false
+  ✓ struct→confirm: per-channel feed + corpus → structure can confirm; decode-grade caps still false
+  ✓ struct: decode-grade caps false + sampleStructureDiscovery true + never converged (all fixtures)
+  ✓ struct: report never names a canonical channel / decoded series
+  ✓ struct→metadata: structure summary surfaced + sampleStructureDiscovery cap true; decode caps false
+  ✓ struct→metadata: no structure → sampleStructureDiscovery false, structure null
+  ✓ struct(R1): misaligned per-channel blocks (junk prefix) still found via full start search
+  ✓ struct(R2): sequential index run → channel_index_table, not a matches offset_table
+  ✓ struct(R3): single contiguous smooth series → NOT mislabelled interleaved_channels
+  ✓ struct(R4): random region yields no targetsPlausible offset_table candidate
+
+[raw-stream] .bmsbin raw stream confirmation criteria
+  ✓ rawstream: catalog-only → not confirmed, no confirmable stream
+  ✓ rawstream: single-file per-channel blocks → confirmable, aggregate not confirmed (corpus required)
+  ✓ rawstream: corpus + consistent per-channel blocks → confirmed_structure + raw_stream_structure_confirmed
+  ✓ rawstream: matching count but inconsistent block length → candidate_only, not confirmed
+  ✓ rawstream: corpus + interleaved layout → confirmed_structure
+  ✓ rawstream: single contiguous smooth series → no interleaved stream, not confirmed
+  ✓ rawstream: offset table → rejected as raw stream (boundary evidence), not confirmed
+  ✓ rawstream: decode-grade capabilities stay false (timeSeries/physicalScaling/handlingCorrelation)
+  ✓ rawstream: always warns identity + physical values unavailable; never names a channel/value
+  ✓ rawstream→confirm: feed WITHOUT corpus → raw streams not confirmed; decode caps false
+  ✓ rawstream→confirm: feed + corpus (fileCount≥2) → raw streams can confirm; decode caps still false
+  ✓ rawstream: real-data-like (no corpus, no clean structure) → not confirmed
+  ✓ rawstream→metadata: summary surfaced + rawStreamConfirmation cap true; decode caps false
+  ✓ rawstream→metadata: no raw stream confirmation → cap false, summary null
+  ✓ rawstream(R1): equal-prefix / variable-tail blocks → NOT confirmed_structure (whole-run length check)
+
+[channel-identity] .bmsbin channel identity confirmation criteria
+  ✓ identity(A): shape-only → hypothesis_only, not confirmed
+  ✓ identity(B): label-only → labeled_unverified, not confirmed
+  ✓ identity(C): independent mapping but raw stream not confirmed → confirmable_identity, not confirmed
+  ✓ identity(D): corpus + confirmed raw stream + independent mapping → confirmed_identity (synthetic); decode caps false
+  ✓ identity(R1): unknowns[] is consistent with the decision on both paths
+  ✓ identity(E): no corpus (single file) → never confirmed_identity
+  ✓ identity(E2): mapping depends on scaling → candidate at most, not confirmed
+  ✓ identity(F): physical/canonical/handling/setup/units caps pinned false (even confirmed_identity)
+  ✓ identity(G): real path (no evidence) → not_confirmed, 0 candidates
+  ✓ identity(G): real path never names a channel (no speed/brake/throttle/steering/accy from catalog)
+  ✓ identity→confirm: feed WITHOUT corpus → channel identity not confirmed; decode caps false
+  ✓ identity→confirm: feed + corpus → channel identity can confirm; decode caps still false
+  ✓ identity→metadata: surfaced + channelIdentityConfirmed false; physical/canonical/handling/setup caps false
+  ✓ identity→metadata: no identity → cap false, summary null
+
+[timebase] .bmsbin timebase confirmation criteria
+  ✓ timebase(A): no evidence → not_confirmed, confirmed false
+  ✓ timebase(B): sample-count only → sample_count_candidate, confirmed false
+  ✓ timebase(C): monotonic counter only → monotonic_candidate, confirmed false
+  ✓ timebase(D): delta stable, no corpus → delta_candidate, confirmed false
+  ✓ timebase(E): manual sample-rate only → fallback hint, not confirmed; units/scaling/timeSeries false
+  ✓ timebase(F): raw stream not confirmed → confirmable_timebase at most, not confirmed
+  ✓ timebase(G): corpus + confirmed raw stream + full structural → confirmed_timebase (synthetic); caps false
+  ✓ timebase(H): gaps/dropouts → not confirmed_timebase + gaps-detected diagnostic
+  ✓ timebase(H2): NaN gap/dropout count → fails closed (not confirmed), never coerced to 0
+  ✓ timebase(I): single file (no corpus) → never confirmed; no inferred Hz/rate value emitted
+  ✓ timebase(red-line): physical/units/canonical/timeSeries/handling/setup caps pinned false (all paths)
+  ✓ timebase→confirm: feed WITHOUT corpus → timebase not confirmed; decode caps false
+  ✓ timebase→confirm: feed + corpus → timebase can confirm; decode caps still false
+  ✓ timebase→metadata: summary surfaced + timebaseConfirmed false; physical/units/canonical/handling caps false
+  ✓ timebase→metadata: no timebase → cap false, summary null
+
+[physical-scaling] .bmsbin physical scaling confirmation criteria
+  ✓ scaling(A): no evidence → not_confirmed; physical/units caps false
+  ✓ scaling(B): raw stream not confirmed → not confirmed; physicalScaling false
+  ✓ scaling(C): channel identity not confirmed → identity_missing, not confirmed
+  ✓ scaling(D): timebase missing (time-indexed) → timebase_missing, not confirmed
+  ✓ scaling(E): manual scale only → scale_hint_only (fallback); not confirmed; units false
+  ✓ scaling(F): unit label only → unit_hint_only, not confirmed
+  ✓ scaling(G): plausible range only → candidate at most, not confirmed (range is supporting only)
+  ✓ scaling(H): transform proposed but not verified/stable → transform_candidate, not confirmed
+  ✓ scaling(I): all prereqs + independent scale + unit + verified transform → confirmed_scaling (synthetic); usable caps still false
+  ✓ scaling(J): synthetic confirmed → canonicalValueEligibility true but canonicalValues NOT available; no overlay
+  ✓ scaling(R1): identity status string cannot override a false aggregate decision → not confirmed
+  ✓ scaling(K): real single-file (no corpus) → never confirmed; physical/units/canonical caps false
+  ✓ scaling(L): real path + manual scale → fallback hint only; physicalScaling/units false
+  ✓ scaling(M): handling/setup/overlay/timeSeries/canonical caps pinned false (all paths)
+  ✓ scaling→confirm: feed WITHOUT corpus → physical scaling not confirmed; decode caps false
+  ✓ scaling→confirm: feed + corpus → physical scaling can confirm; decode-grade caps still false
+  ✓ scaling→metadata: summary surfaced + physicalScaling/units/canonical caps false; overlay false
+  ✓ scaling→metadata: no scaling → cap false, summary null
+
+[telemetry-readiness] .bmsbin telemetry readiness gate
+  ✓ readiness(A): no evidence → not_ready; readiness/handlingAnalysis caps false
+  ✓ readiness(B): canonical/scaling missing → insufficient_prerequisites, not ready
+  ✓ readiness(C): required channels missing → missing_required_channels, not ready
+  ✓ readiness(E): timebase missing → insufficient_prerequisites, not ready
+  ✓ readiness(F-I): sample-rate / sync / dropout / noise blocked → quality_blocked, not ready
+  ✓ readiness(H2): unknown dropout/noise quality → fail-closed, not ready
+  ✓ readiness(R1): units-only prereq → insufficient_prerequisites (ladder symmetric), still not ready
+  ✓ readiness(J): some required channels confirmed → partial_readiness, not ready
+  ✓ readiness(K): prereqs + channels met, quality not fully confirmed → confirmable_readiness, not ready
+  ✓ readiness(L): real single-file → not_ready; handlingAnalysis/overlay caps false
+  ✓ readiness(M): all prereqs + channels + quality pass → ready_for_analysis (synthetic); analysis caps false
+  ✓ readiness(N): handlingAnalysis/overlay/Kus/handling/setup caps pinned false (all paths)
+  ✓ readiness→confirm: feed WITHOUT corpus → telemetryReadyForAnalysis false; decode caps false
+  ✓ readiness→confirm: feed + full prereqs + corpus → telemetryReadyForAnalysis true; decode caps still false
+  ✓ readiness→metadata: summary surfaced + telemetryReady false; handlingAnalysis/overlay/Kus/setup caps false
+  ✓ readiness→metadata: no readiness → cap false, summary null
+
+[extract-eligibility] .bmsbin measured handling-response extraction eligibility gate
+  ✓ extract(A): real not-ready readiness → not_eligible; extraction/measuredHandlingResponse/handling caps false
+  ✓ extract(B): ready but no canonical measured series → canonical_series_unavailable, not eligible
+  ✓ extract(C): ready + canonical series but required channels absent → required_channels_unavailable
+  ✓ extract(C2): ready + canonical series + some required channels → partial_eligibility
+  ✓ extract(D): channels present but too few corner events → segmentation_prerequisites_unmet
+  ✓ extract(E): segmentation ok but windows not separable → window_prerequisites_unmet
+  ✓ extract(F): all prerequisites satisfied (synthetic) → eligible_for_extraction; extraction/analysis caps false
+  ✓ extract(F2): full evidence but no corpus → corpus_unavailable (not eligible, candidate=1, next-evidence + diag)
+  ✓ extract(G): measuredHandlingResponse/handling/overlay/Kus/modelVsActual caps pinned false (all paths)
+  ✓ extract(H): input contract names required channels (abstract) + segmentation prerequisites
+  ✓ extract(H2): output contract is measured-only proxy — not full Kus / model-vs-actual / setup
+  ✓ extract→confirm: feed WITHOUT corpus → measuredExtractionEligible false; decode caps false
+  ✓ extract→confirm: feed + full prereqs + corpus → measuredExtractionEligible true; decode caps still false
+  ✓ extract→metadata: summary surfaced + extractionEligible false; measuredHandlingResponse/handling/overlay caps false
+  ✓ extract→metadata: no extraction → cap false, summary null
+
+[measured-extraction] .bmsbin synthetic measured-extraction harness
+  ✓ measext(A): no eligibility → not_available; harness/analysis caps false; realDataUsed false
+  ✓ measext(A2): not eligible → blocked_by_eligibility; no segments/tendency; caps false
+  ✓ measext(B): eligible but not syntheticOnly (real path) → blocked_real_path; empty segments; null tendency; realDataUsed false
+  ✓ measext(C): syntheticOnly but no series → insufficient_synthetic_series; null tendency; caps false
+  ✓ measext(D): synthetic series → segmented; cornerCount>0; syntheticOnly true; realDataUsed false
+  ✓ measext(D2): full synthetic series → extracted_synthetic
+  ✓ measext(E): entry/mid/exit window counts > 0
+  ✓ measext(F): steady-state windows > 0; confidence present
+  ✓ measext(G): unstable mid → steady-state blocked (0 steady windows; not extracted_synthetic); caps false
+  ✓ measext(H): tendency proxy marked syntheticOnly/notKus/notSetupAdvice/notModelVsActual; count>0
+  ✓ measext(H2): synthetic ratio → understeer_like / oversteer_like proxy (synthetic proxy only)
+  ✓ measext(I): extracted_synthetic → measuredExtractionSynthetic true; all analysis/real caps false
+  ✓ measext(J): real/blocked path → empty segments, null tendency, syntheticOnly false
+  ✓ measext→confirm: feed WITHOUT corpus/prereqs → measuredExtractionSynthetic false; decode caps false
+  ✓ measext→confirm: feed + full prereqs + corpus → measuredExtractionSynthetic true; decode caps still false
+  ✓ measext→metadata: summary surfaced + measuredExtractionSynthetic false; harness/real/handling/overlay caps false
+  ✓ measext→metadata: no measuredExtraction → cap false, summary null
+  ✓ measext(M): prior phases real path unchanged (eligibility not_eligible, readiness not_ready)
+  ✓ measext(N): empty requiredChannels + empty series → insufficient_synthetic_series (no crash)
+  ✓ measext(O): NaN-interleaved mid speed → steady-state fail-closed (0 steady; not extracted); caps false
+  ✓ measext(P): out-of-range/negative segmentHints rejected; segments stay within bounds; realDataUsed false
+  ✓ measext(Q): extracted confidence is medium|low only
+
+[canonical-adapter] .bmsbin real canonical-series adapter boundary / eligibility gate
+  ✓ cadapter(A): no inputs → not_available; canEnter false; caps false; realDataUsed false
+  ✓ cadapter(B): real path → raw_stream_missing; not eligible; canonicalTelemetry/timeSeries/measuredExtraction false; realDataUsed false
+  ✓ cadapter(C): missing raw stream → raw_stream_missing
+  ✓ cadapter(D): missing identity → identity_missing
+  ✓ cadapter(E): missing timebase → timebase_missing
+  ✓ cadapter(F): missing scaling → scaling_missing
+  ✓ cadapter(G): missing units → units_missing
+  ✓ cadapter(H): missing cross-file corpus → corpus_missing
+  ✓ cadapter(I): all prereqs but not syntheticOnly → adapter_contract_candidate; not eligible; canonicalTelemetry false; realDataUsed false
+  ✓ cadapter(J): all prereqs + corpus + syntheticOnly → synthetic_adapter_ready; eligible true; realDataUsed false; analysis caps false
+  ✓ cadapter(K): NaN/invalid evidence → fail-closed (not synthetic_adapter_ready); caps false
+  ✓ cadapter(L): one-way feed — adapter does not mutate readiness / extraction-eligibility
+  ✓ cadapter→metadata: summary surfaced + canonicalAdapterEligible false; canonicalTelemetry/timeSeries/modelVsActual false
+  ✓ cadapter→metadata: no canonicalAdapter → cap false, summary null
+  ✓ cadapter(N): null/garbage opts → fail-closed (no throw; not synthetic_adapter_ready)
+  ✓ cadapter(O): non-numeric corpus.fileCount → not synthetic_adapter_ready; numeric still works
+
+[private-corpus] .bmsbin private real-corpus boundary / evidence-ingestion policy
+  ✓ pcorpus(A): no inputs → not_available; canUse false; caps false; realDataUsed false
+  ✓ pcorpus(B): manifest but policy disabled → private_corpus_disabled
+  ✓ pcorpus(C): policy on, no manifest → manifest_missing
+  ✓ pcorpus(D): manifest without sanitizedOnly → manifest_invalid
+  ✓ pcorpus(E): rawFilesCommitted → unsafe_manifest
+  ✓ pcorpus(F): rawBytesExposed → unsafe_manifest
+  ✓ pcorpus(G): decodedSequencesExposed → unsafe_manifest
+  ✓ pcorpus(H): fileNamesExposed → unsafe_manifest
+  ✓ pcorpus(I): offsetsExposed → unsafe_manifest
+  ✓ pcorpus(J): fingerprintsExposed → unsafe_manifest
+  ✓ pcorpus(K): fileCount<2 → insufficient_file_count
+  ✓ pcorpus(L): no sanitizedEvidence → sanitized_evidence_missing
+  ✓ pcorpus(M): partial evidence → sanitized_evidence_candidate; no confirmation; caps false
+  ✓ pcorpus(N): safe manifest + complete evidence + policy → private_corpus_boundary_ready; evidence available; ALL confirm/canonical/analysis caps false; realDataUsed false
+  ✓ pcorpus(O): hash / path / fileName / channelNames → manifest_invalid
+  ✓ pcorpus(P): NaN / non-numeric fileCount → fail-closed (not boundary_ready)
+  ✓ pcorpus(Q): one-way — does not mutate manifest / sanitized-evidence inputs
+  ✓ pcorpus→metadata: summary surfaced + privateCorpusEvidenceAvailable false; canonicalTelemetry/timeSeries/modelVsActual false
+  ✓ pcorpus→metadata: no privateCorpus → cap false, summary null
+  ✓ pcorpus(S): truthy non-boolean exposure flag (1 / "true" / {}) → unsafe_manifest
+  ✓ pcorpus(T): path / hash / file-ext in formatFamily / sourceType → manifest_invalid; plain token still ready
+
+[sanitized-evidence-adapter] .bmsbin sanitized-evidence adapter dry-run shape
+  ✓ sadapter(A): no inputs → not_available; canProvide false; caps false; realDataUsed false
+  ✓ sadapter(B): 3G-2 boundary not ready → boundary_not_ready
+  ✓ sadapter(C): boundary ready, no evidence → evidence_missing
+  ✓ sadapter(D): evidence without sanitizedOnly → evidence_invalid
+  ✓ sadapter(E): rawBytesExposed → unsafe_evidence
+  ✓ sadapter(F): decodedSequencesExposed → unsafe_evidence
+  ✓ sadapter(G): fileNamesExposed → unsafe_evidence
+  ✓ sadapter(H): pathsExposed → unsafe_evidence
+  ✓ sadapter(I): offsetsExposed → unsafe_evidence
+  ✓ sadapter(J): fingerprintsExposed → unsafe_evidence
+  ✓ sadapter(K): sampleValuesExposed → unsafe_evidence
+  ✓ sadapter(L): channelNamesExposed → unsafe_evidence
+  ✓ sadapter(M): timingExposed → unsafe_evidence
+  ✓ sadapter(N): hashesExposed → unsafe_evidence
+  ✓ sadapter(O): no scope present → insufficient_scope
+  ✓ sadapter(P): only one scope → partial_adapter_shape; no confirmation; caps false
+  ✓ sadapter(Q): core scopes present, not all → adapter_shape_candidate; no confirmation; caps false
+  ✓ sadapter(R): all scopes + safe + boundary ready → dry_run_ready; shape available; ALL confirm/canonical/analysis caps false; realDataUsed false
+  ✓ sadapter(S): hash / fileName / channelNames key OR leaky/unknown scope → evidence_invalid
+  ✓ sadapter(T): malformed evidence → fail-closed (not dry_run_ready)
+  ✓ sadapter(T2): only-status / only-feed forged boundary → boundary_not_ready (dual check)
+  ✓ sadapter(U): one-way — does not mutate boundary / sanitized-evidence inputs
+  ✓ sadapter→metadata: summary surfaced + adapterEvidenceShapeAvailable false; canonicalTelemetry/timeSeries/modelVsActual false
+  ✓ sadapter→metadata: no sanitizedEvidenceAdapter → cap false, summary null
+  ✓ sadapter(W): canonical gate shape present on every path
+  ✓ sadapter(X): all diagnostic + UI panel keys resolve in EN/繁中/JA (3 each)
+  ✓ sadapter(Y): reporter sanitized — boundary_not_ready, shape-available 0, realDataUsed false, scalar histogram
+  ✓ sadapter(Z): one-way downstream — 3G-2 boundary result unchanged after adapter runs
+
+[invariants] Phase 3 trust-chain red-line invariants
+  ✓ invariant(A): real path fail-closed (readiness not_ready / eligibility not_eligible / measext blocked / hub not_confirmed)
+  ✓ invariant(B): no gated capability true on real path (all layers + every merged-metadata red-line cap === false)
+  ✓ invariant(C): hub pins timeSeries/physicalScaling/handlingCorrelation false
+  ✓ invariant(D): bad/empty input fail-closed (no throw, no gated cap)
+  ✓ invariant(E): reporter summary key set === REPORT_FIELDS; all scalar
+  ✓ invariant(F): reporter error-fallback key set === REPORT_FIELDS (drift guard)
+  ✓ invariant(G): synthetic extracted_synthetic opens only measuredExtractionSynthetic/Harness; realDataUsed false
+  ✓ invariant(H): dual-gate — only-status/only-cap → blocked_by_eligibility; eligible+series w/o syntheticOnly → blocked_real_path
+  ✓ invariant(I): canonical gate shape on 3E-0..3G-0B (status/aggregateDecision/confirmationFeed/capabilities/diagnostics/unknowns)
+  ✓ invariant(J): no proprietary telemetry / vendor binary (.bmsbin/.tir/.pds/...) in repo tree (clean-room #5)
+
+========= 結果: 479 passed, 0 failed =========
+=== telemetry-core synthetic tests ===
+telemetry-core: 67 passed, 0 failed
+=== telemetry-view synthetic tests ===
+telemetry-view: 105 passed, 0 failed
+=== telemetry-plot geometry tests ===
+telemetry-plot: 48 passed, 0 failed
+=== telemetry-interact geometry tests ===
+telemetry-interact: 52 passed, 0 failed
+=== telemetry-yaw synthetic tests ===
+telemetry-yaw: 84 passed, 0 failed
+=== canonical-parameters schema tests ===
+canonical-parameters: 39 passed, 0 failed
+=== parameter-conversions proof tests ===
+parameter-conversions: 38 passed, 0 failed
+=== vehicle-profile-f312 fixture tests ===
+vehicle-profile-f312: 30 passed, 0 failed
+=== setup-snapshot tests ===
+setup-snapshot: 35 passed, 0 failed
+=== analysis-case tests ===
+analysis-case: 43 passed, 0 failed
+=== analysis-case adversarial tests ===
+analysis-case-adversarial: 78 passed, 0 failed
+suspension-input-normalizer: 96 passed, 0 failed
+suspension-input-equivalence: 5020 passed, 0 failed  (raw=1002, observable=501)
+suspension-input-adversarial: 54 passed, 0 failed
+canonical-model-input: 33 passed, 0 failed
+analysis-execution: 29 passed, 0 failed
+telemetry-observation: 33 passed, 0 failed
+model-telemetry-comparison: 24 passed, 0 failed
+race-engineer-insight: 26 passed, 0 failed
+driver-coach-insight: 22 passed, 0 failed
+analysis-workspace: 19 passed, 0 failed
+analysis-workspace-viewmodel: 20 passed, 0 failed
+analysis-workspace-integration: 47 passed, 0 failed
+analysis-workspace-ui: 39 passed, 0 failed
+telemetry-import-adapter: 16 passed, 0 failed
+channel-mapping: 8 passed, 0 failed
+calibration-registry: 26 passed, 0 failed
+analysis-window: 7 passed, 0 failed
+canonical-telemetry-session: 9 passed, 0 failed
+analysis-case-export: 45 passed, 0 failed
+r2.3-real-telemetry-integration: 17 passed, 0 failed
+r2.3-import-ui: 16 passed, 0 failed
+measured-metrics: 16 passed, 0 failed
+r2.4-measured-metrics-integration: 26 passed, 0 failed
+r2.4-ui: 23 passed, 0 failed
+setup-ab: 20 passed, 0 failed
+quantitative-setup-recommendation: 32 passed, 0 failed
+r2.5-setup-ab-quantitative-integration: 25 passed, 0 failed
+r2.5-ui: 36 passed, 0 failed
+track-intelligence: 30 passed, 0 failed
+r2.6-track-intelligence-integration: 22 passed, 0 failed
+r2.6-ui: 15 passed, 0 failed
+case-shell: 24 passed, 0 failed
+r3.0a-ui: 66 passed, 0 failed
+storage-backend: 15 passed, 0 failed
+schema-migration: 9 passed, 0 failed
+case-record-schema: 63 passed, 0 failed
+case-store: 36 passed, 0 failed
+session-store: 12 passed, 0 failed
+case-library-viewmodel: 16 passed, 0 failed
+r3.0b-ui: 55 passed, 0 failed
+r3.0b-persistence-integration: 16 passed, 0 failed
+feature-registry: 27 passed, 0 failed
+feature-router: 20 passed, 0 failed
+vehicle-preset-pipeline: 27 passed, 0 failed
+i18n-parity: 105 passed, 0 failed
+node:fs:3022
+  return binding.mkdtemp(prefix, options.encoding);
+                 ^
+
+Error: EPERM: operation not permitted, mkdtemp '/var/folders/bw/dy9my1ls5sz2fnpxk_yrc0k80000gn/T/r3c-cp1-XXXXXX'
+    at Object.mkdtempSync (node:fs:3022:18)
+    at runScript (/Users/SKYLINE/Claude/projects/racing-setup-analyzer/tests/r3.0c-contract-foundation.test.js:539:18)
+    at /Users/SKYLINE/Claude/projects/racing-setup-analyzer/tests/r3.0c-contract-foundation.test.js:556:20
+    at Object.<anonymous> (/Users/SKYLINE/Claude/projects/racing-setup-analyzer/tests/r3.0c-contract-foundation.test.js:556:355)
+    at Module._compile (node:internal/modules/cjs/loader:1803:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1934:10)
+    at Module.load (node:internal/modules/cjs/loader:1524:32)
+    at Module._load (node:internal/modules/cjs/loader:1326:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24) {
+  errno: -1,
+  code: 'EPERM',
+  syscall: 'mkdtemp',
+  path: '/var/folders/bw/dy9my1ls5sz2fnpxk_yrc0k80000gn/T/r3c-cp1-XXXXXX'
+}
+
+Node.js v25.5.0
+
+exec
+/bin/bash -lc "node -e '
+\"use strict\";const HE=require(\"./renderer/js/r3-0d-hypothesis-engine.js\"),EG=require(\"./renderer/js/r3-0d-evidence-graph.js\"),PE=require(\"./renderer/js/r3-0d-priority-engine.js\");const clock=()=>\"2026-06-29T01:00:00Z\",id={caseId:\"case_001\",sessionId:\"sess_001\",lapId:null,sourceId:\"csv_v1\",sourceVersion:\"1.0\",freshness:\"2026-06-29T00:00:00Z\"},n={schemaVersion:1,nodeId:\"n\",category:\"data_quality\",identity:id,credibility:\"measured\",provenance:\"real\",availability:\"available\",confidence:{state:\"not_computed\"},observation:{kind:\"channel_missing\",channel:\"brake\",i18nKey:\"k\",params:null},limitations:[\"LIMITATION_MISSING_CHANNEL\"],supportingEdges:[],contradictingEdges:[]};const g=EG.buildEvidenceGraph({caseAssociation:{caseId:\"case_001\",sessionId:\"sess_001\",lapId:null},rawEvidence:[n]},{clock}).graph,hs=HE.buildHypothesisSet({graph:g},{clock}).hypothesisSet;function freeze(v){if(v&&typeof v===\"object\"){Object.keys(v).forEach(k=>freeze(v[k]));Object.freeze(v)}return v}for(const field of [\"cannotConcludeReasonCodes\",\"alternativeExplanationIds\",\"validationActionIds\"]){const x=structuredClone(hs);console.log(field,\"original\",JSON.stringify(x.hypotheses[0][field]));x.hypotheses[0][field]=\"string\";freeze(x);const r=PE.buildPrioritySet({hypothesisSet:x},{clock});console.log(field,\"mutated\",JSON.stringify({valid:r.valid,eligible:r.eligible,codes:r.reasonCodes}))}
+'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+cannotConcludeReasonCodes original []
+cannotConcludeReasonCodes mutated {"valid":true}
+alternativeExplanationIds original ["alt_46601f763457e398","alt_63b155d7190fb2f1"]
+alternativeExplanationIds mutated {"eligible":false,"codes":["HYPOTHESIS_AUTHORITY_FORGED"]}
+validationActionIds original ["act_88477c3f1598f60a"]
+validationActionIds mutated {"eligible":false,"codes":["HYPOTHESIS_AUTHORITY_FORGED"]}
+
+exec
+/bin/bash -lc "node -e 'const HE=require(\"./renderer/js/r3-0d-hypothesis-engine.js\");for(const r of HE.RULE_REGISTRY)console.log(r.ruleId,r.alternativeExplanations.length)'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+rule_dq_channel_missing 2
+rule_dq_channel_partial 1
+rule_dq_channel_uncalibrated 1
+rule_mc_uncalibrated_input 2
+rule_db_observed_variance 3
+rule_vr_observed_response 3
+rule_sm_setup_candidate 3
+rule_unk_inconclusive 0
+rule_dq_lap_authority_blocked 1
+
+codex
+R2-01/02/03/05 probes close as requested. Independent hashes match D3 output exactly; D3 158/0 and D4 73/0 pass. Two new blockers remain.
+
+Finding D4-R3-01: Non-array `cannotConcludeReasonCodes` bypasses signature and schema validation
+  evidence: [r3-0d-priority-engine.js:518](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-priority-engine.js:518) substitutes `[]` for malformed values instead of rejecting them. Changing an authentic hypothesis from `cannotConcludeReasonCodes: []` to `"string"` while retaining the original `contentSignature` and `hypothesisSetId` returned `valid:true`.
+  severity: BLOCK
+  proposed closure: require plain arrays for `alternativeExplanationIds`, `cannotConcludeReasonCodes`, and `validationActionIds` before hashing; validate element grammar/caps/linkage and hash the fields directly without fallbacks.
+
+Finding D4-R3-02: Caller can forge authority by recomputing both public unkeyed hashes
+  evidence: [r3-0d-hypothesis-engine.js:1248](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-hypothesis-engine.js:1248) and [r3-0d-priority-engine.js:502](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-priority-engine.js:502) use publicly reproducible FNV hashes. After changing status, credibility, and confidence score and recomputing both hashes independently, D4 returned `valid:true` and propagated the forged values.
+  severity: BLOCK
+  proposed closure: use producer attestation backed by a trust anchor unavailable to callers, or have D4 consume authoritative evidence and rerun D3. An unkeyed digest provides integrity consistency, not producer authenticity.
+
+Finding D4-R3-03: Permanent regression coverage omits `confidence.score` mutation
+  evidence: [r3.0d-priority-engine.test.js:606](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/tests/r3.0d-priority-engine.test.js:606) covers status, credibility, and ruleVersion only. The independent score mutation did reject with `HYPOTHESIS_AUTHORITY_FORGED`.
+  severity: NIT
+  proposed closure: add direct stale-signature and recomputed-signature score-mutation cases.
+
+Additional verification:
+
+- Independent `contentSignature`: exact match.
+- Independent `hypothesisSetId`: exact match.
+- Authentic audit footprint: 89 nodes, depth 4; limits are reasonable for the current nine-rule registry.
+- Data-descriptor `opts.clock`: valid, invoked once.
+- CommonJS global probe: `undefined` for D3 and D4.
+- Full `npm test` was environment-blocked at an R3.0C `mkdtemp` call (`EPERM`); all tests reached before that point passed.
+
+FINAL VERDICT: BLOCK
+tokens used
+104,556
+R2-01/02/03/05 probes close as requested. Independent hashes match D3 output exactly; D3 158/0 and D4 73/0 pass. Two new blockers remain.
+
+Finding D4-R3-01: Non-array `cannotConcludeReasonCodes` bypasses signature and schema validation
+  evidence: [r3-0d-priority-engine.js:518](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-priority-engine.js:518) substitutes `[]` for malformed values instead of rejecting them. Changing an authentic hypothesis from `cannotConcludeReasonCodes: []` to `"string"` while retaining the original `contentSignature` and `hypothesisSetId` returned `valid:true`.
+  severity: BLOCK
+  proposed closure: require plain arrays for `alternativeExplanationIds`, `cannotConcludeReasonCodes`, and `validationActionIds` before hashing; validate element grammar/caps/linkage and hash the fields directly without fallbacks.
+
+Finding D4-R3-02: Caller can forge authority by recomputing both public unkeyed hashes
+  evidence: [r3-0d-hypothesis-engine.js:1248](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-hypothesis-engine.js:1248) and [r3-0d-priority-engine.js:502](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/renderer/js/r3-0d-priority-engine.js:502) use publicly reproducible FNV hashes. After changing status, credibility, and confidence score and recomputing both hashes independently, D4 returned `valid:true` and propagated the forged values.
+  severity: BLOCK
+  proposed closure: use producer attestation backed by a trust anchor unavailable to callers, or have D4 consume authoritative evidence and rerun D3. An unkeyed digest provides integrity consistency, not producer authenticity.
+
+Finding D4-R3-03: Permanent regression coverage omits `confidence.score` mutation
+  evidence: [r3.0d-priority-engine.test.js:606](/Users/SKYLINE/Claude/projects/racing-setup-analyzer/tests/r3.0d-priority-engine.test.js:606) covers status, credibility, and ruleVersion only. The independent score mutation did reject with `HYPOTHESIS_AUTHORITY_FORGED`.
+  severity: NIT
+  proposed closure: add direct stale-signature and recomputed-signature score-mutation cases.
+
+Additional verification:
+
+- Independent `contentSignature`: exact match.
+- Independent `hypothesisSetId`: exact match.
+- Authentic audit footprint: 89 nodes, depth 4; limits are reasonable for the current nine-rule registry.
+- Data-descriptor `opts.clock`: valid, invoked once.
+- CommonJS global probe: `undefined` for D3 and D4.
+- Full `npm test` was environment-blocked at an R3.0C `mkdtemp` call (`EPERM`); all tests reached before that point passed.
+
+FINAL VERDICT: BLOCK

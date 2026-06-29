@@ -322,6 +322,16 @@
     if (!_isFrozenSafe(hsIn)) {
       return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
     }
+    // Codex D4 R3 D4-R3-02 closure: PRODUCER AUTHORITY via D3's closure-private WeakSet.
+    // This MUST happen BEFORE any other read of caller-supplied data (before clone, before
+    // schema validation, before reading nested fields, before resolving the clock). A
+    // structuredClone / JSON round-trip / hand-forged shape will fail this check because
+    // the new object reference is not in D3's WeakSet — even if hashes match perfectly.
+    // The verifier is fail-closed (returns false on any throw / Proxy / shape mismatch).
+    if (typeof HE.verifyAuthoritativeHypothesisSet !== 'function'
+        || HE.verifyAuthoritativeHypothesisSet(hsIn) !== true) {
+      return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
+    }
     // Codex D4 R2 D4-R2-02 closure: RECURSIVE descriptor audit BEFORE clone. The previous
     // top-level audit missed nested accessors (e.g. a getter on a hypothesis's status field
     // would fire during structuredClone before the post-clone audit could see anything).
@@ -493,8 +503,23 @@
       if (!_isPlainArray(h.correlationGroupIds)) {
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
       }
-      // contentSignature: present, well-formed string, and EQUAL to D3's recomputed signature
-      // (Codex D4 R2 D4-R2-01 closure). This binds ALL decision-relevant fields.
+      // Codex D4 R3 D4-R3-01 closure: REJECT non-array fields outright — no silent fallback to
+      // []. The previous code substituted [] when the field wasn't an array, which let a
+      // malformed value (e.g. cannotConcludeReasonCodes: "string") slip through with a
+      // signature that matched the authentic-empty-array signature. Empty legitimate arrays
+      // are still accepted; only non-arrays are rejected.
+      if (!_isPlainArray(h.alternativeExplanationIds)) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      }
+      if (!_isPlainArray(h.cannotConcludeReasonCodes)) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      }
+      if (!_isPlainArray(h.validationActionIds)) {
+        return { valid: false, reasonCodes: [CODES.HYPOTHESIS_INVALID] };
+      }
+      // contentSignature is an INTEGRITY / determinism proof (defense-in-depth). Producer
+      // authority lives in D3's WeakSet (already verified above). contentSignature catches
+      // accidental drift and surfaces inconsistent inputs early.
       if (!_isNonEmptyString(h.contentSignature)
           || !HI.safeRegExpTest(/^csig_[0-9a-f]{16}$/, h.contentSignature)) {
         return { valid: false, reasonCodes: [CODES.HYPOTHESIS_AUTHORITY_FORGED] };
@@ -515,9 +540,9 @@
         sup: h.supportingEvidenceIds,
         con: h.contradictingEvidenceIds,
         corr: h.correlationGroupIds,
-        alts: _isPlainArray(h.alternativeExplanationIds) ? h.alternativeExplanationIds : [],
-        cc: _isPlainArray(h.cannotConcludeReasonCodes) ? h.cannotConcludeReasonCodes : [],
-        acts: _isPlainArray(h.validationActionIds) ? h.validationActionIds : [],
+        alts: h.alternativeExplanationIds,
+        cc: h.cannotConcludeReasonCodes,
+        acts: h.validationActionIds,
         lims: h.limitations,
       };
       var expectedSig = 'csig_' + _hashFNV64Hex('contentsig|v' + hs.schemaVersion + '|' + HI.stableStringify(sigMaterial));
