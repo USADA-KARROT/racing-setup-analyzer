@@ -11,6 +11,7 @@
     { "path": "renderer/js/r3-0d-engineer-orchestrator.js", "capability": "engineer_brief_present" },
     { "path": "renderer/js/r3-0d-engineer-ui.js", "capability": "engineer_brief_present" },
     { "path": "renderer/js/i18n-r3-0d.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/r3-0d-contracts-bundle.js", "capability": "contract_foundation_present" },
     { "path": "renderer/js/feature-registry.js", "capability": "feature_registry_active" }
   ],
   "enabledCapabilities": ["contract_foundation_present", "evidence_graph_present", "hypothesis_engine_present", "priority_engine_present", "engineer_brief_present", "feature_registry_active"],

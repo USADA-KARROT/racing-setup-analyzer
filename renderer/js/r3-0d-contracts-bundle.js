@@ -1,3 +1,9 @@
+// renderer/js/r3-0d-contracts-bundle.js — GENERATED, DO NOT EDIT BY HAND.
+// Concatenation of contracts/r3.0d/* in dependency order for browser use.
+// Node test harness loads contracts/r3.0d/* directly; this bundle is browser-only.
+// Regenerate via:  node tools/build-r3-0d-browser-bundle.js
+
+// ====== contracts/r3.0d/hardened-intrinsics.js ======
 /**
  * contracts/r3.0d/hardened-intrinsics.js — R3.0D Hardened Intrinsics Toolkit.
  *
@@ -670,6 +676,8 @@
     catch (e) { root.R3_0D_HardenedIntrinsics = api; }
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+
+// ====== contracts/r3.0d/reason-codes.js ======
 /**
  * contracts/r3.0d/reason-codes.js — R3.0D D1 · Contract Foundation (NON-PRODUCTION).
  *
@@ -971,6 +979,8 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.R3_0D_ReasonCodes = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+
+// ====== contracts/r3.0d/credibility-contract.js ======
 /**
  * contracts/r3.0d/credibility-contract.js — R3.0D D1 · Contract Foundation (NON-PRODUCTION).
  *
@@ -1009,7 +1019,7 @@
 (function (root) {
   'use strict';
 
-  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = null; } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
   var RC = _req('./reason-codes.js', typeof R3_0D_ReasonCodes !== 'undefined' ? R3_0D_ReasonCodes : undefined);
   if (!RC) throw new Error('credibility-contract.js requires reason-codes.js');
   var HI = _req('./hardened-intrinsics.js', typeof R3_0D_HardenedIntrinsics !== 'undefined' ? R3_0D_HardenedIntrinsics : undefined);
@@ -1134,6 +1144,8 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.R3_0D_CredibilityContract = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+
+// ====== contracts/r3.0d/source-identity-contract.js ======
 /**
  * contracts/r3.0d/source-identity-contract.js — R3.0D D1 · Contract Foundation (NON-PRODUCTION).
  *
@@ -1162,7 +1174,7 @@
 (function (root) {
   'use strict';
 
-  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = null; } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
   var RC = _req('./reason-codes.js', typeof R3_0D_ReasonCodes !== 'undefined' ? R3_0D_ReasonCodes : undefined);
   if (!RC) throw new Error('source-identity-contract.js requires reason-codes.js');
   var HI = _req('./hardened-intrinsics.js', typeof R3_0D_HardenedIntrinsics !== 'undefined' ? R3_0D_HardenedIntrinsics : undefined);
@@ -1307,6 +1319,8 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.R3_0D_SourceIdentityContract = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+
+// ====== contracts/r3.0d/evidence-node-contract.js ======
 /**
  * contracts/r3.0d/evidence-node-contract.js — R3.0D D1 · Contract Foundation (NON-PRODUCTION).
  *
@@ -1348,7 +1362,7 @@
 (function (root) {
   'use strict';
 
-  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = null; } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
   var RC = _req('./reason-codes.js', typeof R3_0D_ReasonCodes !== 'undefined' ? R3_0D_ReasonCodes : undefined);
   var CR = _req('./credibility-contract.js', typeof R3_0D_CredibilityContract !== 'undefined' ? R3_0D_CredibilityContract : undefined);
   var SI = _req('./source-identity-contract.js', typeof R3_0D_SourceIdentityContract !== 'undefined' ? R3_0D_SourceIdentityContract : undefined);
@@ -1615,6 +1629,8 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.R3_0D_EvidenceNodeContract = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+
+// ====== contracts/r3.0d/hypothesis-contract.js ======
 /**
  * contracts/r3.0d/hypothesis-contract.js — R3.0D D1 · Contract Foundation (NON-PRODUCTION).
  *
@@ -1645,7 +1661,7 @@
 (function (root) {
   'use strict';
 
-  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = null; } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
   var RC = _req('./reason-codes.js', typeof R3_0D_ReasonCodes !== 'undefined' ? R3_0D_ReasonCodes : undefined);
   var CR = _req('./credibility-contract.js', typeof R3_0D_CredibilityContract !== 'undefined' ? R3_0D_CredibilityContract : undefined);
   var SI = _req('./source-identity-contract.js', typeof R3_0D_SourceIdentityContract !== 'undefined' ? R3_0D_SourceIdentityContract : undefined);
@@ -1942,6 +1958,8 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.R3_0D_HypothesisContract = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+
+// ====== contracts/r3.0d/recommendation-contract.js ======
 /**
  * contracts/r3.0d/recommendation-contract.js — R3.0D D1 · Contract Foundation (NON-PRODUCTION).
  *
@@ -1963,7 +1981,7 @@
 (function (root) {
   'use strict';
 
-  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = null; } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
   var RC = _req('./reason-codes.js', typeof R3_0D_ReasonCodes !== 'undefined' ? R3_0D_ReasonCodes : undefined);
   var CR = _req('./credibility-contract.js', typeof R3_0D_CredibilityContract !== 'undefined' ? R3_0D_CredibilityContract : undefined);
   var SI = _req('./source-identity-contract.js', typeof R3_0D_SourceIdentityContract !== 'undefined' ? R3_0D_SourceIdentityContract : undefined);
@@ -2141,6 +2159,8 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.R3_0D_RecommendationContract = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+
+// ====== contracts/r3.0d/decision-input-contract.js ======
 /**
  * contracts/r3.0d/decision-input-contract.js — R3.0D D1 · Contract Foundation (NON-PRODUCTION).
  *
@@ -2168,7 +2188,7 @@
 (function (root) {
   'use strict';
 
-  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = null; } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
   var RC = _req('./reason-codes.js', typeof R3_0D_ReasonCodes !== 'undefined' ? R3_0D_ReasonCodes : undefined);
   var EN = _req('./evidence-node-contract.js', typeof R3_0D_EvidenceNodeContract !== 'undefined' ? R3_0D_EvidenceNodeContract : undefined);
   var HC = _req('./hypothesis-contract.js', typeof R3_0D_HypothesisContract !== 'undefined' ? R3_0D_HypothesisContract : undefined);
@@ -2336,6 +2356,8 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.R3_0D_DecisionInputContract = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+
+// ====== contracts/r3.0d/engineer-brief-contract.js ======
 /**
  * contracts/r3.0d/engineer-brief-contract.js — R3.0D D1 · Contract Foundation (NON-PRODUCTION).
  *
@@ -2355,7 +2377,7 @@
 (function (root) {
   'use strict';
 
-  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = null; } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
   var RC = _req('./reason-codes.js', typeof R3_0D_ReasonCodes !== 'undefined' ? R3_0D_ReasonCodes : undefined);
   var CR = _req('./credibility-contract.js', typeof R3_0D_CredibilityContract !== 'undefined' ? R3_0D_CredibilityContract : undefined);
   var SI = _req('./source-identity-contract.js', typeof R3_0D_SourceIdentityContract !== 'undefined' ? R3_0D_SourceIdentityContract : undefined);
@@ -2554,6 +2576,8 @@
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (root) root.R3_0D_EngineerBriefContract = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
+
+// ====== contracts/r3.0d/index.js ======
 /**
  * contracts/r3.0d/index.js — R3.0D D1 · Contract Foundation aggregate (NON-PRODUCTION).
  *
@@ -2566,7 +2590,7 @@
 (function (root) {
   'use strict';
 
-  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = null; } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
   var RC = _req('./reason-codes.js', typeof R3_0D_ReasonCodes !== 'undefined' ? R3_0D_ReasonCodes : undefined);
   var CR = _req('./credibility-contract.js', typeof R3_0D_CredibilityContract !== 'undefined' ? R3_0D_CredibilityContract : undefined);
   var SI = _req('./source-identity-contract.js', typeof R3_0D_SourceIdentityContract !== 'undefined' ? R3_0D_SourceIdentityContract : undefined);
