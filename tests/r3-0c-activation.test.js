@@ -129,12 +129,21 @@ R30C_IDS.forEach(function (id) {
   chk('train.phaseStates.R3.0C.finalActivationReached=true', r3c && r3c.finalActivationReached === true);
   chk('train.phaseStates.R3.0C.finalActivationCheckpoint=C8_ACTIVATION', r3c && r3c.finalActivationCheckpoint === 'C8_ACTIVATION');
   chk('train.currentPhase=R3.0C OR train has advanced to a later phase', train.currentPhase === 'R3.0C' || ['R3.0D', 'R3.0E', 'R3.0F'].indexOf(train.currentPhase) !== -1);
-  // R3.0E / R3.0F MUST still be NOT started (only R3.0D may have started after R3.0C).
-  ['R3.0E', 'R3.0F'].forEach(function (p) {
+  // R3.0F MUST still be NOT started (R3.0D and R3.0E may have started after R3.0C / R3.0D
+  // finalActivationReached respectively). R3.0E is permitted to be started once R3.0D
+  // D5_ENGINEER_BRIEF_ACTIVATION finalActivation is reached on Train.
+  ['R3.0F'].forEach(function (p) {
     const s = train.phaseStates && train.phaseStates[p];
     chk('train.phaseStates.' + p + '.started=false', s && s.started === false);
     chk('train.phaseStates.' + p + '.finalActivationReached=false', s && s.finalActivationReached === false);
   });
+  // R3.0E may be started (after R3.0D D5 final-activation), but finalActivationReached
+  // MUST still be false (E5 not reached yet).
+  (function () {
+    const s = train.phaseStates && train.phaseStates['R3.0E'];
+    chk('train.phaseStates.R3.0E.finalActivationReached=false (E5 not reached)',
+      s && s.finalActivationReached === false);
+  })();
 })();
 
 (function () {

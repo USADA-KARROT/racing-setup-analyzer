@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0E",
+  "checkpoint": "E1_CONTRACT_FOUNDATION",
+  "baseSha": "2633032d78ee9d4582cfe10bf7131207e1e1d0f2",
+  "headSha": null,
+  "previousCheckpoint": "E0_BOOTSTRAP",
+  "shaSeparation": {
+    "note": "Per SKYLINE 2026-06-29 R3.0 Continuous Resume Directive §20, every R3.0E checkpoint manifest preserves three-way SHA separation.",
+    "reviewedCandidateSha": null,
+    "reviewedCandidateNote": "Filled after Codex E1 issues PASS verdict against a specific candidate SHA on feat/r3.0e-e1-experiment-contracts. Tier 1 raw evidence will be persisted under governance/r3.0e/codex-checkpoint-evidence/E1/round-N-<sha>.raw.txt.",
+    "manifestCommitSha": null,
+    "manifestCommitNote": "Filled by the same follow-up evidence-anchoring commit; mirrors D1 convention.",
+    "integrationSha": null,
+    "integrationNote": "Filled only after the E1 branch-to-branch PR merges into feat/r3.0-integrated-delivery AND the Train trusted-verification PASSes."
+  },
+  "authorizedPaths": [],
+  "newlyAuthorizedPaths": [],
+  "newlyEnabledCapabilities": ["contract_foundation_present"],
+  "enabledCapabilitiesBefore": [],
+  "enabledCapabilitiesAfter": ["contract_foundation_present"],
+  "forbiddenCapabilities": [
+    "experiment_store_present",
+    "outcome_classifier_present",
+    "case_timeline_present",
+    "feature_registry_active"
+  ],
+  "contractEnforcements": {
+    "scope": "contracts/r3.0e/* (reason-codes + experiment + outcome + control-variables + case-timeline + follow-up-link + index). NON-PRODUCTION at E1: no rendererAdapter, no runtime consumer, no algorithm; no UI; no feature-registry entry. Per SKYLINE D12/E1 ruling: this phase MUST NOT extend the frozen R3.0B case-record schema body (the pre-existing experimentId / followUpCaseIds associations are id-only refs, NOT R3.0E-driven extensions).",
+    "experimentShapeContract": "validateExperimentShape enforces closed key set (18 keys), closed status enum (draft/planned/applied/completed/abandoned/invalid), closed expectedDirection enum (increase/decrease/no_change), bounded magnitudeRange { min<=max, both finite }, mandatory baselineValue (finite number), mandatory non-empty stopConditions, mandatory non-empty validationPlan, bounded controlVariables / followUpCaseIds arrays, envelope byte cap 128 KiB.",
+    "outcomeShapeContract": "validateOutcomeShape enforces closed outcome class enum (confirmed / partially_confirmed / contradicted / inconclusive / invalid_comparison / inconclusive_due_to_confounders), comparabilityScore in [0,1], bounded confounders / dataQualityIssues / sideEffects / limitations arrays, confounders-present invariant (must coexist with inconclusive_due_to_confounders class OR CONTROL_VARIABLE_MISSING limitation).",
+    "controlVariableShapeContract": "validateControlVariableShape enforces closed key set, allowedRange { min<=max } when present, type-checked observed values.",
+    "caseTimelineShapeContract": "validateCaseTimelineShape enforces closed event-kind enum, chronological ordering, bounded events array.",
+    "followUpLinkShapeContract": "validateFollowUpLinkShape enforces non-self-link constraint, closed parentStatus enum (present/archived/deleted)."
+  },
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3.0e-contract-foundation.test.js",
+    "newSuiteAssertions": 33,
+    "evidenceTier": "TIER 3 — Claude-verified on E1 branch HEAD; CI re-run on integrationSha is the authority."
+  },
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": {
+    "verdict": "pending",
+    "verdictRound": 0,
+    "reviewedCandidateSha": null,
+    "verdictEvidenceFile": null,
+    "rounds": []
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "scopeBoundary": {
+    "frozenFilesUntouched": true,
+    "r30bPersistenceUntouched": true,
+    "r30cContractsUntouched": true,
+    "r30cProductionUntouched": true,
+    "r30dContractsUntouched": true,
+    "r30dProductionUntouched": true,
+    "featureRegistryUnchanged": true,
+    "indexHtmlUnchanged": true,
+    "noR30eFeatureIdInRegistry": true,
+    "runtimeConsumerCount": 0,
+    "productionPathCount": 0,
+    "algorithmCount": 0,
+    "uiSurfaceCount": 0
+  },
+  "frozenDiff": 0,
+  "productionDiff": 0,
+  "runtimeConsumerCount": 0,
+  "featureRegistryState": {
+    "expectedRegisteredIds": [],
+    "expectedDeferredIds": ["experiment_loop", "case_timeline"],
+    "note": "E1 does NOT register any R3.0E feature ID. Feature Registry activation is exclusively E5_ACTIVATION."
+  },
+  "crossPhaseGate": {
+    "r3dCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+    "requiredFor": "E1_CONTRACT_FOUNDATION",
+    "satisfied": true,
+    "note": "R3.0D state.currentCheckpoint === 'D5_ENGINEER_BRIEF_ACTIVATION' verified (post Formal D Gate merge at Train HEAD 2633032)."
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": "2026-06-30T00:00:00Z",
+  "status": "candidate",
+  "governanceChanged": true,
+  "changedFiles": [
+    "contracts/r3.0e/reason-codes.js",
+    "contracts/r3.0e/experiment-contract.js",
+    "contracts/r3.0e/outcome-contract.js",
+    "contracts/r3.0e/control-variables-contract.js",
+    "contracts/r3.0e/case-timeline-contract.js",
+    "contracts/r3.0e/follow-up-link-contract.js",
+    "contracts/r3.0e/index.js",
+    "tests/r3.0e-contract-foundation.test.js",
+    "governance/r3.0e/checkpoints/E1.json",
+    "governance/r3.0e/state.json",
+    "governance/r3.0/train.json",
+    "package.json"
+  ],
+  "note": "R3.0E E1_CONTRACT_FOUNDATION — 5 contract modules + aggregate index. NON-PRODUCTION; no Feature Registry change; no UI. Cross-phase gate: R3.0D D5_ENGINEER_BRIEF_ACTIVATION reached on Train HEAD 2633032."
+}
