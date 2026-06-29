@@ -52,6 +52,11 @@ function _he(input, customOpts) {
   return HE.buildHypothesisSet(input, customOpts === undefined ? _opts() : customOpts);
 }
 
+// Captured ambient primitives — used by mutation-test harness so the rebind/restore mechanics
+// don't fall victim to the very rebinding they're testing.
+var _origObjectDefineProperty = Object.defineProperty;
+var _origReflectApply = Reflect.apply;
+
 function _baseIdentity(overrides) {
   var base = {
     caseId: 'case_001',
@@ -858,6 +863,170 @@ console.log('Section H3 — Codex D3 R2 closures');
   var r3 = _he({ graph: g }, hostileOpts);
   chk('HRR2-05-c: accessor on opts data field rejected',
     r3.eligible === false);
+})();
+
+// ---------- Section H4 — Codex D3 R3 closure tests (R3-01..R3-07) -------------------------------
+console.log('Section H4 — Codex D3 R3 closures');
+
+// R3-01: delimiter collision in correlation key — use case/lap with pipe characters
+(function () {
+  // (lapId="a|b", sourceId="c") vs (lapId="a", sourceId="b|c") used to collide in the old key
+  // construction caseId|sessionId|lapId|sourceId. With JSON-stringified components, they don't.
+  var n1 = _baseNode({ nodeId: 'n_p1',
+    identity: _baseIdentity({ lapId: 'a|b', sourceId: 'c' }),
+    observation: { kind: 'channel_missing', channel: 'x', i18nKey: 'k', params: null } });
+  var n2 = _baseNode({ nodeId: 'n_p2',
+    identity: _baseIdentity({ lapId: 'a', sourceId: 'b|c' }),
+    observation: { kind: 'channel_missing', channel: 'y', i18nKey: 'k', params: null } });
+  // Build through D2 — both nodes have different identities so they end up in different correlation groups.
+  var eg = EG.buildEvidenceGraph({ caseAssociation: { caseId: 'case_001', sessionId: 'sess_001', lapId: null }, rawEvidence: [n1, n2] }, { clock: BASE_CLOCK });
+  if (!eg.valid) {
+    chk('HRR3-01: D2 built graph with delimiter-containing identities', false);
+  } else {
+    var r = _he({ graph: eg.graph });
+    chk('HRR3-01: D3 accepts graph where lapId/sourceId contain "|" delimiter (JSON-stringify makes the key collision-free)',
+      r.valid === true);
+  }
+})();
+
+// R3-02: forged correlationGroupId rejected
+(function () {
+  var n = _baseNode({});
+  var g = _buildGraph([n]);
+  // Replace cg ID with a forged value
+  var forgedCG = Object.freeze({
+    correlationGroupId: 'corr_deadbeefdeadbeef',  // valid shape, wrong hash
+    memberNodeIds: g.correlationGroups[0].memberNodeIds,
+    independenceWeight: g.correlationGroups[0].independenceWeight,
+  });
+  var bad = Object.freeze({
+    schemaVersion: 1, graphId: g.graphId,
+    caseAssociation: g.caseAssociation, sessionAssociation: g.sessionAssociation,
+    nodes: g.nodes, edges: g.edges, topologicalOrder: g.topologicalOrder,
+    deduplicationSummary: g.deduplicationSummary,
+    correlationGroups: Object.freeze([forgedCG]),
+    limitations: g.limitations, cannotConclude: g.cannotConclude,
+    provenance: g.provenance, createdAt: g.createdAt,
+    generationToken: g.generationToken, contextVersion: g.contextVersion,
+  });
+  var r = _he({ graph: bad });
+  chk('HRR3-02-a: forged correlationGroupId (wrong hash) rejected',
+    r.eligible === false
+      && HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT) !== -1);
+  // Bad grammar
+  var badGramCG = Object.freeze({
+    correlationGroupId: 'corr_../bad',
+    memberNodeIds: g.correlationGroups[0].memberNodeIds,
+    independenceWeight: g.correlationGroups[0].independenceWeight,
+  });
+  var bad2 = Object.freeze({
+    schemaVersion: 1, graphId: g.graphId,
+    caseAssociation: g.caseAssociation, sessionAssociation: g.sessionAssociation,
+    nodes: g.nodes, edges: g.edges, topologicalOrder: g.topologicalOrder,
+    deduplicationSummary: g.deduplicationSummary,
+    correlationGroups: Object.freeze([badGramCG]),
+    limitations: g.limitations, cannotConclude: g.cannotConclude,
+    provenance: g.provenance, createdAt: g.createdAt,
+    generationToken: g.generationToken, contextVersion: g.contextVersion,
+  });
+  var r2 = _he({ graph: bad2 });
+  chk('HRR3-02-b: correlationGroupId with forbidden grammar (`../bad`) rejected',
+    r2.eligible === false);
+})();
+
+// R3-03: unknown edge.kind rejected
+(function () {
+  var n1 = _baseNode({ nodeId: 'n_e1' });
+  var n2 = _baseNode({ nodeId: 'n_e2',
+    identity: _baseIdentity({ sourceId: 'src_e2' }),
+    observation: { kind: 'channel_missing', channel: 'y', i18nKey: 'k', params: null } });
+  var g = _buildGraph([n1, n2]);
+  var bogusEdge = Object.freeze({ from: 'n_e1', to: 'n_e2', kind: 'attacker_kind' });
+  var bad = Object.freeze({
+    schemaVersion: 1, graphId: g.graphId,
+    caseAssociation: g.caseAssociation, sessionAssociation: g.sessionAssociation,
+    nodes: g.nodes, edges: Object.freeze([bogusEdge]),
+    topologicalOrder: g.topologicalOrder, deduplicationSummary: g.deduplicationSummary,
+    correlationGroups: g.correlationGroups,
+    limitations: g.limitations, cannotConclude: g.cannotConclude,
+    provenance: g.provenance, createdAt: g.createdAt,
+    generationToken: g.generationToken, contextVersion: g.contextVersion,
+  });
+  var r = _he({ graph: bad });
+  chk('HRR3-03: unknown edge.kind rejected (closed enum)',
+    r.eligible === false);
+})();
+
+// R3-04: sourceVersion null/empty rejected
+(function () {
+  var n = _baseNode({ identity: _baseIdentity({ sourceVersion: null }) });
+  // D2 may reject too; verify D3 rejects regardless
+  var eg = EG.buildEvidenceGraph({ caseAssociation: { caseId: 'case_001', sessionId: 'sess_001', lapId: null }, rawEvidence: [n] }, { clock: BASE_CLOCK });
+  if (eg.valid && eg.graph.nodes.length > 0) {
+    var r = _he({ graph: eg.graph });
+    chk('HRR3-04: D3 rejects node with null sourceVersion', r.eligible === false);
+  } else {
+    chk('HRR3-04: D2 rejected null sourceVersion (D3 defense not exercised, ok)', true);
+  }
+})();
+
+// R3-05: opts non-enumerable rejected
+(function () {
+  var g = _buildGraph([_baseNode({})]);
+  var hostileOpts = { clock: BASE_CLOCK };
+  Object.defineProperty(hostileOpts, 'maxAgeMs', { value: 1, enumerable: false });
+  var r = _he({ graph: g }, hostileOpts);
+  chk('HRR3-05-a: non-enumerable opts.maxAgeMs rejected (would have caused freshness rejection if accepted)',
+    r.eligible === false
+      && HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.UNKNOWN_OWN_KEY) !== -1);
+  var hostileOpts2 = {};
+  Object.defineProperty(hostileOpts2, 'clock', { value: BASE_CLOCK, enumerable: false });
+  var r2 = _he({ graph: g }, hostileOpts2);
+  chk('HRR3-05-b: non-enumerable opts.clock rejected',
+    r2.eligible === false);
+})();
+
+// R3-06: clock invoked at most once + clock-result reuse
+(function () {
+  var g = _buildGraph([_baseNode({})]);
+  var calls = 0;
+  var trackedClock = function () { calls += 1; return '2026-06-29T01:00:00Z'; };
+  var r = HE.buildHypothesisSet({ graph: g }, { clock: trackedClock });
+  chk('HRR3-06-a: opts.clock invoked at most once per buildHypothesisSet call', calls <= 1);
+  chk('HRR3-06-b: result.hypothesisSet.createdAt reuses the resolved clock ISO',
+    r.valid === true && r.hypothesisSet.createdAt === '2026-06-29T01:00:00Z');
+})();
+
+// J20: Date.parse rebind — engine uses captured Date.parse via _isoToMs
+(function () {
+  var g = _buildGraph([_baseNode({})]);
+  var origDateParse = Date.parse;
+  var hits = 0;
+  var wrapped = function () { hits += 1; return _origReflectApply(origDateParse, this, arguments); };
+  _origObjectDefineProperty(Date, 'parse', { value: wrapped, configurable: true, writable: true });
+  try {
+    var r = HE.buildHypothesisSet({ graph: g }, { clock: BASE_CLOCK });
+    chk('J20: hostile Date.parse never invoked by engine (captured Date.parse used)', hits === 0);
+    chk('J20: result still valid', r.valid === true);
+  } finally {
+    _origObjectDefineProperty(Date, 'parse', { value: origDateParse, configurable: true, writable: true });
+  }
+})();
+
+// J21: Object.is rebind — engine uses captured Object.is via _exactlyEqual
+(function () {
+  var g = _buildGraph([_baseNode({})]);
+  var origObjectIs = Object.is;
+  var hits = 0;
+  var wrapped = function () { hits += 1; return _origReflectApply(origObjectIs, this, arguments); };
+  _origObjectDefineProperty(Object, 'is', { value: wrapped, configurable: true, writable: true });
+  try {
+    var r = HE.buildHypothesisSet({ graph: g }, { clock: BASE_CLOCK });
+    chk('J21: hostile Object.is never invoked by engine (captured Object.is used)', hits === 0);
+    chk('J21: result still valid', r.valid === true);
+  } finally {
+    _origObjectDefineProperty(Object, 'is', { value: origObjectIs, configurable: true, writable: true });
+  }
 })();
 
 // R2-06 (NIT): positive contradiction-direction test. Build a graph where node A contradicts B

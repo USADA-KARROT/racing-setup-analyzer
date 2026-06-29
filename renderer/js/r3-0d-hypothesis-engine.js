@@ -458,8 +458,35 @@
       if (n.identity.sourceId === 'imported_summary' && n.credibility === 'measured') {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_IMPORTED_SUMMARY_ELEVATION_FORBIDDEN] };
       }
+      // Codex D3 R3 R3-04 closure: enforce full SourceIdentity invariants — every identity field
+      // that D2 requires non-empty MUST be non-empty + within byte cap. sourceVersion=null /
+      // sourceId="" / lapId="" / freshness="" all sneak past the basic scope checks if not
+      // explicitly rejected here.
+      if (!_isNonEmptyString(n.identity.sourceId)) {
+        return { valid: false, reasonCodes: [CODES.SOURCE_IDENTITY_INVALID] };
+      }
+      if (_byteLength(n.identity.sourceId) > STRING_BYTE_CAP) {
+        return { valid: false, reasonCodes: [CODES.BYTE_CAP_EXCEEDED] };
+      }
+      if (!_isNonEmptyString(n.identity.sourceVersion)) {
+        return { valid: false, reasonCodes: [CODES.SOURCE_IDENTITY_VERSION_MISSING] };
+      }
+      if (_byteLength(n.identity.sourceVersion) > STRING_BYTE_CAP) {
+        return { valid: false, reasonCodes: [CODES.BYTE_CAP_EXCEEDED] };
+      }
+      if (nodeLapId !== null) {
+        if (!_isNonEmptyString(nodeLapId)) {
+          return { valid: false, reasonCodes: [CODES.SOURCE_IDENTITY_INVALID] };
+        }
+        if (_byteLength(nodeLapId) > STRING_BYTE_CAP) {
+          return { valid: false, reasonCodes: [CODES.BYTE_CAP_EXCEEDED] };
+        }
+      }
       if (!_isNonEmptyString(n.identity.freshness)) {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_FRESHNESS_STALE] };
+      }
+      if (_byteLength(n.identity.freshness) > STRING_BYTE_CAP) {
+        return { valid: false, reasonCodes: [CODES.BYTE_CAP_EXCEEDED] };
       }
       var freshMs = _isoToMs(n.identity.freshness);
       if (freshMs === null) {
@@ -477,8 +504,14 @@
         return { valid: false, reasonCodes: [CODES.EVIDENCE_FRESHNESS_STALE] };
       }
 
-      // Build expected correlation group bucket for this node.
-      var corrKey = caseId + '|' + sessionId + '|' + (nodeLapId == null ? ' ' : nodeLapId) + '|' + n.identity.sourceId;
+      // Codex D3 R3 R3-01 closure: collision-free correlation key. Use D2's exact encoding
+      // (r3-0d-evidence-graph.js:_correlationGroupCanonical) - HI.stableStringify each
+      // component so JSON-string escaping eliminates ambiguity (caseId="a|b" cannot collide
+      // with lapId containing "|"). The '|' delimiter sits BETWEEN JSON-quoted strings.
+      var corrKey = HI.stableStringify(caseId)
+        + '|' + HI.stableStringify(sessionId)
+        + '|' + HI.stableStringify(nodeLapId == null ? null : nodeLapId)
+        + '|' + HI.stableStringify(n.identity.sourceId);
       HI.safeDefineDataProperty(nodeCorrelationKey, n.nodeId, corrKey);
       var bucketDesc = HI.safeGetOwnDescriptor(expectedGroupBuckets, corrKey);
       if (bucketDesc) {
@@ -509,12 +542,28 @@
       return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT] };
     }
     var matchedKey = HI.safeObjectCreateNull();
+    var seenGroupId = HI.safeObjectCreateNull();
     var globalMemberSeen = HI.safeObjectCreateNull();
     for (var cgi = 0; cgi < g.correlationGroups.length; cgi++) {
       var cg = g.correlationGroups[cgi];
       if (!_isPlainObject(cg) || !_isPlainArray(cg.memberNodeIds) || cg.memberNodeIds.length === 0) {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
       }
+      // Codex D3 R3 R3-02 closure: correlationGroupId must conform to D2's grammar
+      // (`corr_<16hex>`) AND must be unique across g.correlationGroups. Two distinct groups
+      // sharing the same ID would previously bypass downstream dedup.
+      if (!_isNonEmptyString(cg.correlationGroupId)) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
+      }
+      if (HI.safeRegExpTest(ID_FORBIDDEN_RE, cg.correlationGroupId)
+          || !HI.safeRegExpTest(/^corr_[0-9a-f]{16}$/, cg.correlationGroupId)) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_ID_FORBIDDEN] };
+      }
+      if (HI.safeGetOwnDescriptor(seenGroupId, cg.correlationGroupId)) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT] };
+      }
+      HI.safeDefineDataProperty(seenGroupId, cg.correlationGroupId, true);
+
       // All member IDs share the same expected correlation key.
       var firstMember = cg.memberNodeIds[0];
       var keyDesc = HI.safeGetOwnDescriptor(nodeCorrelationKey, firstMember);
@@ -550,16 +599,27 @@
         }
         HI.safeDefineDataProperty(globalMemberSeen, sortedActual[mi], true);
       }
+      // Codex D3 R3 R3-02 closure (cont.): correlationGroupId must equal D2's recompute
+      // ('corr_' + _hash64('corr|' + canonical)). Binds the supplied ID to actual cluster
+      // contents — caller cannot rename group IDs to forge dedup.
+      var expectedGroupId = 'corr_' + _hashFNV64Hex('corr|' + keyForThisGroup);
+      if (cg.correlationGroupId !== expectedGroupId) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT] };
+      }
       // Exact Object.is(weight, 1/count) — rejects NaN, Infinity, or any float drift.
       if (!_exactlyEqual(cg.independenceWeight, 1 / cg.memberNodeIds.length)) {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_GRAPH_CORRELATED_METRICS_DOUBLECOUNT] };
       }
     }
 
-    // Edge endpoint validation: every edge.from and edge.to must reference a known nodeId.
+    // Codex D3 R3 R3-03 closure: enforce D2's closed edge.kind enum.
+    var EDGE_KIND_ALLOWED = ['supports', 'contradicts', 'derived_from', 'correlated_with', 'invalidates'];
     for (var ei = 0; ei < g.edges.length; ei++) {
       var e = g.edges[ei];
       if (!_isPlainObject(e) || !_isNonEmptyString(e.from) || !_isNonEmptyString(e.to) || !_isNonEmptyString(e.kind)) {
+        return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
+      }
+      if (HI.safeArrayIndexOf(EDGE_KIND_ALLOWED, e.kind) === -1) {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
       }
       if (!HI.safeGetOwnDescriptor(nodeIdSet, e.from) || !HI.safeGetOwnDescriptor(nodeIdSet, e.to)) {
@@ -1243,13 +1303,18 @@
           if (typeof odName === 'symbol') {
             return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'opts has symbol key' });
           }
-          if (odName === 'clock') continue;  // function, handled above
           var od = HI.safeGetOwnDescriptor(optsIn, odName);
           if (!od) continue;
+          // Codex D3 R3 R3-05 closure: ALL opts own keys (including 'clock') MUST be enumerable.
+          // Previously the enumerable check applied to input but not opts, so a non-enumerable
+          // maxAgeMs could smuggle through and reach optsSnap.
+          if (!od.enumerable) {
+            return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'opts non-enumerable own key: ' + odName });
+          }
+          if (odName === 'clock') continue;  // function, captured above by reference
           if (typeof od.value === 'function') {
             return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts function field not allowed: ' + odName });
           }
-          // 'value' presence indicates a data descriptor; accessor descriptors are rejected here.
           if (!('value' in od)) {
             return RC.buildBlockedResult([CODES.HYPOTHESIS_INVALID], { detail: 'opts accessor descriptor not allowed: ' + odName });
           }
