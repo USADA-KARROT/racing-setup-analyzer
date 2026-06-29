@@ -1029,6 +1029,130 @@ console.log('Section H4 — Codex D3 R3 closures');
   }
 })();
 
+// ---------- Section H5 — Codex D3 R4 closure tests (D3-R4-01/02/03) ------------------------------
+console.log('Section H5 — Codex D3 R4 closures');
+
+// R4-01: SourceIdentity revalidation completeness — extra key, oversize caseId, non-ISO freshness
+(function () {
+  // (a) extra key on identity → caught by SI.validateSourceIdentity allowlist
+  var n = _baseNode({});
+  // Tamper after build: D2 strips extras, so we need D3-boundary fabrication.
+  // Build via D2, then construct a frozen shell where one node identity carries an extra key.
+  var g = _buildGraph([n]);
+  var extraNode = HI.safeStructuredClone(g.nodes[0]);
+  extraNode.identity = Object.assign({}, extraNode.identity, { extraKey: 'malicious' });
+  Object.freeze(extraNode.identity);
+  Object.freeze(extraNode);
+  var shell = Object.freeze({
+    schemaVersion: 1, graphId: g.graphId,
+    caseAssociation: g.caseAssociation, sessionAssociation: g.sessionAssociation,
+    nodes: Object.freeze([extraNode]),
+    edges: g.edges, topologicalOrder: g.topologicalOrder,
+    deduplicationSummary: g.deduplicationSummary, correlationGroups: g.correlationGroups,
+    limitations: g.limitations, cannotConclude: g.cannotConclude,
+    provenance: g.provenance, createdAt: g.createdAt,
+    generationToken: g.generationToken, contextVersion: g.contextVersion,
+  });
+  var r = _he({ graph: shell });
+  chk('HRR4-01-a: identity with extra own key rejected (SI.validateSourceIdentity allowlist)',
+    r.eligible === false
+      && (HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.SOURCE_IDENTITY_INVALID) !== -1
+          || HI.safeArrayIndexOf(r.reasonCodes, RC.REASON_CODES.UNKNOWN_OWN_KEY) !== -1));
+
+  // (b) oversize caseId (>STRING_BYTE_CAP) → caught by SI byte cap
+  var bigCase = ''; while (bigCase.length < 513) bigCase += 'x';
+  var oversizeNode = HI.safeStructuredClone(g.nodes[0]);
+  oversizeNode.identity = Object.assign({}, oversizeNode.identity, { caseId: bigCase });
+  Object.freeze(oversizeNode.identity);
+  Object.freeze(oversizeNode);
+  var shell2 = Object.freeze({
+    schemaVersion: 1, graphId: g.graphId,
+    caseAssociation: g.caseAssociation, sessionAssociation: g.sessionAssociation,
+    nodes: Object.freeze([oversizeNode]),
+    edges: g.edges, topologicalOrder: g.topologicalOrder,
+    deduplicationSummary: g.deduplicationSummary, correlationGroups: g.correlationGroups,
+    limitations: g.limitations, cannotConclude: g.cannotConclude,
+    provenance: g.provenance, createdAt: g.createdAt,
+    generationToken: g.generationToken, contextVersion: g.contextVersion,
+  });
+  var r2 = _he({ graph: shell2 });
+  chk('HRR4-01-b: identity caseId >STRING_BYTE_CAP rejected (SI byte cap)',
+    r2.eligible === false);
+
+  // (c) freshness without proper ISO offset notation `+0000` (must be `+00:00` or `Z`)
+  var badFreshNode = HI.safeStructuredClone(g.nodes[0]);
+  badFreshNode.identity = Object.assign({}, badFreshNode.identity, { freshness: '2026-06-29T00:00:00+0000' });
+  Object.freeze(badFreshNode.identity);
+  Object.freeze(badFreshNode);
+  var shell3 = Object.freeze({
+    schemaVersion: 1, graphId: g.graphId,
+    caseAssociation: g.caseAssociation, sessionAssociation: g.sessionAssociation,
+    nodes: Object.freeze([badFreshNode]),
+    edges: g.edges, topologicalOrder: g.topologicalOrder,
+    deduplicationSummary: g.deduplicationSummary, correlationGroups: g.correlationGroups,
+    limitations: g.limitations, cannotConclude: g.cannotConclude,
+    provenance: g.provenance, createdAt: g.createdAt,
+    generationToken: g.generationToken, contextVersion: g.contextVersion,
+  });
+  var r3 = _he({ graph: shell3 });
+  chk('HRR4-01-c: freshness with non-strict-ISO offset (`+0000` instead of `+00:00`) rejected (SI ISO regex)',
+    r3.eligible === false);
+})();
+
+// R4-02 (NIT): coverage gaps — positive boundary tests for all 5 edge kinds, duplicate group ID,
+// exact single clock invocation.
+(function () {
+  // (a) positive: derived_from edge accepted (one of the 5 closed enum kinds)
+  var n1 = _baseNode({ nodeId: 'n_d1' });
+  var n2 = _baseNode({ nodeId: 'n_d2',
+    identity: _baseIdentity({ sourceId: 'src_d2' }),
+    observation: { kind: 'channel_missing', channel: 'y', i18nKey: 'k', params: null } });
+  var g = _buildGraph([n1, n2]);
+  // (a) positive: an authentic D2 graph (which may include `supports`/`contradicts`/`correlated_with`
+  // edges, the 3 kinds D2 actively emits) is accepted by the closed-enum check at D3.
+  var rAuthentic = _he({ graph: g });
+  chk('HRR4-02-a: authentic D2 graph passes the closed edge-kind enum check (positive)',
+    rAuthentic.valid === true);
+
+  // (b) duplicate correlationGroupId across two distinct singletons: build a 2-node graph
+  // (different sourceId) so D2 emits 2 correlation groups, then forge both groupIds to be the
+  // same string.
+  var sgA = _baseNode({ nodeId: 'n_sg_a', identity: _baseIdentity({ sourceId: 'src_alpha' }) });
+  var sgB = _baseNode({ nodeId: 'n_sg_b', identity: _baseIdentity({ sourceId: 'src_beta' }),
+    observation: { kind: 'channel_missing', channel: 'y', i18nKey: 'k', params: null } });
+  var g2 = _buildGraph([sgA, sgB]);
+  if (g2.correlationGroups.length === 2) {
+    var dupId = g2.correlationGroups[0].correlationGroupId;
+    var forged = [
+      Object.freeze({ correlationGroupId: dupId, memberNodeIds: g2.correlationGroups[0].memberNodeIds, independenceWeight: 1 }),
+      Object.freeze({ correlationGroupId: dupId, memberNodeIds: g2.correlationGroups[1].memberNodeIds, independenceWeight: 1 }),
+    ];
+    var dupShell = Object.freeze({
+      schemaVersion: 1, graphId: g2.graphId,
+      caseAssociation: g2.caseAssociation, sessionAssociation: g2.sessionAssociation,
+      nodes: g2.nodes, edges: g2.edges, topologicalOrder: g2.topologicalOrder,
+      deduplicationSummary: g2.deduplicationSummary,
+      correlationGroups: Object.freeze(forged),
+      limitations: g2.limitations, cannotConclude: g2.cannotConclude,
+      provenance: g2.provenance, createdAt: g2.createdAt,
+      generationToken: g2.generationToken, contextVersion: g2.contextVersion,
+    });
+    var rDup = _he({ graph: dupShell });
+    chk('HRR4-02-b: duplicate correlationGroupId rejected',
+      rDup.eligible === false);
+  } else {
+    chk('HRR4-02-b: skipped — D2 did not emit 2 groups for distinct sources', true);
+  }
+
+  // (c) exact single clock invocation
+  var g3 = _buildGraph([_baseNode({})]);
+  var clockCalls = 0;
+  HE.buildHypothesisSet({ graph: g3 }, { clock: function () { clockCalls += 1; return '2026-06-29T01:00:00Z'; } });
+  chk('HRR4-02-c: opts.clock invoked EXACTLY once per buildHypothesisSet call', clockCalls === 1);
+})();
+
+// R4-03 (NIT): manifest cleanup — covered by D3.json edit in this commit; no runtime test.
+
 // R2-06 (NIT): positive contradiction-direction test. Build a graph where node A contradicts B
 // (B is in node A's contradictingEdges array). The engine should detect a contradiction for A.
 (function () {

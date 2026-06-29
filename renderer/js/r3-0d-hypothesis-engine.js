@@ -424,6 +424,18 @@
       if (!_isPlainObject(n)) {
         return { valid: false, reasonCodes: [CODES.EVIDENCE_NODE_INVALID] };
       }
+      // Codex D3 R4 D3-R4-01 closure: delegate FULL SourceIdentity validation to the D1 contract.
+      // SI.validateSourceIdentity enforces: (a) closed key set {caseId, sessionId, lapId, sourceId,
+      // sourceVersion, freshness} via Reflect.ownKeys allowlist (rejects extra keys + Symbol keys);
+      // (b) caseId/sessionId/sourceId/sourceVersion/freshness mandatory non-empty strings;
+      // (c) byte caps (≤512) on ALL string fields including caseId/sessionId; (d) lapId optional but
+      // if present must be null or non-empty string + byte cap; (e) freshness must match the
+      // contract's ISO 8601 grammar (T separator + Z or ±HH:MM offset). This single delegation
+      // replaces several inline checks that were partial.
+      var sidCheck = SI.validateSourceIdentity(n.identity);
+      if (sidCheck.valid !== true) {
+        return { valid: false, reasonCodes: (sidCheck && sidCheck.reasonCodes) ? sidCheck.reasonCodes : [CODES.SOURCE_IDENTITY_INVALID] };
+      }
       if (!_isPlainObject(n.identity)) {
         return { valid: false, reasonCodes: [CODES.SOURCE_IDENTITY_INVALID] };
       }
