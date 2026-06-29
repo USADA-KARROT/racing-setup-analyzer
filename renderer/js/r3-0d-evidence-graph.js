@@ -1487,6 +1487,15 @@
     // never throws; never reveals the registry.
     verifyAuthoritativeGraph: verifyAuthoritativeGraph,
   };
+  // Codex D-GATE-04 closure: freeze the exported API so a post-load attacker cannot
+  // replace `verifyAuthoritativeGraph` with `() => true` to bypass D3's verifier-first
+  // check. Combined with D3 capturing the function reference at its module init, this
+  // gives end-to-end producer-attestation guarantees that survive ambient rebind attacks.
+  try { _ObjectFreeze(api); } catch (e) { /* swallow */ }
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
-  if (root) root.R3_0D_EvidenceGraph = api;
+  if (root) {
+    try {
+      _ObjectDefineProperty(root, 'R3_0D_EvidenceGraph', { value: api, writable: false, enumerable: false, configurable: false });
+    } catch (e) { root.R3_0D_EvidenceGraph = api; }
+  }
 })(typeof globalThis !== 'undefined' ? globalThis : this);

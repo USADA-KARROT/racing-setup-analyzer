@@ -62,6 +62,16 @@
   if (!HI || !RC || !CR || !HC || !EN || !SI) {
     throw new Error('r3-0d-hypothesis-engine.js: missing one or more required R3.0D contracts');
   }
+  // Codex D-GATE-04 closure: EG.verifyAuthoritativeGraph is MANDATORY, and the function
+  // reference is captured at D3 module init so a post-load rebind of the EG export cannot
+  // bypass the verifier-first gate. D2's API is deep-frozen and (in the browser) installed
+  // via defineProperty with writable=false, configurable=false. If the verifier is not a
+  // function at D3 load time, this throws — the engine refuses to operate without an
+  // authoritative D2 attestation path.
+  if (!EG || typeof EG.verifyAuthoritativeGraph !== 'function') {
+    throw new Error('r3-0d-hypothesis-engine.js: requires r3-0d-evidence-graph.js with verifyAuthoritativeGraph');
+  }
+  var _CAPTURED_EG_VERIFY_GRAPH = EG.verifyAuthoritativeGraph;
 
   var CODES = RC.REASON_CODES;
 
@@ -1653,13 +1663,15 @@
       // narrow path: EG module didn't load) the legacy structural validation is the
       // fallback — it still catches forged graphs via structuredClone + audit + graphId
       // recompute, just without the producer-attestation gate.
-      if (EG && typeof EG.verifyAuthoritativeGraph === 'function') {
-        if (EG.verifyAuthoritativeGraph(inputSnap.graph) !== true) {
-          // Use HYPOTHESIS_AUTHORITY_FORGED — same reason code D4→D5 uses for failed
-          // producer-attestation. Existing D3 tests already expect this code for
-          // fabricated / tampered graph scenarios.
-          return RC.buildBlockedResult([CODES.HYPOTHESIS_AUTHORITY_FORGED], { detail: 'D2 graph producer-attestation failed' });
-        }
+      // Codex D-GATE-04 closure: call the captured verifier (not EG.verifyAuthoritativeGraph
+      // looked up via ambient EG). A post-load rebind of the EG export cannot reach this
+      // captured reference. The verifier itself uses captured Reflect.apply on captured
+      // WeakSet.prototype.has, so prototype rebinding is also defeated.
+      if (_CAPTURED_EG_VERIFY_GRAPH(inputSnap.graph) !== true) {
+        // Use HYPOTHESIS_AUTHORITY_FORGED — same reason code D4→D5 uses for failed
+        // producer-attestation. Existing D3 tests already expect this code for
+        // fabricated / tampered graph scenarios.
+        return RC.buildBlockedResult([CODES.HYPOTHESIS_AUTHORITY_FORGED], { detail: 'D2 graph producer-attestation failed' });
       }
       var authority = _validateAuthoritativeGraph(inputSnap.graph, refNowMs, maxAgeMs);
       if (authority.valid !== true) {
