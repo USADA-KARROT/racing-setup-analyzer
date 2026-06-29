@@ -7,8 +7,8 @@
   "previousCheckpoint": "E0_BOOTSTRAP",
   "shaSeparation": {
     "note": "Per SKYLINE 2026-06-29 R3.0 Continuous Resume Directive §20, every R3.0E checkpoint manifest preserves three-way SHA separation.",
-    "reviewedCandidateSha": null,
-    "reviewedCandidateNote": "Filled after Codex E1 issues PASS verdict against a specific candidate SHA on feat/r3.0e-e1-experiment-contracts. Tier 1 raw evidence will be persisted under governance/r3.0e/codex-checkpoint-evidence/E1/round-N-<sha>.raw.txt.",
+    "reviewedCandidateSha": "05cff5b83ab8b328269747a9322674ec41e9e5a2",
+    "reviewedCandidateNote": "Codex E1 Round 3 reviewed this exact SHA and issued FINAL VERDICT: PASS (2026-06-30). 7 distinct adversarial findings closed across 3 rounds: R1-01 recursive descriptor audit / R1-02 future-schema rejection / R1-03 outcome-on-draft rejection / R1-04 stopConditions cap+shape / R2-01 audit overflow fail-closed / R2-02 timeline pre-clone audit / R2-03 control-variable pre-clone audit.",
     "manifestCommitSha": null,
     "manifestCommitNote": "Filled by the same follow-up evidence-anchoring commit; mirrors D1 convention.",
     "integrationSha": null,
@@ -43,11 +43,15 @@
   "artifactId": null,
   "artifactBoundSha": null,
   "codexVerdict": {
-    "verdict": "pending",
-    "verdictRound": 0,
-    "reviewedCandidateSha": null,
-    "verdictEvidenceFile": null,
-    "rounds": []
+    "verdict": "PASS",
+    "verdictRound": 3,
+    "reviewedCandidateSha": "05cff5b83ab8b328269747a9322674ec41e9e5a2",
+    "verdictEvidenceFile": "governance/r3.0e/codex-checkpoint-evidence/E1/round-3-05cff5b-PASS.raw.txt",
+    "rounds": [
+      { "round": 1, "reviewedSha": "a2f78f7", "verdict": "BLOCK", "findings": "4 BLOCK (E1-R1-01..04)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E1/round-1-a2f78f7.raw.txt" },
+      { "round": 2, "reviewedSha": "1b875a8", "verdict": "BLOCK", "findings": "3 BLOCK (E1-R2-01..03)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E1/round-2-1b875a8.raw.txt" },
+      { "round": 3, "reviewedSha": "05cff5b", "verdict": "PASS", "findings": "0", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E1/round-3-05cff5b-PASS.raw.txt" }
+    ]
   },
   "r3bCaseRecordSchemaUntouched": true,
   "scopeBoundary": {
