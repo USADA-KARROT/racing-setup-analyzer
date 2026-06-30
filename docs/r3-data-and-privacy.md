@@ -402,10 +402,10 @@ The F2 phase ships nine end-to-end flows under `tests/e2e/` that each exercise t
 | `tests/e2e/flow-03-measured.test.js` | A case with measured-metric data preserves the credibility rung exactly `Measured` through storage roundtrip and migration; no credibility upgrade; qualifiers go in `limitations[]`, not the rung. |
 | `tests/e2e/flow-04-reference-lap.test.js` | R3.0C reference-lap contract: explicit user selection only (no `fastestValid`, no `medianValid`, no `bestSectorComposite`); comparison authority requires same Case + same Session; delta sign = `comparison − reference`. |
 | `tests/e2e/flow-05-vre.test.js` | R3.0D Engineer Brief: authoritative-only inputs; the brief does not classify, does not claim causation, does not blame the driver. |
-| `tests/e2e/flow-06-setup-experiment.test.js` | R3.0E Experiment Loop end-to-end: create setup experiment, classify outcome (authoritative inputs only), append timeline event, F1 sees the records as at-target. |
-| `tests/e2e/flow-07-driver-experiment.test.js` | Driver-instruction-only experiment plus follow-up Case-link semantics; follow-up Case Links carry no comparison authority (cross-case forbidden). |
+| `tests/e2e/flow-06-setup-experiment.test.js` | R3.0E Experiment Loop end-to-end: create setup experiment, append an `outcome_classified` timeline event directly (does not call `classifyOutcome`), F1 sees the records as at-target. |
+| `tests/e2e/flow-07-driver-experiment.test.js` | Driver-instruction-only experiment plus a follow-up Case-link `create` attempt (does not exercise `listForParent`/`markParentStatus`); follow-up Case Links carry no comparison authority (cross-case forbidden). |
 | `tests/e2e/flow-08-export-import.test.js` | Case export produces an R3.0B-validated portable bundle with no raw telemetry; reimport creates an `imported_summary` record, never promoted to `local_full`. |
-| `tests/e2e/flow-09-electron-smoke.test.js` | Electron host process can be invoked and reports a version (no window launch in CI). |
+| `tests/e2e/flow-09-electron-smoke.test.js` | Reads `package.json` to confirm `electron` is declared as a devDependency with a valid semver range; does not invoke the Electron binary or launch a window. |
 
 ## R3.0F F3 hardening probes
 

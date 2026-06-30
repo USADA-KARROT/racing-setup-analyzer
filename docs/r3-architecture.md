@@ -601,10 +601,10 @@ import, comparison, brief, experiment, follow-up, and Electron smoke. The exact 
 | `tests/e2e/flow-03-measured.test.js` | Measured-metrics flow. |
 | `tests/e2e/flow-04-reference-lap.test.js` | Reference-lap explicit selection (no auto fastest / median / best-sector composite). |
 | `tests/e2e/flow-05-vre.test.js` | VRE / R3.0D Engineer Brief on authoritative-only inputs. The brief does **not** classify, claim causation, blame the driver, or take runtime-LLM authority — it is a **read projection** of upstream services. |
-| `tests/e2e/flow-06-setup-experiment.test.js` | Setup experiment create + outcome classify (authoritative-only) + timeline append-only. A correction is a NEW timeline event, not a mutation of an existing one. |
-| `tests/e2e/flow-07-driver-experiment.test.js` | Driver experiment with follow-up Case link. Follow-up Case Links carry **no comparison authority** (cross-case forbidden). Covers `create` + `listForParent` + `markParentStatus` state transitions. |
+| `tests/e2e/flow-06-setup-experiment.test.js` | Setup experiment create + timeline append-only. Appends an `outcome_classified` timeline event directly (does not call `classifyOutcome`). A correction is a NEW timeline event, not a mutation of an existing one. |
+| `tests/e2e/flow-07-driver-experiment.test.js` | Driver experiment with follow-up Case link. Follow-up Case Links carry **no comparison authority** (cross-case forbidden). Attempts `followupLinkStore.create(link)`; does not exercise `listForParent` or `markParentStatus`. |
 | `tests/e2e/flow-08-export-import.test.js` | Case export + reimport. |
-| `tests/e2e/flow-09-electron-smoke.test.js` | Electron startup smoke. Verifies the Electron CLI is reachable, `main.js` has a stable entry shape, the preload exposes only the minimal `contextBridge` surface, and there is no `nodeIntegration` leak. Does **not** launch a window or render UI. |
+| `tests/e2e/flow-09-electron-smoke.test.js` | Electron startup smoke. Reads `package.json` to confirm `electron` is a declared devDependency with a valid semver range; `main.js` has a stable entry shape; the preload exposes only the minimal `contextBridge` surface; no `nodeIntegration` leak. Does **not** invoke the `electron` binary, launch a window, or render UI. |
 
 ### F3 — Hardening probes (6 probes)
 
