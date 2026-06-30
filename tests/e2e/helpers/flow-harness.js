@@ -94,7 +94,19 @@ function createFlowHarness(opts) {
   // via a visited-WeakSet.
   function assertNoStaleCaseRef(viewmodelLike) {
     if (!viewmodelLike || typeof viewmodelLike !== 'object') return;
-    var active = viewmodelLike.activeCaseId || viewmodelLike.caseId || null;
+    // F3-R6-02 closure: anchor lookup must NOT fire accessor getters.
+    function _readAnchor(obj, key) {
+      var d;
+      try { d = Object.getOwnPropertyDescriptor(obj, key); } catch (e) { return undefined; }
+      if (!d) return undefined;
+      if (!('value' in d)) return undefined;
+      return d.value;
+    }
+    var activeFromActive = _readAnchor(viewmodelLike, 'activeCaseId');
+    var activeFromCaseId = _readAnchor(viewmodelLike, 'caseId');
+    var active = (typeof activeFromActive === 'string' && activeFromActive.length > 0)
+      ? activeFromActive
+      : (typeof activeFromCaseId === 'string' && activeFromCaseId.length > 0 ? activeFromCaseId : null);
     if (!active) return;
     var seen = new WeakSet();
     // F3-R2-02 closure: caseAssociation (and other id fields) may be an OBJECT-shape value

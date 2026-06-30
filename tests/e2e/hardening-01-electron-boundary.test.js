@@ -86,6 +86,20 @@ try {
         lastSig = ident.charAt(ident.length - 1);
         continue;
       }
+      // F3-R6-01 closure: numbers also consume keyword context.
+      if (/[0-9]/.test(ch)) {
+        var numStart = i;
+        while (i < n && /[0-9.eE_xboBOXn+\-]/.test(src.charAt(i))) {
+          // accept digits, fractional/exp/separator/bin-oct-hex/BigInt-n; signs only inside exponent
+          var nc = src.charAt(i);
+          if ((nc === '+' || nc === '-') && i > numStart && !/[eE]/.test(src.charAt(i - 1))) break;
+          i++;
+        }
+        out += src.slice(numStart, i);
+        lastWasRegexPrecedingKw = false;
+        lastSig = src.charAt(i - 1);
+        continue;
+      }
       // Regex literal
       if (ch === '/' && couldStartRegex(lastSig)) {
         out += ch;
@@ -106,10 +120,15 @@ try {
         continue;
       }
       if (ch === '"' || ch === "'" || ch === '`') {
-        inStr = true; strCh = ch; out += ch; i++; continue;
+        inStr = true; strCh = ch; out += ch; i++;
+        lastWasRegexPrecedingKw = false;
+        continue;
       }
       out += ch;
-      if (!/\s/.test(ch)) lastSig = ch;
+      if (!/\s/.test(ch)) {
+        lastSig = ch;
+        lastWasRegexPrecedingKw = false; // F3-R6-01: any non-whitespace operator/punct clears kw flag
+      }
       i++;
     }
     return out;

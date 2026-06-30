@@ -42,6 +42,10 @@ try {
   // "renderer-inline-N.js" source for the same DOM-sink rules.
   var indexHtmlRaw = fs.readFileSync(indexHtmlPath, 'utf8');
   function extractInlineScripts(html) {
+    // F3-R6-03 closure: only scan executable JavaScript script blocks. Skip
+    // application/json, importmap, application/ld+json, and other non-executable
+    // data MIME types. Default (no `type` attribute) and explicit JS MIME types
+    // are scanned. `type="module"` IS executable JS and IS scanned.
     var bodies = [];
     var re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
     var m;
@@ -49,6 +53,14 @@ try {
       var attrs = m[1] || '';
       // Skip external <script src="...">
       if (/\bsrc\s*=/.test(attrs)) continue;
+      // Determine type. Default = JS executable.
+      var typeMatch = attrs.match(/\btype\s*=\s*["']([^"']+)["']/i);
+      if (typeMatch) {
+        var typ = typeMatch[1].toLowerCase().trim();
+        // Allowed (executable JS) types: empty / module / text/javascript / application/javascript / application/ecmascript
+        var isExecutableJs = (typ === '' || typ === 'module' || typ === 'text/javascript' || typ === 'application/javascript' || typ === 'application/ecmascript');
+        if (!isExecutableJs) continue;
+      }
       bodies.push(m[2]);
     }
     return bodies;
@@ -133,6 +145,19 @@ try {
         lastSig = ident.charAt(ident.length - 1);
         continue;
       }
+      // F3-R6-01 closure: numbers consume keyword context.
+      if (/[0-9]/.test(ch)) {
+        var numStart = i;
+        while (i < n && /[0-9.eE_xboBOXn+\-]/.test(src.charAt(i))) {
+          var nc = src.charAt(i);
+          if ((nc === '+' || nc === '-') && i > numStart && !/[eE]/.test(src.charAt(i - 1))) break;
+          i++;
+        }
+        out += src.slice(numStart, i);
+        lastWasRegexPrecedingKw = false;
+        lastSig = src.charAt(i - 1);
+        continue;
+      }
       if (ch === '/' && couldStartRegex(lastSig)) {
         out += ch; i++;
         var inCharClass = false;
@@ -150,9 +175,16 @@ try {
         lastSig = '/';
         continue;
       }
-      if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; out += ch; i++; continue; }
+      if (ch === '"' || ch === "'" || ch === '`') {
+        inStr = true; strCh = ch; out += ch; i++;
+        lastWasRegexPrecedingKw = false;
+        continue;
+      }
       out += ch;
-      if (!/\s/.test(ch)) lastSig = ch;
+      if (!/\s/.test(ch)) {
+        lastSig = ch;
+        lastWasRegexPrecedingKw = false;
+      }
       i++;
     }
     return out;
