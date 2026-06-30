@@ -1,16 +1,19 @@
 {
   "schemaVersion": 1,
   "program": "R3.0E",
-  "currentCheckpoint": "E4_CASE_TIMELINE",
+  "currentCheckpoint": "E5_ACTIVATION",
   "authorizedProductionPaths": [
     { "path": "renderer/js/r3-0e-stores.js", "capability": "experiment_store_present" },
     { "path": "renderer/js/r3-0e-outcome-classifier.js", "capability": "outcome_classifier_present" },
-    { "path": "renderer/js/r3-0e-followup-timeline.js", "capability": "case_timeline_present" }
+    { "path": "renderer/js/r3-0e-followup-timeline.js", "capability": "case_timeline_present" },
+    { "path": "renderer/js/r3-0e-experiment-viewmodel.js", "capability": "feature_registry_active" },
+    { "path": "renderer/js/i18n-r3-0e.js", "capability": "feature_registry_active" },
+    { "path": "renderer/js/feature-registry.js", "capability": "feature_registry_active" }
   ],
-  "enabledCapabilities": ["contract_foundation_present", "experiment_store_present", "outcome_classifier_present", "case_timeline_present"],
+  "enabledCapabilities": ["contract_foundation_present", "experiment_store_present", "outcome_classifier_present", "case_timeline_present", "feature_registry_active"],
   "runtimeConsumersAllowed": true,
-  "uiAllowed": false,
-  "featureRegistryActivationAllowed": false,
+  "uiAllowed": true,
+  "featureRegistryActivationAllowed": true,
   "algorithmsAllowed": true,
-  "note": "R3.0E E4_CASE_TIMELINE state. renderer/js/r3-0e-followup-timeline.js is the authorized E4 production module: createFollowUpTimelineService factory that wraps the E2 followUpLinkStore + timelineStore with semantic enforcement (append-only timeline, deterministic eventId via FNV-1a hash of caseId+sequence+kind+i18nKey, clock-monotonic guard at the service layer, strict i18n-key grammar for event i18nKey + driverFeedback / sideEffects, primitive-allowlist for event params, captured-array WeakSet producer attestation for both follow-up link records and timeline projections). Verifiers exported: verifyAuthoritativeFollowUpLink + verifyAuthoritativeTimelineProjection. Service is purely orchestration over E2 stores; persistence semantics (duplicate eventId rejection, out-of-order timestamp rejection, future-schema fail-closed, parent-membership re-index validation) are enforced by E2 stores; E4 layer adds rebuild-on-read authority + deterministic projection. Correction events: a new event whose params carry correction_of=<priorEventId> — the original is NEVER overwritten. Cross-case follow-up linkage is permitted at the service layer (it just records the relationship); the comparison-validity gate that requires same-case / same-session / explicit-reference / comparabilityScore lives in E3 outcome classifier. uiAllowed + featureRegistryActivationAllowed remain false — UI surface is exclusively E5_UI_ACTIVATION. algorithmsAllowed=true ONLY for the three authorized R3.0E paths."
+  "note": "R3.0E E5_ACTIVATION state. Three new files authorized at E5: (a) renderer/js/r3-0e-experiment-viewmodel.js — viewmodel + activation gate that wraps E3 (classifier) + E4 (followup-timeline) verifier outputs into UI-consumable frozen display state (displayState ∈ {unavailable, loading, available, stale-cleared, error-sanitized}); never classifies, never reorders, never hides contradictions; activation gate exposes uiCapabilityReady / featureRegistryActivationAllowed / deferredCapabilities[] / rationaleI18nKey for the host wiring. (b) renderer/js/i18n-r3-0e.js — three-language (en/zh-TW/ja) dictionary for R3.0E UI keys (casenav.experiment_loop, casenav.case_timeline, feat.*.desc, r3.0e.outcome.class.<enum>, r3.0e.timeline.kind.<enum>, r3.0e.activation.*, r3.0e.state.*, r3.0e.disclaimer.*). (c) renderer/js/feature-registry.js — adds case:experiment_loop + case:case_timeline nav nodes and experiment_loop + case_timeline features (case_scoped, available_conditional). Feature Registry activation completes the R3.0E phase. uiAllowed + featureRegistryActivationAllowed flip to TRUE; no Alpine/HTML UI is bundled here — the activation surface is the registry entry + viewmodel deriving display state, mirroring the D5 D5_ENGINEER_BRIEF_ACTIVATION precedent. R3.0B case-record schema NOT modified."
 }

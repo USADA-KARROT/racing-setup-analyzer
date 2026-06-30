@@ -41,6 +41,12 @@
     // /telemetry change). Activation governed by governance/r3.0d/state.json
     // (featureRegistryActivationAllowed=true at D5_ENGINEER_BRIEF_ACTIVATION).
     'case:engineer_brief': { id: 'case:engineer_brief', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'engineer_brief', labelKey: 'casenav.engineer_brief', order: 8, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'engineer_brief', currentTab: 'analysis' } },
+    // R3.0E E5 — Experiment Loop + Case Timeline subviews. Mount the render-only viewmodel
+    // pane wired via R3_0E_ExperimentViewmodel (case/session-scoped; cleared on case/session/
+    // applied-change change). Activation governed by governance/r3.0e/state.json
+    // (featureRegistryActivationAllowed=true at E5_UI_ACTIVATION).
+    'case:experiment_loop': { id: 'case:experiment_loop', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'experiment_loop', labelKey: 'casenav.experiment_loop', order: 9, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'experiment_loop', currentTab: 'analysis' } },
+    'case:case_timeline': { id: 'case:case_timeline', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'case_timeline', labelKey: 'casenav.case_timeline', order: 10, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'case_timeline', currentTab: 'analysis' } },
   };
 
   // ── FEATURES — the 23 stable Feature IDs ──
@@ -80,6 +86,14 @@
     // pane only populates when the case carries an authoritative D3/D4/D5 chain (no
     // hypothesis set → 'unavailable' / 'inconclusive' display state, NOT a missing feature).
     engineer_brief: F('engineer_brief', 'case_scoped', 'case:engineer_brief', 'analysis', { availability: 'available_conditional' }),
+    // R3.0E E5 — Experiment Loop + Case Timeline features. case_scoped;
+    // available_conditional because the panes only populate when the case carries an
+    // authoritative E3 outcome (Experiment Loop) AND an authoritative E4 projection
+    // (Case Timeline). When either is missing, the viewmodel returns 'unavailable'
+    // display state. NOT a missing feature — the registry entry stays mounted with
+    // its deferred-rationale i18n key (handled by the host wiring layer).
+    experiment_loop: F('experiment_loop', 'case_scoped', 'case:experiment_loop', 'analysis', { availability: 'available_conditional' }),
+    case_timeline: F('case_timeline', 'case_scoped', 'case:case_timeline', 'analysis', { availability: 'available_conditional' }),
     // R3.0C — activated at C8_ACTIVATION (governance/r3.0c/state.json featureRegistryActivationAllowed=true).
     // Pane id 'comparisons' is served by the Comparison Workspace UI (renderer/index.html data-r3c-c7-pane).
     // Same-Analysis-Case / same-session scope is enforced by the orchestrator + viewmodel; feature-router only
