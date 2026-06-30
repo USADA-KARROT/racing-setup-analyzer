@@ -62,6 +62,13 @@
   var _CAPTURED_OBJECT_DEFINE_PROPERTY = Object.defineProperty;
   var _CAPTURED_ARRAY_IS_ARRAY = Array.isArray;
   var _CAPTURED_DATE_PARSE = Date.parse;
+  // Codex E4-R2-01 closure: capture Date constructor + Date.prototype.toISOString at
+  // module init so a post-load Date / Date.prototype mutation cannot subvert the
+  // canonicalization step. _canonicalIso uses these captured references via captured
+  // Reflect.apply and ALSO re-parses the produced ISO to verify it round-trips to the
+  // same ms.
+  var _CAPTURED_DATE_CTOR = Date;
+  var _CAPTURED_DATE_PROTO_TO_ISO = Date.prototype.toISOString;
   var _CAPTURED_REFLECT_APPLY = Reflect.apply;
   var _CAPTURED_NUMBER_IS_FINITE = Number.isFinite;
   var _CAPTURED_NUMBER_IS_INTEGER = Number.isInteger;
@@ -86,7 +93,42 @@
       return n;
     } catch (e) { return null; }
   }
+  // Codex E4-R2-01 closure: capture-based canonical ISO. Builds a Date via the captured
+  // constructor, calls captured toISOString via Reflect.apply, then re-parses to verify
+  // the produced string round-trips to the exact same ms. Any divergence (post-load
+  // tampering, Symbol.toPrimitive shenanigans, etc.) → null → caller blocks.
+  function _canonicalIso(ms) {
+    try {
+      if (typeof ms !== 'number' || ms !== ms || !_CAPTURED_NUMBER_IS_FINITE(ms)) return null;
+      var d = new _CAPTURED_DATE_CTOR(ms);
+      var iso = _CAPTURED_REFLECT_APPLY(_CAPTURED_DATE_PROTO_TO_ISO, d, []);
+      if (typeof iso !== 'string' || iso.length === 0) return null;
+      var roundTrip = _CAPTURED_DATE_PARSE(iso);
+      if (typeof roundTrip !== 'number' || roundTrip !== roundTrip || roundTrip !== ms) return null;
+      return iso;
+    } catch (e) { return null; }
+  }
   function _utf8Bytes(s) { if (typeof s !== 'string') return 0; return s.length * 4; }
+
+  // Codex E4-R2-03 closure: reserved-token blocklist for params keys + string values.
+  // Even though strict id grammar permits "blame", "cause" as keys and "driver_error"
+  // as values, these specific tokens are NEVER legitimate diagnostic content. The
+  // blocklist is applied to BOTH keys (lowercased) AND string values (lowercased).
+  // This pushes the design boundary toward i18n-keyed content for any narrative info.
+  var RESERVED_HOSTILE_TOKENS = _CAPTURED_OBJECT_FREEZE([
+    'blame', 'cause', 'caused', 'because', 'fault', 'guilt',
+    'driver_error', 'driver_fault', 'driver_caused', 'crashed',
+  ]);
+  function _containsReservedHostileToken(s) {
+    if (typeof s !== 'string') return false;
+    var lower = s.toLowerCase();
+    for (var i = 0; i < RESERVED_HOSTILE_TOKENS.length; i++) {
+      var tok = RESERVED_HOSTILE_TOKENS[i];
+      if (lower === tok) return true;
+      if (lower.indexOf(tok) !== -1) return true;
+    }
+    return false;
+  }
 
   // ---------- Constants ----------------------------------------------------------------------
   var SERVICE_VERSION = 1;
@@ -253,9 +295,9 @@
     var iso = null;
     if (typeof snap.referenceNowMs === 'number') {
       refMs = snap.referenceNowMs;
-      // Codex E4-R1-02 closure: always canonicalize via Date.toISOString to neutralize
-      // any non-canonical input formats.
-      try { iso = new Date(refMs).toISOString(); } catch (e) { iso = null; }
+      // Codex E4-R2-01 closure: canonicalization via captured intrinsics with round-trip
+      // verification. Post-load Date / Date.prototype.toISOString mutation cannot affect.
+      iso = _canonicalIso(refMs);
     } else if (typeof snap.clock === 'function') {
       var ciso = null;
       try { ciso = snap.clock(); } catch (e) { ciso = null; }
@@ -263,11 +305,7 @@
         var ms = _isoToMs(ciso);
         if (typeof ms === 'number') {
           refMs = ms;
-          // Codex E4-R1-02 closure: canonicalize clock string output. Parseable but
-          // non-canonical strings ("30 Jun 2026") would otherwise persist verbatim
-          // into createdAt fields. Storing only `new Date(ms).toISOString()` ensures
-          // every persisted timestamp is a canonical ISO 8601 string.
-          try { iso = new Date(ms).toISOString(); } catch (e) { iso = null; }
+          iso = _canonicalIso(ms);
         }
       }
     }
@@ -297,6 +335,11 @@
       // 'correction_of' is the canonical reserved key — its value is a strict id.
       var keyOk = /^[a-z][a-z0-9_]{0,31}$/.test(pk);
       if (!keyOk) return { valid: false, code: 'params key not sober: ' + pk };
+      // Codex E4-R2-03 closure: even sober ids that match reserved hostile tokens (blame,
+      // cause, driver_error, ...) are forbidden in BOTH keys and string values. Narrative
+      // / causal / blame content must travel through i18n keys whose translations live
+      // outside the runtime — never as bare strings in the event params.
+      if (_containsReservedHostileToken(pk)) return { valid: false, code: 'params key matches reserved hostile token: ' + pk };
       var pd;
       try { pd = _CAPTURED_OBJECT_GET_OWN_DESC(params, pk); }
       catch (e) { return { valid: false, code: 'params desc fail at ' + pk }; }
@@ -314,6 +357,11 @@
       } else if (typeof pv === 'string') {
         if (!_i18nKeyOk(pv) && !_idGrammarOk(pv)) {
           return { valid: false, code: 'params[' + pk + '] string not strict i18n key / id' };
+        }
+        // Codex E4-R2-03 closure: reserved hostile tokens in string values are forbidden
+        // regardless of grammar match.
+        if (_containsReservedHostileToken(pv)) {
+          return { valid: false, code: 'params[' + pk + '] string matches reserved hostile token' };
         }
       } else {
         return { valid: false, code: 'params[' + pk + '] not primitive (string/number/boolean/null)' };
@@ -438,17 +486,23 @@
       // parent membership). Re-wrap each into our authority registry.
       if (typeof followUpLinkStore.listForParent !== 'function') return Promise.resolve([]);
       return followUpLinkStore.listForParent(parentCaseId).then(function (rows) {
+        var LINK_KEYS_FROZEN = _CAPTURED_OBJECT_FREEZE(['schemaVersion', 'linkId', 'parentCaseId', 'followUpCaseId', 'experimentId', 'parentStatus', 'createdAt']);
         var out = [];
         for (var i = 0; i < rows.length; i++) {
-          var r = rows[i];
+          // Codex E4-R2-02 closure: apply the SAME descriptor snapshot used by
+          // getFollowUpLink BEFORE reading any field. Hostile/accessor rows (proxies that
+          // return phantom data via getters) cannot leak content into authoritative
+          // listings — only data descriptors with the closed key set survive.
+          var snap = _snapshotPlain(rows[i], LINK_KEYS_FROZEN, CODES.LINKAGE_INVALID);
+          if (snap.valid !== true) continue;
           var rebuilt = {
-            schemaVersion: r.schemaVersion,
-            linkId: r.linkId,
-            parentCaseId: r.parentCaseId,
-            followUpCaseId: r.followUpCaseId,
-            experimentId: r.experimentId,
-            parentStatus: r.parentStatus,
-            createdAt: r.createdAt,
+            schemaVersion: snap.snapshot.schemaVersion,
+            linkId: snap.snapshot.linkId,
+            parentCaseId: snap.snapshot.parentCaseId,
+            followUpCaseId: snap.snapshot.followUpCaseId,
+            experimentId: snap.snapshot.experimentId,
+            parentStatus: snap.snapshot.parentStatus,
+            createdAt: snap.snapshot.createdAt,
           };
           var v = FU.validateFollowUpLinkShape(rebuilt);
           if (v.valid !== true) continue;
