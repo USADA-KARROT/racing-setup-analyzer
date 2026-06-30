@@ -90,6 +90,11 @@
   var _CAPTURED_TEXT_ENCODER = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;
   var _CAPTURED_NUMBER_IS_FINITE = Number.isFinite;
   var _CAPTURED_NUMBER_IS_INTEGER = Number.isInteger;
+  // Formal E Gate R2-02 closure (mirrors E4 R3-02): capture RegExp.prototype.test
+  // + String.prototype.charCodeAt at top-of-module so all grammar checks dispatch
+  // via captured Reflect.apply. Defeats post-load ambient rebinding.
+  var _RE_TEST_E3 = RegExp.prototype.test;
+  var _STR_CHAR_CODE_AT_E3_EARLY = String.prototype.charCodeAt;
 
   // WeakSet captures — defeat post-load WeakSet.prototype.has rebinds.
   var _WeakSetCtor = WeakSet;
@@ -126,6 +131,10 @@
   }
 
   // Captured intrinsic helpers — all defensive wrappers.
+  function _reTestE3(re, s) {
+    if (typeof s !== 'string') return false;
+    try { return _CAPTURED_REFLECT_APPLY(_RE_TEST_E3, re, [s]) === true; } catch (e) { return false; }
+  }
   function _isFrozenSafe(v) { try { return _CAPTURED_OBJECT_IS_FROZEN(v) === true; } catch (e) { return false; } }
   function _isArraySafe(v) { try { return _CAPTURED_ARRAY_IS_ARRAY(v) === true; } catch (e) { return false; } }
   function _exactlyEqual(a, b) { try { return _CAPTURED_OBJECT_IS(a, b) === true; } catch (e) { return false; } }
@@ -262,6 +271,11 @@
   function _registerAuthoritativeOutcome(envelope) {
     _wsAdd(_authoritativeOutcomes, envelope);
   }
+  // Formal E Gate R1-01 defence-in-depth: canonical outcomeId grammar enforcement
+  // — even after the WeakSet identity check + frozen check + schema version check,
+  // also verify the outcomeId matches the closed grammar `outcome_[0-9a-f]{16}`.
+  // Belt-and-suspenders against pre-load tampering that the canary missed.
+  var OUTCOME_ID_RE = /^outcome_[0-9a-f]{16}$/;
   function verifyAuthoritativeOutcome(candidate) {
     try {
       if (candidate === null || typeof candidate !== 'object') return false;
@@ -269,6 +283,7 @@
       if (_CAPTURED_OBJECT_IS_FROZEN(candidate) !== true) return false;
       if (candidate.schemaVersion !== OUTCOME_SCHEMA_VERSION) return false;
       if (typeof candidate.outcomeId !== 'string') return false;
+      if (!_reTestE3(OUTCOME_ID_RE, candidate.outcomeId)) return false;
       if (typeof candidate.experimentId !== 'string') return false;
       if (typeof candidate['class'] !== 'string') return false;
       if (!_isArraySafe(candidate.confounders)) return false;
@@ -305,8 +320,8 @@
   function _isBool(v) { return v === true || v === false; }
   function _idGrammarOk(s) {
     if (!_nonEmptyStr(s)) return false;
-    if (ID_FORBIDDEN_RE.test(s)) return false;
-    if (!ID_GRAMMAR_RE.test(s)) return false;
+    if (_reTestE3(ID_FORBIDDEN_RE, s)) return false;
+    if (!_reTestE3(ID_GRAMMAR_RE, s)) return false;
     return true;
   }
   // Codex E3-R1-02 closure: strict i18n-key grammar enforcement. driverFeedback (and any
@@ -315,7 +330,7 @@
   function _i18nKeyOk(s) {
     if (!_nonEmptyStr(s)) return false;
     if (s.length > I18N_KEY_MAX_LEN) return false;
-    if (!I18N_KEY_RE.test(s)) return false;
+    if (!_reTestE3(I18N_KEY_RE, s)) return false;
     return true;
   }
   // Codex E3-R1-01 / E3-R5-02 closure: null-prototype membership set backed by a
@@ -425,7 +440,7 @@
     for (var ni = 0; ni < names.length; ni++) {
       var nm = names[ni];
       if (nm === 'length') continue;
-      if (!ARRAY_INDEX_RE.test(nm)) {
+      if (!_reTestE3(ARRAY_INDEX_RE, nm)) {
         return { valid: false, reasonCodes: [invalidCode, CODES.UNKNOWN_OWN_KEY], detail: 'non-index own key on array: ' + nm };
       }
       var idxN = +nm;
@@ -488,14 +503,31 @@
 
   // ---------- Deterministic ID generator -------------------------------------------------------
   // outcomeId is deterministic from (experimentId, changeId). No clock leak.
+  // Formal E Gate R1-01 / R2-02 closures (mirrors E4 R5/R6 + R3-02): capture-free
+  // hex padding via local hex lookup + bracket access; captured charCodeAt + RegExp.test
+  // already declared at top-of-module (see _RE_TEST_E3 / _STR_CHAR_CODE_AT_E3_EARLY).
+  function _charCodeAtE3(s, i) {
+    if (typeof s !== 'string') return 0;
+    try { return _CAPTURED_REFLECT_APPLY(_STR_CHAR_CODE_AT_E3_EARLY, s, [i]); } catch (e) { return 0; }
+  }
+  function _toHex8E3(h) {
+    var hexChars = '0123456789abcdef';
+    var out = '';
+    var x = h >>> 0;
+    for (var i = 7; i >= 0; i--) {
+      var nibble = (x >>> (i * 4)) & 0xF;
+      out += hexChars[nibble];
+    }
+    return out;
+  }
   function _hash32(s) {
     var h = 0x811c9dc5;
     var len = typeof s === 'string' ? s.length : 0;
     for (var i = 0; i < len; i++) {
-      h ^= s.charCodeAt(i);
+      h ^= _charCodeAtE3(s, i);
       h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
     }
-    return h.toString(16).padStart(8, '0');
+    return _toHex8E3(h);
   }
   function _fnv2(s) {
     var slen = typeof s === 'string' ? s.length : 0;
@@ -695,7 +727,7 @@
             var pk = pNames[pi];
             // Codex E3-R2-02 closure: param KEY must itself be a sober identifier
             // (lower_snake_case, ≤32 chars). No spaces / paths / capitals.
-            if (!/^[a-z][a-z0-9_]{0,31}$/.test(pk)) {
+            if (!_reTestE3(/^[a-z][a-z0-9_]{0,31}$/, pk)) {
               return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params key not sober: ' + pk });
             }
             var pd;
