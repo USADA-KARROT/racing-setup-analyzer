@@ -77,10 +77,12 @@
   var _CAPTURED_OBJECT_FREEZE = Object.freeze;
   var _CAPTURED_OBJECT_IS_FROZEN = Object.isFrozen;
   var _CAPTURED_OBJECT_IS = Object.is;
+  var _CAPTURED_OBJECT_CREATE = Object.create;
   var _CAPTURED_OBJECT_GET_OWN_NAMES = Object.getOwnPropertyNames;
   var _CAPTURED_OBJECT_GET_OWN_DESC = Object.getOwnPropertyDescriptor;
   var _CAPTURED_OBJECT_GET_OWN_SYMS = Object.getOwnPropertySymbols;
   var _CAPTURED_OBJECT_GET_PROTO = Object.getPrototypeOf;
+  var _CAPTURED_OBJECT_DEFINE_PROPERTY = Object.defineProperty;
   var _CAPTURED_ARRAY_IS_ARRAY = Array.isArray;
   var _CAPTURED_DATE_PARSE = Date.parse;
   var _CAPTURED_REFLECT_APPLY = Reflect.apply;
@@ -207,6 +209,17 @@
   var DIRECTION_ALLOWED = _CAPTURED_OBJECT_FREEZE(['increase', 'decrease', 'no_change']);
   var ID_GRAMMAR_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
   var ID_FORBIDDEN_RE = /(\.\.|[\/\\]|^\.)/;
+  // Codex E3-R1-02 closure: strict i18n-key grammar — dotted tokens of [a-z0-9_], 2..6
+  // segments, total length bounded. First segment must start with [a-z]; subsequent
+  // segments may start with [a-z0-9] (the project convention uses tokens like "0e" / "0d"
+  // for R3.0E / R3.0D namespacing, e.g. `r3.0e.driver.feedback.balance_improved`).
+  // Rejects spaces, slashes, blame phrasing, causal wording, capital letters, and any
+  // character outside the closed alphabet so a hostile caller cannot launder
+  // driver-blame / causation text / path traversal through `driverFeedback`.
+  var I18N_KEY_RE = /^[a-z][a-z0-9_]*(?:\.[a-z0-9][a-z0-9_]*){1,5}$/;
+  var I18N_KEY_MAX_LEN = 128;
+  // Canonical array index check — captured because Number is reachable via ambient.
+  var ARRAY_INDEX_RE = /^(?:0|[1-9][0-9]*)$/;
 
   // ---------- Producer attestation (closure-private WeakSet) ----------------------------------
   // After successful classifyOutcome → registered. The exported verifyAuthoritativeOutcome
@@ -263,6 +276,36 @@
     if (!ID_GRAMMAR_RE.test(s)) return false;
     return true;
   }
+  // Codex E3-R1-02 closure: strict i18n-key grammar enforcement. driverFeedback (and any
+  // future i18n-keyed surface in the outcome) MUST pass this gate before being copied to
+  // the outcome envelope.
+  function _i18nKeyOk(s) {
+    if (!_nonEmptyStr(s)) return false;
+    if (s.length > I18N_KEY_MAX_LEN) return false;
+    if (!I18N_KEY_RE.test(s)) return false;
+    return true;
+  }
+  // Codex E3-R1-01 closure: null-prototype set backed by captured Object.create + captured
+  // descriptor helpers. Membership checks use _CAPTURED_OBJECT_GET_OWN_DESC, not
+  // `obj[key] !== undefined`, so an ambient Object.create rebind cannot produce a populated
+  // prototype-bearing object that would spoof prior `add()` calls.
+  function _newCapturedNullSet() {
+    return _CAPTURED_OBJECT_CREATE(null);
+  }
+  function _capturedSetHas(setObj, key) {
+    try {
+      var d = _CAPTURED_OBJECT_GET_OWN_DESC(setObj, key);
+      return !!(d && d.enumerable === true && d.value === true);
+    } catch (e) { return false; }
+  }
+  function _capturedSetAdd(setObj, key) {
+    try {
+      _CAPTURED_OBJECT_DEFINE_PROPERTY(setObj, key, {
+        value: true, writable: false, enumerable: true, configurable: false,
+      });
+      return true;
+    } catch (e) { return false; }
+  }
 
   // Deep freeze using captured Object.freeze + captured getOwnPropertyNames.
   function _deepFreeze(v) {
@@ -298,7 +341,7 @@
     try { names = _CAPTURED_OBJECT_GET_OWN_NAMES(o); } catch (e) {
       return { valid: false, reasonCodes: [invalidCode], detail: 'descriptor read failed' };
     }
-    var snap = Object.create(null);
+    var snap = _CAPTURED_OBJECT_CREATE(null);
     for (var i = 0; i < names.length; i++) {
       var k = names[i];
       // Reject unknown own key — caller cannot smuggle `class`, `outcomeId`, `confounders`,
@@ -321,6 +364,12 @@
     return { valid: true, snapshot: snap };
   }
 
+  // Codex E3-R1-03 closure: dense-array enforcement. Reject sparse arrays (any index in
+  // 0..length-1 missing an enumerable data descriptor → hole) AND reject any own key
+  // other than 'length' or a canonical numeric index (no Symbol keys, no string names,
+  // no negative / fractional / leading-zero indices). The walk indexes BY index, not by
+  // getOwnPropertyNames enumeration order, so a hostile array that puts named own keys
+  // first cannot smuggle a hole past the cap check.
   function _snapshotArrayShape(a, invalidCode) {
     if (!_isPlainArray(a)) {
       return { valid: false, reasonCodes: [invalidCode], detail: 'not array' };
@@ -328,28 +377,58 @@
     if (_hasSymbolOwnKey(a)) {
       return { valid: false, reasonCodes: [invalidCode, CODES.UNKNOWN_OWN_KEY], detail: 'symbol own key on array' };
     }
+    var aLen;
+    try { aLen = a.length; } catch (e) {
+      return { valid: false, reasonCodes: [invalidCode], detail: 'array length inaccessible' };
+    }
+    if (typeof aLen !== 'number' || !_CAPTURED_NUMBER_IS_INTEGER(aLen) || aLen < 0 || aLen > ARRAY_CAP) {
+      return { valid: false, reasonCodes: [invalidCode, CODES.ARRAY_CAP_EXCEEDED], detail: 'array len ' + aLen };
+    }
+    // First sweep: enumerate own keys and reject ANY name other than 'length' or a
+    // canonical numeric index in [0, aLen). Reject Symbol keys (already above), reject
+    // non-enumerable / accessor / non-data descriptors on indices.
     var names;
     try { names = _CAPTURED_OBJECT_GET_OWN_NAMES(a); } catch (e) {
       return { valid: false, reasonCodes: [invalidCode], detail: 'array desc inaccessible' };
     }
-    var snap = [];
-    var aLen = a.length;
-    if (typeof aLen !== 'number' || aLen < 0 || aLen > ARRAY_CAP) {
-      return { valid: false, reasonCodes: [invalidCode, CODES.ARRAY_CAP_EXCEEDED], detail: 'array len ' + aLen };
-    }
-    // Walk via captured-name descriptors so an accessor index isn't possible.
-    for (var i = 0; i < names.length; i++) {
-      var name = names[i];
-      if (name === 'length') continue;
-      var d;
-      try { d = _CAPTURED_OBJECT_GET_OWN_DESC(a, name); } catch (e) {
+    for (var ni = 0; ni < names.length; ni++) {
+      var nm = names[ni];
+      if (nm === 'length') continue;
+      if (!ARRAY_INDEX_RE.test(nm)) {
+        return { valid: false, reasonCodes: [invalidCode, CODES.UNKNOWN_OWN_KEY], detail: 'non-index own key on array: ' + nm };
+      }
+      var idxN = +nm;
+      if (idxN < 0 || idxN >= aLen) {
+        return { valid: false, reasonCodes: [invalidCode], detail: 'array index out of [0,length): ' + nm };
+      }
+      var dn;
+      try { dn = _CAPTURED_OBJECT_GET_OWN_DESC(a, nm); } catch (e) {
         return { valid: false, reasonCodes: [invalidCode], detail: 'array elt desc fail' };
       }
-      if (!d || d.enumerable !== true) {
-        return { valid: false, reasonCodes: [invalidCode], detail: 'non-enumerable array elt' };
+      if (!dn || dn.enumerable !== true) {
+        return { valid: false, reasonCodes: [invalidCode], detail: 'non-enumerable array elt at ' + nm };
+      }
+      if (typeof dn.get === 'function' || typeof dn.set === 'function') {
+        return { valid: false, reasonCodes: [invalidCode], detail: 'accessor array elt at ' + nm };
+      }
+    }
+    // Second sweep: walk by index 0..aLen-1. Every index MUST have an OWN enumerable
+    // data descriptor (no holes, no prototype-inherited values).
+    var snap = [];
+    for (var i = 0; i < aLen; i++) {
+      var key = '' + i;
+      var d;
+      try { d = _CAPTURED_OBJECT_GET_OWN_DESC(a, key); } catch (e) {
+        return { valid: false, reasonCodes: [invalidCode], detail: 'array elt desc fail at ' + i };
+      }
+      if (!d) {
+        return { valid: false, reasonCodes: [invalidCode], detail: 'sparse array hole at index ' + i };
+      }
+      if (d.enumerable !== true) {
+        return { valid: false, reasonCodes: [invalidCode], detail: 'non-enumerable array elt at ' + i };
       }
       if (typeof d.get === 'function' || typeof d.set === 'function') {
-        return { valid: false, reasonCodes: [invalidCode], detail: 'accessor array elt' };
+        return { valid: false, reasonCodes: [invalidCode], detail: 'accessor array elt at ' + i };
       }
       snap.push(d.value);
     }
@@ -357,7 +436,7 @@
   }
 
   function _snapshotOpts(optsIn) {
-    var snap = Object.create(null);
+    var snap = _CAPTURED_OBJECT_CREATE(null);
     if (optsIn === undefined || optsIn === null) return { valid: true, snapshot: snap };
     var r = _snapshotPlainShape(optsIn, OPTS_KEYS_ALLOWED, CODES.OUTCOME_INVALID);
     if (r.valid !== true) return r;
@@ -505,10 +584,14 @@
       if (observation.observedMagnitude !== null && !_isFiniteNumber(observation.observedMagnitude)) {
         return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'observation.observedMagnitude invalid' });
       }
-      // driverFeedback: non-empty string i18n key OR null. The classifier propagates the key
-      // unchanged into the outcome envelope; no text generation, no free-text laundering.
-      if (observation.driverFeedback !== null && !_nonEmptyStr(observation.driverFeedback)) {
-        return RC_E.buildBlockedResult([CODES.OUTCOME_DRIVER_FEEDBACK_INVALID], { detail: 'driverFeedback invalid' });
+      // driverFeedback: STRICT i18n key (dotted lower_snake_case, 2..6 segments, ≤128 chars)
+      // OR null. Codex E3-R1-02 closure: a non-empty-string check alone permits free-text
+      // blame / causation / paths to be laundered into the outcome envelope. The strict
+      // grammar rejects spaces, slashes, capital letters, and any character outside
+      // [a-z0-9._], blocking blame phrasing ("driver error because…") and path leakage
+      // ("/Users/…", "..\\etc\\…") at the contract boundary.
+      if (observation.driverFeedback !== null && !_i18nKeyOk(observation.driverFeedback)) {
+        return RC_E.buildBlockedResult([CODES.OUTCOME_DRIVER_FEEDBACK_INVALID], { detail: 'driverFeedback not a strict i18n key' });
       }
       // dataQualityIssues / sideEffects / contradictingEvidenceIds / supportingEvidenceIds — bounded plain arrays.
       var dqiR = _snapshotArrayShape(observation.dataQualityIssues, CODES.OUTCOME_DATA_QUALITY_INVALID);
@@ -571,7 +654,11 @@
       }
       var controlVariableObservations = cvObsR.snapshot;
       // E1 contract per element. The CV contract permits observedValue + withinRange filled.
-      var observedCvByName = Object.create(null);
+      // Codex E3-R1-01 closure: observed-CV membership is tracked via a captured null-proto
+      // set with descriptor-based membership; an ambient Object.create rebind cannot
+      // synthesize membership entries because we use the captured Object.create + the
+      // captured Object.getOwnPropertyDescriptor for has-checks.
+      var observedCvSet = _newCapturedNullSet();
       for (var cvi = 0; cvi < controlVariableObservations.length; cvi++) {
         var cvObs = controlVariableObservations[cvi];
         var cvCheck = CV.validateControlVariableShape(cvObs);
@@ -590,10 +677,10 @@
         if (cvObs.withinRange === null) {
           return RC_E.buildBlockedResult([CODES.CONTROL_VARIABLE_MISSING], { detail: 'controlVariableObservations[' + cvi + '].withinRange null' });
         }
-        if (observedCvByName[cvObs.name] !== undefined) {
+        if (_capturedSetHas(observedCvSet, cvObs.name)) {
           return RC_E.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID], { detail: 'duplicate control variable name: ' + cvObs.name });
         }
-        observedCvByName[cvObs.name] = cvObs;
+        _capturedSetAdd(observedCvSet, cvObs.name);
       }
 
       // ---- Step 7: opts snapshot ----------------------------------------------------------
@@ -670,13 +757,15 @@
       } else {
         // ---- Step 12: control-variable integrity (inconclusive_due_to_confounders) ------
         // Every declared experiment.controlVariables[].name MUST appear in observations.
+        // Codex E3-R1-01 closure: presence check uses captured descriptor lookup so an
+        // ambient Object.create rebind cannot inject phantom membership.
         var declaredCv = experiment.controlVariables || [];
         for (var dci = 0; dci < declaredCv.length; dci++) {
           var declared = declaredCv[dci];
           if (declared === null || typeof declared !== 'object') continue;
           var declaredName = declared.name;
           if (!_nonEmptyStr(declaredName)) continue;
-          if (observedCvByName[declaredName] === undefined) {
+          if (!_capturedSetHas(observedCvSet, declaredName)) {
             confounders.push(declaredName);
           }
         }

@@ -763,6 +763,178 @@ console.log('Section T — Defensive');
     r.valid !== true);
 })();
 
+// ==================================================================
+// Section U — Codex E3 R1 closures (E3-R1-01..03)
+// ==================================================================
+console.log('Section U — Codex E3 R1 closures');
+
+// U1 — E3-R1-01: Object.create rebind cannot bypass confounder check
+(function () {
+  // Reproducer: declare a control variable in experiment, supply ZERO observations,
+  // then rebind ambient Object.create to a function that returns a populated object.
+  // BEFORE closure: classifier's `observedCvByName = Object.create(null)` would receive
+  // the populated object → presence check passes → missing CV not detected → confirmed.
+  // AFTER closure: captured Object.create is used + descriptor-only membership check.
+  var emptyCvInput = makeInput({ controlVariableObservations: [] });
+  var realObjectCreate = Object.create;
+  var classBefore = null, classAfter = null;
+  try {
+    classBefore = (function () {
+      var r = CL.classifyOutcome(emptyCvInput, { clock: fixedClock() });
+      return r.valid === true ? r.outcome['class'] : ('BLOCKED:' + (r.reasonCodes || []).join(','));
+    })();
+    // Hostile rebind: any new Object.create() returns a synthesized membership map.
+    Object.create = function () {
+      var fakeSet = {};
+      Object.defineProperty(fakeSet, 'tyre_temp_window', {
+        value: true, writable: false, enumerable: true, configurable: false,
+      });
+      return fakeSet;
+    };
+    classAfter = (function () {
+      var r = CL.classifyOutcome(emptyCvInput, { clock: fixedClock() });
+      return r.valid === true ? r.outcome['class'] : ('BLOCKED:' + (r.reasonCodes || []).join(','));
+    })();
+  } finally {
+    Object.create = realObjectCreate;
+  }
+  chk('U1: Object.create rebind cannot bypass missing-CV detection',
+    classBefore === 'inconclusive_due_to_confounders'
+      && classAfter === 'inconclusive_due_to_confounders',
+    { before: classBefore, after: classAfter });
+})();
+
+// U2 — E3-R1-02: driverFeedback rejects blame / causation / free text / paths
+(function () {
+  var blamePhrases = [
+    'driver error because setup caused crash',
+    'this is the driver\'s fault',
+    'blame on the engineer',
+    '/Users/skyline/setup.json',
+    '..\\etc\\passwd',
+    'this caused a crash',
+    'SHOUTING IN CAPITALS',
+    'space in key',
+    'r3.0e Driver feedback Capital',  // mixed case
+    '',                                // empty
+  ];
+  for (var i = 0; i < blamePhrases.length; i++) {
+    var df = blamePhrases[i];
+    var r = CL.classifyOutcome(makeInput({
+      observationOverrides: { driverFeedback: df },
+    }), { clock: fixedClock() });
+    chk('U2.' + (i + 1) + ': blame/path/free-text driverFeedback rejected: ' + JSON.stringify(df).slice(0, 40),
+      r.valid !== true && (r.reasonCodes || []).indexOf('OUTCOME_DRIVER_FEEDBACK_INVALID') !== -1);
+  }
+})();
+
+// U3 — E3-R1-02: valid i18n keys (existing convention) still accepted
+(function () {
+  var validKeys = [
+    'r3.0e.driver.feedback.balance_improved',
+    'r3.0e.driver.feedback.understeer',
+    'r3.0d.brief.no_primary_action',
+    'r3.0e.cv.tyre_temp_window',
+    'r3.0e.stop.lap_time_increase',
+  ];
+  for (var i = 0; i < validKeys.length; i++) {
+    var k = validKeys[i];
+    var r = CL.classifyOutcome(makeInput({
+      observationOverrides: { driverFeedback: k },
+    }), { clock: fixedClock() });
+    chk('U3.' + (i + 1) + ': valid i18n key accepted: ' + k,
+      r.valid === true && r.outcome.driverFeedback === k);
+  }
+})();
+
+// U4 — E3-R1-02: null still permitted (driverFeedback is optional)
+(function () {
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { driverFeedback: null },
+  }), { clock: fixedClock() });
+  chk('U4: null driverFeedback accepted', r.valid === true && r.outcome.driverFeedback === null);
+})();
+
+// U5 — E3-R1-03: sparse array (new Array(N)) rejected as data quality input
+(function () {
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { dataQualityIssues: new Array(5) },
+  }), { clock: fixedClock() });
+  chk('U5: sparse Array(5) dataQualityIssues → BLOCK',
+    r.valid !== true);
+})();
+
+// U6 — E3-R1-03: array with named own key (arr.foo = 'x') rejected
+(function () {
+  var arr = [];
+  arr.foo = 'r3.0e.dq.foo';
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { dataQualityIssues: arr },
+  }), { clock: fixedClock() });
+  chk('U6: named own key on array → BLOCK',
+    r.valid !== true);
+})();
+
+// U7 — E3-R1-03: sparse array as controlVariableObservations rejected
+(function () {
+  var sparse = new Array(3);
+  // Even with valid elements at some indices, the holes should block.
+  sparse[0] = {
+    name: 'tyre_temp_window', description: 'r3.0e.cv.tyre_temp_window',
+    expectedValue: 85, allowedRange: { min: 75, max: 95 },
+    observedValue: 85, withinRange: true,
+  };
+  var r = CL.classifyOutcome(makeInput({ controlVariableObservations: sparse }),
+    { clock: fixedClock() });
+  chk('U7: sparse controlVariableObservations → BLOCK',
+    r.valid !== true);
+})();
+
+// U8 — E3-R1-03: sparse contradictingEvidenceIds rejected (would otherwise misclassify)
+(function () {
+  var sparse = new Array(2);
+  // The classifier would normally count contradictingEvidenceIds.length > 0 → contradicted.
+  // A sparse array with length=2 but no own indices would either: (a) skip elements and
+  // misclassify as confirmed, or (b) reject. Closure mandates (b).
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { contradictingEvidenceIds: sparse },
+  }), { clock: fixedClock() });
+  chk('U8: sparse contradictingEvidenceIds → BLOCK',
+    r.valid !== true);
+})();
+
+// U9 — E3-R1-03: Array.prototype poisoning cannot leak into observed array snapshots
+(function () {
+  // Hostile pollution: Array.prototype gains a numeric-looking own key. The classifier's
+  // walk uses Object.getOwnPropertyDescriptor on the array (own only), so prototype
+  // values do not leak. Verify a dense [] input still classifies as empty.
+  var originalProtoLen = Array.prototype.length;
+  Array.prototype['0'] = 'r3.0e.dq.injected_via_proto';
+  try {
+    var r = CL.classifyOutcome(makeInput({
+      observationOverrides: { dataQualityIssues: [], observedDirection: 'decrease', observedMagnitude: 1.0 },
+    }), { clock: fixedClock() });
+    chk('U9: Array.prototype["0"] pollution does NOT leak into observed array',
+      r.valid === true && r.outcome.dataQualityIssues.length === 0
+        && r.outcome['class'] === 'confirmed');
+  } finally {
+    delete Array.prototype['0'];
+    Array.prototype.length = originalProtoLen;
+  }
+})();
+
+// U10 — E3-R1-03: well-formed dense array still works (regression guard)
+(function () {
+  var arr = ['r3.0e.dq.timebase_jitter', 'r3.0e.dq.gps_dropouts'];
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { dataQualityIssues: arr, observedDirection: 'decrease', observedMagnitude: 1.0 },
+  }), { clock: fixedClock() });
+  // 2 issues, threshold is 4 → still confirmed; dq propagated only when blocking. So
+  // confirmed AND limitations does NOT include the dq codes.
+  chk('U10: dense array within cap accepted',
+    r.valid === true && r.outcome['class'] === 'confirmed');
+})();
+
 // ------------------------------------------------------------------
 // Summary
 // ------------------------------------------------------------------
