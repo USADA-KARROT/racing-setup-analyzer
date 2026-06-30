@@ -67,6 +67,20 @@ var chk = t.chk;
       chk('post-import migrate ok', migrate.ok === true);
       chk('imported case is noop=1', migrate.report.perStore.cases && migrate.report.perStore.cases.noop === 1);
 
+      // F2-R1-03: exercise no-stale-case-ref gate across the export→import transition. The
+      // destination harness "transitions" to the imported case; a stale viewmodel referencing
+      // the source caseId must be flagged.
+      var staleThrew = false;
+      try {
+        dst.assertNoStaleCaseRef({
+          activeCaseId: dstCid,
+          cachedCaseId: srcCid  // stale — points at the source-harness caseId
+        });
+      } catch (e) { staleThrew = /STALE_CASE_REF/.test(String(e && e.message)); }
+      chk('assertNoStaleCaseRef THROWS on stale cachedCaseId after import', staleThrew === true);
+      dst.assertNoStaleCaseRef({ activeCaseId: dstCid, cachedCaseId: dstCid });
+      chk('assertNoStaleCaseRef accepts coherent active + cached after import', true);
+
       // Step 8: zero console error in BOTH harnesses
       chk('zero console.error in src harness', src.consoleErrorCount === 0);
       chk('zero console.error in dst harness', dst.consoleErrorCount === 0);

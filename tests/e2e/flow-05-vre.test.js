@@ -18,16 +18,49 @@ var chk = t.chk;
 (async function () {
   var h = H.createFlowHarness({ stamp: '2026-07-01T00:00:00.000Z' });
   try {
-    // Step 1: R3.0D engineer-brief module loadable
+    // Step 1: R3.0D engineer-brief module loadable + API present (literal require for dep-audit).
     var BRIEF = null;
     try { BRIEF = require('../../renderer/js/r3-0d-engineer-brief.js'); } catch (e) { /* */ }
     chk('R3.0D engineer-brief module loadable', BRIEF !== null && typeof BRIEF === 'object');
+    chk('R3.0D buildEngineerBrief is a function', BRIEF && typeof BRIEF.buildEngineerBrief === 'function');
 
-    // Step 2: brief schema version is locked
-    if (BRIEF && BRIEF.BRIEF_SCHEMA_VERSION !== undefined) {
-      chk('BRIEF_SCHEMA_VERSION=1', BRIEF.BRIEF_SCHEMA_VERSION === 1);
-    } else {
-      chk('BRIEF schema version surface present', true); // soft-check; exact constant may be internal
+    // Step 2: F2-R1-02 closure — actually exercise the authority gate of buildEngineerBrief().
+    // The full happy path requires a real R3.0D HypothesisSet (verified via closure-private
+    // WeakSet) which only the HypothesisEngine producer can mint. A caller-constructed
+    // hypothesisSet is by definition NON-authoritative and MUST be rejected fail-closed.
+    if (BRIEF && typeof BRIEF.buildEngineerBrief === 'function') {
+      // (a) Forged input: caller fabricates a plain object that mimics the shape
+      var forgedHs = {
+        schemaVersion: 1,
+        hypothesisSetId: 'hsetfake0000000000000000000000',
+        caseAssociation: 'caseA',
+        sessionAssociation: 'sessA',
+        hypotheses: [],
+        generatedAt: '2026-07-01T00:00:00.000Z'
+      };
+      var forgedPs = {
+        schemaVersion: 1,
+        prioritySetId: 'psetfake0000000000000000000000',
+        sourceHypothesisSetId: 'hsetfake0000000000000000000000',
+        caseAssociation: 'caseA',
+        sessionAssociation: 'sessA',
+        priorities: [],
+        generatedAt: '2026-07-01T00:00:00.000Z'
+      };
+      var forgedResult = BRIEF.buildEngineerBrief({ hypothesisSet: forgedHs, prioritySet: forgedPs }, {});
+      chk('buildEngineerBrief REJECTS caller-fabricated hypothesisSet', forgedResult && forgedResult.eligible === false);
+      chk('reasonCodes include HYPOTHESIS_AUTHORITY_FORGED', forgedResult && Array.isArray(forgedResult.reasonCodes) && forgedResult.reasonCodes.indexOf('HYPOTHESIS_AUTHORITY_FORGED') !== -1);
+
+      // (b) Null/missing input — must be rejected (not silently passed through)
+      var nullResult = BRIEF.buildEngineerBrief({ hypothesisSet: null, prioritySet: null }, {});
+      chk('buildEngineerBrief REJECTS null inputs', nullResult && nullResult.eligible === false);
+
+      // (c) Non-plain hostile input — must be rejected
+      var hostileInput = Object.create(null);
+      hostileInput.hypothesisSet = forgedHs;
+      hostileInput.prioritySet = forgedPs;
+      var hostileResult = BRIEF.buildEngineerBrief(hostileInput, {});
+      chk('buildEngineerBrief REJECTS Object.create(null) wrapper input', hostileResult && hostileResult.eligible === false);
     }
 
     // Step 3: forbidden actions remain disabled

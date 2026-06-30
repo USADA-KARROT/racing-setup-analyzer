@@ -87,7 +87,25 @@ var chk = t.chk;
     var migrate = await h.migrationEngine.migrate({ confirm: true });
     chk('migrate ok', migrate.ok === true);
 
-    // Step 7: zero console error
+    // Step 7: F2-R1-03 closure — exercise the harness no-stale-case-ref gate.
+    // Simulate a case transition where the activeCaseId moves from parent → follow-up.
+    var staleThrew = false;
+    try {
+      h.assertNoStaleCaseRef({
+        activeCaseId: followUpId,
+        lastSession: { sourceCaseId: parentId }  // stale — points at the prior case
+      });
+    } catch (e) { staleThrew = /STALE_CASE_REF/.test(String(e && e.message)); }
+    chk('assertNoStaleCaseRef THROWS when lastSession.sourceCaseId mismatches active', staleThrew === true);
+
+    // Positive path: matching active + lastSession passes
+    h.assertNoStaleCaseRef({
+      activeCaseId: followUpId,
+      lastSession: { sourceCaseId: followUpId }
+    });
+    chk('assertNoStaleCaseRef accepts coherent active + lastSession', true);
+
+    // Step 8: zero console error
     chk('zero console.error during driver-experiment flow', h.consoleErrorCount === 0);
   } finally {
     h.dispose();
