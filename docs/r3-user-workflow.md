@@ -310,7 +310,7 @@ What both exports deliberately do NOT carry:
 - Any setting that would let the receiving instance auto-pick a reference lap. Reference selection on the receiving side remains user-explicit.
 - Any hardware-click recommendation.
 - Any measured K_us magnitude that was not eligible at production time.
-- A producer-attestation field synthesised by the import engine. Imported records carry the producer's attestation if any, or none at all; the engine never fabricates one.
+- **A producer-attestation field, full stop.** Imported records carry no producer attestation: runtime producer attestation is held in non-serialisable WeakSets and is never persisted or exported; any serialised attestation sentinel field is refused by the migration engine with `PRODUCER_ATTESTATION_REFUSED`. The engine never fabricates one on the way in, and it never lets one survive on the way through.
 
 Where a conclusion does cross a boundary (a comparison summary on the C6 path, or the public fields the R3.0B case bundle preserves), it carries its credibility / provenance / limitations metadata as part of the payload — the honesty contract is not stripped to fit either envelope's bounds.
 

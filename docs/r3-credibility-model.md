@@ -49,9 +49,17 @@ Identical in members and ordering to R3.0C's `CREDIBILITY_LADDER`. The R3.0D con
 
 ### Confidence at D1: closed-state enum only, no numeric value
 
-R3.0D's confidence contract at D1 is unusually strict and worth reproducing in full. `CONFIDENCE_STATES` is the closed enum `["unresolved", "not_computed"]`, with the contract comment verbatim: *Confidence state at D1 — closed enum. There is NO numeric `value` field allowed at D1.* The discipline comment elaborates: *A caller CANNOT directly supply a numeric confidence at D1. Confidence is either: (a) UNRESOLVED — explicit `{ state: 'unresolved' }` marker, OR (b) NOT_COMPUTED — explicit `{ state: 'not_computed' }` marker. The numeric confidence value is produced ONLY by a deterministic engine at D4_PRIORITY_ENGINE. Any D1 confidence object that carries a numeric `value` field is rejected with HYPOTHESIS_CONFIDENCE_FORBIDDEN.* `validateConfidenceShape(c)` therefore enforces a closed-key plain object whose only allowed own key is `state`; numeric `value`, `score`, `numeric`, or `probability` keys are rejected, and any extra own key returns `UNKNOWN_OWN_KEY`.
+R3.0D's confidence at the **contract layer (D1)** is unusually strict: `CONFIDENCE_STATES` is the closed enum `["unresolved", "not_computed"]`, with the contract comment verbatim: *Confidence state at D1 — closed enum. There is NO numeric `value` field allowed at D1.* The discipline comment elaborates: *A caller CANNOT directly supply a numeric confidence at D1. Confidence is either: (a) UNRESOLVED — explicit `{ state: 'unresolved' }` marker, OR (b) NOT_COMPUTED — explicit `{ state: 'not_computed' }` marker.* `validateConfidenceShape(c)` therefore enforces a closed-key plain object whose only allowed own key is `state`; numeric `value`, `score`, `numeric`, or `probability` keys at the **D1 caller layer** are rejected.
 
-The earlier R3.0 drafts spoke of "heuristic confidence capped at medium" as a runtime rule. That is not what the D1 contract layer encodes — D1 has no numeric confidence at all. The D4 priority engine is the only producer authorised to attach a numeric confidence, and any cap that engine applies lives in its module, not in this contract.
+The numeric confidence is computed **inside the R3.0D engines** — not at the D1 caller layer — under a strict D1 → D3 → D4 split:
+
+| Layer | Producer | What it emits / accepts |
+| --- | --- | --- |
+| D1 | Caller-supplied input | Closed-state only: `{ state: 'unresolved' }` or `{ state: 'not_computed' }`. Numeric fields rejected. |
+| **D3 — HypothesisEngine** | `renderer/js/r3-0d-hypothesis-engine.js` | Computes the numeric `confidenceScore` deterministically and emits `{ state, score }` on each Hypothesis it produces. This is the **first authoritative numeric confidence value** in the R3.0D pipeline. |
+| **D4 — PriorityEngine** | `renderer/js/r3-0d-priority-engine.js` | Validates and consumes the D3 export (`verifyAuthoritativeHypothesisSet`); applies its prioritisation rules; emits a PrioritySet that references D3's confidences. D4 does not produce a new numeric confidence; it consumes D3's. |
+
+The D1 contract module's own header comment that names "D4_PRIORITY_ENGINE" as the numeric producer is stale relative to the shipped D3/D4 split — D3 is where the numeric `confidenceScore` is actually computed. Any cap a downstream engine applies (e.g., a heuristic-source cap) lives in that engine's module, not in this contract layer.
 
 ### Availability at D1: closed evidence-graph enum
 

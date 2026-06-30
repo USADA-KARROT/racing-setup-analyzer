@@ -354,8 +354,13 @@ for a given case lineage. It is **its own store** —
 `createTimelineStore` in `renderer/js/r3-0e-stores.js`, with the contract in
 `contracts/r3.0e/case-timeline-contract.js` (UMD export
 `R3_0E_CaseTimelineContract`). It is the **only** append-only store in
-R3.0E; the experiment / outcome / follow-up-link stores allow targeted
-mutation. The timeline-store does not.
+R3.0E. The other R3.0E stores expose different mutation surfaces: the
+**experiment store** allows targeted mutation through its public `create`,
+`update`, and `remove` methods; the **follow-up-link store** allows only the
+narrow `markParentStatus` mutation on an existing link record; the
+**outcome store** is create-only through its public API (`create`, `get`,
+`listForExperiment`), with duplicate-id rejection and no update or remove
+method. The timeline-store has no mutation surface at all.
 
 The store keys timelines by `caseId`: the persisted document for a case is
 `{ schemaVersion, caseId, events }`, with `schemaVersion = 1` (the constant
@@ -377,8 +382,12 @@ The runtime API is just two methods: `getTimeline(caseId)` and
    `eventId` matches the new event's `eventId` with
    `R3_0E_TIMELINE_DUPLICATE_EVENT`. Single-write per id, full stop.
 3. **No deletion / no update.** The store has no delete and no update operation
-   in its runtime API. F1 migration (R3.0F) only ever *adds* events when
-   upgrading older timelines; it does not remove or rewrite existing ones.
+   in its runtime API. F1 migration (R3.0F) does **not** add, remove,
+   reorder, or rewrite timeline events: the migrator at
+   `scripts/migrators/timeline-migrator.js` exports `STEPS = []` and its
+   header states verbatim *"R3.0F F1 timeline migrator. v1 only; never
+   fabricates events."* Migration validates the existing v1 shape and
+   passes records through unchanged.
 4. **Deep-freeze on write, structured-clone on read.** Callers cannot mutate
    an entry by holding its reference, and a returned entry cannot be used to
    smuggle a mutation back into the store.
@@ -389,10 +398,12 @@ The runtime API is just two methods: `getTimeline(caseId)` and
 6. **Future-schema fail-closed.** `schemaVersion > 1` →
    `UNSUPPORTED_FUTURE_SCHEMA`; `schemaVersion < 1` or non-integer →
    `TIMELINE_INVALID`.
-7. **Producer attestation (R3.0F F1).** F1 is the only producer that fabricates
-   timeline events during a migration, and it refuses to fabricate
-   attestation sentinel fields — see the R3.0F migration doc for the
-   `PRODUCER_ATTESTATION_REFUSED` contract.
+7. **Producer attestation (R3.0F F1).** F1 never fabricates timeline events
+   (`STEPS = []` in the timeline migrator) and also refuses any input record
+   carrying attestation sentinel fields anywhere in its shape — see the
+   R3.0F migration doc for the `PRODUCER_ATTESTATION_REFUSED` contract.
+   Runtime producer attestation is held in non-serialisable WeakSets and is
+   never persisted or exported.
 
 The Timeline event-kind enum is closed. The full allowed set, verbatim from
 the contract, is:
