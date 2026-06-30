@@ -686,12 +686,33 @@
               return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params[' + pk + '] not in primitive allowlist (number/boolean/null)' });
             }
             // Define as own enumerable data property — no inheritance, no accessor.
+            // Codex E3-R4-01 closure: a host that poisoned Object.defineProperty BEFORE
+            // the classifier module loaded would have its replacement captured by
+            // _CAPTURED_OBJECT_DEFINE_PROPERTY, and the post-validation define call could
+            // store an arbitrary value (e.g. a path string) regardless of what we
+            // validated above. Defence: re-read the descriptor after define and require
+            //   (a) a data descriptor (no getter/setter installed by the poisoner),
+            //   (b) enumerable === true,
+            //   (c) Object.is(d.value, pv) — exact reference / value identity.
+            // Any mismatch → fail-closed BLOCK with no partial outcome.
             try {
               _CAPTURED_OBJECT_DEFINE_PROPERTY(rebuiltParams, pk, {
                 value: pv, writable: true, enumerable: true, configurable: true,
               });
             } catch (eDef) {
               return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params rebuild failed at ' + pk });
+            }
+            var dCheck;
+            try { dCheck = _CAPTURED_OBJECT_GET_OWN_DESC(rebuiltParams, pk); }
+            catch (eRecheck) { return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'sideEffects[' + si + '].params descriptor re-read failed' }); }
+            if (!dCheck || dCheck.enumerable !== true) {
+              return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'sideEffects[' + si + '].params post-define non-enum at ' + pk });
+            }
+            if (typeof dCheck.get === 'function' || typeof dCheck.set === 'function') {
+              return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'sideEffects[' + si + '].params post-define accessor at ' + pk });
+            }
+            if (!_exactlyEqual(dCheck.value, pv)) {
+              return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'sideEffects[' + si + '].params post-define value mismatch at ' + pk + ' (intrinsic tampering suspected)' });
             }
           }
         }

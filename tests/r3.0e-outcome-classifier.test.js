@@ -1141,6 +1141,77 @@ console.log('Section V — Codex E3 R2 closures');
 })();
 
 // ==================================================================
+// Section X — Codex E3 R4 closure (E3-R4-01)
+// ==================================================================
+console.log('Section X — Codex E3 R4 closure (pre-load defineProperty poisoning)');
+
+// X1 — pre-load Object.defineProperty poisoning attempts to inject path into
+// sideEffects.params.delta_pct must NOT result in a verified outcome. The poisoned
+// classifier module is loaded in a child node subprocess so the poisoning is observed
+// at module-init capture time (where the regression actually lives).
+(function () {
+  var cp = require('child_process');
+  var path = require('path');
+  var script = ''
+    + 'var orig=Object.defineProperty;'
+    + 'Object.defineProperty=function(o,k,d){'
+    + '  if(k==="delta_pct"&&d&&d.value===5){'
+    + '    return orig(o,k,{value:"/Users/skyline/leak.bmsbin",writable:true,enumerable:true,configurable:true});'
+    + '  }'
+    + '  return orig(o,k,d);'
+    + '};'
+    + 'var CL=require("' + path.resolve(__dirname, '..', 'renderer/js/r3-0e-outcome-classifier.js') + '");'
+    + 'Object.defineProperty=orig;'
+    + 'function df(v){if(v&&typeof v==="object"&&!Object.isFrozen(v)){Object.freeze(v);Object.getOwnPropertyNames(v).forEach(function(k){df(v[k]);});}return v;}'
+    + 'var exp=df({'
+    + '  schemaVersion:1,experimentId:"exp_0123456789abcdef",sourceCaseId:"case_demo_a",'
+    + '  sourceHypothesisId:"hyp_demo_001",sourceRecommendationId:"pri_demo_001",'
+    + '  targetMetric:"roll_gradient_deg_per_g",baselineValue:3.5,'
+    + '  expectedDirection:"decrease",expectedMagnitudeRange:{min:0.5,max:1.5},'
+    + '  setupChange:{component:"front_arb"},driverInstruction:null,'
+    + '  controlVariables:[{name:"tyre_temp_window",description:"r3.0e.cv.tyre_temp_window",expectedValue:85,allowedRange:{min:75,max:95},observedValue:null,withinRange:null}],'
+    + '  validationPlan:"r3.0e.plan.controlled_repeat_lap",'
+    + '  stopConditions:[{i18nKey:"r3.0e.stop.lap_time_increase",params:null}],'
+    + '  status:"applied",followUpCaseIds:["case_demo_a_followup_1"],'
+    + '  outcome:null,createdAt:"2026-06-30T10:00:00Z"'
+    + '});'
+    + 'var input={experiment:exp,'
+    + '  appliedChange:{changeId:"change_demo_001",sourceExperimentId:"exp_0123456789abcdef",appliedAt:"2026-06-30T11:00:00Z"},'
+    + '  followUp:{followUpCaseId:"case_demo_a_followup_1",parentCaseId:"case_demo_a",sessionId:"session_demo_a",parentSessionId:"session_demo_a",hasExplicitReference:true,comparabilityScore:0.9},'
+    + '  observation:{observedDirection:"decrease",observedMagnitude:1,driverFeedback:"r3.0e.driver.feedback.balance_improved",dataQualityIssues:[],'
+    + '    sideEffects:[{i18nKey:"r3.0e.side.tyre_wear_increase",params:{delta_pct:5}}],'
+    + '    contradictingEvidenceIds:[],supportingEvidenceIds:["ev_demo_001"]},'
+    + '  controlVariableObservations:[{name:"tyre_temp_window",description:"r3.0e.cv.tyre_temp_window",expectedValue:85,allowedRange:{min:75,max:95},observedValue:84,withinRange:true}]};'
+    + 'var r=CL.classifyOutcome(input,{clock:function(){return "2026-06-30T11:30:00Z";}});'
+    + 'var verified=r.valid===true?CL.verifyAuthoritativeOutcome(r.outcome):false;'
+    + 'var serialized=r.valid===true?JSON.stringify(r.outcome):"";'
+    + 'var leaked=serialized.indexOf("/Users/")!==-1;'
+    + 'process.stdout.write(JSON.stringify({valid:r.valid,verified:verified,leaked:leaked,reasons:r.reasonCodes||[]}));';
+  var out;
+  try {
+    out = cp.execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' });
+  } catch (e) {
+    chk('X1: child process executed (env probe)', false, { error: String(e) });
+    return;
+  }
+  var parsed;
+  try { parsed = JSON.parse(out.trim()); } catch (eP) {
+    chk('X1: child output parsed', false, { stdout: out });
+    return;
+  }
+  // The poisoner injected a path string in place of the validated number. The classifier
+  // MUST fail-closed (valid !== true), OR if it produces an outcome the outcome MUST NOT
+  // verify and MUST NOT contain the path string.
+  chk('X1: poisoned-defineProperty classifier fails-closed (no verified outcome with leaked path)',
+    parsed.valid !== true || (parsed.verified === false && parsed.leaked === false),
+    parsed);
+  // Strongest guarantee: BLOCK is the expected outcome.
+  chk('X1.strong: poisoned classifier returns BLOCK',
+    parsed.valid !== true,
+    parsed);
+})();
+
+// ==================================================================
 // Section W — Codex E3 R3 closures (E3-R3-01..02)
 // ==================================================================
 console.log('Section W — Codex E3 R3 closures');
