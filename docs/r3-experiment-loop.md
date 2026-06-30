@@ -103,9 +103,11 @@ comparing the persisted `createdAt` against the candidate; `remove` deletes both
 the payload and the index entry. The append-only ledger of *what the product
 told the engineer* lives in the Timeline store (see below), not here.
 
-Every experiment record has the following authoritative fields. The record is
-deep-frozen at write time and reads return structured clones; callers cannot
-mutate it in place.
+Every experiment record has the following authoritative fields. `create`/`update`
+write the record into the backend's clone-on-write transaction (cloned, not frozen,
+at write time); `get` deep-freezes the record before returning it
+(`renderer/js/r3-0e-stores.js`), so a caller reading a record back cannot mutate
+it in place.
 
 This table reflects the actual closed key set and validation in
 `contracts/r3.0e/experiment-contract.js`:

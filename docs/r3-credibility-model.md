@@ -236,7 +236,7 @@ The combined effect of the three forbidden propagations is that **the credibilit
 
 ## The honesty-contract envelope
 
-Every R3.0 producer emission — at every rung in whichever enum applies, including the `Unavailable` / blocked path — carries a `limitations[]` field. The field is an **array of machine-readable limitation codes** that name the honest scope caveats the producer attaches to the value. The field is never absent and never empty for non-trivial emissions: a clean run with no caveats still carries the producer's standard baseline limitations (e.g. "linear regime; not a full MBD", "kinematic, confounded; not a professional-grade verdict", "single representative session").
+Every R3.0 producer emission — at every rung in whichever enum applies, including the `Unavailable` / blocked path — carries a `limitations[]` field. The field is an **array of machine-readable limitation codes** that name the honest scope caveats the producer attaches to the value. The field is always present (never absent/undefined), but it is **not** guaranteed non-empty on a clean emission: the R3.0E outcome classifier, for example, initializes `limitations = []` and only appends entries for specific conditions (invalid comparison, confounded control variables, data-quality issues) — a golden-path `confirmed` outcome with no caveats legitimately carries an empty `limitations[]`, not a synthesized baseline caveat. Some other producers do attach a standing scope caveat even on a clean run (e.g. "kinematic, confounded; not a professional-grade verdict" on a corner-delta computed from raw telemetry) — but that is a property of that specific producer's domain, not a blanket guarantee that `limitations[]` is never empty across all producers.
 
 Rules on `limitations[]`:
 

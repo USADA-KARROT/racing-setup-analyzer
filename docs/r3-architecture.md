@@ -76,8 +76,10 @@ A few invariants are global to the topology:
   No code path is conditional on `process` / `window.require` / `node:` — the shell never touches Node APIs.
 - **No runtime LLM.** No phase calls a model at runtime. The decision engine, classifier, and brief generator
   are deterministic transforms of authoritative-only inputs.
-- **No cloud, no multi-user, no telemetry beacon.** Persistence is local-first; raw telemetry never leaves the
-  device through any export path.
+- **No cloud, no multi-user, no telemetry beacon.** Persistence is local-first; nothing is
+  auto-uploaded and the portable case bundle never carries raw telemetry. Raw telemetry CAN
+  leave the device, but only through the explicit, opt-in `exportRawArchive(sessionId)` call
+  (`session-store`, see below) — a separate user action from the case-bundle export.
 - **Feature Registry is the navigation truth source.** A capability is reachable only if its feature ID is
   registered and `featureRegistryActivationAllowed` is `true` **for its own phase's governance state**. This
   is a per-phase flag, not one train-wide switch: R3.0C (`C8_ACTIVATION`), R3.0D
@@ -618,7 +620,7 @@ target the fail-closed boundaries identified earlier in this document:
 | `tests/e2e/hardening-03-no-stale-ui.test.js` | After a Case/Session transition, no viewmodel retains a stale case-id reference, across the full documented set of case-id-bearing fields (`lastSession.*`, `cachedCaseId`/`sourceCaseId`/`priorCaseId`/`parentCaseId`/`followUpCaseId`, R3.0C C8 `lastReassertion.caseId`, R3.0D `currentBrief.caseAssociation`, R3.0E `currentExperiment`/`currentOutcome`/`currentTimeline.caseAssociation`) — verified against a real R3.0E experiment record's production shape, not just a synthetic object. |
 | `tests/e2e/hardening-04-large-library.test.js` | The case-store + F1 migration engine scale **bounded-linear**, not quadratic, as library size grows — verified by counting `backend.list`/`get`/`transact` operations at `N` and `2N`. |
 | `tests/e2e/hardening-05-xss-injection.test.js` | Static scan confirming the renderer never pipes user-supplied or case-derived text into `innerHTML` or `document.write`. |
-| `tests/e2e/hardening-06-supply-chain.test.js` | `package.json` declares only the known Electron/electron-builder dependencies; no production renderer module pulls a bare third-party `require()`; no `package.json` script references untrusted tooling; `CHANGELOG.md` exists at the repo root; no committed secrets/API keys/`.env` files. |
+| `tests/e2e/hardening-06-supply-chain.test.js` | `package.json` declares only the known Electron/electron-builder dependencies; no production renderer module pulls a bare third-party `require()`; no `package.json` script references untrusted tooling; no committed secrets/API keys/`.env` files. (The probe also checks for `CHANGELOG.md`'s presence, but that check is hardcoded non-fatal — `chk('CHANGELOG.md presence check is non-fatal at F3', true)` — and passes unconditionally regardless of whether the file exists.) |
 
 ---
 

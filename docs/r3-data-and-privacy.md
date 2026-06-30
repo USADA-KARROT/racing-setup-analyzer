@@ -2,7 +2,7 @@
 
 This document is the authoritative reference for **where Racing Setup Analyzer's data lives, what is persisted, what is exported, and what is never sent over the network**. It also documents the Electron host security boundaries that enforce these guarantees.
 
-The contract is conservative on purpose: the same fail-closed posture that governs the credibility ladder (Physics > Model > Measured > Derived > Heuristic > Unavailable) governs data handling. The product holds no remote copy of any value, so there is no remote surface from which a value could leak; a value that the user did not explicitly export cannot escape the case bundle.
+The contract is conservative on purpose: the same fail-closed posture that governs the credibility ladder (Physics > Model > Measured > Derived > Heuristic > Unavailable) governs data handling. The product holds no remote copy of any value, so there is no remote surface from which a value could leak; a value the user did not explicitly export cannot leave the device through any of the three export paths below (comparison bundle, case bundle, or raw-telemetry archive).
 
 R3.0F preserves all data invariants frozen at R3.0B (the case-record schema, frozen at v1.4.0) and adds the migration / E2E / hardening evidence that the same posture holds end-to-end.
 
@@ -250,7 +250,7 @@ Comparison is **same-case + same-session only**. A bundle that attempted to comp
 - No fonts, scripts, or stylesheets are loaded from CDNs at runtime; all assets are bundled.
 - No cloud account, no login, no remote identity provider.
 
-This is the product's invariant: no data leaves the host unless the user explicitly exports a comparison bundle (a file written to a path the user picks) or shares it themselves out-of-band.
+This is the product's invariant: no data leaves the host unless the user explicitly triggers one of three export paths — a comparison-export bundle (R3.0C C6), a portable case bundle (`caseStore.exportCase`), or a raw-telemetry archive (`sessionStore.exportRawArchive`, an opt-in distinct from both bundle exports) — each writing a file to a path the user picks, or unless the user shares a result themselves out-of-band.
 
 How the invariant is enforced, in layers:
 

@@ -148,8 +148,11 @@ checkpoint lives at **`governance/r3.0f/checkpoints/F2.json`**. The flow files l
    as at-target. The append-only timeline contract is enforced — a correction is a *new*
    timeline event, never a mutation of a prior one.
 7. **`flow-07-driver-experiment.test.js`** — Driver experiment with follow-up case link.
-   Same Experiment Loop as Flow 06 but for a driver-instruction-only experiment
-   (`driverInstruction` populated, no `setupChange`); also exercises the follow-up-link
+   Same Experiment Loop as Flow 06 but for a driver-instruction-only experiment.
+   `setupChange` is a required plain-object field on every Experiment (the E1 contract
+   rejects a missing one) — for this driver-only flow it carries a placeholder noting no
+   mechanical change (`{ component: 'driver_only', note: 'no mechanical change' }`), while
+   `driverInstruction` carries the actual instruction; also exercises the follow-up-link
    store's `create` path. Follow-up case links carry **no comparison authority**; cross-case
    comparison is forbidden. The flow's link write uses `parentStatus: 'follow_up_required'`,
    which is outside the contract's allowed enum (`'present' | 'archived' | 'deleted'`); the
