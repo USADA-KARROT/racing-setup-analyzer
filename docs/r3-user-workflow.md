@@ -23,7 +23,7 @@ Two activation flags govern what the runtime is allowed to do, and `featureRegis
 The Setup Library landing pane shows:
 
 - A clean library state. No fabricated demo cases are listed in the user's library.
-- The Vehicle Preset Browser surfaces the 501 frozen presets (preset count is an invariant; the UI will refuse to start if it drifts).
+- The Vehicle Preset Browser surfaces the 501 frozen presets. Preset count is a CI/governance invariant enforced by `scripts/check-preset-integrity.js` and `tests/vehicle-preset-pipeline.test.js` — a drift fails the trusted-verification gate before merge. `main.js`'s production startup path has no runtime preset-count check; it does not refuse to start on drift.
 - Two calls to action: **Load Demo Analysis Case** (the golden path; `renderer/js/i18n-workspace.js`'s `aw.label.load_demo_analysis_case`) or import telemetry and click **Build Case & Run Analysis** (`aw.label.build_case_run_analysis`) to create a new Case from real data. There is no separate bare "create an empty Case" button — a Case is created either from the demo or from an import.
 
 The Demo Analysis Case is the only Case that ships pre-populated. Its narrative is produced by production code — the same services that run on a user's real Case — not by hardcoded copy. It exists so a user can see the full capability map exercised end-to-end before they have any telemetry of their own.
@@ -317,7 +317,7 @@ What both exports deliberately do NOT carry:
 
 Where a conclusion does cross a boundary (a comparison summary on the C6 path, or the public fields the R3.0B case bundle preserves), it carries its credibility / provenance / limitations metadata as part of the payload — the honesty contract is not stripped to fit either envelope's bounds.
 
-If the receiving instance's preset count or application version drift from the producing side's invariants, the application refuses to start rather than running with drifted invariants.
+The portable case-bundle schema (`renderer/js/case-record-schema.js`) carries no preset-count or application-version field, so `validatePortableBundle`/`caseStore.importBundle()` cannot compare the receiving instance's invariants against the producing side's — there is no cross-instance drift check on import, and the application does not refuse to start on a preset-count or version mismatch. Preset-count drift is caught at CI/governance time (see above), not at runtime import or startup.
 
 ---
 
