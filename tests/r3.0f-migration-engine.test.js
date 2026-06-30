@@ -1231,6 +1231,26 @@ asyncCase('F1-R8-01: Line Separator (U+2028) splice rejected', function () {
     .then(function (r) { chk('Line Separator splice rejected', r.report.perStore.cases.rejected === 1); });
 });
 
+// F1-R9-01: sourceHash MUST NOT re-trigger inherited toJSON traps. Verified by wrapping the
+// backend so list() returns a record whose prototype carries a toJSON hook. Engine's hash
+// path uses structuredClone-cloned values, so the hook never fires.
+asyncCase('F1-R9-01: sourceHash does not invoke inherited toJSON', function () {
+  var fired = 0;
+  var proto = { toJSON: function () { fired++; return { schemaVersion: 1, caseId: 'c1', hijacked: true }; } };
+  var hostile = Object.create(proto);
+  hostile.schemaVersion = 1; hostile.caseId = 'c1';
+  var real = SB.MemoryBackend();
+  var wrapped = {
+    list: function (ns) { if (ns === 'cases') return Promise.resolve([{ key: 'c1', value: hostile }]); return real.list(ns); },
+    get: real.get.bind(real), put: real.put.bind(real), transact: real.transact.bind(real)
+  };
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, migrated: true }, migrations: ['delta'] };
+  } } };
+  return ENG.createMigrationEngine({ backend: wrapped, registry: registry, stamp: STAMP }).migrate({ confirm: true })
+    .then(function () { chk('toJSON NOT invoked by sourceHash path', fired === 0); });
+});
+
 asyncCase('F1-R6-01 negative: legitimate lapAuthority/projectionSignature/experimentVerified still accepted', function () {
   var b = SB.MemoryBackend();
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {

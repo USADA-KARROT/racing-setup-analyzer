@@ -348,15 +348,25 @@
     return ENV.deepFreeze(entry);
   }
 
-  // F1-R2-01: deterministic preimage hash of a record AT LIST TIME. Used as a TOCTOU sentinel:
-  // the engine carries the sourceHash through `_computeStoreWork` and re-checks it inside the
-  // atomic transact.compute() against the value backend.transact() re-reads. If the value
-  // changed between list and commit, the engine aborts with BACKEND_REJECTED.
-  function _sourceHash(value) {
+  // F1-R2-01 / F1-R9-01: deterministic preimage hash used for TOCTOU sentinels.
+  //
+  // F1-R9-01: the hash MUST be taken AFTER structured-clone sanitization. Calling JSON.stringify
+  // on the ORIGINAL listed value would re-trigger inherited toJSON traps, undoing the F1-R1-02
+  // firewall. structuredClone strips proxies/accessors/toJSON before JSON-stringify reads any
+  // property. Handles records (objects), priorJournal (arrays), priorState (object or null) and
+  // primitives uniformly so the same canonical form is hashed on both sides of the TOCTOU window.
+  // Returns null on sanitization failure (no comparable preimage).
+  function _sanitizedHash(v) {
+    if (v === undefined) v = null;
+    var cloned;
+    try {
+      if (v === null) cloned = null;
+      else if (typeof v !== 'object') cloned = v;
+      else cloned = _StructuredClone(v);
+    } catch (_) { return null; }
     var s;
-    try { s = _JSONStringify(value); } catch (_) { return null; }
-    if (typeof s !== 'string') return null;
-    return _hash(s);
+    try { s = _JSONStringify(cloned); } catch (_) { return null; }
+    return typeof s === 'string' ? _hash(s) : null;
   }
 
   // ── engine factory ───────────────────────────────────────────────────────────
@@ -583,7 +593,7 @@
           var hash = _hash(_JSONStringify(postSan.value));
           // F1-R2-01: source hash captured at list time; re-checked inside the atomic transact
           // to abort on concurrent writers.
-          var sourceHash = _sourceHash(row.value);
+          var sourceHash = _sanitizedHash(row.value);
           writes.push({ store: storeKey, key: key, value: postSan.value, sourceHash: sourceHash });
           counts.migrated += 1;
           entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'migrated', migrationsList, hash, '', []));
@@ -749,8 +759,8 @@
         var storesList = _ObjectKeys(storesUsedForWrites);
         storesList.push(META);
         // Compute prior-journal/state preimage hashes (the snapshot we already loaded above).
-        var priorJournalHash = _sourceHash(priorJournal);
-        var priorStateHash   = _sourceHash(priorState || null);
+        var priorJournalHash = _sanitizedHash(priorJournal);
+        var priorStateHash   = _sanitizedHash(priorState || null);
         // Build reads spec
         var readsSpec = [];
         for (var rw = 0; rw < allWrites.length; rw++) {
@@ -765,7 +775,7 @@
           compute: function (readValues) {
             // TOCTOU verification: each data read must match its sourceHash.
             for (var i = 0; i < allWrites.length; i++) {
-              var observedHash = _sourceHash(readValues[i] === undefined ? null : readValues[i]);
+              var observedHash = _sanitizedHash(readValues[i] === undefined ? null : readValues[i]);
               if (observedHash !== allWrites[i].sourceHash) {
                 // Abort: concurrent writer changed value between list and commit.
                 throw new Error('CONCURRENT_WRITE_DETECTED:' + allWrites[i].store + ':' + allWrites[i].key);
@@ -776,13 +786,13 @@
             var observedPriorJournalNormalized = _ArrayIsArray(observedPriorJournal)
               ? observedPriorJournal
               : (_isPlainObject(observedPriorJournal) && _ArrayIsArray(observedPriorJournal.entries) ? observedPriorJournal.entries : []);
-            if (_sourceHash(observedPriorJournalNormalized) !== priorJournalHash) {
+            if (_sanitizedHash(observedPriorJournalNormalized) !== priorJournalHash) {
               throw new Error('CONCURRENT_JOURNAL_WRITE_DETECTED');
             }
             // priorState verification (compare against the state object we loaded; null if absent)
             var observedPriorState = readValues[allWrites.length + 1];
             var observedPriorStateForHash = _isPlainObject(observedPriorState) ? observedPriorState : null;
-            if (_sourceHash(observedPriorStateForHash) !== priorStateHash) {
+            if (_sanitizedHash(observedPriorStateForHash) !== priorStateHash) {
               throw new Error('CONCURRENT_STATE_WRITE_DETECTED');
             }
             // Strip sourceHash from data writes — that field is engine-internal, must NOT be persisted.
