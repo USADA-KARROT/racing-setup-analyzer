@@ -70,6 +70,20 @@
   var _CAPTURED_DATE_CTOR = Date;
   var _CAPTURED_DATE_PROTO_TO_ISO = Date.prototype.toISOString;
   var _CAPTURED_REFLECT_APPLY = Reflect.apply;
+  // Codex E4-R4-01 closure: capture structuredClone (when available) for clean-copy
+  // Proxy stripping. Falls back to JSON.parse(JSON.stringify(...)) which already strips
+  // Proxy semantics (the resulting tree is plain). Either path drops Proxy traps; the
+  // returned tree is a fresh plain object/array hierarchy.
+  var _CAPTURED_STRUCTURED_CLONE = (typeof structuredClone === 'function') ? structuredClone : null;
+  var _CAPTURED_JSON_PARSE = JSON.parse;
+  var _CAPTURED_JSON_STRINGIFY = JSON.stringify;
+  function _cleanClone(v) {
+    if (v === null || v === undefined) return v;
+    try {
+      if (_CAPTURED_STRUCTURED_CLONE !== null) return _CAPTURED_STRUCTURED_CLONE(v);
+      return _CAPTURED_JSON_PARSE(_CAPTURED_JSON_STRINGIFY(v));
+    } catch (e) { return null; }
+  }
   var _CAPTURED_NUMBER_IS_FINITE = Number.isFinite;
   var _CAPTURED_NUMBER_IS_INTEGER = Number.isInteger;
   var _WeakSetCtor = WeakSet;
@@ -481,9 +495,11 @@
       return followUpLinkStore.get(linkId).then(function (rec) {
         if (rec === null || rec === undefined) return null;
         // E2 has already validated via E1 contract on read. Rehydrate authority.
-        // Codex pattern: rehydrated records get a fresh frozen plain object so identity
-        // is owned by the service, then registered.
-        var r = _snapshotPlain(rec, _CAPTURED_OBJECT_FREEZE(['schemaVersion', 'linkId', 'parentCaseId', 'followUpCaseId', 'experimentId', 'parentStatus', 'createdAt']), CODES.LINKAGE_INVALID);
+        // Codex E4-R4-01 closure: clean-clone the record FIRST (strips any Proxy that
+        // somehow survived the store layer), then descriptor-snapshot the clean tree.
+        var cleaned = _cleanClone(rec);
+        if (cleaned === null) return null;
+        var r = _snapshotPlain(cleaned, _CAPTURED_OBJECT_FREEZE(['schemaVersion', 'linkId', 'parentCaseId', 'followUpCaseId', 'experimentId', 'parentStatus', 'createdAt']), CODES.LINKAGE_INVALID);
         if (r.valid !== true) return null;
         var rebuilt = {
           schemaVersion: r.snapshot.schemaVersion,
@@ -511,11 +527,16 @@
         var LINK_KEYS_FROZEN = _CAPTURED_OBJECT_FREEZE(['schemaVersion', 'linkId', 'parentCaseId', 'followUpCaseId', 'experimentId', 'parentStatus', 'createdAt']);
         var out = [];
         for (var i = 0; i < rows.length; i++) {
+          // Codex E4-R4-01 closure: pass each row through structuredClone (or JSON
+          // clone fallback) BEFORE descriptor snapshot. structuredClone produces a
+          // brand-new plain-object tree — Proxy traps fire during the clone but the
+          // result is concrete data; no Proxy survives. The subsequent descriptor
+          // snapshot operates on the clean tree.
+          var cleaned = _cleanClone(rows[i]);
+          if (cleaned === null) continue;
           // Codex E4-R2-02 closure: apply the SAME descriptor snapshot used by
-          // getFollowUpLink BEFORE reading any field. Hostile/accessor rows (proxies that
-          // return phantom data via getters) cannot leak content into authoritative
-          // listings — only data descriptors with the closed key set survive.
-          var snap = _snapshotPlain(rows[i], LINK_KEYS_FROZEN, CODES.LINKAGE_INVALID);
+          // getFollowUpLink. Only data descriptors with the closed key set survive.
+          var snap = _snapshotPlain(cleaned, LINK_KEYS_FROZEN, CODES.LINKAGE_INVALID);
           if (snap.valid !== true) continue;
           var rebuilt = {
             schemaVersion: snap.snapshot.schemaVersion,
@@ -656,7 +677,11 @@
       if (!_idGrammarOk(caseId)) return Promise.resolve(_block([CODES.TIMELINE_INVALID], 'caseId invalid'));
       var ck = _resolveClock(optsIn);
       if (ck.valid !== true) return Promise.resolve(_block(ck.reasonCodes, ck.detail));
-      return timelineStore.getTimeline(caseId).then(function (rec) {
+      return timelineStore.getTimeline(caseId).then(function (recRaw) {
+        // Codex E4-R4-01 closure: clean-clone the stored timeline FIRST. Strips any
+        // Proxy that might have leaked through the storage layer.
+        var rec = _cleanClone(recRaw);
+        if (rec === null) return _block([CODES.TIMELINE_INVALID], 'store record could not be cloned');
         if (!_isOriginalPlainObject(rec)) return _block([CODES.TIMELINE_INVALID], 'store returned non-plain');
         // Re-validate via E1 contract (defence-in-depth — store already validates on read,
         // but the projection consumer treats this as an authority boundary).

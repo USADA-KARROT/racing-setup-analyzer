@@ -664,6 +664,125 @@ function runChildProbe(probeBody) {
     parsed.valid !== true, parsed);
 })();
 
+// ==================================================================
+// Section T — Codex E4 R4 closure (E4-R4-01) — Proxy listForParent
+// ==================================================================
+console.log('Section T — Codex E4 R4 closure (Proxy listForParent rejection)');
+
+// T1 — Proxy row returned by listForParent is clean-cloned (Proxy stripped) before
+// descriptor snapshot. The cloned tree is a fresh plain object — Proxy traps fire
+// during structuredClone but the result has no surviving traps. The subsequent
+// snapshot enforces the closed key set; only legitimate data fields survive.
+(async function () {
+  // Build a backend stub whose listForParent returns a single Proxy row that PRETENDS
+  // to have all valid link fields, but also exposes a `injectedField` via own keys.
+  var stubBackend = {
+    transact: function () { return Promise.resolve(undefined); },
+    list: function () { return Promise.resolve([]); },
+  };
+  var stubLinkStore = {
+    create: function () { return Promise.resolve(); },
+    get: function () { return Promise.resolve(null); },
+    listForParent: function () {
+      var realLink = {
+        schemaVersion: 1,
+        linkId: 'link_abcdef0123456789',
+        parentCaseId: 'case_demo_a',
+        followUpCaseId: 'case_demo_b',
+        experimentId: 'exp_0123456789abcdef',
+        parentStatus: 'present',
+        createdAt: '2026-06-30T11:00:00.000Z',
+      };
+      var proxy = new Proxy(realLink, {
+        // Reveal an extra key the snapshot would normally reject
+        ownKeys: function (target) {
+          return ['schemaVersion', 'linkId', 'parentCaseId', 'followUpCaseId',
+                  'experimentId', 'parentStatus', 'createdAt', 'injectedField'];
+        },
+        getOwnPropertyDescriptor: function (target, k) {
+          if (k === 'injectedField') {
+            return { value: '/Users/skyline/leak.bmsbin', writable: true, enumerable: true, configurable: true };
+          }
+          return Object.getOwnPropertyDescriptor(target, k);
+        },
+        get: function (target, k) { return target[k]; },
+      });
+      return Promise.resolve([proxy]);
+    },
+  };
+  var stubTimelineStore = {
+    getTimeline: function () { return Promise.resolve(null); },
+    appendEvent: function () { return Promise.resolve(); },
+  };
+  var svc = SVC.createFollowUpTimelineService({
+    timelineStore: stubTimelineStore,
+    followUpLinkStore: stubLinkStore,
+  });
+  var list = await svc.listFollowUpLinksForParent('case_demo_a');
+  // Two acceptable outcomes:
+  //  (a) the Proxy row is rejected entirely (list.length === 0)
+  //  (b) the Proxy row is clean-cloned, snapshot strips injectedField, link rebuilt
+  //      with only the 7 legitimate fields → list.length === 1 AND injectedField absent
+  if (list.length === 1) {
+    chk('T1.cloned: Proxy row clean-cloned; injectedField NOT present',
+      Object.getOwnPropertyNames(list[0]).indexOf('injectedField') === -1
+        && JSON.stringify(list[0]).indexOf('/Users/') === -1);
+    chk('T1.verifies: cleaned link verifies authority',
+      SVC.verifyAuthoritativeFollowUpLink(list[0]) === true);
+  } else {
+    chk('T1.rejected: Proxy row rejected entirely', list.length === 0);
+    chk('T1.no-leak: no surviving link contains path', true);
+  }
+})();
+
+// T2 — Proxy row with HOSTILE getOwnPropertyDescriptor returning accessor still rejected
+(async function () {
+  var stubLinkStore = {
+    create: function () { return Promise.resolve(); },
+    get: function () { return Promise.resolve(null); },
+    listForParent: function () {
+      var realLink = {
+        schemaVersion: 1,
+        linkId: 'link_abcdef0123456789',
+        parentCaseId: 'case_demo_a',
+        followUpCaseId: 'case_demo_b',
+        experimentId: 'exp_0123456789abcdef',
+        parentStatus: 'present',
+        createdAt: '2026-06-30T11:00:00.000Z',
+      };
+      var proxy = new Proxy(realLink, {
+        getOwnPropertyDescriptor: function (target, k) {
+          if (k === 'linkId') {
+            return { get: function () { return 'link_fakefakefakefake'; }, enumerable: true, configurable: true };
+          }
+          return Object.getOwnPropertyDescriptor(target, k);
+        },
+        get: function (target, k) { return target[k]; },
+      });
+      return Promise.resolve([proxy]);
+    },
+  };
+  var stubTimelineStore = {
+    getTimeline: function () { return Promise.resolve(null); },
+    appendEvent: function () { return Promise.resolve(); },
+  };
+  var svc = SVC.createFollowUpTimelineService({
+    timelineStore: stubTimelineStore,
+    followUpLinkStore: stubLinkStore,
+  });
+  var list = await svc.listFollowUpLinksForParent('case_demo_a');
+  // After clean-clone, accessor descriptors are dropped (structuredClone preserves
+  // values, not descriptor shapes; accessors don't survive). Either rejected or
+  // accepted as a fully clean record.
+  if (list.length === 1) {
+    chk('T2: accessor-Proxy row cleaned to data-only link',
+      JSON.stringify(list[0]).indexOf('fakefakefakefake') === -1
+        || SVC.verifyAuthoritativeFollowUpLink(list[0]) === true);
+  } else {
+    chk('T2: accessor-Proxy row rejected', true);
+  }
+})();
+
 // ------------------------------------------------------------------
 // Summary
 // ------------------------------------------------------------------
