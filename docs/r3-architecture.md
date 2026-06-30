@@ -5,9 +5,15 @@ workspace** with local persistence, an explicit-only comparison pipeline, an aut
 a per-store experiment / outcome / timeline / follow-up record set, and a hardening + migration layer.
 
 This document is the runtime map: what the modules are, how they fit together, where the trust boundaries sit,
-and which checks are fail-closed. Every conclusion the product surfaces carries
-**credibility · confidence · provenance · limitations · blockers · evidence references · next validation step**;
-those fields are produced by the services described here, never by the shell or view models.
+and which checks are fail-closed. Every conclusion the product surfaces carries **credibility and
+limitations** at minimum; most also carry **confidence** and **provenance**. The remaining fields — what
+names a fail-closed reason, what names the supporting evidence, what tells the user how to upgrade the
+claim — exist on most producers but under **different field names per producer**, not one universal name:
+`blockedReasons[]` (R3.0C credibility contract), `cannotConcludeReasonCodes[]` + `evidenceSummary[]` +
+`nextValidationAction` (R3.0D Engineer Brief), `blockers[]` + `nextValidationAction` (R3.0C C6 export). The
+R3.0E Outcome object is a structural exception: it carries `limitations[]` and `confounders[]` but has no
+`credibility`, `confidence`, `provenance`, or "next validation step" field at all (see
+`docs/r3-experiment-loop.md`). None of these fields is produced by the shell or view models.
 
 The credibility ladder used throughout is:
 

@@ -6,7 +6,7 @@ The ladder, in shorthand, is the only basis for what the UI is allowed to render
 
 > Physics > Model > Measured > Derived > Heuristic > Unavailable
 
-Every conclusion described below carries credibility, confidence (where relevant), provenance, limitations, blockers, evidence references, and a next validation step. The product never approximates around a missing input; it blocks with a machine-readable reason.
+Every conclusion described below carries `credibility` and `limitations` at minimum; most also carry `confidence` and `provenance`. The remaining honesty-contract fields (a fail-closed reason, the supporting evidence, what to do to upgrade the claim) exist on most producers but under different field names per producer — see `docs/r3-architecture.md`'s introduction for the exact names per layer. The R3.0E Outcome object specifically has no `credibility`/`confidence`/`provenance`/next-validation field at all (see `docs/r3-experiment-loop.md`). The product never approximates around a missing input; it blocks with a machine-readable reason.
 
 A note on version numbers used in this document: "the case-record schema frozen at v1.4.0" is a human-readable label for "the on-disk shape of a Case record as it stood when the package version was 1.4.0" — it is **not** a literal version string stored in code. The actual schema-version field is `CASE_SCHEMA_VERSION` in `renderer/js/schema-migration.js`, a plain integer (`1` today), and F1's migrators compare against that integer, not against any `"v1.4.0"` string. The **package application version** is `1.4.0` today, with a target of `2.0.0` post-merge of the integrated delivery train. The two are related but distinct: a future application version bump does not, on its own, advance `CASE_SCHEMA_VERSION`.
 
@@ -139,16 +139,16 @@ R3.0D produced the Engineer Brief through a four-stage pipeline that is authorit
 3. **Priority engine (D4)** — ranks the hypothesis list using only the authoritative graph's evidence references. No external priors, no learned weights, no LLM.
 4. **Engineer Brief (D5)** — renders the prioritised hypotheses with their full honesty contract.
 
-What the user sees in the brief, per item:
+What the user sees in the brief, per item — these are the real fields of `contracts/r3.0d/engineer-brief-contract.js`'s closed key set:
 
-- The hypothesis statement (never a measured magnitude derived from raw steering, never a corner attribution from driver behaviour alone).
-- Credibility (ladder rung).
-- Confidence (capped at `medium` for directional / raw-steering observations).
-- Provenance (synthetic / real / unverified, propagated unchanged from import).
-- Limitations (linear regime, single representative track, kinematic and confounded — whichever apply).
-- Blockers, if any related stronger claim was blocked, including the reason code.
-- Evidence references (which laps / corners / channels / windows the brief is anchored in).
-- Next validation step (what the user would have to do to upgrade the claim — typically "import a verified steering calibration" or "collect a multi-lap, multi-corner repeat at confirmed-channel quality").
+- The hypothesis statement (`primaryIssueI18nKey`/`primaryIssueParams`, optionally a `secondaryIssueI18nKey`) — never a measured magnitude derived from raw steering, never a corner attribution from driver behaviour alone.
+- `credibility` — the primary hypothesis's rung from the `CONCLUSION_CREDIBILITY` ladder (defaults to `Heuristic` when there is no primary hypothesis).
+- `confidence` — at the D5 layer this is hardcoded to `{ state: 'not_computed' }`. D5 does **not** echo D3's internal quantitative confidence score into the brief; there is no "capped at medium" behavior at this layer.
+- `provenance` — at the D5 layer this is hardcoded to `'unverified'`. D5 deliberately does not make a real/synthetic claim about evidence sources at the brief layer (that signal is consumed individually at the D2 evidence-node level); it is **not** propagated from the import path.
+- `limitations` — the deduplicated union of `hypothesisSet.limitations` and every individual hypothesis's limitations (e.g. `LIMITATION_SYNTHETIC_ONLY`, `LIMITATION_SINGLE_LAP_SAMPLE`, `LIMITATION_HEURISTIC_ONLY` — whichever apply; no brief-level addition on top).
+- `cannotConcludeReasonCodes` — the fail-closed-reason field, populated when a stronger claim could not be made.
+- `evidenceSummary` — an array of `{ nodeId, i18nKey, params }`, naming the evidence-graph nodes the brief is anchored in.
+- `nextValidationAction` — `{ actionId, kind, i18nKey } | null`, what the user would have to do to upgrade the claim (e.g. import a verified calibration, collect a controlled repeat).
 
 Things the brief will never contain at runtime, by construction:
 
