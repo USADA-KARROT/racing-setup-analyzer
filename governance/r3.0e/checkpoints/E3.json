@@ -7,8 +7,8 @@
   "previousCheckpoint": "E2_EXPERIMENT_STORE",
   "shaSeparation": {
     "note": "Three-way SHA separation per the established R3.0 convention.",
-    "reviewedCandidateSha": null,
-    "reviewedCandidateNote": "Filled after Codex E3 PASS verdict against a specific candidate SHA. Tier 1 raw evidence: governance/r3.0e/codex-checkpoint-evidence/E3/round-N-<sha>.raw.txt.",
+    "reviewedCandidateSha": "d73daf6e7280a0673cb1a7c75994daf4b1372111",
+    "reviewedCandidateNote": "Codex E3 Round 8 reviewed this exact SHA and issued FINAL VERDICT: PASS (2026-06-30). 11 distinct adversarial findings closed across 7 rounds: R1-01 Object.create rebind / R1-02 driverFeedback grammar / R1-03 sparse arrays / R2-01 sideEffects.i18nKey grammar / R2-02 sideEffects.params primitive allowlist / R2-03 sparse experiment.controlVariables / R3-01 followUpCaseIds binding / R3-02 sideEffects.params deep-rebuild / R4-01 defineProperty injection post-rebuild value re-read / R5-01 Array.prototype.push capture / R5-02 defineProperty CV-set forgery elimination via captured-array set / R6-01 toJSON-driven post-validation mutation eliminated via freeze-first + custom byte walker / R7-01 TextEncoder undercount eliminated via capture-free s.length*4 + dataQualityIssues i18n grammar.",
     "manifestCommitSha": null,
     "integrationSha": null
   },
@@ -49,11 +49,20 @@
   "artifactId": null,
   "artifactBoundSha": null,
   "codexVerdict": {
-    "verdict": "pending",
-    "verdictRound": 0,
-    "reviewedCandidateSha": null,
-    "verdictEvidenceFile": null,
-    "rounds": []
+    "verdict": "PASS",
+    "verdictRound": 8,
+    "reviewedCandidateSha": "d73daf6e7280a0673cb1a7c75994daf4b1372111",
+    "verdictEvidenceFile": "governance/r3.0e/codex-checkpoint-evidence/E3/round-8-d73daf6-PASS.raw.txt",
+    "rounds": [
+      { "round": 1, "reviewedSha": "ab01b80", "verdict": "BLOCK", "findings": "3 BLOCK (E3-R1-01..03)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-1-ab01b80.raw.txt" },
+      { "round": 2, "reviewedSha": "1c6146d", "verdict": "BLOCK", "findings": "3 BLOCK (E3-R2-01..03)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-2-1c6146d.raw.txt" },
+      { "round": 3, "reviewedSha": "56fdd73", "verdict": "BLOCK", "findings": "1 BLOCK (E3-R3-01) + 1 NIT (E3-R3-02)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-3-56fdd73.raw.txt" },
+      { "round": 4, "reviewedSha": "9419a1b", "verdict": "BLOCK", "findings": "1 BLOCK (E3-R4-01)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-4-9419a1b.raw.txt" },
+      { "round": 5, "reviewedSha": "9ca51a8", "verdict": "BLOCK", "findings": "2 BLOCK (E3-R5-01..02)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-5-9ca51a8.raw.txt" },
+      { "round": 6, "reviewedSha": "4a55c98", "verdict": "BLOCK", "findings": "1 BLOCK (E3-R6-01)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-6-4a55c98.raw.txt" },
+      { "round": 7, "reviewedSha": "2770507", "verdict": "BLOCK", "findings": "1 BLOCK (E3-R7-01)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-7-2770507.raw.txt" },
+      { "round": 8, "reviewedSha": "d73daf6", "verdict": "PASS", "findings": "0", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-8-d73daf6-PASS.raw.txt" }
+    ]
   },
   "r3bCaseRecordSchemaUntouched": true,
   "scopeBoundary": {
