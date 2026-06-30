@@ -2,10 +2,11 @@
  * renderer/js/r3-0e-stores.js — R3.0E E2 · IndexedDB-backed experiment / outcome / timeline /
  * follow-up-link stores (PRODUCTION).
  *
- * Mirrors the R3.0B case-store / session-store pattern: pure logic over an injected
- * storage backend (`backend.transact(stores, mode, work)`). Each store factory returns a
- * narrow CRUD-ish API. Per SKYLINE D12/E1 ruling: R3.0E persistence lives in SEPARATE
- * versioned stores and MUST NOT extend the frozen R3.0B portable case-record schema body.
+ * Uses the R3.0B storage-backend.js contract for atomic transactions:
+ *   backend.transact({ stores:[ns...], reads:[{store,key}...], compute:(readValues)=>({writes, result}) })
+ *
+ * Per SKYLINE D12/E1 ruling: R3.0E persistence lives in SEPARATE versioned stores and MUST
+ * NOT extend the frozen R3.0B portable case-record schema body.
  *
  * Stores:
  *   - r3_0e_experiments       payload by experimentId
@@ -18,26 +19,20 @@
  *   - r3_0e_storeMetadata     migration / schema-version marker
  *
  * Persistence semantics:
- *   - Every payload carries a schemaVersion. Future-schemaVersion is fail-closed: a read
- *     of a record whose schemaVersion > currentSchemaVersion returns null with a
- *     surfaced reason (the caller MUST treat it as unreadable, not as an empty record).
- *   - Persisted records DO NOT carry runtime authority (WeakSet identity is a runtime
- *     concept that cannot survive reload). Rehydration MUST re-validate via the E1
- *     contracts and re-register with the appropriate runtime authority registry BEFORE
- *     a downstream consumer treats the rehydrated value as authoritative.
- *   - Append-only timeline: timeline.events is append-only; existing events are NEVER
- *     overwritten. A correction is a NEW event referencing the prior event id.
- *   - Idempotent re-write: writing a payload whose schemaVersion/id matches a stored
- *     record is permitted (acts as no-op except for updatedAt) unless the digest
- *     differs (stale generation rejected).
+ *   - Every payload validated by its E1 contract BEFORE write (in compute()).
+ *   - Every payload re-validated on read; future-schemaVersion → fail-closed reject.
+ *   - Timeline events append-only; duplicate eventId rejected; out-of-order timestamp
+ *     rejected.
+ *   - Persisted records carry NO runtime authority (WeakSet identity is closure-private
+ *     and cannot survive reload). Rehydration consumers MUST re-validate via the E1
+ *     contracts before treating values as authoritative.
  *
  * UMD: Node require / Electron renderer global (R3_0E_Stores).
  */
 (function (root) {
   'use strict';
-  // E1 contracts — REQUIRED for validation. Module fail-loud if missing. Literal-string
-  // require specifiers per the no-consumer scanner convention; browser fallback via
-  // R3_0E_* globals.
+
+  // E1 contracts — REQUIRED for validation. Literal-string require specifiers.
   var EXP = null, OUT = null, TL = null, FU = null, CV = null, RC_E = null;
   if (typeof module !== 'undefined' && module.exports) {
     try { EXP = require('../../contracts/r3.0e/experiment-contract.js'); } catch (e) { EXP = null; }
@@ -54,11 +49,9 @@
   if (CV === null && typeof R3_0E_ControlVariablesContract !== 'undefined') CV = R3_0E_ControlVariablesContract;
   if (RC_E === null && typeof R3_0E_ReasonCodes !== 'undefined') RC_E = R3_0E_ReasonCodes;
   if (!EXP || !OUT || !TL || !FU || !CV || !RC_E) {
-    throw new Error('r3-0e-stores.js: requires R3.0E E1 contracts (experiment / outcome / timeline / follow-up / control-variables / reason-codes)');
+    throw new Error('r3-0e-stores.js: requires R3.0E E1 contracts');
   }
-  var CODES_E = RC_E.REASON_CODES;
 
-  // Store names — versioned namespace per directive §8 (independent from R3.0B/R3.0C).
   var STORE_NAMES = Object.freeze({
     EXPERIMENTS: 'r3_0e_experiments',
     EXPERIMENTS_INDEX: 'r3_0e_experimentsIndex',
@@ -70,7 +63,6 @@
     STORE_METADATA: 'r3_0e_storeMetadata',
   });
 
-  // Current schema versions per payload class.
   var SCHEMA_VERSIONS = Object.freeze({
     experiment: 1,
     outcome: 1,
@@ -80,101 +72,98 @@
 
   function _now(stamp) { return stamp || (typeof Date !== 'undefined' ? new Date().toISOString() : '1970-01-01T00:00:00.000Z'); }
   function _err(code, extra) { var e = new Error(code); e.code = code; if (extra) Object.assign(e, extra); return e; }
-
-  function _frozenClone(obj) {
-    // Defensive: store callers' input by deep-freezing a structuredClone so subsequent
-    // mutation of the input does NOT bleed into the persisted record. Persisted records
-    // are themselves frozen on read.
-    var clone;
-    try { clone = (typeof structuredClone === 'function') ? structuredClone(obj) : JSON.parse(JSON.stringify(obj)); }
-    catch (e) { return null; }
-    function deepFreeze(v) {
-      if (v === null || typeof v !== 'object') return v;
-      try { Object.freeze(v); } catch (e) { /* swallow */ }
-      var keys = Object.getOwnPropertyNames(v);
-      for (var i = 0; i < keys.length; i++) deepFreeze(v[keys[i]]);
-      return v;
-    }
-    return deepFreeze(clone);
+  function _deepFreeze(v) {
+    if (v === null || typeof v !== 'object') return v;
+    try { Object.freeze(v); } catch (e) { /* swallow */ }
+    var keys = Object.getOwnPropertyNames(v);
+    for (var i = 0; i < keys.length; i++) _deepFreeze(v[keys[i]]);
+    return v;
   }
 
   // ========================================================================================
   // Experiment store
   // ========================================================================================
-  function createExperimentStore(backend, opts) {
-    opts = opts || {};
+  function createExperimentStore(backend) {
     if (!backend || typeof backend.transact !== 'function') throw _err('R3_0E_STORE_BACKEND_INVALID');
     return {
       create: function (rec) {
-        // E1 validate; reject on structural fail.
         var v = EXP.validateExperimentShape(rec);
         if (v.valid !== true) return Promise.reject(_err('R3_0E_EXPERIMENT_INVALID', { reasonCodes: v.reasonCodes }));
         if (rec.schemaVersion !== SCHEMA_VERSIONS.experiment) return Promise.reject(_err('R3_0E_EXPERIMENT_SCHEMA_MISMATCH'));
-        return backend.transact([STORE_NAMES.EXPERIMENTS, STORE_NAMES.EXPERIMENTS_INDEX], 'readwrite', function (tx) {
-          var existing = tx.get(STORE_NAMES.EXPERIMENTS, rec.experimentId);
-          return Promise.resolve(existing).then(function (cur) {
-            if (cur) return Promise.reject(_err('R3_0E_EXPERIMENT_ID_COLLISION'));
-            var payload = _frozenClone(rec);
-            tx.put(STORE_NAMES.EXPERIMENTS, rec.experimentId, payload);
-            tx.put(STORE_NAMES.EXPERIMENTS_INDEX, rec.experimentId, {
-              experimentId: rec.experimentId,
-              sourceCaseId: rec.sourceCaseId,
-              status: rec.status,
-              createdAt: rec.createdAt,
-              updatedAt: rec.createdAt,
-            });
-            return rec.experimentId;
-          });
+        return backend.transact({
+          stores: [STORE_NAMES.EXPERIMENTS, STORE_NAMES.EXPERIMENTS_INDEX],
+          reads: [{ store: STORE_NAMES.EXPERIMENTS, key: rec.experimentId }],
+          compute: function (reads) {
+            if (reads[0] !== undefined && reads[0] !== null) throw _err('R3_0E_EXPERIMENT_ID_COLLISION');
+            return {
+              writes: [
+                { store: STORE_NAMES.EXPERIMENTS, key: rec.experimentId, value: rec },
+                { store: STORE_NAMES.EXPERIMENTS_INDEX, key: rec.experimentId, value: {
+                  experimentId: rec.experimentId, sourceCaseId: rec.sourceCaseId,
+                  status: rec.status, createdAt: rec.createdAt, updatedAt: rec.createdAt,
+                } },
+              ],
+              result: rec.experimentId,
+            };
+          },
         });
       },
       update: function (rec) {
         var v = EXP.validateExperimentShape(rec);
         if (v.valid !== true) return Promise.reject(_err('R3_0E_EXPERIMENT_INVALID', { reasonCodes: v.reasonCodes }));
-        return backend.transact([STORE_NAMES.EXPERIMENTS, STORE_NAMES.EXPERIMENTS_INDEX], 'readwrite', function (tx) {
-          var cur = tx.get(STORE_NAMES.EXPERIMENTS, rec.experimentId);
-          return Promise.resolve(cur).then(function (existing) {
-            if (!existing) return Promise.reject(_err('R3_0E_EXPERIMENT_MISSING'));
-            if (existing.schemaVersion > SCHEMA_VERSIONS.experiment) return Promise.reject(_err('R3_0E_EXPERIMENT_FUTURE_SCHEMA'));
-            // Stale generation: createdAt mismatch is treated as a stale write.
-            if (existing.createdAt !== rec.createdAt) return Promise.reject(_err('R3_0E_EXPERIMENT_STALE_WRITE'));
-            var payload = _frozenClone(rec);
-            tx.put(STORE_NAMES.EXPERIMENTS, rec.experimentId, payload);
-            tx.put(STORE_NAMES.EXPERIMENTS_INDEX, rec.experimentId, {
-              experimentId: rec.experimentId,
-              sourceCaseId: rec.sourceCaseId,
-              status: rec.status,
-              createdAt: rec.createdAt,
-              updatedAt: _now(),
-            });
-            return rec.experimentId;
-          });
+        return backend.transact({
+          stores: [STORE_NAMES.EXPERIMENTS, STORE_NAMES.EXPERIMENTS_INDEX],
+          reads: [{ store: STORE_NAMES.EXPERIMENTS, key: rec.experimentId }],
+          compute: function (reads) {
+            var existing = reads[0];
+            if (existing === undefined || existing === null) throw _err('R3_0E_EXPERIMENT_MISSING');
+            if (existing.schemaVersion > SCHEMA_VERSIONS.experiment) throw _err('R3_0E_EXPERIMENT_FUTURE_SCHEMA');
+            if (existing.createdAt !== rec.createdAt) throw _err('R3_0E_EXPERIMENT_STALE_WRITE');
+            return {
+              writes: [
+                { store: STORE_NAMES.EXPERIMENTS, key: rec.experimentId, value: rec },
+                { store: STORE_NAMES.EXPERIMENTS_INDEX, key: rec.experimentId, value: {
+                  experimentId: rec.experimentId, sourceCaseId: rec.sourceCaseId,
+                  status: rec.status, createdAt: rec.createdAt, updatedAt: _now(),
+                } },
+              ],
+              result: rec.experimentId,
+            };
+          },
         });
       },
       get: function (experimentId) {
-        return backend.transact([STORE_NAMES.EXPERIMENTS], 'readonly', function (tx) {
-          return Promise.resolve(tx.get(STORE_NAMES.EXPERIMENTS, experimentId)).then(function (rec) {
-            if (!rec) return null;
-            if (rec.schemaVersion > SCHEMA_VERSIONS.experiment) {
-              // Future schema → unreadable; surface as null + reason on the surface contract.
-              return Promise.reject(_err('R3_0E_EXPERIMENT_FUTURE_SCHEMA'));
-            }
-            // Re-validate on read (defensive against corrupted record).
+        return backend.transact({
+          stores: [STORE_NAMES.EXPERIMENTS],
+          reads: [{ store: STORE_NAMES.EXPERIMENTS, key: experimentId }],
+          compute: function (reads) {
+            var rec = reads[0];
+            if (rec === undefined || rec === null) return { writes: [], result: null };
+            if (rec.schemaVersion > SCHEMA_VERSIONS.experiment) throw _err('R3_0E_EXPERIMENT_FUTURE_SCHEMA');
             var v = EXP.validateExperimentShape(rec);
-            if (v.valid !== true) return Promise.reject(_err('R3_0E_EXPERIMENT_CORRUPTED', { reasonCodes: v.reasonCodes }));
-            return _frozenClone(rec);
-          });
+            if (v.valid !== true) throw _err('R3_0E_EXPERIMENT_CORRUPTED', { reasonCodes: v.reasonCodes });
+            return { writes: [], result: _deepFreeze(rec) };
+          },
         });
       },
       list: function () {
-        return backend.transact([STORE_NAMES.EXPERIMENTS_INDEX], 'readonly', function (tx) {
-          return Promise.resolve(tx.list ? tx.list(STORE_NAMES.EXPERIMENTS_INDEX) : []);
-        });
+        return backend.list ? backend.list(STORE_NAMES.EXPERIMENTS_INDEX).then(function (rows) {
+          return rows.map(function (r) { return r.value; });
+        }) : Promise.resolve([]);
       },
       remove: function (experimentId) {
-        return backend.transact([STORE_NAMES.EXPERIMENTS, STORE_NAMES.EXPERIMENTS_INDEX], 'readwrite', function (tx) {
-          tx.del(STORE_NAMES.EXPERIMENTS, experimentId);
-          tx.del(STORE_NAMES.EXPERIMENTS_INDEX, experimentId);
-          return experimentId;
+        return backend.transact({
+          stores: [STORE_NAMES.EXPERIMENTS, STORE_NAMES.EXPERIMENTS_INDEX],
+          reads: [],
+          compute: function () {
+            return {
+              writes: [
+                { store: STORE_NAMES.EXPERIMENTS, key: experimentId, op: 'delete' },
+                { store: STORE_NAMES.EXPERIMENTS_INDEX, key: experimentId, op: 'delete' },
+              ],
+              result: experimentId,
+            };
+          },
         });
       },
     };
@@ -189,38 +178,42 @@
       create: function (rec) {
         var v = OUT.validateOutcomeShape(rec);
         if (v.valid !== true) return Promise.reject(_err('R3_0E_OUTCOME_INVALID', { reasonCodes: v.reasonCodes }));
-        return backend.transact([STORE_NAMES.OUTCOMES, STORE_NAMES.OUTCOMES_INDEX], 'readwrite', function (tx) {
-          var cur = tx.get(STORE_NAMES.OUTCOMES, rec.outcomeId);
-          return Promise.resolve(cur).then(function (existing) {
-            if (existing) return Promise.reject(_err('R3_0E_OUTCOME_ID_COLLISION'));
-            var payload = _frozenClone(rec);
-            tx.put(STORE_NAMES.OUTCOMES, rec.outcomeId, payload);
-            tx.put(STORE_NAMES.OUTCOMES_INDEX, rec.outcomeId, {
-              outcomeId: rec.outcomeId,
-              experimentId: rec.experimentId,
-              class: rec['class'],
-              createdAt: rec.createdAt,
-            });
-            return rec.outcomeId;
-          });
+        return backend.transact({
+          stores: [STORE_NAMES.OUTCOMES, STORE_NAMES.OUTCOMES_INDEX],
+          reads: [{ store: STORE_NAMES.OUTCOMES, key: rec.outcomeId }],
+          compute: function (reads) {
+            if (reads[0] !== undefined && reads[0] !== null) throw _err('R3_0E_OUTCOME_ID_COLLISION');
+            return {
+              writes: [
+                { store: STORE_NAMES.OUTCOMES, key: rec.outcomeId, value: rec },
+                { store: STORE_NAMES.OUTCOMES_INDEX, key: rec.outcomeId, value: {
+                  outcomeId: rec.outcomeId, experimentId: rec.experimentId,
+                  class: rec['class'], createdAt: rec.createdAt,
+                } },
+              ],
+              result: rec.outcomeId,
+            };
+          },
         });
       },
       get: function (outcomeId) {
-        return backend.transact([STORE_NAMES.OUTCOMES], 'readonly', function (tx) {
-          return Promise.resolve(tx.get(STORE_NAMES.OUTCOMES, outcomeId)).then(function (rec) {
-            if (!rec) return null;
-            if (rec.schemaVersion > SCHEMA_VERSIONS.outcome) return Promise.reject(_err('R3_0E_OUTCOME_FUTURE_SCHEMA'));
+        return backend.transact({
+          stores: [STORE_NAMES.OUTCOMES],
+          reads: [{ store: STORE_NAMES.OUTCOMES, key: outcomeId }],
+          compute: function (reads) {
+            var rec = reads[0];
+            if (rec === undefined || rec === null) return { writes: [], result: null };
+            if (rec.schemaVersion > SCHEMA_VERSIONS.outcome) throw _err('R3_0E_OUTCOME_FUTURE_SCHEMA');
             var v = OUT.validateOutcomeShape(rec);
-            if (v.valid !== true) return Promise.reject(_err('R3_0E_OUTCOME_CORRUPTED', { reasonCodes: v.reasonCodes }));
-            return _frozenClone(rec);
-          });
+            if (v.valid !== true) throw _err('R3_0E_OUTCOME_CORRUPTED', { reasonCodes: v.reasonCodes });
+            return { writes: [], result: _deepFreeze(rec) };
+          },
         });
       },
       listForExperiment: function (experimentId) {
-        return backend.transact([STORE_NAMES.OUTCOMES_INDEX], 'readonly', function (tx) {
-          return Promise.resolve(tx.list ? tx.list(STORE_NAMES.OUTCOMES_INDEX) : []).then(function (rows) {
-            return (rows || []).filter(function (r) { return r && r.experimentId === experimentId; });
-          });
+        if (!backend.list) return Promise.resolve([]);
+        return backend.list(STORE_NAMES.OUTCOMES_INDEX).then(function (rows) {
+          return rows.map(function (r) { return r.value; }).filter(function (r) { return r && r.experimentId === experimentId; });
         });
       },
     };
@@ -233,40 +226,42 @@
     if (!backend || typeof backend.transact !== 'function') throw _err('R3_0E_STORE_BACKEND_INVALID');
     return {
       getTimeline: function (caseId) {
-        return backend.transact([STORE_NAMES.TIMELINES], 'readonly', function (tx) {
-          return Promise.resolve(tx.get(STORE_NAMES.TIMELINES, caseId)).then(function (rec) {
-            if (!rec) return { schemaVersion: SCHEMA_VERSIONS.timeline, caseId: caseId, events: [] };
-            if (rec.schemaVersion > SCHEMA_VERSIONS.timeline) return Promise.reject(_err('R3_0E_TIMELINE_FUTURE_SCHEMA'));
+        return backend.transact({
+          stores: [STORE_NAMES.TIMELINES],
+          reads: [{ store: STORE_NAMES.TIMELINES, key: caseId }],
+          compute: function (reads) {
+            var rec = reads[0];
+            if (rec === undefined || rec === null) {
+              return { writes: [], result: { schemaVersion: SCHEMA_VERSIONS.timeline, caseId: caseId, events: [] } };
+            }
+            if (rec.schemaVersion > SCHEMA_VERSIONS.timeline) throw _err('R3_0E_TIMELINE_FUTURE_SCHEMA');
             var v = TL.validateCaseTimelineShape(rec);
-            if (v.valid !== true) return Promise.reject(_err('R3_0E_TIMELINE_CORRUPTED', { reasonCodes: v.reasonCodes }));
-            return _frozenClone(rec);
-          });
+            if (v.valid !== true) throw _err('R3_0E_TIMELINE_CORRUPTED', { reasonCodes: v.reasonCodes });
+            return { writes: [], result: _deepFreeze(rec) };
+          },
         });
       },
       appendEvent: function (caseId, event) {
-        // Append-only: read current, append, write back. Existing events are NEVER mutated.
-        return backend.transact([STORE_NAMES.TIMELINES], 'readwrite', function (tx) {
-          var curP = tx.get(STORE_NAMES.TIMELINES, caseId);
-          return Promise.resolve(curP).then(function (cur) {
-            var existing = cur || { schemaVersion: SCHEMA_VERSIONS.timeline, caseId: caseId, events: [] };
-            if (existing.schemaVersion > SCHEMA_VERSIONS.timeline) return Promise.reject(_err('R3_0E_TIMELINE_FUTURE_SCHEMA'));
-            // Reject duplicate eventId.
+        return backend.transact({
+          stores: [STORE_NAMES.TIMELINES],
+          reads: [{ store: STORE_NAMES.TIMELINES, key: caseId }],
+          compute: function (reads) {
+            var existing = reads[0] || { schemaVersion: SCHEMA_VERSIONS.timeline, caseId: caseId, events: [] };
+            if (existing.schemaVersion > SCHEMA_VERSIONS.timeline) throw _err('R3_0E_TIMELINE_FUTURE_SCHEMA');
             for (var i = 0; i < existing.events.length; i++) {
-              if (existing.events[i].eventId === event.eventId) return Promise.reject(_err('R3_0E_TIMELINE_DUPLICATE_EVENT'));
+              if (existing.events[i].eventId === event.eventId) throw _err('R3_0E_TIMELINE_DUPLICATE_EVENT');
             }
-            // Reject out-of-order timestamp.
             if (existing.events.length > 0) {
               var prevMs = Date.parse(existing.events[existing.events.length - 1].createdAt);
               var newMs = Date.parse(event.createdAt);
-              if (isNaN(newMs) || newMs < prevMs) return Promise.reject(_err('R3_0E_TIMELINE_OUT_OF_ORDER'));
+              if (isNaN(newMs) || newMs < prevMs) throw _err('R3_0E_TIMELINE_OUT_OF_ORDER');
             }
             var nextEvents = existing.events.concat([event]);
             var next = { schemaVersion: SCHEMA_VERSIONS.timeline, caseId: caseId, events: nextEvents };
             var v = TL.validateCaseTimelineShape(next);
-            if (v.valid !== true) return Promise.reject(_err('R3_0E_TIMELINE_INVALID', { reasonCodes: v.reasonCodes }));
-            tx.put(STORE_NAMES.TIMELINES, caseId, _frozenClone(next));
-            return event.eventId;
-          });
+            if (v.valid !== true) throw _err('R3_0E_TIMELINE_INVALID', { reasonCodes: v.reasonCodes });
+            return { writes: [{ store: STORE_NAMES.TIMELINES, key: caseId, value: next }], result: event.eventId };
+          },
         });
       },
     };
@@ -277,91 +272,122 @@
   // ========================================================================================
   function createFollowUpLinkStore(backend) {
     if (!backend || typeof backend.transact !== 'function') throw _err('R3_0E_STORE_BACKEND_INVALID');
+
+    function _validateOne(rec) {
+      if (rec === undefined || rec === null) return null;
+      if (rec.schemaVersion > SCHEMA_VERSIONS.followUpLink) throw _err('R3_0E_LINK_FUTURE_SCHEMA');
+      var v = FU.validateFollowUpLinkShape(rec);
+      if (v.valid !== true) throw _err('R3_0E_LINK_CORRUPTED', { reasonCodes: v.reasonCodes });
+      return _deepFreeze(rec);
+    }
+
     return {
       create: function (link) {
         var v = FU.validateFollowUpLinkShape(link);
         if (v.valid !== true) return Promise.reject(_err('R3_0E_LINK_INVALID', { reasonCodes: v.reasonCodes }));
-        return backend.transact([STORE_NAMES.FOLLOWUP_LINKS, STORE_NAMES.FOLLOWUP_LINKS_BY_CASE], 'readwrite', function (tx) {
-          var cur = tx.get(STORE_NAMES.FOLLOWUP_LINKS, link.linkId);
-          return Promise.resolve(cur).then(function (existing) {
-            if (existing) return Promise.reject(_err('R3_0E_LINK_ID_COLLISION'));
-            var payload = _frozenClone(link);
-            tx.put(STORE_NAMES.FOLLOWUP_LINKS, link.linkId, payload);
-            // Reverse index: append linkId to parent case's list.
-            var idxP = tx.get(STORE_NAMES.FOLLOWUP_LINKS_BY_CASE, link.parentCaseId);
-            return Promise.resolve(idxP).then(function (idxRec) {
-              var arr = (idxRec && idxRec.linkIds) ? idxRec.linkIds.slice() : [];
-              if (arr.indexOf(link.linkId) === -1) arr.push(link.linkId);
-              tx.put(STORE_NAMES.FOLLOWUP_LINKS_BY_CASE, link.parentCaseId, { parentCaseId: link.parentCaseId, linkIds: arr });
-              return link.linkId;
-            });
-          });
+        return backend.transact({
+          stores: [STORE_NAMES.FOLLOWUP_LINKS, STORE_NAMES.FOLLOWUP_LINKS_BY_CASE],
+          reads: [
+            { store: STORE_NAMES.FOLLOWUP_LINKS, key: link.linkId },
+            { store: STORE_NAMES.FOLLOWUP_LINKS_BY_CASE, key: link.parentCaseId },
+          ],
+          compute: function (reads) {
+            if (reads[0] !== undefined && reads[0] !== null) throw _err('R3_0E_LINK_ID_COLLISION');
+            var idx = reads[1];
+            var arr = (idx && idx.linkIds) ? idx.linkIds.slice() : [];
+            if (arr.indexOf(link.linkId) === -1) arr.push(link.linkId);
+            return {
+              writes: [
+                { store: STORE_NAMES.FOLLOWUP_LINKS, key: link.linkId, value: link },
+                { store: STORE_NAMES.FOLLOWUP_LINKS_BY_CASE, key: link.parentCaseId, value: { parentCaseId: link.parentCaseId, linkIds: arr } },
+              ],
+              result: link.linkId,
+            };
+          },
         });
       },
       get: function (linkId) {
-        return backend.transact([STORE_NAMES.FOLLOWUP_LINKS], 'readonly', function (tx) {
-          return Promise.resolve(tx.get(STORE_NAMES.FOLLOWUP_LINKS, linkId)).then(function (rec) {
-            if (!rec) return null;
-            if (rec.schemaVersion > SCHEMA_VERSIONS.followUpLink) return Promise.reject(_err('R3_0E_LINK_FUTURE_SCHEMA'));
-            var v = FU.validateFollowUpLinkShape(rec);
-            if (v.valid !== true) return Promise.reject(_err('R3_0E_LINK_CORRUPTED', { reasonCodes: v.reasonCodes }));
-            return _frozenClone(rec);
-          });
+        return backend.transact({
+          stores: [STORE_NAMES.FOLLOWUP_LINKS],
+          reads: [{ store: STORE_NAMES.FOLLOWUP_LINKS, key: linkId }],
+          compute: function (reads) {
+            return { writes: [], result: _validateOne(reads[0]) };
+          },
         });
       },
       listForParent: function (parentCaseId) {
-        return backend.transact([STORE_NAMES.FOLLOWUP_LINKS, STORE_NAMES.FOLLOWUP_LINKS_BY_CASE], 'readonly', function (tx) {
-          return Promise.resolve(tx.get(STORE_NAMES.FOLLOWUP_LINKS_BY_CASE, parentCaseId)).then(function (idx) {
-            if (!idx || !idx.linkIds) return [];
-            var promises = [];
-            for (var i = 0; i < idx.linkIds.length; i++) {
-              promises.push(Promise.resolve(tx.get(STORE_NAMES.FOLLOWUP_LINKS, idx.linkIds[i])));
-            }
-            return Promise.all(promises).then(function (records) {
-              return records.filter(function (r) { return r !== null && r !== undefined; });
-            });
+        // 1. Read the reverse index.
+        return backend.transact({
+          stores: [STORE_NAMES.FOLLOWUP_LINKS_BY_CASE],
+          reads: [{ store: STORE_NAMES.FOLLOWUP_LINKS_BY_CASE, key: parentCaseId }],
+          compute: function (reads) {
+            return { writes: [], result: (reads[0] && reads[0].linkIds) ? reads[0].linkIds.slice() : [] };
+          },
+        }).then(function (linkIds) {
+          if (!linkIds.length) return [];
+          // 2. Read every link in one transact (atomic snapshot).
+          var readSpec = linkIds.map(function (id) { return { store: STORE_NAMES.FOLLOWUP_LINKS, key: id }; });
+          return backend.transact({
+            stores: [STORE_NAMES.FOLLOWUP_LINKS],
+            reads: readSpec,
+            compute: function (reads) {
+              // Codex E2-R1-02 closure: validate every fetched link before returning.
+              var out = [];
+              for (var i = 0; i < reads.length; i++) {
+                var validated = _validateOne(reads[i]);
+                if (validated !== null) out.push(validated);
+              }
+              return { writes: [], result: out };
+            },
           });
         });
       },
       markParentStatus: function (linkId, newStatus) {
-        // Update parentStatus without rewriting other fields (idempotent for present→archived→deleted).
         if (['present', 'archived', 'deleted'].indexOf(newStatus) === -1) {
           return Promise.reject(_err('R3_0E_LINK_PARENT_STATUS_INVALID'));
         }
-        return backend.transact([STORE_NAMES.FOLLOWUP_LINKS], 'readwrite', function (tx) {
-          return Promise.resolve(tx.get(STORE_NAMES.FOLLOWUP_LINKS, linkId)).then(function (cur) {
-            if (!cur) return Promise.reject(_err('R3_0E_LINK_MISSING'));
+        return backend.transact({
+          stores: [STORE_NAMES.FOLLOWUP_LINKS],
+          reads: [{ store: STORE_NAMES.FOLLOWUP_LINKS, key: linkId }],
+          compute: function (reads) {
+            var cur = reads[0];
+            if (cur === undefined || cur === null) throw _err('R3_0E_LINK_MISSING');
             var next = Object.assign({}, cur, { parentStatus: newStatus });
             var v = FU.validateFollowUpLinkShape(next);
-            if (v.valid !== true) return Promise.reject(_err('R3_0E_LINK_INVALID', { reasonCodes: v.reasonCodes }));
-            tx.put(STORE_NAMES.FOLLOWUP_LINKS, linkId, _frozenClone(next));
-            return linkId;
-          });
+            if (v.valid !== true) throw _err('R3_0E_LINK_INVALID', { reasonCodes: v.reasonCodes });
+            return { writes: [{ store: STORE_NAMES.FOLLOWUP_LINKS, key: linkId, value: next }], result: linkId };
+          },
         });
       },
     };
   }
 
   // ========================================================================================
-  // Store metadata (migration markers)
+  // Store metadata
   // ========================================================================================
   function createStoreMetadata(backend) {
     if (!backend || typeof backend.transact !== 'function') throw _err('R3_0E_STORE_BACKEND_INVALID');
     return {
       readVersion: function () {
-        return backend.transact([STORE_NAMES.STORE_METADATA], 'readonly', function (tx) {
-          return Promise.resolve(tx.get(STORE_NAMES.STORE_METADATA, '__r3_0e_version'));
+        return backend.transact({
+          stores: [STORE_NAMES.STORE_METADATA],
+          reads: [{ store: STORE_NAMES.STORE_METADATA, key: '__r3_0e_version' }],
+          compute: function (reads) {
+            return { writes: [], result: reads[0] || null };
+          },
         });
       },
       writeVersion: function (versionMap) {
-        // Map of payload-class → schemaVersion. Idempotent.
         if (!versionMap || typeof versionMap !== 'object') return Promise.reject(_err('R3_0E_VERSION_INVALID'));
-        return backend.transact([STORE_NAMES.STORE_METADATA], 'readwrite', function (tx) {
-          tx.put(STORE_NAMES.STORE_METADATA, '__r3_0e_version', {
-            versions: versionMap,
-            updatedAt: _now(),
-          });
-          return true;
+        return backend.transact({
+          stores: [STORE_NAMES.STORE_METADATA],
+          reads: [],
+          compute: function () {
+            return {
+              writes: [{ store: STORE_NAMES.STORE_METADATA, key: '__r3_0e_version', value: { versions: versionMap, updatedAt: _now() } }],
+              result: true,
+            };
+          },
         });
       },
     };

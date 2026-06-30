@@ -29,6 +29,17 @@
   // Codex E1-R1-02 closure: distinguish UNSUPPORTED_FUTURE_SCHEMA from LINKAGE_INVALID.
   var SUPPORTED_SCHEMA_VERSION = 1;
 
+  // Codex E2-R1-03 closure: path-shaped IDs are forbidden. linkId / parentCaseId /
+  // followUpCaseId / experimentId must all match the closed grammar.
+  var ID_GRAMMAR_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+  var ID_FORBIDDEN_RE = /(\.\.|[\/\\]|^\.)/;
+  function _idOk(s) {
+    if (typeof s !== 'string' || s.length === 0) return false;
+    if (ID_FORBIDDEN_RE.test(s)) return false;
+    if (!ID_GRAMMAR_RE.test(s)) return false;
+    return true;
+  }
+
   function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
   function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (typeof k === 'symbol') return false; if (allowed.indexOf(k) === -1) return false; } return true; }
   function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
@@ -45,11 +56,12 @@
       if (!Number.isInteger(l.schemaVersion)) reasons.push(CODES.LINKAGE_INVALID);
       else if (l.schemaVersion > SUPPORTED_SCHEMA_VERSION) reasons.push(CODES.UNSUPPORTED_FUTURE_SCHEMA);
       else if (l.schemaVersion < 1) reasons.push(CODES.LINKAGE_INVALID);
-      if (!_nonEmptyStr(l.linkId)) reasons.push(CODES.LINKAGE_INVALID);
+      if (!_idOk(l.linkId)) reasons.push(CODES.LINKAGE_INVALID);
       if (!_nonEmptyStr(l.parentCaseId)) reasons.push(CODES.LINKAGE_PARENT_MISSING);
-      if (!_nonEmptyStr(l.followUpCaseId)) reasons.push(CODES.LINKAGE_INVALID);
+      else if (!_idOk(l.parentCaseId)) reasons.push(CODES.LINKAGE_INVALID);
+      if (!_idOk(l.followUpCaseId)) reasons.push(CODES.LINKAGE_INVALID);
       if (l.parentCaseId === l.followUpCaseId) reasons.push(CODES.LINKAGE_INVALID);  // self-link
-      if (!_nonEmptyStr(l.experimentId)) reasons.push(CODES.LINKAGE_INVALID);
+      if (!_idOk(l.experimentId)) reasons.push(CODES.LINKAGE_INVALID);
       if (PARENT_STATUS_ALLOWED.indexOf(l.parentStatus) === -1) reasons.push(CODES.LINKAGE_INVALID);
       if (!_nonEmptyStr(l.createdAt)) reasons.push(CODES.LINKAGE_INVALID);
 

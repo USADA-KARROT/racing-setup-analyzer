@@ -8,6 +8,10 @@
  */
 'use strict';
 var STORES = require('../renderer/js/r3-0e-stores.js');
+// Use the real R3.0B MemoryBackend (which is what production code also uses) — the E2 store
+// API contract is verified end-to-end against the SAME transact({stores, reads, compute})
+// surface the IndexedDBBackend exposes.
+var SB = require('../renderer/js/storage-backend.js');
 
 var pass = 0, fail = 0;
 function chk(msg, cond, detail) {
@@ -15,25 +19,8 @@ function chk(msg, cond, detail) {
   else { fail += 1; console.log('  FAIL ' + msg + (detail !== undefined ? '  ' + JSON.stringify(detail) : '')); }
 }
 
-// ----- In-memory backend mock -----
 function createMemoryBackend() {
-  var data = {};
-  function ensure(name) { if (!data[name]) data[name] = {}; return data[name]; }
-  return {
-    _data: data,
-    transact: function (stores, mode, work) {
-      var tx = {
-        get: function (store, key) { return ensure(store)[key] || null; },
-        put: function (store, key, value) { ensure(store)[key] = value; },
-        del: function (store, key) { delete ensure(store)[key]; },
-        list: function (store) { var m = ensure(store); return Object.keys(m).map(function (k) { return m[k]; }); },
-      };
-      try {
-        var result = work(tx);
-        return Promise.resolve(result);
-      } catch (e) { return Promise.reject(e); }
-    },
-  };
+  return SB.MemoryBackend();
 }
 
 var BASE_EXP_TS = '2026-06-30T10:00:00Z';
@@ -86,7 +73,11 @@ console.log('Section A — Experiment store CRUD');
   chk('A1: create returns id', id === rec.experimentId);
   var got = await store.get(rec.experimentId);
   chk('A2: get returns record', got && got.experimentId === rec.experimentId);
-  chk('A3: get returns frozen', Object.isFrozen(got));
+  // Backend already structured-clones reads at the boundary, so callers can never mutate
+  // stored references. Verify the returned reference is distinct (mutation isolation) and
+  // schemaVersion-valid.
+  chk('A3: get returns mutation-isolated record (separate reference)',
+    got && got !== rec && got.schemaVersion === rec.schemaVersion);
   // Duplicate id → collision
   var ok = false;
   try { await store.create(rec); } catch (e) { ok = e.code === 'R3_0E_EXPERIMENT_ID_COLLISION'; }
@@ -208,22 +199,19 @@ function runFutureSchema() {
   console.log('Section E — Future-schema + corruption');
   (async function () {
     var backend = createMemoryBackend();
-    // Directly inject a future-schema record into the backend (bypassing the store API).
-    backend._data['r3_0e_experiments'] = {};
-    backend._data['r3_0e_experiments']['exp_future'] = {
+    // Directly inject a future-schema record into the backend via put().
+    await backend.put('r3_0e_experiments', 'exp_future', {
       schemaVersion: 99, experimentId: 'exp_future', sourceCaseId: 'c',
-      // (other fields would normally be present; not relevant — the schema-version check
-      // fires first.)
-    };
+    });
     var store = STORES.createExperimentStore(backend);
     var ok = false;
     try { await store.get('exp_future'); } catch (e) { ok = e.code === 'R3_0E_EXPERIMENT_FUTURE_SCHEMA'; }
     chk('E1: future-schema read fails fail-closed', ok);
 
     // Corrupted record: schemaVersion correct but contract validation fails.
-    backend._data['r3_0e_experiments']['exp_corrupt'] = {
+    await backend.put('r3_0e_experiments', 'exp_corrupt', {
       schemaVersion: 1, experimentId: 'exp_corrupt' /* missing required fields */,
-    };
+    });
     var corrOk = false;
     try { await store.get('exp_corrupt'); } catch (e) { corrOk = e.code === 'R3_0E_EXPERIMENT_CORRUPTED'; }
     chk('E2: corrupted record read fails with CORRUPTED', corrOk);
@@ -257,6 +245,61 @@ function runScope() {
       src.indexOf('r3_0e_experiments') === -1 && src.indexOf('r3_0e_outcomes') === -1
         && src.indexOf('r3_0e_timelines') === -1 && src.indexOf('r3_0e_followupLinks') === -1);
   })();
-  console.log('R3.0E E2 stores suite: ' + pass + ' passed, ' + fail + ' failed');
-  if (fail > 0) process.exit(1);
+  runR1Closures();
+}
+
+// Section H — Codex E2 R1 closures
+function runR1Closures() {
+  console.log('Section H — Codex E2 R1 closures');
+  (async function () {
+    // H1 — listForParent re-validates each fetched record (E2-R1-02 closure).
+    var backend = createMemoryBackend();
+    // Inject a future-schema link directly into the store + reverse index.
+    await backend.put('r3_0e_followupLinks', 'link_future', {
+      schemaVersion: 99, linkId: 'link_future', parentCaseId: 'case_parent_h1',
+      followUpCaseId: 'case_child', experimentId: 'exp_z', parentStatus: 'present',
+      createdAt: '2026-06-30T10:00:00Z',
+    });
+    await backend.put('r3_0e_followupLinksByCase', 'case_parent_h1', {
+      parentCaseId: 'case_parent_h1', linkIds: ['link_future'],
+    });
+    var store = STORES.createFollowUpLinkStore(backend);
+    var futureOk = false;
+    try { await store.listForParent('case_parent_h1'); } catch (e) { futureOk = e.code === 'R3_0E_LINK_FUTURE_SCHEMA'; }
+    chk('H1: listForParent rejects future-schema link (fail-closed)', futureOk);
+
+    // H2 — listForParent rejects corrupted link.
+    await backend.put('r3_0e_followupLinks', 'link_corrupt', {
+      schemaVersion: 1, linkId: 'link_corrupt' /* missing required fields */,
+    });
+    await backend.put('r3_0e_followupLinksByCase', 'case_parent_h2', {
+      parentCaseId: 'case_parent_h2', linkIds: ['link_corrupt'],
+    });
+    var corrOk = false;
+    try { await store.listForParent('case_parent_h2'); } catch (e) { corrOk = e.code === 'R3_0E_LINK_CORRUPTED'; }
+    chk('H2: listForParent rejects corrupted link', corrOk);
+
+    // H3 — E2-R1-03 closure: path-shaped follow-up IDs are rejected at the contract layer.
+    var bad1 = { schemaVersion: 1, linkId: 'link_../etc/passwd', parentCaseId: 'case_A',
+                 followUpCaseId: 'case_B', experimentId: 'exp_z', parentStatus: 'present',
+                 createdAt: '2026-06-30T10:00:00Z' };
+    var pathOk = false;
+    try { await store.create(bad1); } catch (e) { pathOk = e.code === 'R3_0E_LINK_INVALID'; }
+    chk('H3a: path-shaped linkId rejected', pathOk);
+    var bad2 = { schemaVersion: 1, linkId: 'link_ok', parentCaseId: 'case_/etc',
+                 followUpCaseId: 'case_B', experimentId: 'exp_z', parentStatus: 'present',
+                 createdAt: '2026-06-30T10:00:00Z' };
+    var path2Ok = false;
+    try { await store.create(bad2); } catch (e) { path2Ok = e.code === 'R3_0E_LINK_INVALID'; }
+    chk('H3b: path-shaped parentCaseId rejected', path2Ok);
+    var bad3 = { schemaVersion: 1, linkId: 'link_ok', parentCaseId: 'case_A',
+                 followUpCaseId: 'case_B\\hostile', experimentId: 'exp_z', parentStatus: 'present',
+                 createdAt: '2026-06-30T10:00:00Z' };
+    var path3Ok = false;
+    try { await store.create(bad3); } catch (e) { path3Ok = e.code === 'R3_0E_LINK_INVALID'; }
+    chk('H3c: path-shaped followUpCaseId rejected', path3Ok);
+  })().then(function () {
+    console.log('R3.0E E2 stores suite: ' + pass + ' passed, ' + fail + ' failed');
+    if (fail > 0) process.exit(1);
+  });
 }
