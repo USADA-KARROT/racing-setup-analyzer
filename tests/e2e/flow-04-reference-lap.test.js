@@ -12,11 +12,10 @@ var H = require('./helpers/flow-harness.js');
 var t = H.makeChk();
 var chk = t.chk;
 
-var REF_CONTRACT_PATH = '../../renderer/js/r3-0c-reference-selection.js';
-
 (async function () {
+  // Literal-require so the dependency auditor can resolve statically.
   var REF = null;
-  try { REF = require(REF_CONTRACT_PATH); } catch (e) { /* module may be exposed under a different shape */ }
+  try { REF = require('../../renderer/js/r3-0c-reference-selection.js'); } catch (e) { /* module may be exposed under a different shape */ }
   chk('R3.0C reference-selection module loadable', REF !== null && typeof REF === 'object');
 
   var h = H.createFlowHarness({ stamp: '2026-07-01T00:00:00.000Z' });
