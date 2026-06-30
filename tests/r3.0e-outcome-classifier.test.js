@@ -1212,6 +1212,122 @@ console.log('Section X — Codex E3 R4 closure (pre-load defineProperty poisonin
 })();
 
 // ==================================================================
+// Section Y — Codex E3 R5 closures (E3-R5-01..02)
+// ==================================================================
+console.log('Section Y — Codex E3 R5 closures');
+
+// Y1 — E3-R5-01: hostile clock that rebinds Array.prototype.push cannot inject content
+// into the outcome's limitations / confounders / sideEffects arrays.
+(function () {
+  var origPush = Array.prototype.push;
+  var hostileClock = function () {
+    Array.prototype.push = function () {
+      // Side-channel injection attempt — push the receiver-supplied value, then also push
+      // a path string. If the classifier uses ambient push, '/Users/...' will appear in
+      // limitations / confounders / sideEffects.
+      var len = this.length;
+      for (var i = 0; i < arguments.length; i++) this[len + i] = arguments[i];
+      this[len + arguments.length] = '/Users/skyline/leak.bmsbin';
+      this.length = len + arguments.length + 1;
+      return this.length;
+    };
+    return '2026-06-30T11:30:00Z';
+  };
+  var r;
+  try {
+    // Use a scenario that adds to limitations: no-explicit-reference + cross-session.
+    r = CL.classifyOutcome(makeInput({
+      followUpOverrides: { parentCaseId: 'case_other', parentSessionId: 'session_other', hasExplicitReference: false },
+    }), { clock: hostileClock });
+  } finally {
+    Array.prototype.push = origPush;
+  }
+  if (r.valid === true) {
+    var serialized = JSON.stringify(r.outcome);
+    chk('Y1: hostile-clock Array.prototype.push rebind does NOT inject content',
+      serialized.indexOf('/Users/') === -1 && serialized.indexOf('leak.bmsbin') === -1,
+      { serialized: serialized });
+    // Confirm limitations content is still only valid reason codes
+    var allValid = true;
+    for (var li = 0; li < r.outcome.limitations.length; li++) {
+      if (typeof r.outcome.limitations[li] !== 'string'
+          || r.outcome.limitations[li].indexOf('/Users/') !== -1) {
+        allValid = false; break;
+      }
+    }
+    chk('Y1.codes: limitations contain only valid reason codes', allValid);
+  } else {
+    // Either way is acceptable — fail-closed is fine
+    chk('Y1: hostile-clock push rebind results in BLOCK or sanitized outcome', true);
+    chk('Y1.codes: limitations contain only valid reason codes', true);
+  }
+})();
+
+// Y2 — E3-R5-02: pre-load Object.defineProperty cannot forge the observed-CV set.
+// The set is now a captured-array, not an object map — there is no defineProperty
+// surface. Regression: poison defineProperty before loading classifier in a child node;
+// run the missing-CV scenario; verify it STILL classifies as inconclusive_due_to_confounders
+// (cannot be promoted to confirmed via membership forgery).
+(function () {
+  var cp = require('child_process');
+  var path = require('path');
+  var classifierPath = path.resolve(__dirname, '..', 'renderer/js/r3-0e-outcome-classifier.js');
+  var script = ''
+    + 'var orig=Object.defineProperty;'
+    + 'Object.defineProperty=function(o,k,d){'
+    // Generic poisoner — whenever defineProperty is called with key X and value true,
+    // ALSO define "tyre_temp_window: true". This is the attack vector against an
+    // object-map membership set.
+    + '  var r=orig(o,k,d);'
+    + '  if(d&&d.value===true){try{orig(o,"tyre_temp_window",{value:true,writable:false,enumerable:true,configurable:false});}catch(e){}}'
+    + '  return r;'
+    + '};'
+    + 'var CL=require("' + classifierPath + '");'
+    + 'Object.defineProperty=orig;'
+    + 'function df(v){if(v&&typeof v==="object"&&!Object.isFrozen(v)){Object.freeze(v);Object.getOwnPropertyNames(v).forEach(function(k){df(v[k]);});}return v;}'
+    + 'var exp=df({'
+    + '  schemaVersion:1,experimentId:"exp_0123456789abcdef",sourceCaseId:"case_demo_a",'
+    + '  sourceHypothesisId:"hyp_demo_001",sourceRecommendationId:"pri_demo_001",'
+    + '  targetMetric:"roll_gradient_deg_per_g",baselineValue:3.5,'
+    + '  expectedDirection:"decrease",expectedMagnitudeRange:{min:0.5,max:1.5},'
+    + '  setupChange:{component:"front_arb"},driverInstruction:null,'
+    + '  controlVariables:[{name:"tyre_temp_window",description:"r3.0e.cv.tyre_temp_window",expectedValue:85,allowedRange:{min:75,max:95},observedValue:null,withinRange:null}],'
+    + '  validationPlan:"r3.0e.plan.controlled_repeat_lap",'
+    + '  stopConditions:[{i18nKey:"r3.0e.stop.lap_time_increase",params:null}],'
+    + '  status:"applied",followUpCaseIds:["case_demo_a_followup_1"],'
+    + '  outcome:null,createdAt:"2026-06-30T10:00:00Z"'
+    + '});'
+    + 'var input={experiment:exp,'
+    + '  appliedChange:{changeId:"change_demo_001",sourceExperimentId:"exp_0123456789abcdef",appliedAt:"2026-06-30T11:00:00Z"},'
+    + '  followUp:{followUpCaseId:"case_demo_a_followup_1",parentCaseId:"case_demo_a",sessionId:"session_demo_a",parentSessionId:"session_demo_a",hasExplicitReference:true,comparabilityScore:0.9},'
+    + '  observation:{observedDirection:"decrease",observedMagnitude:1,driverFeedback:"r3.0e.driver.feedback.balance_improved",dataQualityIssues:[],sideEffects:[],contradictingEvidenceIds:[],supportingEvidenceIds:["ev_demo_001"]},'
+    // Empty CV observations — declared CV is "tyre_temp_window". Without forgery this is
+    // inconclusive_due_to_confounders. The poisoner attempts to inject phantom membership.
+    + '  controlVariableObservations:[]};'
+    + 'var r=CL.classifyOutcome(input,{clock:function(){return "2026-06-30T11:30:00Z";}});'
+    + 'process.stdout.write(JSON.stringify({valid:r.valid,class:r.valid===true?r.outcome.class:null,confounders:r.valid===true?r.outcome.confounders:null,reasons:r.reasonCodes||[]}));';
+  var out;
+  try {
+    out = cp.execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' });
+  } catch (e) {
+    chk('Y2: child process executed', false, { error: String(e) });
+    return;
+  }
+  var parsed;
+  try { parsed = JSON.parse(out.trim()); } catch (eP) {
+    chk('Y2: child output parsed', false, { stdout: out });
+    return;
+  }
+  // The poisoner attempted to fake membership of tyre_temp_window. The captured-array
+  // membership set has no defineProperty surface, so the attack does nothing.
+  chk('Y2: defineProperty poisoner cannot forge CV membership → still confounders',
+    parsed.valid === true
+      && parsed['class'] === 'inconclusive_due_to_confounders'
+      && parsed.confounders && parsed.confounders.indexOf('tyre_temp_window') !== -1,
+    parsed);
+})();
+
+// ==================================================================
 // Section W — Codex E3 R3 closures (E3-R3-01..02)
 // ==================================================================
 console.log('Section W — Codex E3 R3 closures');

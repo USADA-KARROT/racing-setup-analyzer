@@ -104,6 +104,27 @@
     catch (e) { return false; }
   }
 
+  // Codex E3-R5-01 closure: capture Array.prototype methods so a hostile clock (or any
+  // post-authority code path) that rebinds Array.prototype.push / slice / indexOf cannot
+  // affect the classifier's internal array operations. ALL classifier arrays (confounders,
+  // limitations, rebuiltSideEffects, dataQualityIssues snapshots) are mutated and read
+  // exclusively through these captured methods via captured Reflect.apply.
+  var _ARR_PUSH = Array.prototype.push;
+  var _ARR_SLICE = Array.prototype.slice;
+  var _ARR_INDEX_OF = Array.prototype.indexOf;
+  function _arrPush(arr, v) {
+    try { _CAPTURED_REFLECT_APPLY(_ARR_PUSH, arr, [v]); return true; }
+    catch (e) { return false; }
+  }
+  function _arrSlice(arr) {
+    try { return _CAPTURED_REFLECT_APPLY(_ARR_SLICE, arr, []); }
+    catch (e) { return []; }
+  }
+  function _arrIndexOf(arr, v) {
+    try { return _CAPTURED_REFLECT_APPLY(_ARR_INDEX_OF, arr, [v]); }
+    catch (e) { return -1; }
+  }
+
   // Captured intrinsic helpers — all defensive wrappers.
   function _isFrozenSafe(v) { try { return _CAPTURED_OBJECT_IS_FROZEN(v) === true; } catch (e) { return false; } }
   function _isArraySafe(v) { try { return _CAPTURED_ARRAY_IS_ARRAY(v) === true; } catch (e) { return false; } }
@@ -285,26 +306,24 @@
     if (!I18N_KEY_RE.test(s)) return false;
     return true;
   }
-  // Codex E3-R1-01 closure: null-prototype set backed by captured Object.create + captured
-  // descriptor helpers. Membership checks use _CAPTURED_OBJECT_GET_OWN_DESC, not
-  // `obj[key] !== undefined`, so an ambient Object.create rebind cannot produce a populated
-  // prototype-bearing object that would spoof prior `add()` calls.
+  // Codex E3-R1-01 / E3-R5-02 closure: null-prototype membership set backed by a
+  // closure-local captured Array (not an object map). add() uses captured
+  // Array.prototype.push via captured Reflect.apply; has() uses captured indexOf.
+  // This eliminates the entire `defineProperty` attack surface from the set abstraction
+  // (a hostile pre-load defineProperty cannot inject phantom keys because we never
+  // call defineProperty for membership tracking). The set is shape-private: it is a
+  // plain array of string keys, never exposed beyond the classifier closure.
   function _newCapturedNullSet() {
-    return _CAPTURED_OBJECT_CREATE(null);
+    return [];
   }
   function _capturedSetHas(setObj, key) {
-    try {
-      var d = _CAPTURED_OBJECT_GET_OWN_DESC(setObj, key);
-      return !!(d && d.enumerable === true && d.value === true);
-    } catch (e) { return false; }
+    if (!_isPlainArray(setObj)) return false;
+    return _arrIndexOf(setObj, key) !== -1;
   }
   function _capturedSetAdd(setObj, key) {
-    try {
-      _CAPTURED_OBJECT_DEFINE_PROPERTY(setObj, key, {
-        value: true, writable: false, enumerable: true, configurable: false,
-      });
-      return true;
-    } catch (e) { return false; }
+    if (!_isPlainArray(setObj)) return false;
+    if (_arrIndexOf(setObj, key) !== -1) return true;
+    return _arrPush(setObj, key);
   }
 
   // Deep freeze using captured Object.freeze + captured getOwnPropertyNames.
@@ -346,7 +365,7 @@
       var k = names[i];
       // Reject unknown own key — caller cannot smuggle `class`, `outcomeId`, `confounders`,
       // etc. into the input wrapper.
-      if (allowedKeys.indexOf(k) === -1) {
+      if (_arrIndexOf(allowedKeys, k) === -1) {
         return { valid: false, reasonCodes: [invalidCode, CODES.UNKNOWN_OWN_KEY], detail: 'unknown own key ' + k };
       }
       var d;
@@ -430,7 +449,7 @@
       if (typeof d.get === 'function' || typeof d.set === 'function') {
         return { valid: false, reasonCodes: [invalidCode], detail: 'accessor array elt at ' + i };
       }
-      snap.push(d.value);
+      _arrPush(snap, d.value);
     }
     return { valid: true, snapshot: snap };
   }
@@ -520,7 +539,7 @@
       var expCheck = EXP.validateExperimentShape(inputSnap.experiment);
       if (expCheck.valid !== true) {
         return RC_E.buildBlockedResult(
-          expCheck.reasonCodes ? expCheck.reasonCodes.slice() : [CODES.EXPERIMENT_INVALID],
+          expCheck.reasonCodes ? _arrSlice(expCheck.reasonCodes) : [CODES.EXPERIMENT_INVALID],
           { detail: 'experiment shape invalid' }
         );
       }
@@ -577,7 +596,7 @@
       }
       var observation = obsSnapR.snapshot;
       // observedDirection: enum OR null
-      if (observation.observedDirection !== null && DIRECTION_ALLOWED.indexOf(observation.observedDirection) === -1) {
+      if (observation.observedDirection !== null && _arrIndexOf(DIRECTION_ALLOWED, observation.observedDirection) === -1) {
         return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'observation.observedDirection invalid' });
       }
       // observedMagnitude: finite OR null
@@ -718,7 +737,7 @@
         }
         // Rebuild a clean side-effect record so the outcome envelope carries only the
         // validated (deep-copied) structure — caller's original reference is dropped.
-        rebuiltSideEffects.push({ i18nKey: seK, params: rebuiltParams });
+        _arrPush(rebuiltSideEffects, { i18nKey: seK, params: rebuiltParams });
       }
       sideEffects = rebuiltSideEffects;
       var contraR = _snapshotArrayShape(observation.contradictingEvidenceIds, CODES.OUTCOME_INVALID);
@@ -759,7 +778,7 @@
         var cvCheck = CV.validateControlVariableShape(cvObs);
         if (cvCheck.valid !== true) {
           return RC_E.buildBlockedResult(
-            cvCheck.reasonCodes ? cvCheck.reasonCodes.slice() : [CODES.CONTROL_VARIABLES_INVALID],
+            cvCheck.reasonCodes ? _arrSlice(cvCheck.reasonCodes) : [CODES.CONTROL_VARIABLES_INVALID],
             { detail: 'controlVariableObservations[' + cvi + '] shape invalid' }
           );
         }
@@ -866,11 +885,11 @@
 
       if (crossCase || crossSession || noExplicitReference || lowComparability) {
         classDecision = 'invalid_comparison';
-        if (crossCase) limitations.push(CODES.LINKAGE_PARENT_MISSING);
-        if (crossSession) limitations.push(CODES.LIMITATION_CROSS_SESSION_FOLLOW_UP);
-        if (noExplicitReference) limitations.push(CODES.OUTCOME_COMPARABILITY_INSUFFICIENT);
-        if (lowComparability && limitations.indexOf(CODES.OUTCOME_COMPARABILITY_INSUFFICIENT) === -1) {
-          limitations.push(CODES.OUTCOME_COMPARABILITY_INSUFFICIENT);
+        if (crossCase) _arrPush(limitations, CODES.LINKAGE_PARENT_MISSING);
+        if (crossSession) _arrPush(limitations, CODES.LIMITATION_CROSS_SESSION_FOLLOW_UP);
+        if (noExplicitReference) _arrPush(limitations, CODES.OUTCOME_COMPARABILITY_INSUFFICIENT);
+        if (lowComparability && _arrIndexOf(limitations, CODES.OUTCOME_COMPARABILITY_INSUFFICIENT) === -1) {
+          _arrPush(limitations, CODES.OUTCOME_COMPARABILITY_INSUFFICIENT);
         }
       } else {
         // ---- Step 12: control-variable integrity (inconclusive_due_to_confounders) ------
@@ -893,33 +912,33 @@
           var declaredName = declared.name;
           if (!_nonEmptyStr(declaredName)) continue;
           if (!_capturedSetHas(observedCvSet, declaredName)) {
-            confounders.push(declaredName);
+            _arrPush(confounders, declaredName);
           }
         }
         if (confounders.length > 0) {
           classDecision = 'inconclusive_due_to_confounders';
-          if (limitations.indexOf(CODES.CONTROL_VARIABLE_MISSING) === -1) {
-            limitations.push(CODES.CONTROL_VARIABLE_MISSING);
+          if (_arrIndexOf(limitations, CODES.CONTROL_VARIABLE_MISSING) === -1) {
+            _arrPush(limitations, CODES.CONTROL_VARIABLE_MISSING);
           }
         } else {
           // Out-of-range CVs become confounders.
           var outOfRange = [];
           for (var ki = 0; ki < controlVariableObservations.length; ki++) {
             var cvo = controlVariableObservations[ki];
-            if (cvo.withinRange !== true) outOfRange.push(cvo.name);
+            if (cvo.withinRange !== true) _arrPush(outOfRange, cvo.name);
           }
           if (outOfRange.length > 0) {
             classDecision = 'inconclusive_due_to_confounders';
             confounders = outOfRange;
-            if (limitations.indexOf(CODES.CONTROL_VARIABLE_OUT_OF_RANGE) === -1) {
-              limitations.push(CODES.CONTROL_VARIABLE_OUT_OF_RANGE);
+            if (_arrIndexOf(limitations, CODES.CONTROL_VARIABLE_OUT_OF_RANGE) === -1) {
+              _arrPush(limitations, CODES.CONTROL_VARIABLE_OUT_OF_RANGE);
             }
           } else if (controlVariableObservations.length === 0) {
             // No control variables AT ALL — the experiment did not declare any, and none
             // were observed. The outcome can still be classified, but we flag the
             // limitation honestly.
-            if (limitations.indexOf(CODES.LIMITATION_NO_CONTROL_VARIABLES) === -1) {
-              limitations.push(CODES.LIMITATION_NO_CONTROL_VARIABLES);
+            if (_arrIndexOf(limitations, CODES.LIMITATION_NO_CONTROL_VARIABLES) === -1) {
+              _arrPush(limitations, CODES.LIMITATION_NO_CONTROL_VARIABLES);
             }
           }
         }
@@ -940,7 +959,7 @@
             classDecision = 'inconclusive';
             // Carry the data-quality codes as limitations so the UI can show them honestly.
             for (var dqi = 0; dqi < dataQualityIssues.length && limitations.length < ARRAY_CAP; dqi++) {
-              if (limitations.indexOf(dataQualityIssues[dqi]) === -1) limitations.push(dataQualityIssues[dqi]);
+              if (_arrIndexOf(limitations, dataQualityIssues[dqi]) === -1) _arrPush(limitations, dataQualityIssues[dqi]);
             }
           } else if (observation.observedDirection === null) {
             classDecision = 'inconclusive';
@@ -965,7 +984,13 @@
       }
       var outcomeIdStr = _outcomeId(experiment.experimentId, appliedChange.changeId);
       // Bound the limitations array.
-      if (limitations.length > ARRAY_CAP) limitations = limitations.slice(0, ARRAY_CAP);
+      if (limitations.length > ARRAY_CAP) {
+        // Captured-slice with bounded length. Manual loop because captured slice doesn't
+        // take args in our wrapper signature.
+        var trimmed = [];
+        for (var li = 0; li < ARRAY_CAP; li++) _arrPush(trimmed, limitations[li]);
+        limitations = trimmed;
+      }
 
       var outcome = {
         schemaVersion: OUTCOME_SCHEMA_VERSION,
@@ -975,11 +1000,11 @@
         observedDirection: observation.observedDirection,
         observedMagnitude: observation.observedMagnitude,
         comparabilityScore: followUp.comparabilityScore,
-        confounders: confounders.slice(),
+        confounders: _arrSlice(confounders),
         driverFeedback: observation.driverFeedback,
-        dataQualityIssues: dataQualityIssues.slice(),
-        sideEffects: sideEffects.slice(),
-        limitations: limitations.slice(),
+        dataQualityIssues: _arrSlice(dataQualityIssues),
+        sideEffects: _arrSlice(sideEffects),
+        limitations: _arrSlice(limitations),
         createdAt: createdAtIso,
       };
 
@@ -987,7 +1012,7 @@
       var outCheck = OUT.validateOutcomeShape(outcome);
       if (outCheck.valid !== true) {
         return RC_E.buildBlockedResult(
-          outCheck.reasonCodes ? outCheck.reasonCodes.slice() : [CODES.OUTCOME_INVALID],
+          outCheck.reasonCodes ? _arrSlice(outCheck.reasonCodes) : [CODES.OUTCOME_INVALID],
           { detail: 'composed outcome failed E1 OUT.validateOutcomeShape' }
         );
       }
