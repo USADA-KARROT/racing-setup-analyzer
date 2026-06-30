@@ -102,14 +102,23 @@
   var _Date                = Date;
   var _NumberIsFinite      = typeof Number.isFinite === 'function' ? Number.isFinite : function (v) { return typeof v === 'number' && _isFinite(v); };
   var _NumberIsSafeInteger = typeof Number.isSafeInteger === 'function' ? Number.isSafeInteger : function (v) { return _NumberIsFinite(v) && _MathFloor(v) === v && v <= 9007199254740991 && v >= -9007199254740991; };
-  // F1-R10-01: closure-capture prototype methods used inside _hash so ambient prototype
-  // rebinding (e.g. String.prototype.charCodeAt = () => { throw ... }) cannot corrupt
-  // determinism or throw out of migrate().
-  var _FunctionPrototypeCall   = Function.prototype.call;
+  // F1-R10-01 / F1-R11-01 / F1-R11-02: closure-capture every prototype method the engine
+  // invokes against potentially-tampered ambient prototypes. Invoke via captured Reflect.apply
+  // (NOT via .call — that would still go through ambient Function.prototype.call). Reflect.apply
+  // is invoked as a direct function call, never via property lookup.
+  var _ReflectApply            = Reflect.apply;
   var _StringProtoCharCodeAt   = String.prototype.charCodeAt;
+  var _StringProtoReplace      = String.prototype.replace;
+  var _StringProtoNormalize    = String.prototype.normalize;
+  var _StringProtoToLowerCase  = String.prototype.toLowerCase;
+  var _StringProtoIndexOf      = String.prototype.indexOf;
   var _NumberProtoToString     = Number.prototype.toString;
-  function _safeCharCodeAt(str, i) { return _FunctionPrototypeCall.call(_StringProtoCharCodeAt, str, i); }
-  function _safeToString16(n) { return _FunctionPrototypeCall.call(_NumberProtoToString, n, 16); }
+  function _safeCharCodeAt(str, i)        { return _ReflectApply(_StringProtoCharCodeAt, str, [i]); }
+  function _safeToString16(n)             { return _ReflectApply(_NumberProtoToString, n, [16]); }
+  function _safeReplace(str, re, repl)    { return _ReflectApply(_StringProtoReplace, str, [re, repl]); }
+  function _safeNormalize(str, form)      { return _ReflectApply(_StringProtoNormalize, str, [form]); }
+  function _safeToLowerCase(str)          { return _ReflectApply(_StringProtoToLowerCase, str, []); }
+  function _safeIndexOf(str, needle)      { return _ReflectApply(_StringProtoIndexOf, str, [needle]); }
 
   var ENV = _loadEnv();
   if (!ENV) throw new Error('r3-0f-migration-engine: migration-envelope contract not loadable');
@@ -169,13 +178,15 @@
   //   U+2800 — Braille blank (R8)
   // Field names in R3.0B/C/D/E contracts are camelCase ASCII; whitespace is never legitimate.
   var _DEFANG_RE = /[\p{Default_Ignorable_Code_Point}\p{Mn}\p{Cc}\p{Cs}\p{White_Space}⠀]/gu;
+  // F1-R11-02: use closure-captured String prototype methods via _ReflectApply, so ambient
+  // String.prototype.replace / .normalize / .toLowerCase rebinding cannot bypass attestation.
   function _normalizeKey(k) {
     if (typeof k !== 'string') return '';
     var stripped;
-    try { stripped = k.replace(_DEFANG_RE, ''); } catch (_) { stripped = k; }
+    try { stripped = _safeReplace(k, _DEFANG_RE, ''); } catch (_) { stripped = k; }
     var s;
-    try { s = (typeof stripped.normalize === 'function') ? stripped.normalize('NFKC') : stripped; } catch (_) { s = stripped; }
-    return s.toLowerCase();
+    try { s = _safeNormalize(stripped, 'NFKC'); } catch (_) { s = stripped; }
+    try { return _safeToLowerCase(s); } catch (_) { return s; }
   }
   var PRODUCER_ATTESTATION_NORMALIZED = (function () {
     var s = {};
@@ -207,7 +218,7 @@
     // collapsing to a private-sentinel-looking key under NFKC.
     if (_safeCharCodeAt(n, 0) !== 0x5F /* '_' */) return false;
     for (var i = 0; i < PRODUCER_ATTESTATION_TOKENS.length; i++) {
-      if (n.indexOf(PRODUCER_ATTESTATION_TOKENS[i]) !== -1) return true;
+      if (_safeIndexOf(n, PRODUCER_ATTESTATION_TOKENS[i]) !== -1) return true;
     }
     return false;
   }

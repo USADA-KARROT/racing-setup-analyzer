@@ -1322,6 +1322,58 @@ asyncCase('F1-R10-02: row.value accessor that THROWS is treated as unkeyed/faile
     });
 });
 
+// F1-R11-01: Reflect.apply avoids Function.prototype.call; tampering call doesn't break migrate.
+asyncCase('F1-R11-01: tampered Function.prototype.call does not break migrate', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (r) {
+    return { ok: true, record: { schemaVersion: 1, caseId: r.caseId, x: 1 }, migrations: ['delta'] };
+  } } };
+  return b.put('cases', 'c1', { schemaVersion: 1, caseId: 'c1' }).then(function () {
+    var orig = Function.prototype.call;
+    Function.prototype.call = function () { throw new Error('tampered call'); };
+    var pending = ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true });
+    return pending.then(function (r) {
+      Function.prototype.call = orig;
+      chk('migrate ok despite tampered Function.prototype.call', r.ok === true && r.report.status === 'complete');
+    }, function (e) {
+      Function.prototype.call = orig;
+      chk('migrate did NOT throw under tampered call', false, { error: String(e && e.message) });
+    });
+  });
+});
+
+// F1-R11-02: tampered String.prototype.replace/normalize/toLowerCase/indexOf cannot bypass
+// attestation. Engine uses closure-captured Reflect.apply through captured prototype methods.
+asyncCase('F1-R11-02: tampered String prototype methods cannot bypass attestation', function () {
+  var b = SB.MemoryBackend();
+  var hostileKey = '_author' + String.fromCodePoint(0x200D) + 'itative'; // ZWJ splice
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (r) {
+    var rec = { schemaVersion: 1, caseId: r.caseId };
+    rec[hostileKey] = 'forged';
+    return { ok: true, record: rec, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'c2', { schemaVersion: 1, caseId: 'c2' }).then(function () {
+    var origR = String.prototype.replace;
+    var origN = String.prototype.normalize;
+    var origL = String.prototype.toLowerCase;
+    var origI = String.prototype.indexOf;
+    String.prototype.replace = function () { return 'tampered'; };
+    String.prototype.normalize = function () { return 'tampered'; };
+    String.prototype.toLowerCase = function () { return 'tampered'; };
+    String.prototype.indexOf = function () { return -1; };
+    var pending = ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true });
+    return pending.then(function (r) {
+      String.prototype.replace = origR; String.prototype.normalize = origN;
+      String.prototype.toLowerCase = origL; String.prototype.indexOf = origI;
+      chk('tampered String prototypes do NOT bypass attestation', r.report.perStore.cases.rejected === 1);
+    }, function (e) {
+      String.prototype.replace = origR; String.prototype.normalize = origN;
+      String.prototype.toLowerCase = origL; String.prototype.indexOf = origI;
+      chk('migrate did NOT throw under tampered prototypes', false, { error: String(e && e.message) });
+    });
+  });
+});
+
 asyncCase('F1-R6-01 negative: legitimate lapAuthority/projectionSignature/experimentVerified still accepted', function () {
   var b = SB.MemoryBackend();
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
