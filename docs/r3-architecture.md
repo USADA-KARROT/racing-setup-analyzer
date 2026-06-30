@@ -103,7 +103,7 @@ A namespaced async KV with one atomic primitive:
 | `put(ns, key, value)` | Overwrite. |
 | `add(ns, key, value)` | Create-if-absent; aborts on id collision. |
 | `del(ns, key)` | Idempotent. |
-| `list(ns, opts)` | Bounded enumeration; opaque cursors only. |
+| `list(ns)` | Returns the full `[{ key, value }]` array for the namespace. No `opts` parameter, no cursor/pagination API. |
 | `estimateBytes(ns)` | Best-effort size accounting for quota probes. |
 | `update(ns, key, fn)` | Single-key compare-and-set helper built atop `transact`. |
 | `transact({ stores, reads, compute })` | All reads declared up-front; `compute(readValues)` is **synchronous and pure**; returns the writes + a result that are applied in ONE `readwrite` transaction. Commit-or-abort; quota → typed `STORAGE_QUOTA_EXCEEDED`. |
@@ -145,7 +145,7 @@ IndexedDB namespaces** (`r3_0e_*`), not on the case record.
 
 | Store | Namespace | Notes |
 | --- | --- | --- |
-| `case-store` | `cases` + `caseIndex` (one atomic txn) | `create / save / open / duplicate / archive / unarchive / remove(confirm:true) / list / exportCase / importBundle / compact`. `save`-update requires an existing entry — a deleted case is **not** resurrected. `delete` is fail-closed without `confirm:true`. |
+| `case-store` | `cases` + `caseIndex` (one atomic txn) | `create / save / open / duplicate / archive / unarchive / setPinned / remove(confirm:true) / list / exportCase / importBundle / compact`. `save`-update requires an existing entry — a deleted case is **not** resurrected. `delete` is fail-closed without `confirm:true`. |
 | `session-store` | separate namespace | Raw telemetry is **byte-bounded** (`maxSessionBytes` / `maxRawBytes`); oldest-evicted with a bounded eviction log embedded in the index envelope so index/log can't diverge. Never auto-uploaded. Never in a portable case bundle. `exportRawArchive(id)` is an explicit opt-in distinct from the case export. |
 | `experiment-store` | `r3_0e_experiments` + `r3_0e_experimentsIndex` | R3.0E — **mutable** (`create / update / get / list / remove`). See §R3.0E. |
 | `outcome-store` | `r3_0e_outcomes` + `r3_0e_outcomesIndex` | R3.0E — API surface is `create / get / listForExperiment` (no update or remove API exposed). |
