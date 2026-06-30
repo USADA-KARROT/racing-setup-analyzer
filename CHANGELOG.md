@@ -179,12 +179,12 @@ Six hardening probes live at **`tests/e2e/hardening-{01..06}-*.test.js`**, carry
 
 | Probe | Scope | Fail-closed assertion |
 |---|---|---|
-| Electron boundary | Preload surface, `contextIsolation`, `nodeIntegration` | Preload exposes EXACTLY `{platform, version}`; no Node/Electron primitives reach the renderer |
-| Storage failure | IndexedDB quota / corruption / version mismatch | Capability blocks with reason; in-flight state is not partially written; F1 commit is atomic across stores + META |
-| No-stale-UI | View-model identity across reopen / migration / refresh | Stale-eligibility flags from a prior session never re-authorize a capability |
-| Large library | 501-preset catalogue + extended case history | No O(n²) regressions; persistence boundary remains structured-clone-only |
-| XSS | Any text rendered from a case / telemetry / Engineer Brief | Renderer never interprets case content as HTML; no `innerHTML` on untrusted payloads |
-| Supply-chain | Attestation refusal + structured-clone boundary | Foreign-origin records carrying sentinel fields are rejected with `PRODUCER_ATTESTATION_REFUSED`; no live-reference smuggling |
+| Electron boundary | Preload surface, `contextIsolation`, `nodeIntegration`, CSP | Preload exposes EXACTLY `{platform, version}`; no Node/Electron primitives reach the renderer; no unsafe `webPreferences` flag is ever flipped on |
+| Storage failure | `case-store.remove` confirm-guard, `backend.transact` failure, oversized record | `remove` without `confirm:true` is `CONFIRM_REQUIRED`; a backend failure leaves the source record completely unchanged (`BACKEND_REJECTED`, no partial write); an oversized record is rejected by the record-bytes cap |
+| No-stale-UI | Case-id-bearing viewmodel fields across reopen / migration / transition (incl. R3.0C/D/E `caseAssociation` fields) | No stale case-id reference survives a Case/Session transition, verified against a real R3.0E experiment record's production shape |
+| Large library | Case-store + F1 migration engine at `N` and `2N` library size | `backend.list`/`get`/`transact` operation counts grow bounded-linear, not quadratic |
+| XSS | Any text rendered from a case / telemetry / Engineer Brief | Renderer never pipes user-supplied or case-derived text into `innerHTML` or `document.write` |
+| Supply-chain | `package.json` dependency/script declarations, committed secrets | Only known Electron/electron-builder deps declared; no bare third-party `require()` in production renderer modules; no untrusted script references; no committed secrets/`.env` files |
 
 ### Documentation sweep
 

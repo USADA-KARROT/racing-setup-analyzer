@@ -614,11 +614,11 @@ target the fail-closed boundaries identified earlier in this document:
 | File | Target |
 | --- | --- |
 | `tests/e2e/hardening-01-electron-boundary.test.js` | Electron preload surface is exactly `{ platform, version }`; no IPC channel, no FS, no shell spawn, no `webContents` exposure. Drift fails the gate. |
-| `tests/e2e/hardening-02-storage-failure.test.js` | Injects `STORAGE_UNAVAILABLE` / `STORAGE_QUOTA_EXCEEDED`; confirms the UI blocks the affected capability with a reason — not a partial save, not a silent skip. |
-| `tests/e2e/hardening-03-no-stale-ui.test.js` | After a fail-closed block the view does not retain a previous "success" cell. |
-| `tests/e2e/hardening-04-large-library.test.js` | Opening a library at the bounded ceiling number of cases does not exceed declared memory or freeze the renderer. |
-| `tests/e2e/hardening-05-xss-injection.test.js` | Sanitization at every place a user-supplied string crosses into the DOM (case title, vehicle name, custom notes). |
-| `tests/e2e/hardening-06-supply-chain.test.js` | The dependency-free CI lane: a transitive dependency added under cover would fail the install-lane assertion. |
+| `tests/e2e/hardening-02-storage-failure.test.js` | `case-store.remove` requires explicit `confirm:true` (`CONFIRM_REQUIRED` otherwise); a `backend.transact` failure leaves the source record completely unchanged (`BACKEND_REJECTED`, status `halted`, no partial write); an oversized record is rejected by the record-bytes cap. |
+| `tests/e2e/hardening-03-no-stale-ui.test.js` | After a Case/Session transition, no viewmodel retains a stale case-id reference, across the full documented set of case-id-bearing fields (`lastSession.*`, `cachedCaseId`/`sourceCaseId`/`priorCaseId`/`parentCaseId`/`followUpCaseId`, R3.0C C8 `lastReassertion.caseId`, R3.0D `currentBrief.caseAssociation`, R3.0E `currentExperiment`/`currentOutcome`/`currentTimeline.caseAssociation`) — verified against a real R3.0E experiment record's production shape, not just a synthetic object. |
+| `tests/e2e/hardening-04-large-library.test.js` | The case-store + F1 migration engine scale **bounded-linear**, not quadratic, as library size grows — verified by counting `backend.list`/`get`/`transact` operations at `N` and `2N`. |
+| `tests/e2e/hardening-05-xss-injection.test.js` | Static scan confirming the renderer never pipes user-supplied or case-derived text into `innerHTML` or `document.write`. |
+| `tests/e2e/hardening-06-supply-chain.test.js` | `package.json` declares only the known Electron/electron-builder dependencies; no production renderer module pulls a bare third-party `require()`; no `package.json` script references untrusted tooling; `CHANGELOG.md` exists at the repo root; no committed secrets/API keys/`.env` files. |
 
 ---
 

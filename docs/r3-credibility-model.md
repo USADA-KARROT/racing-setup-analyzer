@@ -207,16 +207,16 @@ What is asserted on the **flows that actually surface a producer emission** (flo
 
 ## R3.0F F3 hardening probes: six probes, 133 assertions
 
-R3.0F F3 is the hardening surface. Six probes live under `tests/e2e/hardening-{01..06}-*.test.js`, totalling 133 assertions. The probes exist to verify the structural defences the rest of this document describes:
+R3.0F F3 is the hardening surface. Six probes live under `tests/e2e/hardening-{01..06}-*.test.js`, totalling 133 assertions:
 
-- Closure-private WeakSet identity holds across module boundaries.
-- The structured-clone-only firewall refuses function references, prototype channels, and live-object getters on persistence and IPC paths.
-- The trap-free JSON serializer rejects exotic property shapes (proxy traps, throwing getters, non-enumerable side channels) at emit time.
-- The live module check at consumer boundaries rejects swapped or shadowed producers with a corrupted-state fault.
-- The contract validators (R3.0C and R3.0D) refuse every malformed-attestation shape with the documented reason code rather than silently coercing.
-- `PRODUCER_ATTESTATION_REFUSED` fires on the migration path for attestation-sentinel inputs that the migrator does not consider trustworthy.
+- **Electron boundary.** `contextIsolation`/`nodeIntegration` are explicitly set and never weakened; preload exposes only the minimal `contextBridge` surface; the renderer CSP is never weakened.
+- **Storage failure.** `case-store.remove` requires explicit `confirm:true`; an atomic `backend.transact` failure leaves the source record completely unchanged (no partial write); an oversized record is rejected by the record-bytes cap.
+- **No-stale-UI.** No viewmodel retains a stale case-id reference (across the full documented set of case-id-bearing fields, including R3.0C/D/E `caseAssociation` fields) after a Case/Session transition, verified against a real R3.0E experiment record's production shape.
+- **Large library.** The case-store + F1 migration engine scale bounded-linear, not quadratic, as library size grows.
+- **XSS.** The renderer never pipes user-supplied or case-derived text into `innerHTML` or `document.write`.
+- **Supply-chain.** `package.json` declares only the known Electron/electron-builder dependencies; no production renderer module pulls a bare third-party `require()`; no untrusted script references; no committed secrets/`.env` files.
 
-The probes are not coverage-shaped; they are adversary-shaped. Each probe presents a forged input the producer would have to accept to launder a value's origin, and each probe asserts the producer's refusal with the documented reason code.
+These six probes do not exercise the closure-private WeakSet producer-attestation pattern, the structured-clone-only firewall, or `PRODUCER_ATTESTATION_REFUSED` on the migration path — those defences are real (see "Migration boundary" and the R3.0D/E sections of `docs/r3-experiment-loop.md`), but they are verified by their own phase's tests (e.g. `tests/r3.0e-outcome-classifier.test.js`'s WeakSet producer-attestation checks, `tests/r3.0f-migration-engine.test.js`'s `PRODUCER_ATTESTATION_REFUSED` checks), not by the F3 hardening-`{01..06}` files.
 
 ---
 

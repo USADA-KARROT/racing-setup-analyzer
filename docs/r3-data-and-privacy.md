@@ -409,7 +409,7 @@ The F2 phase ships nine end-to-end flows under `tests/e2e/` that each exercise t
 
 ## R3.0F F3 hardening probes
 
-The F3 phase ships six adversarial probes under `tests/e2e/hardening-{01..06}-*.test.js` covering 133 assertions total. Each probe targets a specific attack surface relevant to the data-flow guarantees above (Electron host boundary, XSS surface in the renderer, supply-chain regressions, structured-clone firewall, migration journal overflow, and producer-attestation field defense). The F3 manifest passes at the milestone baseline; the assertions are the canonical machine-readable counterpart to the prose in this document.
+The F3 phase ships six adversarial probes under `tests/e2e/hardening-{01..06}-*.test.js` covering 133 assertions total: the Electron host boundary (preload surface, `webPreferences`, CSP), storage-failure handling (`case-store.remove` confirm-guard, atomic `backend.transact` failure, oversized-record rejection), no-stale-UI invariants (case-id-bearing viewmodel fields after a Case/Session transition), large-library bounded-linear scaling (operation counts at `N` and `2N`), XSS surfaces (no unsafe DOM-injection patterns), and supply-chain integrity (dependency/script declaration allowlist, no committed secrets). The F3 manifest passes at the milestone baseline; the assertions are the canonical machine-readable counterpart to the prose in this document.
 
 ---
 
