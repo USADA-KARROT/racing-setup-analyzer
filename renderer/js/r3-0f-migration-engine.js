@@ -117,6 +117,7 @@
   var _StringProtoToLowerCase  = String.prototype.toLowerCase;
   var _StringProtoIndexOf      = String.prototype.indexOf;
   var _NumberProtoToString     = Number.prototype.toString;
+  var _ArrayProtoSort          = Array.prototype.sort;
   // F1-R18-01: avoid ambient Array.prototype.push on commit-critical arrays. Index-assignment
   // bypasses the prototype chain (assignment to arr[arr.length] uses the internal length slot,
   // not the .push method). Returns the new length.
@@ -127,6 +128,7 @@
   function _safeNormalize(str, form)      { return _ReflectApply(_StringProtoNormalize, str, [form]); }
   function _safeToLowerCase(str)          { return _ReflectApply(_StringProtoToLowerCase, str, []); }
   function _safeIndexOf(str, needle)      { return _ReflectApply(_StringProtoIndexOf, str, [needle]); }
+  function _safeSort(arr)                 { return _ReflectApply(_ArrayProtoSort, arr, []); }
 
   var ENV = _loadEnv();
   if (!ENV) throw new Error('r3-0f-migration-engine: migration-envelope contract not loadable');
@@ -618,7 +620,9 @@
     var MAX_RECORD_BYTES    = _NumberIsFinite(spec.maxRecordBytes) && spec.maxRecordBytes > 0 ? _MathFloor(spec.maxRecordBytes) : MAX_RECORD_BYTES_DEF;
     var clock               = spec.clock;
     var stamp               = spec.stamp;
-    var KNOWN_STORES        = _ObjectKeys(registry).sort();
+    // F1 pre-R21 hardening: use captured Array.prototype.sort via Reflect.apply so ambient
+    // tampering with sort cannot collapse KNOWN_STORES to [].
+    var KNOWN_STORES        = _safeSort(_ObjectKeys(registry));
     // F1-R2-01: engine-level migrate() serialization. Concurrent migrate() calls on the same
     // engine queue behind this Promise chain so they cannot race on the list-then-transact window.
     // Backend.transact also serializes underneath, but the engine reads BEFORE entering transact
@@ -1188,7 +1192,7 @@
     REASON_CODES:          ENV.REASON_CODES,
     STATUS_VALUES:         ENV.STATUS_VALUES,
     REPORT_STATUS_VALUES:  ENV.REPORT_STATUS_VALUES,
-    PRODUCER_ATTESTATION_FIELDS: _ObjectKeys(PRODUCER_ATTESTATION_FIELDS).sort()
+    PRODUCER_ATTESTATION_FIELDS: _safeSort(_ObjectKeys(PRODUCER_ATTESTATION_FIELDS))
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
