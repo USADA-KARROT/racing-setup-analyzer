@@ -118,6 +118,9 @@
   var _StringProtoIndexOf      = String.prototype.indexOf;
   var _NumberProtoToString     = Number.prototype.toString;
   var _ArrayProtoSort          = Array.prototype.sort;
+  var _PromiseAll              = Promise.all.bind(Promise);
+  var _PromiseResolve          = Promise.resolve.bind(Promise);
+  var _PromiseReject           = Promise.reject.bind(Promise);
   // F1-R18-01: avoid ambient Array.prototype.push on commit-critical arrays. Index-assignment
   // bypasses the prototype chain (assignment to arr[arr.length] uses the internal length slot,
   // not the .push method). Returns the new length.
@@ -627,7 +630,7 @@
     // engine queue behind this Promise chain so they cannot race on the list-then-transact window.
     // Backend.transact also serializes underneath, but the engine reads BEFORE entering transact
     // (to build the per-record migration plan), and that read-window is what this mutex protects.
-    var migrateChain = Promise.resolve();
+    var migrateChain = _PromiseResolve();
 
     for (var i = 0; i < KNOWN_STORES.length; i++) {
       var sk = KNOWN_STORES[i];
@@ -710,7 +713,7 @@
           }));
         })(KNOWN_STORES[i]);
       }
-      return Promise.all(promises).then(function () {
+      return _PromiseAll(promises).then(function () {
         return _readState().then(function (st) {
           var currentEnvelope = st && _isPlainObject(st.envelope) ? st.envelope : null;
           var envMismatch = false;
@@ -890,7 +893,7 @@
     function _migrateImpl(opts) {
       opts = opts || {};
       if (opts.confirm !== true) {
-        return Promise.resolve(ENV.deepFreeze({
+        return _PromiseResolve(ENV.deepFreeze({
           ok: false,
           reasonCode: 'CONFIRM_REQUIRED',
           report: ENV.deepFreeze({ status: 'halted', startedAt: _now(clock, stamp), perStore: {}, journalAppended: 0 })
@@ -938,7 +941,7 @@
             _safePush(listP, backend.list(sk).then(function (rows) { return _ArrayIsArray(rows) ? rows.length : 0; }, function () { return 0; }));
           })(KNOWN_STORES[i]);
         }
-        return Promise.all(listP).then(function (counts) {
+        return _PromiseAll(listP).then(function (counts) {
           var totalRecords = 0;
           for (var j = 0; j < counts.length; j++) totalRecords += counts[j];
           if (totalRecords > MAX_JOURNAL * JOURNAL_OVERFLOW_FACTOR) {
@@ -950,7 +953,7 @@
           }
           // Run per-store compute (no writes yet). Sequentially to keep journal ordering deterministic.
           var perStoreResults = [];
-          var p = Promise.resolve();
+          var p = _PromiseResolve();
           for (var k = 0; k < KNOWN_STORES.length; k++) {
             (function (sk) {
               p = p.then(function () {

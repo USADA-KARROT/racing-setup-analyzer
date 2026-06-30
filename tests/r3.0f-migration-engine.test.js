@@ -1870,6 +1870,38 @@ asyncCase('F1-R20-01: nested accessor in record value also rejected', function (
     });
 });
 
+// F1-R21-01: capture Promise.all + Promise.resolve + Promise.reject at module load. Ambient
+// Promise.all poisoning (e.g., returning resolve([])) cannot bypass the JOURNAL_OVERFLOW
+// preflight which relies on summing per-store record counts.
+(function () {
+  var cp = require('child_process');
+  var script = "'use strict';\n" +
+    // Load engine FIRST so captured Promise.all is the original
+    "var ENG = require(" + JSON.stringify(_path.join(_repo, 'renderer/js/r3-0f-migration-engine.js')) + ");\n" +
+    "var SB = require(" + JSON.stringify(_path.join(_repo, 'renderer/js/storage-backend.js')) + ");\n" +
+    "(async function () {\n" +
+    "  var b = SB.MemoryBackend();\n" +
+    "  for (var i = 0; i < 50; i++) await b.put('cases', 'c' + i, { schemaVersion: 1, caseId: 'c' + i });\n" +
+    // Poison Promise.all AFTER engine load
+    "  Promise.all = function () { return Promise.resolve([]); };\n" +
+    "  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (r) {\n" +
+    "    return { ok: true, record: { schemaVersion: 1, caseId: r.caseId, x: 1 }, migrations: ['delta'] };\n" +
+    "  } } };\n" +
+    "  var res = await ENG.createMigrationEngine({ backend: b, registry: registry, maxJournalEntries: 5, stamp: '2026-07-01T00:00:00.000Z' }).migrate({ confirm: true });\n" +
+    "  process.stdout.write(JSON.stringify({\n" +
+    "    ok: res.ok,\n" +
+    "    reasonCode: res.reasonCode || null,\n" +
+    "    status: res.report.status,\n" +
+    "    casesMigrated: (res.report.perStore.cases && res.report.perStore.cases.migrated) || 0\n" +
+    "  }));\n" +
+    "})();\n";
+  var out = cp.execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' });
+  var result = JSON.parse(out);
+  chk('F1-R21-01: Promise.all poison cannot bypass JOURNAL_OVERFLOW preflight', result.ok === false && result.reasonCode === 'JOURNAL_OVERFLOW');
+  chk('F1-R21-01: status=halted', result.status === 'halted');
+  chk('F1-R21-01: zero records migrated under preflight halt', result.casesMigrated === 0);
+})();
+
 asyncCase('F1-R13-01 negative: legitimate at-target migration still works', function () {
   var b = SB.MemoryBackend();
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
