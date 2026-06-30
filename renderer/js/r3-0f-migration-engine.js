@@ -334,7 +334,11 @@
     var t = typeof v;
     if (t === 'string' || t === 'boolean') return true;
     if (t === 'number') return _isFinite(v); // reject NaN/Infinity (JSON would coerce to null)
-    if (t === 'undefined' || t === 'function' || t === 'symbol' || t === 'bigint') return false;
+    // JSON.stringify omits object properties whose value is undefined (per ECMA-262 §25.5.2).
+    // To stay consistent with R3.0B importBundle which sets `schema: undefined`, the engine
+    // treats undefined on a property as JSON-safe (it will be stripped during serialization).
+    if (t === 'undefined') return true;
+    if (t === 'function' || t === 'symbol' || t === 'bigint') return false;
     if (t !== 'object') return false;
     if (_ArrayIsArray(v)) {
       for (var i = 0; i < v.length; i++) if (!_isJsonSafe(v[i], depth + 1)) return false;
@@ -387,6 +391,11 @@
   function _safeJsonStringify(v, depth) {
     if (depth === undefined) depth = 0;
     if (depth > 256) return null;
+    // JSON.stringify treats undefined as null when it appears as an ARRAY element (caller's
+    // responsibility to omit when it's an object PROPERTY VALUE). Returning 'null' here
+    // mirrors that behaviour for array elements; object-key callers explicitly skip undefined
+    // before invoking this function (see the plain-object branch below).
+    if (v === undefined) return 'null';
     if (v === null) return 'null';
     var t = typeof v;
     if (t === 'boolean') return v ? 'true' : 'false';
@@ -443,14 +452,17 @@
       }
       return arrStr + ']';
     }
-    // Plain object: walk own enumerable keys
+    // Plain object: walk own enumerable keys. Per JSON.stringify semantics, properties whose
+    // value is `undefined` are OMITTED from the output (the key disappears entirely).
     var keys = _ObjectKeys(v);
     var entries = [];
     for (var ki = 0; ki < keys.length; ki++) {
       var k = keys[ki];
+      var keyVal = v[k];
+      if (keyVal === undefined) continue; // omit undefined-valued properties (JSON spec)
       var keyStr = _safeJsonStringify(k, depth + 1);
       if (keyStr === null) return null;
-      var valStr = _safeJsonStringify(v[k], depth + 1);
+      var valStr = _safeJsonStringify(keyVal, depth + 1);
       if (valStr === null) return null;
       entries[entries.length] = keyStr + ':' + valStr;
     }
