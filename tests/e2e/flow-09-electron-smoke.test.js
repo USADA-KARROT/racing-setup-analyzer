@@ -27,15 +27,12 @@ try {
   chk('electron declared in package.json devDependencies', !!(pkgJson.devDependencies && pkgJson.devDependencies.electron));
   chk('electron devDep version range non-empty', typeof (pkgJson.devDependencies && pkgJson.devDependencies.electron) === 'string' && pkgJson.devDependencies.electron.length > 0);
 
-  // Step 2: if electron IS installed (developer machine, integration runs), confirm the
-  // package.json version is a valid semver. In dep-free CI lanes this is a no-op.
-  var installedVersion = null;
-  try { installedVersion = require('electron/package.json').version; } catch (e) { installedVersion = null; }
-  if (installedVersion !== null) {
-    chk('installed electron version is N.N.N semver', /^\d+\.\d+\.\d+/.test(installedVersion));
-  } else {
-    chk('electron not installed (CI dep-free lane) — installed-version check skipped', true);
-  }
+  // Step 2: validate the electron version range declared in package.json. CI dependency-free
+  // lanes don't ship node_modules/electron, so we deliberately AVOID require('electron/...') —
+  // that would be classified as a bare third-party import by the dep-audit. The declared range
+  // ('^33.0.0' or similar) is enough to confirm the build target.
+  var declaredRange = pkgJson.devDependencies && pkgJson.devDependencies.electron;
+  chk('declared electron version range is a valid semver-range string', typeof declaredRange === 'string' && /^[\^~]?\d+\.\d+\.\d+/.test(declaredRange));
 
   // Step 3: main.js exists + structurally sound (contextIsolation: true, nodeIntegration: false)
   var mainPath = path.join(__dirname, '..', '..', 'main.js');
