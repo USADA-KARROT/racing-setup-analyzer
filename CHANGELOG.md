@@ -197,11 +197,15 @@ When the release gate flips `featureRegistryActivationAllowed = true`, the versi
 ## R3.0E — Experiment loop
 
 R3.0E adds the experiment / outcome / follow-up / timeline ladder on top of the decision
-engine. **Only the timeline store is append-only with monotonic `createdAt`.** The
-experiment store, outcome store, and follow-up-link store all permit controlled state
-transitions (`update`, `remove`, `markParentStatus`), but **none** of them ever promote
-comparison authority across cases. `caseAssociation` cross-case writes are forbidden — a
-follow-up case is a new case linked by ID, not a mutation of a prior case.
+engine. The mutation surfaces are deliberately heterogeneous: **only the timeline store
+is append-only with monotonic `createdAt`** and exposes no mutation surface; the
+**experiment store** allows targeted mutation through `create`, `update`, and `remove`;
+the **follow-up-link store** allows only the narrow `markParentStatus` on existing links;
+the **outcome store** is **create-only through its public API** (`create`, `get`,
+`listForExperiment`) with duplicate-id rejection and no `update` or `remove`. None of
+these stores ever promote comparison authority across cases. `caseAssociation` cross-case
+writes are forbidden — a follow-up case is a new case linked by ID, not a mutation of a
+prior case.
 
 | Capability | Credibility | Required input | Fail-closed when |
 |---|---|---|---|

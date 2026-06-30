@@ -174,7 +174,7 @@ The R3.0E outcome classifier obeys the authoritative-only-inputs rule inherited 
 
 ## R3.0F F1 migration: never fabricates attestation
 
-R3.0F F1 is the v1.3 → v1.4.0 migration engine. It is **deterministic by mandate** — given the same input record byte-for-byte, it produces the same output record byte-for-byte. It consumes no clock, no random source, no environment. Its output rung at the conclusion layer is `Derived` because the transform is closed-form over the R3.0B schema; the underlying values keep whatever credibility envelope they had pre-migration.
+R3.0F F1 is the schema-migration engine. It migrates each persisted store's records toward that store's integer `targetVersion` (currently `1` for every R3.0B/E store; per-store migrator steps live under `scripts/migrators/`). F1 emits **no credibility rung of its own**: it is not a producer that classifies anything on the ladder. The transform is **deterministic by mandate** — given the same input record byte-for-byte, the migrator's steps produce the same output record byte-for-byte. The migrator steps consume no clock, no random source, and no environment; the surrounding engine uses an injected stamp/clock only to write its own journal and state metadata records (not the migrated payloads). The underlying credibility envelope of each migrated record is preserved verbatim — the rung, provenance, limitations[], blockedReasons, and evidence references travel through unchanged.
 
 The migration engine's central rule on credibility is that it **never fabricates attestation**. A v1.3 input record that lacks producer attestation fields does not gain them across the migration: the migrator does not invent a `producerId`, a `derivedHere` flag, a calibration binding, or a synthetic-vs-real provenance. Worse, an input record that arrives **carrying** attestation sentinel fields the migrator does not consider trustworthy is refused outright with the reason code `PRODUCER_ATTESTATION_REFUSED`. The migrator does not "best-effort coerce" attested-looking fields into a valid attestation shape; it refuses the record and surfaces the reason.
 
@@ -187,9 +187,21 @@ Two practical consequences:
 
 ## R3.0F F2 end-to-end flows: nine production flows under `tests/e2e/`
 
-R3.0F F2 is the end-to-end verification surface. Nine flows live under `tests/e2e/flow-{01..09}-*.test.js`. Each is a closed flow that exercises one production path through R3.0B persistence, R3.0C comparison authority, R3.0D decision engine, and R3.0E stores end-to-end, on the Demo Analysis Case fixture (`provenance: "synthetic"`, with `LIMITATION_SYNTHETIC_ONLY` riding through). The flows are not unit tests — they are sequence tests that confirm the producer-attestation chain is intact across module boundaries.
+R3.0F F2 is the end-to-end verification surface. Nine flows live under `tests/e2e/flow-{01..09}-*.test.js`. The flows are **heterogeneous** — each exercises a specific production path rather than all running the same R3.0B→C→D→E traversal on the same fixture. Concretely:
 
-The honesty-contract envelope (rung, provenance, limitations, blockers, evidenceRefs, nextValidationStep) is asserted on every emission a flow surfaces. The synthetic marker is asserted on every conclusion the flow produces from Demo Analysis Case inputs. The append-only timeline is asserted in flows that touch R3.0E by attempting (and being rejected for) a duplicate `eventId` or an out-of-order `createdAt`. The same-case + same-session boundary is asserted by attempting a cross-case or cross-session reference lap and being rejected by the R3.0C contract.
+| Flow | Surface exercised |
+| --- | --- |
+| `flow-01-new-user.test.js` | Empty-state baseline on a fresh `MemoryBackend`; F1 idempotent skip on an empty backend. |
+| `flow-02-real-telemetry.test.js` | Session-store roundtrip; raw telemetry never lands in the case bundle. |
+| `flow-03-measured.test.js` | Credibility rung exact `measured`; limitations[] preserved end-to-end; closed-enum membership. |
+| `flow-04-reference-lap.test.js` | R3.0C `selectReference` negative paths (forbidden auto modes, missing selection, forged user-selection, stale candidate lap). |
+| `flow-05-vre.test.js` | R3.0D `buildEngineerBrief` authority gate; forged hypothesisSet rejected with `HYPOTHESIS_AUTHORITY_FORGED`. |
+| `flow-06-setup-experiment.test.js` | R3.0E experiment create + timeline append; out-of-order timeline rejected. |
+| `flow-07-driver-experiment.test.js` | Driver instruction + follow-up Case Link; cross-case + cross-session comparison forbidden; `assertNoStaleCaseRef` invoked. |
+| `flow-08-export-import.test.js` | Bundle export with no raw telemetry; `imported_summary` never promoted; F1 sees imported records as at-target; `assertNoStaleCaseRef` invoked. |
+| `flow-09-electron-smoke.test.js` | Static Electron smoke — `package.json` devDeps declaration, `main.js` contextIsolation/nodeIntegration, `preload.js` contextBridge surface. |
+
+What is asserted on the **flows that actually surface a producer emission** (flows 03/04/05/06/07/08) is the honesty-contract envelope on each emission — rung, provenance, limitations, blockers, evidenceRefs, and (where the producer exposes one) a next-validation-step pointer. The synthetic marker rides through anywhere a Demo Analysis Case input was used; F1 sees that input verbatim and never promotes it. Same-case + same-session is asserted by attempting forbidden cross-boundaries and being rejected by the R3.0C contract.
 
 ---
 
