@@ -92,6 +92,7 @@
   var _ObjectKeys          = Object.keys;
   var _ObjectAssign        = Object.assign || function (t) { for (var i = 1; i < arguments.length; i++) { var s = arguments[i]; if (s) for (var k in s) if (Object.prototype.hasOwnProperty.call(s, k)) t[k] = s[k]; } return t; };
   var _ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
+  var _ObjectGetOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
   var _ObjectGetPrototypeOf = Object.getPrototypeOf;
   var _ObjectPrototype     = Object.prototype;
   var _ObjectPrototypeHasOwnProperty = Object.prototype.hasOwnProperty;
@@ -332,6 +333,33 @@
     return true;
   }
 
+  // F1-R20-01: descriptor-only preflight. structuredClone invokes accessor getters on enumerable
+  // accessor properties. We walk own property descriptors (via captured
+  // _ObjectGetOwnPropertyDescriptor) WITHOUT reading the value, and reject any descriptor that
+  // lacks `value` (i.e., accessor descriptor with `get`/`set`). Symbols are not reachable via
+  // _ObjectGetOwnPropertyNames so they're naturally excluded; if they were reachable via
+  // own-property-symbols, we'd also reject. Returns true if the tree is safe to structuredClone.
+  function _isAccessorFreeDescriptorTree(v, depth) {
+    if (depth === undefined) depth = 0;
+    if (depth > 256) return false;
+    if (v === null) return true;
+    var t = typeof v;
+    if (t !== 'object') return true;
+    var names = _ObjectGetOwnPropertyNames(v);
+    for (var i = 0; i < names.length; i++) {
+      var k = names[i];
+      var d;
+      try { d = _ObjectGetOwnPropertyDescriptor(v, k); } catch (_) { return false; }
+      if (!d) return false;
+      // Accessor descriptor → REJECT
+      if (typeof d.get === 'function' || typeof d.set === 'function') return false;
+      // Data descriptor with `value` — recurse without reading via v[k] (use d.value)
+      if (!('value' in d)) return false;
+      if (!_isAccessorFreeDescriptorTree(d.value, depth + 1)) return false;
+    }
+    return true;
+  }
+
   // F1-R19-01: trap-free own-key serializer. JSON.stringify invokes any `toJSON` it can find via
   // the prototype chain — including a hostile `Object.prototype.toJSON` installed after engine
   // load. This serializer walks own enumerable keys directly (via captured _ObjectKeys) and
@@ -428,6 +456,11 @@
     if (typeof rec !== 'object') return { ok: false, reason: 'RECORD_NOT_AN_OBJECT' };
     if (_ArrayIsArray(rec)) return { ok: false, reason: 'RECORD_NOT_AN_OBJECT' };
     if (!_StructuredClone) return { ok: false, reason: 'PROXY_INPUT_REJECTED' }; // refuse without structured clone
+    // F1-R20-01: descriptor-only preflight — reject any accessor property BEFORE structuredClone
+    // can invoke its getter. structuredClone honors enumerable accessor descriptors and clones
+    // the getter's return value, so a hostile getter could materialize an attacker-controlled
+    // value into the engine's pipeline. We walk own descriptors with no value-read.
+    if (!_isAccessorFreeDescriptorTree(rec)) return { ok: false, reason: 'PROXY_INPUT_REJECTED' };
     var cloned;
     try { cloned = _StructuredClone(rec); } catch (_) { return { ok: false, reason: 'PROXY_INPUT_REJECTED' }; }
     // F1-R14-01: pre-validate the cloned tree is purely JSON-safe (no BigInt/Date/Map/Set/typed
@@ -527,7 +560,11 @@
     try {
       if (v === null) cloned = null;
       else if (typeof v !== 'object') cloned = v;
-      else cloned = _StructuredClone(v);
+      else {
+        // F1-R20-01: descriptor-only preflight before structuredClone.
+        if (!_isAccessorFreeDescriptorTree(v)) return null;
+        cloned = _StructuredClone(v);
+      }
     } catch (_) { return null; }
     if (cloned !== null && typeof cloned === 'object' && !_isJsonSafe(cloned)) return null;
     if (typeof cloned !== 'object' && cloned !== null && typeof cloned !== 'string' && typeof cloned !== 'number' && typeof cloned !== 'boolean') return null;
@@ -620,8 +657,10 @@
               if (!captured) { counts.malformed += 1; continue; }
               var rec = captured.value;
               if (!_isPlainObject(rec)) { counts.malformed += 1; continue; }
-              // Clone the record before reading schemaVersion so a hostile schemaVersion accessor
-              // on the original cannot side-effect detect().
+              // F1-R20-01: descriptor-only preflight before structuredClone in detect() too.
+              // structuredClone honors enumerable accessor descriptors and would invoke a hostile
+              // getter; detect() is a preview path and must be side-effect free.
+              if (!_isAccessorFreeDescriptorTree(rec)) { counts.malformed += 1; continue; }
               var snap;
               try { snap = _StructuredClone(rec); } catch (_) { counts.malformed += 1; continue; }
               var v = snap.schemaVersion;

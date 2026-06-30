@@ -1829,6 +1829,47 @@ asyncCase('F1-R14-01 negative: legitimate ASCII-only record with nested object s
   chk('F1-R19-01: persisted schemaVersion still 99 (source untouched)', result.persistedSchemaVersion === 99);
 })();
 
+// F1-R20-01: descriptor-only preflight rejects accessor properties BEFORE structuredClone can
+// invoke any getter. detect() and _sanitize and _sanitizedHash all gate on
+// _isAccessorFreeDescriptorTree.
+asyncCase('F1-R20-01: enumerable accessor property on source record rejected; getter NEVER fires', function () {
+  var fired = 0;
+  var rec = { schemaVersion: 1 };
+  Object.defineProperty(rec, 'caseId', { enumerable: true, get: function () { fired++; return 'cAccessor'; } });
+  var real = SB.MemoryBackend();
+  var backend = {
+    list: function (ns) { return Promise.resolve(ns === 'cases' ? [{ key: 'cAccessor', value: rec }] : []); },
+    get: real.get.bind(real),
+    put: real.put.bind(real),
+    transact: real.transact.bind(real)
+  };
+  return ENG.createMigrationEngine({ backend: backend, stamp: STAMP }).migrate({ confirm: true })
+    .then(function (r) {
+      chk('accessor getter NEVER fires (fired=0)', fired === 0);
+      chk('rejected=1', r.report.perStore.cases.rejected === 1);
+      chk('migrated=0', r.report.perStore.cases.migrated === 0);
+      chk('noop=0 (no false acceptance)', r.report.perStore.cases.noop === 0);
+    });
+});
+
+asyncCase('F1-R20-01: nested accessor in record value also rejected', function () {
+  var fired = 0;
+  var rec = { schemaVersion: 1, caseId: 'cNested', metadata: {} };
+  Object.defineProperty(rec.metadata, 'title', { enumerable: true, get: function () { fired++; return 'hijack'; } });
+  var real = SB.MemoryBackend();
+  var backend = {
+    list: function (ns) { return Promise.resolve(ns === 'cases' ? [{ key: 'cNested', value: rec }] : []); },
+    get: real.get.bind(real),
+    put: real.put.bind(real),
+    transact: real.transact.bind(real)
+  };
+  return ENG.createMigrationEngine({ backend: backend, stamp: STAMP }).migrate({ confirm: true })
+    .then(function (r) {
+      chk('nested accessor getter NEVER fires', fired === 0);
+      chk('record rejected', r.report.perStore.cases.rejected === 1);
+    });
+});
+
 asyncCase('F1-R13-01 negative: legitimate at-target migration still works', function () {
   var b = SB.MemoryBackend();
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
