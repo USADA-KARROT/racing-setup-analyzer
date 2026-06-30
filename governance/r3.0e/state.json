@@ -1,12 +1,14 @@
 {
   "schemaVersion": 1,
   "program": "R3.0E",
-  "currentCheckpoint": "E1_CONTRACT_FOUNDATION",
-  "authorizedProductionPaths": [],
-  "enabledCapabilities": ["contract_foundation_present"],
-  "runtimeConsumersAllowed": false,
+  "currentCheckpoint": "E2_EXPERIMENT_STORE",
+  "authorizedProductionPaths": [
+    { "path": "renderer/js/r3-0e-stores.js", "capability": "experiment_store_present" }
+  ],
+  "enabledCapabilities": ["contract_foundation_present", "experiment_store_present"],
+  "runtimeConsumersAllowed": true,
   "uiAllowed": false,
   "featureRegistryActivationAllowed": false,
   "algorithmsAllowed": false,
-  "note": "R3.0E E1_CONTRACT_FOUNDATION state. Contracts under contracts/r3.0e/ (reason-codes / experiment / outcome / control-variables / case-timeline / follow-up-link / index) present. NON-PRODUCTION at E1: authorizedProductionPaths remains empty (no renderer/js/r3-0e-* file yet); runtimeConsumersAllowed + algorithmsAllowed + uiAllowed + featureRegistryActivationAllowed remain false. enabledCapabilities adds contract_foundation_present only. Mutating any field above E1 requires a separately-authorized Integrated Delivery Train checkpoint AND requires R3.0D state.currentCheckpoint === 'D5_ENGINEER_BRIEF_ACTIVATION' per cross-phase rule. Per SKYLINE D12/E1 ruling: this phase MUST NOT extend the frozen R3.0B case-record schema body — the existing R3.0B associations `experimentId` and `followUpCaseIds` are id-only refs that pre-existed E1; they are NOT R3.0E-driven extensions."
+  "note": "R3.0E E2_EXPERIMENT_STORE state. renderer/js/r3-0e-stores.js is the authorized E2 production module: factories createExperimentStore / createOutcomeStore / createTimelineStore / createFollowUpLinkStore / createStoreMetadata. Each store validates payloads via the E1 contracts on write AND on read; future-schemaVersion records are fail-closed (read throws R3_0E_*_FUTURE_SCHEMA). Timeline is append-only (duplicate eventId rejected; out-of-order timestamp rejected). Follow-up link reverse index by parentCaseId maintained. uiAllowed + featureRegistryActivationAllowed remain false — UI surface is exclusively E5_UI_ACTIVATION. Per SKYLINE D12/E1 ruling: R3.0E uses SEPARATE versioned IndexedDB stores (r3_0e_experiments / r3_0e_outcomes / r3_0e_timelines / r3_0e_followupLinks / r3_0e_followupLinksByCase / r3_0e_storeMetadata) and MUST NOT extend the frozen R3.0B portable case-record schema body."
 }
