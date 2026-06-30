@@ -92,6 +92,8 @@
   var _ObjectKeys          = Object.keys;
   var _ObjectAssign        = Object.assign || function (t) { for (var i = 1; i < arguments.length; i++) { var s = arguments[i]; if (s) for (var k in s) if (Object.prototype.hasOwnProperty.call(s, k)) t[k] = s[k]; } return t; };
   var _ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
+  var _ObjectGetPrototypeOf = Object.getPrototypeOf;
+  var _ObjectPrototype     = Object.prototype;
   var _ObjectPrototypeHasOwnProperty = Object.prototype.hasOwnProperty;
   var _ArrayIsArray        = Array.isArray;
   var _JSONStringify       = JSON.stringify;
@@ -314,11 +316,12 @@
       for (var i = 0; i < v.length; i++) if (!_isJsonSafe(v[i], depth + 1)) return false;
       return true;
     }
-    // Reject anything whose prototype is not Object.prototype (Date / Map / Set / RegExp /
-    // ArrayBuffer / typed arrays / Promise / etc.). Plain JSON-safe records must use
-    // Object.prototype only.
-    var proto = Object.getPrototypeOf(v);
-    if (proto !== null && proto !== Object.prototype) return false;
+    // F1-R15-01: use CLOSURE-CAPTURED Object.getPrototypeOf + Object.prototype. Ambient rebinding
+    // of Object.getPrototypeOf (e.g., made to always return Object.prototype) would otherwise let
+    // a Date / Map / Set / RegExp / typed array survive this check and reach JSON.stringify where
+    // its prototype toJSON hook would fire.
+    var proto = _ObjectGetPrototypeOf(v);
+    if (proto !== null && proto !== _ObjectPrototype) return false;
     var keys = _ObjectKeys(v);
     for (var j = 0; j < keys.length; j++) if (!_isJsonSafe(v[keys[j]], depth + 1)) return false;
     return true;

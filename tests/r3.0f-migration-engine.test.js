@@ -1522,6 +1522,48 @@ asyncCase('F1-R14-01 negative: legitimate ASCII-only record with nested object s
     });
 });
 
+// F1-R15-01: closure-captured Object.getPrototypeOf + Object.prototype. Poisoned global
+// Object.getPrototypeOf can no longer let Date / Map / Set survive the JSON-safety walker.
+// Test runs in child_process to isolate the global poison from concurrent async tests
+// in this file (the R3.0E experiment contract also uses Object.getPrototypeOf; in-process
+// poisoning would cross-contaminate).
+(function () {
+  var cp = require('child_process');
+  var script = "'use strict';\n" +
+    // Load the engine FIRST so its closure captures the unpoisoned intrinsics.
+    "var ENG = require(" + JSON.stringify(_path.join(_repo, 'renderer/js/r3-0f-migration-engine.js')) + ");\n" +
+    "var SB = require(" + JSON.stringify(_path.join(_repo, 'renderer/js/storage-backend.js')) + ");\n" +
+    "var origGPO = Object.getPrototypeOf;\n" +
+    "var origDateToJSON = Date.prototype.toJSON;\n" +
+    "var fired = 0;\n" +
+    // Poison AFTER engine module load so the engine's closure-captured references stay valid.
+    "Object.getPrototypeOf = function () { return Object.prototype; };\n" +
+    "Date.prototype.toJSON = function () { fired++; return 'pwned-date'; };\n" +
+    "var b = SB.MemoryBackend();\n" +
+    "var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {\n" +
+    "  return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, dt: new Date('2026-01-01') }, migrations: ['delta'] };\n" +
+    "} } };\n" +
+    "(async function () {\n" +
+    "  await b.put('cases', 'cR15', { schemaVersion: 1, caseId: 'cR15' });\n" +
+    "  var r = await ENG.createMigrationEngine({ backend: b, registry: registry, stamp: '2026-07-01T00:00:00.000Z' }).migrate({ confirm: true });\n" +
+    "  var rec = await b.get('cases', 'cR15');\n" +
+    "  Object.getPrototypeOf = origGPO;\n" +
+    "  Date.prototype.toJSON = origDateToJSON;\n" +
+    "  process.stdout.write(JSON.stringify({\n" +
+    "    fired: fired,\n" +
+    "    failed: r.report.perStore.cases.failed,\n" +
+    "    migrated: r.report.perStore.cases.migrated,\n" +
+    "    persistedHasDt: rec && rec.dt !== undefined\n" +
+    "  }));\n" +
+    "})();\n";
+  var out = cp.execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' });
+  var result = JSON.parse(out);
+  chk('F1-R15-01: Date.prototype.toJSON NOT invoked under poisoned getPrototypeOf', result.fired === 0);
+  chk('F1-R15-01: migrator-output-with-Date → failed', result.failed === 1);
+  chk('F1-R15-01: migrated=0', result.migrated === 0);
+  chk('F1-R15-01: persisted record does not contain dt', result.persistedHasDt === false);
+})();
+
 asyncCase('F1-R13-01 negative: legitimate at-target migration still works', function () {
   var b = SB.MemoryBackend();
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
