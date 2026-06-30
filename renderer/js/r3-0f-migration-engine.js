@@ -115,6 +115,10 @@
   var _StringProtoToLowerCase  = String.prototype.toLowerCase;
   var _StringProtoIndexOf      = String.prototype.indexOf;
   var _NumberProtoToString     = Number.prototype.toString;
+  // F1-R18-01: avoid ambient Array.prototype.push on commit-critical arrays. Index-assignment
+  // bypasses the prototype chain (assignment to arr[arr.length] uses the internal length slot,
+  // not the .push method). Returns the new length.
+  function _safePush(arr, v) { arr[arr.length] = v; return arr.length; }
   function _safeCharCodeAt(str, i)        { return _ReflectApply(_StringProtoCharCodeAt, str, [i]); }
   function _safeToString16(n)             { return _ReflectApply(_NumberProtoToString, n, [16]); }
   function _safeReplace(str, re, repl)    { return _ReflectApply(_StringProtoReplace, str, [re, repl]); }
@@ -380,7 +384,7 @@
     var out = [];
     for (var i = 0; i < arr.length && i < 32; i++) {
       var v = arr[i];
-      if (typeof v === 'string' && v.length > 0 && v.length <= 64) out.push(v);
+      if (typeof v === 'string' && v.length > 0 && v.length <= 64) _safePush(out, v);
     }
     return out;
   }
@@ -505,7 +509,7 @@
         var out = [];
         for (var i = 0; i < entries.length; i++) {
           var v = ENV.validateJournalEntry(entries[i]);
-          if (v.ok) out.push(ENV.deepFreeze(entries[i]));
+          if (v.ok) _safePush(out, ENV.deepFreeze(entries[i]));
         }
         return ENV.deepFreeze(out);
       });
@@ -518,7 +522,7 @@
       for (var i = 0; i < KNOWN_STORES.length; i++) {
         (function (storeKey) {
           var mg = registry[storeKey];
-          promises.push(backend.list(storeKey).then(function (rows) {
+          _safePush(promises, backend.list(storeKey).then(function (rows) {
             rows = _ArrayIsArray(rows) ? rows : [];
             var counts = { records: rows.length, atTarget: 0, belowTarget: 0, futureVersion: 0, malformed: 0 };
             for (var r = 0; r < rows.length; r++) {
@@ -577,11 +581,11 @@
             wouldReject: (st.futureVersion || 0) + (st.malformed || 0),
             listFailed: !!st.listFailed
           };
-          if (st.belowTarget > 0) steps.push({ store: sk, action: 'migrate', count: st.belowTarget });
-          if (st.atTarget > 0) steps.push({ store: sk, action: 'no-op', count: st.atTarget });
-          if (st.futureVersion > 0) blockers.push({ store: sk, reasonCode: 'UNSUPPORTED_FUTURE_VERSION', count: st.futureVersion });
-          if (st.malformed > 0) blockers.push({ store: sk, reasonCode: 'RECORD_BAD_VERSION', count: st.malformed });
-          if (st.listFailed) blockers.push({ store: sk, reasonCode: 'BACKEND_REJECTED', count: 0 });
+          if (st.belowTarget > 0) _safePush(steps, { store: sk, action: 'migrate', count: st.belowTarget });
+          if (st.atTarget > 0) _safePush(steps, { store: sk, action: 'no-op', count: st.atTarget });
+          if (st.futureVersion > 0) _safePush(blockers, { store: sk, reasonCode: 'UNSUPPORTED_FUTURE_VERSION', count: st.futureVersion });
+          if (st.malformed > 0) _safePush(blockers, { store: sk, reasonCode: 'RECORD_BAD_VERSION', count: st.malformed });
+          if (st.listFailed) _safePush(blockers, { store: sk, reasonCode: 'BACKEND_REJECTED', count: 0 });
         }
         return ENV.deepFreeze({
           ok: true,
@@ -608,7 +612,7 @@
           // can only fire a single time, and any access throw → unkeyed-row fail-closed branch.
           var captured = _captureRow(rows[i]);
           if (!captured || typeof captured.key !== 'string' || captured.key.length === 0) {
-            entries.push(_journalEntry(now, storeKey, '<unkeyed>', -1, mg.targetVersion, 'failed', [], '', 'BACKEND_REJECTED', ['unkeyed_row']));
+            _safePush(entries, _journalEntry(now, storeKey, '<unkeyed>', -1, mg.targetVersion, 'failed', [], '', 'BACKEND_REJECTED', ['unkeyed_row']));
             counts.failed += 1;
             continue;
           }
@@ -616,13 +620,13 @@
           var capturedValue = captured.value;
           var san = _sanitize(capturedValue, MAX_RECORD_BYTES);
           if (!san.ok) {
-            entries.push(_journalEntry(now, storeKey, key, -1, mg.targetVersion, 'rejected', [], '', san.reason, []));
+            _safePush(entries, _journalEntry(now, storeKey, key, -1, mg.targetVersion, 'rejected', [], '', san.reason, []));
             counts.rejected += 1;
             continue;
           }
           var fromVersion = (typeof san.value.schemaVersion === 'number' && _isFinite(san.value.schemaVersion) && san.value.schemaVersion >= 0 && _MathFloor(san.value.schemaVersion) === san.value.schemaVersion) ? san.value.schemaVersion : -1;
           if (fromVersion < 0) {
-            entries.push(_journalEntry(now, storeKey, key, -1, mg.targetVersion, 'rejected', [], '', 'RECORD_BAD_VERSION', []));
+            _safePush(entries, _journalEntry(now, storeKey, key, -1, mg.targetVersion, 'rejected', [], '', 'RECORD_BAD_VERSION', []));
             counts.rejected += 1;
             continue;
           }
@@ -633,43 +637,43 @@
           // future-version record. fromVersion > targetVersion is always UNSUPPORTED_FUTURE_VERSION,
           // regardless of what the migrator wants to do.
           if (fromVersion > mg.targetVersion) {
-            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'rejected', [], '', 'UNSUPPORTED_FUTURE_VERSION', []));
+            _safePush(entries, _journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'rejected', [], '', 'UNSUPPORTED_FUTURE_VERSION', []));
             counts.rejected += 1;
             continue;
           }
           var result;
           try { result = mg.migrate(san.value); }
           catch (e) {
-            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', [], '', 'MIGRATOR_THREW', [String(e && e.message || e).slice(0, 200)]));
+            _safePush(entries, _journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', [], '', 'MIGRATOR_THREW', [String(e && e.message || e).slice(0, 200)]));
             counts.failed += 1;
             continue;
           }
           if (!_isPlainObject(result) || (result.ok !== true && result.ok !== false)) {
-            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', [], '', 'MIGRATOR_THREW', ['bad_migrator_return']));
+            _safePush(entries, _journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', [], '', 'MIGRATOR_THREW', ['bad_migrator_return']));
             counts.failed += 1;
             continue;
           }
           if (result.ok === false) {
-            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'rejected', _ArrayIsArray(result.migrations) ? result.migrations : [], '', result.reason, []));
+            _safePush(entries, _journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'rejected', _ArrayIsArray(result.migrations) ? result.migrations : [], '', result.reason, []));
             counts.rejected += 1;
             continue;
           }
           var migrated = result.record;
           if (!_isPlainObject(migrated)) {
-            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', [], '', 'POST_MIGRATION_INVALID', ['migrator_returned_non_object']));
+            _safePush(entries, _journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', [], '', 'POST_MIGRATION_INVALID', ['migrator_returned_non_object']));
             counts.failed += 1;
             continue;
           }
           var postSan = _sanitize(migrated, MAX_RECORD_BYTES);
           if (!postSan.ok) {
-            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', _ArrayIsArray(result.migrations) ? result.migrations : [], '', postSan.reason, []));
+            _safePush(entries, _journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', _ArrayIsArray(result.migrations) ? result.migrations : [], '', postSan.reason, []));
             counts.failed += 1;
             continue;
           }
           // F1-R1-09: producer-attestation field defense — reject migrator output that contains
           // any well-known authority-attestation field name.
           if (_containsAttestationField(postSan.value)) {
-            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'rejected', _ArrayIsArray(result.migrations) ? result.migrations : [], '', 'PRODUCER_ATTESTATION_REFUSED', ['attestation_field_in_migrated_record']));
+            _safePush(entries, _journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'rejected', _ArrayIsArray(result.migrations) ? result.migrations : [], '', 'PRODUCER_ATTESTATION_REFUSED', ['attestation_field_in_migrated_record']));
             counts.rejected += 1;
             continue;
           }
@@ -679,17 +683,17 @@
           // Any deviation → POST_MIGRATION_INVALID, no write.
           var toVersion = postSan.value.schemaVersion;
           if (typeof toVersion !== 'number' || !_isFinite(toVersion) || _MathFloor(toVersion) !== toVersion) {
-            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', _ArrayIsArray(result.migrations) ? result.migrations : [], '', 'POST_MIGRATION_INVALID', ['post_migration_schema_version_invalid']));
+            _safePush(entries, _journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', _ArrayIsArray(result.migrations) ? result.migrations : [], '', 'POST_MIGRATION_INVALID', ['post_migration_schema_version_invalid']));
             counts.failed += 1;
             continue;
           }
           if (toVersion > mg.targetVersion) {
-            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', _ArrayIsArray(result.migrations) ? result.migrations : [], '', 'POST_MIGRATION_INVALID', ['version_overshoot']));
+            _safePush(entries, _journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', _ArrayIsArray(result.migrations) ? result.migrations : [], '', 'POST_MIGRATION_INVALID', ['version_overshoot']));
             counts.failed += 1;
             continue;
           }
           if (toVersion !== mg.targetVersion) {
-            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', _ArrayIsArray(result.migrations) ? result.migrations : [], '', 'POST_MIGRATION_INVALID', ['post_migration_schema_version_below_target']));
+            _safePush(entries, _journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', _ArrayIsArray(result.migrations) ? result.migrations : [], '', 'POST_MIGRATION_INVALID', ['post_migration_schema_version_below_target']));
             counts.failed += 1;
             continue;
           }
@@ -705,9 +709,9 @@
           // accessor fire on row.value), routed through _sanitizedHash which structured-clones
           // before serialization. Same canonical form on both sides of the TOCTOU window.
           var sourceHash = _sanitizedHash(capturedValue);
-          writes.push({ store: storeKey, key: key, value: postSan.value, sourceHash: sourceHash });
+          _safePush(writes, { store: storeKey, key: key, value: postSan.value, sourceHash: sourceHash });
           counts.migrated += 1;
-          entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'migrated', migrationsList, hash, '', []));
+          _safePush(entries, _journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'migrated', migrationsList, hash, '', []));
         }
         return { storeKey: storeKey, counts: counts, writes: writes, entries: entries };
       }, function (err) {
@@ -768,7 +772,7 @@
         var listP = [];
         for (var i = 0; i < KNOWN_STORES.length; i++) {
           (function (sk) {
-            listP.push(backend.list(sk).then(function (rows) { return _ArrayIsArray(rows) ? rows.length : 0; }, function () { return 0; }));
+            _safePush(listP, backend.list(sk).then(function (rows) { return _ArrayIsArray(rows) ? rows.length : 0; }, function () { return 0; }));
           })(KNOWN_STORES[i]);
         }
         return Promise.all(listP).then(function (counts) {
@@ -787,7 +791,7 @@
           for (var k = 0; k < KNOWN_STORES.length; k++) {
             (function (sk) {
               p = p.then(function () {
-                return _computeStoreWork(sk, _now(clock, stamp)).then(function (res) { perStoreResults.push(res); });
+                return _computeStoreWork(sk, _now(clock, stamp)).then(function (res) { _safePush(perStoreResults, res); });
               });
             })(KNOWN_STORES[k]);
           }
@@ -805,8 +809,8 @@
       for (var i = 0; i < perStoreResults.length; i++) {
         var r = perStoreResults[i];
         perStoreOut[r.storeKey] = r.counts;
-        for (var j = 0; j < r.entries.length; j++) allEntries.push(r.entries[j]);
-        for (var w = 0; w < r.writes.length; w++) { allWrites.push(r.writes[w]); storesUsedForWrites[r.writes[w].store] = true; }
+        for (var j = 0; j < r.entries.length; j++) _safePush(allEntries, r.entries[j]);
+        for (var w = 0; w < r.writes.length; w++) { _safePush(allWrites, r.writes[w]); storesUsedForWrites[r.writes[w].store] = true; }
         if (r.counts.migrated > 0) anyMigrated = true;
         if (r.counts.rejected > 0) anyRejected = true;
         if (r.counts.failed > 0) anyFailed = true;
@@ -887,17 +891,17 @@
         // writes — so a concurrent writer that committed between list() and transact() will be
         // visible here as a hash mismatch.
         var storesList = _ObjectKeys(storesUsedForWrites);
-        storesList.push(META);
+        _safePush(storesList, META);
         // Compute prior-journal/state preimage hashes (the snapshot we already loaded above).
         var priorJournalHash = _sanitizedHash(priorJournal);
         var priorStateHash   = _sanitizedHash(priorState || null);
         // Build reads spec
         var readsSpec = [];
         for (var rw = 0; rw < allWrites.length; rw++) {
-          readsSpec.push({ store: allWrites[rw].store, key: allWrites[rw].key });
+          _safePush(readsSpec, { store: allWrites[rw].store, key: allWrites[rw].key });
         }
-        readsSpec.push({ store: META, key: JOURNAL_KEY });
-        readsSpec.push({ store: META, key: STATE_KEY });
+        _safePush(readsSpec, { store: META, key: JOURNAL_KEY });
+        _safePush(readsSpec, { store: META, key: STATE_KEY });
 
         return backend.transact({
           stores: storesList,
