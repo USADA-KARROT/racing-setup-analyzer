@@ -99,7 +99,7 @@ try {
   // F3-R20-01 closure: electron-builder allowed args are restricted to known platform flags
   // ONLY. Configuration loading via --config <path> is rejected as it loads arbitrary JS.
   var ALLOWED_SEGMENT_PATTERNS = [
-    /^electron-builder(?:\s+--(?:mac|linux|win|x64|arm64|ia32|dir|publish=never|publish=always|publish=onTag))*\s*$/,
+    /^electron-builder(?:\s+--(?:mac|linux|win|x64|arm64|ia32|dir|publish=never))*\s*$/,
     /^electron(\s+\.|\s*$)/
   ];
   function _segmentAllowed(seg) {
