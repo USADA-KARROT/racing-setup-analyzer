@@ -103,26 +103,39 @@ function createFlowHarness(opts) {
     // of nested-field names — otherwise wrapper objects defeat the gate.
     var ID_FIELDS = ['sourceCaseId', 'priorCaseId', 'cachedCaseId', 'parentCaseId', 'followUpCaseId', 'caseAssociation'];
     var DEPTH = 4; // top + 3 nested levels — production data structures stay within this
+    // F3-R5-02 closure: descriptor-only inspection — NEVER fire getters when checking ID fields.
+    function readDataValue(obj, key) {
+      var d;
+      try { d = Object.getOwnPropertyDescriptor(obj, key); } catch (e) { return undefined; }
+      if (!d) return undefined;
+      if (!('value' in d)) return undefined; // accessor — skip, do NOT fire get()
+      return d.value;
+    }
     function check(obj, pathPrefix, depthRemaining) {
       if (!obj || typeof obj !== 'object') return;
       if (seen.has(obj)) return;
       seen.add(obj);
-      // 1) Known string-or-object case-id fields. Object-shape: take its .caseId.
+      // 1) Known string-or-object case-id fields — descriptor-only reads.
       for (var i = 0; i < ID_FIELDS.length; i++) {
         var f = ID_FIELDS[i];
-        if (!Object.prototype.hasOwnProperty.call(obj, f)) continue;
-        var v = obj[f];
+        var v = readDataValue(obj, f);
+        if (v === undefined) continue;
         if (typeof v === 'string' && v.length > 0 && v !== active) {
           throw new Error('STALE_CASE_REF: ' + pathPrefix + f + '=' + v + ' active=' + active);
         }
-        if (v && typeof v === 'object' && !Array.isArray(v) && typeof v.caseId === 'string' && v.caseId.length > 0 && v.caseId !== active) {
-          throw new Error('STALE_CASE_REF: ' + pathPrefix + f + '.caseId=' + v.caseId + ' active=' + active);
+        if (v && typeof v === 'object' && !Array.isArray(v)) {
+          var innerCaseId = readDataValue(v, 'caseId');
+          if (typeof innerCaseId === 'string' && innerCaseId.length > 0 && innerCaseId !== active) {
+            throw new Error('STALE_CASE_REF: ' + pathPrefix + f + '.caseId=' + innerCaseId + ' active=' + active);
+          }
         }
       }
-      // 2) Bare `.caseId` field on any nested object (not just the explicit nested-field allowlist).
-      if (Object.prototype.hasOwnProperty.call(obj, 'caseId') && typeof obj.caseId === 'string' && obj.caseId.length > 0 && obj.caseId !== active && pathPrefix !== '') {
-        // (pathPrefix === '' means this is the top-level viewmodel — its caseId IS the anchor.)
-        throw new Error('STALE_CASE_REF: ' + pathPrefix + 'caseId=' + obj.caseId + ' active=' + active);
+      // 2) Bare `.caseId` on any NESTED object — descriptor-only read.
+      if (pathPrefix !== '') {
+        var cid = readDataValue(obj, 'caseId');
+        if (typeof cid === 'string' && cid.length > 0 && cid !== active) {
+          throw new Error('STALE_CASE_REF: ' + pathPrefix + 'caseId=' + cid + ' active=' + active);
+        }
       }
       // 3) Bounded recursion through ALL own properties (F3-R4-03: use Reflect.ownKeys so
       // non-enumerable and Symbol-keyed properties are not skipped).

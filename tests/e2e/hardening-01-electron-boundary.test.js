@@ -41,10 +41,19 @@ try {
     var inStr = false;
     var strCh = '';
     var lastSig = ''; // last significant character (non-whitespace, non-comment)
+    // F3-R5-01 closure: track a boolean keyword-context flag alongside lastSig.
+    var lastWasRegexPrecedingKw = false;
     function couldStartRegex(prev) {
-      if (prev === '') return true; // start of file
+      if (lastWasRegexPrecedingKw) return true;
+      if (prev === '') return true;
       if ('([{,;:!=?&|^~<>+-*%'.indexOf(prev) !== -1) return true;
-      return false; // letters/digits/'_' /')'/']' / '"' / "'" / '`' all suggest division
+      return false;
+    }
+    var REGEX_PRECEDING_KEYWORDS = ['return', 'throw', 'typeof', 'void', 'delete', 'case', 'yield', 'await', 'in', 'of', 'new', 'instanceof', 'do', 'else'];
+    function readIdent(s, start) {
+      var j = start;
+      while (j < s.length && /[A-Za-z0-9_$]/.test(s.charAt(j))) j++;
+      return s.slice(start, j);
     }
     while (i < n) {
       var ch = src.charAt(i);
@@ -54,7 +63,6 @@ try {
         if (ch === strCh) { inStr = false; out += ch; i++; lastSig = ch; continue; }
         out += ch; i++; continue;
       }
-      // Comments
       if (ch === '/' && nxt === '/') {
         while (i < n && src.charAt(i) !== '\n') i++;
         continue;
@@ -65,9 +73,20 @@ try {
         if (i < n) i += 2;
         continue;
       }
-      // Regex literal: `/` after an operator-y context, walks to closing `/` while skipping
-      // escape sequences and character-class `[...]`. We PRESERVE the regex literal in the
-      // output so subsequent regex-based assertions can still see it.
+      // Identifier — track if it is a regex-preceding keyword
+      if (/[A-Za-z_$]/.test(ch)) {
+        var ident = readIdent(src, i);
+        out += ident;
+        i += ident.length;
+        if (REGEX_PRECEDING_KEYWORDS.indexOf(ident) !== -1) {
+          lastWasRegexPrecedingKw = true;
+        } else {
+          lastWasRegexPrecedingKw = false;
+        }
+        lastSig = ident.charAt(ident.length - 1);
+        continue;
+      }
+      // Regex literal
       if (ch === '/' && couldStartRegex(lastSig)) {
         out += ch;
         i++;
@@ -79,10 +98,9 @@ try {
           if (rc === '[') { inCharClass = true; i++; continue; }
           if (rc === ']' && inCharClass) { inCharClass = false; i++; continue; }
           if (rc === '/' && !inCharClass) { i++; break; }
-          if (rc === '\n') { break; } // unterminated regex — stop to avoid runaway
+          if (rc === '\n') { break; }
           i++;
         }
-        // Consume optional regex flags
         while (i < n && /[gimsuyd]/.test(src.charAt(i))) { out += src.charAt(i); i++; }
         lastSig = '/';
         continue;

@@ -97,10 +97,18 @@ try {
     var inStr = false;
     var strCh = '';
     var lastSig = '';
+    var lastWasRegexPrecedingKw = false;
     function couldStartRegex(prev) {
+      if (lastWasRegexPrecedingKw) return true;
       if (prev === '') return true;
       if ('([{,;:!=?&|^~<>+-*%'.indexOf(prev) !== -1) return true;
       return false;
+    }
+    var REGEX_PRECEDING_KEYWORDS = ['return', 'throw', 'typeof', 'void', 'delete', 'case', 'yield', 'await', 'in', 'of', 'new', 'instanceof', 'do', 'else'];
+    function readIdent(s, start) {
+      var j = start;
+      while (j < s.length && /[A-Za-z0-9_$]/.test(s.charAt(j))) j++;
+      return s.slice(start, j);
     }
     while (i < n) {
       var ch = src.charAt(i);
@@ -115,6 +123,14 @@ try {
         i += 2;
         while (i < n && !(src.charAt(i) === '*' && i + 1 < n && src.charAt(i + 1) === '/')) i++;
         if (i < n) i += 2;
+        continue;
+      }
+      if (/[A-Za-z_$]/.test(ch)) {
+        var ident = readIdent(src, i);
+        out += ident;
+        i += ident.length;
+        lastWasRegexPrecedingKw = (REGEX_PRECEDING_KEYWORDS.indexOf(ident) !== -1);
+        lastSig = ident.charAt(ident.length - 1);
         continue;
       }
       if (ch === '/' && couldStartRegex(lastSig)) {

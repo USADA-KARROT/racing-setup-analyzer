@@ -35,17 +35,56 @@ try {
   // tokens (curl, wget, npx, fetch, sh -c, eval, base64, ssh, scp, rsync) trigger fail-closed
   // even within a longer command. URL substrings and shell metacharacters (pipe/redirect to
   // /dev/something, $(...), backticks) are rejected.
-  // F3-R3-04 closure: `^node\s+\S+` was too permissive — it accepted `node -e <code>` and
-  // similar arbitrary-execution forms. Tighten to ONLY repo-local script paths and explicit
-  // tool commands. Disallow `-e` / `--eval` / `-p` / `--print` / stdin (`-`) / `--input-type`
-  // / `--experimental-*` / leading flags.
+  // F3-R5-03 closure: prevent path traversal. `node tests/../../etc/passwd` previously matched
+  // the [\w@\-./]+ char class. Now we tokenize the node target path and reject any segment
+  // that is `..`, `.`, empty (consecutive slashes), or begins with `/` (absolute).
   var FORBIDDEN_TOKENS = /\b(curl|wget|npx|fetch|eval|base64|ssh|scp|rsync)\b|\bsh\s+-c\b|https?:\/\/|\$\(|`|\|\s*sh|>\s*\/dev/i;
-  // Allowed node usage: `node <local-path>` where <local-path> is one of a fixed allowlist of
-  // repo-local directories (tests/, scripts/, tools/). No flags between `node` and the path.
-  var ALLOWED_NODE_PATH = /^node\s+(tests|scripts|tools)\/[\w@\-./]+(\s+\S+)*$/;
-  var ALLOWED_NODE_DASH_FLAGS_FORBIDDEN = /\bnode\s+-/; // any `node -X` form (any short or long flag)
+  var ALLOWED_NODE_DASH_FLAGS_FORBIDDEN = /\bnode\s+-/;
+  var ALLOWED_NODE_ROOTS = ['tests', 'scripts', 'tools'];
+
+  function _nodeSegmentAllowed(seg) {
+    // Match: `node <path>` optionally followed by additional args (file paths only, no flags)
+    var m = seg.match(/^node\s+([^\s]+)((?:\s+[^\s]+)*)$/);
+    if (!m) return false;
+    var firstPath = m[1];
+    // Reject absolute paths
+    if (firstPath.charAt(0) === '/') return false;
+    // Reject empty or root-only paths
+    var parts = firstPath.split('/');
+    if (parts.length < 2) return false;
+    // First segment must be an allowed root
+    if (ALLOWED_NODE_ROOTS.indexOf(parts[0]) === -1) return false;
+    // Each subsequent segment must NOT be '.', '..', or empty
+    for (var sp = 0; sp < parts.length; sp++) {
+      var seg2 = parts[sp];
+      if (seg2 === '' || seg2 === '.' || seg2 === '..') return false;
+      // Each segment must use only safe path chars
+      if (!/^[\w@\-.]+$/.test(seg2)) return false;
+    }
+    // Additional args (after the script path) are positional args TO THE SCRIPT, not node
+    // flags. Script-level flags like `--selftest` are allowed; absolute paths and traversal
+    // segments are not, and individual forbidden tokens (already checked at segment level)
+    // are blocked.
+    if (m[2]) {
+      var rest = m[2].trim().split(/\s+/);
+      for (var ri = 0; ri < rest.length; ri++) {
+        var arg = rest[ri];
+        if (arg === '') continue;
+        // Whitelisted: --<name> with simple ASCII letters/digits/dash
+        if (/^--[\w-]+$/.test(arg)) continue;
+        // Whitelisted: -<single-letter>
+        if (/^-[a-zA-Z]$/.test(arg)) continue;
+        // Reject absolute paths and traversal
+        if (arg.charAt(0) === '/') return false;
+        if (arg.indexOf('..') !== -1 || arg.indexOf('/./') !== -1) return false;
+        // Allow simple positional paths (same safe chars + slash)
+        if (!/^[\w@\-./]+$/.test(arg)) return false;
+      }
+    }
+    return true;
+  }
+
   var ALLOWED_SEGMENT_PATTERNS = [
-    ALLOWED_NODE_PATH,
     /^electron-builder(\s|$)/,
     /^electron(\s+\.|\s*$)/
   ];
@@ -53,8 +92,8 @@ try {
     seg = seg.trim();
     if (seg === '') return false;
     if (FORBIDDEN_TOKENS.test(seg)) return false;
-    // Reject any `node -X` form (covers -e / --eval / -p / --print / -- / --input-type / -)
     if (ALLOWED_NODE_DASH_FLAGS_FORBIDDEN.test(seg)) return false;
+    if (_nodeSegmentAllowed(seg)) return true;
     for (var p = 0; p < ALLOWED_SEGMENT_PATTERNS.length; p++) {
       if (ALLOWED_SEGMENT_PATTERNS[p].test(seg)) return true;
     }
