@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0F",
+  "checkpoint": "F3_QUALITY_HARDENING",
+  "baseSha": "882816300d930dffa8ef24f14429c784f5d3c55d",
+  "headSha": null,
+  "previousCheckpoint": "F2_E2E_AUTOMATION",
+  "shaSeparation": {
+    "note": "R3.0F F3 candidate branch SHA convention. reviewedCandidateSha is filled at the Codex review prompt; manifestCommitSha is the governance anchor commit; integrationSha is the Train merge commit.",
+    "reviewedCandidateSha": null,
+    "manifestCommitSha": null,
+    "integrationSha": null
+  },
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0f-migration-engine.js",                "capability": "migration_engine_present" },
+    { "path": "tests/e2e/helpers/flow-harness.js",                    "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-01-new-user.test.js",                   "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-02-real-telemetry.test.js",             "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-03-measured.test.js",                   "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-04-reference-lap.test.js",              "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-05-vre.test.js",                        "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-06-setup-experiment.test.js",           "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-07-driver-experiment.test.js",          "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-08-export-import.test.js",              "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-09-electron-smoke.test.js",             "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/hardening-01-electron-boundary.test.js",     "capability": "quality_hardening_present" },
+    { "path": "tests/e2e/hardening-02-storage-failure.test.js",       "capability": "quality_hardening_present" },
+    { "path": "tests/e2e/hardening-03-no-stale-ui.test.js",           "capability": "quality_hardening_present" },
+    { "path": "tests/e2e/hardening-04-large-library.test.js",         "capability": "quality_hardening_present" },
+    { "path": "tests/e2e/hardening-05-xss-injection.test.js",         "capability": "quality_hardening_present" },
+    { "path": "tests/e2e/hardening-06-supply-chain.test.js",          "capability": "quality_hardening_present" }
+  ],
+  "newlyAuthorizedPaths": [
+    "tests/e2e/hardening-01-electron-boundary.test.js",
+    "tests/e2e/hardening-02-storage-failure.test.js",
+    "tests/e2e/hardening-03-no-stale-ui.test.js",
+    "tests/e2e/hardening-04-large-library.test.js",
+    "tests/e2e/hardening-05-xss-injection.test.js",
+    "tests/e2e/hardening-06-supply-chain.test.js"
+  ],
+  "newlyEnabledCapabilities": ["quality_hardening_present"],
+  "enabledCapabilitiesBefore": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present"],
+  "enabledCapabilitiesAfter": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present", "quality_hardening_present"],
+  "forbiddenCapabilities": [
+    "documentation_present",
+    "release_gate_present",
+    "release_executed"
+  ],
+  "contractEnforcements": {
+    "hardeningScope": "6 hardening test files under tests/e2e/ that ASSERT production-quality invariants. NO new production renderer module is added. The hardening tests work as a static + logic-level audit gate that fails closed when any documented quality bar regresses.",
+    "electronBoundary": "hardening-01 verifies main.js webPreferences (contextIsolation:true, nodeIntegration:false, allowRunningInsecureContent unset, webSecurity unset to false, experimentalFeatures unset, enableRemoteModule unset, nodeIntegrationInWorker unset, nodeIntegrationInSubFrames unset) and preload.js minimal surface (contextBridge only; no ipcRenderer / fs / child_process / net / http / https / os; no eval; no new Function). Also verifies renderer/index.html declares a CSP meta and does not pull external script src.",
+    "storageFailure": "hardening-02 verifies case-store remove() requires {confirm:true} (destructive guard), backend.transact() rejection produces BACKEND_REJECTED + no partial write, oversized record (>maxRecordBytes) is rejected without crashing the engine.",
+    "noStaleUI": "hardening-03 exercises the harness assertNoStaleCaseRef gate across 7 synthetic transition scenarios: coherent state passes; stale lastSession.sourceCaseId / cachedCaseId throws; mixed stale+coherent throws.",
+    "largeLibrary": "hardening-04 seeds 200 cases, asserts case-store.list returns all N entries deterministically, F1 migration treats them as noop=N with zero rejection/failure, F1 detect reports records=atTarget=N.",
+    "xssInjection": "hardening-05 scans renderer/js for unsafe DOM API usage (no variable-RHS innerHTML/outerHTML assignment; no document.write / writeln; no new Function with variable arg). Also scans renderer/index.html: every x-html binding must be a function call into a named helper (not a raw variable / property access).",
+    "supplyChain": "hardening-06 verifies package.json has no runtime dependencies (Electron-only app); devDependencies limited to {electron, electron-builder}; npm scripts use only local toolchain; no .env / .env.local committed; .gitignore excludes node_modules/ and artifacts/. No bare third-party require in renderer/js.",
+    "noProductionCodeChange": "F3 ships ZERO new production renderer/js module. All hardening is test-side validation that the existing production code (R3.0B/C/D/E + F1 engine) already satisfies the quality bar. R3.0B persistence schemas NOT modified.",
+    "stateFloors": "F3 unlocks uiAllowed=true (uiCheckpoint floor reached) and enables quality_hardening_present. featureRegistryActivationAllowed remains false (F6_RELEASE floor). R3.0B case-record schema NOT modified."
+  },
+  "tests": {
+    "command": "npm test",
+    "newSuitesForThisCheckpoint": [
+      "tests/e2e/hardening-01-electron-boundary.test.js",
+      "tests/e2e/hardening-02-storage-failure.test.js",
+      "tests/e2e/hardening-03-no-stale-ui.test.js",
+      "tests/e2e/hardening-04-large-library.test.js",
+      "tests/e2e/hardening-05-xss-injection.test.js",
+      "tests/e2e/hardening-06-supply-chain.test.js"
+    ],
+    "newSuiteAssertionsByFile": {
+      "hardening-01-electron-boundary": 22,
+      "hardening-02-storage-failure": 11,
+      "hardening-03-no-stale-ui": 10,
+      "hardening-04-large-library": 9,
+      "hardening-05-xss-injection": 6,
+      "hardening-06-supply-chain": 15
+    },
+    "newSuiteAssertionsTotal": 73,
+    "evidenceTier": "TIER 3 — Claude-verified on F3 branch HEAD; CI re-run on integrationSha is the authority."
+  },
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": null,
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta", "engineer_brief", "experiment_loop", "case_timeline"],
+    "expectedRendererAdapter": false,
+    "note": "F3 does NOT touch the feature registry. R3.0C/D/E activations remain in their state."
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "crossPhaseGate": {
+    "r3eCheckpoint": "E5_ACTIVATION",
+    "requiredFor": "F3_QUALITY_HARDENING",
+    "satisfied": true,
+    "note": "R3.0E E5_ACTIVATION reached. F1 + F2 already merged. F3 may advance."
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "releaseRecord": null,
+  "note": "R3.0F F3 ships 6 hardening test files that assert production-quality invariants. NO new production renderer module. uiAllowed flips to true (uiCheckpoint floor). main remains 506012afea7b0296f2c1506cc77d4b39ffdf6ccb. No tag, no Release, no deployment."
+}
