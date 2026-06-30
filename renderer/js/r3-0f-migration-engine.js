@@ -102,6 +102,14 @@
   var _Date                = Date;
   var _NumberIsFinite      = typeof Number.isFinite === 'function' ? Number.isFinite : function (v) { return typeof v === 'number' && _isFinite(v); };
   var _NumberIsSafeInteger = typeof Number.isSafeInteger === 'function' ? Number.isSafeInteger : function (v) { return _NumberIsFinite(v) && _MathFloor(v) === v && v <= 9007199254740991 && v >= -9007199254740991; };
+  // F1-R10-01: closure-capture prototype methods used inside _hash so ambient prototype
+  // rebinding (e.g. String.prototype.charCodeAt = () => { throw ... }) cannot corrupt
+  // determinism or throw out of migrate().
+  var _FunctionPrototypeCall   = Function.prototype.call;
+  var _StringProtoCharCodeAt   = String.prototype.charCodeAt;
+  var _NumberProtoToString     = Number.prototype.toString;
+  function _safeCharCodeAt(str, i) { return _FunctionPrototypeCall.call(_StringProtoCharCodeAt, str, i); }
+  function _safeToString16(n) { return _FunctionPrototypeCall.call(_NumberProtoToString, n, 16); }
 
   var ENV = _loadEnv();
   if (!ENV) throw new Error('r3-0f-migration-engine: migration-envelope contract not loadable');
@@ -197,7 +205,7 @@
     // Unicode low-line confusables (U+FF3F fullwidth, U+FE33 presentation form, etc.) to '_';
     // a hostile migrator using `＿fakeSignatureHere` would bypass a raw-char check while still
     // collapsing to a private-sentinel-looking key under NFKC.
-    if (n.charCodeAt(0) !== 0x5F /* '_' */) return false;
+    if (_safeCharCodeAt(n, 0) !== 0x5F /* '_' */) return false;
     for (var i = 0; i < PRODUCER_ATTESTATION_TOKENS.length; i++) {
       if (n.indexOf(PRODUCER_ATTESTATION_TOKENS[i]) !== -1) return true;
     }
@@ -260,17 +268,20 @@
   // F1-R1-08: NON-CRYPTOGRAPHIC deterministic fingerprint over JSON serialization. Useful for
   // auditing equality of post-migration records within one repository, NOT for proving authority,
   // NOT collision-resistant under adversarial input. Auditors must treat this as a weak hash.
+  // F1-R10-01: use closure-captured String.prototype.charCodeAt and Number.prototype.toString so
+  // ambient-prototype rebinding cannot corrupt or throw out of the hash path.
   function _hash(str) {
     if (typeof str !== 'string') str = String(str);
     var h1 = 0x811c9dc5, h2 = 0xcbf29ce4;
-    for (var i = 0; i < str.length; i++) {
-      var c = str.charCodeAt(i);
+    var n = str.length;
+    for (var i = 0; i < n; i++) {
+      var c = _safeCharCodeAt(str, i);
       h1 ^= c & 0xff; h1 = (h1 * 0x01000193) >>> 0;
       h2 ^= (c >> 8) & 0xff; h2 = (h2 * 0x01000193) >>> 0;
     }
-    var a = h1.toString(16); while (a.length < 8) a = '0' + a;
-    var b = h2.toString(16); while (b.length < 8) b = '0' + b;
-    return 'fnv1a64:' + a + b; // prefix marks the hash family — auditors must NOT assume crypto-strength
+    var a = _safeToString16(h1); while (a.length < 8) a = '0' + a;
+    var b = _safeToString16(h2); while (b.length < 8) b = '0' + b;
+    return 'fnv1a64:' + a + b;
   }
 
   // F1-R1-02: structured-clone-only firewall. If structuredClone is unavailable OR throws on the
@@ -356,6 +367,20 @@
   // property. Handles records (objects), priorJournal (arrays), priorState (object or null) and
   // primitives uniformly so the same canonical form is hashed on both sides of the TOCTOU window.
   // Returns null on sanitization failure (no comparable preimage).
+  // F1-R10-02: capture a backend row's key + value once per intake, under try/catch, so a
+  // hostile custom backend cannot fire an accessor getter twice or surface unexpected errors
+  // beyond the firewall. Returns null on any error or non-object input.
+  function _captureRow(row) {
+    if (!row || typeof row !== 'object') return null;
+    try {
+      var k = row.key;
+      var v = row.value;
+      return { key: k, value: v };
+    } catch (_) {
+      return null;
+    }
+  }
+
   function _sanitizedHash(v) {
     if (v === undefined) v = null;
     var cloned;
@@ -447,10 +472,17 @@
             rows = _ArrayIsArray(rows) ? rows : [];
             var counts = { records: rows.length, atTarget: 0, belowTarget: 0, futureVersion: 0, malformed: 0 };
             for (var r = 0; r < rows.length; r++) {
-              var row = rows[r];
-              var rec = row && row.value;
+              // F1-R10-02: capture row.value once via try/catch, then sanitize-clone before
+              // any property read. Hostile accessor on row.value fires at most once per row.
+              var captured = _captureRow(rows[r]);
+              if (!captured) { counts.malformed += 1; continue; }
+              var rec = captured.value;
               if (!_isPlainObject(rec)) { counts.malformed += 1; continue; }
-              var v = rec.schemaVersion;
+              // Clone the record before reading schemaVersion so a hostile schemaVersion accessor
+              // on the original cannot side-effect detect().
+              var snap;
+              try { snap = _StructuredClone(rec); } catch (_) { counts.malformed += 1; continue; }
+              var v = snap.schemaVersion;
               if (typeof v !== 'number' || !_isFinite(v) || v < 0 || _MathFloor(v) !== v) { counts.malformed += 1; continue; }
               if (v > mg.targetVersion) counts.futureVersion += 1;
               else if (v < mg.targetVersion) counts.belowTarget += 1;
@@ -522,14 +554,17 @@
         var entries = [];
         var counts = { records: rows.length, migrated: 0, noop: 0, rejected: 0, failed: 0 };
         for (var i = 0; i < rows.length; i++) {
-          var row = rows[i];
-          var key = row && typeof row.key === 'string' ? row.key : null;
-          if (!key) {
+          // F1-R10-02: capture row.key + row.value ONCE per intake. Hostile accessor on either
+          // can only fire a single time, and any access throw → unkeyed-row fail-closed branch.
+          var captured = _captureRow(rows[i]);
+          if (!captured || typeof captured.key !== 'string' || captured.key.length === 0) {
             entries.push(_journalEntry(now, storeKey, '<unkeyed>', -1, mg.targetVersion, 'failed', [], '', 'BACKEND_REJECTED', ['unkeyed_row']));
             counts.failed += 1;
             continue;
           }
-          var san = _sanitize(row.value, MAX_RECORD_BYTES);
+          var key = captured.key;
+          var capturedValue = captured.value;
+          var san = _sanitize(capturedValue, MAX_RECORD_BYTES);
           if (!san.ok) {
             entries.push(_journalEntry(now, storeKey, key, -1, mg.targetVersion, 'rejected', [], '', san.reason, []));
             counts.rejected += 1;
@@ -591,9 +626,10 @@
             continue;
           }
           var hash = _hash(_JSONStringify(postSan.value));
-          // F1-R2-01: source hash captured at list time; re-checked inside the atomic transact
-          // to abort on concurrent writers.
-          var sourceHash = _sanitizedHash(row.value);
+          // F1-R2-01 / F1-R10-02: source hash uses the ALREADY-CAPTURED value (no second
+          // accessor fire on row.value), routed through _sanitizedHash which structured-clones
+          // before serialization. Same canonical form on both sides of the TOCTOU window.
+          var sourceHash = _sanitizedHash(capturedValue);
           writes.push({ store: storeKey, key: key, value: postSan.value, sourceHash: sourceHash });
           counts.migrated += 1;
           entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'migrated', migrationsList, hash, '', []));

@@ -1251,6 +1251,77 @@ asyncCase('F1-R9-01: sourceHash does not invoke inherited toJSON', function () {
     .then(function () { chk('toJSON NOT invoked by sourceHash path', fired === 0); });
 });
 
+// F1-R10-01: hash uses closure-captured String.prototype.charCodeAt / Number.prototype.toString.
+// Ambient-prototype rebinding cannot corrupt or throw out of migrate().
+asyncCase('F1-R10-01: tampered String.prototype.charCodeAt does not break migrate()', function () {
+  var orig = String.prototype.charCodeAt;
+  String.prototype.charCodeAt = function () { throw new Error('tampered charCodeAt'); };
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (r) {
+    return { ok: true, record: { schemaVersion: 1, caseId: r.caseId, x: 1 }, migrations: ['delta'] };
+  } } };
+  return b.put('cases', 'c1', { schemaVersion: 1, caseId: 'c1' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) {
+      String.prototype.charCodeAt = orig;
+      chk('migrate returned ok=true despite tampered charCodeAt', r.ok === true && r.report.status === 'complete');
+    }, function (e) {
+      String.prototype.charCodeAt = orig;
+      chk('migrate did NOT throw under tampered charCodeAt', false, { error: String(e && e.message) });
+    });
+});
+
+asyncCase('F1-R10-01: tampered Number.prototype.toString does not break migrate()', function () {
+  var orig = Number.prototype.toString;
+  Number.prototype.toString = function () { throw new Error('tampered toString'); };
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (r) {
+    return { ok: true, record: { schemaVersion: 1, caseId: r.caseId, x: 1 }, migrations: ['delta'] };
+  } } };
+  return b.put('cases', 'c1', { schemaVersion: 1, caseId: 'c1' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) {
+      Number.prototype.toString = orig;
+      chk('migrate returned ok=true despite tampered toString', r.ok === true);
+    }, function (e) {
+      Number.prototype.toString = orig;
+      chk('migrate did NOT throw under tampered toString', false, { error: String(e && e.message) });
+    });
+});
+
+// F1-R10-02: backend row.value accessor fires at most once per row (captured into a local).
+// A hostile detector might still want to know that detect() doesn't trigger more accesses.
+asyncCase('F1-R10-02: accessor row.value fires at most once on migrate()', function () {
+  var fired = 0;
+  var rec = { schemaVersion: 1, caseId: 'c1' };
+  var row = { key: 'c1' };
+  Object.defineProperty(row, 'value', { enumerable: true, get: function () { fired++; return rec; } });
+  var real = SB.MemoryBackend();
+  var backend = {
+    list: function (ns) { return Promise.resolve(ns === 'cases' ? [row] : []); },
+    get: real.get.bind(real), put: real.put.bind(real), transact: real.transact.bind(real)
+  };
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (r) {
+    return { ok: true, record: { schemaVersion: 1, caseId: r.caseId, x: 1 }, migrations: ['delta'] };
+  } } };
+  return ENG.createMigrationEngine({ backend: backend, registry: registry, stamp: STAMP }).migrate({ confirm: true })
+    .then(function () { chk('accessor fired at most once', fired <= 1, { fired: fired }); });
+});
+
+asyncCase('F1-R10-02: row.value accessor that THROWS is treated as unkeyed/failed', function () {
+  var row = { key: 'cT' };
+  Object.defineProperty(row, 'value', { enumerable: true, get: function () { throw new Error('hostile getter'); } });
+  var real = SB.MemoryBackend();
+  var backend = {
+    list: function (ns) { return Promise.resolve(ns === 'cases' ? [row] : []); },
+    get: real.get.bind(real), put: real.put.bind(real), transact: real.transact.bind(real)
+  };
+  return ENG.createMigrationEngine({ backend: backend, stamp: STAMP }).migrate({ confirm: true })
+    .then(function (r) {
+      chk('hostile accessor → failed counter', r.report.perStore.cases.failed === 1);
+    });
+});
+
 asyncCase('F1-R6-01 negative: legitimate lapAuthority/projectionSignature/experimentVerified still accepted', function () {
   var b = SB.MemoryBackend();
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
