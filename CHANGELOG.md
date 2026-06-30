@@ -34,10 +34,11 @@ is `2.0.0`.
   since F1.
 - `canonicalTrustUpgraded` remains a hard literal `false`. Suspension normalization is numeric
   compatibility, not evidence.
-- Electron host explicitly sets `contextIsolation: true` and `nodeIntegration: false` in
-  `webPreferences`; no other key (`sandbox`, `webSecurity`, etc.) is set, so Electron's
-  defaults apply and are never explicitly weakened. The preload bridge exposes exactly
-  `{ platform, version }` on `window.electronAPI` — nothing else.
+- Electron host `webPreferences` explicitly sets exactly three keys — `preload`,
+  `contextIsolation: true`, `nodeIntegration: false`; no safety-relevant key (`sandbox`,
+  `webSecurity`, etc.) is ever explicitly weakened, so Electron's own defaults apply to
+  everything else. The preload bridge exposes exactly `{ platform, version }` on
+  `window.electronAPI` — nothing else.
 - **Comparison is same-case + same-session only.** Cross-case comparison and cross-session
   comparison within a single case are both **permanently forbidden** at every layer
   (authority, view model, export, decision engine, experiment loop).
