@@ -19,6 +19,10 @@
   var STEPS = [];
 
   function migrate(rec) {
+    // F1-R2-02: fail closed when the contract validator is unavailable.
+    if (!OC || typeof OC.validateOutcomeShape !== 'function') {
+      return { ok: false, rejected: true, reason: 'NO_MIGRATION_PATH', migrations: [] };
+    }
     if (rec === null || typeof rec !== 'object' || Array.isArray(rec)) {
       return { ok: false, rejected: true, reason: 'RECORD_NOT_AN_OBJECT', migrations: [] };
     }
@@ -40,11 +44,9 @@
       out.schemaVersion = from + 1;
       migrations.push('outcome:' + from + '->' + (from + 1));
     }
-    if (OC && typeof OC.validateOutcomeShape === 'function') {
-      var v2 = OC.validateOutcomeShape(out);
-      if (!v2 || v2.valid !== true) {
-        return { ok: false, rejected: true, reason: 'POST_MIGRATION_INVALID', migrations: migrations, detail: { reasonCodes: (v2 && v2.reasonCodes) || [] } };
-      }
+    var v2 = OC.validateOutcomeShape(out);
+    if (!v2 || v2.valid !== true) {
+      return { ok: false, rejected: true, reason: 'POST_MIGRATION_INVALID', migrations: migrations, detail: { reasonCodes: (v2 && v2.reasonCodes) || [] } };
     }
     return { ok: true, record: out, migrations: migrations };
   }

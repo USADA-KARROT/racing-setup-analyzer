@@ -118,6 +118,12 @@
   // producer modules (R3.0B / R3.0C / R3.0D / R3.0E) use closure-private WeakSet attestation that
   // is NEVER serialized — these field names are reserved sentinels that downstream auditors must
   // be able to trust as "not present in persisted data".
+  // F1-R1-09 / F1-R2-03: producer-attestation defense. We refuse migrator output that contains
+  // either (a) an EXACT match to a well-known attestation key (case variants stripped via NFKC +
+  // lowercase normalization), or (b) a key whose NFKC-lowercased form CONTAINS any of the
+  // attestation TOKENS (authoritative / producerattested / attested / verified / signature /
+  // proof / authority). Token-based check defends against case variants (`_AUTHORITATIVE`),
+  // visual confusables normalized by NFKC, and obfuscated suffix/prefix forms (`_authXattested`).
   var PRODUCER_ATTESTATION_FIELDS = (function () {
     var s = {};
     var names = [
@@ -129,8 +135,33 @@
     for (var i = 0; i < names.length; i++) s[names[i]] = true;
     return _ObjectFreeze(s);
   })();
+  var PRODUCER_ATTESTATION_TOKENS = _ObjectFreeze([
+    'authoritative', 'producerattested', 'attested', 'verified',
+    'signature', 'proof', 'authority'
+  ]);
+  // Pre-compute the normalized form of the exact-name set for fast lookup.
+  function _normalizeKey(k) {
+    if (typeof k !== 'string') return '';
+    var s;
+    try { s = (typeof k.normalize === 'function') ? k.normalize('NFKC') : k; } catch (_) { s = k; }
+    return s.toLowerCase();
+  }
+  var PRODUCER_ATTESTATION_NORMALIZED = (function () {
+    var s = {};
+    var names = _ObjectKeys(PRODUCER_ATTESTATION_FIELDS);
+    for (var i = 0; i < names.length; i++) s[_normalizeKey(names[i])] = true;
+    return _ObjectFreeze(s);
+  })();
+  function _keyLooksLikeAttestation(k) {
+    var n = _normalizeKey(k);
+    if (!n) return false;
+    if (PRODUCER_ATTESTATION_NORMALIZED[n]) return true;
+    for (var i = 0; i < PRODUCER_ATTESTATION_TOKENS.length; i++) {
+      if (n.indexOf(PRODUCER_ATTESTATION_TOKENS[i]) !== -1) return true;
+    }
+    return false;
+  }
 
-  // F1-R1-09: walk a plain-JSON-cloned value, return true if any object contains a forbidden key.
   function _containsAttestationField(v, depth) {
     if (depth === undefined) depth = 0;
     if (depth > 64) return true; // depth-bomb defense; treat as attestation-suspect
@@ -144,7 +175,7 @@
     var keys = _ObjectKeys(v);
     for (var j = 0; j < keys.length; j++) {
       var k = keys[j];
-      if (PRODUCER_ATTESTATION_FIELDS[k]) return true;
+      if (_keyLooksLikeAttestation(k)) return true;
       if (_containsAttestationField(v[k], depth + 1)) return true;
     }
     return false;
@@ -275,6 +306,17 @@
     return ENV.deepFreeze(entry);
   }
 
+  // F1-R2-01: deterministic preimage hash of a record AT LIST TIME. Used as a TOCTOU sentinel:
+  // the engine carries the sourceHash through `_computeStoreWork` and re-checks it inside the
+  // atomic transact.compute() against the value backend.transact() re-reads. If the value
+  // changed between list and commit, the engine aborts with BACKEND_REJECTED.
+  function _sourceHash(value) {
+    var s;
+    try { s = _JSONStringify(value); } catch (_) { return null; }
+    if (typeof s !== 'string') return null;
+    return _hash(s);
+  }
+
   // ── engine factory ───────────────────────────────────────────────────────────
   function createMigrationEngine(spec) {
     spec = spec || {};
@@ -297,6 +339,11 @@
     var clock               = spec.clock;
     var stamp               = spec.stamp;
     var KNOWN_STORES        = _ObjectKeys(registry).sort();
+    // F1-R2-01: engine-level migrate() serialization. Concurrent migrate() calls on the same
+    // engine queue behind this Promise chain so they cannot race on the list-then-transact window.
+    // Backend.transact also serializes underneath, but the engine reads BEFORE entering transact
+    // (to build the per-record migration plan), and that read-window is what this mutex protects.
+    var migrateChain = Promise.resolve();
 
     for (var i = 0; i < KNOWN_STORES.length; i++) {
       var sk = KNOWN_STORES[i];
@@ -492,7 +539,10 @@
             continue;
           }
           var hash = _hash(_JSONStringify(postSan.value));
-          writes.push({ store: storeKey, key: key, value: postSan.value });
+          // F1-R2-01: source hash captured at list time; re-checked inside the atomic transact
+          // to abort on concurrent writers.
+          var sourceHash = _sourceHash(row.value);
+          writes.push({ store: storeKey, key: key, value: postSan.value, sourceHash: sourceHash });
           counts.migrated += 1;
           entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'migrated', migrationsList, hash, '', []));
         }
@@ -507,7 +557,7 @@
       });
     }
 
-    function migrate(opts) {
+    function _migrateImpl(opts) {
       opts = opts || {};
       if (opts.confirm !== true) {
         return Promise.resolve(ENV.deepFreeze({
@@ -578,12 +628,12 @@
               });
             })(KNOWN_STORES[k]);
           }
-          return p.then(function () { return _commit(perStoreResults, startedAt, priorDropped); });
+          return p.then(function () { return _commit(perStoreResults, startedAt, priorDropped, st); });
         });
       });
     }
 
-    function _commit(perStoreResults, startedAt, priorDropped) {
+    function _commit(perStoreResults, startedAt, priorDropped, priorState) {
       var allEntries = [];
       var allWrites = [];
       var perStoreOut = {};
@@ -646,19 +696,62 @@
         // F1-R1-03: ALL writes (data store writes + META journal + META state) commit in ONE
         // atomic backend.transact() across all stores used + META. Either everything lands or
         // nothing does. No half-applied migration without an audit row; no audit row without data.
+        //
+        // F1-R2-01: declare reads for every key we plan to write PLUS META journal + state. Inside
+        // compute(), re-hash each data read and compare against the snapshot sourceHash captured
+        // at list time. Re-hash priorJournal + priorState too; if either changed, abort. Backend
+        // semantics: transact serializes via its own tx mutex; the read values handed to compute()
+        // are the CURRENT contents of the requested keys inside the same atomic boundary as the
+        // writes — so a concurrent writer that committed between list() and transact() will be
+        // visible here as a hash mismatch.
         var storesList = _ObjectKeys(storesUsedForWrites);
         storesList.push(META);
-        var allWritesCombined = allWrites.slice();
-        allWritesCombined.push({ store: META, key: JOURNAL_KEY, value: compactedJournal });
-        allWritesCombined.push({ store: META, key: STATE_KEY,   value: stateNext });
+        // Compute prior-journal/state preimage hashes (the snapshot we already loaded above).
+        var priorJournalHash = _sourceHash(priorJournal);
+        var priorStateHash   = _sourceHash(priorState || null);
+        // Build reads spec
+        var readsSpec = [];
+        for (var rw = 0; rw < allWrites.length; rw++) {
+          readsSpec.push({ store: allWrites[rw].store, key: allWrites[rw].key });
+        }
+        readsSpec.push({ store: META, key: JOURNAL_KEY });
+        readsSpec.push({ store: META, key: STATE_KEY });
 
         return backend.transact({
           stores: storesList,
-          reads: [],
-          compute: function () {
+          reads: readsSpec,
+          compute: function (readValues) {
+            // TOCTOU verification: each data read must match its sourceHash.
+            for (var i = 0; i < allWrites.length; i++) {
+              var observedHash = _sourceHash(readValues[i] === undefined ? null : readValues[i]);
+              if (observedHash !== allWrites[i].sourceHash) {
+                // Abort: concurrent writer changed value between list and commit.
+                throw new Error('CONCURRENT_WRITE_DETECTED:' + allWrites[i].store + ':' + allWrites[i].key);
+              }
+            }
+            // priorJournal verification
+            var observedPriorJournal = readValues[allWrites.length];
+            var observedPriorJournalNormalized = _ArrayIsArray(observedPriorJournal)
+              ? observedPriorJournal
+              : (_isPlainObject(observedPriorJournal) && _ArrayIsArray(observedPriorJournal.entries) ? observedPriorJournal.entries : []);
+            if (_sourceHash(observedPriorJournalNormalized) !== priorJournalHash) {
+              throw new Error('CONCURRENT_JOURNAL_WRITE_DETECTED');
+            }
+            // priorState verification (compare against the state object we loaded; null if absent)
+            var observedPriorState = readValues[allWrites.length + 1];
+            var observedPriorStateForHash = _isPlainObject(observedPriorState) ? observedPriorState : null;
+            if (_sourceHash(observedPriorStateForHash) !== priorStateHash) {
+              throw new Error('CONCURRENT_STATE_WRITE_DETECTED');
+            }
+            // Strip sourceHash from data writes — that field is engine-internal, must NOT be persisted.
+            var sanitizedDataWrites = allWrites.map(function (w) { return { store: w.store, key: w.key, value: w.value }; });
+            var allWritesCombined = sanitizedDataWrites.concat([
+              { store: META, key: JOURNAL_KEY, value: compactedJournal },
+              { store: META, key: STATE_KEY,   value: stateNext }
+            ]);
             return {
               writes: allWritesCombined,
-              result: { journalLen: compactedJournal.length, dropped: totalDropped, dataWrites: allWrites.length }
+              result: { journalLen: compactedJournal.length, dropped: totalDropped, dataWrites: sanitizedDataWrites.length }
             };
           }
         }).then(function (r) {
@@ -707,6 +800,14 @@
           });
         });
       });
+    }
+
+    // F1-R2-01: serialize concurrent migrate() calls via the engine-level mutex chain.
+    function migrate(opts) {
+      var run = function () { return _migrateImpl(opts); };
+      var next = migrateChain.then(run, run); // even if prior errored, next still runs
+      migrateChain = next.then(function () { }, function () { });
+      return next;
     }
 
     return {

@@ -20,6 +20,11 @@
   var STEPS = [];  // STEPS[i] migrates from version i → i+1; none yet at v1
 
   function migrate(rec) {
+    // F1-R2-02: fail closed when the contract validator is unavailable. Without the validator
+    // we cannot enforce post-migration invariants, so we refuse to certify any record as valid.
+    if (!EC || typeof EC.validateExperimentShape !== 'function') {
+      return { ok: false, rejected: true, reason: 'NO_MIGRATION_PATH', migrations: [] };
+    }
     if (rec === null || typeof rec !== 'object' || Array.isArray(rec)) {
       return { ok: false, rejected: true, reason: 'RECORD_NOT_AN_OBJECT', migrations: [] };
     }
@@ -41,11 +46,9 @@
       out.schemaVersion = from + 1;
       migrations.push('experiment:' + from + '->' + (from + 1));
     }
-    if (EC && typeof EC.validateExperimentShape === 'function') {
-      var v2 = EC.validateExperimentShape(out);
-      if (!v2 || v2.valid !== true) {
-        return { ok: false, rejected: true, reason: 'POST_MIGRATION_INVALID', migrations: migrations, detail: { reasonCodes: (v2 && v2.reasonCodes) || [] } };
-      }
+    var v2 = EC.validateExperimentShape(out);
+    if (!v2 || v2.valid !== true) {
+      return { ok: false, rejected: true, reason: 'POST_MIGRATION_INVALID', migrations: migrations, detail: { reasonCodes: (v2 && v2.reasonCodes) || [] } };
     }
     return { ok: true, record: out, migrations: migrations };
   }

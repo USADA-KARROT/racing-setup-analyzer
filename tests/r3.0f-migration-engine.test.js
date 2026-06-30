@@ -457,30 +457,23 @@ asyncCase('record exceeding maxRecordBytes rejected', function () {
 
 // ── S. Producer-attestation restoration boundary ────────────────────────────
 asyncCase('post-migration value handed to backend is plain JSON-clone', function () {
+  // After F1-R2-01, the engine's transact.compute requires proper read values to be passed.
+  // We verify the stored value AFTER migrate() completes by reading the backend directly.
   var real = SB.MemoryBackend();
-  var observedValue = null;
-  var wrapped = {
-    list: real.list.bind(real), get: real.get.bind(real), put: real.put.bind(real),
-    transact: function (spec) {
-      var out = spec.compute([]);
-      if (out && out.writes) {
-        for (var i = 0; i < out.writes.length; i++) {
-          var w = out.writes[i];
-          if (w.store === 'cases') observedValue = w.value;
-        }
-      }
-      return real.transact(spec);
-    }
-  };
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
     return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, addedField: 'x' }, migrations: ['delta'] };
   } } };
   return real.put('cases', 'cAttest', { schemaVersion: 1, caseId: 'cAttest' })
-    .then(function () { return ENG.createMigrationEngine({ backend: wrapped, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
-    .then(function () {
-      chk('observed write happened', observedValue !== null);
+    .then(function () { return ENG.createMigrationEngine({ backend: real, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) {
+      chk('migrate ok', r.ok === true);
+      return real.get('cases', 'cAttest');
+    })
+    .then(function (observedValue) {
+      chk('value persisted', observedValue !== null && observedValue !== undefined);
       chk('observed value has plain prototype', observedValue && Object.getPrototypeOf(observedValue) === Object.prototype);
       chk('observed value is not frozen (live store re-validates)', observedValue && !Object.isFrozen(observedValue));
+      chk('observed value has addedField', observedValue && observedValue.addedField === 'x');
     });
 });
 
@@ -744,6 +737,167 @@ asyncCase('second migrate on unchanged data is no-op (no journal churn)', functi
       chk('second run = no-op', r2.report.status === 'no-op');
       chk('second run idempotentSkipped', r2.report.idempotentSkipped === true);
       chk('second run journalAppended=0', r2.report.journalAppended === 0);
+    });
+});
+
+// ── MM. F1-R2-01 — TOCTOU: concurrent write between list and transact detected ───
+asyncCase('F1-R2-01: concurrent write between list and transact → BACKEND_REJECTED', function () {
+  var real = SB.MemoryBackend();
+  // Inject a wrapped backend that mutates `cases/c1` AFTER list() but BEFORE transact() runs
+  // compute(). We intercept transact: when called by the engine, we first write a "concurrent"
+  // value to the same key via the real backend, then forward the transact. Inside compute, the
+  // engine's read will see the concurrent value, hash mismatch, and throw → BACKEND_REJECTED.
+  var concurrentInjected = false;
+  var wrapped = {
+    list: real.list.bind(real), get: real.get.bind(real), put: real.put.bind(real),
+    transact: function (spec) {
+      // Only inject once and only when transact involves the cases store
+      if (!concurrentInjected && spec.stores && spec.stores.indexOf('cases') !== -1) {
+        concurrentInjected = true;
+        return real.put('cases', 'c1', { schemaVersion: 1, caseId: 'c1', concurrent: true }).then(function () { return real.transact(spec); });
+      }
+      return real.transact(spec);
+    }
+  };
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, migratedAt: 'now' }, migrations: ['delta'] };
+  } } };
+  return real.put('cases', 'c1', { schemaVersion: 1, caseId: 'c1' })
+    .then(function () { return ENG.createMigrationEngine({ backend: wrapped, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) {
+      chk('concurrent write detected → ok=false', r.ok === false);
+      chk('reasonCode=BACKEND_REJECTED', r.reasonCode === 'BACKEND_REJECTED');
+      chk('metaWriteError mentions CONCURRENT', r.report.metaWriteError && r.report.metaWriteError.indexOf('CONCURRENT_WRITE_DETECTED') !== -1);
+      return real.get('cases', 'c1');
+    })
+    .then(function (rec) {
+      // The concurrent writer's value should be preserved; engine must NOT have overwritten it.
+      chk('concurrent writer value preserved (engine did not overwrite)', rec && rec.concurrent === true);
+    });
+});
+
+// ── F1-R2-01: engine-level migrate() serialization ─────────────────────────
+asyncCase('F1-R2-01: concurrent migrate() calls are serialized at the engine', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, n: (rec.n || 0) + 1 }, migrations: ['bump'] };
+  } } };
+  return b.put('cases', 'c1', { schemaVersion: 1, caseId: 'c1', n: 0 })
+    .then(function () {
+      var e = ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP });
+      // Kick off two migrate() calls without awaiting the first. They must serialize.
+      var p1 = e.migrate({ confirm: true });
+      var p2 = e.migrate({ confirm: true });
+      return Promise.all([p1, p2]);
+    })
+    .then(function (results) {
+      var r1 = results[0], r2 = results[1];
+      // First run: data was at v0 conceptually → migrator bumps it. After commit, second migrate
+      // sees the post-migration data and is no-op (or migrates again if migrator is non-idempotent).
+      // The key property: BOTH calls return frozen reports; no exceptions; serialization succeeded.
+      chk('both migrate() calls returned reports', !!r1.report && !!r2.report);
+      chk('first migrate ok', r1.ok === true);
+      chk('second migrate ok (or no-op)', r2.ok === true);
+    });
+});
+
+// ── NN. F1-R2-02 — R3.0E migrators fail closed when contract validator missing ─
+// Use child_process to isolate Module._resolveFilename mutation from the in-process
+// concurrent asyncCases (otherwise they race on require.cache).
+function _runMigratorFailClosed(name, contractMatch, migratorAbsPath, recordLiteral) {
+  var cp = require('child_process');
+  var script = "'use strict';\n" +
+    "var Module = require('module');\n" +
+    "var fs = require('fs');\n" +
+    "var os = require('os');\n" +
+    "var tmpContract = os.tmpdir() + '/empty-" + name + "-contract.js';\n" +
+    "fs.writeFileSync(tmpContract, 'module.exports = {};');\n" +
+    "var orig = Module._resolveFilename;\n" +
+    "Module._resolveFilename = function(req, parent) {\n" +
+    "  if (req.indexOf(" + JSON.stringify(contractMatch) + ") !== -1) return tmpContract;\n" +
+    "  return orig.call(this, req, parent);\n" +
+    "};\n" +
+    "var M = require(" + JSON.stringify(migratorAbsPath) + ");\n" +
+    "var r = M.migrate(" + recordLiteral + ");\n" +
+    "process.stdout.write(JSON.stringify({ ok: r.ok, reason: r.reason }));\n";
+  var out = cp.execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' });
+  return JSON.parse(out);
+}
+
+var _path = require('path');
+var _repo = _path.resolve(__dirname, '..');
+
+(function () {
+  var r = _runMigratorFailClosed('experiment', 'contracts/r3.0e/experiment-contract', _path.join(_repo, 'scripts/migrators/experiment-migrator.js'), '{schemaVersion:1,experimentId:"x"}');
+  chk('F1-R2-02: experiment-migrator fail-closed without validator', r.ok === false && r.reason === 'NO_MIGRATION_PATH');
+})();
+(function () {
+  var r = _runMigratorFailClosed('outcome', 'contracts/r3.0e/outcome-contract', _path.join(_repo, 'scripts/migrators/outcome-migrator.js'), '{schemaVersion:1,outcomeId:"x"}');
+  chk('F1-R2-02: outcome-migrator fail-closed without validator', r.ok === false && r.reason === 'NO_MIGRATION_PATH');
+})();
+(function () {
+  var r = _runMigratorFailClosed('timeline', 'contracts/r3.0e/case-timeline-contract', _path.join(_repo, 'scripts/migrators/timeline-migrator.js'), '{schemaVersion:1,caseId:"x",events:[]}');
+  chk('F1-R2-02: timeline-migrator fail-closed without validator', r.ok === false && r.reason === 'NO_MIGRATION_PATH');
+})();
+(function () {
+  var r = _runMigratorFailClosed('followup', 'contracts/r3.0e/follow-up-link-contract', _path.join(_repo, 'scripts/migrators/followup-migrator.js'), '{schemaVersion:1,linkId:"x"}');
+  chk('F1-R2-02: followup-migrator fail-closed without validator', r.ok === false && r.reason === 'NO_MIGRATION_PATH');
+})();
+
+// ── OO. F1-R2-03 — Case-variant + token attestation key rejected ────────────
+asyncCase('F1-R2-03: uppercase _AUTHORITATIVE rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, _AUTHORITATIVE: true }, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cU', { schemaVersion: 1, caseId: 'cU' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function () { return freshJournalReader(b); })
+    .then(function (j) {
+      var c = j.filter(function (e) { return e.store === 'cases'; });
+      chk('uppercase attestation field rejected', c.length === 1 && c[0].reasonCode === 'PRODUCER_ATTESTATION_REFUSED');
+    });
+});
+
+asyncCase('F1-R2-03: MixedCase _ProducerAttested rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, _ProducerAttested: 1 }, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cM', { schemaVersion: 1, caseId: 'cM' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function () { return freshJournalReader(b); })
+    .then(function (j) {
+      var c = j.filter(function (e) { return e.store === 'cases'; });
+      chk('mixedcase attestation field rejected', c.length === 1 && c[0].reasonCode === 'PRODUCER_ATTESTATION_REFUSED');
+    });
+});
+
+asyncCase('F1-R2-03: token-bearing key like fakeSignatureHere rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, fakeSignatureHere: 'x' }, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cT', { schemaVersion: 1, caseId: 'cT' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function () { return freshJournalReader(b); })
+    .then(function (j) {
+      var c = j.filter(function (e) { return e.store === 'cases'; });
+      chk('token-bearing key rejected', c.length === 1 && c[0].reasonCode === 'PRODUCER_ATTESTATION_REFUSED');
+    });
+});
+
+asyncCase('F1-R2-03: __SIGNATURE rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, __SIGNATURE: 'fake' }, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cS', { schemaVersion: 1, caseId: 'cS' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function () { return freshJournalReader(b); })
+    .then(function (j) {
+      var c = j.filter(function (e) { return e.store === 'cases'; });
+      chk('underscore-prefixed uppercase token rejected', c.length === 1 && c[0].reasonCode === 'PRODUCER_ATTESTATION_REFUSED');
     });
 });
 
