@@ -246,9 +246,11 @@ with its reason code.
 ### C8 — Activation
 
 The Feature Registry's `case_comparison` / `reference_lap` / `corner_delta` IDs are registered with renderer
-adapters at C8. The activation is gated by `featureRegistryActivationAllowed` in the phase governance state.
-Until F6, that flag is `false` and the Comparisons surface is deferred at the registry layer even though the
-production modules exist and pass tests.
+adapters at C8. The activation is gated by `featureRegistryActivationAllowed` in `governance/r3.0c/state.json`
+— and that flag is **already `true`** (`C8_ACTIVATION`). The Comparisons surface is live in the registry
+today (`availability: 'available'`, `rendererAdapter.paneId: 'comparisons'`, no `deferredReason`); it is not
+deferred. R3.0F's own, separate `featureRegistryActivationAllowed` flag remains `false` until F6, but that
+flag governs R3.0F's own (nonexistent) pane, not the already-activated R3.0C surface.
 
 ---
 

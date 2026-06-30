@@ -14,7 +14,7 @@ A note on version numbers used in this document: the **R3 case-record schema ver
 
 ## First launch (empty library)
 
-On the very first launch the local store is empty. R3.0B has provisioned an IndexedDB-backed `case-store`, `session-store`, and `caseAssociation` index through `storage-backend.js`; in Node test mode the same contracts run against an in-memory backend. There is no remote sync, no account, no cloud — every artefact lives on the user's device.
+On the very first launch the local store is empty. R3.0B has provisioned an IndexedDB-backed `storage-backend.js` with five stores — `cases`, `caseIndex`, `sessions`, `sessionIndex`, `meta` — that `case-store.js` and `session-store.js` build on; in Node test mode the same contracts run against an in-memory backend. There is no remote sync, no account, no cloud — every artefact lives on the user's device.
 
 The application runs inside an Electron host whose `BrowserWindow` `webPreferences` explicitly set `contextIsolation: true` and `nodeIntegration: false` (no other `webPreferences` key is set; Electron's defaults apply and are never explicitly weakened); the preload bridge exposes exactly two values to the renderer on `window.electronAPI` — `{platform, version}` — and nothing else. The renderer cannot reach Node, the file system, or arbitrary IPC; every privileged operation goes through the storage backend's typed contract — the R3.0B `backend.transact({ stores, reads, compute })` contract is the single channel for persistent reads and writes. (See `docs/r3-architecture.md` "Electron host boundaries" for the full webPreferences/CSP contract.)
 
@@ -28,7 +28,7 @@ The Setup Library landing pane shows:
 
 The Demo Analysis Case is the only Case that ships pre-populated. Its narrative is produced by production code — the same services that run on a user's real Case — not by hardcoded copy. It exists so a user can see the full capability map exercised end-to-end before they have any telemetry of their own.
 
-Nothing on the first-launch screen claims engineer-grade sign-off, lap-time gains, or measured handling. Capabilities that require telemetry or calibration are visibly marked blocked, with the reason code (`NO_TELEMETRY_IMPORTED`, `NO_CALIBRATION_BOUND`, etc.) shown verbatim.
+Nothing on the first-launch screen claims engineer-grade sign-off, lap-time gains, or measured handling. Capabilities that require telemetry or calibration are visibly marked blocked, with the reason code (`NO_ANALYSIS_CASE`, `NO_STEERING_CHANNEL`, `NO_SPEED_CHANNEL`, `NO_COMPARISON`, etc. — `renderer/js/case-shell.js` + `renderer/js/i18n-shell.js`) shown verbatim.
 
 ---
 
@@ -66,7 +66,7 @@ The importer enforces a hard set of fail-closed conditions before the data is ad
 | Quoting / structural errors | Fatal at parse — no partial admission. |
 | Provenance unknown | Stamped `unverified`. Synthetic stays synthetic; the importer will not relabel synthetic as real. |
 
-After import the Case carries a `telemetryProvenance` field of `synthetic`, `real`, or `unverified`. This value is machine-read at the boundary; downstream code never re-infers it from presence.
+After import the canonical telemetry session carries a `dataProvenance` field of `synthetic`, `real`, or `unverified` (`renderer/js/canonical-telemetry-session.js`). This value is machine-read at the boundary; downstream code never re-infers it from presence.
 
 The act of importing telemetry does NOT, on its own, unlock the Measured rung. It unlocks eligibility *checks* — each capability is then evaluated against its own gate.
 

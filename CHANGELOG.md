@@ -290,7 +290,7 @@ decision-engine layers.
 | Activation (C8) | Derived | Closure-private session authority; second WeakSet defends against session-ID string-match |
 
 The full set of fail-closed reason codes is enumerated in the comparison reason-code
-registry at `governance/r3.0c/reason-codes/registry.json` (the count reported there is the
+contract module at `contracts/r3.0c/reason-codes.js` (the count there is the
 authoritative figure; the changelog deliberately does not duplicate it). Every reason code
 is **machine-readable** and accompanies the blocked capability in the UI. The comparison
 surface refuses to emit a measured magnitude; "observed_more_understeer" is **directional,

@@ -81,9 +81,10 @@ Hardware clicks are never emitted — no validated per-car click→rate mapping
 exists, and fabricating one would silently bypass the credibility ladder.
 
 A Heuristic-rung recommendation is informational only; an experiment authored
-against it carries the Heuristic limitation verbatim, and any subsequent
-`confirmed` outcome is capped at `confidence = medium` regardless of how clean
-the follow-up comparison looks.
+against it carries the Heuristic limitation verbatim. There is no separate
+`confidence` field on the Outcome object (see "Outcome classes" below) — the
+outcome classifier does not emit a confidence scalar at all, so there is no
+confidence cap to describe.
 
 ## Experiment shape (E1 schema)
 
