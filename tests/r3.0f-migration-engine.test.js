@@ -999,6 +999,79 @@ asyncCase('F1-R5-01: ZWSP-prefixed _customAuthority rejected', function () {
     .then(function (r) { chk('ZWSP-prefixed key rejected', r.report.perStore.cases.rejected === 1); });
 });
 
+asyncCase('F1-R6-01: U+E0020 tag-space prefix _authoritative rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r['󠀠_authoritative'] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cTag', { schemaVersion: 1, caseId: 'cTag' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('tag-char prefix rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+asyncCase('F1-R6-01: U+E0020 tag-space splice inside _authoritative rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r['_author󠀠itative'] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cTagSplice', { schemaVersion: 1, caseId: 'cTagSplice' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('tag-char splice rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+asyncCase('F1-R6-01: U+034F CGJ splice rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r['_author͏itative'] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cCGJ', { schemaVersion: 1, caseId: 'cCGJ' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('CGJ splice rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+asyncCase('F1-R6-01: U+3164 Hangul filler prefix rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r['ㅤ_authoritative'] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cHF', { schemaVersion: 1, caseId: 'cHF' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('Hangul filler prefix rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+asyncCase('F1-R6-01: U+0301 combining acute splice (a + U+0301 + uthoritative) rejected', function () {
+  var b = SB.MemoryBackend();
+  // Build the hostile key explicitly: 'a' + U+0301 (combining acute) + 'uthoritative', prefixed '_'.
+  // After Mn strip, this normalizes to '_authoritative' → exact attestation name → REJECT.
+  var hostileKey = '_a' + '́' + 'uthoritative';
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r[hostileKey] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cAcute', { schemaVersion: 1, caseId: 'cAcute' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('combining acute splice rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+// F1-R6-01 negative coverage: legitimate non-ASCII field names that happen to contain attestation
+// tokens after combining-mark strip must STILL pass. Repeats the F1-R3-01 acceptance test for
+// the Unicode-property defense.
+asyncCase('F1-R6-01 negative: legitimate lapAuthority/projectionSignature/experimentVerified still accepted', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, lapAuthority: 'r', projectionSignature: 'sig', experimentVerified: true, distanceAuthority: { authorityStatus: 'ok' } }, migrations: ['ok'] };
+  } } };
+  return b.put('cases', 'cNeg', { schemaVersion: 1, caseId: 'cNeg' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) {
+      chk('legitimate camelCase tokens accepted', r.report.perStore.cases.migrated === 1 && r.report.perStore.cases.rejected === 0);
+    });
+});
+
 asyncCase('F1-R5-01: BOM-prefixed _verified rejected', function () {
   var b = SB.MemoryBackend();
   var hostileKey = '﻿_verified';

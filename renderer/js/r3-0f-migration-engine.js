@@ -140,16 +140,24 @@
     'signature', 'proof', 'authority'
   ]);
   // Pre-compute the normalized form of the exact-name set for fast lookup.
-  // F1-R5-01: strip Unicode format controls + default-ignorable code points BEFORE NFKC. NFKC
-  // does not remove ZWJ/ZWNJ/RTL/LTR marks, bidi isolates, BOM, soft hyphen, or variation
-  // selectors. A hostile migrator could splice e.g. `‏_fakeSignatureHere` or
-  // `_author‍itative` to bypass the sentinel-prefix and token-substring checks. Pre-strip
-  // these and only THEN normalize.
-  var _FORMAT_CTRL_RE = /[­؜᠎​-‏‪-‮⁠-⁯︀-️﻿]/g;
+  // F1-R5-01 / F1-R6-01: strip ALL Unicode format controls AND combining marks AND known
+  // default-ignorable code points BEFORE NFKC. Hostile vectors include:
+  //   - Format controls (Cf): ZWJ U+200D, ZWNJ U+200C, ZWSP U+200B, LRM/RLM U+200E/U+200F,
+  //     bidi isolates U+2066-U+2069, BOM U+FEFF, soft hyphen U+00AD, Mongolian VS U+180E,
+  //     tag characters U+E0020-U+E007F (all gc=Cf).
+  //   - Combining marks (Mn): combining acute U+0301, combining grapheme joiner U+034F,
+  //     plus all other diacritical marks (a hostile splice like `_áuthoritative` collapses
+  //     to `_authoritative` after Mn strip).
+  //   - Hangul fillers (Lo category): U+115F, U+1160, U+3164, U+FFA0 are default-ignorable
+  //     but NOT in Cf or Mn — they are listed explicitly.
+  //   - Variation selectors supplement: U+E0100-U+E01EF (gc=Mn, already covered, but listed
+  //     for clarity).
+  // Unicode property escapes (\p{Cf}, \p{Mn}) require the `u` flag and are stable since Node 12.
+  var _DEFANG_RE = /[\p{Cf}\p{Mn}ᅟᅠㅤﾠ]/gu;
   function _normalizeKey(k) {
     if (typeof k !== 'string') return '';
     var stripped;
-    try { stripped = k.replace(_FORMAT_CTRL_RE, ''); } catch (_) { stripped = k; }
+    try { stripped = k.replace(_DEFANG_RE, ''); } catch (_) { stripped = k; }
     var s;
     try { s = (typeof stripped.normalize === 'function') ? stripped.normalize('NFKC') : stripped; } catch (_) { s = stripped; }
     return s.toLowerCase();
