@@ -1,0 +1,14 @@
+{
+  "check": "r3-r3-0d-no-consumer",
+  "program": "R3.0D",
+  "scanBase": "<repo>",
+  "contractPrefix": "contracts/r3.0d",
+  "scannedFiles": 110,
+  "authorizedPathCount": 10,
+  "productionConsumerCount": 27,
+  "authorizedConsumerCount": 27,
+  "unauthorizedConsumerCount": 0,
+  "runtimeConsumerCount": 27,
+  "violations": [],
+  "ok": true
+}

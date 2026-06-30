@@ -1,0 +1,27 @@
+{
+  "check": "i18n-parity",
+  "locales": [
+    "en",
+    "zh",
+    "ja"
+  ],
+  "expectedLocales": [
+    "en",
+    "zh",
+    "ja"
+  ],
+  "localesOk": true,
+  "keyCounts": {
+    "en": 1701,
+    "zh": 1701,
+    "ja": 1701
+  },
+  "unionKeyCount": 1701,
+  "missing": {
+    "en": [],
+    "zh": [],
+    "ja": []
+  },
+  "i18nMissing": 0,
+  "ok": true
+}

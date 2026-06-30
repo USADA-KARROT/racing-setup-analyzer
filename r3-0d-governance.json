@@ -1,0 +1,42 @@
+{
+  "check": "r3-r3-0d-governance",
+  "program": "R3.0D",
+  "ok": true,
+  "violations": [],
+  "schemaVersion": 1,
+  "currentCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+  "authorizedProductionPaths": [
+    "renderer/js/r3-0d-evidence-graph.js",
+    "renderer/js/r3-0d-hypothesis-engine.js",
+    "renderer/js/r3-0d-priority-engine.js",
+    "renderer/js/r3-0d-engineer-brief.js",
+    "renderer/js/r3-0d-engineer-viewmodel.js",
+    "renderer/js/r3-0d-engineer-orchestrator.js",
+    "renderer/js/r3-0d-engineer-ui.js",
+    "renderer/js/i18n-r3-0d.js",
+    "renderer/js/r3-0d-contracts-bundle.js",
+    "renderer/js/feature-registry.js"
+  ],
+  "authorizedProductionPathCount": 10,
+  "enabledCapabilities": [
+    "contract_foundation_present",
+    "evidence_graph_present",
+    "hypothesis_engine_present",
+    "priority_engine_present",
+    "engineer_brief_present",
+    "feature_registry_active"
+  ],
+  "enabledCapabilityCount": 6,
+  "runtimeConsumersAllowed": true,
+  "uiAllowed": true,
+  "featureRegistryActivationAllowed": true,
+  "algorithmsAllowed": true,
+  "checkpointManifests": [
+    "D0.json",
+    "D1.json",
+    "D2.json",
+    "D3.json",
+    "D4.json",
+    "D5.json"
+  ]
+}

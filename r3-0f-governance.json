@@ -1,0 +1,37 @@
+{
+  "check": "r3-r3-0f-governance",
+  "program": "R3.0F",
+  "ok": true,
+  "violations": [],
+  "schemaVersion": 1,
+  "currentCheckpoint": "F2_E2E_AUTOMATION",
+  "authorizedProductionPaths": [
+    "renderer/js/r3-0f-migration-engine.js",
+    "tests/e2e/helpers/flow-harness.js",
+    "tests/e2e/flow-01-new-user.test.js",
+    "tests/e2e/flow-02-real-telemetry.test.js",
+    "tests/e2e/flow-03-measured.test.js",
+    "tests/e2e/flow-04-reference-lap.test.js",
+    "tests/e2e/flow-05-vre.test.js",
+    "tests/e2e/flow-06-setup-experiment.test.js",
+    "tests/e2e/flow-07-driver-experiment.test.js",
+    "tests/e2e/flow-08-export-import.test.js",
+    "tests/e2e/flow-09-electron-smoke.test.js"
+  ],
+  "authorizedProductionPathCount": 11,
+  "enabledCapabilities": [
+    "governance_bootstrap_present",
+    "migration_engine_present",
+    "e2e_automation_present"
+  ],
+  "enabledCapabilityCount": 3,
+  "runtimeConsumersAllowed": true,
+  "uiAllowed": false,
+  "featureRegistryActivationAllowed": false,
+  "algorithmsAllowed": true,
+  "checkpointManifests": [
+    "F0.json",
+    "F1.json",
+    "F2.json"
+  ]
+}

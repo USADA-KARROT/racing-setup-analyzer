@@ -1,0 +1,2543 @@
+{
+  "tool": "r3-gate0-test-manifest",
+  "timeoutMs": 180000,
+  "summary": {
+    "discovered": 101,
+    "ran": 101,
+    "passedFiles": 100,
+    "failedFiles": 1,
+    "timeoutFiles": 0,
+    "assertionsPassed": 10536,
+    "assertionsFailed": 1,
+    "skipped": 0,
+    "discoveryMissing": [],
+    "discoveryGhost": []
+  },
+  "results": [
+    {
+      "file": "tests/verify-dynamics.js",
+      "command": "node tests/verify-dynamics.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 479,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 2303,
+      "stdoutDigest": {
+        "len": 34263,
+        "sha256": "bc6429a177937580637ac7b03f99421e889a450ea702b2b4fb6432194a1928c3",
+        "head": "\n[1] 軸側傾剛性 K = k_w·t²/2 (Milliken / Suspension Secrets)\n  ✓ 前彈簧側傾剛性 = k·t²/2\n  ✓ 輪胎串聯後總剛性 < 懸吊剛性\n\n[2] Roll gradient 量級 (OptimumG: 街車 ~3-6°/g, 高下壓力賽車 0.2-0.7°/g)\n  ✓ GT3 roll gradient 在 1.5-5 °/g 合理區間\n  ✓ 軟彈簧 → roll gradient 更大\n\n[3] ARB sizing 單位一致性 (Nm/deg)\n  ✓ total_roll_needed ≈ m·g·h/target\n  ✓ front_arb_needed 在現實範圍 (< 3000 Nm/deg)\n  ✓ current_roll_gradient 在現實範圍 (< 15 °/g)\n\n[4] 線性自行車模型 (Gille",
+        "tail": "l-gate — only-status/only-cap → blocked_by_eligibility; eligible+series w/o syntheticOnly → blocked_real_path\n  ✓ invariant(I): canonical gate shape on 3E-0..3G-0B (status/aggregateDecision/confirmationFeed/capabilities/diagnostics/unknowns)\n  ✓ invariant(J): no proprietary telemetry / vendor binary (.bmsbin/.tir/.pds/...) in repo tree (clean-room #5)\n\n========= 結果: 479 passed, 0 failed =========\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/telemetry-core.test.js",
+      "command": "node tests/telemetry-core.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 67,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 33,
+      "stdoutDigest": {
+        "len": 75,
+        "sha256": "82c98637090f9d44bae59e22ea98556bed854703bdb8129ef9a930238217a18f",
+        "head": "=== telemetry-core synthetic tests ===\ntelemetry-core: 67 passed, 0 failed\n",
+        "tail": "=== telemetry-core synthetic tests ===\ntelemetry-core: 67 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/telemetry-view.test.js",
+      "command": "node tests/telemetry-view.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 105,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 48,
+      "stdoutDigest": {
+        "len": 76,
+        "sha256": "c9f5ac63c692ef408fd1af378ee7288acc33c6d9cbd67983d4a17a7c310b6741",
+        "head": "=== telemetry-view synthetic tests ===\ntelemetry-view: 105 passed, 0 failed\n",
+        "tail": "=== telemetry-view synthetic tests ===\ntelemetry-view: 105 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/telemetry-plot.test.js",
+      "command": "node tests/telemetry-plot.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 48,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 38,
+      "stdoutDigest": {
+        "len": 74,
+        "sha256": "e048d55a066d4a3126c29f58e21311317b8a9df3d9a8ccb7674b481770f1c461",
+        "head": "=== telemetry-plot geometry tests ===\ntelemetry-plot: 48 passed, 0 failed\n",
+        "tail": "=== telemetry-plot geometry tests ===\ntelemetry-plot: 48 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/telemetry-interact.test.js",
+      "command": "node tests/telemetry-interact.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 52,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 27,
+      "stdoutDigest": {
+        "len": 82,
+        "sha256": "0a172151848b60ac8027ffdd5c281dd1dbad83aa5e5ad4585d7fc98bcf034c41",
+        "head": "=== telemetry-interact geometry tests ===\ntelemetry-interact: 52 passed, 0 failed\n",
+        "tail": "=== telemetry-interact geometry tests ===\ntelemetry-interact: 52 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/telemetry-yaw.test.js",
+      "command": "node tests/telemetry-yaw.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 84,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 40,
+      "stdoutDigest": {
+        "len": 73,
+        "sha256": "dd2653e1a6d26f1d02543e4d87e09d3119afc0191fd247e262a6b6de3ff5d254",
+        "head": "=== telemetry-yaw synthetic tests ===\ntelemetry-yaw: 84 passed, 0 failed\n",
+        "tail": "=== telemetry-yaw synthetic tests ===\ntelemetry-yaw: 84 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/canonical-parameters.test.js",
+      "command": "node tests/canonical-parameters.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 39,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 28,
+      "stdoutDigest": {
+        "len": 84,
+        "sha256": "3884c41a876cd21a40dd7a52ae075d42f9aeb23514d6bfed4926130ce146872c",
+        "head": "=== canonical-parameters schema tests ===\ncanonical-parameters: 39 passed, 0 failed\n",
+        "tail": "=== canonical-parameters schema tests ===\ncanonical-parameters: 39 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/parameter-conversions.test.js",
+      "command": "node tests/parameter-conversions.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 38,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 31,
+      "stdoutDigest": {
+        "len": 85,
+        "sha256": "bc7eefb2b0af1eee4a63005f118372d61c47ef842e19ebb9f8e8581fd0094fef",
+        "head": "=== parameter-conversions proof tests ===\nparameter-conversions: 38 passed, 0 failed\n",
+        "tail": "=== parameter-conversions proof tests ===\nparameter-conversions: 38 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/vehicle-profile-f312.test.js",
+      "command": "node tests/vehicle-profile-f312.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 30,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 29,
+      "stdoutDigest": {
+        "len": 85,
+        "sha256": "1755bb61e179e5740a8edef4e54ddc01032c5339e948ff0ab96ae80ee61073cc",
+        "head": "=== vehicle-profile-f312 fixture tests ===\nvehicle-profile-f312: 30 passed, 0 failed\n",
+        "tail": "=== vehicle-profile-f312 fixture tests ===\nvehicle-profile-f312: 30 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/setup-snapshot.test.js",
+      "command": "node tests/setup-snapshot.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 35,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 30,
+      "stdoutDigest": {
+        "len": 65,
+        "sha256": "91c85f880b08564870587361fba1fef643a1143c864cacc0f903b15d6595d49a",
+        "head": "=== setup-snapshot tests ===\nsetup-snapshot: 35 passed, 0 failed\n",
+        "tail": "=== setup-snapshot tests ===\nsetup-snapshot: 35 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/analysis-case.test.js",
+      "command": "node tests/analysis-case.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 43,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 196,
+      "stdoutDigest": {
+        "len": 63,
+        "sha256": "ceaabdf019ab03a5aff3cb8555b88520ecb4efa1db6a752a954cf8af659f9343",
+        "head": "=== analysis-case tests ===\nanalysis-case: 43 passed, 0 failed\n",
+        "tail": "=== analysis-case tests ===\nanalysis-case: 43 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/analysis-case-adversarial.test.js",
+      "command": "node tests/analysis-case-adversarial.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 78,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 107,
+      "stdoutDigest": {
+        "len": 87,
+        "sha256": "63cb82dadbcb6f1bde63f63de71185f997068396aec80a3906b2ae27245614dd",
+        "head": "=== analysis-case adversarial tests ===\nanalysis-case-adversarial: 78 passed, 0 failed\n",
+        "tail": "=== analysis-case adversarial tests ===\nanalysis-case-adversarial: 78 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/suspension-input-normalizer.test.js",
+      "command": "node tests/suspension-input-normalizer.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 96,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 29,
+      "stdoutDigest": {
+        "len": 49,
+        "sha256": "f60ca0a729a6427a2073775dc54e5dc6b7857e9e5c244b92feae962c83298b2c",
+        "head": "suspension-input-normalizer: 96 passed, 0 failed\n",
+        "tail": "suspension-input-normalizer: 96 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/suspension-input-equivalence.test.js",
+      "command": "node tests/suspension-input-equivalence.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 5020,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 163,
+      "stdoutDigest": {
+        "len": 80,
+        "sha256": "582b6e897cede82ab854f1799994de023ac88e2d1d70db279b3a1c29e5623ff0",
+        "head": "suspension-input-equivalence: 5020 passed, 0 failed  (raw=1002, observable=501)\n",
+        "tail": "suspension-input-equivalence: 5020 passed, 0 failed  (raw=1002, observable=501)\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/suspension-input-adversarial.test.js",
+      "command": "node tests/suspension-input-adversarial.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 54,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 30,
+      "stdoutDigest": {
+        "len": 50,
+        "sha256": "384c76ef379f257d5bcee30404ec3a8e13b8019019ba732b7b63485966002962",
+        "head": "suspension-input-adversarial: 54 passed, 0 failed\n",
+        "tail": "suspension-input-adversarial: 54 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/canonical-model-input.test.js",
+      "command": "node tests/canonical-model-input.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 33,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 36,
+      "stdoutDigest": {
+        "len": 43,
+        "sha256": "0ed8e4109a74cbc11353f0b877ee2a9c8f601185bf124258bab12f7b8f519110",
+        "head": "canonical-model-input: 33 passed, 0 failed\n",
+        "tail": "canonical-model-input: 33 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/analysis-execution.test.js",
+      "command": "node tests/analysis-execution.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 29,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 62,
+      "stdoutDigest": {
+        "len": 40,
+        "sha256": "f5c7550483bfdbef451433875cad1eed453b6416c0718b5dfae3f5a8f659687c",
+        "head": "analysis-execution: 29 passed, 0 failed\n",
+        "tail": "analysis-execution: 29 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/telemetry-observation.test.js",
+      "command": "node tests/telemetry-observation.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 33,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 68,
+      "stdoutDigest": {
+        "len": 43,
+        "sha256": "8faa5df21abb33ed93cbd71dda3ca20eba55a5ac78525327bfee95887798b64b",
+        "head": "telemetry-observation: 33 passed, 0 failed\n",
+        "tail": "telemetry-observation: 33 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/model-telemetry-comparison.test.js",
+      "command": "node tests/model-telemetry-comparison.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 24,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 43,
+      "stdoutDigest": {
+        "len": 48,
+        "sha256": "37547eabb43a28123beb7d9467e3959c19e0fce1c1793845014d6f636352f4b0",
+        "head": "model-telemetry-comparison: 24 passed, 0 failed\n",
+        "tail": "model-telemetry-comparison: 24 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/race-engineer-insight.test.js",
+      "command": "node tests/race-engineer-insight.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 26,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 25,
+      "stdoutDigest": {
+        "len": 43,
+        "sha256": "bb41e7a02c86e9a63da6a5d0f386fd40706ea38f36b929027b7fc3425b3c811f",
+        "head": "race-engineer-insight: 26 passed, 0 failed\n",
+        "tail": "race-engineer-insight: 26 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/driver-coach-insight.test.js",
+      "command": "node tests/driver-coach-insight.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 22,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 53,
+      "stdoutDigest": {
+        "len": 42,
+        "sha256": "45a8f1dc01a86ce78e37d32a9ecf6a39f860ce6aff97f865bceaa4652075da95",
+        "head": "driver-coach-insight: 22 passed, 0 failed\n",
+        "tail": "driver-coach-insight: 22 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/analysis-workspace.test.js",
+      "command": "node tests/analysis-workspace.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 19,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 85,
+      "stdoutDigest": {
+        "len": 40,
+        "sha256": "c4582e350b5d42f6077e01fd290d5d491560103cbaf2ad78e9853516a1837ce7",
+        "head": "analysis-workspace: 19 passed, 0 failed\n",
+        "tail": "analysis-workspace: 19 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/analysis-workspace-viewmodel.test.js",
+      "command": "node tests/analysis-workspace-viewmodel.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 20,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 79,
+      "stdoutDigest": {
+        "len": 50,
+        "sha256": "b04438975a3199abe1342bf52c3d896fcc2a6575a80047af8b5545d94f7f3cfa",
+        "head": "analysis-workspace-viewmodel: 20 passed, 0 failed\n",
+        "tail": "analysis-workspace-viewmodel: 20 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/analysis-workspace-integration.test.js",
+      "command": "node tests/analysis-workspace-integration.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 47,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 78,
+      "stdoutDigest": {
+        "len": 52,
+        "sha256": "d7575e3b83eba0d3c4eea057ad318385ecee5e02d2c9aacf23cda69d67986c49",
+        "head": "analysis-workspace-integration: 47 passed, 0 failed\n",
+        "tail": "analysis-workspace-integration: 47 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/analysis-workspace-ui.test.js",
+      "command": "node tests/analysis-workspace-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 39,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 32,
+      "stdoutDigest": {
+        "len": 43,
+        "sha256": "347a0dbf0fe1b2a9b2c304f0890b775ea911be1c37b97ddabd2860df2b774a24",
+        "head": "analysis-workspace-ui: 39 passed, 0 failed\n",
+        "tail": "analysis-workspace-ui: 39 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/telemetry-import-adapter.test.js",
+      "command": "node tests/telemetry-import-adapter.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 16,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 28,
+      "stdoutDigest": {
+        "len": 46,
+        "sha256": "5adf287508f098d0766bcc5520a94fc434968e1ffbfc211249751c283e8f781b",
+        "head": "telemetry-import-adapter: 16 passed, 0 failed\n",
+        "tail": "telemetry-import-adapter: 16 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/channel-mapping.test.js",
+      "command": "node tests/channel-mapping.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 8,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 30,
+      "stdoutDigest": {
+        "len": 36,
+        "sha256": "eac02a903b89f7b4d47d190c97e0bd28ce94ba1a3e699d20bf479d2540025d8e",
+        "head": "channel-mapping: 8 passed, 0 failed\n",
+        "tail": "channel-mapping: 8 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/calibration-registry.test.js",
+      "command": "node tests/calibration-registry.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 26,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 26,
+      "stdoutDigest": {
+        "len": 42,
+        "sha256": "d32513864f16edb8015db5a39d8a30bbfc1a34fb52c270befc0e78fe59d3cbe7",
+        "head": "calibration-registry: 26 passed, 0 failed\n",
+        "tail": "calibration-registry: 26 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/analysis-window.test.js",
+      "command": "node tests/analysis-window.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 7,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 47,
+      "stdoutDigest": {
+        "len": 36,
+        "sha256": "2bf0ed21404b0d4cec505cf8ce3dd696ef0b0a9447c2732ef7a46ff0b4a2f939",
+        "head": "analysis-window: 7 passed, 0 failed\n",
+        "tail": "analysis-window: 7 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/canonical-telemetry-session.test.js",
+      "command": "node tests/canonical-telemetry-session.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 9,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 77,
+      "stdoutDigest": {
+        "len": 48,
+        "sha256": "d384d3b258b910558dc898dcf44b6b38bb14f1f7b9b98d91650b08c7cb9a95c9",
+        "head": "canonical-telemetry-session: 9 passed, 0 failed\n",
+        "tail": "canonical-telemetry-session: 9 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/analysis-case-export.test.js",
+      "command": "node tests/analysis-case-export.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 45,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 36,
+      "stdoutDigest": {
+        "len": 42,
+        "sha256": "982da713d47b89c4dd22461a5dad457c6c55350ec29126a0a3ad8c97c827927e",
+        "head": "analysis-case-export: 45 passed, 0 failed\n",
+        "tail": "analysis-case-export: 45 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r2.3-real-telemetry-integration.test.js",
+      "command": "node tests/r2.3-real-telemetry-integration.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 17,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 92,
+      "stdoutDigest": {
+        "len": 53,
+        "sha256": "358c43228bb56962cb7fe7fa824ce1bb3e43a551e97a6d5616b1b1953c5c42c7",
+        "head": "r2.3-real-telemetry-integration: 17 passed, 0 failed\n",
+        "tail": "r2.3-real-telemetry-integration: 17 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r2.3-import-ui.test.js",
+      "command": "node tests/r2.3-import-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 16,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 27,
+      "stdoutDigest": {
+        "len": 36,
+        "sha256": "dd6a7814c3e1010f49d4a61fb768c0d920f6cae2f3cf068866443bc9a37671c5",
+        "head": "r2.3-import-ui: 16 passed, 0 failed\n",
+        "tail": "r2.3-import-ui: 16 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/measured-metrics.test.js",
+      "command": "node tests/measured-metrics.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 16,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 30,
+      "stdoutDigest": {
+        "len": 38,
+        "sha256": "855132d05987092021ecc948bc4fbe05004e5cf0fa51b89bc9cf0d8b5110a315",
+        "head": "measured-metrics: 16 passed, 0 failed\n",
+        "tail": "measured-metrics: 16 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r2.4-measured-metrics-integration.test.js",
+      "command": "node tests/r2.4-measured-metrics-integration.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 26,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 198,
+      "stdoutDigest": {
+        "len": 55,
+        "sha256": "aa569fb8aa67662555122595558fc61e37de758a1095de1763f85b08597369db",
+        "head": "r2.4-measured-metrics-integration: 26 passed, 0 failed\n",
+        "tail": "r2.4-measured-metrics-integration: 26 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r2.4-ui.test.js",
+      "command": "node tests/r2.4-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 23,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 31,
+      "stdoutDigest": {
+        "len": 29,
+        "sha256": "efe8b03ad57084bf5f132052096d44726f75acd421bc5b7e5a248a6458346494",
+        "head": "r2.4-ui: 23 passed, 0 failed\n",
+        "tail": "r2.4-ui: 23 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/setup-ab.test.js",
+      "command": "node tests/setup-ab.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 20,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 101,
+      "stdoutDigest": {
+        "len": 30,
+        "sha256": "45dd249bed5813755625993261adfd1b44fe1b9a5aced48067e7a4680447772c",
+        "head": "setup-ab: 20 passed, 0 failed\n",
+        "tail": "setup-ab: 20 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/quantitative-setup-recommendation.test.js",
+      "command": "node tests/quantitative-setup-recommendation.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 32,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 115,
+      "stdoutDigest": {
+        "len": 55,
+        "sha256": "7b47b3999e76a82e057d31e9948f94adfddbaa123962270b65ddcc3579213c93",
+        "head": "quantitative-setup-recommendation: 32 passed, 0 failed\n",
+        "tail": "quantitative-setup-recommendation: 32 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r2.5-setup-ab-quantitative-integration.test.js",
+      "command": "node tests/r2.5-setup-ab-quantitative-integration.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 25,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 104,
+      "stdoutDigest": {
+        "len": 60,
+        "sha256": "8582b78f0ab5eeadb956be963057d6f3c80bdecf9ac6b672f38721490d78652b",
+        "head": "r2.5-setup-ab-quantitative-integration: 25 passed, 0 failed\n",
+        "tail": "r2.5-setup-ab-quantitative-integration: 25 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r2.5-ui.test.js",
+      "command": "node tests/r2.5-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 36,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 31,
+      "stdoutDigest": {
+        "len": 29,
+        "sha256": "fb340392259789bfa3930bab84f035364f61b287e29a44bc6c9ea071bbd80d6e",
+        "head": "r2.5-ui: 36 passed, 0 failed\n",
+        "tail": "r2.5-ui: 36 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/track-intelligence.test.js",
+      "command": "node tests/track-intelligence.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 30,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 110,
+      "stdoutDigest": {
+        "len": 40,
+        "sha256": "43851017e4d56809a90edfadec3dc2000a789be3c198b9387226d55ebf046216",
+        "head": "track-intelligence: 30 passed, 0 failed\n",
+        "tail": "track-intelligence: 30 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r2.6-track-intelligence-integration.test.js",
+      "command": "node tests/r2.6-track-intelligence-integration.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 22,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 156,
+      "stdoutDigest": {
+        "len": 57,
+        "sha256": "90acf8379e79218f27070768969afd010a5959018621cf66cf2e02420887bf03",
+        "head": "r2.6-track-intelligence-integration: 22 passed, 0 failed\n",
+        "tail": "r2.6-track-intelligence-integration: 22 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r2.6-ui.test.js",
+      "command": "node tests/r2.6-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 15,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 32,
+      "stdoutDigest": {
+        "len": 29,
+        "sha256": "8d6e4c8bf181dc8ccc4d91688c90894e0acf199ad015a94aefcd32f85e581d44",
+        "head": "r2.6-ui: 15 passed, 0 failed\n",
+        "tail": "r2.6-ui: 15 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/case-shell.test.js",
+      "command": "node tests/case-shell.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 24,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 27,
+      "stdoutDigest": {
+        "len": 32,
+        "sha256": "2e58dac30853206998d9fd2fe7b7be64350173cebcf7499c206b3c3839780800",
+        "head": "case-shell: 24 passed, 0 failed\n",
+        "tail": "case-shell: 24 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0a-ui.test.js",
+      "command": "node tests/r3.0a-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 69,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 41,
+      "stdoutDigest": {
+        "len": 30,
+        "sha256": "f15d63988f2dcc6eece08bda51b421ec442e6fc6608e2ea3c851baee8d08ea75",
+        "head": "r3.0a-ui: 69 passed, 0 failed\n",
+        "tail": "r3.0a-ui: 69 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/storage-backend.test.js",
+      "command": "node tests/storage-backend.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 15,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 28,
+      "stdoutDigest": {
+        "len": 37,
+        "sha256": "faf0dfcc13cf00312424224d853bff859884d83e41ea5f35af32e795006f1349",
+        "head": "storage-backend: 15 passed, 0 failed\n",
+        "tail": "storage-backend: 15 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/schema-migration.test.js",
+      "command": "node tests/schema-migration.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 9,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 26,
+      "stdoutDigest": {
+        "len": 37,
+        "sha256": "754631e44a84d73e0b1738dc1fae0c1b3e75644e66c807df0b72b01dbcf8e401",
+        "head": "schema-migration: 9 passed, 0 failed\n",
+        "tail": "schema-migration: 9 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/case-record-schema.test.js",
+      "command": "node tests/case-record-schema.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 63,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 40,
+      "stdoutDigest": {
+        "len": 40,
+        "sha256": "725bc4884a8de7e298c0776ad78970ade0f947bfafb575085cdf363eda265e55",
+        "head": "case-record-schema: 63 passed, 0 failed\n",
+        "tail": "case-record-schema: 63 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/case-store.test.js",
+      "command": "node tests/case-store.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 36,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 37,
+      "stdoutDigest": {
+        "len": 32,
+        "sha256": "16799af44c192d0e62fc5a827f34e5af37a45ff55ebceb34e1ccf0cae4216087",
+        "head": "case-store: 36 passed, 0 failed\n",
+        "tail": "case-store: 36 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/session-store.test.js",
+      "command": "node tests/session-store.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 12,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 35,
+      "stdoutDigest": {
+        "len": 35,
+        "sha256": "00dfeda8948f072017817ad5be8bc61e872328132ce65dd6c4e2499c3419da2c",
+        "head": "session-store: 12 passed, 0 failed\n",
+        "tail": "session-store: 12 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/case-library-viewmodel.test.js",
+      "command": "node tests/case-library-viewmodel.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 16,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 28,
+      "stdoutDigest": {
+        "len": 44,
+        "sha256": "9883f1bcb7703fdadd615037dfceb436db5f963fb0e744e391602648256fafa5",
+        "head": "case-library-viewmodel: 16 passed, 0 failed\n",
+        "tail": "case-library-viewmodel: 16 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0b-ui.test.js",
+      "command": "node tests/r3.0b-ui.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 55,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 32,
+      "stdoutDigest": {
+        "len": 30,
+        "sha256": "3f2a9562632a4c9cbeb86afb511627826f7d3a08867e2ef835f5d1089a9ebbcf",
+        "head": "r3.0b-ui: 55 passed, 0 failed\n",
+        "tail": "r3.0b-ui: 55 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0b-persistence-integration.test.js",
+      "command": "node tests/r3.0b-persistence-integration.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 16,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 34,
+      "stdoutDigest": {
+        "len": 51,
+        "sha256": "8560e01055b18686108138c2cb02e901163b22185b6d791bfe2be1b514086237",
+        "head": "r3.0b-persistence-integration: 16 passed, 0 failed\n",
+        "tail": "r3.0b-persistence-integration: 16 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/feature-registry.test.js",
+      "command": "node tests/feature-registry.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 27,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 27,
+      "stdoutDigest": {
+        "len": 38,
+        "sha256": "f8016dcac150f5bbdba8713d8cdbed1e8ba625b8366f029457db417aaca4cf15",
+        "head": "feature-registry: 27 passed, 0 failed\n",
+        "tail": "feature-registry: 27 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/feature-router.test.js",
+      "command": "node tests/feature-router.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 20,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 29,
+      "stdoutDigest": {
+        "len": 36,
+        "sha256": "4a85450fd9a008b26e1ab81255cedd6b4a8270ef4f2996589759a7c00a410853",
+        "head": "feature-router: 20 passed, 0 failed\n",
+        "tail": "feature-router: 20 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/vehicle-preset-pipeline.test.js",
+      "command": "node tests/vehicle-preset-pipeline.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 27,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 64,
+      "stdoutDigest": {
+        "len": 45,
+        "sha256": "81610f2a968c22ad531f541db01f92b9b4f93d6e8d43a905aea0335a6763ffea",
+        "head": "vehicle-preset-pipeline: 27 passed, 0 failed\n",
+        "tail": "vehicle-preset-pipeline: 27 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/i18n-parity.test.js",
+      "command": "node tests/i18n-parity.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 105,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 86,
+      "stdoutDigest": {
+        "len": 34,
+        "sha256": "e86041b90924db05ea9592692d1c99a66d09be7437bbb78461c7ff90ad12f1df",
+        "head": "i18n-parity: 105 passed, 0 failed\n",
+        "tail": "i18n-parity: 105 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0c-contract-foundation.test.js",
+      "command": "node tests/r3.0c-contract-foundation.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 391,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 124,
+      "stdoutDigest": {
+        "len": 48,
+        "sha256": "4f921f36aba8bac898e8f5734a8b56fb3cc99fc6e7ccdf33fe5c81682676bcf5",
+        "head": "r3.0c-contract-foundation: 391 passed, 0 failed\n",
+        "tail": "r3.0c-contract-foundation: 391 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0c-comparison-adapter.test.js",
+      "command": "node tests/r3-0c-comparison-adapter.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 118,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 52,
+      "stdoutDigest": {
+        "len": 47,
+        "sha256": "e37ab3a2e9377c58b14367d4eb838000c4cf48a59e3822ef67630d58a9756e4d",
+        "head": "r3-0c-comparison-adapter: 118 passed, 0 failed\n",
+        "tail": "r3-0c-comparison-adapter: 118 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0c-lap-authority.test.js",
+      "command": "node tests/r3-0c-lap-authority.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 99,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 40,
+      "stdoutDigest": {
+        "len": 41,
+        "sha256": "387f51f9b3964bfbfc4d07d39e9cea6ce7dec50b3f0aaf55e0378b3b9e4ae8e8",
+        "head": "r3-0c-lap-authority: 99 passed, 0 failed\n",
+        "tail": "r3-0c-lap-authority: 99 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0c-track-identity.test.js",
+      "command": "node tests/r3-0c-track-identity.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 67,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 35,
+      "stdoutDigest": {
+        "len": 42,
+        "sha256": "eef278fafc5097970c3818c2809c51993c1561f53f4e60215b4c8f8f134622e3",
+        "head": "r3-0c-track-identity: 67 passed, 0 failed\n",
+        "tail": "r3-0c-track-identity: 67 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0c-distance-authority.test.js",
+      "command": "node tests/r3-0c-distance-authority.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 67,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 37,
+      "stdoutDigest": {
+        "len": 46,
+        "sha256": "3fbaee361c7a2c449ccd9d173ee12da667769c4ea6c5dfa1b69fd54218c8db8e",
+        "head": "r3-0c-distance-authority: 67 passed, 0 failed\n",
+        "tail": "r3-0c-distance-authority: 67 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0c-normalized-distance.test.js",
+      "command": "node tests/r3-0c-normalized-distance.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 77,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 48,
+      "stdoutDigest": {
+        "len": 47,
+        "sha256": "dda06f89f57159e3b2efeb710096cc6aa4133c7426f98b5081312a4e775e20d7",
+        "head": "r3-0c-normalized-distance: 77 passed, 0 failed\n",
+        "tail": "r3-0c-normalized-distance: 77 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0c-reference-selection.test.js",
+      "command": "node tests/r3-0c-reference-selection.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 30,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 38,
+      "stdoutDigest": {
+        "len": 47,
+        "sha256": "8165621d996b61283d8d3a7613e822ddbefdfe29c437e4a220bc1bed0907de51",
+        "head": "r3-0c-reference-selection: 30 passed, 0 failed\n",
+        "tail": "r3-0c-reference-selection: 30 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0c-corner-segmentation.test.js",
+      "command": "node tests/r3-0c-corner-segmentation.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 41,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 41,
+      "stdoutDigest": {
+        "len": 47,
+        "sha256": "bbd25dff6d82a47758a8dafa007197f4d9dbf9d849bd09e947bb31bd8b9f67f6",
+        "head": "r3-0c-corner-segmentation: 41 passed, 0 failed\n",
+        "tail": "r3-0c-corner-segmentation: 41 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0c-corner-pairing.test.js",
+      "command": "node tests/r3-0c-corner-pairing.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 33,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 40,
+      "stdoutDigest": {
+        "len": 42,
+        "sha256": "135d6a5684f25d8ecdedd0abab616231520b5d8f7dd53930c1240572073d9100",
+        "head": "r3-0c-corner-pairing: 33 passed, 0 failed\n",
+        "tail": "r3-0c-corner-pairing: 33 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0c-delta-metrics.test.js",
+      "command": "node tests/r3-0c-delta-metrics.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 59,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 37,
+      "stdoutDigest": {
+        "len": 41,
+        "sha256": "149b6d4c9dd4da739f3deafaf082f213940ddf846b6bc4967ac975716b79d0d4",
+        "head": "r3-0c-delta-metrics: 59 passed, 0 failed\n",
+        "tail": "r3-0c-delta-metrics: 59 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0c-comparison-export.test.js",
+      "command": "node tests/r3-0c-comparison-export.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 106,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 52,
+      "stdoutDigest": {
+        "len": 46,
+        "sha256": "5a21cc028702167ac396da2abcfd95c959a7ce3d46634d177c1c4953ddece1df",
+        "head": "r3-0c-comparison-export: 106 passed, 0 failed\n",
+        "tail": "r3-0c-comparison-export: 106 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0c-comparison-workspace.test.js",
+      "command": "node tests/r3-0c-comparison-workspace.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 111,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 44,
+      "stdoutDigest": {
+        "len": 49,
+        "sha256": "fba73adf9c6e8c52a56ed6d8ffb9fe93377344a21e44d505bf04832570b8778e",
+        "head": "r3-0c-comparison-workspace: 111 passed, 0 failed\n",
+        "tail": "r3-0c-comparison-workspace: 111 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0c-contracts-bundle-equivalence.test.js",
+      "command": "node tests/r3-0c-contracts-bundle-equivalence.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 17,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 33,
+      "stdoutDigest": {
+        "len": 56,
+        "sha256": "5cd90c8f74ba4542dc1f2889ac6b238dc5024df5e4619fc122f54aad14ba392c",
+        "head": "r3-0c-contracts-bundle-equivalence: 17 passed, 0 failed\n",
+        "tail": "r3-0c-contracts-bundle-equivalence: 17 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0c-activation.test.js",
+      "command": "node tests/r3-0c-activation.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 180,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 70,
+      "stdoutDigest": {
+        "len": 39,
+        "sha256": "df65065a808e651655532602eeb8a303fa741ab0fa66b5522e53ae1f9c90d907",
+        "head": "r3-0c-activation: 180 passed, 0 failed\n",
+        "tail": "r3-0c-activation: 180 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0d-contract-foundation.test.js",
+      "command": "node tests/r3.0d-contract-foundation.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 156,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 79,
+      "stdoutDigest": {
+        "len": 48,
+        "sha256": "bd6c340b7d5f72d2370b5aad1e83c270fcbf941884a4d9ac05b6b498f0417634",
+        "head": "r3.0d-contract-foundation: 156 passed, 0 failed\n",
+        "tail": "r3.0d-contract-foundation: 156 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0d-hardened-intrinsics.test.js",
+      "command": "node tests/r3.0d-hardened-intrinsics.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": null,
+      "assertionsFailed": null,
+      "assertionsParsed": false,
+      "skipped": 0,
+      "durationMs": 30,
+      "stdoutDigest": {
+        "len": 61,
+        "sha256": "270c4a9757a90854fbaf156886ba4206323939833d9e31b9611cfcbf0e42efce",
+        "head": "R3.0D hardened-intrinsics direct-test suite: 75 pass, 0 fail\n",
+        "tail": "R3.0D hardened-intrinsics direct-test suite: 75 pass, 0 fail\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0d-evidence-graph.test.js",
+      "command": "node tests/r3.0d-evidence-graph.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": null,
+      "assertionsFailed": null,
+      "assertionsParsed": false,
+      "skipped": 0,
+      "durationMs": 253,
+      "stdoutDigest": {
+        "len": 48,
+        "sha256": "ebdb910b4454f090a22f0e79cac357aff1d9e29749e17eecb108824b62865ec1",
+        "head": "R3.0D D2 evidence-graph suite: 261 pass, 0 fail\n",
+        "tail": "R3.0D D2 evidence-graph suite: 261 pass, 0 fail\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0d-hypothesis-engine.test.js",
+      "command": "node tests/r3.0d-hypothesis-engine.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 158,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 125,
+      "stdoutDigest": {
+        "len": 637,
+        "sha256": "0d9d359a4747e798e27a16b8c34d985cb4d0d69b8e7d472a9bf0ecbcab1a444e",
+        "head": "Section A — functional happy paths\nSection B — structural\nSection C — authority verification\nSection D — scope (case/session/schema)\nSection E — confidence model\nSection F — limitations & cannot_conclude\nSection G — validation actions + alternative explanations\nSection H — security\nSection H2 — Codex D3 R1 closures\nSection H3 — Codex D3 R2 closures\nSection H4 — Codex D3 R3 closures\nSection H5 — Co",
+        "tail": "alternative explanations\nSection H — security\nSection H2 — Codex D3 R1 closures\nSection H3 — Codex D3 R2 closures\nSection H4 — Codex D3 R3 closures\nSection H5 — Codex D3 R4 closures\nSection H6 — Codex D3 R6 closures (hash-valid fixtures)\nSection I — privacy\nSection J — HI wrapper mutation resilience\nSection K — output immutability\nR3.0D D3 hypothesis-engine adversarial suite: 158 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0d-priority-engine.test.js",
+      "command": "node tests/r3.0d-priority-engine.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 132,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 269,
+      "stdoutDigest": {
+        "len": 692,
+        "sha256": "b6bb38f7b8068643522acb5b3145b53dedfb06cb3e3e4a4d2a5c88a5564c15b2",
+        "head": "Section A — functional happy paths\nSection B — structural\nSection C — authority\nSection D — scope\nSection E — priority ladder\nSection F — blocking prerequisites\nSection G — primary eligibility\nSection H — security\nSection I — privacy\nSection J — HI wrapper mutation resilience\nSection K — output immutability\nSection L — mandatory freshness reference\nSection M — closed kind enum\nSection N — forbidde",
+        "tail": "put immutability\nSection L — mandatory freshness reference\nSection M — closed kind enum\nSection N — forbidden behaviors\nSection O — Codex D4 R1 closures\nSection P — Codex D4 R2 closures\nSection Q — Codex D4 R3 closures\nSection R — Codex D4 R4 closures\nSection S — Codex D4 R5 closures\nSection T — D4→D5 producer-attestation regression\nR3.0D D4 priority-engine adversarial suite: 132 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0d-engineer-brief.test.js",
+      "command": "node tests/r3.0d-engineer-brief.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 88,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 110,
+      "stdoutDigest": {
+        "len": 660,
+        "sha256": "56fffae1a90f221475b0d046e19969f1217f8f442fa7385c7117c99370275eee",
+        "head": "Section A — functional happy paths\nSection B — structural\nSection C — authority gates\nSection D — cross-binding\nSection E — identity binding\nSection F — mandatory freshness\nSection G — brief composition\nSection H — cannot conclude preservation\nSection I — contradictions preservation\nSection J — limitations preservation\nSection K — privacy\nSection L — security\nSection M — determinism\nSection N — D5",
+        "tail": "radictions preservation\nSection J — limitations preservation\nSection K — privacy\nSection L — security\nSection M — determinism\nSection N — D5 producer attestation\nSection O — activation gate\nSection P — HI ambient ban audit\nSection Q — closed key sets\nSection R — forbidden output behaviors\nSection S — Formal Codex D Phase Gate closures\nR3.0D D5 engineer-brief adversarial suite: 88 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0d-engineer-viewmodel.test.js",
+      "command": "node tests/r3.0d-engineer-viewmodel.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 109,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 113,
+      "stdoutDigest": {
+        "len": 628,
+        "sha256": "246cc810ba955336ddee8dd89c1f2e03a294e0c8b743313360bd012a0aa7eb3a",
+        "head": "Section A — ViewModel functional re-projection\nSection B — ViewModel authority gate\nSection C — Display state derivation\nSection D — ViewModel producer attestation\nSection E — Privacy\nSection F — HI ambient ban audit\nSection G — Orchestrator pipeline\nSection H — Generation token & stale-async drop\nSection I — invalidate covers all reasons\nSection J — subscribe/unsubscribe\nSection K — sanitized err",
+        "tail": " Orchestrator pipeline\nSection H — Generation token & stale-async drop\nSection I — invalidate covers all reasons\nSection J — subscribe/unsubscribe\nSection K — sanitized errors\nSection L — authoritative envelope leak protection\nSection M — Codex D5 R1 closures\nSection N — Codex D5 R2 closures\nSection O — Codex D5 R3 closures\nR3.0D D5 viewmodel + orchestrator adversarial suite: 109 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0e-contract-foundation.test.js",
+      "command": "node tests/r3.0e-contract-foundation.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 50,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 51,
+      "stdoutDigest": {
+        "len": 381,
+        "sha256": "5af69e7e027b78a60e1c8d95a4f13f05a5d081284f29cfd8d1ea0105727b5e3e",
+        "head": "Section A — reason codes\nSection B — Experiment\nSection C — Outcome\nSection D — Control Variables\nSection E — Case Timeline\nSection F — Follow-up Link\nSection G — aggregate index\nSection H — scope: case-record-schema.js carries refs only (no R3.0E extension)\nSection I — Codex E1 R1 closures\nSection J — Codex E1 R2 closures\nR3.0E E1 contract-foundation suite: 50 passed, 0 failed\n",
+        "tail": "Section A — reason codes\nSection B — Experiment\nSection C — Outcome\nSection D — Control Variables\nSection E — Case Timeline\nSection F — Follow-up Link\nSection G — aggregate index\nSection H — scope: case-record-schema.js carries refs only (no R3.0E extension)\nSection I — Codex E1 R1 closures\nSection J — Codex E1 R2 closures\nR3.0E E1 contract-foundation suite: 50 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0e-stores.test.js",
+      "command": "node tests/r3.0e-stores.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 38,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 40,
+      "stdoutDigest": {
+        "len": 372,
+        "sha256": "2046f2ad2ffa33b74bb991b5809bea0da6d4f91ee7d854130b57f7a0af9638ef",
+        "head": "Section A — Experiment store CRUD\nSection B — Outcome store\nSection C — Timeline store (append-only)\nSection D — Follow-up link store\nSection E — Future-schema + corruption\nSection F — Store metadata\nSection G — scope: R3.0B case-record schema NOT modified by E2\nSection H — Codex E2 R1 closures\nSection I — Codex E2 R2 closures\nR3.0E E2 stores suite: 38 passed, 0 failed\n",
+        "tail": "Section A — Experiment store CRUD\nSection B — Outcome store\nSection C — Timeline store (append-only)\nSection D — Follow-up link store\nSection E — Future-schema + corruption\nSection F — Store metadata\nSection G — scope: R3.0B case-record schema NOT modified by E2\nSection H — Codex E2 R1 closures\nSection I — Codex E2 R2 closures\nR3.0E E2 stores suite: 38 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0e-outcome-classifier.test.js",
+      "command": "node tests/r3.0e-outcome-classifier.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 158,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 230,
+      "stdoutDigest": {
+        "len": 1168,
+        "sha256": "a0045113265e49cdb88766d4d5039f2df7bae396fae1dfde132fcd31141d7e7a",
+        "head": "Section A — Confirmed (golden path)\nSection B — Partially confirmed\nSection C — Contradicted\nSection D — Inconclusive\nSection E — invalid_comparison\nSection F — inconclusive_due_to_confounders\nSection G — Contradicting evidence\nSection H — Identity binding\nSection I — Missing expected observation / stale generation\nSection J — Caller-classification rejected\nSection K — Forged records / clone rejec",
+        "tail": "dex E3 R4 closure (pre-load defineProperty poisoning)\nSection BB — Formal E Gate R1-01 closure (padStart tamper resistance)\nSection AA — Codex E3 R7 closure (TextEncoder.prototype.encode byte-cap undercount)\nSection Z — Codex E3 R6 closure (toJSON-driven post-validation mutation)\nSection Y — Codex E3 R5 closures\nSection W — Codex E3 R3 closures\nR3.0E outcome classifier suite: 158 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0e-followup-timeline.test.js",
+      "command": "node tests/r3.0e-followup-timeline.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 97,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 454,
+      "stdoutDigest": {
+        "len": 932,
+        "sha256": "dd00b526e1411782f11835b2cac37a3065b8eb57d2b5f1c25e72d6a392bdca93",
+        "head": "Section A — createFollowUpLink golden path\nSection B — createFollowUpLink rejections\nSection C — Cross-case follow-up linkage\nSection D — listFollowUpLinksForParent\nSection E — Append timeline event\nSection F — Timeline append rejections\nSection G — Duplicate event rejection\nSection H — Clock rollback\nSection I — Correction event\nSection J — Projection authority\nSection K — Forged input rejection\n",
+        "tail": "on P — Cross-case timeline scope\nSection Q — Codex E4 R1 closures\nSection R — Codex E4 R2 closures\nSection S — Codex E4 R3 closures (child-process isolation)\nSection T — Codex E4 R4 closure (Proxy listForParent rejection)\nSection U — Codex E4 R5 closure (padStart tamper resistance)\nSection V — Codex E4 R6 closure (charCodeAt tamper resistance)\nR3.0E follow-up + timeline suite: 97 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0e-experiment-viewmodel.test.js",
+      "command": "node tests/r3.0e-experiment-viewmodel.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 60,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 247,
+      "stdoutDigest": {
+        "len": 340,
+        "sha256": "7a8c2cb269162787bfcad90ab7e7425a55bae3f0e1eed30fc5189e73c7fa3e60",
+        "head": "Section A — empty / error / stale factories\nSection B — derive golden path\nSection C — derive missing inputs\nSection D — non-authoritative input rejection\nSection E — feature-registry registration\nSection F — API hardening\nSection G — Verifier boundary\nSection H — Codex E5 R1 closures\nR3.0E experiment viewmodel suite: 60 passed, 0 failed\n",
+        "tail": "Section A — empty / error / stale factories\nSection B — derive golden path\nSection C — derive missing inputs\nSection D — non-authoritative input rejection\nSection E — feature-registry registration\nSection F — API hardening\nSection G — Verifier boundary\nSection H — Codex E5 R1 closures\nR3.0E experiment viewmodel suite: 60 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3.0f-migration-engine.test.js",
+      "command": "node tests/r3.0f-migration-engine.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 250,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 3402,
+      "stdoutDigest": {
+        "len": 45,
+        "sha256": "708960dee3cd014a1038838225226dd988cc08a9b387e18f0e0efd2a0156db0d",
+        "head": "r3.0f-migration-engine: 250 passed, 0 failed\n",
+        "tail": "r3.0f-migration-engine: 250 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/e2e/flow-01-new-user.test.js",
+      "command": "node tests/e2e/flow-01-new-user.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 13,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 41,
+      "stdoutDigest": {
+        "len": 42,
+        "sha256": "e8aeb453dc34d6d73f32527a781186d8554c5eddddd0751965cf54c62d139bf7",
+        "head": "e2e-flow-01-new-user: 13 passed, 0 failed\n",
+        "tail": "e2e-flow-01-new-user: 13 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/e2e/flow-02-real-telemetry.test.js",
+      "command": "node tests/e2e/flow-02-real-telemetry.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 17,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 47,
+      "stdoutDigest": {
+        "len": 48,
+        "sha256": "eaefb60a8310aa1c23a31cf56362f2d2f696d13d6fed237428525f40c8533c52",
+        "head": "e2e-flow-02-real-telemetry: 17 passed, 0 failed\n",
+        "tail": "e2e-flow-02-real-telemetry: 17 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/e2e/flow-03-measured.test.js",
+      "command": "node tests/e2e/flow-03-measured.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 15,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 43,
+      "stdoutDigest": {
+        "len": 42,
+        "sha256": "72dfd53df8c426a7846ac2884e9eb045bcaa995066ef5d684a33b4a28e7ec370",
+        "head": "e2e-flow-03-measured: 15 passed, 0 failed\n",
+        "tail": "e2e-flow-03-measured: 15 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/e2e/flow-04-reference-lap.test.js",
+      "command": "node tests/e2e/flow-04-reference-lap.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 11,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 47,
+      "stdoutDigest": {
+        "len": 47,
+        "sha256": "31f69a29b0657665d1b73c6a5afe09d2ef2ef58ab4970d8b006b85cd5cdc517f",
+        "head": "e2e-flow-04-reference-lap: 11 passed, 0 failed\n",
+        "tail": "e2e-flow-04-reference-lap: 11 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/e2e/flow-05-vre.test.js",
+      "command": "node tests/e2e/flow-05-vre.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 8,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 55,
+      "stdoutDigest": {
+        "len": 36,
+        "sha256": "b9a2d7a99e8528f7abc1b3700a600d2b45bf806ecdd70a05ee693c80675e6cb5",
+        "head": "e2e-flow-05-vre: 8 passed, 0 failed\n",
+        "tail": "e2e-flow-05-vre: 8 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/e2e/flow-06-setup-experiment.test.js",
+      "command": "node tests/e2e/flow-06-setup-experiment.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 14,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 48,
+      "stdoutDigest": {
+        "len": 50,
+        "sha256": "d58d69d79ab3030fc7d60e77fc30adbfa98e17dbe0b8bf20cee4a303f8168a14",
+        "head": "e2e-flow-06-setup-experiment: 14 passed, 0 failed\n",
+        "tail": "e2e-flow-06-setup-experiment: 14 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/e2e/flow-07-driver-experiment.test.js",
+      "command": "node tests/e2e/flow-07-driver-experiment.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 8,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 47,
+      "stdoutDigest": {
+        "len": 50,
+        "sha256": "d5949975dc34013ec56cb2102d5e494fe796440d6e944c55702b78ce9b2fe474",
+        "head": "e2e-flow-07-driver-experiment: 8 passed, 0 failed\n",
+        "tail": "e2e-flow-07-driver-experiment: 8 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/e2e/flow-08-export-import.test.js",
+      "command": "node tests/e2e/flow-08-export-import.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 14,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 47,
+      "stdoutDigest": {
+        "len": 47,
+        "sha256": "97aa5734795481ac0b85c8029d9808b93d7165538ab2e0573ae2d4e86e06f680",
+        "head": "e2e-flow-08-export-import: 14 passed, 0 failed\n",
+        "tail": "e2e-flow-08-export-import: 14 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/e2e/flow-09-electron-smoke.test.js",
+      "command": "node tests/e2e/flow-09-electron-smoke.test.js",
+      "exitCode": 1,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 7,
+      "assertionsFailed": 1,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 40,
+      "stdoutDigest": {
+        "len": 81,
+        "sha256": "ebc79f8ace2bb1c3c2b4d5535c31cc6ffcd398de19e9891e2b9332b2d665805e",
+        "head": "  FAIL electron package installed\ne2e-flow-09-electron-smoke: 7 passed, 1 failed\n",
+        "tail": "  FAIL electron package installed\ne2e-flow-09-electron-smoke: 7 passed, 1 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": false
+    },
+    {
+      "file": "tests/r3-0c-governance.test.js",
+      "command": "node tests/r3-0c-governance.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 46,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 1028,
+      "stdoutDigest": {
+        "len": 38,
+        "sha256": "fbdd06eaf1322aeac9b97714b09f7e288b02dcad935caff6a362f0c36bc20f7c",
+        "head": "r3-0c-governance: 46 passed, 0 failed\n",
+        "tail": "r3-0c-governance: 46 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0c-no-consumer.test.js",
+      "command": "node tests/r3-0c-no-consumer.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 26,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 564,
+      "stdoutDigest": {
+        "len": 39,
+        "sha256": "4b688d1b6670332b4d52f4820feb3b14dde8b972d71bfd2e2fa50bd37161b65e",
+        "head": "r3-0c-no-consumer: 26 passed, 0 failed\n",
+        "tail": "r3-0c-no-consumer: 26 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0c-governance-integrity.test.js",
+      "command": "node tests/r3-0c-governance-integrity.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 14,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 310,
+      "stdoutDigest": {
+        "len": 48,
+        "sha256": "08f178c2f88ceeb4f9f9c5df26b25bd85b4508ac9e2002b842cddfb5249477f3",
+        "head": "r3-0c-governance-integrity: 14 passed, 0 failed\n",
+        "tail": "r3-0c-governance-integrity: 14 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0-phase-governance.test.js",
+      "command": "node tests/r3-0-phase-governance.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 94,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 2165,
+      "stdoutDigest": {
+        "len": 38,
+        "sha256": "42f860cfc60efaa3a96d9bd01cdb621f0b414c65a7221b07632e16b7c0ee95a5",
+        "head": "phase-governance: 94 passed, 0 failed\n",
+        "tail": "phase-governance: 94 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0-phase-no-consumer.test.js",
+      "command": "node tests/r3-0-phase-no-consumer.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 45,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 846,
+      "stdoutDigest": {
+        "len": 39,
+        "sha256": "306a0ac76183b3a34009c0d97961a2ff8c642ced8d95d5fa057ca33589211aad",
+        "head": "phase-no-consumer: 45 passed, 0 failed\n",
+        "tail": "phase-no-consumer: 45 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0-phase-governance-integrity.test.js",
+      "command": "node tests/r3-0-phase-governance-integrity.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 20,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 234,
+      "stdoutDigest": {
+        "len": 48,
+        "sha256": "2aaceeaaf4bb0fcd90a9cbdbef5ae3612feceb51894b2e2cb91651fadf9004ac",
+        "head": "phase-governance-integrity: 20 passed, 0 failed\n",
+        "tail": "phase-governance-integrity: 20 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tests/r3-0-train.test.js",
+      "command": "node tests/r3-0-train.test.js",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 34,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 1517,
+      "stdoutDigest": {
+        "len": 32,
+        "sha256": "56c26006a0526a86366dd4605b55ab73814380dfdf079f9cb61946d5def715fd",
+        "head": "r3-0-train: 34 passed, 0 failed\n",
+        "tail": "r3-0-train: 34 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    },
+    {
+      "file": "tools/validate-against-telemetry.js",
+      "command": "node tools/validate-against-telemetry.js --selftest",
+      "exitCode": 0,
+      "signal": null,
+      "timedOut": false,
+      "assertionsPassed": 15,
+      "assertionsFailed": 0,
+      "assertionsParsed": true,
+      "skipped": 0,
+      "durationMs": 85,
+      "stdoutDigest": {
+        "len": 659,
+        "sha256": "67fd6294c5b74faa52943f39a3de2ed794ca44870e676cb21922ee06b740dce5",
+        "head": "=== SELF-TEST ===\n  ✓ full-config: K_us grade=confirmed\n  ✓ full-config: K_us ≈ 1.5 (got 1.500)\n  ✓ full-config: measured_Kus_available = true\n  ✓ no-config: K_us grade=provisional\n  ✓ no-config: measured_Kus_available = false (fail-closed)\n  ✓ no-config: lists ASSUMED definitions\n  ✓ unknown accy unit → blocked\n  ✓ left/right asymmetry detected\n  ✓ timebase reset → status blocked\n  ✓ timebase blo",
+        "tail": "ts ASSUMED definitions\n  ✓ unknown accy unit → blocked\n  ✓ left/right asymmetry detected\n  ✓ timebase reset → status blocked\n  ✓ timebase blocked → K_us blocked\n  ✓ roll grade=provisional (never auto-confirmed)\n  ✓ roll: measured_roll_gradient_available = false\n  ✓ roll: raw L-R diff slope present\n  ✓ roll: body-roll only when explicitly enabled\n  ✓ app model loads\n\nself-test: 15 passed, 0 failed\n"
+      },
+      "stderrDigest": {
+        "len": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "head": "",
+        "tail": ""
+      },
+      "passed": true
+    }
+  ]
+}

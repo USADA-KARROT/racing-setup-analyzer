@@ -1,0 +1,18 @@
+{
+  "check": "frozen-boundary",
+  "base": "f143b9fcfd5bfbb65cf2c04130c9eeef9853abb9",
+  "head": "fd0ca8f9c37cf618873842ec1de7f9c004847f40",
+  "frozenCount": 23,
+  "baseManifestAvailable": true,
+  "headManifestCount": 23,
+  "baseManifestCount": 23,
+  "changedFileCount": 16,
+  "frozenChanged": [],
+  "allowlisted": [
+    "renderer/js/feature-registry.js"
+  ],
+  "allowedChanged": [],
+  "violations": [],
+  "frozenDiffCount": 0,
+  "ok": true
+}

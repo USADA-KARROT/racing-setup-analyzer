@@ -1,0 +1,108 @@
+{
+  "check": "r3-r3-0d-governance-integrity",
+  "program": "R3.0D",
+  "note": "R3.0D baseline inventory only. This check does not enforce hash equality across PRs; subsequent checkpoints that modify any listed file must declare governanceChanged=true in their checkpoint manifest so Codex scope includes governance review.",
+  "requiredFileCount": 13,
+  "inventory": [
+    {
+      "path": "governance/r3.0d/schema.json",
+      "bytes": 3147,
+      "sha256": "bf108400d1c9c687a3c33bf214888fb6ff0054ca966ca0751389e5ae19915c91"
+    },
+    {
+      "path": "governance/r3.0d/state.json",
+      "bytes": 2585,
+      "sha256": "6b0ee30449ec824908842ea6957f0228f5f1fcdf937f9ff17d31421388bbaa28"
+    },
+    {
+      "path": "governance/r3.0d/capabilities.json",
+      "bytes": 3917,
+      "sha256": "148debdb3a44139371483a39ebf346dd923bc1440c7a52ad12185f0a5aed035f"
+    },
+    {
+      "path": "governance/r3.0d/checkpoint-manifest.schema.json",
+      "bytes": 3809,
+      "sha256": "ef068e4e87f233b92ebf88303a87550e8b5866b55554dae1283175f55b9df005"
+    },
+    {
+      "path": "governance/r3.0d/checkpoints/D0.json",
+      "bytes": 1738,
+      "sha256": "b05590fae9472b8f60494673fc0fae9f5310ce5f8ebd30bdbb49bc15b504f006"
+    },
+    {
+      "path": "governance/r3.0/train.schema.json",
+      "bytes": 3938,
+      "sha256": "0831349e7b146dc633030f8241b2a310e2cd319caf32b445e410cd7e04e18653"
+    },
+    {
+      "path": "governance/r3.0/train.json",
+      "bytes": 2433,
+      "sha256": "97cad7414abb05512f62e3330ff2f9de8b89c4b99cfcd6046799e28b81e35a49"
+    },
+    {
+      "path": "scripts/check-r3-phase-governance.js",
+      "bytes": 20336,
+      "sha256": "aa925594d6a1496fa749691fb067618e412a4136d0f9c8e9570426ded1c25290"
+    },
+    {
+      "path": "scripts/check-r3-phase-no-consumer.js",
+      "bytes": 18283,
+      "sha256": "98c6bc7d9cff9491b33430830f40a23c1a46988a9d339b4b17d4dc7ea50dd99b"
+    },
+    {
+      "path": "scripts/check-r3-phase-governance-integrity.js",
+      "bytes": 5763,
+      "sha256": "78ffd9be6ae29eb18924d7c88998e5158de89888f86ae4cdc1ec336139faf2ed"
+    },
+    {
+      "path": "scripts/check-r3-0-train.js",
+      "bytes": 22821,
+      "sha256": "d325ddea3961b49ea555a4b5c51569c446ccc4e397604a8263ae2c8f5f6ee97f"
+    },
+    {
+      "path": "scripts/collect-evidence.js",
+      "bytes": 15323,
+      "sha256": "e57ee68a264775d8e47890338b204364eb5d330afbd301da3a75faf7bba57050"
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "bytes": 10437,
+      "sha256": "548b2ea19ab8a05bd3a587e0b7818de874c008ae17fdd96bc57f3c1d5373b0f9"
+    },
+    {
+      "path": "governance/r3.0d/checkpoints/D1.json",
+      "bytes": 12029,
+      "sha256": "3e3e5a9352983e199221fbd9e9f6514352ed8cca0d6c473451399632f87d38d9"
+    },
+    {
+      "path": "governance/r3.0d/checkpoints/D2.json",
+      "bytes": 40795,
+      "sha256": "d38fe0f40cb8db13635c6ce49e8ed72837c941a7d3f56e1c198552efe7824c2b"
+    },
+    {
+      "path": "governance/r3.0d/checkpoints/D3.json",
+      "bytes": 19680,
+      "sha256": "417be547dd0a6332ad7316db81d938581b2c1098d4b54edcfa2e7a314ba4cd68"
+    },
+    {
+      "path": "governance/r3.0d/checkpoints/D4.json",
+      "bytes": 15301,
+      "sha256": "422b82fee55598e1f3d461531bf1ae5ecdd3bcbe1d4fefd55fc2165d2e51468f"
+    },
+    {
+      "path": "governance/r3.0d/checkpoints/D5.json",
+      "bytes": 14942,
+      "sha256": "9342f3545430082efa587099c0adfa132c8ccc1298f559c36b167744058df273"
+    }
+  ],
+  "extraCheckpointManifests": [
+    "governance/r3.0d/checkpoints/D1.json",
+    "governance/r3.0d/checkpoints/D2.json",
+    "governance/r3.0d/checkpoints/D3.json",
+    "governance/r3.0d/checkpoints/D4.json",
+    "governance/r3.0d/checkpoints/D5.json"
+  ],
+  "bundleSha256": "0d2c5bae502ccb48944e9eea1436d00ef6576ce6019cbeb6d10c7751a0a83deb",
+  "violations": [],
+  "ok": true
+}

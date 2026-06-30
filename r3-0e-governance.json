@@ -1,0 +1,37 @@
+{
+  "check": "r3-r3-0e-governance",
+  "program": "R3.0E",
+  "ok": true,
+  "violations": [],
+  "schemaVersion": 1,
+  "currentCheckpoint": "E5_ACTIVATION",
+  "authorizedProductionPaths": [
+    "renderer/js/r3-0e-stores.js",
+    "renderer/js/r3-0e-outcome-classifier.js",
+    "renderer/js/r3-0e-followup-timeline.js",
+    "renderer/js/r3-0e-experiment-viewmodel.js",
+    "renderer/js/i18n-r3-0e.js",
+    "renderer/js/feature-registry.js"
+  ],
+  "authorizedProductionPathCount": 6,
+  "enabledCapabilities": [
+    "contract_foundation_present",
+    "experiment_store_present",
+    "outcome_classifier_present",
+    "case_timeline_present",
+    "feature_registry_active"
+  ],
+  "enabledCapabilityCount": 5,
+  "runtimeConsumersAllowed": true,
+  "uiAllowed": true,
+  "featureRegistryActivationAllowed": true,
+  "algorithmsAllowed": true,
+  "checkpointManifests": [
+    "E0.json",
+    "E1.json",
+    "E2.json",
+    "E3.json",
+    "E4.json",
+    "E5.json"
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "check": "r3-0c-no-consumer",
+  "scanBase": "<repo>",
+  "scannedFiles": 110,
+  "currentCheckpoint": "C8_ACTIVATION",
+  "runtimeConsumersAllowed": true,
+  "authorizedConsumerPaths": [
+    "renderer/js/feature-registry.js",
+    "renderer/js/i18n-comparisons.js",
+    "renderer/js/r3-0c-comparison-adapter.js",
+    "renderer/js/r3-0c-comparison-export.js",
+    "renderer/js/r3-0c-comparison-orchestrator.js",
+    "renderer/js/r3-0c-comparison-viewmodel.js",
+    "renderer/js/r3-0c-contracts-bundle.js",
+    "renderer/js/r3-0c-corner-pairing.js",
+    "renderer/js/r3-0c-corner-segmentation.js",
+    "renderer/js/r3-0c-delta-metrics.js",
+    "renderer/js/r3-0c-distance-authority.js",
+    "renderer/js/r3-0c-lap-authority.js",
+    "renderer/js/r3-0c-normalized-distance.js",
+    "renderer/js/r3-0c-reference-selection.js",
+    "renderer/js/r3-0c-track-identity.js"
+  ],
+  "authorizedConsumerCount": 12,
+  "unauthorizedRendererConsumerCount": 0,
+  "productionConsumerCount": 0,
+  "runtimeConsumerCount": 12,
+  "deferredFeatureProbe": {
+    "activationAllowed": true,
+    "contractHolds": true,
+    "allDeferred": true,
+    "detail": {
+      "case_comparison": {
+        "present": true,
+        "availability": "available",
+        "rendererAdapter": true,
+        "paneId": "comparisons"
+      },
+      "reference_lap": {
+        "present": true,
+        "availability": "available",
+        "rendererAdapter": true,
+        "paneId": "comparisons"
+      },
+      "corner_delta": {
+        "present": true,
+        "availability": "available",
+        "rendererAdapter": true,
+        "paneId": "comparisons"
+      }
+    }
+  },
+  "deferredStillDeferred": true,
+  "violations": [],
+  "ok": true
+}

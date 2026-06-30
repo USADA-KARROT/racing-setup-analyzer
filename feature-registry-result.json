@@ -1,0 +1,31 @@
+{
+  "check": "feature-registry",
+  "totalFeatures": 26,
+  "productionFeatureOrphans": 0,
+  "orphans": [],
+  "unreachableFeatures": 0,
+  "unreachable": [],
+  "r30cFeatureIds": [
+    "case_comparison",
+    "reference_lap",
+    "corner_delta"
+  ],
+  "activationAllowed": true,
+  "r30cContractIntact": true,
+  "missingR30c": [],
+  "deferredR30cIds": [
+    "case_comparison",
+    "reference_lap",
+    "corner_delta"
+  ],
+  "missingDeferred": [],
+  "deferredIntact": true,
+  "vehiclePresetsReachable": true,
+  "handlingPredictionReachable": true,
+  "validateRegistry": {
+    "ok": true,
+    "errors": []
+  },
+  "duplicateRoutes": [],
+  "ok": true
+}

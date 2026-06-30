@@ -1,0 +1,448 @@
+{
+  "check": "dependency-audit",
+  "mode": "dependency-free",
+  "entryPoints": 118,
+  "filesTraversed": 233,
+  "builtinImports": [
+    "assert",
+    "child_process",
+    "crypto",
+    "fs",
+    "module",
+    "os",
+    "path",
+    "vm"
+  ],
+  "relativeImports": 497,
+  "externalImports": [],
+  "dynamicUnresolved": [],
+  "unresolvedRelative": [],
+  "dynamicResolvedStatically": [
+    {
+      "file": "tests/verify-dynamics.js",
+      "line": 1070,
+      "via": "static-path-join",
+      "target": "tools/bmsbin-local-probe-report.js"
+    },
+    {
+      "file": "tests/verify-dynamics.js",
+      "line": 2480,
+      "via": "static-path-join",
+      "target": "tools/bmsbin-local-probe-report.js"
+    },
+    {
+      "file": "tests/verify-dynamics.js",
+      "line": 2563,
+      "via": "static-path-join",
+      "target": "tools/bmsbin-local-probe-report.js"
+    },
+    {
+      "file": "renderer/js/analysis-case.js",
+      "line": 24,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./canonical-parameters.js",
+        "./parameter-conversions.js",
+        "./setup-snapshot.js"
+      ]
+    },
+    {
+      "file": "renderer/js/analysis-execution.js",
+      "line": 24,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./analysis-case.js",
+        "./canonical-model-input.js"
+      ]
+    },
+    {
+      "file": "renderer/js/telemetry-observation.js",
+      "line": 29,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./telemetry-core.js",
+        "./telemetry-yaw.js",
+        "./analysis-window.js",
+        "./calibration-registry.js"
+      ]
+    },
+    {
+      "file": "renderer/js/model-telemetry-comparison.js",
+      "line": 25,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./measured-metrics.js"
+      ]
+    },
+    {
+      "file": "renderer/js/analysis-workspace.js",
+      "line": 20,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./analysis-execution.js",
+        "./telemetry-observation.js",
+        "./model-telemetry-comparison.js",
+        "./race-engineer-insight.js",
+        "./driver-coach-insight.js",
+        "./quantitative-setup-recommendation.js",
+        "./track-intelligence.js"
+      ]
+    },
+    {
+      "file": "renderer/js/demo-analysis-case.js",
+      "line": 17,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./canonical-parameters.js",
+        "./parameter-conversions.js",
+        "./setup-snapshot.js",
+        "./analysis-case.js",
+        "./telemetry-core.js",
+        "./suspension-input-normalizer.js"
+      ]
+    },
+    {
+      "file": "renderer/js/telemetry-import-adapter.js",
+      "line": 20,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./telemetry-core.js"
+      ]
+    },
+    {
+      "file": "renderer/js/analysis-window.js",
+      "line": 21,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./telemetry-yaw.js"
+      ]
+    },
+    {
+      "file": "renderer/js/canonical-telemetry-session.js",
+      "line": 23,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./telemetry-core.js",
+        "./channel-mapping.js",
+        "./calibration-registry.js",
+        "./analysis-window.js"
+      ]
+    },
+    {
+      "file": "renderer/js/setup-ab.js",
+      "line": 17,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./analysis-execution.js",
+        "./quantitative-setup-recommendation.js"
+      ]
+    },
+    {
+      "file": "renderer/js/quantitative-setup-recommendation.js",
+      "line": 19,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./analysis-execution.js"
+      ]
+    },
+    {
+      "file": "renderer/js/case-store.js",
+      "line": 15,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./case-record-schema.js",
+        "./schema-migration.js"
+      ]
+    },
+    {
+      "file": "renderer/js/session-store.js",
+      "line": 14,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./schema-migration.js"
+      ]
+    },
+    {
+      "file": "renderer/js/feature-router.js",
+      "line": 14,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./feature-registry.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0c/framing-i18n-key-registry.js",
+      "line": 23,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js",
+        "./comparison-eligibility-contract.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0c/credibility-contract.js",
+      "line": 17,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0c/valid-lap-contract.js",
+      "line": 18,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0c/normalized-position-contract.js",
+      "line": 18,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0c/comparison-eligibility-contract.js",
+      "line": 29,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js",
+        "./valid-lap-contract.js",
+        "./normalized-position-contract.js",
+        "./credibility-contract.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0c/comparison-export-contract.js",
+      "line": 27,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0c/reference-and-corner-contract.js",
+      "line": 24,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0c/delta-metrics-contract.js",
+      "line": 35,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0c/index.js",
+      "line": 14,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js",
+        "./credibility-contract.js",
+        "./valid-lap-contract.js",
+        "./normalized-position-contract.js",
+        "./comparison-eligibility-contract.js",
+        "./comparison-export-contract.js",
+        "./reference-and-corner-contract.js",
+        "./delta-metrics-contract.js",
+        "./framing-i18n-key-registry.js",
+        "./viewmodel-state-transition-contract.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0d/index.js",
+      "line": 13,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js",
+        "./credibility-contract.js",
+        "./source-identity-contract.js",
+        "./evidence-node-contract.js",
+        "./hypothesis-contract.js",
+        "./recommendation-contract.js",
+        "./decision-input-contract.js",
+        "./engineer-brief-contract.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0d/credibility-contract.js",
+      "line": 39,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js",
+        "./hardened-intrinsics.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0d/hypothesis-contract.js",
+      "line": 31,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js",
+        "./credibility-contract.js",
+        "./source-identity-contract.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0d/engineer-brief-contract.js",
+      "line": 20,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js",
+        "./credibility-contract.js",
+        "./source-identity-contract.js",
+        "./hypothesis-contract.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0e/experiment-contract.js",
+      "line": 18,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0e/outcome-contract.js",
+      "line": 17,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0e/control-variables-contract.js",
+      "line": 11,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0e/case-timeline-contract.js",
+      "line": 11,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0e/follow-up-link-contract.js",
+      "line": 12,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0e/index.js",
+      "line": 9,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js",
+        "./experiment-contract.js",
+        "./outcome-contract.js",
+        "./control-variables-contract.js",
+        "./case-timeline-contract.js",
+        "./follow-up-link-contract.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0c/viewmodel-state-transition-contract.js",
+      "line": 18,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0d/source-identity-contract.js",
+      "line": 29,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js",
+        "./hardened-intrinsics.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0d/evidence-node-contract.js",
+      "line": 42,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js",
+        "./credibility-contract.js",
+        "./source-identity-contract.js",
+        "./hardened-intrinsics.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0d/recommendation-contract.js",
+      "line": 22,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js",
+        "./credibility-contract.js",
+        "./source-identity-contract.js",
+        "./hypothesis-contract.js"
+      ]
+    },
+    {
+      "file": "contracts/r3.0d/decision-input-contract.js",
+      "line": 28,
+      "via": "forwarded-literal-args",
+      "fn": "_req",
+      "resolvedSpecs": [
+        "./reason-codes.js",
+        "./evidence-node-contract.js",
+        "./hypothesis-contract.js",
+        "./recommendation-contract.js"
+      ]
+    }
+  ],
+  "dynamicAllowlist": [],
+  "overall": "PASS",
+  "ok": true
+}

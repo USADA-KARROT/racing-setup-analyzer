@@ -1,0 +1,218 @@
+{
+  "check": "r3-0-train",
+  "ok": true,
+  "violations": [],
+  "trainStatus": "IN_PROGRESS",
+  "currentPhase": "R3.0F",
+  "currentPhaseCheckpoint": "F2_E2E_AUTOMATION",
+  "targetVersion": "2.0.0",
+  "targetTag": "v2.0.0",
+  "intermediateReleaseAllowed": false,
+  "r4Excluded": true,
+  "phases": {
+    "R3.0C": {
+      "currentCheckpoint": "C8_ACTIVATION",
+      "finalActivationCheckpoint": "C8_ACTIVATION",
+      "authorizedProductionPathCount": 15,
+      "enabledCapabilityCount": 13,
+      "runtimeConsumersAllowed": true,
+      "uiAllowed": true,
+      "featureRegistryActivationAllowed": true,
+      "algorithmsAllowed": true,
+      "checkpointManifestCount": 10
+    },
+    "R3.0D": {
+      "currentCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+      "finalActivationCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+      "authorizedProductionPathCount": 10,
+      "enabledCapabilityCount": 6,
+      "runtimeConsumersAllowed": true,
+      "uiAllowed": true,
+      "featureRegistryActivationAllowed": true,
+      "algorithmsAllowed": true,
+      "checkpointManifestCount": 6
+    },
+    "R3.0E": {
+      "currentCheckpoint": "E5_ACTIVATION",
+      "finalActivationCheckpoint": "E5_ACTIVATION",
+      "authorizedProductionPathCount": 6,
+      "enabledCapabilityCount": 5,
+      "runtimeConsumersAllowed": true,
+      "uiAllowed": true,
+      "featureRegistryActivationAllowed": true,
+      "algorithmsAllowed": true,
+      "checkpointManifestCount": 6
+    },
+    "R3.0F": {
+      "currentCheckpoint": "F2_E2E_AUTOMATION",
+      "finalActivationCheckpoint": "F6_RELEASE",
+      "authorizedProductionPathCount": 11,
+      "enabledCapabilityCount": 3,
+      "runtimeConsumersAllowed": true,
+      "uiAllowed": false,
+      "featureRegistryActivationAllowed": false,
+      "algorithmsAllowed": true,
+      "checkpointManifestCount": 3
+    }
+  },
+  "historicalCheckpointsByPhase": {
+    "R3.0C": [
+      {
+        "checkpoint": "C0_BOOTSTRAP",
+        "headSha": null,
+        "status": "pending",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "C1_PRODUCTION_ADAPTER",
+        "headSha": null,
+        "status": "pending",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "C2_LAP_AUTHORITY",
+        "headSha": null,
+        "status": "pending",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "C3_NORMALIZED_DISTANCE",
+        "headSha": null,
+        "status": "pending",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "C4_REFERENCE_AND_CORNER",
+        "headSha": null,
+        "status": "pending",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "C5_DELTA_METRICS",
+        "headSha": null,
+        "status": "pending",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "C5R_CP1_RETROFIT",
+        "headSha": "5d2d2aa8fbea5077b19c5ea2d5022f88c39ddb33",
+        "status": "candidate",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "C6_EXPORT",
+        "headSha": null,
+        "status": "pending",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "C7_UI",
+        "headSha": "f0304ffc24d05d0f90abbffe368d5e4bcb1795ff",
+        "status": "candidate",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "C8_ACTIVATION",
+        "headSha": null,
+        "status": "candidate",
+        "governanceChanged": true
+      }
+    ],
+    "R3.0D": [
+      {
+        "checkpoint": "D0_BOOTSTRAP",
+        "headSha": null,
+        "status": "pending",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "D1_CONTRACT_FOUNDATION",
+        "headSha": null,
+        "status": "candidate",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "D2_EVIDENCE_GRAPH",
+        "headSha": null,
+        "status": "candidate",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "D3_HYPOTHESIS_ENGINE",
+        "headSha": null,
+        "status": "candidate",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "D4_PRIORITY_ENGINE",
+        "headSha": null,
+        "status": "candidate",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+        "headSha": null,
+        "status": "candidate",
+        "governanceChanged": true
+      }
+    ],
+    "R3.0E": [
+      {
+        "checkpoint": "E0_BOOTSTRAP",
+        "headSha": null,
+        "status": "pending",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "E1_CONTRACT_FOUNDATION",
+        "headSha": null,
+        "status": "candidate",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "E2_EXPERIMENT_STORE",
+        "headSha": null,
+        "status": "candidate",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "E3_OUTCOME_CLASSIFIER",
+        "headSha": null,
+        "status": "candidate",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "E4_CASE_TIMELINE",
+        "headSha": null,
+        "status": "candidate",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "E5_ACTIVATION",
+        "headSha": null,
+        "status": "candidate",
+        "governanceChanged": true
+      }
+    ],
+    "R3.0F": [
+      {
+        "checkpoint": "F0_BOOTSTRAP",
+        "headSha": null,
+        "status": "pending",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "F1_MIGRATION_ENGINE",
+        "headSha": null,
+        "status": "pending",
+        "governanceChanged": true
+      },
+      {
+        "checkpoint": "F2_E2E_AUTOMATION",
+        "headSha": null,
+        "status": "pending",
+        "governanceChanged": true
+      }
+    ]
+  }
+}
