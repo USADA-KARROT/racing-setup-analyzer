@@ -873,17 +873,20 @@ asyncCase('F1-R2-03: MixedCase _ProducerAttested rejected', function () {
     });
 });
 
-asyncCase('F1-R2-03: token-bearing key like fakeSignatureHere rejected', function () {
+// F1-R3-01 closure narrowed the token check to PRIVATE-prefixed keys only. Replace the
+// previous fakeSignatureHere camelCase test (which would have triggered a false positive)
+// with a private-prefix variant that genuinely impersonates an attestation sentinel.
+asyncCase('F1-R2-03: token-bearing private key _fakeSignatureHere rejected', function () {
   var b = SB.MemoryBackend();
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
-    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, fakeSignatureHere: 'x' }, migrations: ['evil'] };
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, _fakeSignatureHere: 'x' }, migrations: ['evil'] };
   } } };
   return b.put('cases', 'cT', { schemaVersion: 1, caseId: 'cT' })
     .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
     .then(function () { return freshJournalReader(b); })
     .then(function (j) {
       var c = j.filter(function (e) { return e.store === 'cases'; });
-      chk('token-bearing key rejected', c.length === 1 && c[0].reasonCode === 'PRODUCER_ATTESTATION_REFUSED');
+      chk('underscore-prefixed token-bearing key rejected', c.length === 1 && c[0].reasonCode === 'PRODUCER_ATTESTATION_REFUSED');
     });
 });
 
@@ -898,6 +901,62 @@ asyncCase('F1-R2-03: __SIGNATURE rejected', function () {
     .then(function (j) {
       var c = j.filter(function (e) { return e.store === 'cases'; });
       chk('underscore-prefixed uppercase token rejected', c.length === 1 && c[0].reasonCode === 'PRODUCER_ATTESTATION_REFUSED');
+    });
+});
+
+// ── PP. F1-R3-01 — sentinel-aware token check (legitimate R3.0C fields pass) ─
+asyncCase('F1-R3-01: legitimate lapAuthority field accepted (not rejected as attestation)', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, analysisResults: { comparison: { lapAuthority: 'ref', distanceAuthority: { authorityStatus: 'ok' }, normalizationAuthority: 'segment-mean', projectionSignature: 'fnv:abc' } } }, migrations: ['delta'] };
+  } } };
+  return b.put('cases', 'cLeg', { schemaVersion: 1, caseId: 'cLeg' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) {
+      chk('legitimate R3.0C-shaped record migrates (not rejected as attestation)', r.report.perStore.cases.migrated === 1);
+      return b.get('cases', 'cLeg');
+    })
+    .then(function (rec) {
+      chk('persisted record has lapAuthority', rec && rec.analysisResults && rec.analysisResults.comparison && rec.analysisResults.comparison.lapAuthority === 'ref');
+      chk('persisted record has projectionSignature', rec && rec.analysisResults.comparison.projectionSignature === 'fnv:abc');
+    });
+});
+
+asyncCase('F1-R3-01: legitimate experimentVerified field accepted', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, experimentVerified: true, signedAt: '2026-07-01' }, migrations: ['delta'] };
+  } } };
+  return b.put('cases', 'cExp', { schemaVersion: 1, caseId: 'cExp' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('camelCase token-bearing field accepted', r.report.perStore.cases.migrated === 1); });
+});
+
+asyncCase('F1-R3-01: underscore-prefixed token-bearing private name STILL rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, _customAuthority: 'forged' }, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cUS', { schemaVersion: 1, caseId: 'cUS' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function () { return freshJournalReader(b); })
+    .then(function (j) {
+      var c = j.filter(function (e) { return e.store === 'cases'; });
+      chk('underscore-prefixed token rejected', c.length === 1 && c[0].reasonCode === 'PRODUCER_ATTESTATION_REFUSED');
+    });
+});
+
+asyncCase('F1-R3-01: triple-underscore __signature private name rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, ___signature: 'x' }, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'c3U', { schemaVersion: 1, caseId: 'c3U' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function () { return freshJournalReader(b); })
+    .then(function (j) {
+      var c = j.filter(function (e) { return e.store === 'cases'; });
+      chk('triple-underscore signature rejected', c.length === 1 && c[0].reasonCode === 'PRODUCER_ATTESTATION_REFUSED');
     });
 });
 

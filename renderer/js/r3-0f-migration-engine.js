@@ -152,10 +152,25 @@
     for (var i = 0; i < names.length; i++) s[_normalizeKey(names[i])] = true;
     return _ObjectFreeze(s);
   })();
+  // F1-R3-01: sentinel-aware token check. Ordinary contract field names that happen to contain
+  // an attestation TOKEN (e.g. R3.0C `lapAuthority`, `distanceAuthority`, `normalizationAuthority`,
+  // `projectionSignature`, R3.0E `experimentVerified`, etc.) are legitimate persisted data and
+  // must NOT be rejected. The runtime rule:
+  //   (a) Exact match (after NFKC + lowercase) to one of the 15 PRODUCER_ATTESTATION_FIELDS
+  //       sentinel names — REJECT (defends against `_authoritative`, `_AUTHORITATIVE`, `__verified`).
+  //   (b) Key that BEGINS with one or more underscores (the JS "private sentinel" convention)
+  //       AND whose normalized form contains an attestation token — REJECT. This catches
+  //       `_authXattested`, `__customAuthority`, `___signature`, etc. while letting
+  //       camelCase contract fields pass.
+  //   (c) Otherwise — accept. Ordinary field names whose body contains an attestation token
+  //       (e.g. `lapAuthority`, `projectionSignature`, `experimentVerified`) are NOT private
+  //       sentinels and must pass migration.
   function _keyLooksLikeAttestation(k) {
+    if (typeof k !== 'string' || k.length === 0) return false;
     var n = _normalizeKey(k);
     if (!n) return false;
     if (PRODUCER_ATTESTATION_NORMALIZED[n]) return true;
+    if (k.charCodeAt(0) !== 0x5F /* '_' */) return false; // not a private-sentinel name → accept
     for (var i = 0; i < PRODUCER_ATTESTATION_TOKENS.length; i++) {
       if (n.indexOf(PRODUCER_ATTESTATION_TOKENS[i]) !== -1) return true;
     }
