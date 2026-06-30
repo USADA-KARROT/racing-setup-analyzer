@@ -147,7 +147,11 @@
   // (combining acute U+0301, combining grapheme joiner U+034F, variation selectors supplement
   // U+E0100..U+E01EF) that are NOT in DICP but are still used in token-splicing attacks.
   // Unicode property escapes require the `u` flag and are stable since Node 12.
-  var _DEFANG_RE = /[\p{Default_Ignorable_Code_Point}\p{Mn}]/gu;
+  // Also strip \p{Cc} (C0 U+0000..U+001F + C1 U+0080..U+009F control characters — NULL, BEL,
+  // ESC, etc.) and \p{Cs} (isolated surrogate halves in malformed UTF-16). Neither category is
+  // in DICP nor in Mn, but both can be spliced inside attestation tokens to bypass substring
+  // matching. They are never legitimate in serialized field names.
+  var _DEFANG_RE = /[\p{Default_Ignorable_Code_Point}\p{Mn}\p{Cc}\p{Cs}]/gu;
   function _normalizeKey(k) {
     if (typeof k !== 'string') return '';
     var stripped;
