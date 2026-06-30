@@ -498,6 +498,28 @@
     return 'NO_MIGRATION_PATH';
   }
 
+  // F1 pre-R21 hardening: sanitize limitations array via index loop (no ambient
+  // Array.prototype.slice/.map/.filter chain). Strings only, max 16 entries, max 200 chars each.
+  function _sanitizeLimitationsList(arr) {
+    if (!_ArrayIsArray(arr)) return [];
+    var out = [];
+    for (var i = 0; i < arr.length && out.length < 16; i++) {
+      var v = arr[i];
+      if (typeof v === 'string' && v.length > 0) {
+        // Truncate to 200 chars via captured charCodeAt-style index access; primitive substring
+        // would itself use ambient String.prototype.slice — we use the captured _safeReplace
+        // style approach by building char-by-char.
+        if (v.length <= 200) _safePush(out, v);
+        else {
+          var truncated = '';
+          for (var j = 0; j < 200; j++) truncated += _StringFromCharCode(_safeCharCodeAt(v, j));
+          _safePush(out, truncated);
+        }
+      }
+    }
+    return out;
+  }
+
   // F1-R1-01: validate migrationsApplied array contains only short non-empty strings (defense vs
   // migrator-supplied fabricated audit labels). Returns sanitized copy.
   function _sanitizeMigrationsApplied(arr) {
@@ -521,7 +543,9 @@
       status: status,
       recordHash: typeof recordHash === 'string' ? recordHash : '',
       migrationsApplied: _sanitizeMigrationsApplied(migrationsApplied),
-      limitations: _ArrayIsArray(limitations) ? limitations.slice(0, 16).map(function (l) { return typeof l === 'string' ? l.slice(0, 200) : ''; }).filter(function (l) { return l.length > 0; }) : []
+      // F1 pre-R21 hardening: replace ambient .slice/.map/.filter chain with index loops so
+      // limitations sanitization is not vulnerable to selective Array prototype poisoning.
+      limitations: _sanitizeLimitationsList(limitations)
     };
     if (status === 'rejected' || status === 'failed') {
       entry.reasonCode = _coerceReasonCode(reasonCode);
@@ -621,11 +645,18 @@
         return st;
       }, function () { return null; });
     }
+    // F1 pre-R21 hardening: copy via index loop instead of ambient Array.prototype.slice so a
+    // poisoned slice cannot return [] while the underlying journal is non-empty (which would
+    // cause priorJournalHash drift vs the in-transact re-read, but harden up front anyway).
     function _readJournal() {
       return backend.get(META, JOURNAL_KEY).then(function (j) {
-        if (_ArrayIsArray(j)) return j.slice();
-        if (_isPlainObject(j) && _ArrayIsArray(j.entries)) return j.entries.slice();
-        return [];
+        var src = null;
+        if (_ArrayIsArray(j)) src = j;
+        else if (_isPlainObject(j) && _ArrayIsArray(j.entries)) src = j.entries;
+        if (!src) return [];
+        var copy = [];
+        for (var i = 0; i < src.length; i++) copy[i] = src[i];
+        return copy;
       }, function () { return []; });
     }
 
