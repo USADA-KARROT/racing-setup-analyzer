@@ -7,7 +7,8 @@
   "previousCheckpoint": "F1_MIGRATION_ENGINE",
   "shaSeparation": {
     "note": "R3.0F F2 candidate branch SHA convention. reviewedCandidateSha is filled by the Codex review prompt and bound to the exact PR head SHA. manifestCommitSha is the governance anchor commit; integrationSha is the squash/merge commit on the R3.0 Integrated Delivery Train.",
-    "reviewedCandidateSha": null,
+    "reviewedCandidateSha": "8bcceec7bd7c81a2a3adcee5a413e7d923749a16",
+    "reviewedCandidateNote": "Codex F2 Round 2 reviewed this exact SHA and issued FINAL VERDICT: PASS. F2 review lineage: R1 BLOCK 3 (F2-R1-01 selectReference negative paths; F2-R1-02 buildEngineerBrief authority gate; F2-R1-03 assertNoStaleCaseRef gate invocation in flow-07 + flow-08) → R2 PASS. R2 verification also confirmed via direct probe that a Proxy-wrapped D3/D4 input is rejected with HYPOTHESIS_AUTHORITY_FORGED and zero Proxy traps fire. F1 closure anchors (descriptor-preflight, BigInt JSON-safety, trap-free serialization, atomic transact, TOCTOU sourceHash) remain structurally intact at this SHA — R2 closures only touched 4 test files. R3.0B persistence + R3.0C/D/E contracts NOT modified.",
     "manifestCommitSha": null,
     "integrationSha": null
   },
@@ -89,7 +90,17 @@
   "workflowRunId": null,
   "artifactId": null,
   "artifactBoundSha": null,
-  "codexVerdict": null,
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 2,
+    "reviewedCandidateSha": "8bcceec7bd7c81a2a3adcee5a413e7d923749a16",
+    "verdictEvidenceFile": "governance/r3.0f/codex-checkpoint-evidence/F2/round-2-8bcceec-PASS.raw.txt",
+    "verdictEvidenceSha256": "71b3d735f326c552c936645fc654dd9e475bd7e417c5de78f5a034288cf82b22",
+    "rounds": [
+      { "round": 1, "reviewedSha": "39a48744e33f5cec9d3e0d96bb942f06dd23431c", "verdict": "BLOCK", "findings": "3 BLOCK (F2-R1-01 selectReference negative paths; F2-R1-02 buildEngineerBrief authority gate; F2-R1-03 assertNoStaleCaseRef gate invocation)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F2/round-1-prompt.md" },
+      { "round": 2, "reviewedSha": "8bcceec7bd7c81a2a3adcee5a413e7d923749a16", "verdict": "PASS", "findings": "0", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F2/round-2-prompt.md", "evidence": "governance/r3.0f/codex-checkpoint-evidence/F2/round-2-8bcceec-PASS.raw.txt" }
+    ]
+  },
   "frozenDiff": null,
   "productionDiff": null,
   "runtimeConsumerCount": null,
