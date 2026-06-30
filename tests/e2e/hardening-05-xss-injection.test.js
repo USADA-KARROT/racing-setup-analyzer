@@ -329,13 +329,23 @@ try {
   ];
   var unsafeXHtml = [];
   var xHtmlCount = 0;
+  // F3-R10-02 closure: helper-specific argument rules. The `t()` translation helper RETURNS
+  // its input unchanged when the i18n key is missing, so passing user-controlled property
+  // chains would inject HTML. Restrict `t` to STRING-LITERAL keys only. Badge helpers
+  // (credBadge/tierBadge) accept bare property accesses too (production usage).
+  var HELPER_ARG_RULES = {
+    t: 'literal-only',
+    credBadge: 'literal-or-prop-or-ternary',
+    tierBadge: 'literal-or-prop-or-ternary'
+  };
   function isSafeHelperCall(expr) {
-    // Match: helperName ( argList )  (single-paren call only)
     var m = expr.match(/^([a-zA-Z_$][\w$]*)\s*\(([\s\S]*)\)\s*$/);
     if (!m) return false;
     if (SAFE_XHTML_HELPERS.indexOf(m[1]) === -1) return false;
+    var helperName = m[1];
+    var rule = HELPER_ARG_RULES[helperName];
     var argList = m[2].trim();
-    if (argList === '') return true; // zero-arg call is trivially safe
+    if (argList === '') return true;
     // Split on top-level commas
     var args = [];
     var depth = 0;
@@ -366,7 +376,10 @@ try {
     // heuristic}). The helpers themselves are pure functions of these enums plus i18n lookups.
     function isSafeArg(arg) {
       if (isSafeStringLiteral(arg)) return true;
-      // Bare identifier / dot-chain property access
+      // F3-R10-02: if rule is literal-only (e.g., t()), the function returns at this point —
+      // bare property access is NOT safe because `t(case.title)` would echo back unknown keys.
+      if (rule === 'literal-only') return false;
+      // Otherwise (credBadge/tierBadge): bare identifier / dot-chain property access OK.
       if (/^[a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)*$/.test(arg)) return true;
       // Ternary `<cond> ? <left> : <right>` where both branches are themselves safe args.
       // Use a depth-aware splitter so nested ternaries are handled correctly.

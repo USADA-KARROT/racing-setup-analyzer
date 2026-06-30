@@ -183,6 +183,17 @@ try {
     chk(lbl + '.contextIsolation === literal true', /(^|[\s,{])contextIsolation\s*:\s*true\s*(,|$|\s)/m.test(wpBody));
     chk(lbl + '.nodeIntegration === literal false', /(^|[\s,{])nodeIntegration\s*:\s*false\s*(,|$|\s)/m.test(wpBody));
 
+    // F3-R10-01 closure: reject any unsafe redeclaration. JS uses the LAST value for duplicate
+    // keys; a contributor leaving both `contextIsolation: true` and later `contextIsolation: false`
+    // would silently flip the effective value. Reject ANY occurrence of the unsafe literal +
+    // assert exactly ONE occurrence of each required key.
+    chk(lbl + ' has NO contextIsolation: false anywhere', !/contextIsolation\s*:\s*false/.test(wpBody));
+    chk(lbl + ' has NO nodeIntegration: true anywhere', !/nodeIntegration\s*:\s*true/.test(wpBody));
+    var ciCount = (wpBody.match(/(^|[\s,{])contextIsolation\s*:/g) || []).length;
+    var niCount = (wpBody.match(/(^|[\s,{])nodeIntegration\s*:/g) || []).length;
+    chk(lbl + ' declares contextIsolation EXACTLY ONCE', ciCount === 1, { count: ciCount });
+    chk(lbl + ' declares nodeIntegration EXACTLY ONCE', niCount === 1, { count: niCount });
+
     chk(lbl + '.allowRunningInsecureContent NOT set to true', !/allowRunningInsecureContent\s*:\s*true/.test(wpBody));
     chk(lbl + '.webSecurity NOT set to false', !/webSecurity\s*:\s*false/.test(wpBody));
     chk(lbl + '.experimentalFeatures NOT set to true', !/experimentalFeatures\s*:\s*true/.test(wpBody));
