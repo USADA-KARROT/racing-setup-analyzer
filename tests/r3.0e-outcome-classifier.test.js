@@ -1212,6 +1212,112 @@ console.log('Section X — Codex E3 R4 closure (pre-load defineProperty poisonin
 })();
 
 // ==================================================================
+// Section AA — Codex E3 R7 closure (E3-R7-01)
+// ==================================================================
+console.log('Section AA — Codex E3 R7 closure (TextEncoder.prototype.encode byte-cap undercount)');
+
+// AA1 — child-process: pre-load TextEncoder.prototype.encode rebind cannot
+// produce a verified oversized outcome.
+(function () {
+  var cp = require('child_process');
+  var path = require('path');
+  var classifierPath = path.resolve(__dirname, '..', 'renderer/js/r3-0e-outcome-classifier.js');
+  // Build a script that:
+  //  1. Rebinds TextEncoder.prototype.encode to return { length: 0 }
+  //  2. Loads the classifier (so its capture picks up the poisoned version)
+  //  3. Submits an input where the dataQualityIssues array is filled with hostile
+  //     long strings; the byte cap MUST still reject (either via i18n grammar OR
+  //     via byte cap based on s.length*4).
+  var script = ''
+    + 'TextEncoder.prototype.encode=function(){return {length:0};};'
+    + 'var CL=require("' + classifierPath + '");'
+    + 'function df(v){if(v&&typeof v==="object"&&!Object.isFrozen(v)){Object.freeze(v);Object.getOwnPropertyNames(v).forEach(function(k){df(v[k]);});}return v;}'
+    + 'var exp=df({'
+    + '  schemaVersion:1,experimentId:"exp_0123456789abcdef",sourceCaseId:"case_demo_a",'
+    + '  sourceHypothesisId:"hyp_demo_001",sourceRecommendationId:"pri_demo_001",'
+    + '  targetMetric:"roll_gradient_deg_per_g",baselineValue:3.5,'
+    + '  expectedDirection:"decrease",expectedMagnitudeRange:{min:0.5,max:1.5},'
+    + '  setupChange:{component:"front_arb"},driverInstruction:null,'
+    + '  controlVariables:[{name:"tyre_temp_window",description:"r3.0e.cv.tyre_temp_window",expectedValue:85,allowedRange:{min:75,max:95},observedValue:null,withinRange:null}],'
+    + '  validationPlan:"r3.0e.plan.controlled_repeat_lap",'
+    + '  stopConditions:[{i18nKey:"r3.0e.stop.lap_time_increase",params:null}],'
+    + '  status:"applied",followUpCaseIds:["case_demo_a_followup_1"],'
+    + '  outcome:null,createdAt:"2026-06-30T10:00:00Z"'
+    + '});'
+    + 'var huge="r3.0e.dq."+"x".repeat(150000);'
+    + 'var input={experiment:exp,'
+    + '  appliedChange:{changeId:"change_demo_001",sourceExperimentId:"exp_0123456789abcdef",appliedAt:"2026-06-30T11:00:00Z"},'
+    + '  followUp:{followUpCaseId:"case_demo_a_followup_1",parentCaseId:"case_demo_a",sessionId:"session_demo_a",parentSessionId:"session_demo_a",hasExplicitReference:true,comparabilityScore:0.9},'
+    + '  observation:{observedDirection:"decrease",observedMagnitude:1,driverFeedback:"r3.0e.driver.feedback.balance_improved",'
+    + '    dataQualityIssues:[huge,"a","b","c","d"],'
+    + '    sideEffects:[],contradictingEvidenceIds:[],supportingEvidenceIds:["ev_demo_001"]},'
+    + '  controlVariableObservations:[{name:"tyre_temp_window",description:"r3.0e.cv.tyre_temp_window",expectedValue:85,allowedRange:{min:75,max:95},observedValue:84,withinRange:true}]};'
+    + 'var r=CL.classifyOutcome(input,{clock:function(){return "2026-06-30T11:30:00Z";}});'
+    + 'process.stdout.write(JSON.stringify({valid:r.valid,reasons:r.reasonCodes||[],hugeLen:huge.length}));';
+  var out;
+  try {
+    out = cp.execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' });
+  } catch (e) {
+    chk('AA1: child process executed', false, { error: String(e) });
+    return;
+  }
+  var parsed;
+  try { parsed = JSON.parse(out.trim()); } catch (eP) {
+    chk('AA1: child output parsed', false, { stdout: out });
+    return;
+  }
+  // The hostile dataQualityIssues entries are either rejected by i18n grammar
+  // (too long, contains x.repeat → still a single segment which is fine grammar-wise
+  // but exceeds 128 chars so still rejected) OR by byte cap. Either way → BLOCK.
+  chk('AA1: TextEncoder poison + huge dataQualityIssues → BLOCK (no verified outcome)',
+    parsed.valid !== true,
+    parsed);
+})();
+
+// AA2 — direct: hostile-clock TextEncoder.prototype.encode rebind cannot affect cap
+(function () {
+  var origEncode = TextEncoder.prototype.encode;
+  var hostileClock = function () {
+    TextEncoder.prototype.encode = function () { return { length: 0 }; };
+    return '2026-06-30T11:30:00Z';
+  };
+  // Pre-built scenario with VALID i18n keys but many of them — by themselves they
+  // shouldn't exceed cap, so this is a control case verifying we don't accidentally
+  // BLOCK valid inputs.
+  var manyKeys = [];
+  for (var i = 0; i < 30; i++) manyKeys.push('r3.0e.dq.item_' + i);
+  var r;
+  try {
+    r = CL.classifyOutcome(makeInput({
+      observationOverrides: { dataQualityIssues: manyKeys, observedDirection: 'decrease', observedMagnitude: 1.0 },
+    }), { clock: hostileClock });
+  } finally {
+    TextEncoder.prototype.encode = origEncode;
+  }
+  // 30 i18n keys > DATA_QUALITY_ISSUE_BLOCK_THRESHOLD → inconclusive (dq blocking).
+  // Outcome should still be produced (not BLOCKed by byte cap because total size is small).
+  chk('AA2: TextEncoder poison + bounded valid dataQualityIssues → still classifies',
+    r.valid === true && r.outcome['class'] === 'inconclusive',
+    r);
+})();
+
+// AA3 — dataQualityIssues now MUST pass strict i18n grammar (defence-in-depth)
+(function () {
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { dataQualityIssues: ['driver caused the crash'] },
+  }), { clock: fixedClock() });
+  chk('AA3: free-text dataQualityIssues entry → BLOCK',
+    r.valid !== true && (r.reasonCodes || []).indexOf('OUTCOME_DATA_QUALITY_INVALID') !== -1);
+})();
+(function () {
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { dataQualityIssues: ['/Users/skyline/raw.bmsbin'] },
+  }), { clock: fixedClock() });
+  chk('AA3.path: path string in dataQualityIssues → BLOCK',
+    r.valid !== true);
+})();
+
+// ==================================================================
 // Section Z — Codex E3 R6 closure (E3-R6-01)
 // ==================================================================
 console.log('Section Z — Codex E3 R6 closure (toJSON-driven post-validation mutation)');

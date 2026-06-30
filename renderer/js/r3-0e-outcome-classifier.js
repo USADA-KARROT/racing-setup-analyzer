@@ -137,12 +137,24 @@
       return n;
     } catch (e) { return null; }
   }
+  // Codex E3-R7-01 closure: do NOT route byte-counting through TextEncoder. A hostile
+  // clock (or any post-load tampering) could rebind TextEncoder.prototype.encode to
+  // return { length: 0 }, undercounting the envelope and letting an oversized outcome
+  // bypass the ENVELOPE_BYTE_CAP. UTF-8 byte length is conservatively bounded by
+  // (string.length * 4) — every code unit emits at most 4 UTF-8 bytes. This overcounts
+  // for ASCII-heavy strings but NEVER undercounts. The cap is generous (128 KiB) so the
+  // overcount is acceptable. We read `.length` via a captured String access to keep
+  // intrinsic stability.
+  var _CAPTURED_STRING_PROTO_LENGTH_DESC = (function () {
+    try { return _CAPTURED_OBJECT_GET_OWN_DESC(String.prototype, 'length') || null; }
+    catch (e) { return null; }
+  })();
   function _utf8Bytes(s) {
-    try {
-      if (typeof s !== 'string') return 0;
-      if (_CAPTURED_TEXT_ENCODER !== null) return new _CAPTURED_TEXT_ENCODER().encode(s).length;
-      return (typeof Buffer !== 'undefined') ? Buffer.byteLength(s, 'utf8') : s.length * 4;
-    } catch (e) { return Infinity; }
+    if (typeof s !== 'string') return 0;
+    // `string.length` is a built-in primitive read; it is not overridable on strings.
+    // We multiply by 4 (worst-case UTF-8 expansion per UTF-16 code unit) for a safe
+    // upper-bound that intrinsic tampering cannot undercount.
+    return s.length * 4;
   }
 
   // ---------- Module-init integrity snapshot --------------------------------------------------
@@ -618,9 +630,14 @@
         return RC_E.buildBlockedResult(dqiR.reasonCodes, { detail: 'dataQualityIssues: ' + dqiR.detail });
       }
       var dataQualityIssues = dqiR.snapshot;
+      // Codex E3-R7-01 closure (defence-in-depth): each data-quality issue MUST pass the
+      // strict i18n-key grammar. This bounds size (≤128 chars), eliminates the
+      // free-text / blame / path laundering vector, AND ensures byte-count overflow
+      // attacks via huge strings cannot inflate the envelope before the byte-cap walker
+      // sees it.
       for (var qi = 0; qi < dataQualityIssues.length; qi++) {
-        if (!_nonEmptyStr(dataQualityIssues[qi])) {
-          return RC_E.buildBlockedResult([CODES.OUTCOME_DATA_QUALITY_INVALID], { detail: 'dataQualityIssues[' + qi + '] not non-empty string' });
+        if (!_i18nKeyOk(dataQualityIssues[qi])) {
+          return RC_E.buildBlockedResult([CODES.OUTCOME_DATA_QUALITY_INVALID], { detail: 'dataQualityIssues[' + qi + '] not strict i18n key' });
         }
       }
       var seR = _snapshotArrayShape(observation.sideEffects, CODES.OUTCOME_INVALID);
