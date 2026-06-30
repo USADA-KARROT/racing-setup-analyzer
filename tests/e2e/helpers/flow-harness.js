@@ -124,22 +124,30 @@ function createFlowHarness(opts) {
         // (pathPrefix === '' means this is the top-level viewmodel — its caseId IS the anchor.)
         throw new Error('STALE_CASE_REF: ' + pathPrefix + 'caseId=' + obj.caseId + ' active=' + active);
       }
-      // 3) Bounded recursion through ALL own properties whose value is an object or array.
+      // 3) Bounded recursion through ALL own properties (F3-R4-03: use Reflect.ownKeys so
+      // non-enumerable and Symbol-keyed properties are not skipped).
       if (depthRemaining > 0) {
-        var keys = Object.keys(obj);
+        var keys;
+        try { keys = Reflect.ownKeys(obj); } catch (e) { keys = []; }
         for (var k = 0; k < keys.length; k++) {
           var kn = keys[k];
-          var val = obj[kn];
-          if (val && typeof val === 'object') {
-            if (Array.isArray(val)) {
-              for (var ai = 0; ai < val.length; ai++) {
-                if (val[ai] && typeof val[ai] === 'object') {
-                  check(val[ai], pathPrefix + kn + '[' + ai + '].', depthRemaining - 1);
-                }
+          // Read via descriptor to avoid firing accessor getters on hostile inputs
+          var desc;
+          try { desc = Object.getOwnPropertyDescriptor(obj, kn); } catch (de) { continue; }
+          if (!desc) continue;
+          if (!('value' in desc)) continue; // skip accessor properties (potentially hostile)
+          var val = desc.value;
+          if (!val || typeof val !== 'object') continue;
+          // Symbol-keyed: include path label safely
+          var kLabel = typeof kn === 'symbol' ? '[Symbol(' + (kn.description || '') + ')]' : kn;
+          if (Array.isArray(val)) {
+            for (var ai = 0; ai < val.length; ai++) {
+              if (val[ai] && typeof val[ai] === 'object') {
+                check(val[ai], pathPrefix + kLabel + '[' + ai + '].', depthRemaining - 1);
               }
-            } else {
-              check(val, pathPrefix + kn + '.', depthRemaining - 1);
             }
+          } else {
+            check(val, pathPrefix + kLabel + '.', depthRemaining - 1);
           }
         }
       }

@@ -27,28 +27,35 @@ try {
   var indexPath = path.join(__dirname, '..', '..', 'renderer', 'index.html');
   var indexSrc = fs.readFileSync(indexPath, 'utf8');
 
-  // F3-R3-01 closure: lexical scanner that strips comments while respecting string/template
-  // contexts. Regex-only stripping mistakes `//` inside a string-literal for a line comment
-  // and can swallow subsequent code, including unsafe flags. The scanner walks characters,
-  // tracks string/template/regex state, and only treats `//` and `/*` as comments OUTSIDE
-  // those contexts.
+  // F3-R4-01 closure: lexical scanner now also recognizes regex literals (including character
+  // classes like `/[/*]/` that contain `/` and `*`). Without regex tracking, the scanner would
+  // see `/[` and enter block-comment mode, truncating the rest of the source.
+  // Strategy: determine if a `/` starts a regex literal by looking back at the last meaningful
+  // non-whitespace character. Regex follows operators, keywords, `(`, `[`, `{`, `,`, `;`, `:`,
+  // `!`, `=`, `?`, `&`, `|`, `^`, `~`, `<`, `>`, `+`, `-`, `*`, `%`, `return`, `typeof`, etc.
+  // After identifiers, `]`, `)`, numbers, or string literals, `/` is division.
   function stripJsComments(src) {
     var out = '';
     var i = 0;
     var n = src.length;
     var inStr = false;
     var strCh = '';
+    var lastSig = ''; // last significant character (non-whitespace, non-comment)
+    function couldStartRegex(prev) {
+      if (prev === '') return true; // start of file
+      if ('([{,;:!=?&|^~<>+-*%'.indexOf(prev) !== -1) return true;
+      return false; // letters/digits/'_' /')'/']' / '"' / "'" / '`' all suggest division
+    }
     while (i < n) {
       var ch = src.charAt(i);
       var nxt = i + 1 < n ? src.charAt(i + 1) : '';
       if (inStr) {
         if (ch === '\\' && i + 1 < n) { out += ch + nxt; i += 2; continue; }
-        if (ch === strCh) { inStr = false; out += ch; i++; continue; }
+        if (ch === strCh) { inStr = false; out += ch; i++; lastSig = ch; continue; }
         out += ch; i++; continue;
       }
-      // Not in string: detect comment start
+      // Comments
       if (ch === '/' && nxt === '/') {
-        // line comment — skip to newline (preserve the newline)
         while (i < n && src.charAt(i) !== '\n') i++;
         continue;
       }
@@ -58,10 +65,34 @@ try {
         if (i < n) i += 2;
         continue;
       }
+      // Regex literal: `/` after an operator-y context, walks to closing `/` while skipping
+      // escape sequences and character-class `[...]`. We PRESERVE the regex literal in the
+      // output so subsequent regex-based assertions can still see it.
+      if (ch === '/' && couldStartRegex(lastSig)) {
+        out += ch;
+        i++;
+        var inCharClass = false;
+        while (i < n) {
+          var rc = src.charAt(i);
+          out += rc;
+          if (rc === '\\' && i + 1 < n) { out += src.charAt(i + 1); i += 2; continue; }
+          if (rc === '[') { inCharClass = true; i++; continue; }
+          if (rc === ']' && inCharClass) { inCharClass = false; i++; continue; }
+          if (rc === '/' && !inCharClass) { i++; break; }
+          if (rc === '\n') { break; } // unterminated regex — stop to avoid runaway
+          i++;
+        }
+        // Consume optional regex flags
+        while (i < n && /[gimsuyd]/.test(src.charAt(i))) { out += src.charAt(i); i++; }
+        lastSig = '/';
+        continue;
+      }
       if (ch === '"' || ch === "'" || ch === '`') {
         inStr = true; strCh = ch; out += ch; i++; continue;
       }
-      out += ch; i++;
+      out += ch;
+      if (!/\s/.test(ch)) lastSig = ch;
+      i++;
     }
     return out;
   }

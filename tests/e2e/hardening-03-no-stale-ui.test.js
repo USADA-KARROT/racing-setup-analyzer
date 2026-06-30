@@ -181,6 +181,39 @@ try {
   });
   chk('coherent object-shape currentBrief.caseAssociation passes', true);
 
+  // ---- (3.6) F3-R4-03 — non-enumerable + Symbol-keyed property coverage ─────────
+  // (w) Non-enumerable nested object with stale sourceCaseId — must be caught
+  var nonEnumVm = { activeCaseId: caseB.caseId };
+  Object.defineProperty(nonEnumVm, 'hidden', {
+    value: { sourceCaseId: caseA.caseId },
+    enumerable: false,
+    configurable: false,
+    writable: false
+  });
+  var threwNonEnum = false;
+  try { h.assertNoStaleCaseRef(nonEnumVm); } catch (e) { threwNonEnum = /STALE_CASE_REF/.test(String(e && e.message)); }
+  chk('non-enumerable nested stale sourceCaseId throws', threwNonEnum === true);
+
+  // (x) Symbol-keyed nested object with stale sourceCaseId — must be caught
+  var symKey = Symbol('hiddenCase');
+  var symVm = { activeCaseId: caseB.caseId };
+  symVm[symKey] = { sourceCaseId: caseA.caseId };
+  var threwSym = false;
+  try { h.assertNoStaleCaseRef(symVm); } catch (e) { threwSym = /STALE_CASE_REF/.test(String(e && e.message)); }
+  chk('Symbol-keyed nested stale sourceCaseId throws', threwSym === true);
+
+  // (y) Accessor property (getter) — must NOT fire the accessor (security: avoid hostile getters)
+  var accessorFired = 0;
+  var accVm = { activeCaseId: caseB.caseId };
+  Object.defineProperty(accVm, 'hostile', {
+    get: function () { accessorFired++; return { sourceCaseId: caseA.caseId }; },
+    enumerable: true
+  });
+  // We accept either: (a) gate throws (it read the accessor), or (b) gate passes silently and
+  // did NOT fire the accessor. The hardened gate prefers (b) — descriptor-only inspection.
+  try { h.assertNoStaleCaseRef(accVm); } catch (e) {}
+  chk('accessor properties not invoked by stale-ref gate (descriptor-only)', accessorFired === 0);
+
   // ---- (4) Console-error guard ─────────────────────────────────────────────
   chk('zero console.error during no-stale-UI hardening', h.consoleErrorCount === 0);
   chk('harness consoleErrorCount accessor reachable', typeof h.consoleErrorCount === 'number');

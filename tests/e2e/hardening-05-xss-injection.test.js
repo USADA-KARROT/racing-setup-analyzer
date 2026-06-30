@@ -87,12 +87,59 @@ try {
   }
   chk('no unsafe variable-RHS innerHTML in renderer/js AND inline scripts', unsafeInnerHtmlAssigns.length === 0, unsafeInnerHtmlAssigns.slice(0, 5));
 
-  // F3-R1-05 closure: scan for all forbidden DOM API patterns and fail-closed on ALL of them.
-  // Strip JS comments first so block-comment decoys cannot mask a real sink.
+  // F3-R4-02 closure: replace regex-based comment stripping with the same string/regex-literal-
+  // aware lexical scanner used in hardening-01. A string literal containing "/*" before an
+  // unsafe sink and a later string containing "*/" would otherwise delete the sink between them.
   function stripJsComments(src) {
-    src = src.replace(/\/\*[\s\S]*?\*\//g, '');
-    src = src.replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-    return src;
+    var out = '';
+    var i = 0;
+    var n = src.length;
+    var inStr = false;
+    var strCh = '';
+    var lastSig = '';
+    function couldStartRegex(prev) {
+      if (prev === '') return true;
+      if ('([{,;:!=?&|^~<>+-*%'.indexOf(prev) !== -1) return true;
+      return false;
+    }
+    while (i < n) {
+      var ch = src.charAt(i);
+      var nxt = i + 1 < n ? src.charAt(i + 1) : '';
+      if (inStr) {
+        if (ch === '\\' && i + 1 < n) { out += ch + nxt; i += 2; continue; }
+        if (ch === strCh) { inStr = false; out += ch; i++; lastSig = ch; continue; }
+        out += ch; i++; continue;
+      }
+      if (ch === '/' && nxt === '/') { while (i < n && src.charAt(i) !== '\n') i++; continue; }
+      if (ch === '/' && nxt === '*') {
+        i += 2;
+        while (i < n && !(src.charAt(i) === '*' && i + 1 < n && src.charAt(i + 1) === '/')) i++;
+        if (i < n) i += 2;
+        continue;
+      }
+      if (ch === '/' && couldStartRegex(lastSig)) {
+        out += ch; i++;
+        var inCharClass = false;
+        while (i < n) {
+          var rc = src.charAt(i);
+          out += rc;
+          if (rc === '\\' && i + 1 < n) { out += src.charAt(i + 1); i += 2; continue; }
+          if (rc === '[') { inCharClass = true; i++; continue; }
+          if (rc === ']' && inCharClass) { inCharClass = false; i++; continue; }
+          if (rc === '/' && !inCharClass) { i++; break; }
+          if (rc === '\n') { break; }
+          i++;
+        }
+        while (i < n && /[gimsuyd]/.test(src.charAt(i))) { out += src.charAt(i); i++; }
+        lastSig = '/';
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; out += ch; i++; continue; }
+      out += ch;
+      if (!/\s/.test(ch)) lastSig = ch;
+      i++;
+    }
+    return out;
   }
 
   // F3-R3-03 closure: run the same forbidden-API scan over inline scripts AND renderer/js files.
