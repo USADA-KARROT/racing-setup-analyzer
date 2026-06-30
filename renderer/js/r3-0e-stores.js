@@ -321,7 +321,12 @@
           stores: [STORE_NAMES.FOLLOWUP_LINKS_BY_CASE],
           reads: [{ store: STORE_NAMES.FOLLOWUP_LINKS_BY_CASE, key: parentCaseId }],
           compute: function (reads) {
-            return { writes: [], result: (reads[0] && reads[0].linkIds) ? reads[0].linkIds.slice() : [] };
+            var idx = reads[0];
+            // Codex E2-R2-01 closure: validate the reverse-index row itself.
+            if (idx === undefined || idx === null) return { writes: [], result: [] };
+            if (idx.parentCaseId !== parentCaseId) throw _err('R3_0E_LINK_CORRUPTED', { detail: 'reverse-index parentCaseId mismatch' });
+            if (!Array.isArray(idx.linkIds)) throw _err('R3_0E_LINK_CORRUPTED', { detail: 'reverse-index linkIds not array' });
+            return { writes: [], result: idx.linkIds.slice() };
           },
         }).then(function (linkIds) {
           if (!linkIds.length) return [];
@@ -332,10 +337,18 @@
             reads: readSpec,
             compute: function (reads) {
               // Codex E2-R1-02 closure: validate every fetched link before returning.
+              // Codex E2-R2-01 closure: ALSO verify each validated link's parentCaseId
+              // matches the caller-supplied parentCaseId. A poisoned reverse index that
+              // points at another parent's valid link is rejected as corruption rather
+              // than silently leaked across parent boundaries.
               var out = [];
               for (var i = 0; i < reads.length; i++) {
                 var validated = _validateOne(reads[i]);
-                if (validated !== null) out.push(validated);
+                if (validated === null) continue;
+                if (validated.parentCaseId !== parentCaseId) {
+                  throw _err('R3_0E_LINK_CORRUPTED', { detail: 'reverse-index points at link with mismatched parentCaseId' });
+                }
+                out.push(validated);
               }
               return { writes: [], result: out };
             },

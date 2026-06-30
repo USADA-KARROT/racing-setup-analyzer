@@ -298,6 +298,42 @@ function runR1Closures() {
     var path3Ok = false;
     try { await store.create(bad3); } catch (e) { path3Ok = e.code === 'R3_0E_LINK_INVALID'; }
     chk('H3c: path-shaped followUpCaseId rejected', path3Ok);
+
+    // Section I — Codex E2 R2 closures
+    console.log('Section I — Codex E2 R2 closures');
+    // I1 — poisoned reverse index: idx.parentCaseId mismatch → corruption.
+    var backend2 = createMemoryBackend();
+    await backend2.put('r3_0e_followupLinksByCase', 'case_I1', {
+      parentCaseId: 'WRONG_PARENT', linkIds: ['link_x'],
+    });
+    var store2 = STORES.createFollowUpLinkStore(backend2);
+    var ok = false;
+    try { await store2.listForParent('case_I1'); } catch (e) { ok = e.code === 'R3_0E_LINK_CORRUPTED'; }
+    chk('I1a: reverse-index with mismatched parentCaseId rejected', ok);
+
+    // I2 — reverse index points at a valid link belonging to a DIFFERENT parent.
+    var backend3 = createMemoryBackend();
+    // Create link for case_real_parent
+    var goodLink = { schemaVersion: 1, linkId: 'link_I2', parentCaseId: 'case_real_parent',
+                     followUpCaseId: 'case_child', experimentId: 'exp_z',
+                     parentStatus: 'present', createdAt: '2026-06-30T10:00:00Z' };
+    await backend3.put('r3_0e_followupLinks', 'link_I2', goodLink);
+    // Poison reverse index: case_attacker_parent points at link_I2.
+    await backend3.put('r3_0e_followupLinksByCase', 'case_attacker_parent', {
+      parentCaseId: 'case_attacker_parent', linkIds: ['link_I2'],
+    });
+    var store3 = STORES.createFollowUpLinkStore(backend3);
+    var ok2 = false;
+    try { await store3.listForParent('case_attacker_parent'); } catch (e) { ok2 = e.code === 'R3_0E_LINK_CORRUPTED'; }
+    chk('I1b: reverse-index pointing at link with mismatched parentCaseId rejected', ok2);
+
+    // I3 — non-array linkIds in reverse index → corruption.
+    var backend4 = createMemoryBackend();
+    await backend4.put('r3_0e_followupLinksByCase', 'case_I3', { parentCaseId: 'case_I3', linkIds: 'not-an-array' });
+    var store4 = STORES.createFollowUpLinkStore(backend4);
+    var ok3 = false;
+    try { await store4.listForParent('case_I3'); } catch (e) { ok3 = e.code === 'R3_0E_LINK_CORRUPTED'; }
+    chk('I1c: reverse-index with non-array linkIds rejected', ok3);
   })().then(function () {
     console.log('R3.0E E2 stores suite: ' + pass + ' passed, ' + fail + ' failed');
     if (fail > 0) process.exit(1);
