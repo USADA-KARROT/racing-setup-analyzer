@@ -95,8 +95,11 @@ try {
   for (var i = 0; i < allSources.length; i++) {
     var src = allSources[i].src;
     var srcName = allSources[i].name;
-    // Find lines like `.innerHTML = X` where X is NOT a string literal
-    var lines = src.split(/\n/);
+    // F3-R12-01 closure: collapse multi-line assignment patterns before line-by-line scanning.
+    // A pattern like `element.innerHTML =\n  case.title;` would otherwise split into two lines
+    // with no detectable assignment. Join any line ending with `=` to the next line.
+    var collapsed = src.replace(/=\s*\r?\n\s*/g, '= ');
+    var lines = collapsed.split(/\n/);
     for (var l = 0; l < lines.length; l++) {
       var line = lines[l];
       // F3-R9-04 closure: accept assignments terminated by `;`, `)`, end-of-line, OR end-of-input.
@@ -233,8 +236,10 @@ try {
       unsafeApis.push(srcName2 + ': new Function with non-literal arg → ' + nfMatches[nfi].slice(0, 60));
     }
 
+    // F3-R12-01: collapse multi-line assignments for outerHTML/computed scans too.
+    var sCollapsed = s.replace(/=\s*\r?\n\s*/g, '= ');
     // (iii) variable-RHS outerHTML/innerHTML assignment via dot OR computed access
-    var lines2 = s.split(/\n/);
+    var lines2 = sCollapsed.split(/\n/);
     for (var l2 = 0; l2 < lines2.length; l2++) {
       var line2 = lines2[l2];
       // F3-R9-04 closure: also accept end-of-line termination (ASI).
@@ -374,13 +379,24 @@ try {
     // The bare property-access carve-out reflects the existing production pattern where
     // tierBadge/credBadge receive enum-constrained values (e.g., c.tier in {physics,model,
     // heuristic}). The helpers themselves are pure functions of these enums plus i18n lookups.
+    // F3-R12-02 closure: badge-helper args must come from an EXACT allowlist of
+    // production-known enum-authoritative property chains. A bare-chain-allow rule lets
+    // future contributors funnel user-typed fields (`case.title`) through approved helpers.
+    // Exhaustive grep of all bare-chain args used by tierBadge / credBadge in renderer/index.html
+    // at this SHA. Adding a new arg requires updating this allowlist (forces explicit review).
+    var BADGE_ARG_ALLOWED_CHAINS = [
+      'c.tier',
+      'l',
+      'analysisView.setupInputs.frontWheelRate.credibility',
+      'analysisView.setupInputs.rearWheelRate.credibility',
+      'analysisView.setupInputs.frontArb.credibility',
+      'analysisView.setupInputs.rearArb.credibility'
+    ];
     function isSafeArg(arg) {
       if (isSafeStringLiteral(arg)) return true;
-      // F3-R10-02: if rule is literal-only (e.g., t()), the function returns at this point —
-      // bare property access is NOT safe because `t(case.title)` would echo back unknown keys.
       if (rule === 'literal-only') return false;
-      // Otherwise (credBadge/tierBadge): bare identifier / dot-chain property access OK.
-      if (/^[a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)*$/.test(arg)) return true;
+      // F3-R12-02: badge helpers — bare property chain ONLY if it's in the exact allowlist.
+      if (BADGE_ARG_ALLOWED_CHAINS.indexOf(arg) !== -1) return true;
       // Ternary `<cond> ? <left> : <right>` where both branches are themselves safe args.
       // Use a depth-aware splitter so nested ternaries are handled correctly.
       var qIdx = -1;
