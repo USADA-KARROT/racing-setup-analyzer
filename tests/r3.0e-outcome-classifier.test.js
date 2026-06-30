@@ -935,6 +935,207 @@ console.log('Section U — Codex E3 R1 closures');
     r.valid === true && r.outcome['class'] === 'confirmed');
 })();
 
+// ==================================================================
+// Section V — Codex E3 R2 closures (E3-R2-01..03)
+// ==================================================================
+console.log('Section V — Codex E3 R2 closures');
+
+// V1 — E3-R2-01: sideEffects[].i18nKey enforced to strict i18n grammar
+(function () {
+  var hostileKeys = [
+    'driver caused the crash',                  // free text with space
+    '/Users/skyline/raw.bmsbin',                // path
+    '..\\etc\\passwd',                          // path traversal
+    'Blame',                                    // capital + single segment
+    '',                                         // empty
+    'r3 0e foo',                                // spaces
+  ];
+  for (var i = 0; i < hostileKeys.length; i++) {
+    var key = hostileKeys[i];
+    var r = CL.classifyOutcome(makeInput({
+      observationOverrides: { sideEffects: [{ i18nKey: key, params: null }] },
+    }), { clock: fixedClock() });
+    chk('V1.' + (i + 1) + ': hostile sideEffects i18nKey rejected: ' + JSON.stringify(key).slice(0, 40),
+      r.valid !== true);
+  }
+})();
+(function () {
+  // Valid i18n key still accepted
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { sideEffects: [{ i18nKey: 'r3.0e.side.tyre_wear_increase', params: null }] },
+  }), { clock: fixedClock() });
+  chk('V1.valid: well-formed sideEffects i18nKey accepted',
+    r.valid === true && r.outcome.sideEffects.length === 1
+      && r.outcome.sideEffects[0].i18nKey === 'r3.0e.side.tyre_wear_increase');
+})();
+
+// V2 — E3-R2-02: sideEffects[].params restricted to number/boolean/null primitives
+(function () {
+  // String value in params → BLOCK (laundering vector)
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { sideEffects: [
+      { i18nKey: 'r3.0e.side.ok', params: { blame: 'driver caused crash' } },
+    ] },
+  }), { clock: fixedClock() });
+  chk('V2.1: sideEffects.params string value → BLOCK',
+    r.valid !== true);
+})();
+(function () {
+  // Path-like string in params value → BLOCK
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { sideEffects: [
+      { i18nKey: 'r3.0e.side.ok', params: { path: '/Users/skyline/raw.bmsbin' } },
+    ] },
+  }), { clock: fixedClock() });
+  chk('V2.2: sideEffects.params path-string value → BLOCK',
+    r.valid !== true);
+})();
+(function () {
+  // Nested object in params → BLOCK
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { sideEffects: [
+      { i18nKey: 'r3.0e.side.ok', params: { nested: { evil: 1 } } },
+    ] },
+  }), { clock: fixedClock() });
+  chk('V2.3: sideEffects.params nested object → BLOCK',
+    r.valid !== true);
+})();
+(function () {
+  // Array in params → BLOCK (raw telemetry laundering)
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { sideEffects: [
+      { i18nKey: 'r3.0e.side.ok', params: { rawTelemetry: [1, 2, 3] } },
+    ] },
+  }), { clock: fixedClock() });
+  chk('V2.4: sideEffects.params array value (raw telemetry) → BLOCK',
+    r.valid !== true);
+})();
+(function () {
+  // Non-finite number → BLOCK
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { sideEffects: [
+      { i18nKey: 'r3.0e.side.ok', params: { delta: Infinity } },
+    ] },
+  }), { clock: fixedClock() });
+  chk('V2.5: sideEffects.params non-finite number → BLOCK',
+    r.valid !== true);
+})();
+(function () {
+  // Symbol-keyed params → BLOCK
+  var p = {};
+  p[Symbol('s')] = 1;
+  p.delta_pct = 5.0;
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { sideEffects: [
+      { i18nKey: 'r3.0e.side.ok', params: p },
+    ] },
+  }), { clock: fixedClock() });
+  chk('V2.6: sideEffects.params Symbol-keyed → BLOCK',
+    r.valid !== true);
+})();
+(function () {
+  // Non-sober param key (capitals / spaces) → BLOCK
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { sideEffects: [
+      { i18nKey: 'r3.0e.side.ok', params: { 'BlameTarget': 0 } },
+    ] },
+  }), { clock: fixedClock() });
+  chk('V2.7: sideEffects.params capital-keyed → BLOCK',
+    r.valid !== true);
+})();
+(function () {
+  // Valid primitives: number / boolean / null accepted
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { sideEffects: [
+      { i18nKey: 'r3.0e.side.tyre_wear', params: { delta_pct: 12.5, accelerated: true, prior_run: null } },
+    ] },
+  }), { clock: fixedClock() });
+  chk('V2.8: sideEffects.params valid primitives accepted',
+    r.valid === true && r.outcome.sideEffects[0].params.delta_pct === 12.5);
+})();
+(function () {
+  // null params still permitted
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { sideEffects: [{ i18nKey: 'r3.0e.side.ok', params: null }] },
+  }), { clock: fixedClock() });
+  chk('V2.9: null sideEffects.params accepted', r.valid === true);
+})();
+
+// V3 — E3-R2-03: experiment.controlVariables sparse / named-key rejected
+(function () {
+  // Sparse declared controlVariables on the experiment object
+  var sparseCv = new Array(2);
+  sparseCv[0] = { name: 'tyre_temp_window', description: 'r3.0e.cv.tyre_temp_window',
+    expectedValue: 85, allowedRange: { min: 75, max: 95 }, observedValue: null, withinRange: null };
+  // index 1 is a hole
+  // We can't pass this through makeExperiment because E1 validateExperimentShape ALSO
+  // walks via getOwnPropertyNames and will accept the sparse-with-1-element through its
+  // own audit. Build the experiment manually, bypassing deepFreeze depth-1 on the array.
+  var raw = {
+    schemaVersion: 1, experimentId: BASE_EXP_ID, sourceCaseId: BASE_CASE,
+    sourceHypothesisId: 'hyp_demo_001', sourceRecommendationId: 'pri_demo_001',
+    targetMetric: 'roll_gradient_deg_per_g', baselineValue: 3.5,
+    expectedDirection: 'decrease', expectedMagnitudeRange: { min: 0.5, max: 1.5 },
+    setupChange: { component: 'front_arb', delta_nm_per_deg: 200 },
+    driverInstruction: null,
+    controlVariables: sparseCv,
+    validationPlan: 'r3.0e.plan.controlled_repeat_lap',
+    stopConditions: [{ i18nKey: 'r3.0e.stop.lap_time_increase', params: { threshold_s: 0.5 } }],
+    status: 'applied', followUpCaseIds: [BASE_FOLLOWUP], outcome: null,
+    createdAt: BASE_EXPERIMENT_TS,
+  };
+  Object.freeze(raw.expectedMagnitudeRange);
+  Object.freeze(raw.setupChange);
+  Object.freeze(raw.stopConditions[0].params);
+  Object.freeze(raw.stopConditions[0]);
+  Object.freeze(raw.stopConditions);
+  Object.freeze(raw.controlVariables[0].allowedRange);
+  Object.freeze(raw.controlVariables[0]);
+  Object.freeze(raw.controlVariables);  // sparse-frozen
+  Object.freeze(raw.followUpCaseIds);
+  Object.freeze(raw);
+  // Provide a complete CV observation for index-0 so the test isolates the sparse issue.
+  var cvObs = [
+    { name: 'tyre_temp_window', description: 'r3.0e.cv.tyre_temp_window',
+      expectedValue: 85, allowedRange: { min: 75, max: 95 }, observedValue: 84, withinRange: true },
+  ];
+  var r = CL.classifyOutcome(makeInput({ experiment: raw, controlVariableObservations: cvObs }),
+    { clock: fixedClock() });
+  chk('V3.1: sparse experiment.controlVariables → BLOCK',
+    r.valid !== true && (r.reasonCodes || []).indexOf('CONTROL_VARIABLES_INVALID') !== -1);
+})();
+(function () {
+  // Named own key on experiment.controlVariables → BLOCK
+  var cv = [];
+  cv.injected = { name: 'injected', description: 'fake', expectedValue: 0, allowedRange: null,
+    observedValue: null, withinRange: null };
+  // cv.length === 0; named key 'injected'
+  Object.freeze(cv);
+  var raw = {
+    schemaVersion: 1, experimentId: BASE_EXP_ID, sourceCaseId: BASE_CASE,
+    sourceHypothesisId: 'hyp_demo_001', sourceRecommendationId: 'pri_demo_001',
+    targetMetric: 'roll_gradient_deg_per_g', baselineValue: 3.5,
+    expectedDirection: 'decrease', expectedMagnitudeRange: { min: 0.5, max: 1.5 },
+    setupChange: { component: 'front_arb', delta_nm_per_deg: 200 },
+    driverInstruction: null, controlVariables: cv,
+    validationPlan: 'r3.0e.plan.controlled_repeat_lap',
+    stopConditions: [{ i18nKey: 'r3.0e.stop.lap_time_increase', params: { threshold_s: 0.5 } }],
+    status: 'applied', followUpCaseIds: [BASE_FOLLOWUP], outcome: null,
+    createdAt: BASE_EXPERIMENT_TS,
+  };
+  Object.freeze(raw.expectedMagnitudeRange);
+  Object.freeze(raw.setupChange);
+  Object.freeze(raw.stopConditions[0].params);
+  Object.freeze(raw.stopConditions[0]);
+  Object.freeze(raw.stopConditions);
+  Object.freeze(raw.followUpCaseIds);
+  Object.freeze(raw);
+  var r = CL.classifyOutcome(makeInput({ experiment: raw, controlVariableObservations: [] }),
+    { clock: fixedClock() });
+  chk('V3.2: named own key on experiment.controlVariables → BLOCK',
+    r.valid !== true);
+})();
+
 // ------------------------------------------------------------------
 // Summary
 // ------------------------------------------------------------------

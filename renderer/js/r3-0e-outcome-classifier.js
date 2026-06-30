@@ -609,23 +609,78 @@
         return RC_E.buildBlockedResult(seR.reasonCodes, { detail: 'sideEffects: ' + seR.detail });
       }
       var sideEffects = seR.snapshot;
-      // Each side-effect must be a plain { i18nKey, params } object (params may be null).
+      // Each side-effect must be a plain { i18nKey, params } object.
+      // Codex E3-R2-01 closure: i18nKey MUST pass the strict i18n grammar — same gate as
+      // driverFeedback — so free-text / blame / causation / path laundering through the
+      // side-effect surface is impossible.
+      // Codex E3-R2-02 closure: params is restricted to a CLOSED primitive allowlist
+      // (null OR plain object whose every value is a finite number / boolean / null).
+      // String values are FORBIDDEN to eliminate any free-text laundering vector. i18n
+      // substitution numerics (thresholds, magnitudes) remain expressible.
+      var SE_KEYS_FROZEN = _CAPTURED_OBJECT_FREEZE(['i18nKey', 'params']);
+      var rebuiltSideEffects = [];
       for (var si = 0; si < sideEffects.length; si++) {
         var se = sideEffects[si];
         if (!_isOriginalPlainObject(se)) {
           return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '] not plain' });
         }
-        var seKeysR = _snapshotPlainShape(se, _CAPTURED_OBJECT_FREEZE(['i18nKey', 'params']), CODES.OUTCOME_INVALID);
+        var seKeysR = _snapshotPlainShape(se, SE_KEYS_FROZEN, CODES.OUTCOME_INVALID);
         if (seKeysR.valid !== true) {
           return RC_E.buildBlockedResult(seKeysR.reasonCodes, { detail: 'sideEffects[' + si + ']: ' + seKeysR.detail });
         }
-        if (!_nonEmptyStr(seKeysR.snapshot.i18nKey)) {
-          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].i18nKey not non-empty' });
+        var seK = seKeysR.snapshot.i18nKey;
+        var seP = seKeysR.snapshot.params;
+        if (!_i18nKeyOk(seK)) {
+          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].i18nKey not strict i18n key' });
         }
-        if (seKeysR.snapshot.params !== null && seKeysR.snapshot.params !== undefined && !_isOriginalPlainObject(seKeysR.snapshot.params)) {
-          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params not plain' });
+        if (seP !== null && seP !== undefined) {
+          if (!_isOriginalPlainObject(seP)) {
+            return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params not plain' });
+          }
+          if (_hasSymbolOwnKey(seP)) {
+            return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.UNKNOWN_OWN_KEY], { detail: 'sideEffects[' + si + '].params has Symbol key' });
+          }
+          var pNames;
+          try { pNames = _CAPTURED_OBJECT_GET_OWN_NAMES(seP); }
+          catch (eDesc) { return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params desc fail' }); }
+          if (pNames.length > 16) {
+            return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.ARRAY_CAP_EXCEEDED], { detail: 'sideEffects[' + si + '].params keys exceed cap' });
+          }
+          for (var pi = 0; pi < pNames.length; pi++) {
+            var pk = pNames[pi];
+            // Codex E3-R2-02 closure: param KEY must itself be a sober identifier
+            // (lower_snake_case, ≤32 chars). No spaces / paths / capitals.
+            if (!/^[a-z][a-z0-9_]{0,31}$/.test(pk)) {
+              return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params key not sober: ' + pk });
+            }
+            var pd;
+            try { pd = _CAPTURED_OBJECT_GET_OWN_DESC(seP, pk); }
+            catch (eDesc2) { return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params desc fail at ' + pk }); }
+            if (!pd || pd.enumerable !== true) {
+              return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params non-enum key ' + pk });
+            }
+            if (typeof pd.get === 'function' || typeof pd.set === 'function') {
+              return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params accessor at ' + pk });
+            }
+            var pv = pd.value;
+            // CLOSED primitive allowlist — number (finite) / boolean / null. NO strings,
+            // NO objects, NO arrays. String values would be the laundering vector.
+            if (pv === null) continue;
+            if (typeof pv === 'boolean') continue;
+            if (typeof pv === 'number') {
+              if (!_isFiniteNumber(pv)) {
+                return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params[' + pk + '] not finite number' });
+              }
+              continue;
+            }
+            return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params[' + pk + '] not in primitive allowlist (number/boolean/null)' });
+          }
         }
+        // Rebuild a clean side-effect record so the outcome envelope carries only the
+        // validated (deep-copied) structure — caller's original reference is dropped.
+        rebuiltSideEffects.push({ i18nKey: seK, params: seP === undefined ? null : seP });
       }
+      sideEffects = rebuiltSideEffects;
       var contraR = _snapshotArrayShape(observation.contradictingEvidenceIds, CODES.OUTCOME_INVALID);
       if (contraR.valid !== true) {
         return RC_E.buildBlockedResult(contraR.reasonCodes, { detail: 'contradictingEvidenceIds: ' + contraR.detail });
@@ -759,7 +814,16 @@
         // Every declared experiment.controlVariables[].name MUST appear in observations.
         // Codex E3-R1-01 closure: presence check uses captured descriptor lookup so an
         // ambient Object.create rebind cannot inject phantom membership.
-        var declaredCv = experiment.controlVariables || [];
+        // Codex E3-R2-03 closure: experiment.controlVariables MUST be dense + index-only
+        // own keys (E1's nested-descriptor audit does not catch sparse arrays — sparse
+        // [] returns only the 'length' own key and slips through). Snapshot via the same
+        // captured-array sweep used for observation arrays so a hostile sparse array
+        // attached to a frozen experiment cannot silently bypass missing-CV detection.
+        var declaredCvR = _snapshotArrayShape(experiment.controlVariables || [], CODES.CONTROL_VARIABLES_INVALID);
+        if (declaredCvR.valid !== true) {
+          return RC_E.buildBlockedResult(declaredCvR.reasonCodes, { detail: 'experiment.controlVariables: ' + declaredCvR.detail });
+        }
+        var declaredCv = declaredCvR.snapshot;
         for (var dci = 0; dci < declaredCv.length; dci++) {
           var declared = declaredCv[dci];
           if (declared === null || typeof declared !== 'object') continue;
