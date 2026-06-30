@@ -98,6 +98,14 @@
   var _STR_TO_LOWER = String.prototype.toLowerCase;
   var _STR_INDEX_OF = String.prototype.indexOf;
   var _RE_TEST = RegExp.prototype.test;
+  // Codex E4-R6-01 closure: capture String.prototype.charCodeAt so hash derivation
+  // is immune to post-load String.prototype.charCodeAt tampering. The deterministic
+  // linkId/eventId/projectionId derivation must not depend on mutable string methods.
+  var _STR_CHAR_CODE_AT = String.prototype.charCodeAt;
+  function _charCodeAt(s, i) {
+    if (typeof s !== 'string') return 0;
+    try { return _CAPTURED_REFLECT_APPLY(_STR_CHAR_CODE_AT, s, [i]); } catch (e) { return 0; }
+  }
   function _wsAdd(s, v) { try { _CAPTURED_REFLECT_APPLY(_WS_ADD, s, [v]); return true; } catch (e) { return false; } }
   function _wsHas(s, v) { try { return _CAPTURED_REFLECT_APPLY(_WS_HAS, s, [v]) === true; } catch (e) { return false; } }
   function _arrPush(a, v) { try { _CAPTURED_REFLECT_APPLY(_ARR_PUSH, a, [v]); return true; } catch (e) { return false; } }
@@ -278,7 +286,9 @@
     var h = 0x811c9dc5;
     var len = typeof s === 'string' ? s.length : 0;
     for (var i = 0; i < len; i++) {
-      h ^= s.charCodeAt(i);
+      // Codex E4-R6-01 closure: captured charCodeAt prevents post-load tampering
+      // from changing deterministic id derivation.
+      h ^= _charCodeAt(s, i);
       h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
     }
     return _toHex8(h);

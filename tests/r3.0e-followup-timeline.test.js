@@ -818,6 +818,28 @@ console.log('Section U — Codex E4 R5 closure (padStart tamper resistance)');
     parsed);
 })();
 
+// ==================================================================
+// Section V — Codex E4 R6 closure (E4-R6-01) — charCodeAt tamper resistance
+// ==================================================================
+console.log('Section V — Codex E4 R6 closure (charCodeAt tamper resistance)');
+
+(function () {
+  var out = runChildProbe('async function(){'
+    + 'var origCC=String.prototype.charCodeAt;'
+    + 'var svc1=mkService();'
+    + 'var rBase=await svc1.createFollowUpLink({parentCaseId:"case_demo_a",followUpCaseId:"case_demo_b",experimentId:"exp_0123456789abcdef"},{clock:function(){return "2026-06-30T11:00:00Z";}});'
+    + 'String.prototype.charCodeAt=function(){return 0;};'
+    + 'var svc2=mkService();'
+    + 'var rTampered=await svc2.createFollowUpLink({parentCaseId:"case_demo_a",followUpCaseId:"case_demo_b",experimentId:"exp_0123456789abcdef"},{clock:function(){return "2026-06-30T11:00:00Z";}});'
+    + 'String.prototype.charCodeAt=origCC;'
+    + 'process.stdout.write(JSON.stringify({base:rBase.link&&rBase.link.linkId,tampered:rTampered.link&&rTampered.link.linkId,same:rBase.link&&rTampered.link&&rBase.link.linkId===rTampered.link.linkId}));'
+    + '}');
+  var parsed = JSON.parse(out.trim());
+  chk('V1: String.prototype.charCodeAt rebind does NOT change linkId',
+    parsed.same === true,
+    parsed);
+})();
+
 // ------------------------------------------------------------------
 // Summary
 // ------------------------------------------------------------------
