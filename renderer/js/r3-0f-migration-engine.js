@@ -109,6 +109,7 @@
   // (NOT via .call — that would still go through ambient Function.prototype.call). Reflect.apply
   // is invoked as a direct function call, never via property lookup.
   var _ReflectApply            = Reflect.apply;
+  var _StringFromCharCode      = String.fromCharCode;
   var _StringProtoCharCodeAt   = String.prototype.charCodeAt;
   var _StringProtoReplace      = String.prototype.replace;
   var _StringProtoNormalize    = String.prototype.normalize;
@@ -331,11 +332,97 @@
     return true;
   }
 
-  // F1-R1-02 / F1-R14-01: structured-clone-only firewall + JSON-safety walker. If structuredClone
-  // is unavailable OR throws on the input, the record is REJECTED. We then walk the cloned tree
-  // and reject any non-plain-JSON value (BigInt / Date / Map / Set / typed array / function /
-  // symbol / NaN / Infinity / non-plain prototype). Only THEN do we JSON.stringify, which is now
-  // proven trap-free because no toJSON hook is reachable.
+  // F1-R19-01: trap-free own-key serializer. JSON.stringify invokes any `toJSON` it can find via
+  // the prototype chain — including a hostile `Object.prototype.toJSON` installed after engine
+  // load. This serializer walks own enumerable keys directly (via captured _ObjectKeys) and
+  // emits JSON without consulting toJSON at any point. Bounded depth 256. Returns a JSON string
+  // OR null on failure (cycle / unsupported value). Caller must have already validated input via
+  // _isJsonSafe (so only null / boolean / finite number / string / plain object / array reach).
+  function _safeJsonStringify(v, depth) {
+    if (depth === undefined) depth = 0;
+    if (depth > 256) return null;
+    if (v === null) return 'null';
+    var t = typeof v;
+    if (t === 'boolean') return v ? 'true' : 'false';
+    if (t === 'number') {
+      if (!_isFinite(v)) return null;
+      // Use ambient Number→string conversion via _safeToString16-style approach is overkill;
+      // simple coercion is safe here because _isJsonSafe already rejected NaN/Infinity, and
+      // primitive number stringification does not invoke prototype methods on the number.
+      return '' + v;
+    }
+    if (t === 'string') {
+      // Escape per JSON RFC 8259 §7. Walk char-by-char using captured charCodeAt; emit using
+      // string concatenation (no prototype methods on the result string).
+      var out = '"';
+      for (var i = 0; i < v.length; i++) {
+        var c = _safeCharCodeAt(v, i);
+        if (c === 0x22) out += '\\"';        // "
+        else if (c === 0x5C) out += '\\\\';   // backslash
+        else if (c === 0x08) out += '\\b';
+        else if (c === 0x09) out += '\\t';
+        else if (c === 0x0A) out += '\\n';
+        else if (c === 0x0C) out += '\\f';
+        else if (c === 0x0D) out += '\\r';
+        else if (c < 0x20) {
+          var h = _safeToString16(c);
+          while (h.length < 4) h = '0' + h;
+          out += '\\u' + h;
+        } else if (c >= 0xD800 && c <= 0xDFFF) {
+          // Lone surrogate — _isJsonSafe should have rejected via _DEFANG_RE on key paths but
+          // primitive string VALUES with lone surrogates may survive. Emit as \uXXXX escape.
+          var hs = _safeToString16(c);
+          while (hs.length < 4) hs = '0' + hs;
+          out += '\\u' + hs;
+        } else {
+          // Build single-char string via String.fromCharCode (intrinsic — closure-captured)
+          out += _StringFromCharCode(c);
+        }
+      }
+      return out + '"';
+    }
+    if (t !== 'object') return null; // function / bigint / symbol / undefined → unsupported
+    if (_ArrayIsArray(v)) {
+      var parts = [];
+      for (var ai = 0; ai < v.length; ai++) {
+        var elem = _safeJsonStringify(v[ai], depth + 1);
+        if (elem === null) return null;
+        parts[parts.length] = elem;
+      }
+      // Join with comma using string concatenation (no Array.prototype.join — could be tampered).
+      var arrStr = '[';
+      for (var pj = 0; pj < parts.length; pj++) {
+        if (pj > 0) arrStr += ',';
+        arrStr += parts[pj];
+      }
+      return arrStr + ']';
+    }
+    // Plain object: walk own enumerable keys
+    var keys = _ObjectKeys(v);
+    var entries = [];
+    for (var ki = 0; ki < keys.length; ki++) {
+      var k = keys[ki];
+      var keyStr = _safeJsonStringify(k, depth + 1);
+      if (keyStr === null) return null;
+      var valStr = _safeJsonStringify(v[k], depth + 1);
+      if (valStr === null) return null;
+      entries[entries.length] = keyStr + ':' + valStr;
+    }
+    var objStr = '{';
+    for (var ej = 0; ej < entries.length; ej++) {
+      if (ej > 0) objStr += ',';
+      objStr += entries[ej];
+    }
+    return objStr + '}';
+  }
+
+  // F1-R1-02 / F1-R14-01 / F1-R19-01: structured-clone-only firewall + JSON-safety walker +
+  // trap-free serializer. If structuredClone is unavailable OR throws on the input, the record
+  // is REJECTED. We then walk the cloned tree and reject any non-plain-JSON value (BigInt / Date /
+  // Map / Set / typed array / function / symbol / NaN / Infinity / non-plain prototype). The
+  // post-clone JSON serialization uses _safeJsonStringify (trap-free) instead of JSON.stringify
+  // so hostile Object.prototype.toJSON / Array.prototype.toJSON / inherited toJSON hooks added
+  // AFTER module load cannot fire.
   function _sanitize(rec, maxBytes) {
     if (rec === null || rec === undefined) return { ok: false, reason: 'RECORD_NOT_AN_OBJECT' };
     if (typeof rec !== 'object') return { ok: false, reason: 'RECORD_NOT_AN_OBJECT' };
@@ -347,8 +434,9 @@
     // arrays/Symbol/Function/NaN/Infinity/non-plain prototypes). Reject before JSON.stringify so
     // no toJSON hook is reachable.
     if (!_isJsonSafe(cloned)) return { ok: false, reason: 'RECORD_CIRCULAR' };
-    var serialized;
-    try { serialized = _JSONStringify(cloned); } catch (_) { return { ok: false, reason: 'RECORD_CIRCULAR' }; }
+    // F1-R19-01: use trap-free _safeJsonStringify instead of JSON.stringify, so a hostile
+    // Object.prototype.toJSON / inherited toJSON cannot be invoked during serialization.
+    var serialized = _safeJsonStringify(cloned);
     if (typeof serialized !== 'string') return { ok: false, reason: 'RECORD_CIRCULAR' };
     if (serialized.length > maxBytes) return { ok: false, reason: 'RECORD_TOO_LARGE', bytes: serialized.length };
     var final;
@@ -443,8 +531,8 @@
     } catch (_) { return null; }
     if (cloned !== null && typeof cloned === 'object' && !_isJsonSafe(cloned)) return null;
     if (typeof cloned !== 'object' && cloned !== null && typeof cloned !== 'string' && typeof cloned !== 'number' && typeof cloned !== 'boolean') return null;
-    var s;
-    try { s = _JSONStringify(cloned); } catch (_) { return null; }
+    // F1-R19-01: trap-free serialization
+    var s = _safeJsonStringify(cloned);
     return typeof s === 'string' ? _hash(s) : null;
   }
 
@@ -704,7 +792,8 @@
             counts.noop += 1;
             continue;
           }
-          var hash = _hash(_JSONStringify(postSan.value));
+          // F1-R19-01: hash from trap-free serializer (already validated via _isJsonSafe upstream)
+          var hash = _hash(_safeJsonStringify(postSan.value));
           // F1-R2-01 / F1-R10-02: source hash uses the ALREADY-CAPTURED value (no second
           // accessor fire on row.value), routed through _sanitizedHash which structured-clones
           // before serialization. Same canonical form on both sides of the TOCTOU window.

@@ -1795,6 +1795,40 @@ asyncCase('F1-R14-01 negative: legitimate ASCII-only record with nested object s
   chk('F1-R18-01: no orphan migrated data without journal entry under .push poison', !(result.dataPersisted && result.migratedClaim === 0));
 })();
 
+// F1-R19-01: trap-free _safeJsonStringify replaces JSON.stringify on all serialization paths
+// (sanitize / sourceHash / recordHash). Hostile Object.prototype.toJSON added AFTER engine
+// load can no longer rewrite source records during sanitize-time serialization.
+(function () {
+  var cp = require('child_process');
+  var script = "'use strict';\n" +
+    "var ENG = require(" + JSON.stringify(_path.join(_repo, 'renderer/js/r3-0f-migration-engine.js')) + ");\n" +
+    "var SB = require(" + JSON.stringify(_path.join(_repo, 'renderer/js/storage-backend.js')) + ");\n" +
+    "Object.prototype.toJSON = function () {\n" +
+    "  if (this && this.schemaVersion === 99 && this.caseId === 'future') {\n" +
+    "    return { schemaVersion: 1, caseId: this.caseId };\n" +
+    "  }\n" +
+    "  return this;\n" +
+    "};\n" +
+    "(async function () {\n" +
+    "  var b = SB.MemoryBackend();\n" +
+    "  await b.put('cases', 'future', { schemaVersion: 99, caseId: 'future' });\n" +
+    "  var res = await ENG.createMigrationEngine({ backend: b, stamp: '2026-07-01T00:00:00.000Z' }).migrate({ confirm: true });\n" +
+    "  var persisted = await b.get('cases', 'future');\n" +
+    "  delete Object.prototype.toJSON;\n" +
+    "  process.stdout.write(JSON.stringify({\n" +
+    "    rejected: res.report.perStore.cases.rejected,\n" +
+    "    migrated: res.report.perStore.cases.migrated,\n" +
+    "    noop: res.report.perStore.cases.noop,\n" +
+    "    persistedSchemaVersion: persisted && persisted.schemaVersion\n" +
+    "  }));\n" +
+    "})();\n";
+  var out = cp.execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' });
+  var result = JSON.parse(out);
+  chk('F1-R19-01: future-version record still rejected (toJSON bypass blocked)', result.rejected === 1);
+  chk('F1-R19-01: future-version record NOT migrated under hostile Object.prototype.toJSON', result.migrated === 0);
+  chk('F1-R19-01: persisted schemaVersion still 99 (source untouched)', result.persistedSchemaVersion === 99);
+})();
+
 asyncCase('F1-R13-01 negative: legitimate at-target migration still works', function () {
   var b = SB.MemoryBackend();
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
