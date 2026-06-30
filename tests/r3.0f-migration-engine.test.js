@@ -1902,6 +1902,43 @@ asyncCase('F1-R20-01: nested accessor in record value also rejected', function (
   chk('F1-R21-01: zero records migrated under preflight halt', result.casesMigrated === 0);
 })();
 
+// F1-R22-01: capture Promise.prototype.then + .catch at module load via _safeThen / _safeCatch
+// helpers that invoke via captured Reflect.apply. Runtime-poisoned Promise.prototype.then cannot
+// rewrite resolved values delivered to engine callbacks.
+(function () {
+  var cp = require('child_process');
+  var script = "'use strict';\n" +
+    "var ENG = require(" + JSON.stringify(_path.join(_repo, 'renderer/js/r3-0f-migration-engine.js')) + ");\n" +
+    "var SB = require(" + JSON.stringify(_path.join(_repo, 'renderer/js/storage-backend.js')) + ");\n" +
+    "(async function () {\n" +
+    "  var b = SB.MemoryBackend();\n" +
+    "  for (var i = 0; i < 50; i++) await b.put('cases', 'c' + i, { schemaVersion: 1, caseId: 'c' + i });\n" +
+    // Poison Promise.prototype.then AFTER engine load: rewrite non-empty arrays to []
+    "  var origThen = Promise.prototype.then;\n" +
+    "  Promise.prototype.then = function (onFulfilled, onRejected) {\n" +
+    "    var t = function (v) {\n" +
+    "      if (Array.isArray(v) && v.length > 0) return onFulfilled ? onFulfilled([]) : [];\n" +
+    "      return onFulfilled ? onFulfilled(v) : v;\n" +
+    "    };\n" +
+    "    return origThen.call(this, t, onRejected);\n" +
+    "  };\n" +
+    "  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (r) {\n" +
+    "    return { ok: true, record: { schemaVersion: 1, caseId: r.caseId, x: 1 }, migrations: ['delta'] };\n" +
+    "  } } };\n" +
+    "  var res = await ENG.createMigrationEngine({ backend: b, registry: registry, maxJournalEntries: 5, stamp: '2026-07-01T00:00:00.000Z' }).migrate({ confirm: true });\n" +
+    "  Promise.prototype.then = origThen;\n" +
+    "  process.stdout.write(JSON.stringify({\n" +
+    "    ok: res.ok,\n" +
+    "    reasonCode: res.reasonCode || null,\n" +
+    "    status: res.report.status\n" +
+    "  }));\n" +
+    "})();\n";
+  var out = cp.execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' });
+  var result = JSON.parse(out);
+  chk('F1-R22-01: Promise.prototype.then poison cannot bypass JOURNAL_OVERFLOW preflight', result.ok === false && result.reasonCode === 'JOURNAL_OVERFLOW');
+  chk('F1-R22-01: status=halted', result.status === 'halted');
+})();
+
 asyncCase('F1-R13-01 negative: legitimate at-target migration still works', function () {
   var b = SB.MemoryBackend();
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {

@@ -121,6 +121,19 @@
   var _PromiseAll              = Promise.all.bind(Promise);
   var _PromiseResolve          = Promise.resolve.bind(Promise);
   var _PromiseReject           = Promise.reject.bind(Promise);
+  // F1-R22-01: capture Promise.prototype.then and Promise.prototype.catch. Ambient .then
+  // poisoning can rewrite resolved values delivered to engine callbacks (e.g. transforming
+  // [50] → [] right before the JOURNAL_OVERFLOW preflight reads them). _safeThen / _safeCatch
+  // route every engine-owned promise transition through captured Reflect.apply + captured
+  // Promise.prototype.then / Promise.prototype.catch so the ambient prototype cannot intercept.
+  var _PromiseProtoThen        = Promise.prototype.then;
+  var _PromiseProtoCatch       = Promise.prototype.catch;
+  function _safeThen(p, onFulfilled, onRejected) {
+    return _ReflectApply(_PromiseProtoThen, p, onRejected === undefined ? [onFulfilled] : [onFulfilled, onRejected]);
+  }
+  function _safeCatch(p, onRejected) {
+    return _ReflectApply(_PromiseProtoCatch, p, [onRejected]);
+  }
   // F1-R18-01: avoid ambient Array.prototype.push on commit-critical arrays. Index-assignment
   // bypasses the prototype chain (assignment to arr[arr.length] uses the internal length slot,
   // not the .push method). Returns the new length.
@@ -647,7 +660,7 @@
     function envelope() { return ENV.buildEnvelope(); }
 
     function _readState() {
-      return backend.get(META, STATE_KEY).then(function (st) {
+      return _safeThen(backend.get(META, STATE_KEY), function (st) {
         if (!_isPlainObject(st)) return null;
         return st;
       }, function () { return null; });
@@ -656,7 +669,7 @@
     // poisoned slice cannot return [] while the underlying journal is non-empty (which would
     // cause priorJournalHash drift vs the in-transact re-read, but harden up front anyway).
     function _readJournal() {
-      return backend.get(META, JOURNAL_KEY).then(function (j) {
+      return _safeThen(backend.get(META, JOURNAL_KEY), function (j) {
         var src = null;
         if (_ArrayIsArray(j)) src = j;
         else if (_isPlainObject(j) && _ArrayIsArray(j.entries)) src = j.entries;
@@ -668,7 +681,7 @@
     }
 
     function journal() {
-      return _readJournal().then(function (entries) {
+      return _safeThen(_readJournal(), function (entries) {
         var out = [];
         for (var i = 0; i < entries.length; i++) {
           var v = ENV.validateJournalEntry(entries[i]);
@@ -685,7 +698,7 @@
       for (var i = 0; i < KNOWN_STORES.length; i++) {
         (function (storeKey) {
           var mg = registry[storeKey];
-          _safePush(promises, backend.list(storeKey).then(function (rows) {
+          _safePush(promises, _safeThen(backend.list(storeKey), function (rows) {
             rows = _ArrayIsArray(rows) ? rows : [];
             var counts = { records: rows.length, atTarget: 0, belowTarget: 0, futureVersion: 0, malformed: 0 };
             for (var r = 0; r < rows.length; r++) {
@@ -713,8 +726,8 @@
           }));
         })(KNOWN_STORES[i]);
       }
-      return _PromiseAll(promises).then(function () {
-        return _readState().then(function (st) {
+      return _safeThen(_PromiseAll(promises), function () {
+        return _safeThen(_readState(), function (st) {
           var currentEnvelope = st && _isPlainObject(st.envelope) ? st.envelope : null;
           var envMismatch = false;
           if (currentEnvelope) {
@@ -734,7 +747,7 @@
     }
 
     function plan() {
-      return detect().then(function (det) {
+      return _safeThen(detect(), function (det) {
         var steps = [], blockers = [], perStoreSummary = {};
         for (var i = 0; i < KNOWN_STORES.length; i++) {
           var sk = KNOWN_STORES[i];
@@ -767,7 +780,7 @@
     // Pre-compute per-store work outside any transact. Returns { storeKey, counts, writes, entries }.
     function _computeStoreWork(storeKey, now) {
       var mg = registry[storeKey];
-      return backend.list(storeKey).then(function (rows) {
+      return _safeThen(backend.list(storeKey), function (rows) {
         rows = _ArrayIsArray(rows) ? rows : [];
         var writes = [];
         var entries = [];
@@ -900,7 +913,7 @@
         }));
       }
       var startedAt = _now(clock, stamp);
-      return _readState().then(function (st) {
+      return _safeThen(_readState(), function (st) {
         // F1-R1-06: validate the persisted envelope structurally (not just engineVersion number)
         if (st && _isPlainObject(st.envelope)) {
           var ev = ENV.validateEnvelope(st.envelope);
@@ -938,10 +951,10 @@
         var listP = [];
         for (var i = 0; i < KNOWN_STORES.length; i++) {
           (function (sk) {
-            _safePush(listP, backend.list(sk).then(function (rows) { return _ArrayIsArray(rows) ? rows.length : 0; }, function () { return 0; }));
+            _safePush(listP, _safeThen(backend.list(sk), function (rows) { return _ArrayIsArray(rows) ? rows.length : 0; }, function () { return 0; }));
           })(KNOWN_STORES[i]);
         }
-        return _PromiseAll(listP).then(function (counts) {
+        return _safeThen(_PromiseAll(listP), function (counts) {
           var totalRecords = 0;
           for (var j = 0; j < counts.length; j++) totalRecords += counts[j];
           if (totalRecords > MAX_JOURNAL * JOURNAL_OVERFLOW_FACTOR) {
@@ -956,12 +969,12 @@
           var p = _PromiseResolve();
           for (var k = 0; k < KNOWN_STORES.length; k++) {
             (function (sk) {
-              p = p.then(function () {
-                return _computeStoreWork(sk, _now(clock, stamp)).then(function (res) { _safePush(perStoreResults, res); });
+              p = _safeThen(p, function () {
+                return _safeThen(_computeStoreWork(sk, _now(clock, stamp)), function (res) { _safePush(perStoreResults, res); });
               });
             })(KNOWN_STORES[k]);
           }
-          return p.then(function () { return _commit(perStoreResults, startedAt, priorDropped, st); });
+          return _safeThen(p, function () { return _commit(perStoreResults, startedAt, priorDropped, st); });
         });
       });
     }
@@ -1008,7 +1021,7 @@
       }
 
       // Read prior journal, append new entries, compact, build state.
-      return _readJournal().then(function (priorJournal) {
+      return _safeThen(_readJournal(), function (priorJournal) {
         // F1-R17-01: build compactedJournal with plain index loops instead of
         // priorJournal.concat / .slice. Ambient Array.prototype.concat or .slice poisoning
         // could otherwise return only priorJournal (or []) while META state still claims
@@ -1069,7 +1082,7 @@
         _safePush(readsSpec, { store: META, key: JOURNAL_KEY });
         _safePush(readsSpec, { store: META, key: STATE_KEY });
 
-        return backend.transact({
+        return _safeThen(backend.transact({
           stores: storesList,
           reads: readsSpec,
           compute: function (readValues) {
@@ -1122,7 +1135,7 @@
               result: { journalLen: compactedJournal.length, dropped: totalDropped, dataWrites: sanitizedDataWrites.length }
             };
           }
-        }).then(function (r) {
+        }), function (r) {
           // F1-R1-10: validate return shape strictly.
           if (!_isPlainObject(r) || !_NumberIsSafeInteger(r.journalLen) || r.journalLen < 0 ||
               !_NumberIsSafeInteger(r.dropped) || r.dropped < 0 || !_NumberIsSafeInteger(r.dataWrites) || r.dataWrites < 0) {
@@ -1170,11 +1183,13 @@
       });
     }
 
-    // F1-R2-01: serialize concurrent migrate() calls via the engine-level mutex chain.
+    // F1-R2-01 / F1-R22-01: serialize concurrent migrate() calls via the engine-level mutex
+    // chain, using captured _safeThen so ambient Promise.prototype.then poisoning cannot break
+    // the serialization handshake.
     function migrate(opts) {
       var run = function () { return _migrateImpl(opts); };
-      var next = migrateChain.then(run, run); // even if prior errored, next still runs
-      migrateChain = next.then(function () { }, function () { });
+      var next = _safeThen(migrateChain, run, run); // even if prior errored, next still runs
+      migrateChain = _safeThen(next, function () { }, function () { });
       return next;
     }
 
