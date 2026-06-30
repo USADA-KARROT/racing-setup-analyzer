@@ -3,7 +3,7 @@
   "program": "R3.0",
   "phases": ["R3.0C", "R3.0D", "R3.0E", "R3.0F"],
   "currentPhase": "R3.0E",
-  "currentPhaseCheckpoint": "E2_EXPERIMENT_STORE",
+  "currentPhaseCheckpoint": "E3_OUTCOME_CLASSIFIER",
   "phaseStates": {
     "R3.0C": {
       "governanceDir": "governance/r3.0c",
@@ -21,7 +21,7 @@
     },
     "R3.0E": {
       "governanceDir": "governance/r3.0e",
-      "currentCheckpoint": "E2_EXPERIMENT_STORE",
+      "currentCheckpoint": "E3_OUTCOME_CLASSIFIER",
       "finalActivationCheckpoint": "E5_ACTIVATION",
       "started": true,
       "finalActivationReached": false

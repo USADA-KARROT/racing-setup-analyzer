@@ -1,14 +1,15 @@
 {
   "schemaVersion": 1,
   "program": "R3.0E",
-  "currentCheckpoint": "E2_EXPERIMENT_STORE",
+  "currentCheckpoint": "E3_OUTCOME_CLASSIFIER",
   "authorizedProductionPaths": [
-    { "path": "renderer/js/r3-0e-stores.js", "capability": "experiment_store_present" }
+    { "path": "renderer/js/r3-0e-stores.js", "capability": "experiment_store_present" },
+    { "path": "renderer/js/r3-0e-outcome-classifier.js", "capability": "outcome_classifier_present" }
   ],
-  "enabledCapabilities": ["contract_foundation_present", "experiment_store_present"],
+  "enabledCapabilities": ["contract_foundation_present", "experiment_store_present", "outcome_classifier_present"],
   "runtimeConsumersAllowed": true,
   "uiAllowed": false,
   "featureRegistryActivationAllowed": false,
-  "algorithmsAllowed": false,
-  "note": "R3.0E E2_EXPERIMENT_STORE state. renderer/js/r3-0e-stores.js is the authorized E2 production module: factories createExperimentStore / createOutcomeStore / createTimelineStore / createFollowUpLinkStore / createStoreMetadata. Each store validates payloads via the E1 contracts on write AND on read; future-schemaVersion records are fail-closed (read throws R3_0E_*_FUTURE_SCHEMA). Timeline is append-only (duplicate eventId rejected; out-of-order timestamp rejected). Follow-up link reverse index by parentCaseId maintained. uiAllowed + featureRegistryActivationAllowed remain false — UI surface is exclusively E5_UI_ACTIVATION. Per SKYLINE D12/E1 ruling: R3.0E uses SEPARATE versioned IndexedDB stores (r3_0e_experiments / r3_0e_outcomes / r3_0e_timelines / r3_0e_followupLinks / r3_0e_followupLinksByCase / r3_0e_storeMetadata) and MUST NOT extend the frozen R3.0B portable case-record schema body."
+  "algorithmsAllowed": true,
+  "note": "R3.0E E3_OUTCOME_CLASSIFIER state. renderer/js/r3-0e-outcome-classifier.js is the authorized E3 production module: deterministic Outcome Classifier with closure-private WeakSet producer attestation. classifyOutcome(input, opts) accepts authoritative-only inputs (E1-valid Experiment + Applied Change record + Follow-up identity + Observation + Control Variable observations) and produces a deep-frozen Outcome envelope registered in a module-private WeakSet. verifyAuthoritativeOutcome(candidate) is the only verifier exported. Classification enum (closed, mirrors E1 outcome-contract): confirmed / partially_confirmed / contradicted / inconclusive / invalid_comparison / inconclusive_due_to_confounders. Precedence ladder: invalid_comparison > inconclusive_due_to_confounders > inconclusive (data quality OR null direction) > contradicted (contradicting evidence OR direction mismatch) > partially_confirmed (direction match, magnitude outside range) > confirmed (only when direction match AND magnitude in expectedMagnitudeRange AND no contradictions AND no confounders AND same case/session AND explicit reference AND comparabilityScore >= 0.5). Clock invoked AT MOST ONCE, AFTER all authority/structural gates pass — forged input → zero clock invocations. Output never contains causal claims, driver-blame wording, raw telemetry samples, filesystem paths, or stack traces. uiAllowed + featureRegistryActivationAllowed remain false — UI surface is exclusively E5_UI_ACTIVATION. algorithmsAllowed=true ONLY for renderer/js/r3-0e-outcome-classifier.js (the exact authorized path in state.authorizedProductionPaths). Per SKYLINE D12/E1 ruling: R3.0E uses SEPARATE versioned IndexedDB stores and MUST NOT extend the frozen R3.0B portable case-record schema body."
 }

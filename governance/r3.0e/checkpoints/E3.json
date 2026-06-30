@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0E",
+  "checkpoint": "E3_OUTCOME_CLASSIFIER",
+  "baseSha": "7642123ed384ad5a557a1a54047f81ff7b02b6c3",
+  "headSha": null,
+  "previousCheckpoint": "E2_EXPERIMENT_STORE",
+  "shaSeparation": {
+    "note": "Three-way SHA separation per the established R3.0 convention.",
+    "reviewedCandidateSha": "d73daf6e7280a0673cb1a7c75994daf4b1372111",
+    "reviewedCandidateNote": "Codex E3 Round 8 reviewed this exact SHA and issued FINAL VERDICT: PASS (2026-06-30). 11 distinct adversarial findings closed across 7 rounds: R1-01 Object.create rebind / R1-02 driverFeedback grammar / R1-03 sparse arrays / R2-01 sideEffects.i18nKey grammar / R2-02 sideEffects.params primitive allowlist / R2-03 sparse experiment.controlVariables / R3-01 followUpCaseIds binding / R3-02 sideEffects.params deep-rebuild / R4-01 defineProperty injection post-rebuild value re-read / R5-01 Array.prototype.push capture / R5-02 defineProperty CV-set forgery elimination via captured-array set / R6-01 toJSON-driven post-validation mutation eliminated via freeze-first + custom byte walker / R7-01 TextEncoder undercount eliminated via capture-free s.length*4 + dataQualityIssues i18n grammar.",
+    "manifestCommitSha": null,
+    "integrationSha": null
+  },
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0e-stores.js", "capability": "experiment_store_present" },
+    { "path": "renderer/js/r3-0e-outcome-classifier.js", "capability": "outcome_classifier_present" }
+  ],
+  "newlyAuthorizedPaths": [
+    "renderer/js/r3-0e-outcome-classifier.js"
+  ],
+  "newlyEnabledCapabilities": ["outcome_classifier_present"],
+  "enabledCapabilitiesBefore": ["contract_foundation_present", "experiment_store_present"],
+  "enabledCapabilitiesAfter": ["contract_foundation_present", "experiment_store_present", "outcome_classifier_present"],
+  "forbiddenCapabilities": [
+    "case_timeline_present",
+    "feature_registry_active"
+  ],
+  "contractEnforcements": {
+    "classifierScope": "renderer/js/r3-0e-outcome-classifier.js exports classifyOutcome(input, opts) → { valid: true, outcome } | blocked envelope, and verifyAuthoritativeOutcome(candidate) → boolean. NO other public surface. NO WeakSet, register function, secret, or signing primitive exported. NO mutation of vehicle preset / setup file / calibration / model / telemetry / feature-registry / R3.0B case-record schema. NO LLM, NO runtime config, NO filesystem, NO randomness.",
+    "inputAuthority": "Input wrapper has a CLOSED key set: {experiment, appliedChange, followUp, observation, controlVariableObservations}. Caller-supplied `class`, `outcome`, `confounders`, `comparabilityScore`, or any unknown own key on the wrapper → BLOCK with UNKNOWN_OWN_KEY before any further [[Get]] read. Each nested sub-object also has a CLOSED key set. Each control-variable observation is validated via the E1 CV contract; observedValue + withinRange MUST be filled (E3 algorithm requirement on top of E1 shape).",
+    "experimentBinding": "experiment.status MUST be 'applied'; experiment.outcome MUST be null (E1 already enforces this for status=applied, defence-in-depth in classifier too); appliedChange.sourceExperimentId MUST equal experiment.experimentId; followUp.parentCaseId MUST equal experiment.sourceCaseId. Any binding mismatch → BLOCK (EXPERIMENT_STATUS_INVALID / OUTCOME_INVALID).",
+    "comparisonValidityPrecedence": "invalid_comparison takes precedence over inconclusive/confirmed when ANY of: followUp.parentCaseId !== experiment.sourceCaseId (cross-case forbidden), followUp.sessionId !== followUp.parentSessionId (cross-session forbidden), followUp.hasExplicitReference !== true (R3.0C explicit-reference policy), followUp.comparabilityScore < 0.5 (low-comparability threshold). Limitations carried per signal: LINKAGE_PARENT_MISSING / LIMITATION_CROSS_SESSION_FOLLOW_UP / OUTCOME_COMPARABILITY_INSUFFICIENT.",
+    "confounderPrecedence": "inconclusive_due_to_confounders takes precedence over confirmed/contradicted when: any declared experiment.controlVariables[].name is missing from controlVariableObservations (limitation: CONTROL_VARIABLE_MISSING; confounders = missing names) OR any control variable observation has withinRange === false (limitation: CONTROL_VARIABLE_OUT_OF_RANGE; confounders = out-of-range names). When NO control variables are declared AND none observed, classification proceeds normally but limitation LIMITATION_NO_CONTROL_VARIABLES is carried.",
+    "classificationCascade": "After invalid_comparison / inconclusive_due_to_confounders gates pass, the cascade is: dataQualityIssues.length > 4 → inconclusive (with dq codes propagated to limitations); observedDirection === null → inconclusive; contradictingEvidenceIds.length > 0 → contradicted (blocks confirmed even if direction matches); !directionMatch → contradicted; directionMatch AND magnitudeInRange → confirmed; directionMatch AND !magnitudeInRange → partially_confirmed.",
+    "clockOrdering": "Clock (opts.clock || opts.referenceNowMs) is invoked AT MOST ONCE, in Step 9, AFTER input wrapper descriptor snapshot, experiment shape, appliedChange/followUp/observation/CV descriptor snapshots, opts snapshot, AND identity binding (status/sourceExperimentId/parentCaseId). Forged input fails earlier in the cascade → ZERO clock invocations. Hostile clock throwing or returning a non-string → BLOCK with no partial output.",
+    "producerAttestation": "classifyOutcome registers every successfully-classified outcome envelope in a closure-private WeakSet (_authoritativeOutcomes). verifyAuthoritativeOutcome(candidate) checks identity (WeakSet membership) AND structural witnesses (Object.isFrozen, schemaVersion, outcomeId/experimentId/class strings, confounders/limitations arrays). Clones, JSON round-trips, structuredClone outputs, hand-forged frozen lookalikes, and Proxy objects do NOT pass. WeakSet operations dispatched via captured WeakSet.prototype.add/has + captured Reflect.apply so post-load WeakSet.prototype.has = () => true cannot defeat verification.",
+    "capturedIntrinsics": "Object.freeze / Object.isFrozen / Object.is / Object.getOwnPropertyNames / Object.getOwnPropertyDescriptor / Object.getOwnPropertySymbols / Object.getPrototypeOf / Array.isArray / Date.parse / Reflect.apply / JSON.stringify / TextEncoder / Number.isFinite / Number.isInteger / WeakSet ctor + prototype methods are captured at module init so post-load ambient rebind cannot affect validation.",
+    "outcomeShape": "Output passes through E1 OUT.validateOutcomeShape before deep-freeze + registration. Envelope byte cap 128 KiB. outcomeId is deterministic FNV-1a hash of (experimentId, changeId) — NO clock leak. createdAt is the resolved clock ISO (or appliedChange.appliedAt fallback). NO causal language, NO driver-blame language, NO free-text driver feedback (i18n key only), NO raw telemetry, NO filesystem path, NO stack trace.",
+    "stateFloors": "E3 unlocks algorithmsAllowed=true ONLY for renderer/js/r3-0e-outcome-classifier.js (the exact authorized path). uiAllowed remains false (E5 only). featureRegistryActivationAllowed remains false (E5 only). R3.0B case-record schema is NOT modified (r3bCaseRecordSchemaUntouched=true)."
+  },
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3.0e-outcome-classifier.test.js",
+    "newSuiteAssertions": 95,
+    "evidenceTier": "TIER 3 — Claude-verified on E3 branch HEAD; CI re-run on integrationSha is the authority."
+  },
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 8,
+    "reviewedCandidateSha": "d73daf6e7280a0673cb1a7c75994daf4b1372111",
+    "verdictEvidenceFile": "governance/r3.0e/codex-checkpoint-evidence/E3/round-8-d73daf6-PASS.raw.txt",
+    "rounds": [
+      { "round": 1, "reviewedSha": "ab01b80", "verdict": "BLOCK", "findings": "3 BLOCK (E3-R1-01..03)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-1-ab01b80.raw.txt" },
+      { "round": 2, "reviewedSha": "1c6146d", "verdict": "BLOCK", "findings": "3 BLOCK (E3-R2-01..03)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-2-1c6146d.raw.txt" },
+      { "round": 3, "reviewedSha": "56fdd73", "verdict": "BLOCK", "findings": "1 BLOCK (E3-R3-01) + 1 NIT (E3-R3-02)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-3-56fdd73.raw.txt" },
+      { "round": 4, "reviewedSha": "9419a1b", "verdict": "BLOCK", "findings": "1 BLOCK (E3-R4-01)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-4-9419a1b.raw.txt" },
+      { "round": 5, "reviewedSha": "9ca51a8", "verdict": "BLOCK", "findings": "2 BLOCK (E3-R5-01..02)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-5-9ca51a8.raw.txt" },
+      { "round": 6, "reviewedSha": "4a55c98", "verdict": "BLOCK", "findings": "1 BLOCK (E3-R6-01)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-6-4a55c98.raw.txt" },
+      { "round": 7, "reviewedSha": "2770507", "verdict": "BLOCK", "findings": "1 BLOCK (E3-R7-01)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-7-2770507.raw.txt" },
+      { "round": 8, "reviewedSha": "d73daf6", "verdict": "PASS", "findings": "0", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E3/round-8-d73daf6-PASS.raw.txt" }
+    ]
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "scopeBoundary": {
+    "frozenFilesUntouched": true,
+    "r30bPersistenceUntouched": true,
+    "r30cContractsUntouched": true,
+    "r30cProductionUntouched": true,
+    "r30dContractsUntouched": true,
+    "r30dProductionUntouched": true,
+    "r30eContractsUntouched": true,
+    "r30eStoresUntouched": true,
+    "featureRegistryUnchanged": true,
+    "indexHtmlUnchanged": true,
+    "noR30eFeatureIdInRegistry": true,
+    "runtimeConsumerCount": 2,
+    "productionPathCount": 2,
+    "algorithmCount": 1,
+    "uiSurfaceCount": 0
+  },
+  "frozenDiff": 0,
+  "productionDiff": 1,
+  "runtimeConsumerCount": 2,
+  "featureRegistryState": {
+    "expectedRegisteredIds": [],
+    "expectedDeferredIds": ["experiment_loop", "case_timeline"],
+    "note": "E3 does NOT register any R3.0E feature ID. Feature Registry activation is exclusively E5_ACTIVATION."
+  },
+  "crossPhaseGate": {
+    "r3dCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+    "requiredFor": "E3_OUTCOME_CLASSIFIER",
+    "satisfied": true
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": "2026-06-30T00:00:00Z",
+  "status": "candidate",
+  "governanceChanged": true,
+  "changedFiles": [
+    "renderer/js/r3-0e-outcome-classifier.js",
+    "tests/r3.0e-outcome-classifier.test.js",
+    "governance/r3.0e/checkpoints/E3.json",
+    "governance/r3.0e/state.json",
+    "governance/r3.0/train.json",
+    "package.json"
+  ],
+  "note": "R3.0E E3_OUTCOME_CLASSIFIER — deterministic Outcome Classifier algorithm with closure-private WeakSet producer attestation. classifyOutcome derives all classification fields from authoritative inputs (Experiment, AppliedChange, FollowUp identity, Observation, ControlVariableObservations); caller-supplied class/outcome/confounders are rejected before any [[Get]] read. Precedence: invalid_comparison > inconclusive_due_to_confounders > inconclusive > contradicted > partially_confirmed > confirmed. Clock at most once post-authority. No UI; no Feature Registry change."
+}
