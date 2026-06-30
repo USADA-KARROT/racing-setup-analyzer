@@ -1212,6 +1212,33 @@ console.log('Section X — Codex E3 R4 closure (pre-load defineProperty poisonin
 })();
 
 // ==================================================================
+// Section BB — Formal E Gate R1-01 closure (padStart / charCodeAt tamper resistance)
+// ==================================================================
+console.log('Section BB — Formal E Gate R1-01 closure (padStart tamper resistance)');
+
+(function () {
+  var cp = require('child_process');
+  var path = require('path');
+  var classifierPath = path.resolve(__dirname, '..', 'renderer/js/r3-0e-outcome-classifier.js');
+  var script = ''
+    + 'String.prototype.padStart=function(){return "deadbeef";};'
+    + 'var CL=require("' + classifierPath + '");'
+    + 'function df(v){if(v&&typeof v==="object"&&!Object.isFrozen(v)){Object.freeze(v);Object.getOwnPropertyNames(v).forEach(function(k){df(v[k]);});}return v;}'
+    + 'var exp=df({schemaVersion:1,experimentId:"exp_0123456789abcdef",sourceCaseId:"case_demo_a",sourceHypothesisId:"hyp_demo_001",sourceRecommendationId:"pri_demo_001",targetMetric:"roll_gradient_deg_per_g",baselineValue:3.5,expectedDirection:"decrease",expectedMagnitudeRange:{min:0.5,max:1.5},setupChange:{component:"front_arb"},driverInstruction:null,controlVariables:[{name:"tyre_temp_window",description:"r3.0e.cv.tyre_temp_window",expectedValue:85,allowedRange:{min:75,max:95},observedValue:null,withinRange:null}],validationPlan:"r3.0e.plan.controlled_repeat_lap",stopConditions:[{i18nKey:"r3.0e.stop.lap_time_increase",params:null}],status:"applied",followUpCaseIds:["case_demo_a_followup_1"],outcome:null,createdAt:"2026-06-30T10:00:00Z"});'
+    + 'var input={experiment:exp,appliedChange:{changeId:"change_demo_001",sourceExperimentId:"exp_0123456789abcdef",appliedAt:"2026-06-30T11:00:00Z"},followUp:{followUpCaseId:"case_demo_a_followup_1",parentCaseId:"case_demo_a",sessionId:"session_demo_a",parentSessionId:"session_demo_a",hasExplicitReference:true,comparabilityScore:0.9},observation:{observedDirection:"decrease",observedMagnitude:1,driverFeedback:"r3.0e.driver.feedback.balance_improved",dataQualityIssues:[],sideEffects:[],contradictingEvidenceIds:[],supportingEvidenceIds:["ev_demo_001"]},controlVariableObservations:[{name:"tyre_temp_window",description:"r3.0e.cv.tyre_temp_window",expectedValue:85,allowedRange:{min:75,max:95},observedValue:84,withinRange:true}]};'
+    + 'var r=CL.classifyOutcome(input,{clock:function(){return "2026-06-30T11:30:00Z";}});'
+    + 'process.stdout.write(JSON.stringify({valid:r.valid,outcomeId:r.valid===true?r.outcome.outcomeId:null,verifies:r.valid===true?CL.verifyAuthoritativeOutcome(r.outcome):false}));';
+  var out = cp.execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' });
+  var parsed = JSON.parse(out.trim());
+  chk('BB1: padStart tamper does NOT forge outcomeId',
+    parsed.valid === true
+      && parsed.outcomeId !== 'outcome_deadbeefdeadbeef'
+      && /^outcome_[0-9a-f]{16}$/.test(parsed.outcomeId),
+    parsed);
+  chk('BB1.verifies: tamper-resistant outcome still verifies', parsed.verifies === true);
+})();
+
+// ==================================================================
 // Section AA — Codex E3 R7 closure (E3-R7-01)
 // ==================================================================
 console.log('Section AA — Codex E3 R7 closure (TextEncoder.prototype.encode byte-cap undercount)');

@@ -262,6 +262,11 @@
   function _registerAuthoritativeOutcome(envelope) {
     _wsAdd(_authoritativeOutcomes, envelope);
   }
+  // Formal E Gate R1-01 defence-in-depth: canonical outcomeId grammar enforcement
+  // — even after the WeakSet identity check + frozen check + schema version check,
+  // also verify the outcomeId matches the closed grammar `outcome_[0-9a-f]{16}`.
+  // Belt-and-suspenders against pre-load tampering that the canary missed.
+  var OUTCOME_ID_RE = /^outcome_[0-9a-f]{16}$/;
   function verifyAuthoritativeOutcome(candidate) {
     try {
       if (candidate === null || typeof candidate !== 'object') return false;
@@ -269,6 +274,7 @@
       if (_CAPTURED_OBJECT_IS_FROZEN(candidate) !== true) return false;
       if (candidate.schemaVersion !== OUTCOME_SCHEMA_VERSION) return false;
       if (typeof candidate.outcomeId !== 'string') return false;
+      if (!OUTCOME_ID_RE.test(candidate.outcomeId)) return false;
       if (typeof candidate.experimentId !== 'string') return false;
       if (typeof candidate['class'] !== 'string') return false;
       if (!_isArraySafe(candidate.confounders)) return false;
@@ -488,14 +494,34 @@
 
   // ---------- Deterministic ID generator -------------------------------------------------------
   // outcomeId is deterministic from (experimentId, changeId). No clock leak.
+  // Formal E Gate R1-01 closure (mirrors E4 R5/R6): capture-free hex padding via local
+  // hex lookup + bracket access, and captured String.prototype.charCodeAt via
+  // captured Reflect.apply. Defeats post-load String.prototype.padStart /
+  // Number.prototype.toString / String.prototype.charCodeAt tampering that would
+  // otherwise let an attacker forge a path-like outcomeId.
+  var _STR_CHAR_CODE_AT_E3 = String.prototype.charCodeAt;
+  function _charCodeAtE3(s, i) {
+    if (typeof s !== 'string') return 0;
+    try { return _CAPTURED_REFLECT_APPLY(_STR_CHAR_CODE_AT_E3, s, [i]); } catch (e) { return 0; }
+  }
+  function _toHex8E3(h) {
+    var hexChars = '0123456789abcdef';
+    var out = '';
+    var x = h >>> 0;
+    for (var i = 7; i >= 0; i--) {
+      var nibble = (x >>> (i * 4)) & 0xF;
+      out += hexChars[nibble];
+    }
+    return out;
+  }
   function _hash32(s) {
     var h = 0x811c9dc5;
     var len = typeof s === 'string' ? s.length : 0;
     for (var i = 0; i < len; i++) {
-      h ^= s.charCodeAt(i);
+      h ^= _charCodeAtE3(s, i);
       h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
     }
-    return h.toString(16).padStart(8, '0');
+    return _toHex8E3(h);
   }
   function _fnv2(s) {
     var slen = typeof s === 'string' ? s.length : 0;
