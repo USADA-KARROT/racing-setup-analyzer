@@ -99,17 +99,19 @@ try {
     var lines = src.split(/\n/);
     for (var l = 0; l < lines.length; l++) {
       var line = lines[l];
-      var m = line.match(/\.innerHTML\s*=\s*(.+?)\s*[;)]/);
+      // F3-R9-04 closure: accept assignments terminated by `;`, `)`, end-of-line, OR end-of-input.
+      // ASI (Automatic Semicolon Insertion) allows `element.innerHTML = userValue` without `;`.
+      var m = line.match(/\.innerHTML\s*=\s*(.+?)\s*(?:[;)]|$)/);
       if (m) {
         var rhs = m[1].trim();
-        if (isSafeStringLiteral(rhs)) continue;
-        unsafeInnerHtmlAssigns.push(srcName + ':' + (l + 1) + ' ' + line.trim().slice(0, 120));
+        if (rhs && !isSafeStringLiteral(rhs)) {
+          unsafeInnerHtmlAssigns.push(srcName + ':' + (l + 1) + ' ' + line.trim().slice(0, 120));
+        }
       }
-      // Also catch computed-form ['innerHTML'] = X on this line
-      var mIcomp = line.match(/\[\s*['"`]innerHTML['"`]\s*\]\s*=\s*(.+?)\s*[;)]/);
+      var mIcomp = line.match(/\[\s*['"`]innerHTML['"`]\s*\]\s*=\s*(.+?)\s*(?:[;)]|$)/);
       if (mIcomp) {
         var rhsIcomp = mIcomp[1].trim();
-        if (!isSafeStringLiteral(rhsIcomp)) {
+        if (rhsIcomp && !isSafeStringLiteral(rhsIcomp)) {
           unsafeInnerHtmlAssigns.push(srcName + ':' + (l + 1) + ' ["innerHTML"] = variable RHS (computed)');
         }
       }
@@ -235,26 +237,25 @@ try {
     var lines2 = s.split(/\n/);
     for (var l2 = 0; l2 < lines2.length; l2++) {
       var line2 = lines2[l2];
-      // Dot form: .outerHTML = X
-      var mO = line2.match(/\.outerHTML\s*=\s*(.+?)\s*[;)]/);
+      // F3-R9-04 closure: also accept end-of-line termination (ASI).
+      var mO = line2.match(/\.outerHTML\s*=\s*(.+?)\s*(?:[;)]|$)/);
       if (mO) {
         var rhsO = mO[1].trim();
-        if (!isSafeStringLiteral(rhsO)) {
+        if (rhsO && !isSafeStringLiteral(rhsO)) {
           unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' outerHTML = variable RHS');
         }
       }
-      // F3-R7-03: computed forms ['outerHTML'] and ['innerHTML']
-      var mOc = line2.match(/\[\s*['"`]outerHTML['"`]\s*\]\s*=\s*(.+?)\s*[;)]/);
+      var mOc = line2.match(/\[\s*['"`]outerHTML['"`]\s*\]\s*=\s*(.+?)\s*(?:[;)]|$)/);
       if (mOc) {
         var rhsOc = mOc[1].trim();
-        if (!isSafeStringLiteral(rhsOc)) {
+        if (rhsOc && !isSafeStringLiteral(rhsOc)) {
           unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' ["outerHTML"] = variable RHS (computed)');
         }
       }
-      var mIc = line2.match(/\[\s*['"`]innerHTML['"`]\s*\]\s*=\s*(.+?)\s*[;)]/);
+      var mIc = line2.match(/\[\s*['"`]innerHTML['"`]\s*\]\s*=\s*(.+?)\s*(?:[;)]|$)/);
       if (mIc) {
         var rhsIc = mIc[1].trim();
-        if (!isSafeStringLiteral(rhsIc)) {
+        if (rhsIc && !isSafeStringLiteral(rhsIc)) {
           unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' ["innerHTML"] = variable RHS (computed)');
         }
       }

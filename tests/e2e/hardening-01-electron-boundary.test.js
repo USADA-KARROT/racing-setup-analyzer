@@ -176,6 +176,10 @@ try {
     chk(lbl + ' uses NO computed-key syntax for security flags',
       !/\[\s*['"`](?:contextIsolation|nodeIntegration|webSecurity|allowRunningInsecureContent|experimentalFeatures|enableRemoteModule|nodeIntegrationInWorker|nodeIntegrationInSubFrames|sandbox)['"`]\s*\]\s*:/.test(wpBody));
 
+    // F3-R9-01 closure: reject any spread `...` inside webPreferences. A spread can carry
+    // unsafe overrides that the static-flag audit cannot see.
+    chk(lbl + ' uses NO spread operator', !/\.\.\./.test(wpBody));
+
     chk(lbl + '.contextIsolation === literal true', /(^|[\s,{])contextIsolation\s*:\s*true\s*(,|$|\s)/m.test(wpBody));
     chk(lbl + '.nodeIntegration === literal false', /(^|[\s,{])nodeIntegration\s*:\s*false\s*(,|$|\s)/m.test(wpBody));
 
@@ -207,12 +211,14 @@ try {
 
   // F3-R8-02 closure: enumerate EVERY exposeInMainWorld call. There must be EXACTLY ONE
   // and its surface must be exactly {platform, version}.
+  // F3-R9-02 closure: also detect computed-form contextBridge['exposeInMainWorld'] calls.
   function extractAllExposedSurfaces(src) {
     var entries = [];
     var startIdx = 0;
     while (true) {
       var sub = src.slice(startIdx);
-      var sm = sub.match(/contextBridge\.exposeInMainWorld\s*\(\s*(['"`])([^'"`]+)\1\s*,\s*\{/);
+      // Dot form OR computed form OR alias-via-destructure (latter detected separately below).
+      var sm = sub.match(/contextBridge\s*(?:\.exposeInMainWorld|\[\s*['"`]exposeInMainWorld['"`]\s*\])\s*\(\s*(['"`])([^'"`]+)\1\s*,\s*\{/);
       if (!sm) break;
       var absStart = startIdx + sm.index + sm[0].length;
       var worldName = sm[2];
@@ -242,6 +248,14 @@ try {
   var exposedEntry = exposedSurfaces[0] || { name: '', body: '' };
   var exposedBody = exposedEntry.body || '';
   chk('preload.js exposes the surface as "electronAPI"', exposedEntry.name === 'electronAPI');
+
+  // F3-R9-02 closure: also assert NO bare/aliased `exposeInMainWorld` reference outside the
+  // single audited call. A regression like
+  //   const e = contextBridge.exposeInMainWorld; e('backdoor', {...})
+  // would not match the extractor. We count total occurrences of the keyword and require it
+  // to appear exactly ONCE in the file.
+  var exposeOccurrences = (preloadSrc.match(/exposeInMainWorld/g) || []).length;
+  chk('preload.js references exposeInMainWorld EXACTLY ONCE (no aliasing/destructuring escape)', exposeOccurrences === 1, { count: exposeOccurrences });
 
   // No spread (...) — exposes hidden properties
   chk('preload.js exposed surface has NO spread operator', !/\.\.\./.test(exposedBody));
@@ -284,6 +298,62 @@ try {
   }
   var exposedKeys = topLevelKeys(exposedBody).sort();
   chk('preload.js exposed surface has EXACTLY {platform, version}', JSON.stringify(exposedKeys) === JSON.stringify(['platform', 'version']), { keys: exposedKeys });
+
+  // F3-R9-03 closure: each exposed value must be an INERT primitive expression — no functions,
+  // no closures, no process/global access, no dynamic require. Parse the body's key:value pairs
+  // and assert each value is on an allowlist of safe shapes.
+  function topLevelEntries(body) {
+    var entries = [];
+    var depth = 0;
+    var inStr = false;
+    var strCh = '';
+    var segStart = 0;
+    for (var i = 0; i <= body.length; i++) {
+      var ch = i < body.length ? body.charAt(i) : ',';
+      if (inStr) {
+        if (ch === '\\') { i++; continue; }
+        if (ch === strCh) inStr = false;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; continue; }
+      if (ch === '{' || ch === '[' || ch === '(') depth++;
+      else if (ch === '}' || ch === ']' || ch === ')') depth--;
+      else if (ch === ',' && depth === 0) {
+        var seg = body.slice(segStart, i).trim();
+        if (seg) {
+          var kvMatch = seg.match(/^([a-zA-Z_$][\w$]*)\s*:\s*([\s\S]+)$/);
+          if (kvMatch) entries.push({ key: kvMatch[1], value: kvMatch[2].trim() });
+          else if (/^[a-zA-Z_$][\w$]*$/.test(seg)) entries.push({ key: seg, value: seg }); // shorthand
+        }
+        segStart = i + 1;
+      }
+    }
+    return entries;
+  }
+  var exposedEntries = topLevelEntries(exposedBody);
+  var EXPOSED_FORBIDDEN_TOKENS = /\bprocess\b|\bglobalThis\b|\b__dirname\b|\b__filename\b|\bModule\b|\beval\b|\b(?:child_process|fs|net|http|https|os|crypto|dgram|vm|cluster|worker_threads|repl|inspector|perf_hooks|trace_events)\b/;
+  function isInertExposedValue(val) {
+    // (a) string literal
+    if (/^["'][^"']*["']$/.test(val)) return true;
+    // (b) reading process.platform IS allowed (it's a known-inert string)
+    if (/^process\.platform$/.test(val)) return true;
+    // (c) require('./package.json').version is the only allowed require chain
+    if (/^require\(\s*['"]\.\/package\.json['"]\s*\)\.version$/.test(val)) return true;
+    // (d) plain numeric / boolean / null literal
+    if (/^(?:-?\d+(?:\.\d+)?|true|false|null)$/.test(val)) return true;
+    return false;
+  }
+  for (var ee = 0; ee < exposedEntries.length; ee++) {
+    var entry = exposedEntries[ee];
+    // Static forbidden-token check (catches process.env, child_process, etc., even via concat)
+    chk('exposed[' + entry.key + '] has NO Node-authority tokens',
+      !EXPOSED_FORBIDDEN_TOKENS.test(entry.value) || /^process\.platform$/.test(entry.value),
+      { key: entry.key, value: entry.value.slice(0, 80) });
+    // Allowlist shape check
+    chk('exposed[' + entry.key + '] is an inert primitive expression',
+      isInertExposedValue(entry.value),
+      { key: entry.key, value: entry.value.slice(0, 80) });
+  }
 
   // Step 4: renderer/index.html declares CSP header
   var cspMatch = indexSrc.match(/<meta\s+http-equiv\s*=\s*"Content-Security-Policy"\s+content\s*=\s*"([^"]+)"/i);

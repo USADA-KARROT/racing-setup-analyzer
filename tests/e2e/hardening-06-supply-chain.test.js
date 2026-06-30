@@ -45,7 +45,10 @@ try {
   // backticks), pipes (|), and known dangerous tool names. The previous pattern only caught
   // redirection to /dev/...; now any `>` redirection is rejected. (Note: `&&` is the SEGMENT
   // separator and is intentionally not flagged at the full-script level.)
-  var FORBIDDEN_TOKENS = /\b(curl|wget|npx|fetch|eval|base64|ssh|scp|rsync|nc|netcat|telnet)\b|\bsh\s+-c\b|https?:\/\/|\$\(|`|\|\s*\w|\|\||\s>\s|\s>>\s|\s<\s|2\s*>|&\s*>/i;
+  // F3-R9-05 closure: shell redirection rejection no longer requires whitespace around `>`.
+  // `electron-builder >out` (no space) must fail. Use ANY `>` / `<` / `|` shell-metachar
+  // outside string-literal contexts. The previous pattern required `\s>\s` and missed compact forms.
+  var FORBIDDEN_TOKENS = /\b(curl|wget|npx|fetch|eval|base64|ssh|scp|rsync|nc|netcat|telnet)\b|\bsh\s+-c\b|https?:\/\/|\$\(|`|\|\s*\w|\|\||>|<\s|2>|&>/i;
   var ALLOWED_NODE_DASH_FLAGS_FORBIDDEN = /\bnode\s+-/;
   var ALLOWED_NODE_ROOTS = ['tests', 'scripts', 'tools'];
 
