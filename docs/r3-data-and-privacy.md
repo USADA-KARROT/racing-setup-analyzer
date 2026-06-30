@@ -256,7 +256,7 @@ How the invariant is enforced, in layers:
 
 1. **Absence of call sites.** Production paths contain no `fetch`, `XMLHttpRequest`, `WebSocket`, or `navigator.sendBeacon` to remote origins. This is a code-shape property, auditable by grep.
 2. **Electron Content Security Policy.** The renderer's CSP (see below) sets `default-src 'self'`; `connect-src` is not declared separately, so it falls back to `default-src 'self'`. So even if a third-party dependency attempted to open a remote connection, the browser engine would refuse it.
-3. **R3.0F F3 supply-chain probe.** F3's hardening manifest includes a supply-chain probe that asserts the production build does not introduce a new outbound origin via a dependency update. The probe passes at the F3 baseline that ships in this milestone.
+3. **R3.0F F3 supply-chain probe.** F3's hardening manifest includes a supply-chain probe (`tests/e2e/hardening-06-supply-chain.test.js`) that asserts `package.json` declares only the known Electron/electron-builder dependencies, no production renderer module pulls a bare third-party import via `require()`, no `package.json` script references untrusted external tooling, and no secrets/API keys/`.env` files are committed. It does not inspect outbound network origins or destinations directly — the no-egress invariant rests on layer 1 (no call sites) and layer 2 (CSP) above; this probe verifies the dependency surface stays closed, which is what would let a third-party call site sneak in. The probe passes at the F3 baseline that ships in this milestone.
 
 The combination of "no call sites in our code" + "CSP refuses connections" + "supply-chain probe verifies the dependency surface" is what the contract rests on, rather than a single runtime interceptor.
 

@@ -94,7 +94,7 @@ R3.0C's comparison-authority contract carries the full six-rung `CREDIBILITY_LAD
 
 The comparison authority itself is structurally constrained by three rules that the contract validator presupposes:
 
-1. **Same-case + same-session only.** Comparison and reference laps must both belong to the same Analysis Case and the same session of that case. Cross-case comparison is forbidden by the case-store; cross-session comparison within a case is forbidden by the comparison-authority layer.
+1. **Same-case + same-session only.** Comparison and reference laps must both belong to the same Analysis Case and the same session of that case. Both checks are enforced by R3.0C's reference-selection module (`renderer/js/r3-0c-reference-selection.js`), which rejects a caseId mismatch with `CROSS_CASE_COMPARISON_UNSUPPORTED` and a sessionId mismatch with `CROSS_SESSION_COMPARISON_UNSUPPORTED` — `case-store` itself (R3.0B CRUD/import/export) has no comparison gate of its own.
 2. **Reference lap = explicit user selection.** There is no `fastest_valid` auto-pick, no `median` auto-pick, no `best_sector_composite` auto-pick. The user names the reference lap by its identity in the current session.
 3. **Delta = comparison − reference** with a fixed sign convention. The delta metric set is allowlisted (the six allowlisted delta metrics live in the R3.0C delta-metrics module). Segmentation is deterministic over the normalized-distance grid. Pairing is deterministic over the corner-identity assignment. Every emission carries `derivedHere: false` because the contract is a pass-through, but the upstream delta producer carries `Derived` on the rung field and `real` (or `synthetic`, preserved) on the provenance field.
 

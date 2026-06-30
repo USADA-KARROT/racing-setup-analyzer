@@ -50,13 +50,19 @@ only *lower* the rung of an input as it propagates; it may never *raise* it.
 | Priority / Recommendation | R3.0D D4 | Verified hypotheses | Ranked candidates + a Recommendation (`contracts/r3.0d/recommendation-contract.js` shape: `priorityKey`, `applyMode` restricted to `driver_action`/`user_initiated`, no `auto_*`) | Heuristic |
 | Engineer Brief | R3.0D D5 | Priority list + evidence graph | Authoritative brief (read-only) | Heuristic |
 | Experiment Plan | R3.0E E1 | Engineer authors the plan, referencing the brief/recommendation by id | Experiment record (mutable via `create`/`update`/`get`/`list`/`remove`; the Timeline is the append-only audit trail — see below) | Derived |
-| Outcome Classification | R3.0E E3 | Experiment + applied change + follow-up comparison + control-variable observations | Outcome record (see "Outcome classifier" below) | Derived (capped) |
+| Outcome Classification | R3.0E E3 | Experiment + applied change + follow-up comparison + control-variable observations | Outcome record (see "Outcome classifier" below) | Heuristic |
 
 *The rung shown is the maximum a stage can emit; actual rung is set per-run by
 the underlying input credibility.* A Priority or Engineer Brief node whose
 inputs are all Measured-rung still emerges at the **Heuristic** ceiling above,
 because ranking and prose-style framing are themselves heuristic operations on
-the underlying evidence.
+the underlying evidence. None of these rungs is a literal field stored on the
+emitted record — they are a documentation-level classification of each
+producer stage. The Outcome object specifically (see "Outcome classifier"
+below) has no `credibility` key in its 13-field shape at all; "Heuristic" here
+describes the *nature of the classification step* (a structured judgment over
+authoritative inputs via fixed thresholds, not a measured magnitude), not a
+runtime value the classifier emits.
 
 The Experiment record's `sourceHypothesisId` and `sourceRecommendationId`
 fields are **id-grammar-validated string references only** (`contracts/r3.0e/
@@ -481,11 +487,17 @@ resolution that the rest of R3.0 uses.
 Because the Timeline is the only ordered, append-only record of *what the
 product told the engineer*, two product invariants follow:
 
-- A classified outcome appears in the Timeline exactly once. Re-running the
-  classifier on the same experiment does not produce a second
-  `outcome_classified` event — the second append is rejected by the
-  duplicate-`eventId` rule. The experiment store may itself update other
-  fields, but it cannot rewrite history.
+- Re-running the classifier on the same experiment does **not** rewrite
+  history: `eventId` is derived deterministically from
+  `(caseId, sequence, kind, i18nKey)`, where `sequence` is the current
+  event count at append time. A second classification run produces a
+  **second, distinct** `outcome_classified` event (a different `sequence`
+  yields a different `eventId`) at a strictly later `createdAt` — it is
+  not rejected as a duplicate, and the original event is never overwritten
+  or removed. The duplicate-`eventId` rule guards against re-appending the
+  exact same `(caseId, sequence, kind, i18nKey)` tuple, not against
+  re-classifying the same experiment. The experiment store may itself
+  update other fields, but the Timeline itself can only grow, never rewrite.
 - An `inconclusive`, `inconclusive_due_to_confounders`, or `invalid_comparison`
   outcome is **not** silently upgraded by a later, better follow-up. The
   original `outcome_classified` event stays in the Timeline. A later
