@@ -16,7 +16,7 @@ A note on version numbers used in this document: the **R3 case-record schema ver
 
 On the very first launch the local store is empty. R3.0B has provisioned an IndexedDB-backed `case-store`, `session-store`, and `caseAssociation` index through `storage-backend.js`; in Node test mode the same contracts run against an in-memory backend. There is no remote sync, no account, no cloud — every artefact lives on the user's device.
 
-The application runs inside an Electron host configured with `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true` by default; the preload bridge exposes exactly two values to the renderer — `{platform, version}` — and nothing else. The renderer cannot reach Node, the file system, or arbitrary IPC; every privileged operation goes through the storage backend's typed contract — the R3.0B `backend.transact({ stores, reads, compute })` contract is the single channel for persistent reads and writes.
+The application runs inside an Electron host whose `BrowserWindow` `webPreferences` explicitly set `contextIsolation: true` and `nodeIntegration: false` (no other `webPreferences` key is set; Electron's defaults apply and are never explicitly weakened); the preload bridge exposes exactly two values to the renderer on `window.electronAPI` — `{platform, version}` — and nothing else. The renderer cannot reach Node, the file system, or arbitrary IPC; every privileged operation goes through the storage backend's typed contract — the R3.0B `backend.transact({ stores, reads, compute })` contract is the single channel for persistent reads and writes. (See `docs/r3-architecture.md` "Electron host boundaries" for the full webPreferences/CSP contract.)
 
 Across the entire R3.0F surface, two activation flags govern what the runtime is allowed to do today. `runtimeConsumersAllowed` has been `true` since F1 — production services bind to authoritative inputs and emit results. `featureRegistryActivationAllowed` is `false` and remains `false` until `F6_RELEASE`; any path that would activate a deferred capability through the feature registry fails closed with a named reason code, regardless of whether the underlying service is otherwise ready.
 
@@ -175,9 +175,9 @@ An experiment record carries:
 - The parent Case ID (same-case constraint; cross-case association is rejected at the store boundary).
 - The applied-change descriptor (the setup lever or process change the user intends to make), in physical units only.
 - The controlled variables the user pledges to hold constant (tyre set, fuel, track session, driver, weather window).
-- The expected directional effect, in the user's own words. The product does not auto-populate this from the brief; the user must commit to the prediction so the outcome classifier can later compare expected vs observed.
+- The expected directional effect — a closed enum (`'increase' | 'decrease' | 'no_change'`), not free text. The product does not auto-populate this from the brief; the user must commit to one of the three values so the outcome classifier can later compare expected vs observed.
 - Stop conditions, capped at the schema's `stopConditions` shape — these are user-defined and bounded.
-- A draft outcome slot, explicitly empty. An outcome on a draft experiment is rejected; the experiment must be ran before an outcome can be attached.
+- An outcome slot that must stay `null` while `status` is `'draft'`, `'planned'`, or `'applied'`; it may only become non-null once `status` reaches `'completed'`, `'abandoned'`, or `'invalid'`. The contract layer enforces this gating directly — a caller cannot attach a classification result to an experiment that has not concluded.
 
 The schema is recursively audited. Future-schema fields are rejected at the store boundary; an audit overflow fails closed; pre-clone audits run before timeline and control-variable mutations.
 
@@ -192,6 +192,8 @@ Outside the application — at the car, on the track — the user applies the ch
 The new session is imported as its own Case. This is the only way to bring follow-up telemetry into the workspace. There is no "append telemetry to existing Case" path, because that would let two physically different sessions silently merge into one comparison authority.
 
 After import the follow-up Case goes through exactly the same gates as the original Case: import preflight, channel mapping, capability tier evaluation, provenance stamping.
+
+**Same-session requirement.** The outcome classifier (below) requires the follow-up's `sessionId` to match its own `parentSessionId` attestation field (`followUp.sessionId !== followUp.parentSessionId` forces `class = 'invalid_comparison'`) — consistent with R3.0C's "same-case + same-session only" comparison rule applied at the experiment-outcome layer too. A genuinely new physical track session — a new `sessionId` distinct from any prior reference — will classify as `invalid_comparison` unless the caller constructs the follow-up attestation as a same-session re-analysis. Wiring a brand-new physical follow-up session into a classifiable outcome end-to-end is not yet exercised by the shipped UI surface; this document does not claim it is.
 
 ---
 
@@ -211,29 +213,30 @@ Once linked, the follow-up Case is now eligible to be the subject of an outcome 
 
 ## Classify the outcome
 
-The Outcome Classifier (R3.0E) is the only place in the product where an experiment's result is named. It accepts authoritative-only inputs:
+The Outcome Classifier (R3.0E E3, `renderer/js/r3-0e-outcome-classifier.js`) is the only place in the product where an experiment's result is named. Its input wrapper has exactly five keys:
 
-- The parent Experiment record.
-- The parent Case's applied-change descriptor.
-- The comparison authority (same-case, same-session, explicit-reference, with the C2–C5 chain green).
-- The pledged controlled variables.
-- A minimum credibility floor on the underlying observations.
+- `experiment` — the parent Experiment record (deep-frozen, re-validated against the E1 contract).
+- `appliedChange` — the applied-change audit envelope (`changeId`, `sourceExperimentId`, `appliedAt`).
+- `followUp` — the R3.0B/R3.0C attestation for the follow-up: `parentCaseId`, `sessionId`, `parentSessionId`, `hasExplicitReference`, `comparabilityScore`.
+- `observation` — observed direction/magnitude, driver feedback (i18n key only), data-quality issues, side effects, and supporting/contradicting evidence id arrays.
+- `controlVariableObservations` — observed readings for the experiment's declared control variables.
 
-The classifier never accepts a caller-provided final outcome. Confirmation requires *all* of: same-case, same-session, explicit-reference, controlled-variables pledge intact, and the minimum credibility floor met. If any of these fail, the outcome is `cannotConclude` with the specific reason codes — not "inconclusive as a soft hedge", but a hard fail-closed result with named blockers.
+The classifier never accepts a caller-provided final outcome — `class`, `confounders`, and `comparabilityScore` are derived, never read from the caller's outcome side. There is no credibility-floor gate in this classifier; classification is driven entirely by the structural checks above.
 
-Possible outcome classes:
+Possible outcome classes, in precedence order:
 
-| Class | Meaning | Required conditions |
+| Precedence | Class | Required conditions |
 |---|---|---|
-| `confirmed` | The expected directional effect was observed within the credibility floor. | All authoritative-input gates pass; expected vs observed agree in direction. |
-| `refuted` | The observed direction is opposite the expected direction. | All authoritative-input gates pass; expected vs observed disagree in direction. |
-| `inconclusive` | Gates pass but the observed effect is not directionally separable from noise at the configured floor. | All authoritative-input gates pass; expected vs observed not separable. |
-| `invalid_comparison` | The comparison authority itself is not valid (track identity / lap authority / explicit-reference / controlled-variables broken). | Takes precedence over `inconclusive` and `cannotConclude` when the comparison itself is not legal. |
-| `cannotConclude` | Any required input is missing or below the credibility floor. | Default fail-closed. |
+| 1 | `invalid_comparison` | Cross-case, OR cross-session (`followUp.sessionId !== followUp.parentSessionId`), OR no explicit reference, OR `comparabilityScore < 0.5`. |
+| 2 | `inconclusive_due_to_confounders` | A declared control variable is missing from the observations, or an observed one is out of range. |
+| 3 | `inconclusive` | Too many data-quality issues (more than 4), or no observed direction. |
+| 4 | `contradicted` | Contradicting evidence present, or observed direction does not match the expected direction. |
+| 5 | `confirmed` | Observed direction matches the expected direction AND observed magnitude falls within the expected range. |
+| 6 | `partially_confirmed` | Observed direction matches the expected direction but observed magnitude falls outside the expected range. |
 
-The outcome class names — including `refuted` rather than any softer term — match the vocabulary used in `docs/r3-experiment-loop.md` and `docs/r3-credibility-model.md`.
+There is no `refuted` class and no `cannotConclude` class in the shipped classifier — see `docs/r3-experiment-loop.md` "Outcome classes" for the full precedence table and the exact reason codes each class can carry as `limitations`.
 
-The classifier output record carries: class, reason codes, supporting and contradicting evidence IDs, controlled-variable integrity result, comparison validity result, expected-vs-observed direction summary, limitations, `cannotConclude` flag where applicable, provenance, `createdAt`, and a generation token tying the outcome to the exact authoritative inputs used.
+The Outcome record carries exactly thirteen fields: `schemaVersion`, `outcomeId`, `experimentId`, `class`, `observedDirection`, `observedMagnitude`, `comparabilityScore`, `confounders`, `driverFeedback`, `dataQualityIssues`, `sideEffects`, `limitations`, `createdAt`. There is no separate `reasonCodes`, `comparisonValidity`, `controlledVariableIntegrity`, `expectedVsObserved`, `provenance`, or `generationToken` field on the output.
 
 The classifier never produces a measured K_us magnitude, a lap-time gain, a causal claim, or a setup-click recommendation. Its output is a typed directional + diagnostic record, attached to the experiment through a new outcome-store `create` (recall: outcomes are written once through the public surface; there is no update path), and the timeline store records the event separately.
 
@@ -288,7 +291,7 @@ The payload is bounded by the contract:
 
 The public API surface for this envelope is exactly `buildComparisonExportEnvelope(payload)`, `validateComparisonExportEnvelope(env)`, `isDistinctFromCaseExportIdentity(caseExportIdentity)`, plus the named constants `COMPARISON_EXPORT_IDENTITY`, `COMPARISON_EXPORT_SCHEMA_VERSION`, `MAX_BOUNDED_ARRAY`, `MAX_STRING_UTF8_BYTES`, `MAX_ENVELOPE_UTF8_BYTES`, and `ENVELOPE_KEYS`.
 
-The CP1 implementation that ships today wires no real export command yet and embeds no data: `payload` defaults to `null` and `generatedAt` is stamped `null`. A future production exporter is the place where a bounded comparison summary will be assembled from upstream C2–C5 results and stamped with a real timestamp. **Even then, the envelope will carry a bounded summary — not engineer briefs, not experiment records, not follow-up links, not outcomes, not the timeline.** Those R3.0D / R3.0E artefacts live in their own stores and have their own contracts; they are not co-bundled into the comparison-export envelope.
+The bare contract helper `buildComparisonExportEnvelope(payload)` defaults `payload` to `null` and `generatedAt` to `null` when called with no arguments — that is the CP1 (non-production) contract default, not the shipped behavior. The production exporter, `buildComparisonExport(request)` in `renderer/js/r3-0c-comparison-export.js`, is already implemented and wired through `r3-0c-comparison-adapter.js` into the C7 comparison orchestrator: it builds a populated, bounded payload from the upstream C2–C5 comparison result + association + credibility metadata, constructs the envelope via the contract, round-trips it through `JSON.stringify`/`JSON.parse` to verify it survives serialization, and returns `status: 'comparison_export_built'`. UI activation of this path (a button the user clicks) remains gated behind `featureRegistryActivationAllowed` per the R3.0C state machine — the service runs, but the user-visible pane may not yet be lit. **Whenever it runs, the envelope carries a bounded summary — not engineer briefs, not experiment records, not follow-up links, not outcomes, not the timeline.** Those R3.0D / R3.0E artefacts live in their own stores and have their own contracts; they are not co-bundled into the comparison-export envelope.
 
 ## Export and reimport a Case (R3.0B portable case bundle)
 

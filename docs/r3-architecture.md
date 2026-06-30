@@ -24,9 +24,9 @@ tree and one persistence contract; the host differences are confined to a small 
 
 ```
 +----------------------------------- Electron Host (main.js / preload.js) -----------------------------------+
-|  - contextIsolation: true, nodeIntegration: false, sandbox: true (default)                                  |
-|  - preload exposes EXACTLY { platform, version } — no IPC, no FS, no shell, no module require               |
-|  - File:// origin loads renderer/index.html; no remote module loader; CSP enforced                          |
+|  - contextIsolation: true, nodeIntegration: false explicitly set; no unsafe flag ever flipped on            |
+|  - preload exposes EXACTLY { platform, version } on window.electronAPI — no IPC, no FS, no shell            |
+|  - File:// origin loads renderer/index.html; CSP default-src 'self' (see Electron host boundaries below)    |
 +-------------------------------------------------------------------------------------------------------------+
             |
             v
@@ -418,37 +418,37 @@ authoritative schema versions are `{ experiment: 1, outcome: 1, timeline: 1, fol
 
 ### Outcome classifier
 
-`outcome-classifier.js` accepts **authoritative-only inputs** (the Experiment record, the applied-change record,
-the comparison authority, the controlled variables). It never accepts a caller-provided final outcome. The
-output shape is:
+`r3-0e-outcome-classifier.js` (authoritative entry `classifyOutcome(input, opts)`) accepts a **closed five-key
+input wrapper** — `experiment`, `appliedChange`, `followUp` (same-case/same-session/explicit-reference/
+comparability attestation), `observation` (direction/magnitude/evidence ids), and
+`controlVariableObservations`. It never accepts a caller-provided `class`, `confounders`, or
+`comparabilityScore`. The Outcome output has exactly thirteen keys, matching
+`contracts/r3.0e/outcome-contract.js`'s `OUTCOME_KEYS`:
 
 ```
-{ class, reasonCodes, supportingEvidenceIds, contradictingEvidenceIds,
-  controlledVariableIntegrity, comparisonValidity, expectedVsObserved,
-  limitations, cannotConclude, provenance, createdAt, generationToken }
+{ schemaVersion, outcomeId, experimentId, class, observedDirection, observedMagnitude,
+  comparabilityScore, confounders, driverFeedback, dataQualityIssues, sideEffects,
+  limitations, createdAt }
 ```
 
-`class` is one of five values: **`confirmed` / `refuted` / `inconclusive` / `invalid_comparison` /
-`cannotConclude`**. The classes are mutually exclusive and ordered by precedence:
+`class` is one of six values, ordered by precedence:
 
-- **`invalid_comparison`** takes precedence over every other class whenever the comparison authority is not
-  valid (reference not selected, normalized-distance authority blocked, track identity mismatch, …).
-- **`cannotConclude`** is emitted whenever the comparison authority is valid but a downstream precondition
-  (controlled-variable integrity, minimum credibility, same-session, explicit reference) is not satisfied. The
-  `cannotConclude: true` flag in the output is always co-present with `class === 'cannotConclude'`, and the
-  reason is carried in `reasonCodes`.
-- **`confirmed` / `refuted` / `inconclusive`** are reachable only when all preconditions are satisfied; the
-  three differ by what the comparison + controlled-variable evidence actually shows.
+1. **`invalid_comparison`** — cross-case, cross-session (`followUp.sessionId !== followUp.parentSessionId`),
+   no explicit reference, or `comparabilityScore < 0.5`. Takes precedence over every other class.
+2. **`inconclusive_due_to_confounders`** — a control variable declared in `experiment.controlVariables` is
+   missing from the observed set, or an observed one has `withinRange !== true`.
+3. **`inconclusive`** — `observation.dataQualityIssues.length` exceeds a fixed threshold (4), or
+   `observation.observedDirection === null`.
+4. **`contradicted`** — `observation.contradictingEvidenceIds` is non-empty, or the observed direction does
+   not match `experiment.expectedDirection`.
+5. **`confirmed`** — observed direction matches the expected direction AND `observedMagnitude` falls within
+   `experiment.expectedMagnitudeRange`.
+6. **`partially_confirmed`** (fallback) — observed direction matches but the magnitude falls outside the
+   expected range.
 
-`confirmed` is **never** emitted without:
-
-- same-case + same-session,
-- explicit reference selection,
-- controlled-variables integrity verified,
-- minimum credibility threshold satisfied.
-
-Absent any one of those, the classifier emits `cannotConclude` with the reason — it does not downgrade to
-`inconclusive` (which is reserved for "preconditions met, evidence does not support either direction").
+There is no `refuted` class, no `cannotConclude` class, and no credibility-floor gate in this classifier —
+classification is driven entirely by the structural checks above. See `docs/r3-experiment-loop.md` "Outcome
+classes" for the full table with file:line grounding.
 
 ### Honesty contract for the experiment loop
 
@@ -614,24 +614,37 @@ target the fail-closed boundaries identified earlier in this document:
 The Electron host is deliberately thin.
 
 ```
-main.js       — creates a BrowserWindow with the locked-down webPreferences below
-preload.js    — exposes exactly { platform, version } onto window.<appBridge>
+main.js       — creates a BrowserWindow; webPreferences below
+preload.js    — exposes exactly { platform, version } onto window.electronAPI
 renderer/     — runs as if it were a browser tab; never imports node:* / electron / fs / child_process
 ```
 
-Frozen `webPreferences`:
+`main.js`'s `BrowserWindow` `webPreferences` object literal explicitly sets exactly three keys:
 
 | Option | Value | Why |
 | --- | --- | --- |
+| `preload` | path to `preload.js` | The only privileged surface. |
 | `contextIsolation` | `true` | Renderer cannot reach into the preload's realm. |
 | `nodeIntegration` | `false` | No `require` / `process` / `Buffer` in the renderer. |
-| `nodeIntegrationInSubFrames` | `false` | Same for iframes. |
-| `sandbox` | `true` (default) | OS-level sandbox. |
-| `webSecurity` | `true` | Same-origin enforcement. |
-| `allowRunningInsecureContent` | `false` | No mixed content. |
-| `enableRemoteModule` | `false` / absent | No remote module loader. |
 
-The preload surface is **exactly** `{ platform, version }`. There is no `ipcRenderer.invoke` channel, no FS
+No other `webPreferences` key (`sandbox`, `webSecurity`, `allowRunningInsecureContent`,
+`nodeIntegrationInWorker`, `nodeIntegrationInSubFrames`, `enableRemoteModule`) is present in the object
+literal — they are absent, not explicitly hardened, and Electron's own defaults apply. The F3 boundary
+probe (`tests/e2e/hardening-01-electron-boundary.test.js`) does not assert these are explicitly set; it
+asserts `contextIsolation`/`nodeIntegration` are each declared exactly once with their safe literal value,
+and that none of the other keys is ever explicitly flipped to an unsafe value (e.g. `sandbox: false`,
+`webSecurity: false`, `nodeIntegration: true`) — a regression that adds an explicit unsafe flag fails
+closed; a contributor who never touches these keys does not.
+
+`renderer/index.html` declares `Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval'`.
+This restricts the default fetch directive — and therefore `connect-src`, which falls back to `default-src`
+when unset — to the app's own origin, so no remote network destination is reachable from a CSP standpoint.
+It does **not** block inline `<script>` tags or `eval()` (`'unsafe-inline'`/`'unsafe-eval'` are explicitly
+allowed), and the policy has no `object-src 'none'`, `base-uri 'self'`, or `frame-ancestors 'none'`
+directive. The F3 probe only asserts `default-src 'self'` is present in the declared policy.
+
+The preload surface is **exactly** `{ platform, version }` exposed via `contextBridge.exposeInMainWorld`
+under the name `electronAPI` (`window.electronAPI`). There is no `ipcRenderer.invoke` channel, no FS
 access, no shell spawn, no `webContents` exposure. A renderer-side feature that "would need a native API" is
 either solved without one or stays out of scope. The F3 boundary hardening probe
 (`hardening-01-electron-boundary.test.js`) verifies this no-IPC contract byte by byte against an expected
@@ -679,7 +692,7 @@ R3.0 production paths are deterministic by construction:
 | D5 brief | Deep-frozen emit; generation token bound to inputs | Token stale / retired / replayed against a different case | Brief refused. |
 | R3.0E timeline | Append-only invariants pass (unique `eventId`, monotonic `createdAt`, current schema, shape re-validated) | Duplicate / out-of-order / future schema / shape mismatch | Reason code, no append. |
 | R3.0E follow-up link | `parentCaseId` matches reverse index AND link; `markParentStatus` in `{present, archived, deleted}` | Reverse-index mismatch / non-array / status off-allowlist | `R3_0E_LINK_CORRUPTED` / `R3_0E_LINK_PARENT_STATUS_INVALID`. |
-| Outcome classifier | Authority + same-case/same-session + controlled-variables + min credibility | Any precondition fails | `cannotConclude` with reason; `invalid_comparison` takes precedence when the comparison authority itself is invalid. |
+| Outcome classifier | Same-case/same-session/explicit-reference attestation + control-variable observations | Cross-case, cross-session, no reference, low comparability, or a missing/out-of-range control variable | `invalid_comparison` (highest precedence) or `inconclusive_due_to_confounders` with the specific limitation code. |
 | Feature Registry | `featureRegistryActivationAllowed === true` | Otherwise | Feature deferred (navigation hidden / disabled). |
 
 ### What this means for the user

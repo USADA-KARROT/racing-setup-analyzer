@@ -30,8 +30,10 @@ is `2.0.0`.
   consumers have been allowed since F1 but UI activation is governed phase-by-phase.
 - `canonicalTrustUpgraded` remains a hard literal `false`. Suspension normalization is numeric
   compatibility, not evidence.
-- Electron host posture is `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`
-  by default. The preload bridge exposes exactly `{ platform, version }` — nothing else.
+- Electron host explicitly sets `contextIsolation: true` and `nodeIntegration: false` in
+  `webPreferences`; no other key (`sandbox`, `webSecurity`, etc.) is set, so Electron's
+  defaults apply and are never explicitly weakened. The preload bridge exposes exactly
+  `{ platform, version }` on `window.electronAPI` — nothing else.
 - **Comparison is same-case + same-session only.** Cross-case comparison and cross-session
   comparison within a single case are both **permanently forbidden** at every layer
   (authority, view model, export, decision engine, experiment loop).
@@ -218,21 +220,22 @@ Store contract reminders:
 
 - **Experiments**: `create`, `update`, `remove` permitted; `EXPERIMENTS` and
   `EXPERIMENTS_INDEX` are kept in lockstep on delete.
-- **Outcomes**: `update` permitted; `updatedAt` advances on each accepted update; class
-  assignment never upgrades a credibility rung.
+- **Outcomes**: create-only through the public API (`create`, `get`, `listForExperiment`);
+  no `update`, no `remove`. An outcome is classified once.
 - **Timeline**: append-only per case; duplicate `eventId` rejected; out-of-order timestamps
   rejected; a correction is a new event, not a mutation.
 - **Follow-up links**: `create`, `listForParent`, `markParentStatus` permitted; the link
   itself carries no comparison authority.
 
-Outcomes are classified into one of `confirmed`, `refuted`, `inconclusive`,
-`invalid_comparison`, `cannotConclude`. `invalid_comparison` takes precedence over
-`inconclusive` and `cannotConclude` whenever the comparison authority itself is not valid
-for this experiment; `cannotConclude` is the explicit terminal class when the
-controlled-variable witness, credibility floor, or evidence linkage is missing even though
-comparison authority is otherwise valid. The Outcome classifier sits at **Heuristic** on
-the ladder because its class assignment is a structured judgment over authoritative
-inputs, not a measured magnitude — consistent with `docs/r3-experiment-loop.md`.
+Outcomes are classified into one of six classes, in precedence order: `invalid_comparison`,
+`inconclusive_due_to_confounders`, `inconclusive`, `contradicted`, `confirmed`,
+`partially_confirmed`. `invalid_comparison` takes precedence over every other class
+whenever the follow-up's same-case / same-session / explicit-reference / comparability
+attestation is not valid; `inconclusive_due_to_confounders` is next whenever a declared
+control variable is missing or out of range. There is no `refuted` class and no
+`cannotConclude` class — see `docs/r3-experiment-loop.md` "Outcome classes" for the full
+table. The Outcome classifier sits at **Heuristic** on the ladder because its class
+assignment is a structured judgment over authoritative inputs, not a measured magnitude.
 
 ---
 

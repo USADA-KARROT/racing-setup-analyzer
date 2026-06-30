@@ -245,7 +245,7 @@ This is the product's invariant: no data leaves the host unless the user explici
 How the invariant is enforced, in layers:
 
 1. **Absence of call sites.** Production paths contain no `fetch`, `XMLHttpRequest`, `WebSocket`, or `navigator.sendBeacon` to remote origins. This is a code-shape property, auditable by grep.
-2. **Electron Content Security Policy.** The renderer's CSP (see below) restricts `connect-src` to `'self'`, so even if a third-party dependency attempted to open a remote connection, the browser engine would refuse it.
+2. **Electron Content Security Policy.** The renderer's CSP (see below) sets `default-src 'self'`; `connect-src` is not declared separately, so it falls back to `default-src 'self'`. So even if a third-party dependency attempted to open a remote connection, the browser engine would refuse it.
 3. **R3.0F F3 supply-chain probe.** F3's hardening manifest includes a supply-chain probe that asserts the production build does not introduce a new outbound origin via a dependency update. The probe passes at the F3 baseline that ships in this milestone.
 
 The combination of "no call sites in our code" + "CSP refuses connections" + "supply-chain probe verifies the dependency surface" is what the contract rests on, rather than a single runtime interceptor.
@@ -256,17 +256,29 @@ The combination of "no call sites in our code" + "CSP refuses connections" + "su
 
 The Electron host is configured to deny the renderer any path to system resources beyond an explicitly enumerated preload surface.
 
+`main.js`'s `BrowserWindow` `webPreferences` object literal explicitly sets exactly three keys:
+
 | Setting | Value | Rationale |
 |---|---|---|
+| `preload` | path to `preload.js` | The only privileged surface. |
 | `contextIsolation` | `true` | Renderer JavaScript runs in an isolated context; it cannot reach into the preload's Node scope. |
 | `nodeIntegration` | `false` | The renderer has no `require`, no `process`, no Node globals. Renderer code cannot touch the filesystem, spawn processes, or load native modules. |
-| `sandbox` | `true` (default for renderers) | OS-level sandbox; renderer cannot make arbitrary syscalls. |
-| `webSecurity` | `true` | Same-origin policy enforced in renderer. |
-| `allowRunningInsecureContent` | `false` | Mixed-content blocked. |
-| Content Security Policy | `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'` | No remote origins. No inline scripts beyond hashed/nonced ones. No remote `connect-src` — combined with the no-egress contract, this means the renderer has no way to phone home even if compromised. |
-| `nodeIntegrationInWorker` | `false` | Workers also have no Node. |
-| `nodeIntegrationInSubFrames` | `false` | Sub-frames likewise. |
-| `enableRemoteModule` | `false` / deprecated and not used | The `remote` module is never enabled. |
+
+No other `webPreferences` key — `sandbox`, `webSecurity`, `allowRunningInsecureContent`,
+`nodeIntegrationInWorker`, `nodeIntegrationInSubFrames`, `enableRemoteModule` — is present in the object
+literal. They are absent, not explicitly hardened to a safe value; Electron's own defaults apply. The F3
+electron-boundary probe (`tests/e2e/hardening-01-electron-boundary.test.js`) does not assert these are
+explicitly set — it asserts `contextIsolation`/`nodeIntegration` are each declared exactly once with their
+safe literal value, and that none of the other keys is ever explicitly flipped to an unsafe value (e.g.
+`sandbox: false`, `webSecurity: false`, `nodeIntegration: true`).
+
+`renderer/index.html` declares the Content Security Policy `default-src 'self' 'unsafe-inline'
+'unsafe-eval'`. This restricts the default fetch directive — and therefore `connect-src`, which falls back
+to `default-src` when unset — to the app's own origin, so no remote network destination is reachable from a
+CSP standpoint; combined with the no-egress contract below, the renderer has no way to phone home even if
+compromised. The policy does **not** block inline `<script>` tags or `eval()` (`'unsafe-inline'` and
+`'unsafe-eval'` are explicitly allowed), and has no `object-src 'none'`, `base-uri 'self'`, or
+`frame-ancestors 'none'` directive. The F3 probe only asserts `default-src 'self'` is present.
 
 ### Preload surface
 
@@ -334,7 +346,7 @@ The product gives the user explicit, local control over their data. There is no 
 
 A case is deleted via `caseStore.remove(caseId, { confirm: true })`. The `confirm: true` flag is **required**; without it the store returns `{ ok: false, code: 'CONFIRM_REQUIRED' }` as a fail-closed safeguard against accidental UI wiring.
 
-Internally, `remove` runs a single atomic `backend.transact()` across the two stores it owns, namely `cases` and `caseIndex`. The writes are: delete the row at `cases[caseId]`, and write a new `caseIndex.__index` value with that `caseId` removed from the index summary. Error paths include `CONFIRM_REQUIRED`, `CASE_NOT_FOUND`, `STORE_ERROR`, and the sibling guards on the import path (`ID_COLLISION`, `CANNOT_OVERWRITE_IMPORTED`, `CANNOT_OVERWRITE_FUTURE`, `CANNOT_DUPLICATE_IMPORTED_SUMMARY`, `RECORD_NOT_STORABLE`).
+Internally, `remove` runs a single atomic `backend.transact()` across the two stores it owns, namely `cases` and `caseIndex`. The writes are: delete the row at `cases[caseId]`, and write a new `caseIndex.__index` value with that `caseId` removed from the index summary. `remove` does **not** read the case row first, so it has no `CASE_NOT_FOUND` path — calling it with an unknown `caseId` deletes nothing from `cases` (there is no row to delete) but still rewrites `caseIndex.__index` and reports `{ ok: true }`. Its only error paths are `CONFIRM_REQUIRED` and `STORE_ERROR`. (`CASE_NOT_FOUND` is a real code elsewhere in this store — e.g. `setPinned` and `_setArchived` read-and-check the case row first — but `remove` itself does not use it.) The sibling guards on the import path (`ID_COLLISION`, `CANNOT_OVERWRITE_IMPORTED`, `CANNOT_OVERWRITE_FUTURE`, `CANNOT_DUPLICATE_IMPORTED_SUMMARY`, `RECORD_NOT_STORABLE`) belong to `importBundle`, not `remove`.
 
 **`caseStore.remove` does not cascade.** It does not delete from `sessions`, it does not delete from any R3.0E store (`r3_0e_experiments`, `r3_0e_experimentsIndex`, `r3_0e_outcomes`, `r3_0e_outcomesIndex`, `r3_0e_timelines`, `r3_0e_followupLinks`, `r3_0e_followupLinksByCase`), and it does not delete R3.0D Engineer Brief artifacts. This is a deliberate boundary — the case store knows about cases, not about everything that has ever referenced a case — and there is no `caseAssociation` field on the dependent records that would let it cascade safely without a second pass.
 
@@ -397,8 +409,8 @@ The F3 phase ships six adversarial probes under `tests/e2e/hardening-{01..06}-*.
 - Raw telemetry is never in a case bundle. Only the structured `imported_summary` is.
 - `imported_summary` is never promoted to `Measured` automatically. Promotion requires confirmed mapping + verified calibration + sample-quality gate + re-derived authority. When promotion is not warranted, a `Derived` or `Heuristic` substitute is offered explicitly, or the capability is `Unavailable`.
 - Comparison is same-case + same-session, reference-lap explicit-user-only, delta sign `(comparison − reference)`. Follow-up Case Links never carry comparison authority.
-- No production network egress. Enforced by CSP `connect-src 'self'` + absence of remote fetch call sites in production paths + R3.0F F3 supply-chain probe verification.
-- Electron host enforces `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, strict CSP, and a preload surface of exactly `{ platform, version }`. R3.0F F3 electron-boundary and XSS probes assert this surface.
+- No production network egress. Enforced by CSP `default-src 'self' 'unsafe-inline' 'unsafe-eval'` (no `connect-src` declared, so it falls back to `default-src 'self'`) + absence of remote fetch call sites in production paths + R3.0F F3 supply-chain probe verification.
+- Electron host explicitly sets `contextIsolation: true` and `nodeIntegration: false`; `sandbox`/`webSecurity`/`allowRunningInsecureContent`/etc. are absent (Electron defaults apply, never explicitly weakened) and the CSP allows `'unsafe-inline'`/`'unsafe-eval'` (not a strict policy). Preload surface is exactly `{ platform, version }` on `window.electronAPI`. R3.0F F3 electron-boundary and XSS probes assert these properties — see "Electron host security" above for the exact contract.
 - User control is local and immediate. `caseStore.remove({ confirm: true })` deletes the case row and rewrites `caseIndex.__index` atomically; it does **not** cascade. Sessions, R3.0E records (experiment/outcome/timeline/follow-up-link), and R3.0D briefs require separate removal calls; outcomes and timelines have no `remove()` (write-once / append-only by contract). The R3.0F migration journal and state live as two named keys inside the `meta` store and are wiped only by deleting `userData`.
 - R3.0F F1 is deterministic, idempotent, fail-closed, structured-clone-only at the boundary, and **refuses to write producer-attestation field names** with `PRODUCER_ATTESTATION_REFUSED`. There is no `migrations` object store and no `migrationId`; the journal at `meta['__r3_0f_migration_journal__']` (capped at 256 entries by default) and the state at `meta['__r3_0f_migration_state__']` are the audit surface.
 - All of the above held across R3.0F F1 migration, F2 nine E2E flows, and F3 six hardening probes (133 assertions) at the milestone baseline.

@@ -21,10 +21,17 @@ here are live behind the activation gate; user-visible panes are not yet lit.
 
 ## Producer chain: R3.0D engineer-brief → recommendation → experiment plan
 
-The loop has a single, strict producer chain. Each stage consumes only the
-**authoritative** output of the previous stage; no stage will read
-caller-provided summary flags such as `eligible`, `confirmed`, `validated`, or
-`final`. Eligibility is re-derived from raw evidence on every run.
+The chain that precedes an experiment plan spans two programs. **R3.0D owns the
+recommendation**; **R3.0E owns the experiment, its application, and its
+classification.** There is no R3.0E-side "recommendation producer" — the
+Recommendation shape itself is defined and validated by the non-production
+contract `contracts/r3.0d/recommendation-contract.js` and consumed inside
+R3.0D's own D4 Priority Engine / D5 Engineer Brief, not by an R3.0E module.
+
+Each stage consumes only the **authoritative** output of the previous stage;
+no stage will read caller-provided summary flags such as `eligible`,
+`confirmed`, `validated`, or `final`. Eligibility is re-derived from raw
+evidence on every run.
 
 The credibility ladder used throughout this document, top-to-bottom, is:
 **Physics > Model > Measured > Derived > Heuristic > Unavailable**. A stage may
@@ -34,10 +41,10 @@ only *lower* the rung of an input as it propagates; it may never *raise* it.
 |-------|----------|----------------|--------|-----------------------|
 | Evidence graph | R3.0D D2 | R3.0C comparison authority + R3.0B case-record | Authoritative evidence nodes | Measured / Derived |
 | Hypothesis | R3.0D D3 | Evidence graph (closure-private WeakSet verified) | Ranked hypotheses with reason-codes | Model / Derived / Heuristic |
-| Priority | R3.0D D4 | Verified hypotheses | Ranked candidates | Heuristic |
+| Priority / Recommendation | R3.0D D4 | Verified hypotheses | Ranked candidates + a Recommendation (`contracts/r3.0d/recommendation-contract.js` shape: `priorityKey`, `applyMode` restricted to `driver_action`/`user_initiated`, no `auto_*`) | Heuristic |
 | Engineer Brief | R3.0D D5 | Priority list + evidence graph | Authoritative brief (read-only) | Heuristic |
-| Recommendation | R3.0E E3 | Engineer Brief (authoritative-only) | Physical-unit recommendation | Derived / Heuristic |
-| Experiment Plan | R3.0E E1 | Recommendation + brief + case | Experiment record (mutable; timeline is append-only) | Derived |
+| Experiment Plan | R3.0E E1 | Engineer authors the plan, referencing the brief/recommendation by id | Experiment record (mutable via `create`/`update`/`get`/`list`/`remove`; the Timeline is the append-only audit trail — see below) | Derived |
+| Outcome Classification | R3.0E E3 | Experiment + applied change + follow-up comparison + control-variable observations | Outcome record (see "Outcome classifier" below) | Derived (capped) |
 
 *The rung shown is the maximum a stage can emit; actual rung is set per-run by
 the underlying input credibility.* A Priority or Engineer Brief node whose
@@ -45,11 +52,13 @@ inputs are all Measured-rung still emerges at the **Heuristic** ceiling above,
 because ranking and prose-style framing are themselves heuristic operations on
 the underlying evidence.
 
-E3 consumes the R3.0D Engineer Brief as authoritative-only input, verified
-through the same closure-private WeakSet pattern (`_authoritativeGraphs` /
-`verifyAuthoritativeGraph`) used by R3.0D. Caller-supplied brief contents are
-rejected; only a brief object that was minted by D5 and is still resident in the
-authoritative set will pass the gate.
+The Experiment record's `sourceHypothesisId` and `sourceRecommendationId`
+fields are **id-grammar-validated string references only** (`contracts/r3.0e/
+experiment-contract.js`) — there is no closure-private WeakSet that verifies
+an R3.0D-minted Recommendation or Engineer Brief object crossed the R3.0D→
+R3.0E boundary intact. The engineer is the one who reads the D5 brief and
+authors the E1 experiment record referencing it by id; R3.0E does not
+re-verify the brief's authoritative provenance at experiment-creation time.
 
 The chain has two non-negotiable properties:
 
@@ -85,25 +94,28 @@ Every experiment record has the following authoritative fields. The record is
 deep-frozen at write time and reads return structured clones; callers cannot
 mutate it in place.
 
-| Field | Type | Authority | Meaning |
+This table reflects the actual closed key set and validation in
+`contracts/r3.0e/experiment-contract.js`:
+
+| Field | Type | Validation | Meaning |
 |-------|------|-----------|---------|
-| `experimentId` | opaque id | Generated | Stable identity. Never reused. |
-| `sourceCaseId` | case id | Producer-attested | The case the experiment was authored against. |
-| `sourceHypothesisId` | hypothesis id | R3.0D D3 | The hypothesis being tested. Must exist in the source case's authoritative evidence graph. |
-| `sourceRecommendationId` | recommendation id | R3.0E E3 | The recommendation that produced the plan. |
-| `targetMetric` | enumerated code | Allowlist | Which **delta metric** (R3.0C C5) the experiment is targeting — e.g. `entry_understeer_delta`, `mid_balance_delta`. Free-form metric names are rejected. |
-| `baselineValue` | `{ value, units, credibility, provenance }` | Measured / Derived | The baseline reading from the source case. Carries the credibility-ladder rung explicitly. |
-| `expectedDirection` | `"increase" \| "decrease" \| "stay"` | Derived | The qualitative direction predicted by the model. Never a magnitude claim. |
-| `expectedMagnitudeRange` | `{ min, max, units } \| null` | Model | Optional. When present, declared as a **predicted range**, not a guaranteed outcome. `null` when the model cannot bound it honestly. |
-| `setupChange` | structured diff | Producer-attested | The setup lever(s) being moved, in physical units. No clicks. |
-| `driverInstruction` | string \| null | Heuristic | Optional driver-facing note. Marked `Heuristic` and never treated as a vehicle fact. |
-| `controlVariables` | array of declarations | Authoritative | Variables the engineer is asserting will be held constant (tyre set, fuel mass, track temp window, driver, session). Used by the outcome classifier; missing controls block confirmation. |
-| `validationPlan` | structured | Authoritative | Which lap selection rule applies for the follow-up reference (still **EXPLICIT USER ONLY** at consumption time — the plan can describe *intent*, never auto-pick). |
-| `stopConditions` | array of reason-codes | Allowlist | Pre-enumerated conditions that abort the experiment (e.g. `RAIN_DETECTED`, `TYRE_SET_CHANGED_UNDECLARED`). |
-| `status` | enumerated | State machine | `draft` → `applied` → `awaiting_followup` → `classified` → `closed`. No back-transitions. |
-| `followUpCaseIds` | array | Producer-attested | Cases authored as the experimental follow-up. Each entry is a one-way link, validated against the link grammar. |
-| `outcome` | classifier result \| null | E3 classifier | Set once, when classification runs. Never overwritten. |
-| `createdAt` | ISO-8601 timestamp | Authority | Used as the stale-write guard on `update`. |
+| `experimentId` | string, `exp_<16-32 hex>` | Grammar-checked | Stable identity. Never reused. |
+| `sourceCaseId` | string | Id-grammar-checked only | The case the experiment was authored against. No live cross-check against R3.0B at the contract layer. |
+| `sourceHypothesisId` | string | Id-grammar-checked only | Reference to the R3.0D D3 hypothesis being tested. Not re-verified against the evidence graph at write time. |
+| `sourceRecommendationId` | string | Id-grammar-checked only | Reference to the R3.0D D4/D5 recommendation that produced the plan. Not re-verified against an authoritative R3.0D producer set. |
+| `targetMetric` | non-empty string (≤512 bytes) | Length-checked only | Which metric the experiment is targeting (e.g. a R3.0C C5 delta-metric name). **Not an allowlist** — any non-empty string under the byte cap is accepted at this layer. |
+| `baselineValue` | finite number | `Number.isFinite` | The baseline reading from the source case. A plain number — no `{ value, units, credibility, provenance }` wrapper. |
+| `expectedDirection` | `'increase' \| 'decrease' \| 'no_change'` | Closed enum | The qualitative direction predicted by the model. (Not `"stay"` — the literal enum value is `'no_change'`.) |
+| `expectedMagnitudeRange` | `{ min: number, max: number }`, `min <= max` | Required, not nullable | A plain object with finite `min`/`max`. There is no `units` key in this object and no `null` escape hatch — the contract rejects a non-plain or missing range. |
+| `setupChange` | plain object | `_isPlain` only | The setup lever(s) being moved. The contract checks it is a plain object; it does not enforce a specific physical-unit shape. |
+| `driverInstruction` | string \| `null` | Optional | Optional driver-facing note when non-null. |
+| `controlVariables` | array, ≤32 entries | `Array.isArray` + length cap only | Declared control variables. The E1 contract does not validate per-element shape; the E3 classifier reads each element's `.name` at runtime to compare against observed control variables. |
+| `validationPlan` | non-empty string (≤512 bytes) | Length-checked only | An i18n-key-style string naming the validation procedure. **Not a structured object.** |
+| `stopConditions` | array, 1–32 entries, each `{ i18nKey: string, params?: object }` | Shape-checked | Pre-enumerated guard conditions. The contract enforces the `{i18nKey, params}` shape and a non-empty `i18nKey`; it does not enforce a fixed catalogue of `i18nKey` values. |
+| `status` | enumerated | Closed enum | `'draft' \| 'planned' \| 'applied' \| 'completed' \| 'abandoned' \| 'invalid'`. The contract does not enforce transition order — that is left to the calling code. |
+| `followUpCaseIds` | array, ≤32 entries | `Array.isArray` + length cap only | Cases authored as the experimental follow-up. |
+| `outcome` | Outcome object \| `null` | Status-gated | Must be `null` while `status` is `'draft'`, `'planned'`, or `'applied'`. May be a plain object only when `status` is `'completed'`, `'abandoned'`, or `'invalid'` — this prevents a caller from attaching a classification result before the experiment has actually concluded. |
+| `createdAt` | ISO-8601 string | Non-empty string | Used as the stale-write guard on `update` (compared for exact equality, not freshness). |
 
 Fields not in this list are silently dropped at write time — a recursive
 descriptor audit on the input rejects future-schema bleed-through and overflow.
@@ -245,38 +257,62 @@ performs a new, fresh, same-case + same-session comparison with an
 
 Reference lap selection in the follow-up obeys the R3.0C C4 rule unchanged:
 **explicit user selection only**. There is no `fastest_valid`,
-`median`, `best_sector_composite`, or any other auto-pick. When the user has
-not picked a reference, the comparison capability is blocked with
-`REFERENCE_LAP_NOT_SELECTED`.
+`median`, `best_sector_composite`, or any other auto-pick. At the R3.0C
+comparison-authority layer, an unselected reference is rejected with
+`REFERENCE_NOT_SELECTED` (`contracts/r3.0c/reference-and-corner-contract.js`).
+At the R3.0E outcome-classifier layer (below), the follow-up's
+`hasExplicitReference !== true` flag folds into the `invalid_comparison` class
+with the limitation `OUTCOME_COMPARABILITY_INSUFFICIENT` — there is no
+`REFERENCE_LAP_NOT_SELECTED` code in the shipped R3.0E path.
 
 Delta sign in the follow-up case is, as always, `comparison − reference`.
 
 ## Outcome classifier authoritative-only inputs
 
-The outcome classifier is a deterministic function. It takes only
-authoritative inputs and emits a single classified outcome. It never accepts
-a caller-supplied "final" outcome, never trusts an `eligible` / `confirmed`
-flag, and never reads anything outside the producer chain.
+The outcome classifier (`renderer/js/r3-0e-outcome-classifier.js`,
+authoritative entry `classifyOutcome(input, opts)`) is a deterministic
+function. It takes only the fields declared in its closed input-key set and
+emits a single classified Outcome. It never accepts a caller-supplied "final"
+outcome, never trusts an `eligible`/`confirmed` flag, and never reads a field
+outside its allowlisted input shape.
 
-Its inputs, in order:
+The input wrapper has exactly five keys:
 
-1. **The Experiment record** (E1), retrieved by id from the experiment store
-   and verified through a closure-private WeakSet (`_authoritativeGraphs` /
-   `verifyAuthoritativeGraph` pattern from R3.0D, extended for E3).
-2. **The applied change**, as declared in `experiment.setupChange`. The
-   classifier does not re-derive what was changed — but it does reject the
-   run when the follow-up case's setup does not reflect the declared change.
-3. **The R3.0C comparison authority output** for the *follow-up case alone*
-   (same-case + same-session), with an **explicitly user-selected reference
-   lap**. Missing reference → `REFERENCE_LAP_NOT_SELECTED` → outcome blocked.
-4. **The declared `controlVariables`** from the experiment. The classifier
-   checks each one against the follow-up case's session metadata. An
-   undeclared change (e.g. tyre set differs but `controlVariables` did not
-   release it) is a hard fail.
-5. **A minimum credibility floor** on the comparison output, set at the
-   **Measured** rung. If any input on which the target delta depends is at
-   `Heuristic` or `Unavailable`, the classifier emits `cannotConclude` — not
-   a guess. (`Derived` rung is permitted but caps `confidence` at `medium`.)
+1. **`experiment`** — the Experiment record (E1). The classifier requires it
+   to be deep-frozen and re-validates it against
+   `EXP.validateExperimentShape`. This is a **shape + immutability** check, not
+   a producer-identity WeakSet check — there is no cross-program authority
+   registry verifying the experiment was minted by a specific R3.0D/R3.0E
+   producer.
+2. **`appliedChange`** — `{ changeId, sourceExperimentId, appliedAt }`,
+   id-grammar- and timestamp-checked. The classifier does not re-derive what
+   was changed from `experiment.setupChange`; it only validates this small
+   envelope's shape and freshness.
+3. **`followUp`** — `{ followUpCaseId, parentCaseId, sessionId,
+   parentSessionId, hasExplicitReference, comparabilityScore }`. The
+   classifier derives `crossCase` (`followUp.parentCaseId !==
+   experiment.sourceCaseId`), `crossSession`
+   (`followUp.sessionId !== followUp.parentSessionId`), `noExplicitReference`
+   (`followUp.hasExplicitReference !== true`), and `lowComparability`
+   (`comparabilityScore < 0.5`) from this object. Any one of the four forces
+   `class = 'invalid_comparison'` — this is the highest-precedence outcome.
+4. **`observation`** — `{ observedDirection, observedMagnitude,
+   driverFeedback, dataQualityIssues, sideEffects, contradictingEvidenceIds,
+   supportingEvidenceIds }`. `observedDirection`/`observedMagnitude` drive the
+   confirmed/partially_confirmed/contradicted decision (see below);
+   `dataQualityIssues.length` above a fixed threshold (4) forces
+   `'inconclusive'`; a non-empty `contradictingEvidenceIds` forces
+   `'contradicted'` regardless of direction match.
+5. **`controlVariableObservations`** — an array of observed control-variable
+   readings. The classifier compares this against `experiment.controlVariables`
+   (declared by name): a declared variable missing from the observations, or
+   an observed variable flagged `withinRange !== true`, becomes a confounder
+   and forces `class = 'inconclusive_due_to_confounders'`.
+
+There is **no credibility-rung gate** in this classifier (no "Measured floor",
+no `Heuristic`/`Unavailable` rejection) and **no `cannotConclude` class** —
+that vocabulary does not exist in the shipped code. The six real classes are
+listed in the next section.
 
 Inputs the classifier explicitly **does not** read:
 
@@ -284,68 +320,63 @@ Inputs the classifier explicitly **does not** read:
 - Any driver-behaviour observation as a vehicle finding. Driver behaviour
   ≠ vehicle characteristic ≠ setup finding.
 - Any LLM-produced narrative. The classifier is reason-code-only.
-- Any caller-provided summary flag.
+- Any caller-provided summary flag (`eligible`, `confirmed`, `class`, etc.).
 
-The output shape is:
+The output Outcome object has exactly thirteen keys, matching
+`contracts/r3.0e/outcome-contract.js`'s `OUTCOME_KEYS`:
 
 ```
 {
-  class,                       // one of the five outcome classes (next section)
-  reasonCodes,                 // allowlisted reason-codes; never free text
-  supportingEvidenceIds,       // evidence-graph node ids that support the class
-  contradictingEvidenceIds,    // evidence-graph node ids that contradict it
-  controlledVariableIntegrity, // per-control-variable status; any 'violated' → not confirmed
-  comparisonValidity,          // 'valid' | 'invalid' (drives invalid_comparison)
-  expectedVsObserved,          // structured: directionMatch, magnitudeWithinPredictedRange?
-  limitations,                 // honest scope caveats (always populated, even on confirmed)
-  cannotConclude,              // boolean shortcut mirroring class === 'cannotConclude'
-  provenance,                  // { syntheticOrReal, mappingTrusted, calibrationPresent }
-  createdAt,                   // ISO-8601
-  generationToken              // single-use token; bumped per case-transition
+  schemaVersion,        // integer, currently 1
+  outcomeId,            // derived from experimentId + appliedChange.changeId
+  experimentId,         // echoes experiment.experimentId
+  class,                // one of six outcome classes (next section)
+  observedDirection,    // echoed from the observation input
+  observedMagnitude,    // echoed from the observation input
+  comparabilityScore,   // echoed from the followUp input
+  confounders,          // control-variable names that drifted/are missing (see step 5 above)
+  driverFeedback,       // echoed from the observation input
+  dataQualityIssues,    // echoed from the observation input
+  sideEffects,          // echoed from the observation input
+  limitations,          // reason codes accumulated during classification (always present, may be empty)
+  createdAt,            // ISO-8601, resolved from opts.clock / appliedChange.appliedAt / experiment.createdAt
 }
 ```
 
-`comparisonValidity = "invalid"` forces `class = invalid_comparison` regardless
-of other fields; see the precedence ordering in the outcome-classes table
-below.
+There is no `reasonCodes`, `supportingEvidenceIds`, `contradictingEvidenceIds`,
+`controlledVariableIntegrity`, `comparisonValidity`, `expectedVsObserved`,
+`cannotConclude`, `provenance`, or `generationToken` key on the output —
+those are either input-only fields (`supportingEvidenceIds`/
+`contradictingEvidenceIds` belong to the `observation` input) or do not exist
+in the shipped classifier at all.
 
-`generationToken` exists specifically to defend against retired-token replay:
-a classifier result written under an old token (e.g. before a case transition)
-is rejected on read.
+## Outcome classes: confirmed / partially_confirmed / contradicted / inconclusive / invalid_comparison / inconclusive_due_to_confounders
 
-## Outcome classes: confirmed / refuted / inconclusive / invalid_comparison / cannotConclude
+The classifier emits exactly one of **six** classes
+(`contracts/r3.0e/outcome-contract.js`'s `OUTCOME_CLASS_ALLOWED`). The classes
+are evaluated in a fixed precedence order — when multiple conditions apply,
+the highest-precedence class wins:
 
-The classifier emits exactly one of five classes. The classes are ordered by
-precedence — when multiple conditions apply, the highest-precedence class wins.
+| Precedence | Class | When (from `renderer/js/r3-0e-outcome-classifier.js`) | What it does *not* mean |
+|---|-------|------|--------------------------|
+| 1 (highest) | `invalid_comparison` | `crossCase` (follow-up's `parentCaseId` ≠ experiment's `sourceCaseId`), OR `crossSession` (follow-up's `sessionId` ≠ `parentSessionId`), OR `noExplicitReference` (`hasExplicitReference !== true`), OR `lowComparability` (`comparabilityScore < 0.5`). | Does **not** mean the experiment failed — only that *no honest comparison was possible*. The setup change is not judged. |
+| 2 | `inconclusive_due_to_confounders` | A control variable declared in `experiment.controlVariables` is missing from the observed set, OR an observed control variable has `withinRange !== true`. | Does **not** mean the hypothesis is wrong — it means a variable the engineer promised to hold constant did not stay constant (or was never observed). |
+| 3 | `inconclusive` | `observation.dataQualityIssues.length` exceeds a fixed threshold (4), OR `observation.observedDirection === null`. | Does **not** mean "try again with more aggressive change" — it means the observation itself was too noisy or incomplete to classify. |
+| 4 | `contradicted` | `observation.contradictingEvidenceIds` is non-empty, OR the observed direction does not match `experiment.expectedDirection`. | Does **not** mean the hypothesis is universally false — only that the predicted direction was not observed under these controls in this session. |
+| 5 | `confirmed` | Observed direction matches `expectedDirection` AND `observedMagnitude` falls within `expectedMagnitudeRange` (`min`–`max`, inclusive). | Does **not** mean "the setup change *caused* the lap time", does **not** mean "professionally validated", and does **not** unlock any auto-apply. Correlation ≠ causation, Prediction ≠ guaranteed result. |
+| 6 (fallback) | `partially_confirmed` | Observed direction matches `expectedDirection`, but `observedMagnitude` falls outside `expectedMagnitudeRange` (or is not a finite number). | Does **not** mean "confirmed at a lower confidence" with a numeric score — there is no separate confidence scalar; `partially_confirmed` is itself the honest signal that direction matched but magnitude did not. |
 
-| Class | When | What it does *not* mean |
-|-------|------|--------------------------|
-| `invalid_comparison` | The R3.0C comparison authority rejected the follow-up's comparison (e.g. no explicit reference lap, non-monotonic timebase, channel mapped-but-unconfirmed, degenerate normalized-distance). | Does **not** mean the experiment failed — only that *no honest comparison was possible*. The setup change is not judged. |
-| `cannotConclude` | A required input is at credibility `Heuristic` or `Unavailable` (below the **Measured** credibility floor — see Authoritative-only inputs step 5); or a declared control variable is missing data; or the minimum credibility floor is not met. | Does **not** mean the experiment was inconclusive in the data — it means *the data does not let us conclude either way*. The next-validation step is populated. |
-| `inconclusive` | All inputs were credible and controlled, the comparison was valid, but the predicted direction was neither observed nor reversed under the stated control variables at a credibility above the floor (e.g. within noise, mixed across the corner-pairing, or magnitude inside the model's predicted range and inside the noise band simultaneously). | Does **not** mean "try again with more aggressive change". |
-| `refuted` | Comparison valid, controls intact, the **opposite** of `expectedDirection` was observed under the stated control variables at a credibility above the floor. | Does **not** mean the hypothesis is universally false — only that the predicted direction was not observed under these controls in this session. |
-| `confirmed` | Comparison valid, controls intact, the predicted direction was observed under the stated control variables at a credibility above the floor. When `expectedMagnitudeRange` was supplied, the observed magnitude is reported alongside it but does not itself gate the class. | Does **not** mean "the setup change *caused* the lap time", does **not** mean "professionally validated", and does **not** unlock any auto-apply. Correlation ≠ causation, Prediction ≠ guaranteed result. |
-
-Every outcome — including `confirmed` — carries:
-
-- **credibility** of the underlying comparison (the ladder rung; e.g.
-  `Measured (kinematic, confounded)` for a corner-delta on raw telemetry).
-- **confidence**, an independent scalar capped at `medium` whenever any input
-  rung is below `Measured`.
-- **provenance** machine-read from the comparison output (synthetic stays
-  synthetic; nothing presented as real that is not).
-- **limitations**, always populated. A confirmed outcome that ran against
-  synthetic data carries the synthetic limitation verbatim.
-- **blockers** (empty when the class is one of the four classified outcomes;
-  populated with reason-codes when the class is `invalid_comparison` /
-  `cannotConclude`).
-- **evidence references** to the supporting and contradicting evidence-graph
-  nodes.
-- **next validation step** — the explicit action the user would have to take
-  to upgrade credibility (e.g. "import verified road-wheel steering
-  calibration to upgrade directional → measured" / "run a second follow-up
-  with the same tyre set to corroborate"). This field is required on every
-  outcome, not just blocked ones.
+There is no `refuted` or `cannotConclude` class, and there is no separate
+`credibility`/`confidence`/`provenance`/`blockers`/`evidence references`/
+`next validation step` field on the Outcome object — the thirteen fields
+listed in the output-shape block above are the entire output. The closest
+analogues that do exist are: `limitations` (reason codes accumulated during
+classification, e.g. `LIMITATION_CROSS_SESSION_FOLLOW_UP`,
+`OUTCOME_COMPARABILITY_INSUFFICIENT`, `CONTROL_VARIABLE_MISSING`,
+`CONTROL_VARIABLE_OUT_OF_RANGE`, `LIMITATION_NO_CONTROL_VARIABLES`, or the
+echoed `dataQualityIssues` codes when `'inconclusive'` is blocking-triggered),
+and `confounders` (the names of control variables that drifted or went
+unobserved, populated only for `'inconclusive_due_to_confounders'`).
 
 ## Append-only Timeline (non-decreasing `createdAt`, no overwrite, out-of-order rejected)
 
@@ -437,10 +468,11 @@ product told the engineer*, two product invariants follow:
   `outcome_classified` event — the second append is rejected by the
   duplicate-`eventId` rule. The experiment store may itself update other
   fields, but it cannot rewrite history.
-- A `cannotConclude` or `invalid_comparison` outcome is **not** silently
-  upgraded by a later, better follow-up. The original `outcome_classified`
-  event stays in the Timeline. A later follow-up is a new experiment with
-  its own outcome — the history is preserved, not overwritten.
+- An `inconclusive`, `inconclusive_due_to_confounders`, or `invalid_comparison`
+  outcome is **not** silently upgraded by a later, better follow-up. The
+  original `outcome_classified` event stays in the Timeline. A later
+  follow-up is a new experiment with its own outcome — the history is
+  preserved, not overwritten.
 
 This is the experiment loop's honesty contract in storage form: the product
 remembers what it could and could not honestly say, in the order it said it,
