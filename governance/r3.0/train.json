@@ -3,7 +3,7 @@
   "program": "R3.0",
   "phases": ["R3.0C", "R3.0D", "R3.0E", "R3.0F"],
   "currentPhase": "R3.0F",
-  "currentPhaseCheckpoint": "F2_E2E_AUTOMATION",
+  "currentPhaseCheckpoint": "F3_QUALITY_HARDENING",
   "phaseStates": {
     "R3.0C": {
       "governanceDir": "governance/r3.0c",
@@ -28,7 +28,7 @@
     },
     "R3.0F": {
       "governanceDir": "governance/r3.0f",
-      "currentCheckpoint": "F2_E2E_AUTOMATION",
+      "currentCheckpoint": "F3_QUALITY_HARDENING",
       "finalActivationCheckpoint": "F6_RELEASE",
       "started": true,
       "finalActivationReached": false

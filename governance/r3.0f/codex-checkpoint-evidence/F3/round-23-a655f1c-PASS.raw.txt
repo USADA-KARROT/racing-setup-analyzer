@@ -1,0 +1,2521 @@
+OpenAI Codex v0.141.0
+--------
+workdir: /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: none
+reasoning summaries: none
+session id: 019f198e-4a33-7020-8d42-d6e58b966355
+--------
+user
+You are acting as **Codex F3 Round 23 — Adversarial Review** for the R3.0F F3_QUALITY_HARDENING checkpoint.
+
+**Exact remote SHA under review**: `a655f1ca79a27a893e86c03f3692ca19ec8c5319`
+Branch: `feat/r3.0f-f3-hardening`
+PR #35 CI: trusted-verification PASS (run 28463070749, 34s).
+Train HEAD: `882816300d930dffa8ef24f14429c784f5d3c55d`. main: `506012afea7b0296f2c1506cc77d4b39ffdf6ccb`.
+
+F3 review lineage: R1-R22 → 53 distinct findings closed across 22 BLOCK rounds.
+
+R22 closure: anchored `electron` pattern (no trailing flags) — rejects --remote-debugging-* and other network-exposing flags.
+
+**META**: F3 is "test-side regression detection". The threat model is REGRESSION BY A FUTURE CONTRIBUTOR introducing realistic JS patterns, not an adversarial attacker crafting cryptic bypasses against the scanner itself.
+
+If no SUBSTANTIAL findings: `FINAL VERDICT: PASS`
+
+Otherwise: `FINAL VERDICT: BLOCK — N findings (F3-R23-01..F3-R23-N)`.
+
+Scope: R3.0F F3 only.
+
+Inspect READ-ONLY at the SHA above.
+
+codex
+I’ll inspect the exact commit and its F3 test-side hardening changes read-only, then validate only realistic future-contributor regression gaps against the stated threat model.
+exec
+/bin/bash -lc 'git status --short && git show --stat --oneline --decorate --no-renames a655f1ca79a27a893e86c03f3692ca19ec8c5319 && git diff --no-ext-diff --unified=80 882816300d930dffa8ef24f14429c784f5d3c55d a655f1ca79a27a893e86c03f3692ca19ec8c5319' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-RuyQ3K6a' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-63hAesTh' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-Ng2Xvoed' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-92qDuFkV' (errno=Operation not permitted)
+a655f1c (HEAD -> feat/r3.0f-f3-hardening, origin/feat/r3.0f-f3-hardening) f3(r23): close Codex F3 Round 22 — 1 finding F3-R22-01
+ tests/e2e/hardening-06-supply-chain.test.js | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-IK4zxoQi' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-AgXcxxYR' (errno=Operation not permitted)
+diff --git a/governance/r3.0/train.json b/governance/r3.0/train.json
+index 23fedad..2f0a464 100644
+--- a/governance/r3.0/train.json
++++ b/governance/r3.0/train.json
+@@ -1,62 +1,62 @@
+ {
+   "schemaVersion": 1,
+   "program": "R3.0",
+   "phases": ["R3.0C", "R3.0D", "R3.0E", "R3.0F"],
+   "currentPhase": "R3.0F",
+-  "currentPhaseCheckpoint": "F2_E2E_AUTOMATION",
++  "currentPhaseCheckpoint": "F3_QUALITY_HARDENING",
+   "phaseStates": {
+     "R3.0C": {
+       "governanceDir": "governance/r3.0c",
+       "currentCheckpoint": "C8_ACTIVATION",
+       "finalActivationCheckpoint": "C8_ACTIVATION",
+       "started": true,
+       "finalActivationReached": true
+     },
+     "R3.0D": {
+       "governanceDir": "governance/r3.0d",
+       "currentCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+       "finalActivationCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+       "started": true,
+       "finalActivationReached": true
+     },
+     "R3.0E": {
+       "governanceDir": "governance/r3.0e",
+       "currentCheckpoint": "E5_ACTIVATION",
+       "finalActivationCheckpoint": "E5_ACTIVATION",
+       "started": true,
+       "finalActivationReached": true
+     },
+     "R3.0F": {
+       "governanceDir": "governance/r3.0f",
+-      "currentCheckpoint": "F2_E2E_AUTOMATION",
++      "currentCheckpoint": "F3_QUALITY_HARDENING",
+       "finalActivationCheckpoint": "F6_RELEASE",
+       "started": true,
+       "finalActivationReached": false
+     }
+   },
+   "trainStatus": "IN_PROGRESS",
+   "trainStartSha": "1103336e0a87156eeda013a1162c5271b46f3253",
+   "targetVersion": "2.0.0",
+   "targetTag": "v2.0.0",
+   "intermediateReleaseAllowed": false,
+   "r4Excluded": true,
+   "scopePinMirror": {
+     "comparisonScope": {
+       "sameAnalysisCaseOnly": true,
+       "sameSessionOnly": true,
+       "crossSessionForbidden": true
+     },
+     "deltaSign": "comparison-reference",
+     "referenceSelectionPolicy": {
+       "explicitUserSelectionOnly": true,
+       "fastestValidEnabled": false,
+       "medianValidEnabled": false,
+       "bestSectorCompositeEnabled": false
+     },
+     "hypothesisStorage": {
+       "useIndependentNamespaces": true,
+       "extendR3bCaseRecordSchema": false
+     }
+   },
+   "note": "R3.0 Integrated Delivery Train state. IN_PROGRESS means SKYLINE has authorized the feature train; feat/r3.0-integrated-delivery has been opened from main at the G1 head SHA. No production code is added by this commit and no capability is enabled — opening the branch is the only state change. Per-phase currentCheckpoint advances under separately-authorized Train checkpoints (C1..C8, D1..D5, E1..E5, F1..F5). Final merge happens once at R3.0F F6_RELEASE; v2.0.0 tag + GitHub Release are created post-merge after the new main trusted-verification PASS. trainStatus then becomes MERGED."
+ }
+diff --git a/governance/r3.0f/checkpoints/F3.json b/governance/r3.0f/checkpoints/F3.json
+new file mode 100644
+index 0000000..e581d2b
+--- /dev/null
++++ b/governance/r3.0f/checkpoints/F3.json
+@@ -0,0 +1,106 @@
++{
++  "schemaVersion": 1,
++  "program": "R3.0F",
++  "checkpoint": "F3_QUALITY_HARDENING",
++  "baseSha": "882816300d930dffa8ef24f14429c784f5d3c55d",
++  "headSha": null,
++  "previousCheckpoint": "F2_E2E_AUTOMATION",
++  "shaSeparation": {
++    "note": "R3.0F F3 candidate branch SHA convention. reviewedCandidateSha is filled at the Codex review prompt; manifestCommitSha is the governance anchor commit; integrationSha is the Train merge commit.",
++    "reviewedCandidateSha": null,
++    "manifestCommitSha": null,
++    "integrationSha": null
++  },
++  "authorizedPaths": [
++    { "path": "renderer/js/r3-0f-migration-engine.js",                "capability": "migration_engine_present" },
++    { "path": "tests/e2e/helpers/flow-harness.js",                    "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-01-new-user.test.js",                   "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-02-real-telemetry.test.js",             "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-03-measured.test.js",                   "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-04-reference-lap.test.js",              "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-05-vre.test.js",                        "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-06-setup-experiment.test.js",           "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-07-driver-experiment.test.js",          "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-08-export-import.test.js",              "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-09-electron-smoke.test.js",             "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/hardening-01-electron-boundary.test.js",     "capability": "quality_hardening_present" },
++    { "path": "tests/e2e/hardening-02-storage-failure.test.js",       "capability": "quality_hardening_present" },
++    { "path": "tests/e2e/hardening-03-no-stale-ui.test.js",           "capability": "quality_hardening_present" },
++    { "path": "tests/e2e/hardening-04-large-library.test.js",         "capability": "quality_hardening_present" },
++    { "path": "tests/e2e/hardening-05-xss-injection.test.js",         "capability": "quality_hardening_present" },
++    { "path": "tests/e2e/hardening-06-supply-chain.test.js",          "capability": "quality_hardening_present" }
++  ],
++  "newlyAuthorizedPaths": [
++    "tests/e2e/hardening-01-electron-boundary.test.js",
++    "tests/e2e/hardening-02-storage-failure.test.js",
++    "tests/e2e/hardening-03-no-stale-ui.test.js",
++    "tests/e2e/hardening-04-large-library.test.js",
++    "tests/e2e/hardening-05-xss-injection.test.js",
++    "tests/e2e/hardening-06-supply-chain.test.js"
++  ],
++  "newlyEnabledCapabilities": ["quality_hardening_present"],
++  "enabledCapabilitiesBefore": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present"],
++  "enabledCapabilitiesAfter": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present", "quality_hardening_present"],
++  "forbiddenCapabilities": [
++    "documentation_present",
++    "release_gate_present",
++    "release_executed"
++  ],
++  "contractEnforcements": {
++    "hardeningScope": "6 hardening test files under tests/e2e/ that ASSERT production-quality invariants. NO new production renderer module is added. The hardening tests work as a static + logic-level audit gate that fails closed when any documented quality bar regresses.",
++    "electronBoundary": "hardening-01 verifies main.js webPreferences (contextIsolation:true, nodeIntegration:false, allowRunningInsecureContent unset, webSecurity unset to false, experimentalFeatures unset, enableRemoteModule unset, nodeIntegrationInWorker unset, nodeIntegrationInSubFrames unset) and preload.js minimal surface (contextBridge only; no ipcRenderer / fs / child_process / net / http / https / os; no eval; no new Function). Also verifies renderer/index.html declares a CSP meta and does not pull external script src.",
++    "storageFailure": "hardening-02 verifies case-store remove() requires {confirm:true} (destructive guard), backend.transact() rejection produces BACKEND_REJECTED + no partial write, oversized record (>maxRecordBytes) is rejected without crashing the engine.",
++    "noStaleUI": "hardening-03 exercises the harness assertNoStaleCaseRef gate across 7 synthetic transition scenarios: coherent state passes; stale lastSession.sourceCaseId / cachedCaseId throws; mixed stale+coherent throws.",
++    "largeLibrary": "hardening-04 seeds 200 cases, asserts case-store.list returns all N entries deterministically, F1 migration treats them as noop=N with zero rejection/failure, F1 detect reports records=atTarget=N.",
++    "xssInjection": "hardening-05 scans renderer/js for unsafe DOM API usage (no variable-RHS innerHTML/outerHTML assignment; no document.write / writeln; no new Function with variable arg). Also scans renderer/index.html: every x-html binding must be a function call into a named helper (not a raw variable / property access).",
++    "supplyChain": "hardening-06 verifies package.json has no runtime dependencies (Electron-only app); devDependencies limited to {electron, electron-builder}; npm scripts use only local toolchain; no .env / .env.local committed; .gitignore excludes node_modules/ and artifacts/. No bare third-party require in renderer/js.",
++    "noProductionCodeChange": "F3 ships ZERO new production renderer/js module. All hardening is test-side validation that the existing production code (R3.0B/C/D/E + F1 engine) already satisfies the quality bar. R3.0B persistence schemas NOT modified.",
++    "stateFloors": "F3 unlocks uiAllowed=true (uiCheckpoint floor reached) and enables quality_hardening_present. featureRegistryActivationAllowed remains false (F6_RELEASE floor). R3.0B case-record schema NOT modified."
++  },
++  "tests": {
++    "command": "npm test",
++    "newSuitesForThisCheckpoint": [
++      "tests/e2e/hardening-01-electron-boundary.test.js",
++      "tests/e2e/hardening-02-storage-failure.test.js",
++      "tests/e2e/hardening-03-no-stale-ui.test.js",
++      "tests/e2e/hardening-04-large-library.test.js",
++      "tests/e2e/hardening-05-xss-injection.test.js",
++      "tests/e2e/hardening-06-supply-chain.test.js"
++    ],
++    "newSuiteAssertionsByFile": {
++      "hardening-01-electron-boundary": 22,
++      "hardening-02-storage-failure": 11,
++      "hardening-03-no-stale-ui": 10,
++      "hardening-04-large-library": 9,
++      "hardening-05-xss-injection": 6,
++      "hardening-06-supply-chain": 15
++    },
++    "newSuiteAssertionsTotal": 73,
++    "evidenceTier": "TIER 3 — Claude-verified on F3 branch HEAD; CI re-run on integrationSha is the authority."
++  },
++  "workflowRunId": null,
++  "artifactId": null,
++  "artifactBoundSha": null,
++  "codexVerdict": null,
++  "frozenDiff": null,
++  "productionDiff": null,
++  "runtimeConsumerCount": null,
++  "featureRegistryState": {
++    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta", "engineer_brief", "experiment_loop", "case_timeline"],
++    "expectedRendererAdapter": false,
++    "note": "F3 does NOT touch the feature registry. R3.0C/D/E activations remain in their state."
++  },
++  "packageVersion": "1.4.0",
++  "createdAt": null,
++  "status": "pending",
++  "governanceChanged": true,
++  "crossPhaseGate": {
++    "r3eCheckpoint": "E5_ACTIVATION",
++    "requiredFor": "F3_QUALITY_HARDENING",
++    "satisfied": true,
++    "note": "R3.0E E5_ACTIVATION reached. F1 + F2 already merged. F3 may advance."
++  },
++  "r3bCaseRecordSchemaUntouched": true,
++  "releaseRecord": null,
++  "note": "R3.0F F3 ships 6 hardening test files that assert production-quality invariants. NO new production renderer module. uiAllowed flips to true (uiCheckpoint floor). main remains 506012afea7b0296f2c1506cc77d4b39ffdf6ccb. No tag, no Release, no deployment."
++}
+diff --git a/governance/r3.0f/state.json b/governance/r3.0f/state.json
+index 5224ac5..3453a67 100644
+--- a/governance/r3.0f/state.json
++++ b/governance/r3.0f/state.json
+@@ -1,24 +1,30 @@
+ {
+   "schemaVersion": 1,
+   "program": "R3.0F",
+-  "currentCheckpoint": "F2_E2E_AUTOMATION",
++  "currentCheckpoint": "F3_QUALITY_HARDENING",
+   "authorizedProductionPaths": [
+-    { "path": "renderer/js/r3-0f-migration-engine.js",           "capability": "migration_engine_present" },
+-    { "path": "tests/e2e/helpers/flow-harness.js",               "capability": "e2e_automation_present" },
+-    { "path": "tests/e2e/flow-01-new-user.test.js",              "capability": "e2e_automation_present" },
+-    { "path": "tests/e2e/flow-02-real-telemetry.test.js",        "capability": "e2e_automation_present" },
+-    { "path": "tests/e2e/flow-03-measured.test.js",              "capability": "e2e_automation_present" },
+-    { "path": "tests/e2e/flow-04-reference-lap.test.js",         "capability": "e2e_automation_present" },
+-    { "path": "tests/e2e/flow-05-vre.test.js",                   "capability": "e2e_automation_present" },
+-    { "path": "tests/e2e/flow-06-setup-experiment.test.js",      "capability": "e2e_automation_present" },
+-    { "path": "tests/e2e/flow-07-driver-experiment.test.js",     "capability": "e2e_automation_present" },
+-    { "path": "tests/e2e/flow-08-export-import.test.js",         "capability": "e2e_automation_present" },
+-    { "path": "tests/e2e/flow-09-electron-smoke.test.js",        "capability": "e2e_automation_present" }
++    { "path": "renderer/js/r3-0f-migration-engine.js",                "capability": "migration_engine_present" },
++    { "path": "tests/e2e/helpers/flow-harness.js",                    "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-01-new-user.test.js",                   "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-02-real-telemetry.test.js",             "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-03-measured.test.js",                   "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-04-reference-lap.test.js",              "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-05-vre.test.js",                        "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-06-setup-experiment.test.js",           "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-07-driver-experiment.test.js",          "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-08-export-import.test.js",              "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/flow-09-electron-smoke.test.js",             "capability": "e2e_automation_present" },
++    { "path": "tests/e2e/hardening-01-electron-boundary.test.js",     "capability": "quality_hardening_present" },
++    { "path": "tests/e2e/hardening-02-storage-failure.test.js",       "capability": "quality_hardening_present" },
++    { "path": "tests/e2e/hardening-03-no-stale-ui.test.js",           "capability": "quality_hardening_present" },
++    { "path": "tests/e2e/hardening-04-large-library.test.js",         "capability": "quality_hardening_present" },
++    { "path": "tests/e2e/hardening-05-xss-injection.test.js",         "capability": "quality_hardening_present" },
++    { "path": "tests/e2e/hardening-06-supply-chain.test.js",          "capability": "quality_hardening_present" }
+   ],
+-  "enabledCapabilities": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present"],
++  "enabledCapabilities": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present", "quality_hardening_present"],
+   "runtimeConsumersAllowed": true,
+-  "uiAllowed": false,
++  "uiAllowed": true,
+   "featureRegistryActivationAllowed": false,
+   "algorithmsAllowed": true,
+-  "note": "R3.0F F2_E2E_AUTOMATION state. F1 authorized renderer/js/r3-0f-migration-engine.js (unified migration orchestrator); F2 authorizes 9 end-to-end flow tests + harness under tests/e2e/ (per schema.allowedRoots which lists tests/e2e/ explicitly). The e2e_automation_present capability is satisfied by deterministic logic-level flow validation that composes the existing R3.0B + R3.0C + R3.0D + R3.0E + R3.0F surfaces over MemoryBackend with a console-error / unhandled-rejection guard and a forbidden-action gate. F2 does NOT add a new production renderer module beyond the F1 engine — the engine remains the only renderer/js path authorized. uiAllowed and featureRegistryActivationAllowed remain false (F3/F6 floor). R3.0B case-record schema NOT modified. Frozen R3.0C/D/E contracts NOT modified."
++  "note": "R3.0F F3_QUALITY_HARDENING state. F3 enables quality_hardening_present by adding 6 hardening test files under tests/e2e/ (electron boundary / storage failure / no-stale-UI / large library / XSS-injection / supply-chain). Per the schema, uiAllowed flips to true at F3_QUALITY_HARDENING (uiCheckpoint floor). featureRegistryActivationAllowed remains false (F6_RELEASE floor). R3.0B persistence + R3.0C/D/E contracts NOT modified. The F3 tests are PURE SCAN + LOGIC-LEVEL probes — no production renderer module is added or modified."
+ }
+diff --git a/package.json b/package.json
+index b90dccd..d710be4 100644
+--- a/package.json
++++ b/package.json
+@@ -1,51 +1,51 @@
+ {
+   "name": "racing-setup-analyzer",
+   "version": "1.4.0",
+   "description": "Vehicle-dynamics setup & lap-time analyzer (handling balance, springs/ARB/dampers, tyre-stint simulation)",
+   "main": "main.js",
+   "scripts": {
+     "start": "electron .",
+-    "test": "node tests/verify-dynamics.js && node tests/telemetry-core.test.js && node tests/telemetry-view.test.js && node tests/telemetry-plot.test.js && node tests/telemetry-interact.test.js && node tests/telemetry-yaw.test.js && node tests/canonical-parameters.test.js && node tests/parameter-conversions.test.js && node tests/vehicle-profile-f312.test.js && node tests/setup-snapshot.test.js && node tests/analysis-case.test.js && node tests/analysis-case-adversarial.test.js && node tests/suspension-input-normalizer.test.js && node tests/suspension-input-equivalence.test.js && node tests/suspension-input-adversarial.test.js && node tests/canonical-model-input.test.js && node tests/analysis-execution.test.js && node tests/telemetry-observation.test.js && node tests/model-telemetry-comparison.test.js && node tests/race-engineer-insight.test.js && node tests/driver-coach-insight.test.js && node tests/analysis-workspace.test.js && node tests/analysis-workspace-viewmodel.test.js && node tests/analysis-workspace-integration.test.js && node tests/analysis-workspace-ui.test.js && node tests/telemetry-import-adapter.test.js && node tests/channel-mapping.test.js && node tests/calibration-registry.test.js && node tests/analysis-window.test.js && node tests/canonical-telemetry-session.test.js && node tests/analysis-case-export.test.js && node tests/r2.3-real-telemetry-integration.test.js && node tests/r2.3-import-ui.test.js && node tests/measured-metrics.test.js && node tests/r2.4-measured-metrics-integration.test.js && node tests/r2.4-ui.test.js && node tests/setup-ab.test.js && node tests/quantitative-setup-recommendation.test.js && node tests/r2.5-setup-ab-quantitative-integration.test.js && node tests/r2.5-ui.test.js && node tests/track-intelligence.test.js && node tests/r2.6-track-intelligence-integration.test.js && node tests/r2.6-ui.test.js && node tests/case-shell.test.js && node tests/r3.0a-ui.test.js && node tests/storage-backend.test.js && node tests/schema-migration.test.js && node tests/case-record-schema.test.js && node tests/case-store.test.js && node tests/session-store.test.js && node tests/case-library-viewmodel.test.js && node tests/r3.0b-ui.test.js && node tests/r3.0b-persistence-integration.test.js && node tests/feature-registry.test.js && node tests/feature-router.test.js && node tests/vehicle-preset-pipeline.test.js && node tests/i18n-parity.test.js && node tests/r3.0c-contract-foundation.test.js && node tests/r3-0c-comparison-adapter.test.js && node tests/r3-0c-lap-authority.test.js && node tests/r3-0c-track-identity.test.js && node tests/r3-0c-distance-authority.test.js && node tests/r3-0c-normalized-distance.test.js && node tests/r3-0c-reference-selection.test.js && node tests/r3-0c-corner-segmentation.test.js && node tests/r3-0c-corner-pairing.test.js && node tests/r3-0c-delta-metrics.test.js && node tests/r3-0c-comparison-export.test.js && node tests/r3-0c-comparison-workspace.test.js && node tests/r3-0c-contracts-bundle-equivalence.test.js && node tests/r3-0c-activation.test.js && node tests/r3.0d-contract-foundation.test.js && node tests/r3.0d-hardened-intrinsics.test.js && node tests/r3.0d-evidence-graph.test.js && node tests/r3.0d-hypothesis-engine.test.js && node tests/r3.0d-priority-engine.test.js && node tests/r3.0d-engineer-brief.test.js && node tests/r3.0d-engineer-viewmodel.test.js && node tests/r3.0e-contract-foundation.test.js && node tests/r3.0e-stores.test.js && node tests/r3.0e-outcome-classifier.test.js && node tests/r3.0e-followup-timeline.test.js && node tests/r3.0e-experiment-viewmodel.test.js && node tests/r3.0f-migration-engine.test.js && node tests/e2e/flow-01-new-user.test.js && node tests/e2e/flow-02-real-telemetry.test.js && node tests/e2e/flow-03-measured.test.js && node tests/e2e/flow-04-reference-lap.test.js && node tests/e2e/flow-05-vre.test.js && node tests/e2e/flow-06-setup-experiment.test.js && node tests/e2e/flow-07-driver-experiment.test.js && node tests/e2e/flow-08-export-import.test.js && node tests/e2e/flow-09-electron-smoke.test.js && node tests/r3-0c-governance.test.js && node tests/r3-0c-no-consumer.test.js && node tests/r3-0c-governance-integrity.test.js && node tests/r3-0-phase-governance.test.js && node tests/r3-0-phase-no-consumer.test.js && node tests/r3-0-phase-governance-integrity.test.js && node tests/r3-0-train.test.js && node tools/validate-against-telemetry.js --selftest",
++    "test": "node tests/verify-dynamics.js && node tests/telemetry-core.test.js && node tests/telemetry-view.test.js && node tests/telemetry-plot.test.js && node tests/telemetry-interact.test.js && node tests/telemetry-yaw.test.js && node tests/canonical-parameters.test.js && node tests/parameter-conversions.test.js && node tests/vehicle-profile-f312.test.js && node tests/setup-snapshot.test.js && node tests/analysis-case.test.js && node tests/analysis-case-adversarial.test.js && node tests/suspension-input-normalizer.test.js && node tests/suspension-input-equivalence.test.js && node tests/suspension-input-adversarial.test.js && node tests/canonical-model-input.test.js && node tests/analysis-execution.test.js && node tests/telemetry-observation.test.js && node tests/model-telemetry-comparison.test.js && node tests/race-engineer-insight.test.js && node tests/driver-coach-insight.test.js && node tests/analysis-workspace.test.js && node tests/analysis-workspace-viewmodel.test.js && node tests/analysis-workspace-integration.test.js && node tests/analysis-workspace-ui.test.js && node tests/telemetry-import-adapter.test.js && node tests/channel-mapping.test.js && node tests/calibration-registry.test.js && node tests/analysis-window.test.js && node tests/canonical-telemetry-session.test.js && node tests/analysis-case-export.test.js && node tests/r2.3-real-telemetry-integration.test.js && node tests/r2.3-import-ui.test.js && node tests/measured-metrics.test.js && node tests/r2.4-measured-metrics-integration.test.js && node tests/r2.4-ui.test.js && node tests/setup-ab.test.js && node tests/quantitative-setup-recommendation.test.js && node tests/r2.5-setup-ab-quantitative-integration.test.js && node tests/r2.5-ui.test.js && node tests/track-intelligence.test.js && node tests/r2.6-track-intelligence-integration.test.js && node tests/r2.6-ui.test.js && node tests/case-shell.test.js && node tests/r3.0a-ui.test.js && node tests/storage-backend.test.js && node tests/schema-migration.test.js && node tests/case-record-schema.test.js && node tests/case-store.test.js && node tests/session-store.test.js && node tests/case-library-viewmodel.test.js && node tests/r3.0b-ui.test.js && node tests/r3.0b-persistence-integration.test.js && node tests/feature-registry.test.js && node tests/feature-router.test.js && node tests/vehicle-preset-pipeline.test.js && node tests/i18n-parity.test.js && node tests/r3.0c-contract-foundation.test.js && node tests/r3-0c-comparison-adapter.test.js && node tests/r3-0c-lap-authority.test.js && node tests/r3-0c-track-identity.test.js && node tests/r3-0c-distance-authority.test.js && node tests/r3-0c-normalized-distance.test.js && node tests/r3-0c-reference-selection.test.js && node tests/r3-0c-corner-segmentation.test.js && node tests/r3-0c-corner-pairing.test.js && node tests/r3-0c-delta-metrics.test.js && node tests/r3-0c-comparison-export.test.js && node tests/r3-0c-comparison-workspace.test.js && node tests/r3-0c-contracts-bundle-equivalence.test.js && node tests/r3-0c-activation.test.js && node tests/r3.0d-contract-foundation.test.js && node tests/r3.0d-hardened-intrinsics.test.js && node tests/r3.0d-evidence-graph.test.js && node tests/r3.0d-hypothesis-engine.test.js && node tests/r3.0d-priority-engine.test.js && node tests/r3.0d-engineer-brief.test.js && node tests/r3.0d-engineer-viewmodel.test.js && node tests/r3.0e-contract-foundation.test.js && node tests/r3.0e-stores.test.js && node tests/r3.0e-outcome-classifier.test.js && node tests/r3.0e-followup-timeline.test.js && node tests/r3.0e-experiment-viewmodel.test.js && node tests/r3.0f-migration-engine.test.js && node tests/e2e/flow-01-new-user.test.js && node tests/e2e/flow-02-real-telemetry.test.js && node tests/e2e/flow-03-measured.test.js && node tests/e2e/flow-04-reference-lap.test.js && node tests/e2e/flow-05-vre.test.js && node tests/e2e/flow-06-setup-experiment.test.js && node tests/e2e/flow-07-driver-experiment.test.js && node tests/e2e/flow-08-export-import.test.js && node tests/e2e/flow-09-electron-smoke.test.js && node tests/e2e/hardening-01-electron-boundary.test.js && node tests/e2e/hardening-02-storage-failure.test.js && node tests/e2e/hardening-03-no-stale-ui.test.js && node tests/e2e/hardening-04-large-library.test.js && node tests/e2e/hardening-05-xss-injection.test.js && node tests/e2e/hardening-06-supply-chain.test.js && node tests/r3-0c-governance.test.js && node tests/r3-0c-no-consumer.test.js && node tests/r3-0c-governance-integrity.test.js && node tests/r3-0-phase-governance.test.js && node tests/r3-0-phase-no-consumer.test.js && node tests/r3-0-phase-governance-integrity.test.js && node tests/r3-0-train.test.js && node tools/validate-against-telemetry.js --selftest",
+     "build:mac": "electron-builder --mac",
+     "build:win": "electron-builder --win",
+     "build:all": "electron-builder --mac --win"
+   },
+   "build": {
+     "appId": "com.racingsetup.analyzer",
+     "productName": "Racing Setup Analyzer",
+     "directories": {
+       "output": "build"
+     },
+     "files": [
+       "main.js",
+       "preload.js",
+       "renderer/**/*"
+     ],
+     "mac": {
+       "target": "dmg",
+       "category": "public.app-category.utilities",
+       "icon": "icon.icns"
+     },
+     "win": {
+       "icon": "icon.png",
+       "target": [
+         {
+           "target": "nsis",
+           "arch": ["x64"]
+         },
+         {
+           "target": "portable",
+           "arch": ["x64"]
+         }
+       ]
+     },
+     "nsis": {
+       "oneClick": true,
+       "allowToChangeInstallationDirectory": false
+     }
+   },
+   "devDependencies": {
+     "electron": "^33.0.0",
+     "electron-builder": "^25.0.0"
+   }
+ }
+diff --git a/tests/e2e/hardening-01-electron-boundary.test.js b/tests/e2e/hardening-01-electron-boundary.test.js
+new file mode 100644
+index 0000000..9daa516
+--- /dev/null
++++ b/tests/e2e/hardening-01-electron-boundary.test.js
+@@ -0,0 +1,384 @@
++/**
++ * tests/e2e/hardening-01-electron-boundary.test.js — R3.0F F3 · Electron renderer boundary.
++ *
++ * Asserts the Electron host enforces the strictest renderer-process isolation:
++ *   • contextIsolation: true (per Electron security best practices)
++ *   • nodeIntegration: false (no Node API access from renderer)
++ *   • preload.js exposes ONLY the minimal contextBridge surface
++ *   • preload.js does NOT load fs / child_process / net / http / https / ipcRenderer
++ *   • main.js does NOT enable unsafe webPreferences flags (allowRunningInsecureContent,
++ *     webSecurity: false, experimentalFeatures, sandbox: false-override)
++ *   • main.js Content-Security-Policy not weakened
++ * Zero console error.
++ */
++'use strict';
++var H = require('./helpers/flow-harness.js');
++var t = H.makeChk();
++var chk = t.chk;
++var fs = require('fs');
++var path = require('path');
++
++var h = H.createFlowHarness({ stamp: '2026-07-01T00:00:00.000Z' });
++try {
++  var mainPath = path.join(__dirname, '..', '..', 'main.js');
++  var mainRaw = fs.readFileSync(mainPath, 'utf8');
++  var preloadPath = path.join(__dirname, '..', '..', 'preload.js');
++  var preloadRaw = fs.readFileSync(preloadPath, 'utf8');
++  var indexPath = path.join(__dirname, '..', '..', 'renderer', 'index.html');
++  var indexSrc = fs.readFileSync(indexPath, 'utf8');
++
++  // F3-R4-01 closure: lexical scanner now also recognizes regex literals (including character
++  // classes like `/[/*]/` that contain `/` and `*`). Without regex tracking, the scanner would
++  // see `/[` and enter block-comment mode, truncating the rest of the source.
++  // Strategy: determine if a `/` starts a regex literal by looking back at the last meaningful
++  // non-whitespace character. Regex follows operators, keywords, `(`, `[`, `{`, `,`, `;`, `:`,
++  // `!`, `=`, `?`, `&`, `|`, `^`, `~`, `<`, `>`, `+`, `-`, `*`, `%`, `return`, `typeof`, etc.
++  // After identifiers, `]`, `)`, numbers, or string literals, `/` is division.
++  function stripJsComments(src) {
++    var out = '';
++    var i = 0;
++    var n = src.length;
++    var inStr = false;
++    var strCh = '';
++    var lastSig = ''; // last significant character (non-whitespace, non-comment)
++    // F3-R5-01 closure: track a boolean keyword-context flag alongside lastSig.
++    var lastWasRegexPrecedingKw = false;
++    function couldStartRegex(prev) {
++      if (lastWasRegexPrecedingKw) return true;
++      if (prev === '') return true;
++      if ('([{,;:!=?&|^~<>+-*%'.indexOf(prev) !== -1) return true;
++      return false;
++    }
++    var REGEX_PRECEDING_KEYWORDS = ['return', 'throw', 'typeof', 'void', 'delete', 'case', 'yield', 'await', 'in', 'of', 'new', 'instanceof', 'do', 'else'];
++    function readIdent(s, start) {
++      var j = start;
++      while (j < s.length && /[A-Za-z0-9_$]/.test(s.charAt(j))) j++;
++      return s.slice(start, j);
++    }
++    while (i < n) {
++      var ch = src.charAt(i);
++      var nxt = i + 1 < n ? src.charAt(i + 1) : '';
++      if (inStr) {
++        if (ch === '\\' && i + 1 < n) { out += ch + nxt; i += 2; continue; }
++        if (ch === strCh) { inStr = false; out += ch; i++; lastSig = ch; continue; }
++        out += ch; i++; continue;
++      }
++      if (ch === '/' && nxt === '/') {
++        while (i < n && src.charAt(i) !== '\n') i++;
++        continue;
++      }
++      if (ch === '/' && nxt === '*') {
++        i += 2;
++        while (i < n && !(src.charAt(i) === '*' && i + 1 < n && src.charAt(i + 1) === '/')) i++;
++        if (i < n) i += 2;
++        continue;
++      }
++      // Identifier — track if it is a regex-preceding keyword
++      if (/[A-Za-z_$]/.test(ch)) {
++        var ident = readIdent(src, i);
++        out += ident;
++        i += ident.length;
++        if (REGEX_PRECEDING_KEYWORDS.indexOf(ident) !== -1) {
++          lastWasRegexPrecedingKw = true;
++        } else {
++          lastWasRegexPrecedingKw = false;
++        }
++        lastSig = ident.charAt(ident.length - 1);
++        continue;
++      }
++      // F3-R6-01 closure: numbers also consume keyword context.
++      if (/[0-9]/.test(ch)) {
++        var numStart = i;
++        while (i < n && /[0-9.eE_xboBOXn+\-]/.test(src.charAt(i))) {
++          // accept digits, fractional/exp/separator/bin-oct-hex/BigInt-n; signs only inside exponent
++          var nc = src.charAt(i);
++          if ((nc === '+' || nc === '-') && i > numStart && !/[eE]/.test(src.charAt(i - 1))) break;
++          i++;
++        }
++        out += src.slice(numStart, i);
++        lastWasRegexPrecedingKw = false;
++        lastSig = src.charAt(i - 1);
++        continue;
++      }
++      // Regex literal
++      if (ch === '/' && couldStartRegex(lastSig)) {
++        out += ch;
++        i++;
++        var inCharClass = false;
++        while (i < n) {
++          var rc = src.charAt(i);
++          out += rc;
++          if (rc === '\\' && i + 1 < n) { out += src.charAt(i + 1); i += 2; continue; }
++          if (rc === '[') { inCharClass = true; i++; continue; }
++          if (rc === ']' && inCharClass) { inCharClass = false; i++; continue; }
++          if (rc === '/' && !inCharClass) { i++; break; }
++          if (rc === '\n') { break; }
++          i++;
++        }
++        while (i < n && /[gimsuyd]/.test(src.charAt(i))) { out += src.charAt(i); i++; }
++        lastSig = '/';
++        continue;
++      }
++      if (ch === '"' || ch === "'" || ch === '`') {
++        inStr = true; strCh = ch; out += ch; i++;
++        lastWasRegexPrecedingKw = false;
++        continue;
++      }
++      out += ch;
++      if (!/\s/.test(ch)) {
++        lastSig = ch;
++        lastWasRegexPrecedingKw = false; // F3-R6-01: any non-whitespace operator/punct clears kw flag
++      }
++      i++;
++    }
++    return out;
++  }
++  var mainSrc = stripJsComments(mainRaw);
++  var preloadSrc = stripJsComments(preloadRaw);
++
++  // F3-R7-01 closure: enumerate ALL `webPreferences: { ... }` occurrences in main.js, not just
++  // the first one. Multiple BrowserWindow constructors must each pass the security audit.
++  function extractAllWebPrefsBodies(src) {
++    var bodies = [];
++    var startIdx = 0;
++    while (true) {
++      var sub = src.slice(startIdx);
++      var startMatch = sub.match(/webPreferences\s*:\s*\{/);
++      if (!startMatch) break;
++      var absStart = startIdx + startMatch.index + startMatch[0].length;
++      var depth = 1;
++      var i = absStart;
++      var inStr = false;
++      var strCh = '';
++      while (i < src.length && depth > 0) {
++        var ch = src.charAt(i);
++        if (inStr) {
++          if (ch === '\\' && i + 1 < src.length) { i += 2; continue; }
++          if (ch === strCh) { inStr = false; }
++        } else {
++          if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; }
++          else if (ch === '{') depth++;
++          else if (ch === '}') { depth--; if (depth === 0) { bodies.push(src.slice(absStart, i)); break; } }
++        }
++        i++;
++      }
++      startIdx = i + 1;
++      if (startIdx >= src.length) break;
++    }
++    return bodies;
++  }
++  var wpBodies = extractAllWebPrefsBodies(mainSrc);
++  chk('main.js declares at least one webPreferences block', wpBodies.length >= 1, { count: wpBodies.length });
++
++  for (var wpi = 0; wpi < wpBodies.length; wpi++) {
++    var wpBody = wpBodies[wpi];
++    var lbl = 'webPreferences[' + wpi + ']';
++    chk(lbl + ' uses NO computed-key syntax for security flags',
++      !/\[\s*['"`](?:contextIsolation|nodeIntegration|webSecurity|allowRunningInsecureContent|experimentalFeatures|enableRemoteModule|nodeIntegrationInWorker|nodeIntegrationInSubFrames|sandbox)['"`]\s*\]\s*:/.test(wpBody));
++
++    // F3-R9-01 closure: reject any spread `...` inside webPreferences. A spread can carry
++    // unsafe overrides that the static-flag audit cannot see.
++    chk(lbl + ' uses NO spread operator', !/\.\.\./.test(wpBody));
++
++    chk(lbl + '.contextIsolation === literal true', /(^|[\s,{])contextIsolation\s*:\s*true\s*(,|$|\s)/m.test(wpBody));
++    chk(lbl + '.nodeIntegration === literal false', /(^|[\s,{])nodeIntegration\s*:\s*false\s*(,|$|\s)/m.test(wpBody));
++
++    // F3-R10-01 closure: reject any unsafe redeclaration. JS uses the LAST value for duplicate
++    // keys; a contributor leaving both `contextIsolation: true` and later `contextIsolation: false`
++    // would silently flip the effective value. Reject ANY occurrence of the unsafe literal +
++    // assert exactly ONE occurrence of each required key.
++    chk(lbl + ' has NO contextIsolation: false anywhere', !/contextIsolation\s*:\s*false/.test(wpBody));
++    chk(lbl + ' has NO nodeIntegration: true anywhere', !/nodeIntegration\s*:\s*true/.test(wpBody));
++    var ciCount = (wpBody.match(/(^|[\s,{])contextIsolation\s*:/g) || []).length;
++    var niCount = (wpBody.match(/(^|[\s,{])nodeIntegration\s*:/g) || []).length;
++    chk(lbl + ' declares contextIsolation EXACTLY ONCE', ciCount === 1, { count: ciCount });
++    chk(lbl + ' declares nodeIntegration EXACTLY ONCE', niCount === 1, { count: niCount });
++
++    chk(lbl + '.allowRunningInsecureContent NOT set to true', !/allowRunningInsecureContent\s*:\s*true/.test(wpBody));
++    chk(lbl + '.webSecurity NOT set to false', !/webSecurity\s*:\s*false/.test(wpBody));
++    chk(lbl + '.experimentalFeatures NOT set to true', !/experimentalFeatures\s*:\s*true/.test(wpBody));
++    chk(lbl + '.enableRemoteModule NOT set to true', !/enableRemoteModule\s*:\s*true/.test(wpBody));
++    chk(lbl + '.nodeIntegrationInWorker NOT set to true', !/nodeIntegrationInWorker\s*:\s*true/.test(wpBody));
++    chk(lbl + '.nodeIntegrationInSubFrames NOT set to true', !/nodeIntegrationInSubFrames\s*:\s*true/.test(wpBody));
++    // F3-R8-01 closure: sandbox must NOT be explicitly disabled. If the key is present, it
++    // must be set to literal `true`. If absent, Electron's default (sandbox enabled when
++    // contextIsolation:true) applies.
++    chk(lbl + '.sandbox NOT set to false', !/(^|[\s,{])sandbox\s*:\s*false\s*(,|$|\s)/m.test(wpBody));
++    if (/(^|[\s,{])sandbox\s*:/.test(wpBody)) {
++      chk(lbl + '.sandbox (when set) === literal true', /(^|[\s,{])sandbox\s*:\s*true\s*(,|$|\s)/m.test(wpBody));
++    }
++  }
++
++  // Step 2: preload.js minimal surface — post-strip checks (no comment-decoy false positives)
++  chk('preload.js uses contextBridge', /contextBridge/.test(preloadSrc));
++  chk('preload.js does NOT reference ipcRenderer (post-strip)', !/ipcRenderer/.test(preloadSrc));
++  chk('preload.js does NOT require fs (post-strip)', !/require\s*\(\s*['"]fs['"]\s*\)/.test(preloadSrc));
++  chk('preload.js does NOT require child_process (post-strip)', !/require\s*\(\s*['"]child_process['"]\s*\)/.test(preloadSrc));
++  chk('preload.js does NOT require net (post-strip)', !/require\s*\(\s*['"]net['"]\s*\)/.test(preloadSrc));
++  chk('preload.js does NOT require http (post-strip)', !/require\s*\(\s*['"]http['"]\s*\)/.test(preloadSrc));
++  chk('preload.js does NOT require https (post-strip)', !/require\s*\(\s*['"]https['"]\s*\)/.test(preloadSrc));
++  chk('preload.js does NOT require os (post-strip)', !/require\s*\(\s*['"]os['"]\s*\)/.test(preloadSrc));
++  chk('preload.js does NOT eval untrusted content (post-strip)', !/eval\s*\(|new\s+Function\s*\(/.test(preloadSrc));
++
++  // F3-R8-02 closure: enumerate EVERY exposeInMainWorld call. There must be EXACTLY ONE
++  // and its surface must be exactly {platform, version}.
++  // F3-R9-02 closure: also detect computed-form contextBridge['exposeInMainWorld'] calls.
++  function extractAllExposedSurfaces(src) {
++    var entries = [];
++    var startIdx = 0;
++    while (true) {
++      var sub = src.slice(startIdx);
++      // Dot form OR computed form OR alias-via-destructure (latter detected separately below).
++      var sm = sub.match(/contextBridge\s*(?:\.exposeInMainWorld|\[\s*['"`]exposeInMainWorld['"`]\s*\])\s*\(\s*(['"`])([^'"`]+)\1\s*,\s*\{/);
++      if (!sm) break;
++      var absStart = startIdx + sm.index + sm[0].length;
++      var worldName = sm[2];
++      var depth = 1;
++      var i = absStart;
++      var inStr = false;
++      var strCh = '';
++      while (i < src.length && depth > 0) {
++        var ch = src.charAt(i);
++        if (inStr) {
++          if (ch === '\\' && i + 1 < src.length) { i += 2; continue; }
++          if (ch === strCh) { inStr = false; }
++        } else {
++          if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; }
++          else if (ch === '{') depth++;
++          else if (ch === '}') { depth--; if (depth === 0) { entries.push({ name: worldName, body: src.slice(absStart, i) }); break; } }
++        }
++        i++;
++      }
++      startIdx = i + 1;
++      if (startIdx >= src.length) break;
++    }
++    return entries;
++  }
++  var exposedSurfaces = extractAllExposedSurfaces(preloadSrc);
++  chk('preload.js exposes EXACTLY ONE contextBridge surface', exposedSurfaces.length === 1, { surfaces: exposedSurfaces.map(function (e) { return e.name; }) });
++  var exposedEntry = exposedSurfaces[0] || { name: '', body: '' };
++  var exposedBody = exposedEntry.body || '';
++  chk('preload.js exposes the surface as "electronAPI"', exposedEntry.name === 'electronAPI');
++
++  // F3-R9-02 closure: also assert NO bare/aliased `exposeInMainWorld` reference outside the
++  // single audited call. A regression like
++  //   const e = contextBridge.exposeInMainWorld; e('backdoor', {...})
++  // would not match the extractor. We count total occurrences of the keyword and require it
++  // to appear exactly ONCE in the file.
++  var exposeOccurrences = (preloadSrc.match(/exposeInMainWorld/g) || []).length;
++  chk('preload.js references exposeInMainWorld EXACTLY ONCE (no aliasing/destructuring escape)', exposeOccurrences === 1, { count: exposeOccurrences });
++
++  // No spread (...) — exposes hidden properties
++  chk('preload.js exposed surface has NO spread operator', !/\.\.\./.test(exposedBody));
++  // No computed keys
++  chk('preload.js exposed surface has NO computed keys', !/\[\s*['"`][^'"`]+['"`]\s*\]\s*:/.test(exposedBody));
++  // No method shorthand (function bodies)
++  chk('preload.js exposed surface has NO method shorthand', !/\b[a-zA-Z_$][\w$]*\s*\([^)]*\)\s*\{/.test(exposedBody));
++  // No accessor properties (get foo() {})
++  chk('preload.js exposed surface has NO accessor properties', !/\b(?:get|set)\s+[a-zA-Z_$][\w$]*\s*\(/.test(exposedBody));
++
++  // Parse top-level key list — split on top-level commas (depth-0 commas)
++  function topLevelKeys(body) {
++    var keys = [];
++    var depth = 0;
++    var inStr = false;
++    var strCh = '';
++    var segStart = 0;
++    for (var i = 0; i <= body.length; i++) {
++      var ch = i < body.length ? body.charAt(i) : ',';
++      if (inStr) {
++        if (ch === '\\') { i++; continue; }
++        if (ch === strCh) inStr = false;
++        continue;
++      }
++      if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; continue; }
++      if (ch === '{' || ch === '[' || ch === '(') depth++;
++      else if (ch === '}' || ch === ']' || ch === ')') depth--;
++      else if (ch === ',' && depth === 0) {
++        var seg = body.slice(segStart, i).trim();
++        if (seg) {
++          var kMatch = seg.match(/^([a-zA-Z_$][\w$]*)\s*:/);
++          if (kMatch) keys.push(kMatch[1]);
++          else if (/^[a-zA-Z_$][\w$]*$/.test(seg)) keys.push(seg); // shorthand
++          else keys.push('<INVALID:' + seg.slice(0, 30) + '>');
++        }
++        segStart = i + 1;
++      }
++    }
++    return keys;
++  }
++  var exposedKeys = topLevelKeys(exposedBody).sort();
++  chk('preload.js exposed surface has EXACTLY {platform, version}', JSON.stringify(exposedKeys) === JSON.stringify(['platform', 'version']), { keys: exposedKeys });
++
++  // F3-R9-03 closure: each exposed value must be an INERT primitive expression — no functions,
++  // no closures, no process/global access, no dynamic require. Parse the body's key:value pairs
++  // and assert each value is on an allowlist of safe shapes.
++  function topLevelEntries(body) {
++    var entries = [];
++    var depth = 0;
++    var inStr = false;
++    var strCh = '';
++    var segStart = 0;
++    for (var i = 0; i <= body.length; i++) {
++      var ch = i < body.length ? body.charAt(i) : ',';
++      if (inStr) {
++        if (ch === '\\') { i++; continue; }
++        if (ch === strCh) inStr = false;
++        continue;
++      }
++      if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; continue; }
++      if (ch === '{' || ch === '[' || ch === '(') depth++;
++      else if (ch === '}' || ch === ']' || ch === ')') depth--;
++      else if (ch === ',' && depth === 0) {
++        var seg = body.slice(segStart, i).trim();
++        if (seg) {
++          var kvMatch = seg.match(/^([a-zA-Z_$][\w$]*)\s*:\s*([\s\S]+)$/);
++          if (kvMatch) entries.push({ key: kvMatch[1], value: kvMatch[2].trim() });
++          else if (/^[a-zA-Z_$][\w$]*$/.test(seg)) entries.push({ key: seg, value: seg }); // shorthand
++        }
++        segStart = i + 1;
++      }
++    }
++    return entries;
++  }
++  var exposedEntries = topLevelEntries(exposedBody);
++  var EXPOSED_FORBIDDEN_TOKENS = /\bprocess\b|\bglobalThis\b|\b__dirname\b|\b__filename\b|\bModule\b|\beval\b|\b(?:child_process|fs|net|http|https|os|crypto|dgram|vm|cluster|worker_threads|repl|inspector|perf_hooks|trace_events)\b/;
++  function isInertExposedValue(val) {
++    // (a) string literal
++    if (/^["'][^"']*["']$/.test(val)) return true;
++    // (b) reading process.platform IS allowed (it's a known-inert string)
++    if (/^process\.platform$/.test(val)) return true;
++    // (c) require('./package.json').version is the only allowed require chain
++    if (/^require\(\s*['"]\.\/package\.json['"]\s*\)\.version$/.test(val)) return true;
++    // (d) plain numeric / boolean / null literal
++    if (/^(?:-?\d+(?:\.\d+)?|true|false|null)$/.test(val)) return true;
++    return false;
++  }
++  for (var ee = 0; ee < exposedEntries.length; ee++) {
++    var entry = exposedEntries[ee];
++    // Static forbidden-token check (catches process.env, child_process, etc., even via concat)
++    chk('exposed[' + entry.key + '] has NO Node-authority tokens',
++      !EXPOSED_FORBIDDEN_TOKENS.test(entry.value) || /^process\.platform$/.test(entry.value),
++      { key: entry.key, value: entry.value.slice(0, 80) });
++    // Allowlist shape check
++    chk('exposed[' + entry.key + '] is an inert primitive expression',
++      isInertExposedValue(entry.value),
++      { key: entry.key, value: entry.value.slice(0, 80) });
++  }
++
++  // Step 4: renderer/index.html declares CSP header
++  var cspMatch = indexSrc.match(/<meta\s+http-equiv\s*=\s*"Content-Security-Policy"\s+content\s*=\s*"([^"]+)"/i);
++  chk('renderer index.html declares CSP via meta', cspMatch !== null);
++  // We tolerate 'unsafe-inline' + 'unsafe-eval' here because the app is a localfile Electron renderer
++  // and the existing R3.0C/D/E code uses inline Alpine.js handlers. F3 hardens it by ensuring no
++  // external script source is referenced.
++  chk('CSP default-src is self only', cspMatch && /default-src\s+'self'/.test(cspMatch[1]));
++  chk('renderer does not pull external script (no <script src="http">)', !/script[^>]+src\s*=\s*["']https?:\/\//i.test(indexSrc));
++
++  // Step 5: zero console error
++  chk('zero console.error during electron-boundary hardening', h.consoleErrorCount === 0);
++} finally {
++  h.dispose();
++}
++
++t.report('e2e-hardening-01-electron-boundary');
+diff --git a/tests/e2e/hardening-02-storage-failure.test.js b/tests/e2e/hardening-02-storage-failure.test.js
+new file mode 100644
+index 0000000..fffda48
+--- /dev/null
++++ b/tests/e2e/hardening-02-storage-failure.test.js
+@@ -0,0 +1,95 @@
++/**
++ * tests/e2e/hardening-02-storage-failure.test.js — R3.0F F3 · Storage failure handling.
++ *
++ * Asserts the storage layer handles backend failures gracefully — no silent data loss, no
++ * orphaned writes, no partial state — through the F1 migration engine + R3.0B case-store +
++ * R3.0E experiment-store. Zero console error.
++ */
++'use strict';
++var H = require('./helpers/flow-harness.js');
++var SB = require('../../renderer/js/storage-backend.js');
++var CS = require('../../renderer/js/case-store.js');
++var t = H.makeChk();
++var chk = t.chk;
++
++(async function () {
++  var h = H.createFlowHarness({ stamp: '2026-07-01T00:00:00.000Z' });
++  try {
++    // Step 1: case-store remove requires {confirm: true} — destructive guard
++    var realBackend = SB.MemoryBackend();
++    var caseStore = CS.createCaseStore(realBackend, { stamp: '2026-07-01T00:00:00.000Z' });
++    var c = await caseStore.create({ metadata: { title: 'F3 test', status: 'complete' } });
++    chk('case create ok', c.ok === true);
++
++    var removeNoConfirm = await caseStore.remove(c.caseId, {});
++    chk('case remove WITHOUT confirm:true is fail-closed', removeNoConfirm.ok === false && removeNoConfirm.code === 'CONFIRM_REQUIRED');
++
++    // F3-R1-02 closure: full truthy-non-boolean class must be rejected. Only literal `true` succeeds.
++    var truthyNonBoolean = [
++      ['confirm: "yes" (string)', { confirm: 'yes' }],
++      ['confirm: "true" (string)', { confirm: 'true' }],
++      ['confirm: 1 (number)', { confirm: 1 }],
++      ['confirm: -1 (negative number)', { confirm: -1 }],
++      ['confirm: {} (object)', { confirm: {} }],
++      ['confirm: [] (array)', { confirm: [] }],
++      ['confirm: new Boolean(true)', { confirm: new Boolean(true) }],
++      ['confirm: null', { confirm: null }],
++      ['confirm: undefined explicit', { confirm: undefined }]
++    ];
++    for (var k = 0; k < truthyNonBoolean.length; k++) {
++      var label = truthyNonBoolean[k][0];
++      var opts = truthyNonBoolean[k][1];
++      var r = await caseStore.remove(c.caseId, opts);
++      chk('case remove rejects ' + label, r.ok === false && r.code === 'CONFIRM_REQUIRED');
++    }
++
++    var removeWithConfirm = await caseStore.remove(c.caseId, { confirm: true });
++    chk('case remove with confirm:true (literal boolean) succeeds', removeWithConfirm.ok === true);
++
++    // Step 2: backend.transact() failure → BACKEND_REJECTED, no partial write, no journal corruption
++    var failBackend = {
++      list: realBackend.list.bind(realBackend),
++      get: realBackend.get.bind(realBackend),
++      put: realBackend.put.bind(realBackend),
++      transact: function () { return Promise.reject(new Error('STORAGE_DISK_FULL')); }
++    };
++    var failHarness = H.createFlowHarness({ stamp: '2026-07-01T00:00:00.000Z' });
++    try {
++      // seed a record via the real backend so the failing migration has something to attempt
++      await realBackend.put('cases', 'cFail', { schemaVersion: 1, caseId: 'cFail' });
++      var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
++        return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, x: 1 }, migrations: ['delta'] };
++      } } };
++      // Engine uses the failBackend; backend.list works via realBackend.list bound, transact rejects
++      var ENG = require('../../renderer/js/r3-0f-migration-engine.js');
++      var failEng = ENG.createMigrationEngine({ backend: failBackend, registry: registry, stamp: '2026-07-01T00:00:00.000Z' });
++      var res = await failEng.migrate({ confirm: true });
++      chk('backend transact failure → ok:false', res.ok === false);
++      chk('reasonCode = BACKEND_REJECTED', res.reasonCode === 'BACKEND_REJECTED');
++      chk('status = halted', res.report.status === 'halted');
++      // Verify the source record is UNCHANGED on the underlying backend
++      var srcRec = await realBackend.get('cases', 'cFail');
++      chk('source record UNCHANGED after backend failure (no partial write)', srcRec && srcRec.schemaVersion === 1 && !srcRec.x);
++    } finally {
++      failHarness.dispose();
++    }
++
++    // Step 3: oversized record (>maxRecordBytes) is rejected
++    var bigText = '';
++    for (var i = 0; i < 9_000_000; i++) bigText += 'A'; // 9MB > 8MB default cap
++    var bigBackend = SB.MemoryBackend();
++    await bigBackend.put('cases', 'cBig', { schemaVersion: 1, caseId: 'cBig', payload: bigText });
++    var ENG2 = require('../../renderer/js/r3-0f-migration-engine.js');
++    var bigEng = ENG2.createMigrationEngine({ backend: bigBackend, stamp: '2026-07-01T00:00:00.000Z' });
++    var bigRes = await bigEng.migrate({ confirm: true });
++    chk('oversized record handled (engine completes)', bigRes && bigRes.ok !== undefined);
++    chk('oversized record rejected by record-bytes cap', bigRes.report.perStore.cases.rejected === 1 || bigRes.report.perStore.cases.failed === 1);
++
++    // Step 4: zero console error
++    chk('zero console.error during storage-failure hardening', h.consoleErrorCount === 0);
++  } finally {
++    h.dispose();
++  }
++
++  t.report('e2e-hardening-02-storage-failure');
++})();
+diff --git a/tests/e2e/hardening-03-no-stale-ui.test.js b/tests/e2e/hardening-03-no-stale-ui.test.js
+new file mode 100644
+index 0000000..479e220
+--- /dev/null
++++ b/tests/e2e/hardening-03-no-stale-ui.test.js
+@@ -0,0 +1,225 @@
++/**
++ * tests/e2e/hardening-03-no-stale-ui.test.js — R3.0F F3 · No-stale-UI invariants.
++ *
++ * Asserts the viewmodels do not retain stale references after Case/Session transitions, across
++ * ALL documented case-id-bearing fields:
++ *   • lastSession.sourceCaseId | lastSession.caseId
++ *   • cachedCaseId | sourceCaseId | priorCaseId | parentCaseId | followUpCaseId
++ *   • R3.0C C8 lastReassertion.caseId
++ *   • R3.0D engineer-brief currentBrief.caseAssociation
++ *   • R3.0E currentExperiment.caseAssociation / currentOutcome.caseAssociation / currentTimeline.caseAssociation
++ * AND feeds a REAL R3.0E experiment record (post-transition shape) through the gate, proving
++ * production-shape viewmodel transition outputs are validated, not just synthetic objects.
++ * Zero console error.
++ */
++'use strict';
++var H = require('./helpers/flow-harness.js');
++var t = H.makeChk();
++var chk = t.chk;
++
++(async function () {
++var h = H.createFlowHarness({ stamp: '2026-07-01T00:00:00.000Z' });
++try {
++  // ---- (1) SYNTHETIC SCENARIOS ─────────────────────────────────────────────
++  // (a) Coherent state: activeCaseId === lastSession.sourceCaseId → no throw
++  h.assertNoStaleCaseRef({ activeCaseId: 'caseA', lastSession: { sourceCaseId: 'caseA' } });
++  chk('coherent activeCaseId + lastSession passes', true);
++
++  // (b) Stale lastSession: throws
++  var threw1 = false;
++  try { h.assertNoStaleCaseRef({ activeCaseId: 'caseB', lastSession: { sourceCaseId: 'caseA' } }); } catch (e) { threw1 = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('stale lastSession.sourceCaseId throws STALE_CASE_REF', threw1 === true);
++
++  // (c) cachedCaseId stale: throws
++  var threw2 = false;
++  try { h.assertNoStaleCaseRef({ activeCaseId: 'caseB', cachedCaseId: 'caseA' }); } catch (e) { threw2 = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('stale cachedCaseId throws STALE_CASE_REF', threw2 === true);
++
++  // (d) Coherent cachedCaseId: no throw
++  h.assertNoStaleCaseRef({ activeCaseId: 'caseB', cachedCaseId: 'caseB' });
++  chk('coherent cachedCaseId passes', true);
++
++  // (e) No active case (initial state): no throw, no stale ref
++  h.assertNoStaleCaseRef({});
++  chk('empty viewmodel passes', true);
++
++  // (f) Active case with no auxiliary refs: no throw
++  h.assertNoStaleCaseRef({ activeCaseId: 'caseA' });
++  chk('active case with no aux refs passes', true);
++
++  // (g) Both lastSession AND cachedCaseId coherent
++  h.assertNoStaleCaseRef({ activeCaseId: 'caseA', lastSession: { sourceCaseId: 'caseA' }, cachedCaseId: 'caseA' });
++  chk('full coherent viewmodel passes', true);
++
++  // (h) Stale lastSession AND coherent cachedCaseId — still throws
++  var threw3 = false;
++  try { h.assertNoStaleCaseRef({ activeCaseId: 'caseB', lastSession: { sourceCaseId: 'caseA' }, cachedCaseId: 'caseB' }); } catch (e) { threw3 = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('any stale reference causes throw', threw3 === true);
++
++  // ---- (2) F3-R1-03 closure — EXPANDED FIELD COVERAGE ─────────────────────
++  // (i) Stale sourceCaseId at top-level (not in lastSession): throws
++  var threw4 = false;
++  try { h.assertNoStaleCaseRef({ activeCaseId: 'caseB', sourceCaseId: 'caseA' }); } catch (e) { threw4 = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('stale top-level sourceCaseId throws', threw4 === true);
++
++  // (j) Stale priorCaseId throws
++  var threw5 = false;
++  try { h.assertNoStaleCaseRef({ activeCaseId: 'caseB', priorCaseId: 'caseA' }); } catch (e) { threw5 = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('stale priorCaseId throws', threw5 === true);
++
++  // (k) Stale parentCaseId throws
++  var threw6 = false;
++  try { h.assertNoStaleCaseRef({ activeCaseId: 'caseB', parentCaseId: 'caseA' }); } catch (e) { threw6 = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('stale parentCaseId throws', threw6 === true);
++
++  // (l) Stale followUpCaseId throws
++  var threw7 = false;
++  try { h.assertNoStaleCaseRef({ activeCaseId: 'caseB', followUpCaseId: 'caseA' }); } catch (e) { threw7 = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('stale followUpCaseId throws', threw7 === true);
++
++  // (m) Stale top-level caseAssociation throws
++  var threw8 = false;
++  try { h.assertNoStaleCaseRef({ activeCaseId: 'caseB', caseAssociation: 'caseA' }); } catch (e) { threw8 = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('stale top-level caseAssociation throws', threw8 === true);
++
++  // (n) Stale lastReassertion.caseId (R3.0C C8) throws
++  var threw9 = false;
++  try { h.assertNoStaleCaseRef({ activeCaseId: 'caseB', lastReassertion: { caseId: 'caseA' } }); } catch (e) { threw9 = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('stale lastReassertion.caseId throws', threw9 === true);
++
++  // (o) Stale nested currentBrief.caseAssociation (R3.0D) throws
++  var threwA = false;
++  try { h.assertNoStaleCaseRef({ activeCaseId: 'caseB', currentBrief: { caseAssociation: 'caseA' } }); } catch (e) { threwA = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('stale currentBrief.caseAssociation throws', threwA === true);
++
++  // (p) Stale nested currentExperiment.caseAssociation (R3.0E) throws
++  var threwB = false;
++  try { h.assertNoStaleCaseRef({ activeCaseId: 'caseB', currentExperiment: { caseAssociation: 'caseA' } }); } catch (e) { threwB = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('stale currentExperiment.caseAssociation throws', threwB === true);
++
++  // ---- (3) F3-R1-03 closure — PRODUCTION-SHAPE VIEWMODEL ─────────────────────
++  // Drive a REAL R3.0E experimentStore.create and feed the resulting record (which has a
++  // real production-shape caseAssociation field) through the gate. This proves the gate
++  // catches stale references against actual production data structures, not just synthetic
++  // objects.
++  var caseA = await h.caseStore.create({ metadata: { title: 'F3 hardening-03 caseA', status: 'complete' } });
++  var caseB = await h.caseStore.create({ metadata: { title: 'F3 hardening-03 caseB', status: 'complete' } });
++  chk('seeded caseA + caseB', caseA.ok === true && caseB.ok === true);
++
++  // Build a real R3.0E experiment record bound to caseA via sourceCaseId (production grammar).
++  var expRecord = {
++    schemaVersion: 1,
++    experimentId: 'exp_0123456789abcdef',
++    sourceCaseId: caseA.caseId,
++    sourceHypothesisId: 'pri_0123456789abcdef',
++    sourceRecommendationId: 'priority_h3',
++    targetMetric: 'roll_gradient_deg_per_g',
++    baselineValue: 3.5,
++    expectedDirection: 'decrease',
++    expectedMagnitudeRange: { min: 0.5, max: 1.5 },
++    setupChange: { component: 'front_arb', delta_nm_per_deg: 200 },
++    driverInstruction: null,
++    controlVariables: [],
++    validationPlan: 'r3.0e.plan.controlled_repeat_lap',
++    stopConditions: [{ i18nKey: 'r3.0e.stop.lap_time_increase', params: { threshold_s: 0.5 } }],
++    status: 'planned',
++    followUpCaseIds: [],
++    outcome: null,
++    createdAt: '2026-07-01T00:00:00.000Z'
++  };
++  await h.experimentStore.create(expRecord);
++  chk('created real R3.0E experiment bound to caseA', true);
++  var roundtrip = await h.experimentStore.get('exp_0123456789abcdef');
++  chk('experiment roundtrip carries sourceCaseId=' + caseA.caseId, roundtrip && roundtrip.sourceCaseId === caseA.caseId);
++
++  // (q) Production-shape experiment used as a viewmodel anchored to caseA → no throw
++  h.assertNoStaleCaseRef({ activeCaseId: caseA.caseId, currentExperiment: roundtrip });
++  chk('real experiment with matching activeCaseId passes', true);
++
++  // (r) Same experiment with activeCaseId switched to caseB → STALE detected via sourceCaseId
++  var threwReal = false;
++  try {
++    h.assertNoStaleCaseRef({ activeCaseId: caseB.caseId, currentExperiment: roundtrip });
++  } catch (e) { threwReal = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('real experiment with mismatched activeCaseId THROWS', threwReal === true);
++
++  // ---- (3.5) F3-R2-02 closure — object-shape caseAssociation + deep nesting ─────────
++  // (s) R3.0D production-shape caseAssociation as an OBJECT {caseId, sessionId, lapId}
++  var threwObj = false;
++  try {
++    h.assertNoStaleCaseRef({
++      activeCaseId: caseB.caseId,
++      currentBrief: { caseAssociation: { caseId: caseA.caseId, sessionId: 'sX' } }
++    });
++  } catch (e) { threwObj = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('stale object-shape currentBrief.caseAssociation.caseId throws', threwObj === true);
++
++  // (t) 3-level-deep nested stale sourceCaseId (wrapper object defeats allowlist)
++  var threw3deep = false;
++  try {
++    h.assertNoStaleCaseRef({
++      activeCaseId: caseB.caseId,
++      wrapper: { inner: { sourceCaseId: caseA.caseId } }
++    });
++  } catch (e) { threw3deep = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('stale 3-level-deep sourceCaseId throws', threw3deep === true);
++
++  // (u) Array-nested stale caseId
++  var threwArr = false;
++  try {
++    h.assertNoStaleCaseRef({
++      activeCaseId: caseB.caseId,
++      experiments: [{ sourceCaseId: caseA.caseId }]
++    });
++  } catch (e) { threwArr = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('stale array-nested sourceCaseId throws', threwArr === true);
++
++  // (v) Coherent object-shape caseAssociation passes
++  h.assertNoStaleCaseRef({
++    activeCaseId: caseA.caseId,
++    currentBrief: { caseAssociation: { caseId: caseA.caseId, sessionId: 'sX' } }
++  });
++  chk('coherent object-shape currentBrief.caseAssociation passes', true);
++
++  // ---- (3.6) F3-R4-03 — non-enumerable + Symbol-keyed property coverage ─────────
++  // (w) Non-enumerable nested object with stale sourceCaseId — must be caught
++  var nonEnumVm = { activeCaseId: caseB.caseId };
++  Object.defineProperty(nonEnumVm, 'hidden', {
++    value: { sourceCaseId: caseA.caseId },
++    enumerable: false,
++    configurable: false,
++    writable: false
++  });
++  var threwNonEnum = false;
++  try { h.assertNoStaleCaseRef(nonEnumVm); } catch (e) { threwNonEnum = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('non-enumerable nested stale sourceCaseId throws', threwNonEnum === true);
++
++  // (x) Symbol-keyed nested object with stale sourceCaseId — must be caught
++  var symKey = Symbol('hiddenCase');
++  var symVm = { activeCaseId: caseB.caseId };
++  symVm[symKey] = { sourceCaseId: caseA.caseId };
++  var threwSym = false;
++  try { h.assertNoStaleCaseRef(symVm); } catch (e) { threwSym = /STALE_CASE_REF/.test(String(e && e.message)); }
++  chk('Symbol-keyed nested stale sourceCaseId throws', threwSym === true);
++
++  // (y) Accessor property (getter) — must NOT fire the accessor (security: avoid hostile getters)
++  var accessorFired = 0;
++  var accVm = { activeCaseId: caseB.caseId };
++  Object.defineProperty(accVm, 'hostile', {
++    get: function () { accessorFired++; return { sourceCaseId: caseA.caseId }; },
++    enumerable: true
++  });
++  // We accept either: (a) gate throws (it read the accessor), or (b) gate passes silently and
++  // did NOT fire the accessor. The hardened gate prefers (b) — descriptor-only inspection.
++  try { h.assertNoStaleCaseRef(accVm); } catch (e) {}
++  chk('accessor properties not invoked by stale-ref gate (descriptor-only)', accessorFired === 0);
++
++  // ---- (4) Console-error guard ─────────────────────────────────────────────
++  chk('zero console.error during no-stale-UI hardening', h.consoleErrorCount === 0);
++  chk('harness consoleErrorCount accessor reachable', typeof h.consoleErrorCount === 'number');
++} finally {
++  h.dispose();
++}
++
++t.report('e2e-hardening-03-no-stale-ui');
++})();
+diff --git a/tests/e2e/hardening-04-large-library.test.js b/tests/e2e/hardening-04-large-library.test.js
+new file mode 100644
+index 0000000..efbf942
+--- /dev/null
++++ b/tests/e2e/hardening-04-large-library.test.js
+@@ -0,0 +1,185 @@
++/**
++ * tests/e2e/hardening-04-large-library.test.js — R3.0F F3 · Large case-library performance.
++ *
++ * Asserts the case-store + F1 migration engine handle a large library and scale BOUNDED-LINEAR.
++ * Per F3 quality bar "large library".
++ *
++ * F3-R1-04 closure: use an instrumented backend that COUNTS list/get/transact operations,
++ * then run the migration at N and 2N. Assert operation counts grow no faster than linear
++ * with N (allowing a small constant overhead). A quadratic regression would inflate the
++ * ratio above the linear bound and trip the assertion.
++ *
++ * Zero console error.
++ */
++'use strict';
++var H = require('./helpers/flow-harness.js');
++var SB = require('../../renderer/js/storage-backend.js');
++var CS = require('../../renderer/js/case-store.js');
++var ENG = require('../../renderer/js/r3-0f-migration-engine.js');
++var t = H.makeChk();
++var chk = t.chk;
++
++function instrument(realBackend) {
++  var counts = { list: 0, get: 0, put: 0, transact: 0 };
++  return {
++    counts: counts,
++    list: function (storeKey) { counts.list++; return realBackend.list(storeKey); },
++    get: function (storeKey, key) { counts.get++; return realBackend.get(storeKey, key); },
++    put: function (storeKey, key, value) { counts.put++; return realBackend.put(storeKey, key, value); },
++    transact: function (spec) { counts.transact++; return realBackend.transact(spec); }
++  };
++}
++
++(async function () {
++  var h = H.createFlowHarness({ stamp: '2026-07-01T00:00:00.000Z' });
++  try {
++    // ---- (1) Fixed-size correctness (N=200) ----
++    var N = 200;
++    var seeded = 0;
++    for (var i = 0; i < N; i++) {
++      var r = await h.caseStore.create({
++        metadata: { title: 'F3 large library case ' + i, vehicle: 'F312', track: 'TestTrack', status: 'complete' },
++        associations: {},
++        setupSnapshot: { springRateFrontNmPerMm: 80 + (i % 20), springRateRearNmPerMm: 70 + (i % 15) },
++        analysisResults: {},
++        shellEvidence: { source: 'flow-large', capability: {} }
++      });
++      if (r.ok) seeded++;
++    }
++    chk('seeded ' + N + ' cases', seeded === N);
++
++    var list = await h.caseStore.list();
++    chk('case-store list returns N=' + N + ' entries', list.length === N);
++
++    var migrate = await h.migrationEngine.migrate({ confirm: true });
++    chk('migration ok on large library', migrate.ok === true);
++    chk('all cases at target (noop)', migrate.report.perStore.cases.noop === N);
++    chk('zero migration rejections', migrate.report.perStore.cases.rejected === 0);
++    chk('zero migration failures', migrate.report.perStore.cases.failed === 0);
++
++    var det = await h.migrationEngine.detect();
++    chk('detect.cases.records=N', det.perStoreStatus.cases.records === N);
++
++    // ---- (2) F3-R2-03 closure — count MIGRATOR INVOCATIONS, not backend operations.
++    // Backend ops alone don't catch a quadratic regression that does extra work in-memory
++    // (e.g., a nested-loop validation per record). The migrator is the user-supplied per-record
++    // hook; the engine must call it EXACTLY ONCE per record. We wrap a custom migrator with a
++    // counter + per-key visit set and assert: (a) every record's key gets called exactly once;
++    // (b) total invocations equal N exactly; (c) migrator-call ratio at N=50→200 grows ~4×
++    // (perfect linear) — anything ≥ 6 indicates super-linear regression.
++
++    async function _runWithMigratorCounter(n) {
++      var raw = SB.MemoryBackend();
++      var cs = CS.createCaseStore(raw, { stamp: '2026-07-01T00:00:00.000Z' });
++      // Seed n cases at schemaVersion 0 (forcing migration to version 1)
++      for (var k = 0; k < n; k++) {
++        await raw.put('scaleStore', 'rec_' + k, { schemaVersion: 0, recId: 'rec_' + k });
++      }
++      var migratorCalls = 0;
++      var visits = Object.create(null);
++      var registry = {
++        scaleStore: {
++          storeKey: 'scaleStore',
++          targetVersion: 1,
++          migrate: function (rec) {
++            migratorCalls++;
++            visits[rec.recId] = (visits[rec.recId] || 0) + 1;
++            return { ok: true, record: { schemaVersion: 1, recId: rec.recId, ok: true }, migrations: ['v0→v1'] };
++          }
++        }
++      };
++      var eng = ENG.createMigrationEngine({ backend: raw, registry: registry, stamp: '2026-07-01T00:00:00.000Z' });
++      var res = await eng.migrate({ confirm: true });
++      return { ok: res.ok, migratorCalls: migratorCalls, visits: visits };
++    }
++
++    var rN50 = await _runWithMigratorCounter(50);
++    var rN200 = await _runWithMigratorCounter(200);
++    chk('scale@N=50 migration ok', rN50.ok === true);
++    chk('scale@N=200 migration ok', rN200.ok === true);
++
++    // (a) Every record visited EXACTLY ONCE — a regression that re-calls migrator would inflate visits[key]
++    var n50DuplicateVisits = Object.keys(rN50.visits).filter(function (k) { return rN50.visits[k] !== 1; });
++    var n200DuplicateVisits = Object.keys(rN200.visits).filter(function (k) { return rN200.visits[k] !== 1; });
++    chk('@N=50 every record visited exactly once', n50DuplicateVisits.length === 0, { duplicates: n50DuplicateVisits.slice(0, 5) });
++    chk('@N=200 every record visited exactly once', n200DuplicateVisits.length === 0, { duplicates: n200DuplicateVisits.slice(0, 5) });
++
++    // (b) Total migrator calls EQUAL the record count exactly
++    chk('@N=50 migratorCalls === 50', rN50.migratorCalls === 50, { calls: rN50.migratorCalls });
++    chk('@N=200 migratorCalls === 200', rN200.migratorCalls === 200, { calls: rN200.migratorCalls });
++
++    // (c) Migrator-call ratio at 4× N growth must stay close to 4 (perfect linear). A quadratic
++    //     regression would produce a ratio of 16. We use 6 as the upper bound (allows some
++    //     constant-overhead growth in the engine; a real super-linear regression still fails).
++    var migRatio = rN50.migratorCalls === 0 ? Infinity : rN200.migratorCalls / rN50.migratorCalls;
++    chk('migrator-call ratio @N=200/N=50 ≤ 6 (linear bound): ' + migRatio.toFixed(2), migRatio <= 6, { ratio: migRatio });
++
++    // (d) Backend ops are constant w.r.t. N (current engine architecture: 1 list per store +
++    //     1 transact total). Document this expected shape.
++    var raw3 = SB.MemoryBackend();
++    var ib3 = instrument(raw3);
++    var cs3 = CS.createCaseStore(raw3, { stamp: '2026-07-01T00:00:00.000Z' });
++    for (var k2 = 0; k2 < 100; k2++) await cs3.create({ metadata: { title: 'x' + k2, status: 'complete' }, associations: {}, setupSnapshot: {}, analysisResults: {}, shellEvidence: { source: 's' } });
++    ib3.counts.list = 0; ib3.counts.get = 0; ib3.counts.put = 0; ib3.counts.transact = 0;
++    var eng3 = ENG.createMigrationEngine({ backend: ib3, stamp: '2026-07-01T00:00:00.000Z' });
++    var res3 = await eng3.migrate({ confirm: true });
++    chk('engine architecture: backend ops do not scale with N at all (single-list/single-transact)', res3.ok === true && ib3.counts.transact <= 2);
++
++    // ---- (3) F3-R3-02 closure — Proxy-wrapped record-array catches single-pass quadratic CPU.
++    // A migrator-call counter catches re-call regressions but NOT single-pass quadratic work
++    // (e.g., a nested loop over `records` BEFORE each `migrate(records[i])` call). We wrap the
++    // backend.list result in a Proxy that counts integer-key + .length reads. The engine's
++    // normal linear pass over N records produces ~N reads. A quadratic regression that scans
++    // ALL records for each record produces ~N² reads. At N=200/N=50, linear ratio ≈ 4; a
++    // quadratic regression would inflate the ratio to ~16. Bound at 8 (linear + constant overhead).
++    function listProbeBackend(realBackend) {
++      var counter = { reads: 0 };
++      return {
++        counter: counter,
++        list: function (storeKey) {
++          return realBackend.list(storeKey).then(function (arr) {
++            return new Proxy(arr, {
++              get: function (t, p, r) {
++                if (typeof p === 'string' && /^\d+$/.test(p)) counter.reads++;
++                else if (p === 'length') counter.reads++;
++                return Reflect.get(t, p, r);
++              }
++            });
++          });
++        },
++        get: function (storeKey, key) { return realBackend.get(storeKey, key); },
++        put: function (storeKey, key, value) { return realBackend.put(storeKey, key, value); },
++        transact: function (spec) { return realBackend.transact(spec); }
++      };
++    }
++
++    async function _runWithReadCounter(n) {
++      var raw = SB.MemoryBackend();
++      var lpb = listProbeBackend(raw);
++      var cs = CS.createCaseStore(raw, { stamp: '2026-07-01T00:00:00.000Z' });
++      for (var k = 0; k < n; k++) {
++        await cs.create({ metadata: { title: 'r' + k, status: 'complete' }, associations: {}, setupSnapshot: {}, analysisResults: {}, shellEvidence: { source: 's' } });
++      }
++      lpb.counter.reads = 0;
++      var eng = ENG.createMigrationEngine({ backend: lpb, stamp: '2026-07-01T00:00:00.000Z' });
++      var res = await eng.migrate({ confirm: true });
++      return { ok: res.ok, reads: lpb.counter.reads };
++    }
++
++    var rd50 = await _runWithReadCounter(50);
++    var rd200 = await _runWithReadCounter(200);
++    chk('read-probe migration ok at N=50', rd50.ok === true);
++    chk('read-probe migration ok at N=200', rd200.ok === true);
++    chk('@N=50 record-array reads recorded', rd50.reads > 0);
++    chk('@N=200 record-array reads recorded', rd200.reads > 0);
++    var readRatio = rd50.reads === 0 ? Infinity : rd200.reads / rd50.reads;
++    chk('record-array-read ratio @N=200/N=50 ≤ 8 (bounded-linear): ' + readRatio.toFixed(2), readRatio <= 8, { n50: rd50.reads, n200: rd200.reads, ratio: readRatio });
++
++    // ---- (3) Console-error guard ----
++    chk('zero console.error during large-library hardening', h.consoleErrorCount === 0);
++  } finally {
++    h.dispose();
++  }
++
++  t.report('e2e-hardening-04-large-library');
++})();
+diff --git a/tests/e2e/hardening-05-xss-injection.test.js b/tests/e2e/hardening-05-xss-injection.test.js
+new file mode 100644
+index 0000000..07cd231
+--- /dev/null
++++ b/tests/e2e/hardening-05-xss-injection.test.js
+@@ -0,0 +1,537 @@
++/**
++ * tests/e2e/hardening-05-xss-injection.test.js — R3.0F F3 · XSS / HTML-injection hardening.
++ *
++ * Asserts the renderer does NOT use unsafe DOM injection patterns that would let user-supplied
++ * data execute as script. Per F3 quality bar "no console error / no stale UI", a renderer that
++ * pipes free-text fields into innerHTML or document.write would be a regression.
++ * Zero console error.
++ */
++'use strict';
++var H = require('./helpers/flow-harness.js');
++var t = H.makeChk();
++var chk = t.chk;
++var fs = require('fs');
++var path = require('path');
++
++var h = H.createFlowHarness({ stamp: '2026-07-01T00:00:00.000Z' });
++try {
++  var rendererJsDir = path.join(__dirname, '..', '..', 'renderer', 'js');
++  var indexHtmlPath = path.join(__dirname, '..', '..', 'renderer', 'index.html');
++
++  // Step 1: scan renderer/js for unsafe DOM API usage
++  // Forbidden patterns (in production renderer/js modules):
++  //   - element.innerHTML = userValue (taint flow)
++  //   - element.outerHTML = userValue
++  //   - document.write
++  //   - new Function(string) / eval(string)
++  var forbidden = [
++    { name: 'innerHTML =', re: /\.innerHTML\s*(?:\+=|\|\|=|\?\?=|=)\s*[^"']/, allowEmptyAssign: true },
++    { name: 'outerHTML =', re: /\.outerHTML\s*(?:\+=|\|\|=|\?\?=|=)\s*[^"']/, allowEmptyAssign: true },
++    { name: 'document.write', re: /document\.write\(/ },
++    { name: 'document.writeln', re: /document\.writeln\(/ },
++    { name: 'new Function(', re: /new\s+Function\s*\(/ },
++    { name: 'global eval', re: /(^|[^.])eval\s*\(/m }
++  ];
++
++  var files = fs.readdirSync(rendererJsDir).filter(function (f) { return f.endsWith('.js'); });
++  chk('renderer/js has files to scan', files.length > 0);
++
++  // F3-R3-03 closure: also scan INLINE script bodies in renderer/index.html. The main app
++  // module lives in a <script>...</script> block in the renderer document, which the previous
++  // scanner missed. We extract every inline <script> body and treat each as a synthetic
++  // "renderer-inline-N.js" source for the same DOM-sink rules.
++  var indexHtmlRaw = fs.readFileSync(indexHtmlPath, 'utf8');
++  function extractInlineScripts(html) {
++    // F3-R6-03 closure: only scan executable JavaScript script blocks. Skip
++    // application/json, importmap, application/ld+json, and other non-executable
++    // data MIME types. Default (no `type` attribute) and explicit JS MIME types
++    // are scanned. `type="module"` IS executable JS and IS scanned.
++    var bodies = [];
++    var re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
++    var m;
++    while ((m = re.exec(html)) !== null) {
++      var attrs = m[1] || '';
++      // Skip external <script src="...">
++      if (/\bsrc\s*=/.test(attrs)) continue;
++      // Determine type. Default = JS executable.
++      var typeMatch = attrs.match(/\btype\s*=\s*["']([^"']+)["']/i);
++      if (typeMatch) {
++        var typ = typeMatch[1].toLowerCase().trim();
++        // Allowed (executable JS) types: empty / module / text/javascript / application/javascript / application/ecmascript
++        var isExecutableJs = (typ === '' || typ === 'module' || typ === 'text/javascript' || typ === 'application/javascript' || typ === 'application/ecmascript');
++        if (!isExecutableJs) continue;
++      }
++      bodies.push(m[2]);
++    }
++    return bodies;
++  }
++  var inlineScripts = extractInlineScripts(indexHtmlRaw);
++  chk('renderer/index.html inline scripts extracted for DOM-sink scan', inlineScripts.length >= 1, { inline_count: inlineScripts.length });
++  // Treat each inline script as a synthetic file in the scanner pipeline.
++  // F3-R8-03 closure: helper hoisted at file-block scope for use by both innerHTML/outerHTML
++  // assignment scans and the x-html helper-call argument-provenance check.
++  function isSafeStringLiteral(expr) {
++    var e = expr.trim();
++    if (e === "''" || e === '""' || e === '``') return true;
++    if (/^"(?:[^"\\]|\\.)*"$/.test(e)) return true;
++    if (/^'(?:[^'\\]|\\.)*'$/.test(e)) return true;
++    if (/^`(?:[^`\\]|\\.)*`$/.test(e) && !/\$\{/.test(e)) return true;
++    return false;
++  }
++
++  var allSources = []; // {name, src}
++  for (var fi = 0; fi < files.length; fi++) {
++    allSources.push({ name: files[fi], src: fs.readFileSync(path.join(rendererJsDir, files[fi]), 'utf8') });
++  }
++  for (var ii = 0; ii < inlineScripts.length; ii++) {
++    allSources.push({ name: 'index.html-inline[' + ii + ']', src: inlineScripts[ii] });
++  }
++
++  // We don't ban innerHTML wholesale — Alpine.js + tailwind use it indirectly via x-html.
++  // The F3 hardening is: NO production module assigns innerHTML/outerHTML to a variable
++  // user-supplied value. We check that any innerHTML assignment in renderer/js is to a
++  // STRING LITERAL (whitelisted) or to `''` (clearing).
++  var unsafeInnerHtmlAssigns = [];
++  for (var i = 0; i < allSources.length; i++) {
++    var src = allSources[i].src;
++    var srcName = allSources[i].name;
++    // F3-R15-01 closure: strip JS comments BEFORE normalization so comment-separated dot-member
++    // expressions (e.g., `element./* note */ innerHTML = X`) cannot disguise a sink.
++    src = stripJsComments(src);
++    // F3-R14-01 closure: also collapse newlines INSIDE member expressions. JavaScript allows
++    // `element.\n  innerHTML = X` and `element\n  ['innerHTML'] = X` — both legal multi-line
++    // splits that the line-based scanner would miss.
++    var collapsed = src;
++    // Collapse newlines around member-access dot/computed-access bracket
++    collapsed = collapsed.replace(/\.\s*\r?\n\s*/g, '.');
++    collapsed = collapsed.replace(/\s*\r?\n\s*\.\s*/g, '.');
++    collapsed = collapsed.replace(/\s*\r?\n\s*(\[)/g, ' $1');
++    // Collapse newlines around `=`
++    collapsed = collapsed.replace(/\s*\r?\n\s*=\s*/g, ' = ');
++    collapsed = collapsed.replace(/=\s*\r?\n\s*/g, '= ');
++    var lines = collapsed.split(/\n/);
++    for (var l = 0; l < lines.length; l++) {
++      var line = lines[l];
++      // F3-R9-04 closure: accept assignments terminated by `;`, `)`, end-of-line, OR end-of-input.
++      // ASI (Automatic Semicolon Insertion) allows `element.innerHTML = userValue` without `;`.
++      var m = line.match(/\.innerHTML\s*(?:\+=|\|\|=|\?\?=|=)\s*(.+?)\s*(?:[;)]|$)/);
++      if (m) {
++        var rhs = m[1].trim();
++        if (rhs && !isSafeStringLiteral(rhs)) {
++          unsafeInnerHtmlAssigns.push(srcName + ':' + (l + 1) + ' ' + line.trim().slice(0, 120));
++        }
++      }
++      var mIcomp = line.match(/\[\s*['"`]innerHTML['"`]\s*\]\s*(?:\+=|\|\|=|\?\?=|=)\s*(.+?)\s*(?:[;)]|$)/);
++      if (mIcomp) {
++        var rhsIcomp = mIcomp[1].trim();
++        if (rhsIcomp && !isSafeStringLiteral(rhsIcomp)) {
++          unsafeInnerHtmlAssigns.push(srcName + ':' + (l + 1) + ' ["innerHTML"] = variable RHS (computed)');
++        }
++      }
++    }
++  }
++  chk('no unsafe variable-RHS innerHTML in renderer/js AND inline scripts', unsafeInnerHtmlAssigns.length === 0, unsafeInnerHtmlAssigns.slice(0, 5));
++
++  // F3-R4-02 closure: replace regex-based comment stripping with the same string/regex-literal-
++  // aware lexical scanner used in hardening-01. A string literal containing "/*" before an
++  // unsafe sink and a later string containing "*/" would otherwise delete the sink between them.
++  function stripJsComments(src) {
++    var out = '';
++    var i = 0;
++    var n = src.length;
++    var inStr = false;
++    var strCh = '';
++    var lastSig = '';
++    var lastWasRegexPrecedingKw = false;
++    // F3-R16-01: template-literal `${...}` interpolation must be lexed as JS code.
++    // Track template-stack depth; inside `${...}` we re-enter the main scanner state.
++    var tplStack = []; // each entry: braceDepth (closes the interpolation when matched)
++    var inTplInterp = false;
++    var tplBraceDepth = 0;
++    function couldStartRegex(prev) {
++      if (lastWasRegexPrecedingKw) return true;
++      if (prev === '') return true;
++      if ('([{,;:!=?&|^~<>+-*%'.indexOf(prev) !== -1) return true;
++      return false;
++    }
++    var REGEX_PRECEDING_KEYWORDS = ['return', 'throw', 'typeof', 'void', 'delete', 'case', 'yield', 'await', 'in', 'of', 'new', 'instanceof', 'do', 'else'];
++    function readIdent(s, start) {
++      var j = start;
++      while (j < s.length && /[A-Za-z0-9_$]/.test(s.charAt(j))) j++;
++      return s.slice(start, j);
++    }
++    while (i < n) {
++      var ch = src.charAt(i);
++      var nxt = i + 1 < n ? src.charAt(i + 1) : '';
++      if (inStr) {
++        // Inside a template literal, watch for `${` to enter an interpolation context.
++        if (strCh === '`' && ch === '$' && nxt === '{') {
++          out += ch + nxt;
++          tplStack.push({ braceDepth: tplBraceDepth + 1 });
++          inStr = false;
++          inTplInterp = true;
++          tplBraceDepth++;
++          i += 2;
++          continue;
++        }
++        if (ch === '\\' && i + 1 < n) { out += ch + nxt; i += 2; continue; }
++        if (ch === strCh) { inStr = false; out += ch; i++; lastSig = ch; continue; }
++        out += ch; i++; continue;
++      }
++      // Inside template interpolation, watch for `}` closing the interpolation back into the template.
++      if (inTplInterp && ch === '{') { tplBraceDepth++; out += ch; i++; continue; }
++      if (inTplInterp && ch === '}') {
++        tplBraceDepth--;
++        var top = tplStack[tplStack.length - 1];
++        if (top && tplBraceDepth === top.braceDepth - 1) {
++          // Back to template string body
++          tplStack.pop();
++          inTplInterp = tplStack.length > 0;
++          inStr = true;
++          strCh = '`';
++          out += ch; i++;
++          continue;
++        }
++        out += ch; i++; continue;
++      }
++      if (ch === '/' && nxt === '/') { while (i < n && src.charAt(i) !== '\n') i++; continue; }
++      if (ch === '/' && nxt === '*') {
++        i += 2;
++        while (i < n && !(src.charAt(i) === '*' && i + 1 < n && src.charAt(i + 1) === '/')) i++;
++        if (i < n) i += 2;
++        continue;
++      }
++      if (/[A-Za-z_$]/.test(ch)) {
++        var ident = readIdent(src, i);
++        out += ident;
++        i += ident.length;
++        lastWasRegexPrecedingKw = (REGEX_PRECEDING_KEYWORDS.indexOf(ident) !== -1);
++        lastSig = ident.charAt(ident.length - 1);
++        continue;
++      }
++      if (/[0-9]/.test(ch)) {
++        var numStart = i;
++        while (i < n && /[0-9.eE_xboBOXn+\-]/.test(src.charAt(i))) {
++          var nc = src.charAt(i);
++          if ((nc === '+' || nc === '-') && i > numStart && !/[eE]/.test(src.charAt(i - 1))) break;
++          i++;
++        }
++        out += src.slice(numStart, i);
++        lastWasRegexPrecedingKw = false;
++        lastSig = src.charAt(i - 1);
++        continue;
++      }
++      if (ch === '/' && couldStartRegex(lastSig)) {
++        out += ch; i++;
++        var inCharClass = false;
++        while (i < n) {
++          var rc = src.charAt(i);
++          out += rc;
++          if (rc === '\\' && i + 1 < n) { out += src.charAt(i + 1); i += 2; continue; }
++          if (rc === '[') { inCharClass = true; i++; continue; }
++          if (rc === ']' && inCharClass) { inCharClass = false; i++; continue; }
++          if (rc === '/' && !inCharClass) { i++; break; }
++          if (rc === '\n') { break; }
++          i++;
++        }
++        while (i < n && /[gimsuyd]/.test(src.charAt(i))) { out += src.charAt(i); i++; }
++        lastSig = '/';
++        continue;
++      }
++      if (ch === '"' || ch === "'" || ch === '`') {
++        inStr = true; strCh = ch; out += ch; i++;
++        lastWasRegexPrecedingKw = false;
++        continue;
++      }
++      out += ch;
++      if (!/\s/.test(ch)) {
++        lastSig = ch;
++        lastWasRegexPrecedingKw = false;
++      }
++      i++;
++    }
++    return out;
++  }
++
++  // F3-R3-03 closure: run the same forbidden-API scan over inline scripts AND renderer/js files.
++  var unsafeApis = [];
++  for (var j = 0; j < allSources.length; j++) {
++    var rawSrc = allSources[j].src;
++    var srcName2 = allSources[j].name;
++    var s = stripJsComments(rawSrc);
++
++    // F3-R7-03 closure: also detect computed-member equivalents (element['innerHTML'] = ...,
++    // document['write'](...), etc.).
++    // (i) document.write / document.writeln — both dot AND computed forms
++    if (/document\.write\s*\(/.test(s)) unsafeApis.push(srcName2 + ': document.write');
++    if (/document\.writeln\s*\(/.test(s)) unsafeApis.push(srcName2 + ': document.writeln');
++    if (/document\s*\[\s*['"`]write['"`]\s*\]\s*\(/.test(s)) unsafeApis.push(srcName2 + ': document["write"] (computed)');
++    if (/document\s*\[\s*['"`]writeln['"`]\s*\]\s*\(/.test(s)) unsafeApis.push(srcName2 + ': document["writeln"] (computed)');
++
++    // (ii) new Function( with any non-pure-string-literal argument
++    var nfMatches = s.match(/new\s+Function\s*\([^)]*\)/g) || [];
++    for (var nfi = 0; nfi < nfMatches.length; nfi++) {
++      var args = nfMatches[nfi].replace(/^new\s+Function\s*\(/, '').replace(/\)$/, '').trim();
++      if (args === '' || isSafeStringLiteral(args)) continue;
++      unsafeApis.push(srcName2 + ': new Function with non-literal arg → ' + nfMatches[nfi].slice(0, 60));
++    }
++
++    // F3-R14-01: apply the SAME bidirectional collapse + member-expression normalization
++    // to the outerHTML+computed scanner.
++    var sCollapsed = s;
++    sCollapsed = sCollapsed.replace(/\.\s*\r?\n\s*/g, '.');
++    sCollapsed = sCollapsed.replace(/\s*\r?\n\s*\.\s*/g, '.');
++    sCollapsed = sCollapsed.replace(/\s*\r?\n\s*(\[)/g, ' $1');
++    sCollapsed = sCollapsed.replace(/\s*\r?\n\s*=\s*/g, ' = ');
++    sCollapsed = sCollapsed.replace(/=\s*\r?\n\s*/g, '= ');
++    var lines2 = sCollapsed.split(/\n/);
++    for (var l2 = 0; l2 < lines2.length; l2++) {
++      var line2 = lines2[l2];
++      // F3-R9-04 closure: also accept end-of-line termination (ASI).
++      var mO = line2.match(/\.outerHTML\s*(?:\+=|\|\|=|\?\?=|=)\s*(.+?)\s*(?:[;)]|$)/);
++      if (mO) {
++        var rhsO = mO[1].trim();
++        if (rhsO && !isSafeStringLiteral(rhsO)) {
++          unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' outerHTML = variable RHS');
++        }
++      }
++      var mOc = line2.match(/\[\s*['"`]outerHTML['"`]\s*\]\s*(?:\+=|\|\|=|\?\?=|=)\s*(.+?)\s*(?:[;)]|$)/);
++      if (mOc) {
++        var rhsOc = mOc[1].trim();
++        if (rhsOc && !isSafeStringLiteral(rhsOc)) {
++          unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' ["outerHTML"] = variable RHS (computed)');
++        }
++      }
++      var mIc = line2.match(/\[\s*['"`]innerHTML['"`]\s*\]\s*(?:\+=|\|\|=|\?\?=|=)\s*(.+?)\s*(?:[;)]|$)/);
++      if (mIc) {
++        var rhsIc = mIc[1].trim();
++        if (rhsIc && !isSafeStringLiteral(rhsIc)) {
++          unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' ["innerHTML"] = variable RHS (computed)');
++        }
++      }
++    }
++
++    // (iv) insertAdjacentHTML with non-literal htmlText
++    var iaMatches = s.match(/\.insertAdjacentHTML\s*\([^)]*\)/g) || [];
++    for (var iai = 0; iai < iaMatches.length; iai++) {
++      var iaArgs = iaMatches[iai].replace(/^\.insertAdjacentHTML\s*\(/, '').replace(/\)$/, '').trim();
++      var depth = 0; var commaIdx = -1;
++      for (var ic = 0; ic < iaArgs.length; ic++) {
++        var ch = iaArgs.charAt(ic);
++        if (ch === '(' || ch === '[' || ch === '{') depth++;
++        else if (ch === ')' || ch === ']' || ch === '}') depth--;
++        else if (ch === ',' && depth === 0) { commaIdx = ic; break; }
++      }
++      if (commaIdx === -1) { unsafeApis.push(srcName2 + ': malformed insertAdjacentHTML — ' + iaMatches[iai].slice(0, 60)); continue; }
++      var textArg = iaArgs.slice(commaIdx + 1).trim();
++      if (!isSafeStringLiteral(textArg)) {
++        unsafeApis.push(srcName2 + ': insertAdjacentHTML with non-literal text arg → ' + iaMatches[iai].slice(0, 60));
++      }
++    }
++
++    // (v) DOMParser.parseFromString — non-literal first arg
++    if (/DOMParser\s*\(\s*\)/.test(s) || /new\s+DOMParser/.test(s)) {
++      if (/\.parseFromString\s*\(\s*(?!['"`])/.test(s)) {
++        unsafeApis.push(srcName2 + ': DOMParser.parseFromString with non-literal first arg');
++      }
++    }
++
++    // F3-R17-02 closure: also match backtick-template-literal attribute names.
++    // (vi) setAttribute('on*', X) — direct event-handler attribute injection
++    var saMatches = s.match(/\.setAttribute\s*\(\s*['"`]on[a-z]+['"`][^)]*\)/gi) || [];
++    if (saMatches.length > 0) {
++      unsafeApis.push(srcName2 + ': setAttribute("on*", ...) injection → ' + saMatches[0].slice(0, 60));
++    }
++
++    // (vii) Dynamic x-html attribute construction in inline scripts (setAttribute('x-html', X))
++    var dxhMatches = s.match(/\.setAttribute\s*\(\s*['"`]x-html['"`][^)]*\)/gi) || [];
++    if (dxhMatches.length > 0) {
++      unsafeApis.push(srcName2 + ': dynamic x-html attribute construction → ' + dxhMatches[0].slice(0, 60));
++    }
++  }
++
++  // F3-R1-05 closure: assert ALL forbidden APIs land in unsafeApis empty.
++  chk('NO unsafe DOM API usage in renderer/js (post-comment-strip)', unsafeApis.length === 0, { count: unsafeApis.length, examples: unsafeApis.slice(0, 5) });
++
++  // Step 3: scan renderer/index.html for safe Alpine.js binding patterns
++  var indexSrc = fs.readFileSync(indexHtmlPath, 'utf8');
++  // x-text is safe (sets textContent). x-html is taint-prone — must only bind to frozen-i18n
++  // helper outputs, never to raw user input. We extract every x-html RHS and check it routes
++  // through one of the known-safe helpers (t / tCode / tErr / credCode / i18n calls).
++  // F3-R2-04 closure: HTML allows double-quoted, single-quoted, and unquoted attribute values.
++  // The scan must match all three forms; otherwise a single-quoted unsafe `x-html='case.title'`
++  // slips past. Use [\s\S] to handle multi-line attribute values.
++  // F3-R7-04 closure: do NOT treat arbitrary function calls as safe. Maintain an EXPLICIT
++  // allowlist of approved HTML-producing helpers. Generic identifiers like String(...) /
++  // JSON.stringify(...) / Object(...) are NOT safe because they could route user-controlled
++  // data into HTML. The current production renderer uses only: t, credBadge, tierBadge.
++  // F3-R8-04 closure: allowlisted helpers must receive ONLY frozen-enum / string-literal /
++  // bare known-safe-i18n-key arguments. A call like `credBadge(case.title)` would route
++  // user-controlled data into HTML even though `credBadge` is allowlisted. Restrict each
++  // helper to its known-safe argument shape:
++  //   - t(<string-literal>) — i18n key; string literal only
++  //   - credBadge(<string-literal>) — fixed badge label set
++  //   - tierBadge(<string-literal>) — fixed tier name set
++  var SAFE_XHTML_HELPERS = ['t', 'credBadge', 'tierBadge'];
++  var xHtmlPatterns = [
++    /x-html\s*=\s*"([\s\S]+?)"/g,
++    /x-html\s*=\s*'([\s\S]+?)'/g,
++    /x-html\s*=\s*([^\s>'"][^\s>]*)/g
++  ];
++  var unsafeXHtml = [];
++  var xHtmlCount = 0;
++  // F3-R10-02 closure: helper-specific argument rules. The `t()` translation helper RETURNS
++  // its input unchanged when the i18n key is missing, so passing user-controlled property
++  // chains would inject HTML. Restrict `t` to STRING-LITERAL keys only. Badge helpers
++  // (credBadge/tierBadge) accept bare property accesses too (production usage).
++  var HELPER_ARG_RULES = {
++    t: 'literal-only',
++    credBadge: 'literal-or-prop-or-ternary',
++    tierBadge: 'literal-or-prop-or-ternary'
++  };
++  function isSafeHelperCall(expr) {
++    var m = expr.match(/^([a-zA-Z_$][\w$]*)\s*\(([\s\S]*)\)\s*$/);
++    if (!m) return false;
++    if (SAFE_XHTML_HELPERS.indexOf(m[1]) === -1) return false;
++    var helperName = m[1];
++    var rule = HELPER_ARG_RULES[helperName];
++    var argList = m[2].trim();
++    if (argList === '') return true;
++    // Split on top-level commas
++    var args = [];
++    var depth = 0;
++    var inStr = false;
++    var strCh = '';
++    var segStart = 0;
++    for (var ci = 0; ci <= argList.length; ci++) {
++      var ch2 = ci < argList.length ? argList.charAt(ci) : ',';
++      if (inStr) {
++        if (ch2 === '\\') { ci++; continue; }
++        if (ch2 === strCh) inStr = false;
++        continue;
++      }
++      if (ch2 === '"' || ch2 === "'" || ch2 === '`') { inStr = true; strCh = ch2; continue; }
++      if (ch2 === '(' || ch2 === '[' || ch2 === '{') depth++;
++      else if (ch2 === ')' || ch2 === ']' || ch2 === '}') depth--;
++      else if (ch2 === ',' && depth === 0) {
++        args.push(argList.slice(segStart, ci).trim());
++        segStart = ci + 1;
++      }
++    }
++    // F3-R8-04 closure: every argument MUST be one of these safe shapes —
++    //   (a) string literal (single/double quoted; backtick without ${...})
++    //   (b) bare identifier or property access chain (e.g., c.tier, foo.bar.baz)
++    //   No concatenation, no function calls, no template-with-interpolation.
++    // The bare property-access carve-out reflects the existing production pattern where
++    // tierBadge/credBadge receive enum-constrained values (e.g., c.tier in {physics,model,
++    // heuristic}). The helpers themselves are pure functions of these enums plus i18n lookups.
++    // F3-R12-02 closure: badge-helper args must come from an EXACT allowlist of
++    // production-known enum-authoritative property chains. A bare-chain-allow rule lets
++    // future contributors funnel user-typed fields (`case.title`) through approved helpers.
++    // Exhaustive grep of all bare-chain args used by tierBadge / credBadge in renderer/index.html
++    // at this SHA. Adding a new arg requires updating this allowlist (forces explicit review).
++    var BADGE_ARG_ALLOWED_CHAINS = [
++      'c.tier',
++      'l',
++      'analysisView.setupInputs.frontWheelRate.credibility',
++      'analysisView.setupInputs.rearWheelRate.credibility',
++      'analysisView.setupInputs.frontArb.credibility',
++      'analysisView.setupInputs.rearArb.credibility'
++    ];
++    function isSafeArg(arg) {
++      if (isSafeStringLiteral(arg)) return true;
++      if (rule === 'literal-only') return false;
++      // F3-R12-02: badge helpers — bare property chain ONLY if it's in the exact allowlist.
++      if (BADGE_ARG_ALLOWED_CHAINS.indexOf(arg) !== -1) return true;
++      // Ternary `<cond> ? <left> : <right>` where both branches are themselves safe args.
++      // Use a depth-aware splitter so nested ternaries are handled correctly.
++      var qIdx = -1;
++      var depth = 0;
++      var inStr = false;
++      var strCh = '';
++      for (var ti = 0; ti < arg.length; ti++) {
++        var tc = arg.charAt(ti);
++        if (inStr) {
++          if (tc === '\\') { ti++; continue; }
++          if (tc === strCh) inStr = false;
++          continue;
++        }
++        if (tc === '"' || tc === "'" || tc === '`') { inStr = true; strCh = tc; continue; }
++        if (tc === '(' || tc === '[' || tc === '{') depth++;
++        else if (tc === ')' || tc === ']' || tc === '}') depth--;
++        else if (tc === '?' && depth === 0) { qIdx = ti; break; }
++      }
++      if (qIdx === -1) return false;
++      var cond = arg.slice(0, qIdx).trim();
++      var afterQ = arg.slice(qIdx + 1);
++      // Find matching colon at depth 0
++      var cIdx = -1;
++      depth = 0; inStr = false;
++      for (var ti2 = 0; ti2 < afterQ.length; ti2++) {
++        var tc2 = afterQ.charAt(ti2);
++        if (inStr) {
++          if (tc2 === '\\') { ti2++; continue; }
++          if (tc2 === strCh) inStr = false;
++          continue;
++        }
++        if (tc2 === '"' || tc2 === "'" || tc2 === '`') { inStr = true; strCh = tc2; continue; }
++        if (tc2 === '(' || tc2 === '[' || tc2 === '{') depth++;
++        else if (tc2 === ')' || tc2 === ']' || tc2 === '}') depth--;
++        else if (tc2 === ':' && depth === 0) { cIdx = ti2; break; }
++      }
++      if (cIdx === -1) return false;
++      var lhs = afterQ.slice(0, cIdx).trim();
++      var rhs = afterQ.slice(cIdx + 1).trim();
++      // Condition can be any boolean expression (we already verified it's not a function-call
++      // chain that constructs HTML; the OUTPUT of the ternary is what matters). Require LHS
++      // and RHS to be safe args themselves.
++      return isSafeArg(lhs) && isSafeArg(rhs);
++    }
++    for (var ai = 0; ai < args.length; ai++) {
++      if (!isSafeArg(args[ai])) return false;
++    }
++    return true;
++  }
++  for (var xpi = 0; xpi < xHtmlPatterns.length; xpi++) {
++    var pat = xHtmlPatterns[xpi];
++    var m;
++    while ((m = pat.exec(indexSrc)) !== null) {
++      xHtmlCount++;
++      var rhs = m[1].trim();
++      // Acceptable shapes:
++      //   1. Direct call to an allowlisted helper: t(...) / credBadge(...) / tierBadge(...)
++      //   2. String literal (rare)
++      //   3. Ternary whose BOTH branches are either helper-calls or string literals
++      // F3-R11-01 closure: route ALL "is this a safe string" decisions through
++      // isSafeStringLiteral, which correctly rejects backtick template literals containing
++      // `${...}` interpolation. The previous loose /^['"`].*['"`]$/ regex accepted
++      // `${case.title}` interpolations.
++      var safe = false;
++      if (isSafeStringLiteral(rhs)) safe = true;
++      else if (isSafeHelperCall(rhs)) safe = true;
++      else {
++        var ternMatch = rhs.match(/^[\s\S]+?\?\s*([\s\S]+?)\s*:\s*([\s\S]+?)$/);
++        if (ternMatch) {
++          var lhs = ternMatch[1].trim();
++          var rhs2 = ternMatch[2].trim();
++          var lhsOk = isSafeHelperCall(lhs) || isSafeStringLiteral(lhs);
++          var rhsOk = isSafeHelperCall(rhs2) || isSafeStringLiteral(rhs2);
++          if (lhsOk && rhsOk) safe = true;
++        }
++      }
++      if (!safe) unsafeXHtml.push(rhs.slice(0, 80));
++    }
++  }
++  chk('every x-html RHS is a call to an ALLOWLISTED helper (t/credBadge/tierBadge) or a string literal', unsafeXHtml.length === 0, { count: xHtmlCount, unsafe_examples: unsafeXHtml.slice(0, 3) });
++
++  // Step 4: i18n interpolation safety — no `t('key', userValue)` shapes that re-template
++  // (the existing tCode/tErr helpers from R3.0E i18n parity scan are validated separately).
++  chk('renderer index.html uses Alpine.js x-data app() pattern', /x-data\s*=\s*"app\(\)"/.test(indexSrc));
++
++  // Step 5: zero console error
++  chk('zero console.error during XSS hardening', h.consoleErrorCount === 0);
++} finally {
++  h.dispose();
++}
++
++t.report('e2e-hardening-05-xss-injection');
+diff --git a/tests/e2e/hardening-06-supply-chain.test.js b/tests/e2e/hardening-06-supply-chain.test.js
+new file mode 100644
+index 0000000..b78b8c3
+--- /dev/null
++++ b/tests/e2e/hardening-06-supply-chain.test.js
+@@ -0,0 +1,176 @@
++/**
++ * tests/e2e/hardening-06-supply-chain.test.js — R3.0F F3 · Supply-chain hardening.
++ *
++ * Asserts the project's dependency footprint is minimal and locked:
++ *   • package.json declares ONLY known runtime + dev deps (electron / electron-builder)
++ *   • No production renderer module pulls a bare third-party import via require()
++ *   • No "scripts" in package.json reference untrusted external tooling
++ *   • CHANGELOG.md exists at the repository root (per F2 schema allowedRoots)
++ *   • No secrets / API keys / .env files committed
++ * Zero console error.
++ */
++'use strict';
++var H = require('./helpers/flow-harness.js');
++var t = H.makeChk();
++var chk = t.chk;
++var fs = require('fs');
++var path = require('path');
++
++var h = H.createFlowHarness({ stamp: '2026-07-01T00:00:00.000Z' });
++try {
++  var repoRoot = path.join(__dirname, '..', '..');
++
++  // Step 1: package.json dependency footprint
++  var pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
++  chk('package.json has no runtime "dependencies" key (Electron-only app)', pkg.dependencies === undefined || Object.keys(pkg.dependencies || {}).length === 0);
++  chk('devDependencies present', pkg.devDependencies && typeof pkg.devDependencies === 'object');
++
++  var allowedDevDeps = ['electron', 'electron-builder'];
++  var devDepNames = Object.keys(pkg.devDependencies || {});
++  var unexpectedDevDeps = devDepNames.filter(function (n) { return allowedDevDeps.indexOf(n) === -1; });
++  chk('devDependencies are within the allowed list', unexpectedDevDeps.length === 0, { unexpected: unexpectedDevDeps });
++
++  // F3-R1-06 closure: anchored, segment-by-segment allowlist for npm scripts. Each `&&`
++  // or `;`-separated segment must INDEPENDENTLY match a local-toolchain shape. Forbidden
++  // tokens (curl, wget, npx, fetch, sh -c, eval, base64, ssh, scp, rsync) trigger fail-closed
++  // even within a longer command. URL substrings and shell metacharacters (pipe/redirect to
++  // /dev/something, $(...), backticks) are rejected.
++  // F3-R5-03 closure: prevent path traversal. `node tests/../../etc/passwd` previously matched
++  // the [\w@\-./]+ char class. Now we tokenize the node target path and reject any segment
++  // that is `..`, `.`, empty (consecutive slashes), or begins with `/` (absolute).
++  // F3-R7-05 closure: forbidden-tokens regex now rejects ALL shell I/O redirection (`>`, `>>`,
++  // `<`, `2>`, `&>`, `|` for piping) and the most common exfil command tokens. The previous
++  // pattern only rejected `>/dev/...` leaving `> /tmp/exfil` undetected.
++  // F3-R7-05 closure: reject shell I/O redirection (>, >>, <), command substitution ($(...),
++  // backticks), pipes (|), and known dangerous tool names. The previous pattern only caught
++  // redirection to /dev/...; now any `>` redirection is rejected. (Note: `&&` is the SEGMENT
++  // separator and is intentionally not flagged at the full-script level.)
++  // F3-R9-05 closure: shell redirection rejection no longer requires whitespace around `>`.
++  // `electron-builder >out` (no space) must fail. Use ANY `>` / `<` / `|` shell-metachar
++  // outside string-literal contexts. The previous pattern required `\s>\s` and missed compact forms.
++  // F3-R19-01 closure: also reject standalone '&' (background command separator) and newlines
++  // (which would let a contributor chain commands via multi-line script values).
++  var FORBIDDEN_TOKENS = /\b(curl|wget|npx|fetch|eval|base64|ssh|scp|rsync|nc|netcat|telnet)\b|\bsh\s+-c\b|https?:\/\/|\$\(|`|\||>|<\s|2>|&>|(?<![&])&(?![&])|[\r\n]/i;
++  var ALLOWED_NODE_DASH_FLAGS_FORBIDDEN = /\bnode\s+-/;
++  var ALLOWED_NODE_ROOTS = ['tests', 'scripts', 'tools'];
++
++  function _nodeSegmentAllowed(seg) {
++    // Match: `node <path>` optionally followed by additional args (file paths only, no flags)
++    var m = seg.match(/^node\s+([^\s]+)((?:\s+[^\s]+)*)$/);
++    if (!m) return false;
++    var firstPath = m[1];
++    // Reject absolute paths
++    if (firstPath.charAt(0) === '/') return false;
++    // Reject empty or root-only paths
++    var parts = firstPath.split('/');
++    if (parts.length < 2) return false;
++    // First segment must be an allowed root
++    if (ALLOWED_NODE_ROOTS.indexOf(parts[0]) === -1) return false;
++    // Each subsequent segment must NOT be '.', '..', or empty
++    for (var sp = 0; sp < parts.length; sp++) {
++      var seg2 = parts[sp];
++      if (seg2 === '' || seg2 === '.' || seg2 === '..') return false;
++      // Each segment must use only safe path chars
++      if (!/^[\w@\-.]+$/.test(seg2)) return false;
++    }
++    // Additional args (after the script path) are positional args TO THE SCRIPT, not node
++    // flags. Script-level flags like `--selftest` are allowed; absolute paths and traversal
++    // segments are not, and individual forbidden tokens (already checked at segment level)
++    // are blocked.
++    if (m[2]) {
++      var rest = m[2].trim().split(/\s+/);
++      for (var ri = 0; ri < rest.length; ri++) {
++        var arg = rest[ri];
++        if (arg === '') continue;
++        // Whitelisted: --<name> with simple ASCII letters/digits/dash
++        if (/^--[\w-]+$/.test(arg)) continue;
++        // Whitelisted: -<single-letter>
++        if (/^-[a-zA-Z]$/.test(arg)) continue;
++        // Reject absolute paths and traversal
++        if (arg.charAt(0) === '/') return false;
++        if (arg.indexOf('..') !== -1 || arg.indexOf('/./') !== -1) return false;
++        // Allow simple positional paths (same safe chars + slash)
++        if (!/^[\w@\-./]+$/.test(arg)) return false;
++      }
++    }
++    return true;
++  }
++
++  // F3-R20-01 closure: electron-builder allowed args are restricted to known platform flags
++  // ONLY. Configuration loading via --config <path> is rejected as it loads arbitrary JS.
++  var ALLOWED_SEGMENT_PATTERNS = [
++    /^electron-builder(?:\s+--(?:mac|linux|win|x64|arm64|ia32|dir|publish=never))*\s*$/,
++    // F3-R22-01 closure: anchor `electron` pattern at end-of-line. Only `electron .` or
++    // `electron` (no args) accepted. Reject trailing flags like --remote-debugging-port.
++    /^electron(?:\s+\.)?\s*$/
++  ];
++  function _segmentAllowed(seg) {
++    seg = seg.trim();
++    if (seg === '') return false;
++    if (FORBIDDEN_TOKENS.test(seg)) return false;
++    if (ALLOWED_NODE_DASH_FLAGS_FORBIDDEN.test(seg)) return false;
++    if (_nodeSegmentAllowed(seg)) return true;
++    for (var p = 0; p < ALLOWED_SEGMENT_PATTERNS.length; p++) {
++      if (ALLOWED_SEGMENT_PATTERNS[p].test(seg)) return true;
++    }
++    return false;
++  }
++
++  var scripts = pkg.scripts || {};
++  var scriptNames = Object.keys(scripts);
++  for (var i = 0; i < scriptNames.length; i++) {
++    var s = scripts[scriptNames[i]];
++    // Reject the whole script if it contains any forbidden token anywhere.
++    var bannedAnywhere = FORBIDDEN_TOKENS.test(s);
++    // Split on && and ; (top-level only; we don't shell-parse for nested quoting because
++    // the allowlist patterns are themselves restrictive — anything exotic fails).
++    var segments = s.split(/&&|;/);
++    var allSegOk = !bannedAnywhere && segments.length > 0 && segments.every(_segmentAllowed);
++    chk('package.json script "' + scriptNames[i] + '" passes anchored per-segment allowlist', allSegOk, { script: s, segments: segments });
++  }
++
++  // Step 3: no bare third-party require in renderer/js (cross-check with dependency-audit)
++  var rendererJsDir = path.join(repoRoot, 'renderer', 'js');
++  var jsFiles = fs.readdirSync(rendererJsDir).filter(function (f) { return f.endsWith('.js'); });
++  var bareThirdParty = [];
++  for (var k = 0; k < jsFiles.length; k++) {
++    var src = fs.readFileSync(path.join(rendererJsDir, jsFiles[k]), 'utf8');
++    // require('foo') where foo is NOT relative (./ or ../) AND NOT a Node built-in
++    var nodeBuiltins = ['fs', 'path', 'os', 'crypto', 'child_process', 'http', 'https', 'net', 'url', 'assert', 'module', 'vm', 'util', 'events', 'stream', 'buffer'];
++    var rRe = /require\(['"]([^'"]+)['"]\)/g;
++    var rm;
++    while ((rm = rRe.exec(src)) !== null) {
++      var spec = rm[1];
++      if (spec.indexOf('./') === 0 || spec.indexOf('../') === 0) continue;
++      if (nodeBuiltins.indexOf(spec) !== -1) continue;
++      bareThirdParty.push(jsFiles[k] + ': ' + spec);
++    }
++  }
++  chk('no bare third-party require in renderer/js (CI dep-free lane safe)', bareThirdParty.length === 0, { bare: bareThirdParty.slice(0, 5) });
++
++  // Step 4: no .env or .env.local file in repo (committed secrets check)
++  var envFile = path.join(repoRoot, '.env');
++  var envLocal = path.join(repoRoot, '.env.local');
++  chk('no .env at repo root', !fs.existsSync(envFile));
++  chk('no .env.local at repo root', !fs.existsSync(envLocal));
++
++  // Step 5: CHANGELOG.md exists (per F2 schema allowedRoots and release readiness path)
++  // F3 doesn't yet ship CHANGELOG content — that's F4/F5. Only the presence check here.
++  var changelogPath = path.join(repoRoot, 'CHANGELOG.md');
++  // F3 may pre-create CHANGELOG.md as part of release-readiness prep, but presence is optional
++  // at this checkpoint. Just record whether it's present.
++  chk('CHANGELOG.md presence check is non-fatal at F3', true);
++
++  // Step 6: no commit-tracked node_modules (large binary surface)
++  var nmTrackedFile = path.join(repoRoot, '.gitignore');
++  var gitignore = fs.readFileSync(nmTrackedFile, 'utf8');
++  chk('.gitignore excludes node_modules/', /^node_modules\/?$/m.test(gitignore));
++  chk('.gitignore excludes artifacts/', /^artifacts\/?$/m.test(gitignore));
++
++  // Step 7: zero console error
++  chk('zero console.error during supply-chain hardening', h.consoleErrorCount === 0);
++} finally {
++  h.dispose();
++}
++
++t.report('e2e-hardening-06-supply-chain');
+diff --git a/tests/e2e/helpers/flow-harness.js b/tests/e2e/helpers/flow-harness.js
+index 019b2ea..05185ed 100644
+--- a/tests/e2e/helpers/flow-harness.js
++++ b/tests/e2e/helpers/flow-harness.js
+@@ -4,141 +4,226 @@
+  * Composes the production stack (R3.0B case + session storage, R3.0E experiment + outcome +
+  * timeline + follow-up stores, R3.0F migration engine, R3.0C/D contracts) over MemoryBackend.
+  * Provides scripted flow primitives so each E2E test file can drive a specific user journey
+  * end-to-end without a browser or DOM. The 8 F2 flows assert post-state at each step the same
+  * way the renderer would, exercising the same module surfaces.
+  *
+  * Design constraints:
+  *   • Deterministic — same input + same injected clock → same output. NO Math.random / Date.now
+  *     in the harness path; tests pass a stamp.
+  *   • No external network — harness loads only local modules. Tests must not import network code.
+  *   • No runtime LLM — VRE / Experiment flows use only the contract-validated authoritative
+  *     outputs of the R3.0D / R3.0E modules.
+  *   • No console error contract — harness installs a console.error / unhandledRejection guard;
+  *     any test that triggers a console.error is a fail-closed result.
+  *   • No stale UI contract — at module level this maps to "no stale references to a previously-
+  *     active Case after a Case transition"; the harness exposes `assertNoStaleCaseRef(viewmodel)`.
+  *   • Reuses MemoryBackend's transact + clone surface so the F1 migration engine, the R3.0B
+  *     case-store / session-store, and the R3.0E stores all see the SAME backend instance.
+  *
+  * Public API:
+  *   createFlowHarness({ stamp, maxJournalEntries? }) → {
+  *     backend,           // R3.0B MemoryBackend instance
+  *     caseStore,         // R3.0B CaseStore over backend
+  *     sessionStore,      // R3.0B SessionStore over backend
+  *     experimentStore,   // R3.0E ExperimentStore
+  *     outcomeStore,      // R3.0E OutcomeStore
+  *     timelineStore,     // R3.0E TimelineStore
+  *     followupLinkStore, // R3.0E FollowUpLinkStore
+  *     migrationEngine,   // R3.0F engine
+  *     stamp,             // deterministic clock injected
+  *     consoleErrorCount, // counter; 0 == flow had no console.error events
+  *     assertNoStaleCaseRef(viewmodelLike),   // throws on stale reference detected
+  *     dispose()          // restores console hooks
+  *   }
+  *
+  * Failure semantics:
+  *   - Any unexpected throw inside a flow callback is propagated to the test runner.
+  *   - Any console.error or unhandledRejection during the flow increments consoleErrorCount
+  *     so the test can chk('zero console error', consoleErrorCount === 0).
+  *
+  * UMD: Node only (E2E tests run under Node, never in browser).
+  */
+ 'use strict';
+ var SB   = require('../../../renderer/js/storage-backend.js');
+ var CRS  = require('../../../renderer/js/case-record-schema.js');
+ var MIG  = require('../../../renderer/js/schema-migration.js');
+ var CS   = require('../../../renderer/js/case-store.js');
+ var SS   = require('../../../renderer/js/session-store.js');
+ var E_ST = require('../../../renderer/js/r3-0e-stores.js');
+ var ENG  = require('../../../renderer/js/r3-0f-migration-engine.js');
+ 
+ function createFlowHarness(opts) {
+   opts = opts || {};
+   var stamp = opts.stamp || '2026-07-01T00:00:00.000Z';
+   var backend = SB.MemoryBackend();
+ 
+   var caseStore    = CS.createCaseStore(backend, { stamp: stamp });
+   var sessionStore = SS.createSessionStore(backend, { stamp: stamp });
+   // R3.0E stores expose factories under their module
+   var experimentStore   = E_ST.createExperimentStore(backend);
+   var outcomeStore      = E_ST.createOutcomeStore(backend);
+   var timelineStore     = E_ST.createTimelineStore(backend);
+   var followupLinkStore = E_ST.createFollowUpLinkStore(backend);
+ 
+   var migrationEngine = ENG.createMigrationEngine({ backend: backend, stamp: stamp });
+ 
+   // Console-error guard (no-stale-UI contract / zero-console-error contract).
+   var consoleErrorCount = 0;
+   var origError = console.error;
+   console.error = function () { consoleErrorCount += 1; };
+   var origUnhandled = process.listeners('unhandledRejection');
+   function _unhandledHandler() { consoleErrorCount += 1; }
+   process.on('unhandledRejection', _unhandledHandler);
+ 
+   function dispose() {
+     console.error = origError;
+     process.removeListener('unhandledRejection', _unhandledHandler);
+   }
+ 
+   // No-stale-case-ref contract: after a Case transition, viewmodels MUST clear any reference
+-  // to the prior caseId. This helper inspects a viewmodel-like object (or the lastSession state)
+-  // and asserts no stale caseId exists relative to the current activeCaseId.
++  // to the prior caseId. This helper inspects a viewmodel-like object and asserts no stale caseId
++  // exists relative to the current activeCaseId — across ALL documented case-id-bearing fields:
++  //   • lastSession.sourceCaseId | lastSession.caseId
++  //   • cachedCaseId | sourceCaseId | priorCaseId | parentCaseId | followUpCaseId
++  //   • R3.0C C8 lastReassertion.caseId
++  //   • R3.0D engineer-brief caseAssociation
++  //   • R3.0E experiment.caseAssociation / outcome.caseAssociation / timeline.caseAssociation
++  //   • Any *.caseId / *.caseAssociation field one level deep
++  // Recursion depth is bounded to 2 (top-level and one nested level) to keep the scan
++  // deterministic and fail-closed without runaway cycles. Objects with cycles are tolerated
++  // via a visited-WeakSet.
+   function assertNoStaleCaseRef(viewmodelLike) {
+     if (!viewmodelLike || typeof viewmodelLike !== 'object') return;
+-    var active = viewmodelLike.activeCaseId || viewmodelLike.caseId || null;
+-    var lastSession = viewmodelLike.lastSession || null;
+-    if (active && lastSession && lastSession.sourceCaseId && lastSession.sourceCaseId !== active) {
+-      throw new Error('STALE_CASE_REF: lastSession.sourceCaseId=' + lastSession.sourceCaseId + ' active=' + active);
++    // F3-R6-02 closure: anchor lookup must NOT fire accessor getters.
++    function _readAnchor(obj, key) {
++      var d;
++      try { d = Object.getOwnPropertyDescriptor(obj, key); } catch (e) { return undefined; }
++      if (!d) return undefined;
++      if (!('value' in d)) return undefined;
++      return d.value;
+     }
+-    if (viewmodelLike.cachedCaseId && active && viewmodelLike.cachedCaseId !== active) {
+-      throw new Error('STALE_CASE_REF: cachedCaseId=' + viewmodelLike.cachedCaseId + ' active=' + active);
++    var activeFromActive = _readAnchor(viewmodelLike, 'activeCaseId');
++    var activeFromCaseId = _readAnchor(viewmodelLike, 'caseId');
++    var active = (typeof activeFromActive === 'string' && activeFromActive.length > 0)
++      ? activeFromActive
++      : (typeof activeFromCaseId === 'string' && activeFromCaseId.length > 0 ? activeFromCaseId : null);
++    if (!active) return;
++    var seen = new WeakSet();
++    // F3-R2-02 closure: caseAssociation (and other id fields) may be an OBJECT-shape value
++    // ({caseId, sessionId, lapId}) in R3.0D production outputs, not just a string. Also,
++    // bounded recursion must traverse ALL own object/array values, not only a fixed allowlist
++    // of nested-field names — otherwise wrapper objects defeat the gate.
++    var ID_FIELDS = ['sourceCaseId', 'priorCaseId', 'cachedCaseId', 'parentCaseId', 'followUpCaseId', 'caseAssociation'];
++    var DEPTH = 4; // top + 3 nested levels — production data structures stay within this
++    // F3-R5-02 closure: descriptor-only inspection — NEVER fire getters when checking ID fields.
++    function readDataValue(obj, key) {
++      var d;
++      try { d = Object.getOwnPropertyDescriptor(obj, key); } catch (e) { return undefined; }
++      if (!d) return undefined;
++      if (!('value' in d)) return undefined; // accessor — skip, do NOT fire get()
++      return d.value;
+     }
++    function check(obj, pathPrefix, depthRemaining) {
++      if (!obj || typeof obj !== 'object') return;
++      if (seen.has(obj)) return;
++      seen.add(obj);
++      // 1) Known string-or-object case-id fields — descriptor-only reads.
++      for (var i = 0; i < ID_FIELDS.length; i++) {
++        var f = ID_FIELDS[i];
++        var v = readDataValue(obj, f);
++        if (v === undefined) continue;
++        if (typeof v === 'string' && v.length > 0 && v !== active) {
++          throw new Error('STALE_CASE_REF: ' + pathPrefix + f + '=' + v + ' active=' + active);
++        }
++        if (v && typeof v === 'object' && !Array.isArray(v)) {
++          var innerCaseId = readDataValue(v, 'caseId');
++          if (typeof innerCaseId === 'string' && innerCaseId.length > 0 && innerCaseId !== active) {
++            throw new Error('STALE_CASE_REF: ' + pathPrefix + f + '.caseId=' + innerCaseId + ' active=' + active);
++          }
++        }
++      }
++      // 2) Bare `.caseId` on any NESTED object — descriptor-only read.
++      if (pathPrefix !== '') {
++        var cid = readDataValue(obj, 'caseId');
++        if (typeof cid === 'string' && cid.length > 0 && cid !== active) {
++          throw new Error('STALE_CASE_REF: ' + pathPrefix + 'caseId=' + cid + ' active=' + active);
++        }
++      }
++      // 3) Bounded recursion through ALL own properties (F3-R4-03: use Reflect.ownKeys so
++      // non-enumerable and Symbol-keyed properties are not skipped).
++      if (depthRemaining > 0) {
++        var keys;
++        try { keys = Reflect.ownKeys(obj); } catch (e) { keys = []; }
++        for (var k = 0; k < keys.length; k++) {
++          var kn = keys[k];
++          // Read via descriptor to avoid firing accessor getters on hostile inputs
++          var desc;
++          try { desc = Object.getOwnPropertyDescriptor(obj, kn); } catch (de) { continue; }
++          if (!desc) continue;
++          if (!('value' in desc)) continue; // skip accessor properties (potentially hostile)
++          var val = desc.value;
++          if (!val || typeof val !== 'object') continue;
++          // Symbol-keyed: include path label safely
++          var kLabel = typeof kn === 'symbol' ? '[Symbol(' + (kn.description || '') + ')]' : kn;
++          if (Array.isArray(val)) {
++            for (var ai = 0; ai < val.length; ai++) {
++              if (val[ai] && typeof val[ai] === 'object') {
++                check(val[ai], pathPrefix + kLabel + '[' + ai + '].', depthRemaining - 1);
++              }
++            }
++          } else {
++            check(val, pathPrefix + kLabel + '.', depthRemaining - 1);
++          }
++        }
++      }
++    }
++    check(viewmodelLike, '', DEPTH);
+   }
+ 
+   // Forbidden-action gate: documented invariants the engine must never permit during F2 E2E.
+   // The harness exposes a quick boolean assertion helper for each.
+   function assertForbiddenActionsDisabled(state) {
+     if (!state || typeof state !== 'object') return;
+     if (state.autoReferenceLap === true) throw new Error('FORBIDDEN: auto reference lap enabled');
+     if (state.autoApplySetup === true) throw new Error('FORBIDDEN: auto apply setup enabled');
+     if (state.runtimeLLMDecisionAuthority === true) throw new Error('FORBIDDEN: runtime LLM decision authority enabled');
+     if (state.causationClaim === true) throw new Error('FORBIDDEN: causation claim enabled');
+     if (state.driverBlame === true) throw new Error('FORBIDDEN: driver blame enabled');
+   }
+ 
+   return {
+     backend: backend,
+     caseStore: caseStore,
+     sessionStore: sessionStore,
+     experimentStore: experimentStore,
+     outcomeStore: outcomeStore,
+     timelineStore: timelineStore,
+     followupLinkStore: followupLinkStore,
+     migrationEngine: migrationEngine,
+     stamp: stamp,
+     get consoleErrorCount() { return consoleErrorCount; },
+     resetConsoleErrorCount: function () { consoleErrorCount = 0; },
+     assertNoStaleCaseRef: assertNoStaleCaseRef,
+     assertForbiddenActionsDisabled: assertForbiddenActionsDisabled,
+     dispose: dispose
+   };
+ }
+ 
+ // Tiny test-runner helper used by every flow file. Mirrors the existing project style.
+ function makeChk() {
+   var state = { pass: 0, fail: 0 };
+   function chk(msg, cond, detail) {
+     if (cond) state.pass += 1;
+     else { state.fail += 1; console.log('  FAIL ' + msg + (detail !== undefined ? '  ' + JSON.stringify(detail) : '')); }
+   }
+   function report(label) {
+     console.log(label + ': ' + state.pass + ' passed, ' + state.fail + ' failed');
+     process.exit(state.fail === 0 ? 0 : 1);
+   }
+   return { chk: chk, report: report, state: state };
+ }
+ 
+ module.exports = {
+   createFlowHarness: createFlowHarness,
+   makeChk: makeChk
+ };
+
+exec
+/bin/bash -lc 'git show --no-ext-diff --unified=30 a655f1ca79a27a893e86c03f3692ca19ec8c5319 -- tests/e2e/hardening-06-supply-chain.test.js && git show a655f1ca79a27a893e86c03f3692ca19ec8c5319:tests/e2e/hardening-06-supply-chain.test.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-6zxwbQkS' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-GlEmup8m' (errno=Operation not permitted)
+commit a655f1ca79a27a893e86c03f3692ca19ec8c5319
+Author: USADA-KARROT <skyline.fkd@gmail.com>
+Date:   Wed Jul 1 01:21:44 2026 +0800
+
+    f3(r23): close Codex F3 Round 22 — 1 finding F3-R22-01
+    
+    F3-R22-01 (electron pattern not end-anchored):
+      Previous /^electron(\s+\.|\s*$)/ accepted any trailing args after
+      'electron .' including network-exposing flags like
+      --remote-debugging-address=0.0.0.0 --remote-debugging-port=9222.
+      Closure: anchor pattern at end-of-line. Only 'electron .' or 'electron'
+      (no args) accepted.
+    
+    Tests: 105 PASS.
+    
+    Frozen invariants preserved.
+    
+    Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
+
+diff --git a/tests/e2e/hardening-06-supply-chain.test.js b/tests/e2e/hardening-06-supply-chain.test.js
+index 270a30b..b78b8c3 100644
+--- a/tests/e2e/hardening-06-supply-chain.test.js
++++ b/tests/e2e/hardening-06-supply-chain.test.js
+@@ -73,61 +73,63 @@ try {
+       // Each segment must use only safe path chars
+       if (!/^[\w@\-.]+$/.test(seg2)) return false;
+     }
+     // Additional args (after the script path) are positional args TO THE SCRIPT, not node
+     // flags. Script-level flags like `--selftest` are allowed; absolute paths and traversal
+     // segments are not, and individual forbidden tokens (already checked at segment level)
+     // are blocked.
+     if (m[2]) {
+       var rest = m[2].trim().split(/\s+/);
+       for (var ri = 0; ri < rest.length; ri++) {
+         var arg = rest[ri];
+         if (arg === '') continue;
+         // Whitelisted: --<name> with simple ASCII letters/digits/dash
+         if (/^--[\w-]+$/.test(arg)) continue;
+         // Whitelisted: -<single-letter>
+         if (/^-[a-zA-Z]$/.test(arg)) continue;
+         // Reject absolute paths and traversal
+         if (arg.charAt(0) === '/') return false;
+         if (arg.indexOf('..') !== -1 || arg.indexOf('/./') !== -1) return false;
+         // Allow simple positional paths (same safe chars + slash)
+         if (!/^[\w@\-./]+$/.test(arg)) return false;
+       }
+     }
+     return true;
+   }
+ 
+   // F3-R20-01 closure: electron-builder allowed args are restricted to known platform flags
+   // ONLY. Configuration loading via --config <path> is rejected as it loads arbitrary JS.
+   var ALLOWED_SEGMENT_PATTERNS = [
+     /^electron-builder(?:\s+--(?:mac|linux|win|x64|arm64|ia32|dir|publish=never))*\s*$/,
+-    /^electron(\s+\.|\s*$)/
++    // F3-R22-01 closure: anchor `electron` pattern at end-of-line. Only `electron .` or
++    // `electron` (no args) accepted. Reject trailing flags like --remote-debugging-port.
++    /^electron(?:\s+\.)?\s*$/
+   ];
+   function _segmentAllowed(seg) {
+     seg = seg.trim();
+     if (seg === '') return false;
+     if (FORBIDDEN_TOKENS.test(seg)) return false;
+     if (ALLOWED_NODE_DASH_FLAGS_FORBIDDEN.test(seg)) return false;
+     if (_nodeSegmentAllowed(seg)) return true;
+     for (var p = 0; p < ALLOWED_SEGMENT_PATTERNS.length; p++) {
+       if (ALLOWED_SEGMENT_PATTERNS[p].test(seg)) return true;
+     }
+     return false;
+   }
+ 
+   var scripts = pkg.scripts || {};
+   var scriptNames = Object.keys(scripts);
+   for (var i = 0; i < scriptNames.length; i++) {
+     var s = scripts[scriptNames[i]];
+     // Reject the whole script if it contains any forbidden token anywhere.
+     var bannedAnywhere = FORBIDDEN_TOKENS.test(s);
+     // Split on && and ; (top-level only; we don't shell-parse for nested quoting because
+     // the allowlist patterns are themselves restrictive — anything exotic fails).
+     var segments = s.split(/&&|;/);
+     var allSegOk = !bannedAnywhere && segments.length > 0 && segments.every(_segmentAllowed);
+     chk('package.json script "' + scriptNames[i] + '" passes anchored per-segment allowlist', allSegOk, { script: s, segments: segments });
+   }
+ 
+   // Step 3: no bare third-party require in renderer/js (cross-check with dependency-audit)
+   var rendererJsDir = path.join(repoRoot, 'renderer', 'js');
+   var jsFiles = fs.readdirSync(rendererJsDir).filter(function (f) { return f.endsWith('.js'); });
+   var bareThirdParty = [];
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-DnsRUTxc' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-DqiKIxi6' (errno=Operation not permitted)
+/**
+ * tests/e2e/hardening-06-supply-chain.test.js — R3.0F F3 · Supply-chain hardening.
+ *
+ * Asserts the project's dependency footprint is minimal and locked:
+ *   • package.json declares ONLY known runtime + dev deps (electron / electron-builder)
+ *   • No production renderer module pulls a bare third-party import via require()
+ *   • No "scripts" in package.json reference untrusted external tooling
+ *   • CHANGELOG.md exists at the repository root (per F2 schema allowedRoots)
+ *   • No secrets / API keys / .env files committed
+ * Zero console error.
+ */
+'use strict';
+var H = require('./helpers/flow-harness.js');
+var t = H.makeChk();
+var chk = t.chk;
+var fs = require('fs');
+var path = require('path');
+
+var h = H.createFlowHarness({ stamp: '2026-07-01T00:00:00.000Z' });
+try {
+  var repoRoot = path.join(__dirname, '..', '..');
+
+  // Step 1: package.json dependency footprint
+  var pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
+  chk('package.json has no runtime "dependencies" key (Electron-only app)', pkg.dependencies === undefined || Object.keys(pkg.dependencies || {}).length === 0);
+  chk('devDependencies present', pkg.devDependencies && typeof pkg.devDependencies === 'object');
+
+  var allowedDevDeps = ['electron', 'electron-builder'];
+  var devDepNames = Object.keys(pkg.devDependencies || {});
+  var unexpectedDevDeps = devDepNames.filter(function (n) { return allowedDevDeps.indexOf(n) === -1; });
+  chk('devDependencies are within the allowed list', unexpectedDevDeps.length === 0, { unexpected: unexpectedDevDeps });
+
+  // F3-R1-06 closure: anchored, segment-by-segment allowlist for npm scripts. Each `&&`
+  // or `;`-separated segment must INDEPENDENTLY match a local-toolchain shape. Forbidden
+  // tokens (curl, wget, npx, fetch, sh -c, eval, base64, ssh, scp, rsync) trigger fail-closed
+  // even within a longer command. URL substrings and shell metacharacters (pipe/redirect to
+  // /dev/something, $(...), backticks) are rejected.
+  // F3-R5-03 closure: prevent path traversal. `node tests/../../etc/passwd` previously matched
+  // the [\w@\-./]+ char class. Now we tokenize the node target path and reject any segment
+  // that is `..`, `.`, empty (consecutive slashes), or begins with `/` (absolute).
+  // F3-R7-05 closure: forbidden-tokens regex now rejects ALL shell I/O redirection (`>`, `>>`,
+  // `<`, `2>`, `&>`, `|` for piping) and the most common exfil command tokens. The previous
+  // pattern only rejected `>/dev/...` leaving `> /tmp/exfil` undetected.
+  // F3-R7-05 closure: reject shell I/O redirection (>, >>, <), command substitution ($(...),
+  // backticks), pipes (|), and known dangerous tool names. The previous pattern only caught
+  // redirection to /dev/...; now any `>` redirection is rejected. (Note: `&&` is the SEGMENT
+  // separator and is intentionally not flagged at the full-script level.)
+  // F3-R9-05 closure: shell redirection rejection no longer requires whitespace around `>`.
+  // `electron-builder >out` (no space) must fail. Use ANY `>` / `<` / `|` shell-metachar
+  // outside string-literal contexts. The previous pattern required `\s>\s` and missed compact forms.
+  // F3-R19-01 closure: also reject standalone '&' (background command separator) and newlines
+  // (which would let a contributor chain commands via multi-line script values).
+  var FORBIDDEN_TOKENS = /\b(curl|wget|npx|fetch|eval|base64|ssh|scp|rsync|nc|netcat|telnet)\b|\bsh\s+-c\b|https?:\/\/|\$\(|`|\||>|<\s|2>|&>|(?<![&])&(?![&])|[\r\n]/i;
+  var ALLOWED_NODE_DASH_FLAGS_FORBIDDEN = /\bnode\s+-/;
+  var ALLOWED_NODE_ROOTS = ['tests', 'scripts', 'tools'];
+
+  function _nodeSegmentAllowed(seg) {
+    // Match: `node <path>` optionally followed by additional args (file paths only, no flags)
+    var m = seg.match(/^node\s+([^\s]+)((?:\s+[^\s]+)*)$/);
+    if (!m) return false;
+    var firstPath = m[1];
+    // Reject absolute paths
+    if (firstPath.charAt(0) === '/') return false;
+    // Reject empty or root-only paths
+    var parts = firstPath.split('/');
+    if (parts.length < 2) return false;
+    // First segment must be an allowed root
+    if (ALLOWED_NODE_ROOTS.indexOf(parts[0]) === -1) return false;
+    // Each subsequent segment must NOT be '.', '..', or empty
+    for (var sp = 0; sp < parts.length; sp++) {
+      var seg2 = parts[sp];
+      if (seg2 === '' || seg2 === '.' || seg2 === '..') return false;
+      // Each segment must use only safe path chars
+      if (!/^[\w@\-.]+$/.test(seg2)) return false;
+    }
+    // Additional args (after the script path) are positional args TO THE SCRIPT, not node
+    // flags. Script-level flags like `--selftest` are allowed; absolute paths and traversal
+    // segments are not, and individual forbidden tokens (already checked at segment level)
+    // are blocked.
+    if (m[2]) {
+      var rest = m[2].trim().split(/\s+/);
+      for (var ri = 0; ri < rest.length; ri++) {
+        var arg = rest[ri];
+        if (arg === '') continue;
+        // Whitelisted: --<name> with simple ASCII letters/digits/dash
+        if (/^--[\w-]+$/.test(arg)) continue;
+        // Whitelisted: -<single-letter>
+        if (/^-[a-zA-Z]$/.test(arg)) continue;
+        // Reject absolute paths and traversal
+        if (arg.charAt(0) === '/') return false;
+        if (arg.indexOf('..') !== -1 || arg.indexOf('/./') !== -1) return false;
+        // Allow simple positional paths (same safe chars + slash)
+        if (!/^[\w@\-./]+$/.test(arg)) return false;
+      }
+    }
+    return true;
+  }
+
+  // F3-R20-01 closure: electron-builder allowed args are restricted to known platform flags
+  // ONLY. Configuration loading via --config <path> is rejected as it loads arbitrary JS.
+  var ALLOWED_SEGMENT_PATTERNS = [
+    /^electron-builder(?:\s+--(?:mac|linux|win|x64|arm64|ia32|dir|publish=never))*\s*$/,
+    // F3-R22-01 closure: anchor `electron` pattern at end-of-line. Only `electron .` or
+    // `electron` (no args) accepted. Reject trailing flags like --remote-debugging-port.
+    /^electron(?:\s+\.)?\s*$/
+  ];
+  function _segmentAllowed(seg) {
+    seg = seg.trim();
+    if (seg === '') return false;
+    if (FORBIDDEN_TOKENS.test(seg)) return false;
+    if (ALLOWED_NODE_DASH_FLAGS_FORBIDDEN.test(seg)) return false;
+    if (_nodeSegmentAllowed(seg)) return true;
+    for (var p = 0; p < ALLOWED_SEGMENT_PATTERNS.length; p++) {
+      if (ALLOWED_SEGMENT_PATTERNS[p].test(seg)) return true;
+    }
+    return false;
+  }
+
+  var scripts = pkg.scripts || {};
+  var scriptNames = Object.keys(scripts);
+  for (var i = 0; i < scriptNames.length; i++) {
+    var s = scripts[scriptNames[i]];
+    // Reject the whole script if it contains any forbidden token anywhere.
+    var bannedAnywhere = FORBIDDEN_TOKENS.test(s);
+    // Split on && and ; (top-level only; we don't shell-parse for nested quoting because
+    // the allowlist patterns are themselves restrictive — anything exotic fails).
+    var segments = s.split(/&&|;/);
+    var allSegOk = !bannedAnywhere && segments.length > 0 && segments.every(_segmentAllowed);
+    chk('package.json script "' + scriptNames[i] + '" passes anchored per-segment allowlist', allSegOk, { script: s, segments: segments });
+  }
+
+  // Step 3: no bare third-party require in renderer/js (cross-check with dependency-audit)
+  var rendererJsDir = path.join(repoRoot, 'renderer', 'js');
+  var jsFiles = fs.readdirSync(rendererJsDir).filter(function (f) { return f.endsWith('.js'); });
+  var bareThirdParty = [];
+  for (var k = 0; k < jsFiles.length; k++) {
+    var src = fs.readFileSync(path.join(rendererJsDir, jsFiles[k]), 'utf8');
+    // require('foo') where foo is NOT relative (./ or ../) AND NOT a Node built-in
+    var nodeBuiltins = ['fs', 'path', 'os', 'crypto', 'child_process', 'http', 'https', 'net', 'url', 'assert', 'module', 'vm', 'util', 'events', 'stream', 'buffer'];
+    var rRe = /require\(['"]([^'"]+)['"]\)/g;
+    var rm;
+    while ((rm = rRe.exec(src)) !== null) {
+      var spec = rm[1];
+      if (spec.indexOf('./') === 0 || spec.indexOf('../') === 0) continue;
+      if (nodeBuiltins.indexOf(spec) !== -1) continue;
+      bareThirdParty.push(jsFiles[k] + ': ' + spec);
+    }
+  }
+  chk('no bare third-party require in renderer/js (CI dep-free lane safe)', bareThirdParty.length === 0, { bare: bareThirdParty.slice(0, 5) });
+
+  // Step 4: no .env or .env.local file in repo (committed secrets check)
+  var envFile = path.join(repoRoot, '.env');
+  var envLocal = path.join(repoRoot, '.env.local');
+  chk('no .env at repo root', !fs.existsSync(envFile));
+  chk('no .env.local at repo root', !fs.existsSync(envLocal));
+
+  // Step 5: CHANGELOG.md exists (per F2 schema allowedRoots and release readiness path)
+  // F3 doesn't yet ship CHANGELOG content — that's F4/F5. Only the presence check here.
+  var changelogPath = path.join(repoRoot, 'CHANGELOG.md');
+  // F3 may pre-create CHANGELOG.md as part of release-readiness prep, but presence is optional
+  // at this checkpoint. Just record whether it's present.
+  chk('CHANGELOG.md presence check is non-fatal at F3', true);
+
+  // Step 6: no commit-tracked node_modules (large binary surface)
+  var nmTrackedFile = path.join(repoRoot, '.gitignore');
+  var gitignore = fs.readFileSync(nmTrackedFile, 'utf8');
+  chk('.gitignore excludes node_modules/', /^node_modules\/?$/m.test(gitignore));
+  chk('.gitignore excludes artifacts/', /^artifacts\/?$/m.test(gitignore));
+
+  // Step 7: zero console error
+  chk('zero console.error during supply-chain hardening', h.consoleErrorCount === 0);
+} finally {
+  h.dispose();
+}
+
+t.report('e2e-hardening-06-supply-chain');
+
+codex
+The R22 closure is narrowly implemented: the only accepted Electron launch forms are now `electron` and `electron .`, with trailing whitespace only. I’m checking whether the surrounding segment parser creates any realistic way for trailing launch arguments to escape that end anchor.
+exec
+/bin/bash -lc 'node tests/e2e/hardening-06-supply-chain.test.js && git diff-tree --no-commit-id --name-status -r a655f1ca79a27a893e86c03f3692ca19ec8c5319 && git rev-parse a655f1ca79a27a893e86c03f3692ca19ec8c5319''^' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+e2e-hardening-06-supply-chain: 15 passed, 0 failed
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-QoSEVMr9' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-NgHvombA' (errno=Operation not permitted)
+M	tests/e2e/hardening-06-supply-chain.test.js
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-MppKxosk' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-f5BwBK4y' (errno=Operation not permitted)
+21b92620adfc82f9f69ae6098baa825ff5963381
+
+codex
+Reviewed exact SHA `a655f1ca79a27a893e86c03f3692ca19ec8c5319` read-only. Targeted suite: 15/15 passed. No substantial F3 regression-detection gaps found.
+
+FINAL VERDICT: PASS
+tokens used
+20,023
+Reviewed exact SHA `a655f1ca79a27a893e86c03f3692ca19ec8c5319` read-only. Targeted suite: 15/15 passed. No substantial F3 regression-detection gaps found.
+
+FINAL VERDICT: PASS

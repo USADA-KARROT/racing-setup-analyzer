@@ -81,18 +81,103 @@ function createFlowHarness(opts) {
   }
 
   // No-stale-case-ref contract: after a Case transition, viewmodels MUST clear any reference
-  // to the prior caseId. This helper inspects a viewmodel-like object (or the lastSession state)
-  // and asserts no stale caseId exists relative to the current activeCaseId.
+  // to the prior caseId. This helper inspects a viewmodel-like object and asserts no stale caseId
+  // exists relative to the current activeCaseId — across ALL documented case-id-bearing fields:
+  //   • lastSession.sourceCaseId | lastSession.caseId
+  //   • cachedCaseId | sourceCaseId | priorCaseId | parentCaseId | followUpCaseId
+  //   • R3.0C C8 lastReassertion.caseId
+  //   • R3.0D engineer-brief caseAssociation
+  //   • R3.0E experiment.caseAssociation / outcome.caseAssociation / timeline.caseAssociation
+  //   • Any *.caseId / *.caseAssociation field one level deep
+  // Recursion depth is bounded to 2 (top-level and one nested level) to keep the scan
+  // deterministic and fail-closed without runaway cycles. Objects with cycles are tolerated
+  // via a visited-WeakSet.
   function assertNoStaleCaseRef(viewmodelLike) {
     if (!viewmodelLike || typeof viewmodelLike !== 'object') return;
-    var active = viewmodelLike.activeCaseId || viewmodelLike.caseId || null;
-    var lastSession = viewmodelLike.lastSession || null;
-    if (active && lastSession && lastSession.sourceCaseId && lastSession.sourceCaseId !== active) {
-      throw new Error('STALE_CASE_REF: lastSession.sourceCaseId=' + lastSession.sourceCaseId + ' active=' + active);
+    // F3-R6-02 closure: anchor lookup must NOT fire accessor getters.
+    function _readAnchor(obj, key) {
+      var d;
+      try { d = Object.getOwnPropertyDescriptor(obj, key); } catch (e) { return undefined; }
+      if (!d) return undefined;
+      if (!('value' in d)) return undefined;
+      return d.value;
     }
-    if (viewmodelLike.cachedCaseId && active && viewmodelLike.cachedCaseId !== active) {
-      throw new Error('STALE_CASE_REF: cachedCaseId=' + viewmodelLike.cachedCaseId + ' active=' + active);
+    var activeFromActive = _readAnchor(viewmodelLike, 'activeCaseId');
+    var activeFromCaseId = _readAnchor(viewmodelLike, 'caseId');
+    var active = (typeof activeFromActive === 'string' && activeFromActive.length > 0)
+      ? activeFromActive
+      : (typeof activeFromCaseId === 'string' && activeFromCaseId.length > 0 ? activeFromCaseId : null);
+    if (!active) return;
+    var seen = new WeakSet();
+    // F3-R2-02 closure: caseAssociation (and other id fields) may be an OBJECT-shape value
+    // ({caseId, sessionId, lapId}) in R3.0D production outputs, not just a string. Also,
+    // bounded recursion must traverse ALL own object/array values, not only a fixed allowlist
+    // of nested-field names — otherwise wrapper objects defeat the gate.
+    var ID_FIELDS = ['sourceCaseId', 'priorCaseId', 'cachedCaseId', 'parentCaseId', 'followUpCaseId', 'caseAssociation'];
+    var DEPTH = 4; // top + 3 nested levels — production data structures stay within this
+    // F3-R5-02 closure: descriptor-only inspection — NEVER fire getters when checking ID fields.
+    function readDataValue(obj, key) {
+      var d;
+      try { d = Object.getOwnPropertyDescriptor(obj, key); } catch (e) { return undefined; }
+      if (!d) return undefined;
+      if (!('value' in d)) return undefined; // accessor — skip, do NOT fire get()
+      return d.value;
     }
+    function check(obj, pathPrefix, depthRemaining) {
+      if (!obj || typeof obj !== 'object') return;
+      if (seen.has(obj)) return;
+      seen.add(obj);
+      // 1) Known string-or-object case-id fields — descriptor-only reads.
+      for (var i = 0; i < ID_FIELDS.length; i++) {
+        var f = ID_FIELDS[i];
+        var v = readDataValue(obj, f);
+        if (v === undefined) continue;
+        if (typeof v === 'string' && v.length > 0 && v !== active) {
+          throw new Error('STALE_CASE_REF: ' + pathPrefix + f + '=' + v + ' active=' + active);
+        }
+        if (v && typeof v === 'object' && !Array.isArray(v)) {
+          var innerCaseId = readDataValue(v, 'caseId');
+          if (typeof innerCaseId === 'string' && innerCaseId.length > 0 && innerCaseId !== active) {
+            throw new Error('STALE_CASE_REF: ' + pathPrefix + f + '.caseId=' + innerCaseId + ' active=' + active);
+          }
+        }
+      }
+      // 2) Bare `.caseId` on any NESTED object — descriptor-only read.
+      if (pathPrefix !== '') {
+        var cid = readDataValue(obj, 'caseId');
+        if (typeof cid === 'string' && cid.length > 0 && cid !== active) {
+          throw new Error('STALE_CASE_REF: ' + pathPrefix + 'caseId=' + cid + ' active=' + active);
+        }
+      }
+      // 3) Bounded recursion through ALL own properties (F3-R4-03: use Reflect.ownKeys so
+      // non-enumerable and Symbol-keyed properties are not skipped).
+      if (depthRemaining > 0) {
+        var keys;
+        try { keys = Reflect.ownKeys(obj); } catch (e) { keys = []; }
+        for (var k = 0; k < keys.length; k++) {
+          var kn = keys[k];
+          // Read via descriptor to avoid firing accessor getters on hostile inputs
+          var desc;
+          try { desc = Object.getOwnPropertyDescriptor(obj, kn); } catch (de) { continue; }
+          if (!desc) continue;
+          if (!('value' in desc)) continue; // skip accessor properties (potentially hostile)
+          var val = desc.value;
+          if (!val || typeof val !== 'object') continue;
+          // Symbol-keyed: include path label safely
+          var kLabel = typeof kn === 'symbol' ? '[Symbol(' + (kn.description || '') + ')]' : kn;
+          if (Array.isArray(val)) {
+            for (var ai = 0; ai < val.length; ai++) {
+              if (val[ai] && typeof val[ai] === 'object') {
+                check(val[ai], pathPrefix + kLabel + '[' + ai + '].', depthRemaining - 1);
+              }
+            }
+          } else {
+            check(val, pathPrefix + kLabel + '.', depthRemaining - 1);
+          }
+        }
+      }
+    }
+    check(viewmodelLike, '', DEPTH);
   }
 
   // Forbidden-action gate: documented invariants the engine must never permit during F2 E2E.

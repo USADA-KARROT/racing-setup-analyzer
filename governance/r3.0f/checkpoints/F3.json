@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0F",
+  "checkpoint": "F3_QUALITY_HARDENING",
+  "baseSha": "882816300d930dffa8ef24f14429c784f5d3c55d",
+  "headSha": null,
+  "previousCheckpoint": "F2_E2E_AUTOMATION",
+  "shaSeparation": {
+    "note": "R3.0F F3 candidate branch SHA convention. reviewedCandidateSha is filled at the Codex review prompt; manifestCommitSha is the governance anchor commit; integrationSha is the Train merge commit.",
+    "reviewedCandidateSha": "a655f1ca79a27a893e86c03f3692ca19ec8c5319",
+    "reviewedCandidateNote": "Codex F3 Round 23 reviewed this exact SHA and issued FINAL VERDICT: PASS. 23 review rounds total: R1 (6 findings) → R2 (4) → R3 (4) → R4 (3) → R5 (3) → R6 (3) → R7 (5) → R8 (4) → R9 (5) → R10 (2) → R11 (1) → R12 (2) → R13 (1) → R14 (1) → R15 (1) → R16 (1) → R17 (2) → R18 (1) → R19 (1) → R20 (1) → R21 (1) → R22 (1) → R23 PASS. 53 distinct adversarial findings closed across 22 BLOCK rounds. Architectural milestones: (a) regex-literal-aware + template-interpolation-aware lexical comment scanner with keyword-context regex disambiguation; (b) balanced-brace webPreferences extractor that enumerates ALL BrowserWindow blocks; (c) computed-key syntax rejection + spread rejection + literal-only flag enforcement + EXACTLY-ONCE duplicate-key gate + sandbox-false rejection; (d) preload contextBridge surface with EXACTLY ONE exposeInMainWorld call + exact-keys allowlist {platform,version} + inert-primitive-only value allowlist + spread/computed-key/method-shorthand/accessor rejection; (e) descriptor-only assertNoStaleCaseRef with Reflect.ownKeys (catches non-enumerable + Symbol keys) + depth-4 recursion + production-shape experiment record verification + 11 documented case-id-bearing fields; (f) Proxy-wrapped record-array read-counter for bounded-linear N-doubling scaling check + per-key visit verification + migrator-call exactness; (g) XSS DOM-sink scanner with multi-line + ASI + comment-separated + member-expression-newline + template-interpolation + computed-form + compound-assignment (+= ||= ??=) coverage for innerHTML/outerHTML/document.write/insertAdjacentHTML/DOMParser/setAttribute('on*'/'x-html')/new Function; (h) x-html function-call argument-shape allowlist with per-helper rules (t: literal-only; credBadge/tierBadge: literal-or-bare-enum-chain-or-ternary) + EXPLICIT bare-chain enum allowlist; (i) supply-chain anchored npm script grammar with segment-by-segment parsing, repo-local path tokenizer rejecting traversal + absolute paths, anchored electron/electron-builder allowlist with platform-flag-only args + no --publish=always/onTag + no --remote-debugging-*, forbidden-token regex rejecting all shell I/O redirection + pipes + standalone & + newlines + Node-authority tokens; (j) confirm gate full truthy-non-boolean rejection class + storage failure BACKEND_REJECTED + oversized-record rejection. NO new production renderer module added. R3.0B persistence + R3.0C/D/E contracts NOT modified.",
+    "manifestCommitSha": null,
+    "integrationSha": null
+  },
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0f-migration-engine.js",                "capability": "migration_engine_present" },
+    { "path": "tests/e2e/helpers/flow-harness.js",                    "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-01-new-user.test.js",                   "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-02-real-telemetry.test.js",             "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-03-measured.test.js",                   "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-04-reference-lap.test.js",              "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-05-vre.test.js",                        "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-06-setup-experiment.test.js",           "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-07-driver-experiment.test.js",          "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-08-export-import.test.js",              "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-09-electron-smoke.test.js",             "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/hardening-01-electron-boundary.test.js",     "capability": "quality_hardening_present" },
+    { "path": "tests/e2e/hardening-02-storage-failure.test.js",       "capability": "quality_hardening_present" },
+    { "path": "tests/e2e/hardening-03-no-stale-ui.test.js",           "capability": "quality_hardening_present" },
+    { "path": "tests/e2e/hardening-04-large-library.test.js",         "capability": "quality_hardening_present" },
+    { "path": "tests/e2e/hardening-05-xss-injection.test.js",         "capability": "quality_hardening_present" },
+    { "path": "tests/e2e/hardening-06-supply-chain.test.js",          "capability": "quality_hardening_present" }
+  ],
+  "newlyAuthorizedPaths": [
+    "tests/e2e/hardening-01-electron-boundary.test.js",
+    "tests/e2e/hardening-02-storage-failure.test.js",
+    "tests/e2e/hardening-03-no-stale-ui.test.js",
+    "tests/e2e/hardening-04-large-library.test.js",
+    "tests/e2e/hardening-05-xss-injection.test.js",
+    "tests/e2e/hardening-06-supply-chain.test.js"
+  ],
+  "newlyEnabledCapabilities": ["quality_hardening_present"],
+  "enabledCapabilitiesBefore": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present"],
+  "enabledCapabilitiesAfter": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present", "quality_hardening_present"],
+  "forbiddenCapabilities": [
+    "documentation_present",
+    "release_gate_present",
+    "release_executed"
+  ],
+  "contractEnforcements": {
+    "hardeningScope": "6 hardening test files under tests/e2e/ that ASSERT production-quality invariants. NO new production renderer module is added. The hardening tests work as a static + logic-level audit gate that fails closed when any documented quality bar regresses.",
+    "electronBoundary": "hardening-01 verifies main.js webPreferences (contextIsolation:true, nodeIntegration:false, allowRunningInsecureContent unset, webSecurity unset to false, experimentalFeatures unset, enableRemoteModule unset, nodeIntegrationInWorker unset, nodeIntegrationInSubFrames unset) and preload.js minimal surface (contextBridge only; no ipcRenderer / fs / child_process / net / http / https / os; no eval; no new Function). Also verifies renderer/index.html declares a CSP meta and does not pull external script src.",
+    "storageFailure": "hardening-02 verifies case-store remove() requires {confirm:true} (destructive guard), backend.transact() rejection produces BACKEND_REJECTED + no partial write, oversized record (>maxRecordBytes) is rejected without crashing the engine.",
+    "noStaleUI": "hardening-03 exercises the harness assertNoStaleCaseRef gate across 7 synthetic transition scenarios: coherent state passes; stale lastSession.sourceCaseId / cachedCaseId throws; mixed stale+coherent throws.",
+    "largeLibrary": "hardening-04 seeds 200 cases, asserts case-store.list returns all N entries deterministically, F1 migration treats them as noop=N with zero rejection/failure, F1 detect reports records=atTarget=N.",
+    "xssInjection": "hardening-05 scans renderer/js for unsafe DOM API usage (no variable-RHS innerHTML/outerHTML assignment; no document.write / writeln; no new Function with variable arg). Also scans renderer/index.html: every x-html binding must be a function call into a named helper (not a raw variable / property access).",
+    "supplyChain": "hardening-06 verifies package.json has no runtime dependencies (Electron-only app); devDependencies limited to {electron, electron-builder}; npm scripts use only local toolchain; no .env / .env.local committed; .gitignore excludes node_modules/ and artifacts/. No bare third-party require in renderer/js.",
+    "noProductionCodeChange": "F3 ships ZERO new production renderer/js module. All hardening is test-side validation that the existing production code (R3.0B/C/D/E + F1 engine) already satisfies the quality bar. R3.0B persistence schemas NOT modified.",
+    "stateFloors": "F3 unlocks uiAllowed=true (uiCheckpoint floor reached) and enables quality_hardening_present. featureRegistryActivationAllowed remains false (F6_RELEASE floor). R3.0B case-record schema NOT modified."
+  },
+  "tests": {
+    "command": "npm test",
+    "newSuitesForThisCheckpoint": [
+      "tests/e2e/hardening-01-electron-boundary.test.js",
+      "tests/e2e/hardening-02-storage-failure.test.js",
+      "tests/e2e/hardening-03-no-stale-ui.test.js",
+      "tests/e2e/hardening-04-large-library.test.js",
+      "tests/e2e/hardening-05-xss-injection.test.js",
+      "tests/e2e/hardening-06-supply-chain.test.js"
+    ],
+    "newSuiteAssertionsByFile": {
+      "hardening-01-electron-boundary": 22,
+      "hardening-02-storage-failure": 11,
+      "hardening-03-no-stale-ui": 10,
+      "hardening-04-large-library": 9,
+      "hardening-05-xss-injection": 6,
+      "hardening-06-supply-chain": 15
+    },
+    "newSuiteAssertionsTotal": 73,
+    "evidenceTier": "TIER 3 — Claude-verified on F3 branch HEAD; CI re-run on integrationSha is the authority."
+  },
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 23,
+    "reviewedCandidateSha": "a655f1ca79a27a893e86c03f3692ca19ec8c5319",
+    "verdictEvidenceFile": "governance/r3.0f/codex-checkpoint-evidence/F3/round-23-a655f1c-PASS.raw.txt",
+    "verdictEvidenceSha256": "c4143d5db8f1133d08be892e713e58b1257e29cf673b4eb5622308c0f85a19fc",
+    "totalBlockRounds": 22,
+    "totalDistinctFindings": 53,
+    "rounds": [
+      { "round": 1, "verdict": "BLOCK", "findings": 6 },
+      { "round": 2, "verdict": "BLOCK", "findings": 4 },
+      { "round": 3, "verdict": "BLOCK", "findings": 4 },
+      { "round": 4, "verdict": "BLOCK", "findings": 3 },
+      { "round": 5, "verdict": "BLOCK", "findings": 3 },
+      { "round": 6, "verdict": "BLOCK", "findings": 3 },
+      { "round": 7, "verdict": "BLOCK", "findings": 5 },
+      { "round": 8, "verdict": "BLOCK", "findings": 4 },
+      { "round": 9, "verdict": "BLOCK", "findings": 5 },
+      { "round": 10, "verdict": "BLOCK", "findings": 2 },
+      { "round": 11, "verdict": "BLOCK", "findings": 1 },
+      { "round": 12, "verdict": "BLOCK", "findings": 2 },
+      { "round": 13, "verdict": "BLOCK", "findings": 1 },
+      { "round": 14, "verdict": "BLOCK", "findings": 1 },
+      { "round": 15, "verdict": "BLOCK", "findings": 1 },
+      { "round": 16, "verdict": "BLOCK", "findings": 1 },
+      { "round": 17, "verdict": "BLOCK", "findings": 2 },
+      { "round": 18, "verdict": "BLOCK", "findings": 1 },
+      { "round": 19, "verdict": "BLOCK", "findings": 1 },
+      { "round": 20, "verdict": "BLOCK", "findings": 1 },
+      { "round": 21, "verdict": "BLOCK", "findings": 1 },
+      { "round": 22, "verdict": "BLOCK", "findings": 1 },
+      { "round": 23, "reviewedSha": "a655f1ca79a27a893e86c03f3692ca19ec8c5319", "verdict": "PASS", "findings": 0, "evidence": "governance/r3.0f/codex-checkpoint-evidence/F3/round-23-a655f1c-PASS.raw.txt", "evidenceSha256": "c4143d5db8f1133d08be892e713e58b1257e29cf673b4eb5622308c0f85a19fc" }
+    ]
+  },
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta", "engineer_brief", "experiment_loop", "case_timeline"],
+    "expectedRendererAdapter": false,
+    "note": "F3 does NOT touch the feature registry. R3.0C/D/E activations remain in their state."
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "crossPhaseGate": {
+    "r3eCheckpoint": "E5_ACTIVATION",
+    "requiredFor": "F3_QUALITY_HARDENING",
+    "satisfied": true,
+    "note": "R3.0E E5_ACTIVATION reached. F1 + F2 already merged. F3 may advance."
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "releaseRecord": null,
+  "note": "R3.0F F3 ships 6 hardening test files that assert production-quality invariants. NO new production renderer module. uiAllowed flips to true (uiCheckpoint floor). main remains 506012afea7b0296f2c1506cc77d4b39ffdf6ccb. No tag, no Release, no deployment."
+}
