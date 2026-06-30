@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0F",
+  "checkpoint": "F4_DOCUMENTATION",
+  "baseSha": "b4f681a419b4933b573329fbae870cec10f85a05",
+  "headSha": null,
+  "previousCheckpoint": "F3_QUALITY_HARDENING",
+  "shaSeparation": {
+    "note": "R3.0F F4 candidate branch SHA convention. reviewedCandidateSha is filled at the Codex review prompt; manifestCommitSha is the governance anchor commit; integrationSha is the Train merge commit.",
+    "reviewedCandidateSha": null,
+    "manifestCommitSha": null,
+    "integrationSha": null
+  },
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0f-migration-engine.js",                "capability": "migration_engine_present" },
+    { "path": "tests/e2e/helpers/flow-harness.js",                    "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-01-new-user.test.js",                   "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-02-real-telemetry.test.js",             "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-03-measured.test.js",                   "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-04-reference-lap.test.js",              "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-05-vre.test.js",                        "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-06-setup-experiment.test.js",           "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-07-driver-experiment.test.js",          "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-08-export-import.test.js",              "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-09-electron-smoke.test.js",             "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/hardening-01-electron-boundary.test.js",     "capability": "quality_hardening_present" },
+    { "path": "tests/e2e/hardening-02-storage-failure.test.js",       "capability": "quality_hardening_present" },
+    { "path": "tests/e2e/hardening-03-no-stale-ui.test.js",           "capability": "quality_hardening_present" },
+    { "path": "tests/e2e/hardening-04-large-library.test.js",         "capability": "quality_hardening_present" },
+    { "path": "tests/e2e/hardening-05-xss-injection.test.js",         "capability": "quality_hardening_present" },
+    { "path": "tests/e2e/hardening-06-supply-chain.test.js",          "capability": "quality_hardening_present" },
+    { "path": "docs/r3-architecture.md",                              "capability": "documentation_present" },
+    { "path": "docs/r3-user-workflow.md",                             "capability": "documentation_present" },
+    { "path": "docs/r3-data-and-privacy.md",                          "capability": "documentation_present" },
+    { "path": "docs/r3-credibility-model.md",                         "capability": "documentation_present" },
+    { "path": "docs/r3-experiment-loop.md",                           "capability": "documentation_present" },
+    { "path": "CHANGELOG.md",                                         "capability": "documentation_present" }
+  ],
+  "newlyAuthorizedPaths": [
+    "docs/r3-architecture.md",
+    "docs/r3-user-workflow.md",
+    "docs/r3-data-and-privacy.md",
+    "docs/r3-credibility-model.md",
+    "docs/r3-experiment-loop.md",
+    "CHANGELOG.md"
+  ],
+  "newlyEnabledCapabilities": ["documentation_present"],
+  "enabledCapabilitiesBefore": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present", "quality_hardening_present"],
+  "enabledCapabilitiesAfter": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present", "quality_hardening_present", "documentation_present"],
+  "forbiddenCapabilities": [
+    "release_gate_present",
+    "release_executed"
+  ],
+  "contractEnforcements": {
+    "documentationScope": "6 new docs (5 under docs/, CHANGELOG.md at repo root). NO new production renderer/js module is added. README.md remains accurate but may receive a minor R3 entry pointer if drafted within scope.",
+    "credibilityLadder": "All docs use the closed-rung enum: Physics > Model > Measured > Derived > Heuristic > Unavailable. Synthetic is explicitly tagged and never promoted. measured requires a verified calibration bound to the mapping and session.",
+    "forbiddenPhrases": "No 'professionally validated' claim. No 'AI replaces race engineer' claim. No 'trust this number' claim. No magnitude claim without explicit calibration boundary. No causation from correlation. No driver blame. No auto setup apply. No auto reference lap.",
+    "comparisonAuthority": "Comparison is SAME-CASE + SAME-SESSION only. Reference-lap is EXPLICIT-USER-SELECTION only. Delta sign = (comparison - reference).",
+    "engineerBriefAuthority": "R3.0D Engineer Brief consumes ONLY authoritative R3.0D HypothesisSet + PrioritySet inputs (closure-private WeakSet verification). No runtime LLM. No causation. No driver blame.",
+    "experimentLoop": "R3.0E Experiment / Outcome / Follow-up Link / Timeline are append-only with monotonic createdAt. Cross-case comparison FORBIDDEN; follow-up links only.",
+    "noProductionCodeChange": "F4 ships ZERO new production renderer/js module. R3.0B case-record schema NOT modified.",
+    "stateFloors": "F4 unlocks documentation_present. featureRegistryActivationAllowed remains false (F6_RELEASE floor). R3.0B case-record schema NOT modified."
+  },
+  "tests": {
+    "command": "npm test",
+    "newSuitesForThisCheckpoint": [],
+    "newSuiteAssertionsTotal": 0,
+    "evidenceTier": "TIER 3 — Claude-verified on F4 branch HEAD; CI re-run on integrationSha is the authority.",
+    "note": "F4 ships documentation only. No new test files. The existing 105-test full suite must continue to PASS."
+  },
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": null,
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta", "engineer_brief", "experiment_loop", "case_timeline"],
+    "expectedRendererAdapter": false,
+    "note": "F4 does NOT touch the feature registry. R3.0C/D/E activations remain in their state."
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "crossPhaseGate": {
+    "r3eCheckpoint": "E5_ACTIVATION",
+    "requiredFor": "F4_DOCUMENTATION",
+    "satisfied": true,
+    "note": "R3.0E E5_ACTIVATION reached. F1 + F2 + F3 already merged. F4 may advance."
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "releaseRecord": null,
+  "note": "R3.0F F4 ships 6 new documentation files (5 R3-* under docs/ + CHANGELOG.md). NO new production renderer code. main remains 506012afea7b0296f2c1506cc77d4b39ffdf6ccb. No tag, no Release, no deployment."
+}
