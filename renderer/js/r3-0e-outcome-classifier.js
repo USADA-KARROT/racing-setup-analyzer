@@ -633,6 +633,14 @@
         if (!_i18nKeyOk(seK)) {
           return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].i18nKey not strict i18n key' });
         }
+        // Codex E3-R3-02 closure: rebuild params into a fresh plain object from validated
+        // descriptors so the outcome envelope does NOT retain a reference to the caller's
+        // original params object (a hostile caller could otherwise mutate it before the
+        // freeze sweep completes, or rely on identity to back-channel state). The new
+        // object is a `{}` plain-object (so it round-trips through E1 outcome shape
+        // validation which requires plain prototypes), populated only with the
+        // validated allowlist values.
+        var rebuiltParams = null;
         if (seP !== null && seP !== undefined) {
           if (!_isOriginalPlainObject(seP)) {
             return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params not plain' });
@@ -646,6 +654,7 @@
           if (pNames.length > 16) {
             return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.ARRAY_CAP_EXCEEDED], { detail: 'sideEffects[' + si + '].params keys exceed cap' });
           }
+          rebuiltParams = {};
           for (var pi = 0; pi < pNames.length; pi++) {
             var pk = pNames[pi];
             // Codex E3-R2-02 closure: param KEY must itself be a sober identifier
@@ -665,20 +674,30 @@
             var pv = pd.value;
             // CLOSED primitive allowlist — number (finite) / boolean / null. NO strings,
             // NO objects, NO arrays. String values would be the laundering vector.
-            if (pv === null) continue;
-            if (typeof pv === 'boolean') continue;
-            if (typeof pv === 'number') {
+            if (pv === null) {
+              // pass — plain assignment below
+            } else if (typeof pv === 'boolean') {
+              // pass
+            } else if (typeof pv === 'number') {
               if (!_isFiniteNumber(pv)) {
                 return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params[' + pk + '] not finite number' });
               }
-              continue;
+            } else {
+              return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params[' + pk + '] not in primitive allowlist (number/boolean/null)' });
             }
-            return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params[' + pk + '] not in primitive allowlist (number/boolean/null)' });
+            // Define as own enumerable data property — no inheritance, no accessor.
+            try {
+              _CAPTURED_OBJECT_DEFINE_PROPERTY(rebuiltParams, pk, {
+                value: pv, writable: true, enumerable: true, configurable: true,
+              });
+            } catch (eDef) {
+              return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params rebuild failed at ' + pk });
+            }
           }
         }
         // Rebuild a clean side-effect record so the outcome envelope carries only the
         // validated (deep-copied) structure — caller's original reference is dropped.
-        rebuiltSideEffects.push({ i18nKey: seK, params: seP === undefined ? null : seP });
+        rebuiltSideEffects.push({ i18nKey: seK, params: rebuiltParams });
       }
       sideEffects = rebuiltSideEffects;
       var contraR = _snapshotArrayShape(observation.contradictingEvidenceIds, CODES.OUTCOME_INVALID);
@@ -757,6 +776,29 @@
       }
       if (appliedChange.sourceExperimentId !== experiment.experimentId) {
         return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'appliedChange.sourceExperimentId !== experiment.experimentId' });
+      }
+      // Codex E3-R3-01 closure: experiment.followUpCaseIds MUST pass the dense-array
+      // snapshot (E1's nested-descriptor audit does not catch sparse arrays — sparse
+      // [] enumerates only 'length' and slips through). Every id must pass the strict
+      // ID grammar. The provided followUp.followUpCaseId MUST be a member of the
+      // experiment's declared follow-up case ids — otherwise a caller could submit a
+      // followUp object pointing at an arbitrary case while the experiment's actual
+      // follow-up linkage was empty (or sparse) and the classifier would still produce
+      // a confirmed outcome despite the linkage break.
+      var followUpIdsR = _snapshotArrayShape(experiment.followUpCaseIds || [], CODES.LINKAGE_INVALID);
+      if (followUpIdsR.valid !== true) {
+        return RC_E.buildBlockedResult(followUpIdsR.reasonCodes, { detail: 'experiment.followUpCaseIds: ' + followUpIdsR.detail });
+      }
+      var declaredFollowUpIds = followUpIdsR.snapshot;
+      var followUpDeclared = false;
+      for (var fui = 0; fui < declaredFollowUpIds.length; fui++) {
+        if (!_idGrammarOk(declaredFollowUpIds[fui])) {
+          return RC_E.buildBlockedResult([CODES.LINKAGE_INVALID], { detail: 'experiment.followUpCaseIds[' + fui + '] invalid id' });
+        }
+        if (declaredFollowUpIds[fui] === followUp.followUpCaseId) followUpDeclared = true;
+      }
+      if (!followUpDeclared) {
+        return RC_E.buildBlockedResult([CODES.LINKAGE_INVALID], { detail: 'followUp.followUpCaseId not declared in experiment.followUpCaseIds' });
       }
       // parentCaseId binding — followUp's parent MUST be the experiment's source case. If
       // parentCaseId mismatches, treat as invalid_comparison (cross-case forbidden).

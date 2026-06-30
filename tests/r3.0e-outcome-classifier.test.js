@@ -226,9 +226,12 @@ console.log('Section D — Inconclusive');
 // ------------------------------------------------------------------
 console.log('Section E — invalid_comparison');
 (function () {
-  // Cross-case
+  // Cross-case (parentCaseId differs from experiment.sourceCaseId). The experiment must
+  // still declare followUp.followUpCaseId in its followUpCaseIds (E3-R3-01 linkage gate),
+  // so we use the BASE_FOLLOWUP id (which IS in the default experiment's followUpCaseIds)
+  // and only override parentCaseId to a different case.
   var r = CL.classifyOutcome(makeInput({
-    followUpOverrides: { parentCaseId: 'case_other', followUpCaseId: 'case_other_follow' },
+    followUpOverrides: { parentCaseId: 'case_other' },
   }), { clock: fixedClock() });
   chk('E1: cross-case → invalid_comparison',
     r.valid === true && r.outcome['class'] === 'invalid_comparison');
@@ -264,7 +267,8 @@ console.log('Section E — invalid_comparison');
     r.valid === true && r.outcome['class'] === 'invalid_comparison');
 })();
 (function () {
-  // Precedence: cross-case AND would-otherwise-be-confirmed → invalid_comparison wins (not confirmed)
+  // Precedence: cross-case AND would-otherwise-be-confirmed → invalid_comparison wins (not confirmed).
+  // (followUpCaseId stays in the declared followUpCaseIds — only parentCaseId mismatches.)
   var r = CL.classifyOutcome(makeInput({
     followUpOverrides: { parentCaseId: 'case_other' },
     observationOverrides: { observedDirection: 'decrease', observedMagnitude: 1.0 },
@@ -1134,6 +1138,111 @@ console.log('Section V — Codex E3 R2 closures');
     { clock: fixedClock() });
   chk('V3.2: named own key on experiment.controlVariables → BLOCK',
     r.valid !== true);
+})();
+
+// ==================================================================
+// Section W — Codex E3 R3 closures (E3-R3-01..02)
+// ==================================================================
+console.log('Section W — Codex E3 R3 closures');
+
+// W1 — E3-R3-01: sparse experiment.followUpCaseIds rejected
+(function () {
+  var sparse = new Array(2);
+  Object.freeze(sparse);
+  var raw = {
+    schemaVersion: 1, experimentId: BASE_EXP_ID, sourceCaseId: BASE_CASE,
+    sourceHypothesisId: 'hyp_demo_001', sourceRecommendationId: 'pri_demo_001',
+    targetMetric: 'roll_gradient_deg_per_g', baselineValue: 3.5,
+    expectedDirection: 'decrease', expectedMagnitudeRange: { min: 0.5, max: 1.5 },
+    setupChange: { component: 'front_arb', delta_nm_per_deg: 200 },
+    driverInstruction: null, controlVariables: [],
+    validationPlan: 'r3.0e.plan.controlled_repeat_lap',
+    stopConditions: [{ i18nKey: 'r3.0e.stop.lap_time_increase', params: { threshold_s: 0.5 } }],
+    status: 'applied', followUpCaseIds: sparse, outcome: null,
+    createdAt: BASE_EXPERIMENT_TS,
+  };
+  Object.freeze(raw.expectedMagnitudeRange);
+  Object.freeze(raw.setupChange);
+  Object.freeze(raw.stopConditions[0].params);
+  Object.freeze(raw.stopConditions[0]);
+  Object.freeze(raw.stopConditions);
+  Object.freeze(raw.controlVariables);
+  Object.freeze(raw);
+  var r = CL.classifyOutcome(makeInput({ experiment: raw, controlVariableObservations: [] }),
+    { clock: fixedClock() });
+  chk('W1: sparse experiment.followUpCaseIds → BLOCK',
+    r.valid !== true && (r.reasonCodes || []).indexOf('LINKAGE_INVALID') !== -1);
+})();
+
+// W2 — E3-R3-01: named own key on experiment.followUpCaseIds rejected
+(function () {
+  var fu = [BASE_FOLLOWUP];
+  fu.injected = 'case_evil';
+  Object.freeze(fu);
+  var raw = {
+    schemaVersion: 1, experimentId: BASE_EXP_ID, sourceCaseId: BASE_CASE,
+    sourceHypothesisId: 'hyp_demo_001', sourceRecommendationId: 'pri_demo_001',
+    targetMetric: 'roll_gradient_deg_per_g', baselineValue: 3.5,
+    expectedDirection: 'decrease', expectedMagnitudeRange: { min: 0.5, max: 1.5 },
+    setupChange: { component: 'front_arb', delta_nm_per_deg: 200 },
+    driverInstruction: null, controlVariables: [],
+    validationPlan: 'r3.0e.plan.controlled_repeat_lap',
+    stopConditions: [{ i18nKey: 'r3.0e.stop.lap_time_increase', params: { threshold_s: 0.5 } }],
+    status: 'applied', followUpCaseIds: fu, outcome: null,
+    createdAt: BASE_EXPERIMENT_TS,
+  };
+  Object.freeze(raw.expectedMagnitudeRange);
+  Object.freeze(raw.setupChange);
+  Object.freeze(raw.stopConditions[0].params);
+  Object.freeze(raw.stopConditions[0]);
+  Object.freeze(raw.stopConditions);
+  Object.freeze(raw.controlVariables);
+  Object.freeze(raw);
+  var r = CL.classifyOutcome(makeInput({ experiment: raw, controlVariableObservations: [] }),
+    { clock: fixedClock() });
+  chk('W2: named own key on experiment.followUpCaseIds → BLOCK',
+    r.valid !== true);
+})();
+
+// W3 — E3-R3-01: followUp.followUpCaseId must be a member of experiment.followUpCaseIds
+(function () {
+  var exp = makeExperiment({ followUpCaseIds: ['case_demo_a_followup_2'] });
+  var r = CL.classifyOutcome(makeInput({
+    experiment: exp,
+    followUpOverrides: { followUpCaseId: 'case_demo_a_followup_arbitrary' },
+  }), { clock: fixedClock() });
+  chk('W3: followUpCaseId not in experiment.followUpCaseIds → BLOCK LINKAGE_INVALID',
+    r.valid !== true && (r.reasonCodes || []).indexOf('LINKAGE_INVALID') !== -1);
+})();
+
+// W4 — E3-R3-01: well-declared followUpCaseId membership accepted (regression)
+(function () {
+  var exp = makeExperiment({ followUpCaseIds: ['case_demo_a_followup_1', 'case_demo_a_followup_2'] });
+  var r = CL.classifyOutcome(makeInput({
+    experiment: exp,
+    followUpOverrides: { followUpCaseId: 'case_demo_a_followup_2' },
+  }), { clock: fixedClock() });
+  chk('W4: declared followUpCaseId accepted → confirmed',
+    r.valid === true && r.outcome['class'] === 'confirmed');
+})();
+
+// W5 — E3-R3-02: sideEffects.params is rebuilt (not the caller's reference)
+(function () {
+  var p = { delta_pct: 5, ok: true };
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { sideEffects: [{ i18nKey: 'r3.0e.side.ok', params: p }] },
+  }), { clock: fixedClock() });
+  chk('W5: rebuilt sideEffects.params is NOT the caller reference',
+    r.valid === true && r.outcome.sideEffects[0].params !== p
+      && r.outcome.sideEffects[0].params.delta_pct === 5
+      && r.outcome.sideEffects[0].params.ok === true);
+  // Mutating the caller's original after classification does NOT affect the outcome
+  try { p.delta_pct = 999; } catch (e) { /* swallow */ }
+  chk('W5.iso: caller-side mutation does NOT affect outcome.sideEffects.params',
+    r.valid === true && r.outcome.sideEffects[0].params.delta_pct === 5);
+  // Outcome's params is frozen
+  chk('W5.frozen: outcome.sideEffects[0].params is frozen',
+    r.valid === true && Object.isFrozen(r.outcome.sideEffects[0].params));
 })();
 
 // ------------------------------------------------------------------
