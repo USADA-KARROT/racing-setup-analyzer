@@ -5,40 +5,50 @@
  * r3_0e_timelines / r3_0e_followupLinks) against the unified storage envelope. The engine:
  *
  *   • is deterministic — same inputs + same injected clock + same backend state → same writes/journal.
- *   • is idempotent — running migrate() against a fully-migrated store is a no-op (zero writes).
+ *   • is idempotent — running migrate() against a fully-migrated store performs ZERO writes AND ZERO
+ *     journal appends; no spurious churn even when re-invoked repeatedly.
  *   • is fail-closed — future-version records are REJECTED (never coerced); malformed records, sparse
  *     arrays, accessors, symbols, Proxy traps, non-enumerable hostile keys, prototype-pollution, hostile
- *     toJSON hooks, BigInt/cycles are all stripped by an input firewall (structuredClone → JSON deep-clone).
- *   • never silently drops data — every record is either migrated, no-op, rejected (with reasonCode), or
- *     failed (backend abort). Each record produces ONE deterministic journal entry.
- *   • never fabricates producer attestation — migrator output is plain data; the live store re-validates
- *     on subsequent read via its own contract path.
- *   • is single-batch atomic per store — either ALL writes + journal entries for a store batch land, or
- *     the batch is aborted (backend.transact). On abort, the entire batch is journaled as 'failed' with
- *     reasonCode BACKEND_REJECTED in a final defensive journal append (best effort).
+ *     toJSON hooks, BigInt/cycles are all stripped by an input firewall (structuredClone ONLY; JSON-fallback
+ *     paths on the original object are intentionally REMOVED so toJSON traps cannot run — see F1-R1-02).
+ *   • never silently drops data — every state-changing record is journaled; pure no-op runs emit no journal
+ *     entries (audit count lives in state.lastRunPerStore) so repeat scans cannot churn the ring buffer.
+ *   • never fabricates producer attestation — migrator output is plain data, and any field whose name
+ *     looks like a producer-attestation marker (allowlist of well-known names) causes the migrated record
+ *     to be REJECTED with PRODUCER_ATTESTATION_REFUSED (F1-R1-09).
+ *   • commits store writes AND journal AND state in ONE atomic backend.transact() across all stores +
+ *     META, so a META failure cannot land data without an audit row, and a data failure cannot land an
+ *     audit row without the data (F1-R1-03).
  *   • never invents authority across stores — migration of one record never references another store's
  *     records. The follow-up reverse index and the experiments/outcomes secondary index are NOT touched
  *     by the engine; those indexes are owned by the live stores and will be re-validated next time the
  *     live store reads them.
+ *   • enforces a closed-enum reasonCode at the boundary: any migrator-supplied reason that is not in
+ *     contracts/r3.0f/migration-envelope.js REASON_CODES is mapped to NO_MIGRATION_PATH (F1-R1-01).
+ *   • preflights journal capacity: if processing would exceed MAX_JOURNAL × JOURNAL_OVERFLOW_FACTOR
+ *     entries in a single run, the engine HALTS before any mutation (F1-R1-05).
+ *   • validates the persisted envelope structurally (not just engineVersion) and rejects any malformed
+ *     envelope as ENVELOPE_VERSION_MISMATCH (F1-R1-06).
+ *   • validates lifetimeJournalDropped is a non-negative safe integer (F1-R1-07).
+ *   • recordHash is documented as a NON-CRYPTOGRAPHIC FNV-1a fingerprint — useful for audit comparison
+ *     within one repository, NOT a tamper-proof signature (F1-R1-08).
+ *   • validates backend.transact() return shape; fail-closed BACKEND_REJECTED if missing fields (F1-R1-10).
  *
  * Hostile-runtime defenses (anti-tamper, anti-poisoning):
  *   • Closure-captured intrinsics at module load time (Object.* / Array.* / JSON.* / String.* / Number.*).
- *   • Pre-clone every record via structuredClone (closure-captured), fallback to closure-captured JSON
- *     parse/stringify chain — strips Proxy traps, accessors, symbols, non-enumerables, prototype chains,
- *     toJSON hooks. JSON.stringify rejects cycles → RECORD_CIRCULAR.
- *   • Reject any record whose pre-clone fails or whose serialized size > maxRecordBytes (8MB default).
- *   • Reject any migrator result that lacks an "ok" boolean — defense vs malicious migrator overrides.
- *   • Journal is a closure-private append-only buffer plus a backend mirror. Engine refuses to append
- *     when totalDropped+entries exceeds 4× maxJournalEntries within a single run (JOURNAL_OVERFLOW).
+ *   • structuredClone REQUIRED at module load — engine refuses to construct without it.
+ *   • Migrator results validated at the boundary: ok must be explicit boolean; migrationsApplied must be
+ *     an array of plain strings; reason must be in closed enum (or mapped to NO_MIGRATION_PATH).
+ *   • Producer-attestation field-name allowlist rejection (see PRODUCER_ATTESTATION_FIELDS).
  *
  * Public API:
  *   createMigrationEngine({ backend, registry?, metaStore?, journalKey?, stateKey?, clock?, stamp?,
- *                           maxJournalEntries?, maxRecordBytes?, migratorTimeoutMs? })
- *     → { detect, plan, migrate, journal, envelope }
+ *                           maxJournalEntries?, maxRecordBytes? })
+ *     → { detect, plan, migrate, journal, envelope, knownStores }
  *
- *   detect()    → Promise<{ ok, currentEnvelope?, targetEnvelope, perStoreStatus, knownStores }>
- *   plan()      → Promise<{ ok, generatedAt, steps, blockers, perStoreSummary }>
- *   migrate(opts={confirm:true}) → Promise<{ ok, report }> — report has perStore, journalAppended, status.
+ *   detect()    → Promise<frozen { ok, currentEnvelope?, targetEnvelope, perStoreStatus, knownStores, envelopeMismatch }>
+ *   plan()      → Promise<frozen { ok, generatedAt, steps, blockers, perStoreSummary }>
+ *   migrate({confirm:true}) → Promise<frozen { ok, report | reasonCode }>
  *   journal()   → Promise<frozen array of journal entries (most recent last)>
  *   envelope()  → frozen target envelope
  *
@@ -46,9 +56,7 @@
  */
 (function (root) {
   'use strict';
-  // Literal-only require pairs (each entry: [nodeFn, browserGlobalName]). Keeping the require
-  // specifiers literal-string-only satisfies the phase-no-consumer heuristic and gives the
-  // bundler a static dependency graph. Each branch returns null on failure (best-effort UMD).
+  // Literal-only require pairs.
   function _loadEnv() {
     if (typeof module !== 'undefined' && module.exports) { try { return require('../../contracts/r3.0f/migration-envelope.js'); } catch (_) { } }
     return (root && root.R3_0F_MigrationEnvelope) || null;
@@ -79,27 +87,21 @@
   }
 
   // ── closure-captured intrinsics ──────────────────────────────────────────────
-  var _Object              = Object;
-  var _ObjectCreate        = Object.create;
   var _ObjectFreeze        = Object.freeze;
   var _ObjectIsFrozen      = Object.isFrozen;
   var _ObjectKeys          = Object.keys;
   var _ObjectAssign        = Object.assign || function (t) { for (var i = 1; i < arguments.length; i++) { var s = arguments[i]; if (s) for (var k in s) if (Object.prototype.hasOwnProperty.call(s, k)) t[k] = s[k]; } return t; };
   var _ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
-  var _ObjectGetPrototypeOf      = Object.getPrototypeOf;
-  var _ObjectPrototype     = Object.prototype;
   var _ObjectPrototypeHasOwnProperty = Object.prototype.hasOwnProperty;
   var _ArrayIsArray        = Array.isArray;
-  var _ArrayPrototypeSlice = Array.prototype.slice;
-  var _ArrayPrototypePush  = Array.prototype.push;
   var _JSONStringify       = JSON.stringify;
   var _JSONParse           = JSON.parse;
   var _StructuredClone     = typeof structuredClone === 'function' ? structuredClone : null;
   var _isFinite            = isFinite;
-  var _isNaN               = isNaN;
   var _MathFloor           = Math.floor;
   var _Date                = Date;
   var _NumberIsFinite      = typeof Number.isFinite === 'function' ? Number.isFinite : function (v) { return typeof v === 'number' && _isFinite(v); };
+  var _NumberIsSafeInteger = typeof Number.isSafeInteger === 'function' ? Number.isSafeInteger : function (v) { return _NumberIsFinite(v) && _MathFloor(v) === v && v <= 9007199254740991 && v >= -9007199254740991; };
 
   var ENV = _loadEnv();
   if (!ENV) throw new Error('r3-0f-migration-engine: migration-envelope contract not loadable');
@@ -109,9 +111,46 @@
   var STATE_KEY_DEFAULT        = '__r3_0f_migration_state__';
   var MAX_JOURNAL_ENTRIES_DEF  = 256;
   var MAX_RECORD_BYTES_DEF     = 8000000; // 8MB
-  var JOURNAL_OVERFLOW_FACTOR  = 4;       // overflow gate inside one migrate() call
+  var JOURNAL_OVERFLOW_FACTOR  = 4;
 
-  // ── default migrator registry (literal loaders) ──────────────────────────────
+  // F1-R1-09: producer-attestation field-name allowlist. Any migrated record whose top-level OR
+  // nested object contains one of these keys is REJECTED with PRODUCER_ATTESTATION_REFUSED. Live
+  // producer modules (R3.0B / R3.0C / R3.0D / R3.0E) use closure-private WeakSet attestation that
+  // is NEVER serialized — these field names are reserved sentinels that downstream auditors must
+  // be able to trust as "not present in persisted data".
+  var PRODUCER_ATTESTATION_FIELDS = (function () {
+    var s = {};
+    var names = [
+      '_authoritative', '_producerAttested', '_attested', '__attested',
+      '_verified', '__verified', '_signature', '__signature',
+      '_proof', '__proof', '_authority', '__authority',
+      '_authoritativeSession', '_authoritativeCase', '_authoritativeOutcome'
+    ];
+    for (var i = 0; i < names.length; i++) s[names[i]] = true;
+    return _ObjectFreeze(s);
+  })();
+
+  // F1-R1-09: walk a plain-JSON-cloned value, return true if any object contains a forbidden key.
+  function _containsAttestationField(v, depth) {
+    if (depth === undefined) depth = 0;
+    if (depth > 64) return true; // depth-bomb defense; treat as attestation-suspect
+    if (v === null || typeof v !== 'object') return false;
+    if (_ArrayIsArray(v)) {
+      for (var i = 0; i < v.length; i++) {
+        if (_containsAttestationField(v[i], depth + 1)) return true;
+      }
+      return false;
+    }
+    var keys = _ObjectKeys(v);
+    for (var j = 0; j < keys.length; j++) {
+      var k = keys[j];
+      if (PRODUCER_ATTESTATION_FIELDS[k]) return true;
+      if (_containsAttestationField(v[k], depth + 1)) return true;
+    }
+    return false;
+  }
+
+  // Default registry (literal loaders)
   function _defaultRegistry() {
     var reg = {};
     var mods = [
@@ -131,7 +170,6 @@
     return reg;
   }
 
-  // ── helpers (closure-private; do not depend on prototype methods) ────────────
   function _isPlainObject(v) {
     if (v === null || typeof v !== 'object') return false;
     if (_ArrayIsArray(v)) return false;
@@ -146,7 +184,9 @@
     try { return new _Date().toISOString(); } catch (_) { return '1970-01-01T00:00:00.000Z'; }
   }
 
-  // FNV-1a 64 (BigInt-free) — deterministic hash sufficient to fingerprint a record post-migration
+  // F1-R1-08: NON-CRYPTOGRAPHIC deterministic fingerprint over JSON serialization. Useful for
+  // auditing equality of post-migration records within one repository, NOT for proving authority,
+  // NOT collision-resistant under adversarial input. Auditors must treat this as a weak hash.
   function _hash(str) {
     if (typeof str !== 'string') str = String(str);
     var h1 = 0x811c9dc5, h2 = 0xcbf29ce4;
@@ -155,27 +195,25 @@
       h1 ^= c & 0xff; h1 = (h1 * 0x01000193) >>> 0;
       h2 ^= (c >> 8) & 0xff; h2 = (h2 * 0x01000193) >>> 0;
     }
-    // pad to 8 hex chars each
     var a = h1.toString(16); while (a.length < 8) a = '0' + a;
     var b = h2.toString(16); while (b.length < 8) b = '0' + b;
-    return a + b;
+    return 'fnv1a64:' + a + b; // prefix marks the hash family — auditors must NOT assume crypto-strength
   }
 
-  // Input firewall: structuredClone → JSON deep-clone. Returns { ok, value? , reason?, bytes? }.
+  // F1-R1-02: structured-clone-only firewall. If structuredClone is unavailable OR throws on the
+  // input, the record is REJECTED. We never JSON-stringify the original object (that would invoke
+  // attacker-controlled toJSON traps).
   function _sanitize(rec, maxBytes) {
     if (rec === null || rec === undefined) return { ok: false, reason: 'RECORD_NOT_AN_OBJECT' };
     if (typeof rec !== 'object') return { ok: false, reason: 'RECORD_NOT_AN_OBJECT' };
     if (_ArrayIsArray(rec)) return { ok: false, reason: 'RECORD_NOT_AN_OBJECT' };
-    var cloned = null, viaJson = false;
-    if (_StructuredClone) {
-      try { cloned = _StructuredClone(rec); } catch (_) { cloned = null; }
-    }
-    if (cloned === null) {
-      try { cloned = _JSONParse(_JSONStringify(rec)); viaJson = true; }
-      catch (_) { return { ok: false, reason: 'RECORD_CIRCULAR' }; }
-    }
-    // After structuredClone, also do a JSON round-trip so the engine ALWAYS sees a plain
-    // JSON-compatible value (structuredClone preserves Maps/Sets/Dates which we don't want in storage).
+    if (!_StructuredClone) return { ok: false, reason: 'PROXY_INPUT_REJECTED' }; // refuse without structured clone
+    var cloned;
+    try { cloned = _StructuredClone(rec); } catch (_) { return { ok: false, reason: 'PROXY_INPUT_REJECTED' }; }
+    // structuredClone preserves Maps/Sets/Dates/typed arrays which we don't want in storage; force a
+    // JSON round-trip on the CLONED value (toJSON cannot be a Proxy trap because cloned has no
+    // prototype chain to the original; even if a clone-preserved Date is involved, JSON.stringify
+    // on it just produces an ISO string — acceptable).
     var serialized;
     try { serialized = _JSONStringify(cloned); } catch (_) { return { ok: false, reason: 'RECORD_CIRCULAR' }; }
     if (typeof serialized !== 'string') return { ok: false, reason: 'RECORD_CIRCULAR' };
@@ -183,10 +221,41 @@
     var final;
     try { final = _JSONParse(serialized); } catch (_) { return { ok: false, reason: 'RECORD_CIRCULAR' }; }
     if (!_isPlainObject(final)) return { ok: false, reason: 'RECORD_NOT_AN_OBJECT' };
-    return { ok: true, value: final, bytes: serialized.length, viaJson: viaJson };
+    return { ok: true, value: final, bytes: serialized.length };
   }
 
-  // Build a deterministic journal entry. ALL fields owned by the engine.
+  // F1-R1-01: closed-enum boundary. Map any migrator-supplied reason that is NOT in the contract
+  // enum to NO_MIGRATION_PATH so unknown codes never poison the journal. Legacy R3.0B codes are
+  // pre-mapped to their F1 equivalents.
+  var LEGACY_REASON_MAP = (function () {
+    var m = {};
+    m['case_NOT_AN_OBJECT']    = 'RECORD_NOT_AN_OBJECT';
+    m['session_NOT_AN_OBJECT'] = 'RECORD_NOT_AN_OBJECT';
+    m['case_BAD_VERSION']      = 'RECORD_BAD_VERSION';
+    m['session_BAD_VERSION']   = 'RECORD_BAD_VERSION';
+    return _ObjectFreeze(m);
+  })();
+  function _coerceReasonCode(reason) {
+    if (typeof reason !== 'string' || !reason.length) return 'NO_MIGRATION_PATH';
+    if (LEGACY_REASON_MAP[reason]) return LEGACY_REASON_MAP[reason];
+    // build reason set from contract — closure-captured
+    var REASON_CODES = ENV.REASON_CODES;
+    for (var i = 0; i < REASON_CODES.length; i++) if (REASON_CODES[i] === reason) return reason;
+    return 'NO_MIGRATION_PATH';
+  }
+
+  // F1-R1-01: validate migrationsApplied array contains only short non-empty strings (defense vs
+  // migrator-supplied fabricated audit labels). Returns sanitized copy.
+  function _sanitizeMigrationsApplied(arr) {
+    if (!_ArrayIsArray(arr)) return [];
+    var out = [];
+    for (var i = 0; i < arr.length && i < 32; i++) {
+      var v = arr[i];
+      if (typeof v === 'string' && v.length > 0 && v.length <= 64) out.push(v);
+    }
+    return out;
+  }
+
   function _journalEntry(now, store, key, fromVersion, toVersion, status, migrationsApplied, recordHash, reasonCode, limitations) {
     var entry = {
       schemaVersion: 1,
@@ -196,12 +265,12 @@
       fromVersion: fromVersion,
       toVersion: toVersion,
       status: status,
-      recordHash: recordHash,
-      migrationsApplied: _ArrayIsArray(migrationsApplied) ? migrationsApplied.slice() : [],
-      limitations: _ArrayIsArray(limitations) ? limitations.slice() : []
+      recordHash: typeof recordHash === 'string' ? recordHash : '',
+      migrationsApplied: _sanitizeMigrationsApplied(migrationsApplied),
+      limitations: _ArrayIsArray(limitations) ? limitations.slice(0, 16).map(function (l) { return typeof l === 'string' ? l.slice(0, 200) : ''; }).filter(function (l) { return l.length > 0; }) : []
     };
     if (status === 'rejected' || status === 'failed') {
-      entry.reasonCode = reasonCode || 'NO_MIGRATION_PATH';
+      entry.reasonCode = _coerceReasonCode(reasonCode);
     }
     return ENV.deepFreeze(entry);
   }
@@ -215,6 +284,9 @@
     if (typeof spec.backend.list !== 'function' || typeof spec.backend.get !== 'function') {
       throw new Error('createMigrationEngine: backend with list+get required');
     }
+    if (!_StructuredClone) {
+      throw new Error('createMigrationEngine: structuredClone required (Node 17+ / modern browser)');
+    }
     var backend             = spec.backend;
     var registry            = spec.registry && typeof spec.registry === 'object' ? spec.registry : _defaultRegistry();
     var META                = (typeof spec.metaStore === 'string' && spec.metaStore.length) ? spec.metaStore : META_STORE_DEFAULT;
@@ -226,7 +298,6 @@
     var stamp               = spec.stamp;
     var KNOWN_STORES        = _ObjectKeys(registry).sort();
 
-    // Validate registry: each entry must have storeKey, targetVersion (number), migrate (function)
     for (var i = 0; i < KNOWN_STORES.length; i++) {
       var sk = KNOWN_STORES[i];
       var mg = registry[sk];
@@ -241,14 +312,12 @@
 
     function envelope() { return ENV.buildEnvelope(); }
 
-    // Read the persisted state envelope from meta store; return null if absent / malformed.
     function _readState() {
       return backend.get(META, STATE_KEY).then(function (st) {
         if (!_isPlainObject(st)) return null;
         return st;
       }, function () { return null; });
     }
-
     function _readJournal() {
       return backend.get(META, JOURNAL_KEY).then(function (j) {
         if (_ArrayIsArray(j)) return j.slice();
@@ -268,7 +337,6 @@
       });
     }
 
-    // detect() — list each store, classify counts; does NOT mutate state.
     function detect() {
       var target = envelope();
       var perStoreStatus = {};
@@ -291,7 +359,6 @@
             }
             perStoreStatus[storeKey] = counts;
           }, function () {
-            // backend list failed for this store — record null record-set
             perStoreStatus[storeKey] = { records: 0, atTarget: 0, belowTarget: 0, futureVersion: 0, malformed: 0, listFailed: true };
           }));
         })(KNOWN_STORES[i]);
@@ -316,7 +383,6 @@
       });
     }
 
-    // plan() — pure preview. NEVER writes. NEVER mutates registry.
     function plan() {
       return detect().then(function (det) {
         var steps = [], blockers = [], perStoreSummary = {};
@@ -348,22 +414,18 @@
       });
     }
 
-    // Per-store migration batch. Returns Promise<{ store, counts, journalEntries, ok }>
-    function _migrateStore(storeKey) {
+    // Pre-compute per-store work outside any transact. Returns { storeKey, counts, writes, entries }.
+    function _computeStoreWork(storeKey, now) {
       var mg = registry[storeKey];
-      var now = _now(clock, stamp);
       return backend.list(storeKey).then(function (rows) {
         rows = _ArrayIsArray(rows) ? rows : [];
-        // Pre-process rows OUTSIDE the transact (transact is sync). We build writes + journal entries
-        // here, then commit atomically. Cross-record state cannot leak: each row is processed in
-        // isolation, against its CLONED value.
         var writes = [];
         var entries = [];
         var counts = { records: rows.length, migrated: 0, noop: 0, rejected: 0, failed: 0 };
         for (var i = 0; i < rows.length; i++) {
           var row = rows[i];
           var key = row && typeof row.key === 'string' ? row.key : null;
-          if (!key) { // backend returned an unkeyed row — treat as failed but DO NOT WRITE
+          if (!key) {
             entries.push(_journalEntry(now, storeKey, '<unkeyed>', -1, mg.targetVersion, 'failed', [], '', 'BACKEND_REJECTED', ['unkeyed_row']));
             counts.failed += 1;
             continue;
@@ -387,33 +449,33 @@
             counts.failed += 1;
             continue;
           }
-          // Defense: migrator MUST return a plain object with explicit ok boolean.
           if (!_isPlainObject(result) || (result.ok !== true && result.ok !== false)) {
             entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', [], '', 'MIGRATOR_THREW', ['bad_migrator_return']));
             counts.failed += 1;
             continue;
           }
           if (result.ok === false) {
-            var rc = (typeof result.reason === 'string' && result.reason.length) ? result.reason : 'NO_MIGRATION_PATH';
-            // Map legacy schema-migration.js codes into the F1 closed enum.
-            if (rc === 'case_NOT_AN_OBJECT' || rc === 'session_NOT_AN_OBJECT') rc = 'RECORD_NOT_AN_OBJECT';
-            if (rc === 'case_BAD_VERSION' || rc === 'session_BAD_VERSION') rc = 'RECORD_BAD_VERSION';
-            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'rejected', _ArrayIsArray(result.migrations) ? result.migrations : [], '', rc, []));
+            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'rejected', _ArrayIsArray(result.migrations) ? result.migrations : [], '', result.reason, []));
             counts.rejected += 1;
             continue;
           }
-          // ok=true. If migrations array is empty, this is a no-op (already at target).
           var migrated = result.record;
           if (!_isPlainObject(migrated)) {
             entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', [], '', 'POST_MIGRATION_INVALID', ['migrator_returned_non_object']));
             counts.failed += 1;
             continue;
           }
-          // Re-sanitize the post-migration record (defends against migrator returning an exotic value).
           var postSan = _sanitize(migrated, MAX_RECORD_BYTES);
           if (!postSan.ok) {
             entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', _ArrayIsArray(result.migrations) ? result.migrations : [], '', postSan.reason, []));
             counts.failed += 1;
+            continue;
+          }
+          // F1-R1-09: producer-attestation field defense — reject migrator output that contains
+          // any well-known authority-attestation field name.
+          if (_containsAttestationField(postSan.value)) {
+            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'rejected', _ArrayIsArray(result.migrations) ? result.migrations : [], '', 'PRODUCER_ATTESTATION_REFUSED', ['attestation_field_in_migrated_record']));
+            counts.rejected += 1;
             continue;
           }
           var toVersion = (typeof postSan.value.schemaVersion === 'number' && _isFinite(postSan.value.schemaVersion)) ? postSan.value.schemaVersion : mg.targetVersion;
@@ -422,23 +484,20 @@
             counts.failed += 1;
             continue;
           }
-          var hash = _hash(_JSONStringify(postSan.value));
           var migrationsList = _ArrayIsArray(result.migrations) ? result.migrations : [];
-          var status;
           if (migrationsList.length === 0 && fromVersion === mg.targetVersion) {
-            // True no-op: no write necessary. Journal records the no-op (deterministic audit).
-            status = 'no-op';
+            // F1-R1-04: pure no-op records do NOT receive a journal entry. The count is preserved
+            // in counts.noop and surfaces in state.lastRunPerStore.
             counts.noop += 1;
-          } else {
-            status = 'migrated';
-            writes.push({ store: storeKey, key: key, value: postSan.value });
-            counts.migrated += 1;
+            continue;
           }
-          entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, status, migrationsList, hash, '', []));
+          var hash = _hash(_JSONStringify(postSan.value));
+          writes.push({ store: storeKey, key: key, value: postSan.value });
+          counts.migrated += 1;
+          entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'migrated', migrationsList, hash, '', []));
         }
         return { storeKey: storeKey, counts: counts, writes: writes, entries: entries };
       }, function (err) {
-        // list failed — record one defensive entry and skip writes
         return {
           storeKey: storeKey,
           counts: { records: 0, migrated: 0, noop: 0, rejected: 0, failed: 1 },
@@ -458,9 +517,17 @@
         }));
       }
       var startedAt = _now(clock, stamp);
-      // Read existing state to detect envelope mismatch up front.
       return _readState().then(function (st) {
+        // F1-R1-06: validate the persisted envelope structurally (not just engineVersion number)
         if (st && _isPlainObject(st.envelope)) {
+          var ev = ENV.validateEnvelope(st.envelope);
+          if (!ev.ok) {
+            return ENV.deepFreeze({
+              ok: false,
+              reasonCode: 'ENVELOPE_VERSION_MISMATCH',
+              report: ENV.deepFreeze({ status: 'halted', startedAt: startedAt, perStore: {}, journalAppended: 0, envelopeViolations: ev.violations.slice(0, 16) })
+            });
+          }
           if (typeof st.envelope.engineVersion === 'number' && st.envelope.engineVersion > ENV.ENGINE_VERSION) {
             return ENV.deepFreeze({
               ok: false,
@@ -469,118 +536,174 @@
             });
           }
         }
-        // Sequentially migrate each store. We do NOT parallelize: ordering matters for the journal
-        // (deterministic audit) and because backend.transact() serializes anyway.
-        var perStoreOut = {};
-        var allEntries = [];
-        var anyWrites = false;
-        var anyMigrated = false, anyRejected = false, anyFailed = false;
-        var p = Promise.resolve();
-        for (var i = 0; i < KNOWN_STORES.length; i++) {
-          (function (sk) {
-            p = p.then(function () {
-              return _migrateStore(sk).then(function (res) {
-                perStoreOut[sk] = res.counts;
-                // overflow gate per single migrate() run
-                if (allEntries.length + res.entries.length > MAX_JOURNAL * JOURNAL_OVERFLOW_FACTOR) {
-                  res.entries = [_journalEntry(_now(clock, stamp), sk, '<overflow>', -1, registry[sk].targetVersion, 'failed', [], '', 'JOURNAL_OVERFLOW', [])];
-                  res.writes = [];
-                  res.counts.failed += 1;
-                }
-                for (var j = 0; j < res.entries.length; j++) allEntries.push(res.entries[j]);
-                if (res.counts.migrated > 0) anyMigrated = true;
-                if (res.counts.rejected > 0) anyRejected = true;
-                if (res.counts.failed > 0) anyFailed = true;
-                if (res.writes.length > 0) {
-                  anyWrites = true;
-                  // Commit this store's writes atomically. Failure → buffer-only journal append; no partial write.
-                  return backend.transact({
-                    stores: [sk],
-                    reads: [],
-                    compute: function () { return { writes: res.writes, result: { committed: res.writes.length } }; }
-                  }).then(function () { return; }, function (err) {
-                    // backend rejected: invalidate THIS store's migrated count and re-journal as failed
-                    var failedNow = _now(clock, stamp);
-                    var migratedNow = res.counts.migrated;
-                    perStoreOut[sk] = _ObjectAssign({}, res.counts, { migrated: 0, failed: res.counts.failed + migratedNow });
-                    // remove the prior "migrated" entries we already pushed for this store — replace with one defensive failed entry
-                    allEntries = allEntries.filter(function (e) { return !(e.store === sk && e.status === 'migrated'); });
-                    allEntries.push(_journalEntry(failedNow, sk, '<batch>', -1, registry[sk].targetVersion, 'failed', [], '', 'BACKEND_REJECTED', [String(err && err.message || err).slice(0, 200)]));
-                    anyFailed = true;
-                    anyMigrated = res.counts.migrated > 0 ? anyMigrated : anyMigrated; // keep prior flag from other stores
-                  });
-                }
-              });
-            });
-          })(KNOWN_STORES[i]);
-        }
-        return p.then(function () {
-          // Build report status
-          var status;
-          if (anyFailed) status = 'halted';
-          else if (anyRejected && anyMigrated) status = 'partial';
-          else if (anyRejected && !anyMigrated && !anyWrites) status = 'partial';
-          else if (anyMigrated) status = 'complete';
-          else status = 'no-op';
-          var completedAt = _now(clock, stamp);
-          // Persist journal + state in ONE atomic transact on META store
-          return _readJournal().then(function (priorJournal) {
-            var compactedJournal = priorJournal.concat(allEntries);
-            var totalDropped = 0;
-            if (compactedJournal.length > MAX_JOURNAL) {
-              totalDropped = compactedJournal.length - MAX_JOURNAL;
-              compactedJournal = compactedJournal.slice(compactedJournal.length - MAX_JOURNAL);
-            }
-            var stateNext = {
-              schemaVersion: 1,
-              envelope: envelope(),
-              lastRunStartedAt: startedAt,
-              lastRunCompletedAt: completedAt,
-              lastRunStatus: status,
-              lastRunPerStore: perStoreOut,
-              lastRunJournalAppended: allEntries.length,
-              lifetimeJournalDropped: ((st && _isPlainObject(st) && typeof st.lifetimeJournalDropped === 'number') ? st.lifetimeJournalDropped : 0) + totalDropped
-            };
-            return backend.transact({
-              stores: [META],
-              reads: [],
-              compute: function () {
-                return {
-                  writes: [
-                    { store: META, key: JOURNAL_KEY, value: compactedJournal },
-                    { store: META, key: STATE_KEY,   value: stateNext }
-                  ],
-                  result: { journalLen: compactedJournal.length, dropped: totalDropped }
-                };
-              }
-            }).then(function (r) {
-              return ENV.deepFreeze({
-                ok: status !== 'halted',
-                report: ENV.deepFreeze({
-                  startedAt: startedAt,
-                  completedAt: completedAt,
-                  status: status,
-                  perStore: perStoreOut,
-                  journalAppended: allEntries.length,
-                  journalLen: r.journalLen,
-                  lifetimeJournalDropped: stateNext.lifetimeJournalDropped,
-                  envelope: envelope()
-                })
-              });
-            }, function (err) {
+        // F1-R1-07: prior lifetimeJournalDropped must be a non-negative safe integer.
+        var priorDropped = 0;
+        if (st && _isPlainObject(st)) {
+          if (st.lifetimeJournalDropped !== undefined) {
+            if (!_NumberIsSafeInteger(st.lifetimeJournalDropped) || st.lifetimeJournalDropped < 0) {
               return ENV.deepFreeze({
                 ok: false,
-                reasonCode: 'BACKEND_REJECTED',
-                report: ENV.deepFreeze({
-                  startedAt: startedAt,
-                  completedAt: _now(clock, stamp),
-                  status: 'halted',
-                  perStore: perStoreOut,
-                  journalAppended: 0,
-                  metaWriteError: String(err && err.message || err).slice(0, 200)
-                })
+                reasonCode: 'ENVELOPE_VERSION_MISMATCH',
+                report: ENV.deepFreeze({ status: 'halted', startedAt: startedAt, perStore: {}, journalAppended: 0, stateViolation: 'lifetimeJournalDropped_invalid' })
               });
+            }
+            priorDropped = st.lifetimeJournalDropped;
+          }
+        }
+        // F1-R1-05: preflight journal capacity. Sum records across stores; if total > overflow
+        // threshold, HALT before any mutation.
+        var listP = [];
+        for (var i = 0; i < KNOWN_STORES.length; i++) {
+          (function (sk) {
+            listP.push(backend.list(sk).then(function (rows) { return _ArrayIsArray(rows) ? rows.length : 0; }, function () { return 0; }));
+          })(KNOWN_STORES[i]);
+        }
+        return Promise.all(listP).then(function (counts) {
+          var totalRecords = 0;
+          for (var j = 0; j < counts.length; j++) totalRecords += counts[j];
+          if (totalRecords > MAX_JOURNAL * JOURNAL_OVERFLOW_FACTOR) {
+            return ENV.deepFreeze({
+              ok: false,
+              reasonCode: 'JOURNAL_OVERFLOW',
+              report: ENV.deepFreeze({ status: 'halted', startedAt: startedAt, perStore: {}, journalAppended: 0, totalRecordsObserved: totalRecords, journalCapacity: MAX_JOURNAL * JOURNAL_OVERFLOW_FACTOR })
             });
+          }
+          // Run per-store compute (no writes yet). Sequentially to keep journal ordering deterministic.
+          var perStoreResults = [];
+          var p = Promise.resolve();
+          for (var k = 0; k < KNOWN_STORES.length; k++) {
+            (function (sk) {
+              p = p.then(function () {
+                return _computeStoreWork(sk, _now(clock, stamp)).then(function (res) { perStoreResults.push(res); });
+              });
+            })(KNOWN_STORES[k]);
+          }
+          return p.then(function () { return _commit(perStoreResults, startedAt, priorDropped); });
+        });
+      });
+    }
+
+    function _commit(perStoreResults, startedAt, priorDropped) {
+      var allEntries = [];
+      var allWrites = [];
+      var perStoreOut = {};
+      var storesUsedForWrites = {};
+      var anyMigrated = false, anyRejected = false, anyFailed = false;
+      for (var i = 0; i < perStoreResults.length; i++) {
+        var r = perStoreResults[i];
+        perStoreOut[r.storeKey] = r.counts;
+        for (var j = 0; j < r.entries.length; j++) allEntries.push(r.entries[j]);
+        for (var w = 0; w < r.writes.length; w++) { allWrites.push(r.writes[w]); storesUsedForWrites[r.writes[w].store] = true; }
+        if (r.counts.migrated > 0) anyMigrated = true;
+        if (r.counts.rejected > 0) anyRejected = true;
+        if (r.counts.failed > 0) anyFailed = true;
+      }
+      var status;
+      if (anyFailed) status = 'halted';
+      else if (anyMigrated && anyRejected) status = 'partial';
+      else if (anyMigrated) status = 'complete';
+      else if (anyRejected) status = 'partial';
+      else status = 'no-op';
+      var completedAt = _now(clock, stamp);
+
+      // F1-R1-04: idempotency — pure no-op runs (no migrations, no rejections, no failures) do
+      // NOT touch META. The state.lastRunPerStore counters still live in the previous state.json
+      // mirror; downstream auditors can re-derive presence-only counts from backend.list() instead.
+      if (status === 'no-op' && allWrites.length === 0 && allEntries.length === 0) {
+        return ENV.deepFreeze({
+          ok: true,
+          report: ENV.deepFreeze({
+            startedAt: startedAt,
+            completedAt: completedAt,
+            status: 'no-op',
+            perStore: perStoreOut,
+            journalAppended: 0,
+            envelope: envelope(),
+            idempotentSkipped: true
+          })
+        });
+      }
+
+      // Read prior journal, append new entries, compact, build state.
+      return _readJournal().then(function (priorJournal) {
+        var compactedJournal = priorJournal.concat(allEntries);
+        var totalDropped = 0;
+        if (compactedJournal.length > MAX_JOURNAL) {
+          totalDropped = compactedJournal.length - MAX_JOURNAL;
+          compactedJournal = compactedJournal.slice(compactedJournal.length - MAX_JOURNAL); // keep newest
+        }
+        var stateNext = {
+          schemaVersion: 1,
+          envelope: envelope(),
+          lastRunStartedAt: startedAt,
+          lastRunCompletedAt: completedAt,
+          lastRunStatus: status,
+          lastRunPerStore: perStoreOut,
+          lastRunJournalAppended: allEntries.length,
+          lifetimeJournalDropped: priorDropped + totalDropped
+        };
+
+        // F1-R1-03: ALL writes (data store writes + META journal + META state) commit in ONE
+        // atomic backend.transact() across all stores used + META. Either everything lands or
+        // nothing does. No half-applied migration without an audit row; no audit row without data.
+        var storesList = _ObjectKeys(storesUsedForWrites);
+        storesList.push(META);
+        var allWritesCombined = allWrites.slice();
+        allWritesCombined.push({ store: META, key: JOURNAL_KEY, value: compactedJournal });
+        allWritesCombined.push({ store: META, key: STATE_KEY,   value: stateNext });
+
+        return backend.transact({
+          stores: storesList,
+          reads: [],
+          compute: function () {
+            return {
+              writes: allWritesCombined,
+              result: { journalLen: compactedJournal.length, dropped: totalDropped, dataWrites: allWrites.length }
+            };
+          }
+        }).then(function (r) {
+          // F1-R1-10: validate return shape strictly.
+          if (!_isPlainObject(r) || !_NumberIsSafeInteger(r.journalLen) || r.journalLen < 0 ||
+              !_NumberIsSafeInteger(r.dropped) || r.dropped < 0 || !_NumberIsSafeInteger(r.dataWrites) || r.dataWrites < 0) {
+            return ENV.deepFreeze({
+              ok: false,
+              reasonCode: 'BACKEND_REJECTED',
+              report: ENV.deepFreeze({
+                startedAt: startedAt,
+                completedAt: _now(clock, stamp),
+                status: 'halted',
+                perStore: perStoreOut,
+                journalAppended: 0,
+                metaWriteError: 'transact_returned_invalid_shape'
+              })
+            });
+          }
+          return ENV.deepFreeze({
+            ok: status !== 'halted',
+            report: ENV.deepFreeze({
+              startedAt: startedAt,
+              completedAt: completedAt,
+              status: status,
+              perStore: perStoreOut,
+              journalAppended: allEntries.length,
+              journalLen: r.journalLen,
+              lifetimeJournalDropped: stateNext.lifetimeJournalDropped,
+              envelope: envelope()
+            })
+          });
+        }, function (err) {
+          // F1-R1-03: atomic transact failed → NOTHING was written. No data, no journal, no state.
+          return ENV.deepFreeze({
+            ok: false,
+            reasonCode: 'BACKEND_REJECTED',
+            report: ENV.deepFreeze({
+              startedAt: startedAt,
+              completedAt: _now(clock, stamp),
+              status: 'halted',
+              perStore: perStoreOut,
+              journalAppended: 0,
+              metaWriteError: String(err && err.message || err).slice(0, 200)
+            })
           });
         });
       });
@@ -602,7 +725,8 @@
     PER_STORE_TARGETS:     ENV.PER_STORE_TARGETS,
     REASON_CODES:          ENV.REASON_CODES,
     STATUS_VALUES:         ENV.STATUS_VALUES,
-    REPORT_STATUS_VALUES:  ENV.REPORT_STATUS_VALUES
+    REPORT_STATUS_VALUES:  ENV.REPORT_STATUS_VALUES,
+    PRODUCER_ATTESTATION_FIELDS: _ObjectKeys(PRODUCER_ATTESTATION_FIELDS).sort()
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

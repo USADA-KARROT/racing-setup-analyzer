@@ -14,8 +14,10 @@
  *     - status ∈ { migrated, no-op, rejected, failed }.
  *     - reasonCode populated when status ∈ { rejected, failed } (closed enum).
  *     - limitations carry honest deferred / partial / un-validated observations (never weakening).
- *     - recordHash is a stable SHA-256-like (we use a deterministic FNV-1a fallback when SubtleCrypto is
- *       unavailable, e.g. Node test runner) over JSON.stringify(record) at the post-migration state.
+ *     - recordHash is a NON-CRYPTOGRAPHIC deterministic FNV-1a-64 fingerprint over JSON.stringify(record)
+ *       at the post-migration state. Prefixed with 'fnv1a64:' so auditors cannot mistake it for a
+ *       tamper-proof signature. Useful for equality checks WITHIN one repository's audit history;
+ *       NOT collision-resistant under adversarial input. Authority is NEVER derived from this hash.
  *
  *   MigrationPlan — frozen { generatedAt, currentVersions: {...}, targetVersions: {...},
  *                            steps: [...], blockers: [...] }.
