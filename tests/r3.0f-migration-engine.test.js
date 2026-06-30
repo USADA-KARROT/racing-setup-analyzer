@@ -1434,7 +1434,12 @@ function _r13Probe(label, returnedRecord) {
       })
       .then(function (j) {
         var entry = j.filter(function (e) { return e.store === 'cases'; })[0];
-        chk(label + ': journal reasonCode=POST_MIGRATION_INVALID', entry && entry.reasonCode === 'POST_MIGRATION_INVALID');
+        // F1-R14-01: NaN/Infinity now sanitized out at _isJsonSafe (reason RECORD_CIRCULAR);
+        // other invalid-version variants still go through the post-migration schemaVersion check
+        // (reason POST_MIGRATION_INVALID). Both are valid fail-closed codes — test accepts either.
+        var validReasons = ['POST_MIGRATION_INVALID', 'RECORD_CIRCULAR'];
+        chk(label + ': journal reasonCode in {POST_MIGRATION_INVALID, RECORD_CIRCULAR} (got ' + (entry && entry.reasonCode) + ')',
+            entry && validReasons.indexOf(entry.reasonCode) !== -1);
       });
   });
 }
@@ -1445,6 +1450,77 @@ _r13Probe('schemaVersion=1.5 fractional', { schemaVersion: 1.5, caseId: 'c1' });
 _r13Probe('schemaVersion="1" string', { schemaVersion: '1', caseId: 'c1' });
 _r13Probe('schemaVersion missing (undefined)', { caseId: 'c1' });
 _r13Probe('schemaVersion=NaN', { schemaVersion: NaN, caseId: 'c1' });
+
+// F1-R14-01: JSON-safety walker rejects BigInt / Date / Map / Set / typed-array values BEFORE
+// JSON.stringify, so ambient toJSON hooks (BigInt.prototype.toJSON, Date.prototype.toJSON, etc.)
+// cannot fire and corrupt the persisted record.
+asyncCase('F1-R14-01: migrator output containing BigInt rejected; BigInt.prototype.toJSON never fires', function () {
+  var fired = 0;
+  var orig = BigInt.prototype.toJSON;
+  BigInt.prototype.toJSON = function () { fired++; return 'coerced'; };
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, big: 1n, x: 1 }, migrations: ['delta'] };
+  } } };
+  return b.put('cases', 'cR14a', { schemaVersion: 1, caseId: 'cR14a' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) {
+      BigInt.prototype.toJSON = orig;
+      chk('BigInt.prototype.toJSON NOT invoked (fired=0)', fired === 0);
+      chk('migrator-output-with-BigInt → failed', r.report.perStore.cases.failed === 1);
+      chk('migrated=0', r.report.perStore.cases.migrated === 0);
+      return b.get('cases', 'cR14a');
+    })
+    .then(function (rec) {
+      chk('source record untouched (no "big" key)', rec && rec.big === undefined);
+    }, function (e) {
+      BigInt.prototype.toJSON = orig;
+      chk('did not throw', false, { error: String(e && e.message) });
+    });
+});
+
+asyncCase('F1-R14-01: source record containing BigInt rejected; toJSON never fires', function () {
+  var fired = 0;
+  var orig = BigInt.prototype.toJSON;
+  BigInt.prototype.toJSON = function () { fired++; return 'coerced'; };
+  var b = SB.MemoryBackend();
+  return b.put('cases', 'cR14b', { schemaVersion: 1, caseId: 'cR14b', big: 1n })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) {
+      BigInt.prototype.toJSON = orig;
+      chk('source-with-BigInt → rejected', r.report.perStore.cases.rejected === 1);
+      chk('BigInt.prototype.toJSON NOT invoked', fired === 0);
+    }, function (e) {
+      BigInt.prototype.toJSON = orig;
+      chk('did not throw', false, { error: String(e && e.message) });
+    });
+});
+
+asyncCase('F1-R14-01: source record containing Date rejected; Date.prototype.toJSON never fires', function () {
+  var fired = 0;
+  var orig = Date.prototype.toJSON;
+  Date.prototype.toJSON = function () { fired++; return 'pwned'; };
+  var b = SB.MemoryBackend();
+  return b.put('cases', 'cR14c', { schemaVersion: 1, caseId: 'cR14c', dt: new Date('2026-01-01') })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) {
+      Date.prototype.toJSON = orig;
+      chk('source-with-Date → rejected', r.report.perStore.cases.rejected === 1);
+      chk('Date.prototype.toJSON NOT invoked', fired === 0);
+    }, function (e) {
+      Date.prototype.toJSON = orig;
+      chk('did not throw', false, { error: String(e && e.message) });
+    });
+});
+
+asyncCase('F1-R14-01 negative: legitimate ASCII-only record with nested object still no-op', function () {
+  var b = SB.MemoryBackend();
+  return b.put('cases', 'cR14d', { schemaVersion: 1, caseId: 'cR14d', metadata: { title: 'X', vehicle: 'V' }, analysisResults: { lapAuthority: 'ref' } })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) {
+      chk('legitimate plain-JSON record no-op', r.report.perStore.cases.noop === 1 && r.report.perStore.cases.rejected === 0);
+    });
+});
 
 asyncCase('F1-R13-01 negative: legitimate at-target migration still works', function () {
   var b = SB.MemoryBackend();

@@ -295,9 +295,40 @@
     return 'fnv1a64:' + a + b;
   }
 
-  // F1-R1-02: structured-clone-only firewall. If structuredClone is unavailable OR throws on the
-  // input, the record is REJECTED. We never JSON-stringify the original object (that would invoke
-  // attacker-controlled toJSON traps).
+  // F1-R14-01: JSON-safety walker. structuredClone preserves Date/BigInt/Map/Set/RegExp etc., and
+  // JSON.stringify on those would invoke ambient toJSON hooks (e.g. BigInt.prototype.toJSON).
+  // Walk the structuredCloned value BEFORE JSON.stringify and reject any non-plain-JSON value.
+  // Returns true iff the value is purely null / string / number / boolean / plain object / array.
+  // Note: undefined is rejected here because JSON would silently strip it; callers receive a
+  // sanitize-fail and journal the record as RECORD_CIRCULAR.
+  function _isJsonSafe(v, depth) {
+    if (depth === undefined) depth = 0;
+    if (depth > 256) return false; // bounded depth
+    if (v === null) return true;
+    var t = typeof v;
+    if (t === 'string' || t === 'boolean') return true;
+    if (t === 'number') return _isFinite(v); // reject NaN/Infinity (JSON would coerce to null)
+    if (t === 'undefined' || t === 'function' || t === 'symbol' || t === 'bigint') return false;
+    if (t !== 'object') return false;
+    if (_ArrayIsArray(v)) {
+      for (var i = 0; i < v.length; i++) if (!_isJsonSafe(v[i], depth + 1)) return false;
+      return true;
+    }
+    // Reject anything whose prototype is not Object.prototype (Date / Map / Set / RegExp /
+    // ArrayBuffer / typed arrays / Promise / etc.). Plain JSON-safe records must use
+    // Object.prototype only.
+    var proto = Object.getPrototypeOf(v);
+    if (proto !== null && proto !== Object.prototype) return false;
+    var keys = _ObjectKeys(v);
+    for (var j = 0; j < keys.length; j++) if (!_isJsonSafe(v[keys[j]], depth + 1)) return false;
+    return true;
+  }
+
+  // F1-R1-02 / F1-R14-01: structured-clone-only firewall + JSON-safety walker. If structuredClone
+  // is unavailable OR throws on the input, the record is REJECTED. We then walk the cloned tree
+  // and reject any non-plain-JSON value (BigInt / Date / Map / Set / typed array / function /
+  // symbol / NaN / Infinity / non-plain prototype). Only THEN do we JSON.stringify, which is now
+  // proven trap-free because no toJSON hook is reachable.
   function _sanitize(rec, maxBytes) {
     if (rec === null || rec === undefined) return { ok: false, reason: 'RECORD_NOT_AN_OBJECT' };
     if (typeof rec !== 'object') return { ok: false, reason: 'RECORD_NOT_AN_OBJECT' };
@@ -305,10 +336,10 @@
     if (!_StructuredClone) return { ok: false, reason: 'PROXY_INPUT_REJECTED' }; // refuse without structured clone
     var cloned;
     try { cloned = _StructuredClone(rec); } catch (_) { return { ok: false, reason: 'PROXY_INPUT_REJECTED' }; }
-    // structuredClone preserves Maps/Sets/Dates/typed arrays which we don't want in storage; force a
-    // JSON round-trip on the CLONED value (toJSON cannot be a Proxy trap because cloned has no
-    // prototype chain to the original; even if a clone-preserved Date is involved, JSON.stringify
-    // on it just produces an ISO string — acceptable).
+    // F1-R14-01: pre-validate the cloned tree is purely JSON-safe (no BigInt/Date/Map/Set/typed
+    // arrays/Symbol/Function/NaN/Infinity/non-plain prototypes). Reject before JSON.stringify so
+    // no toJSON hook is reachable.
+    if (!_isJsonSafe(cloned)) return { ok: false, reason: 'RECORD_CIRCULAR' };
     var serialized;
     try { serialized = _JSONStringify(cloned); } catch (_) { return { ok: false, reason: 'RECORD_CIRCULAR' }; }
     if (typeof serialized !== 'string') return { ok: false, reason: 'RECORD_CIRCULAR' };
@@ -392,6 +423,9 @@
     }
   }
 
+  // F1-R14-01: same JSON-safety walker applies here too. structuredClone may preserve BigInt,
+  // Date, etc.; JSON.stringify would invoke their toJSON. Reject unsafe values BEFORE serialize.
+  // null on unsafe → callers fail-closed (TOCTOU comparisons against valid hashes will not match).
   function _sanitizedHash(v) {
     if (v === undefined) v = null;
     var cloned;
@@ -400,6 +434,8 @@
       else if (typeof v !== 'object') cloned = v;
       else cloned = _StructuredClone(v);
     } catch (_) { return null; }
+    if (cloned !== null && typeof cloned === 'object' && !_isJsonSafe(cloned)) return null;
+    if (typeof cloned !== 'object' && cloned !== null && typeof cloned !== 'string' && typeof cloned !== 'number' && typeof cloned !== 'boolean') return null;
     var s;
     try { s = _JSONStringify(cloned); } catch (_) { return null; }
     return typeof s === 'string' ? _hash(s) : null;
