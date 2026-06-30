@@ -100,7 +100,9 @@ try {
   // ONLY. Configuration loading via --config <path> is rejected as it loads arbitrary JS.
   var ALLOWED_SEGMENT_PATTERNS = [
     /^electron-builder(?:\s+--(?:mac|linux|win|x64|arm64|ia32|dir|publish=never))*\s*$/,
-    /^electron(\s+\.|\s*$)/
+    // F3-R22-01 closure: anchor `electron` pattern at end-of-line. Only `electron .` or
+    // `electron` (no args) accepted. Reject trailing flags like --remote-debugging-port.
+    /^electron(?:\s+\.)?\s*$/
   ];
   function _segmentAllowed(seg) {
     seg = seg.trim();
