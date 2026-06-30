@@ -253,19 +253,89 @@
     var iso = null;
     if (typeof snap.referenceNowMs === 'number') {
       refMs = snap.referenceNowMs;
-      iso = new Date(refMs).toISOString();
+      // Codex E4-R1-02 closure: always canonicalize via Date.toISOString to neutralize
+      // any non-canonical input formats.
+      try { iso = new Date(refMs).toISOString(); } catch (e) { iso = null; }
     } else if (typeof snap.clock === 'function') {
       var ciso = null;
       try { ciso = snap.clock(); } catch (e) { ciso = null; }
       if (typeof ciso === 'string' && ciso.length > 0) {
         var ms = _isoToMs(ciso);
-        if (typeof ms === 'number') { refMs = ms; iso = ciso; }
+        if (typeof ms === 'number') {
+          refMs = ms;
+          // Codex E4-R1-02 closure: canonicalize clock string output. Parseable but
+          // non-canonical strings ("30 Jun 2026") would otherwise persist verbatim
+          // into createdAt fields. Storing only `new Date(ms).toISOString()` ensures
+          // every persisted timestamp is a canonical ISO 8601 string.
+          try { iso = new Date(ms).toISOString(); } catch (e) { iso = null; }
+        }
       }
     }
-    if (typeof refMs !== 'number' || refMs !== refMs) {
+    if (typeof refMs !== 'number' || refMs !== refMs || iso === null) {
       return { valid: false, reasonCodes: [CODES.TIMELINE_INVALID], detail: 'cannot resolve clock' };
     }
     return { valid: true, refMs: refMs, iso: iso };
+  }
+
+  // ---------- E4 timeline-event params validator (shared by append + project) ---------------
+  // Codex E4-R1-01 closure: projectTimeline MUST re-apply the SAME primitive allowlist
+  // used by appendTimelineEvent. The E1 contract is structurally permissive (params
+  // accepts any plain object); the E4 service layer adds the strict allowlist. A
+  // corrupted stored event with hostile params must NOT survive into an authoritative
+  // projection.
+  function _validateEventParams(params) {
+    if (params === null || params === undefined) return { valid: true, value: null };
+    if (!_isOriginalPlainObject(params)) return { valid: false, code: 'params not plain' };
+    if (_hasSymbolOwnKey(params)) return { valid: false, code: 'params has Symbol key' };
+    var names;
+    try { names = _CAPTURED_OBJECT_GET_OWN_NAMES(params); }
+    catch (e) { return { valid: false, code: 'params desc fail' }; }
+    if (names.length > 16) return { valid: false, code: 'params keys exceed cap' };
+    var rebuilt = {};
+    for (var pi = 0; pi < names.length; pi++) {
+      var pk = names[pi];
+      // 'correction_of' is the canonical reserved key — its value is a strict id.
+      var keyOk = /^[a-z][a-z0-9_]{0,31}$/.test(pk);
+      if (!keyOk) return { valid: false, code: 'params key not sober: ' + pk };
+      var pd;
+      try { pd = _CAPTURED_OBJECT_GET_OWN_DESC(params, pk); }
+      catch (e) { return { valid: false, code: 'params desc fail at ' + pk }; }
+      if (!pd || pd.enumerable !== true) return { valid: false, code: 'params non-enum at ' + pk };
+      if (typeof pd.get === 'function' || typeof pd.set === 'function') {
+        return { valid: false, code: 'params accessor at ' + pk };
+      }
+      var pv = pd.value;
+      if (pv === null) {
+        // allowed
+      } else if (typeof pv === 'boolean') {
+        // allowed
+      } else if (typeof pv === 'number') {
+        if (!_isFiniteNumber(pv)) return { valid: false, code: 'params[' + pk + '] not finite' };
+      } else if (typeof pv === 'string') {
+        if (!_i18nKeyOk(pv) && !_idGrammarOk(pv)) {
+          return { valid: false, code: 'params[' + pk + '] string not strict i18n key / id' };
+        }
+      } else {
+        return { valid: false, code: 'params[' + pk + '] not primitive (string/number/boolean/null)' };
+      }
+      try {
+        _CAPTURED_OBJECT_DEFINE_PROPERTY(rebuilt, pk, { value: pv, writable: true, enumerable: true, configurable: true });
+      } catch (e) {
+        return { valid: false, code: 'params rebuild failed at ' + pk };
+      }
+      // Codex E4-R1-03 / E3-R4-01 closure pattern: re-read descriptor and verify value
+      // identity with Object.is. Defeats pre-load defineProperty poisoning.
+      var dCheck;
+      try { dCheck = _CAPTURED_OBJECT_GET_OWN_DESC(rebuilt, pk); }
+      catch (e) { return { valid: false, code: 'params re-read fail' }; }
+      if (!dCheck || dCheck.enumerable !== true || typeof dCheck.get === 'function' || typeof dCheck.set === 'function') {
+        return { valid: false, code: 'params post-define corrupt at ' + pk };
+      }
+      var same = false;
+      try { same = _CAPTURED_OBJECT_IS(dCheck.value, pv) === true; } catch (e) { same = false; }
+      if (!same) return { valid: false, code: 'params post-define value mismatch at ' + pk };
+    }
+    return { valid: true, value: rebuilt };
   }
 
   // ---------- Factory: createFollowUpTimelineService ----------------------------------------
@@ -403,62 +473,11 @@
         return Promise.resolve(_block([CODES.TIMELINE_INVALID], 'kind not in closed enum: ' + i.kind));
       }
       if (!_i18nKeyOk(i.i18nKey)) return Promise.resolve(_block([CODES.TIMELINE_INVALID], 'i18nKey not strict i18n key'));
-      // Params: optional, must be plain primitive map (number/boolean/null) or null
-      var rebuiltParams = null;
-      if (i.params !== undefined && i.params !== null) {
-        if (!_isOriginalPlainObject(i.params)) return Promise.resolve(_block([CODES.TIMELINE_INVALID], 'params not plain'));
-        if (_hasSymbolOwnKey(i.params)) return Promise.resolve(_block([CODES.TIMELINE_INVALID, CODES.UNKNOWN_OWN_KEY], 'params has Symbol key'));
-        var pNames;
-        try { pNames = _CAPTURED_OBJECT_GET_OWN_NAMES(i.params); }
-        catch (e) { return Promise.resolve(_block([CODES.TIMELINE_INVALID], 'params desc fail')); }
-        if (pNames.length > 16) return Promise.resolve(_block([CODES.TIMELINE_INVALID, CODES.ARRAY_CAP_EXCEEDED], 'params keys exceed cap'));
-        rebuiltParams = {};
-        for (var pi = 0; pi < pNames.length; pi++) {
-          var pk = pNames[pi];
-          if (!/^[a-z][a-z0-9_]{0,31}$/.test(pk)) {
-            return Promise.resolve(_block([CODES.TIMELINE_INVALID], 'params key not sober: ' + pk));
-          }
-          var pd;
-          try { pd = _CAPTURED_OBJECT_GET_OWN_DESC(i.params, pk); }
-          catch (e) { return Promise.resolve(_block([CODES.TIMELINE_INVALID], 'params desc fail at ' + pk)); }
-          if (!pd || pd.enumerable !== true) return Promise.resolve(_block([CODES.TIMELINE_INVALID], 'params non-enum at ' + pk));
-          if (typeof pd.get === 'function' || typeof pd.set === 'function') {
-            return Promise.resolve(_block([CODES.TIMELINE_INVALID], 'params accessor at ' + pk));
-          }
-          var pv = pd.value;
-          if (pv === null) {
-            // allowed
-          } else if (typeof pv === 'boolean') {
-            // allowed
-          } else if (typeof pv === 'number') {
-            if (!_isFiniteNumber(pv)) return Promise.resolve(_block([CODES.TIMELINE_INVALID], 'params[' + pk + '] not finite'));
-          } else if (typeof pv === 'string') {
-            // String allowed ONLY if it's a strict i18n key OR a strict id (event reference).
-            if (!_i18nKeyOk(pv) && !_idGrammarOk(pv)) {
-              return Promise.resolve(_block([CODES.TIMELINE_INVALID], 'params[' + pk + '] string not strict i18n key / id'));
-            }
-          } else {
-            return Promise.resolve(_block([CODES.TIMELINE_INVALID], 'params[' + pk + '] not primitive (string/number/boolean/null)'));
-          }
-          try {
-            _CAPTURED_OBJECT_DEFINE_PROPERTY(rebuiltParams, pk, { value: pv, writable: true, enumerable: true, configurable: true });
-          } catch (e) {
-            return Promise.resolve(_block([CODES.TIMELINE_INVALID], 'params rebuild failed at ' + pk));
-          }
-          // Post-define value-equality re-read (E3-R4-01 closure pattern)
-          var dCheck;
-          try { dCheck = _CAPTURED_OBJECT_GET_OWN_DESC(rebuiltParams, pk); }
-          catch (e) { return Promise.resolve(_block([CODES.TIMELINE_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], 'params re-read fail')); }
-          if (!dCheck || dCheck.enumerable !== true || typeof dCheck.get === 'function' || typeof dCheck.set === 'function') {
-            return Promise.resolve(_block([CODES.TIMELINE_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], 'params post-define corrupt at ' + pk));
-          }
-          var same = false;
-          try { same = _CAPTURED_OBJECT_IS(dCheck.value, pv) === true; } catch (e) { same = false; }
-          if (!same) {
-            return Promise.resolve(_block([CODES.TIMELINE_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], 'params post-define value mismatch at ' + pk));
-          }
-        }
-      }
+      // Codex E4-R1-01/03 closure: delegate params validation to the shared E4 helper
+      // which applies the primitive allowlist AND the post-define value-equality re-read.
+      var pvR = _validateEventParams(i.params);
+      if (pvR.valid !== true) return Promise.resolve(_block([CODES.TIMELINE_INVALID], 'params: ' + pvR.code));
+      var rebuiltParams = pvR.value;
       // Correction event: correctionOf must be an existing event id (validated grammar)
       // OR null/undefined. The store layer enforces append-only — the original event is
       // never modified.
@@ -474,11 +493,28 @@
       return timelineStore.getTimeline(i.caseId).then(function (existing) {
         var existingEvents = (existing && _isArraySafe(existing.events)) ? existing.events : [];
         var sequence = existingEvents.length;
-        // Clock monotonicity check at the service layer (defence-in-depth; E2 also enforces).
+        // Codex E4-R1-05 closure: STRICT monotonicity. The E1 contract spec is monotonic
+        // by createdAt; equal-timestamp appends are ambiguous (the deterministic eventId
+        // is derived from sequence which IS unique, but two events at the same ms can
+        // still mask the ordering on reload). Reject refMs <= prev so every event is
+        // strictly later than the previous.
         if (existingEvents.length > 0) {
           var prevMs = _isoToMs(existingEvents[existingEvents.length - 1].createdAt);
-          if (prevMs !== null && ck.refMs < prevMs) {
-            return _block([CODES.TIMELINE_ORDERING_INVALID], 'clock rollback: refMs ' + ck.refMs + ' < prev ' + prevMs);
+          if (prevMs !== null && ck.refMs <= prevMs) {
+            return _block([CODES.TIMELINE_ORDERING_INVALID], 'clock not strictly monotonic: refMs ' + ck.refMs + ' <= prev ' + prevMs);
+          }
+        }
+
+        // Codex E4-R1-04 closure: correctionOf MUST reference an existing event id in
+        // THIS case's timeline. Otherwise a caller could correct a non-existent event,
+        // leaving an orphaned reference in the persisted timeline.
+        if (i.correctionOf !== undefined && i.correctionOf !== null) {
+          var found = false;
+          for (var ei = 0; ei < existingEvents.length; ei++) {
+            if (existingEvents[ei].eventId === i.correctionOf) { found = true; break; }
+          }
+          if (!found) {
+            return _block([CODES.TIMELINE_INVALID], 'correctionOf references non-existent event: ' + i.correctionOf);
           }
         }
 
@@ -495,6 +531,18 @@
             _CAPTURED_OBJECT_DEFINE_PROPERTY(finalParams, 'correction_of', { value: i.correctionOf, writable: true, enumerable: true, configurable: true });
           } catch (e) {
             return _block([CODES.TIMELINE_INVALID], 'correctionOf injection failed');
+          }
+          // Codex E4-R1-03 closure: post-define value-equality re-read for correction_of.
+          var dCO;
+          try { dCO = _CAPTURED_OBJECT_GET_OWN_DESC(finalParams, 'correction_of'); }
+          catch (eRR) { return _block([CODES.TIMELINE_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], 'correction_of re-read fail'); }
+          if (!dCO || dCO.enumerable !== true || typeof dCO.get === 'function' || typeof dCO.set === 'function') {
+            return _block([CODES.TIMELINE_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], 'correction_of post-define corrupt');
+          }
+          var coSame = false;
+          try { coSame = _CAPTURED_OBJECT_IS(dCO.value, i.correctionOf) === true; } catch (eRR2) { coSame = false; }
+          if (!coSame) {
+            return _block([CODES.TIMELINE_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], 'correction_of post-define value mismatch');
           }
         }
         var event = {
@@ -551,13 +599,20 @@
           if (!_idGrammarOk(er.snapshot.eventId)) return _block([CODES.TIMELINE_INVALID], 'event ' + i + ' eventId invalid');
           if (_arrIndexOf(EVENT_KIND_ALLOWED, er.snapshot.kind) === -1) return _block([CODES.TIMELINE_INVALID], 'event ' + i + ' kind invalid');
           if (!_i18nKeyOk(er.snapshot.i18nKey)) return _block([CODES.TIMELINE_INVALID], 'event ' + i + ' i18nKey invalid');
-          // Re-freeze a service-owned copy of the event.
+          // Codex E4-R1-01 closure: apply the SAME primitive allowlist to stored params
+          // that appendTimelineEvent uses. A corrupted-storage event with hostile params
+          // (string blame, path, nested object, raw-telemetry array) must NOT pass through
+          // into an authoritative projection.
+          var pvR2 = _validateEventParams(er.snapshot.params);
+          if (pvR2.valid !== true) return _block([CODES.TIMELINE_INVALID], 'event ' + i + ' params: ' + pvR2.code);
+          // Re-freeze a service-owned copy of the event with REBUILT params (caller's
+          // reference dropped; outcome envelope carries only sanitized structure).
           var copy = {
             eventId: er.snapshot.eventId,
             kind: er.snapshot.kind,
             createdAt: er.snapshot.createdAt,
             i18nKey: er.snapshot.i18nKey,
-            params: er.snapshot.params,
+            params: pvR2.value,
           };
           _deepFreeze(copy);
           _arrPush(rebuiltEvents, copy);

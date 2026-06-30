@@ -194,17 +194,17 @@ console.log('Section G — Duplicate event rejection');
   var svc = mkService();
   var input = { caseId: CASE_A, kind: 'baseline_captured', i18nKey: 'r3.0e.tl.same' };
   var r1 = await svc.appendTimelineEvent(input, { clock: fixedClock('2026-06-30T11:00:00Z') });
-  // Second append at the SAME sequence index would produce same eventId (deterministic).
-  // But E2 sees existing events and rejects duplicate eventId. Actually our service
-  // computes sequence from existing.length so the second call would have sequence=1
-  // (different eventId). To force duplicate we need to call with custom logic... actually
-  // the deterministic eventId per (caseId, sequence, kind, i18nKey) means the second
-  // call with sequence=1 produces a different id, so no duplicate would happen here.
   chk('G1: first append valid', r1.valid === true);
-  // To genuinely test duplicate, manually call E2 store with same id
-  var r2 = await svc.appendTimelineEvent(input, { clock: fixedClock('2026-06-30T11:00:00Z') });
-  // Same input → sequence is now 1, so different eventId → no duplicate → valid
-  chk('G2: second append with same input but next sequence is valid', r2.valid === true && r1.event.eventId !== r2.event.eventId);
+  // Strict-monotonic gate (E4-R1-05 closure): the second append must have a STRICTLY
+  // later timestamp than the previous event. The deterministic eventId per
+  // (caseId, sequence, kind, i18nKey) means sequence=1 produces a different id.
+  var r2 = await svc.appendTimelineEvent(input, { clock: fixedClock('2026-06-30T11:00:01Z') });
+  chk('G2: second append with strictly later clock + same kind+key is valid',
+    r2.valid === true && r1.event.eventId !== r2.event.eventId);
+  // Same clock as previous → strict monotonic blocks it.
+  var r3 = await svc.appendTimelineEvent(input, { clock: fixedClock('2026-06-30T11:00:01Z') });
+  chk('G3: same-clock re-append → BLOCK TIMELINE_ORDERING_INVALID (strict monotonic)',
+    r3.valid !== true && (r3.reasonCodes || []).indexOf('TIMELINE_ORDERING_INVALID') !== -1);
 })();
 
 // ------------------------------------------------------------------
@@ -398,6 +398,130 @@ console.log('Section P — Cross-case timeline scope');
     pA.valid && pA.projection.eventCount === 1 && pA.projection.events[0].i18nKey === 'r3.0e.tl.a1');
   chk('P2: case B timeline contains only B events',
     pB.valid && pB.projection.eventCount === 1 && pB.projection.events[0].i18nKey === 'r3.0e.tl.b1');
+})();
+
+// ==================================================================
+// Section Q — Codex E4 R1 closures (E4-R1-01..05)
+// ==================================================================
+console.log('Section Q — Codex E4 R1 closures');
+
+// Q1 — E4-R1-01: projectTimeline applies E4 primitive allowlist to stored params
+(async function () {
+  // To simulate a corrupted stored event with hostile params, we go directly to the E2
+  // store and append an event whose params include a free-text string. Then projecting
+  // through the E4 service should BLOCK.
+  var be = SB.MemoryBackend();
+  var ts = STORES.createTimelineStore(be);
+  var svc = SVC.createFollowUpTimelineService({
+    timelineStore: ts,
+    followUpLinkStore: STORES.createFollowUpLinkStore(be),
+  });
+  // Directly append a hostile event via the store (bypassing the E4 service).
+  await ts.appendEvent(CASE_A, {
+    eventId: 'event_hostile_aaaa', kind: 'baseline_captured', createdAt: '2026-06-30T11:00:00Z',
+    i18nKey: 'r3.0e.tl.hostile', params: { blame: 'driver caused crash' },
+  });
+  var p = await svc.projectTimeline(CASE_A, { clock: fixedClock('2026-06-30T12:00:00Z') });
+  chk('Q1: projectTimeline rejects stored event with hostile params',
+    p.valid !== true && (p.reasonCodes || []).indexOf('TIMELINE_INVALID') !== -1,
+    p);
+})();
+
+// Q2 — E4-R1-01: projectTimeline rejects stored event with path string in params
+(async function () {
+  var be = SB.MemoryBackend();
+  var ts = STORES.createTimelineStore(be);
+  var svc = SVC.createFollowUpTimelineService({
+    timelineStore: ts,
+    followUpLinkStore: STORES.createFollowUpLinkStore(be),
+  });
+  await ts.appendEvent(CASE_A, {
+    eventId: 'event_hostile_bbbb', kind: 'baseline_captured', createdAt: '2026-06-30T11:00:00Z',
+    i18nKey: 'r3.0e.tl.x', params: { path: '/Users/skyline/leak.bmsbin' },
+  });
+  var p = await svc.projectTimeline(CASE_A, { clock: fixedClock('2026-06-30T12:00:00Z') });
+  chk('Q2: projectTimeline rejects stored event with path string in params',
+    p.valid !== true);
+})();
+
+// Q3 — E4-R1-01: projectTimeline rejects stored event with array params
+(async function () {
+  var be = SB.MemoryBackend();
+  var ts = STORES.createTimelineStore(be);
+  var svc = SVC.createFollowUpTimelineService({
+    timelineStore: ts,
+    followUpLinkStore: STORES.createFollowUpLinkStore(be),
+  });
+  await ts.appendEvent(CASE_A, {
+    eventId: 'event_hostile_cccc', kind: 'baseline_captured', createdAt: '2026-06-30T11:00:00Z',
+    i18nKey: 'r3.0e.tl.x', params: { raw: [1, 2, 3] },
+  });
+  var p = await svc.projectTimeline(CASE_A, { clock: fixedClock('2026-06-30T12:00:00Z') });
+  chk('Q3: projectTimeline rejects stored event with array params',
+    p.valid !== true);
+})();
+
+// Q4 — E4-R1-02: clock string canonicalization (non-ISO input → stored ISO)
+(async function () {
+  var svc = mkService();
+  // "30 Jun 2026 11:00:00 GMT" is Date.parseable but NOT ISO 8601 canonical.
+  var r = await svc.createFollowUpLink({
+    parentCaseId: CASE_A, followUpCaseId: CASE_B, experimentId: EXP_ID,
+  }, { clock: function () { return '30 Jun 2026 11:00:00 GMT'; } });
+  chk('Q4: non-canonical clock string accepted',
+    r.valid === true);
+  chk('Q4.canon: createdAt is canonical ISO',
+    r.valid === true && /^2026-06-30T11:00:00\.000Z$/.test(r.link.createdAt),
+    r.valid === true ? { createdAt: r.link.createdAt } : r);
+})();
+
+// Q5 — E4-R1-03: correction_of injection passes post-define value-equality
+// (This is implicit in existing I3 test passing — verifying via direct probe here:)
+(async function () {
+  var svc = mkService();
+  var orig = await svc.appendTimelineEvent({ caseId: CASE_A, kind: 'experiment_planned', i18nKey: 'r3.0e.tl.orig' },
+    { clock: fixedClock('2026-06-30T11:00:00Z') });
+  chk('Q5.setup: original event created', orig.valid === true);
+  var corr = await svc.appendTimelineEvent({
+    caseId: CASE_A, kind: 'experiment_abandoned', i18nKey: 'r3.0e.tl.correction',
+    correctionOf: orig.event.eventId,
+  }, { clock: fixedClock('2026-06-30T11:30:00Z') });
+  chk('Q5: correction_of stored unchanged',
+    corr.valid === true && corr.event.params.correction_of === orig.event.eventId);
+})();
+
+// Q6 — E4-R1-04: correctionOf MUST reference an existing event id
+(async function () {
+  var svc = mkService();
+  await svc.appendTimelineEvent({ caseId: CASE_A, kind: 'baseline_captured', i18nKey: 'r3.0e.tl.x' },
+    { clock: fixedClock('2026-06-30T11:00:00Z') });
+  var r = await svc.appendTimelineEvent({
+    caseId: CASE_A, kind: 'experiment_abandoned', i18nKey: 'r3.0e.tl.correction',
+    correctionOf: 'event_does_not_exist',
+  }, { clock: fixedClock('2026-06-30T11:30:00Z') });
+  chk('Q6: correctionOf referencing non-existent event → BLOCK TIMELINE_INVALID',
+    r.valid !== true && (r.reasonCodes || []).indexOf('TIMELINE_INVALID') !== -1);
+})();
+
+// Q7 — E4-R1-05: strict monotonic timestamp (equal ms → BLOCK)
+(async function () {
+  var svc = mkService();
+  await svc.appendTimelineEvent({ caseId: CASE_A, kind: 'baseline_captured', i18nKey: 'r3.0e.tl.first' },
+    { clock: fixedClock('2026-06-30T11:00:00Z') });
+  var r = await svc.appendTimelineEvent({ caseId: CASE_A, kind: 'experiment_planned', i18nKey: 'r3.0e.tl.second' },
+    { clock: fixedClock('2026-06-30T11:00:00Z') });
+  chk('Q7: equal-timestamp append → BLOCK TIMELINE_ORDERING_INVALID (strict monotonic)',
+    r.valid !== true && (r.reasonCodes || []).indexOf('TIMELINE_ORDERING_INVALID') !== -1);
+})();
+
+// Q8 — E4-R1-05 regression: strictly later still accepted
+(async function () {
+  var svc = mkService();
+  await svc.appendTimelineEvent({ caseId: CASE_A, kind: 'baseline_captured', i18nKey: 'r3.0e.tl.first' },
+    { clock: fixedClock('2026-06-30T11:00:00Z') });
+  var r = await svc.appendTimelineEvent({ caseId: CASE_A, kind: 'experiment_planned', i18nKey: 'r3.0e.tl.second' },
+    { clock: fixedClock('2026-06-30T11:00:00.001Z') });
+  chk('Q8: strictly later clock (+1ms) accepted', r.valid === true);
 })();
 
 // ------------------------------------------------------------------
