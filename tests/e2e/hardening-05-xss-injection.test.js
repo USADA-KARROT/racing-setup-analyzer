@@ -197,9 +197,13 @@ try {
     var srcName2 = allSources[j].name;
     var s = stripJsComments(rawSrc);
 
-    // (i) document.write / document.writeln
-    if (/document\.write\(/.test(s)) unsafeApis.push(srcName2 + ': document.write');
-    if (/document\.writeln\(/.test(s)) unsafeApis.push(srcName2 + ': document.writeln');
+    // F3-R7-03 closure: also detect computed-member equivalents (element['innerHTML'] = ...,
+    // document['write'](...), etc.).
+    // (i) document.write / document.writeln — both dot AND computed forms
+    if (/document\.write\s*\(/.test(s)) unsafeApis.push(srcName2 + ': document.write');
+    if (/document\.writeln\s*\(/.test(s)) unsafeApis.push(srcName2 + ': document.writeln');
+    if (/document\s*\[\s*['"`]write['"`]\s*\]\s*\(/.test(s)) unsafeApis.push(srcName2 + ': document["write"] (computed)');
+    if (/document\s*\[\s*['"`]writeln['"`]\s*\]\s*\(/.test(s)) unsafeApis.push(srcName2 + ': document["writeln"] (computed)');
 
     // (ii) new Function( with any non-pure-string-literal argument
     var nfMatches = s.match(/new\s+Function\s*\([^)]*\)/g) || [];
@@ -209,16 +213,32 @@ try {
       unsafeApis.push(srcName2 + ': new Function with non-literal arg → ' + nfMatches[nfi].slice(0, 60));
     }
 
-    // (iii) variable-RHS outerHTML assignment
+    // (iii) variable-RHS outerHTML/innerHTML assignment via dot OR computed access
     var lines2 = s.split(/\n/);
     for (var l2 = 0; l2 < lines2.length; l2++) {
       var line2 = lines2[l2];
+      // Dot form: .outerHTML = X
       var mO = line2.match(/\.outerHTML\s*=\s*(.+?)\s*[;)]/);
       if (mO) {
         var rhsO = mO[1].trim();
-        if (rhsO === "''" || rhsO === '""') continue;
-        if (/^['"`].*['"`]$/.test(rhsO)) continue;
-        unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' outerHTML = variable RHS');
+        if (!(rhsO === "''" || rhsO === '""' || /^['"`].*['"`]$/.test(rhsO))) {
+          unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' outerHTML = variable RHS');
+        }
+      }
+      // F3-R7-03: computed forms ['outerHTML'] and ['innerHTML']
+      var mOc = line2.match(/\[\s*['"`]outerHTML['"`]\s*\]\s*=\s*(.+?)\s*[;)]/);
+      if (mOc) {
+        var rhsOc = mOc[1].trim();
+        if (!(rhsOc === "''" || rhsOc === '""' || /^['"`].*['"`]$/.test(rhsOc))) {
+          unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' ["outerHTML"] = variable RHS (computed)');
+        }
+      }
+      var mIc = line2.match(/\[\s*['"`]innerHTML['"`]\s*\]\s*=\s*(.+?)\s*[;)]/);
+      if (mIc) {
+        var rhsIc = mIc[1].trim();
+        if (!(rhsIc === "''" || rhsIc === '""' || /^['"`].*['"`]$/.test(rhsIc))) {
+          unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' ["innerHTML"] = variable RHS (computed)');
+        }
       }
     }
 
@@ -271,27 +291,51 @@ try {
   // F3-R2-04 closure: HTML allows double-quoted, single-quoted, and unquoted attribute values.
   // The scan must match all three forms; otherwise a single-quoted unsafe `x-html='case.title'`
   // slips past. Use [\s\S] to handle multi-line attribute values.
+  // F3-R7-04 closure: do NOT treat arbitrary function calls as safe. Maintain an EXPLICIT
+  // allowlist of approved HTML-producing helpers. Generic identifiers like String(...) /
+  // JSON.stringify(...) / Object(...) are NOT safe because they could route user-controlled
+  // data into HTML. The current production renderer uses only: t, credBadge, tierBadge.
+  var SAFE_XHTML_HELPERS = ['t', 'credBadge', 'tierBadge'];
   var xHtmlPatterns = [
-    /x-html\s*=\s*"([\s\S]+?)"/g,    // double-quoted
-    /x-html\s*=\s*'([\s\S]+?)'/g,    // single-quoted
-    /x-html\s*=\s*([^\s>'"][^\s>]*)/g // unquoted (rare, but allowed by HTML)
+    /x-html\s*=\s*"([\s\S]+?)"/g,
+    /x-html\s*=\s*'([\s\S]+?)'/g,
+    /x-html\s*=\s*([^\s>'"][^\s>]*)/g
   ];
   var unsafeXHtml = [];
   var xHtmlCount = 0;
+  function isSafeHelperCall(expr) {
+    var m = expr.match(/^([a-zA-Z_$][\w$]*)\s*\(/);
+    if (!m) return false;
+    return SAFE_XHTML_HELPERS.indexOf(m[1]) !== -1;
+  }
   for (var xpi = 0; xpi < xHtmlPatterns.length; xpi++) {
     var pat = xHtmlPatterns[xpi];
     var m;
     while ((m = pat.exec(indexSrc)) !== null) {
       xHtmlCount++;
       var rhs = m[1].trim();
-      // Safe pattern: every x-html binding MUST be a function call into a named helper.
-      var safe = /^[a-zA-Z_$][\w$]*\s*\(/.test(rhs)
-              || /^['"`].*['"`]$/.test(rhs)
-              || /\?\s*[a-zA-Z_$][\w$]*\s*\(/.test(rhs);
+      // Acceptable shapes:
+      //   1. Direct call to an allowlisted helper: t(...) / credBadge(...) / tierBadge(...)
+      //   2. String literal (rare)
+      //   3. Ternary whose BOTH branches are either helper-calls or string literals
+      var safe = false;
+      if (/^['"`].*['"`]$/.test(rhs)) safe = true;
+      else if (isSafeHelperCall(rhs)) safe = true;
+      else {
+        // Ternary: cond ? lhs : rhs — accept ONLY if both lhs+rhs are helper-calls or literals.
+        var ternMatch = rhs.match(/^[\s\S]+?\?\s*([\s\S]+?)\s*:\s*([\s\S]+?)$/);
+        if (ternMatch) {
+          var lhs = ternMatch[1].trim();
+          var rhs2 = ternMatch[2].trim();
+          var lhsOk = isSafeHelperCall(lhs) || /^['"`].*['"`]$/.test(lhs);
+          var rhsOk = isSafeHelperCall(rhs2) || /^['"`].*['"`]$/.test(rhs2);
+          if (lhsOk && rhsOk) safe = true;
+        }
+      }
       if (!safe) unsafeXHtml.push(rhs.slice(0, 80));
     }
   }
-  chk('every x-html RHS (double/single/unquoted) is a function call, not a raw variable', unsafeXHtml.length === 0, { count: xHtmlCount, unsafe_examples: unsafeXHtml.slice(0, 3) });
+  chk('every x-html RHS is a call to an ALLOWLISTED helper (t/credBadge/tierBadge) or a string literal', unsafeXHtml.length === 0, { count: xHtmlCount, unsafe_examples: unsafeXHtml.slice(0, 3) });
 
   // Step 4: i18n interpolation safety — no `t('key', userValue)` shapes that re-template
   // (the existing tCode/tErr helpers from R3.0E i18n parity scan are validated separately).

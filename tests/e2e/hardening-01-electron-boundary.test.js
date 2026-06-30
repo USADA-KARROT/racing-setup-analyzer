@@ -136,11 +136,74 @@ try {
   var mainSrc = stripJsComments(mainRaw);
   var preloadSrc = stripJsComments(preloadRaw);
 
-  // F3-R2-01 closure: extract the webPreferences object body via balanced-brace scanning,
-  // not a naive regex. A regex like `webPreferences\s*:\s*\{([\s\S]*?)\n\s*\}` truncates at the
-  // FIRST nested object's closing brace, leaving subsequent unsafe flags invisible.
-  function extractWebPrefsBody(src) {
-    var startMatch = src.match(/webPreferences\s*:\s*\{/);
+  // F3-R7-01 closure: enumerate ALL `webPreferences: { ... }` occurrences in main.js, not just
+  // the first one. Multiple BrowserWindow constructors must each pass the security audit.
+  function extractAllWebPrefsBodies(src) {
+    var bodies = [];
+    var startIdx = 0;
+    while (true) {
+      var sub = src.slice(startIdx);
+      var startMatch = sub.match(/webPreferences\s*:\s*\{/);
+      if (!startMatch) break;
+      var absStart = startIdx + startMatch.index + startMatch[0].length;
+      var depth = 1;
+      var i = absStart;
+      var inStr = false;
+      var strCh = '';
+      while (i < src.length && depth > 0) {
+        var ch = src.charAt(i);
+        if (inStr) {
+          if (ch === '\\' && i + 1 < src.length) { i += 2; continue; }
+          if (ch === strCh) { inStr = false; }
+        } else {
+          if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; }
+          else if (ch === '{') depth++;
+          else if (ch === '}') { depth--; if (depth === 0) { bodies.push(src.slice(absStart, i)); break; } }
+        }
+        i++;
+      }
+      startIdx = i + 1;
+      if (startIdx >= src.length) break;
+    }
+    return bodies;
+  }
+  var wpBodies = extractAllWebPrefsBodies(mainSrc);
+  chk('main.js declares at least one webPreferences block', wpBodies.length >= 1, { count: wpBodies.length });
+
+  for (var wpi = 0; wpi < wpBodies.length; wpi++) {
+    var wpBody = wpBodies[wpi];
+    var lbl = 'webPreferences[' + wpi + ']';
+    chk(lbl + ' uses NO computed-key syntax for security flags',
+      !/\[\s*['"`](?:contextIsolation|nodeIntegration|webSecurity|allowRunningInsecureContent|experimentalFeatures|enableRemoteModule|nodeIntegrationInWorker|nodeIntegrationInSubFrames|sandbox)['"`]\s*\]\s*:/.test(wpBody));
+
+    chk(lbl + '.contextIsolation === literal true', /(^|[\s,{])contextIsolation\s*:\s*true\s*(,|$|\s)/m.test(wpBody));
+    chk(lbl + '.nodeIntegration === literal false', /(^|[\s,{])nodeIntegration\s*:\s*false\s*(,|$|\s)/m.test(wpBody));
+
+    chk(lbl + '.allowRunningInsecureContent NOT set to true', !/allowRunningInsecureContent\s*:\s*true/.test(wpBody));
+    chk(lbl + '.webSecurity NOT set to false', !/webSecurity\s*:\s*false/.test(wpBody));
+    chk(lbl + '.experimentalFeatures NOT set to true', !/experimentalFeatures\s*:\s*true/.test(wpBody));
+    chk(lbl + '.enableRemoteModule NOT set to true', !/enableRemoteModule\s*:\s*true/.test(wpBody));
+    chk(lbl + '.nodeIntegrationInWorker NOT set to true', !/nodeIntegrationInWorker\s*:\s*true/.test(wpBody));
+    chk(lbl + '.nodeIntegrationInSubFrames NOT set to true', !/nodeIntegrationInSubFrames\s*:\s*true/.test(wpBody));
+  }
+
+  // Step 2: preload.js minimal surface — post-strip checks (no comment-decoy false positives)
+  chk('preload.js uses contextBridge', /contextBridge/.test(preloadSrc));
+  chk('preload.js does NOT reference ipcRenderer (post-strip)', !/ipcRenderer/.test(preloadSrc));
+  chk('preload.js does NOT require fs (post-strip)', !/require\s*\(\s*['"]fs['"]\s*\)/.test(preloadSrc));
+  chk('preload.js does NOT require child_process (post-strip)', !/require\s*\(\s*['"]child_process['"]\s*\)/.test(preloadSrc));
+  chk('preload.js does NOT require net (post-strip)', !/require\s*\(\s*['"]net['"]\s*\)/.test(preloadSrc));
+  chk('preload.js does NOT require http (post-strip)', !/require\s*\(\s*['"]http['"]\s*\)/.test(preloadSrc));
+  chk('preload.js does NOT require https (post-strip)', !/require\s*\(\s*['"]https['"]\s*\)/.test(preloadSrc));
+  chk('preload.js does NOT require os (post-strip)', !/require\s*\(\s*['"]os['"]\s*\)/.test(preloadSrc));
+  chk('preload.js does NOT eval untrusted content (post-strip)', !/eval\s*\(|new\s+Function\s*\(/.test(preloadSrc));
+
+  // F3-R7-02 closure: parse the exposed object and require EXACTLY {platform, version} as
+  // the only two data keys. Reject spreads, computed keys, accessors, methods, or any extra
+  // own property.
+  function extractExposedSurfaceBody(src) {
+    // Match: contextBridge.exposeInMainWorld('<name>', { ... });
+    var startMatch = src.match(/contextBridge\.exposeInMainWorld\s*\(\s*['"`][^'"`]+['"`]\s*,\s*\{/);
     if (!startMatch) return null;
     var start = startMatch.index + startMatch[0].length;
     var depth = 1;
@@ -161,37 +224,51 @@ try {
     }
     return null;
   }
-  var wpBody = extractWebPrefsBody(mainSrc);
-  chk('main.js declares webPreferences block (balanced-brace extract)', wpBody !== null);
-  if (wpBody == null) wpBody = '';
+  var exposedBody = extractExposedSurfaceBody(preloadSrc);
+  chk('preload.js exposes a contextBridge surface block', exposedBody !== null);
+  if (exposedBody == null) exposedBody = '';
 
-  chk('webPreferences uses NO computed-key syntax for security flags',
-    !/\[\s*['"`](?:contextIsolation|nodeIntegration|webSecurity|allowRunningInsecureContent|experimentalFeatures|enableRemoteModule|nodeIntegrationInWorker|nodeIntegrationInSubFrames|sandbox)['"`]\s*\]\s*:/.test(wpBody));
+  // No spread (...) — exposes hidden properties
+  chk('preload.js exposed surface has NO spread operator', !/\.\.\./.test(exposedBody));
+  // No computed keys
+  chk('preload.js exposed surface has NO computed keys', !/\[\s*['"`][^'"`]+['"`]\s*\]\s*:/.test(exposedBody));
+  // No method shorthand (function bodies)
+  chk('preload.js exposed surface has NO method shorthand', !/\b[a-zA-Z_$][\w$]*\s*\([^)]*\)\s*\{/.test(exposedBody));
+  // No accessor properties (get foo() {})
+  chk('preload.js exposed surface has NO accessor properties', !/\b(?:get|set)\s+[a-zA-Z_$][\w$]*\s*\(/.test(exposedBody));
 
-  chk('main.js webPreferences.contextIsolation === literal true', /(^|[\s,{])contextIsolation\s*:\s*true\s*(,|$|\s)/m.test(wpBody));
-  chk('main.js webPreferences.nodeIntegration === literal false', /(^|[\s,{])nodeIntegration\s*:\s*false\s*(,|$|\s)/m.test(wpBody));
-
-  chk('webPreferences.allowRunningInsecureContent NOT set to true', !/allowRunningInsecureContent\s*:\s*true/.test(wpBody));
-  chk('webPreferences.webSecurity NOT set to false', !/webSecurity\s*:\s*false/.test(wpBody));
-  chk('webPreferences.experimentalFeatures NOT set to true', !/experimentalFeatures\s*:\s*true/.test(wpBody));
-  chk('webPreferences.enableRemoteModule NOT set to true', !/enableRemoteModule\s*:\s*true/.test(wpBody));
-  chk('webPreferences.nodeIntegrationInWorker NOT set to true', !/nodeIntegrationInWorker\s*:\s*true/.test(wpBody));
-  chk('webPreferences.nodeIntegrationInSubFrames NOT set to true', !/nodeIntegrationInSubFrames\s*:\s*true/.test(wpBody));
-
-  // Step 2: preload.js minimal surface — post-strip checks (no comment-decoy false positives)
-  chk('preload.js uses contextBridge', /contextBridge/.test(preloadSrc));
-  chk('preload.js does NOT reference ipcRenderer (post-strip)', !/ipcRenderer/.test(preloadSrc));
-  chk('preload.js does NOT require fs (post-strip)', !/require\s*\(\s*['"]fs['"]\s*\)/.test(preloadSrc));
-  chk('preload.js does NOT require child_process (post-strip)', !/require\s*\(\s*['"]child_process['"]\s*\)/.test(preloadSrc));
-  chk('preload.js does NOT require net (post-strip)', !/require\s*\(\s*['"]net['"]\s*\)/.test(preloadSrc));
-  chk('preload.js does NOT require http (post-strip)', !/require\s*\(\s*['"]http['"]\s*\)/.test(preloadSrc));
-  chk('preload.js does NOT require https (post-strip)', !/require\s*\(\s*['"]https['"]\s*\)/.test(preloadSrc));
-  chk('preload.js does NOT require os (post-strip)', !/require\s*\(\s*['"]os['"]\s*\)/.test(preloadSrc));
-  chk('preload.js does NOT eval untrusted content (post-strip)', !/eval\s*\(|new\s+Function\s*\(/.test(preloadSrc));
-
-  // Step 3: preload exposed surface is tiny + read-only
-  // The expected surface is { platform, version } — both read-only metadata.
-  chk('preload.js exposes only platform + version (no IPC channels)', /platform\s*:/.test(preloadSrc) && /version\s*:/.test(preloadSrc) && preloadSrc.length < 500);
+  // Parse top-level key list — split on top-level commas (depth-0 commas)
+  function topLevelKeys(body) {
+    var keys = [];
+    var depth = 0;
+    var inStr = false;
+    var strCh = '';
+    var segStart = 0;
+    for (var i = 0; i <= body.length; i++) {
+      var ch = i < body.length ? body.charAt(i) : ',';
+      if (inStr) {
+        if (ch === '\\') { i++; continue; }
+        if (ch === strCh) inStr = false;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; continue; }
+      if (ch === '{' || ch === '[' || ch === '(') depth++;
+      else if (ch === '}' || ch === ']' || ch === ')') depth--;
+      else if (ch === ',' && depth === 0) {
+        var seg = body.slice(segStart, i).trim();
+        if (seg) {
+          var kMatch = seg.match(/^([a-zA-Z_$][\w$]*)\s*:/);
+          if (kMatch) keys.push(kMatch[1]);
+          else if (/^[a-zA-Z_$][\w$]*$/.test(seg)) keys.push(seg); // shorthand
+          else keys.push('<INVALID:' + seg.slice(0, 30) + '>');
+        }
+        segStart = i + 1;
+      }
+    }
+    return keys;
+  }
+  var exposedKeys = topLevelKeys(exposedBody).sort();
+  chk('preload.js exposed surface has EXACTLY {platform, version}', JSON.stringify(exposedKeys) === JSON.stringify(['platform', 'version']), { keys: exposedKeys });
 
   // Step 4: renderer/index.html declares CSP header
   var cspMatch = indexSrc.match(/<meta\s+http-equiv\s*=\s*"Content-Security-Policy"\s+content\s*=\s*"([^"]+)"/i);

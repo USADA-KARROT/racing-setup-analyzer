@@ -38,7 +38,14 @@ try {
   // F3-R5-03 closure: prevent path traversal. `node tests/../../etc/passwd` previously matched
   // the [\w@\-./]+ char class. Now we tokenize the node target path and reject any segment
   // that is `..`, `.`, empty (consecutive slashes), or begins with `/` (absolute).
-  var FORBIDDEN_TOKENS = /\b(curl|wget|npx|fetch|eval|base64|ssh|scp|rsync)\b|\bsh\s+-c\b|https?:\/\/|\$\(|`|\|\s*sh|>\s*\/dev/i;
+  // F3-R7-05 closure: forbidden-tokens regex now rejects ALL shell I/O redirection (`>`, `>>`,
+  // `<`, `2>`, `&>`, `|` for piping) and the most common exfil command tokens. The previous
+  // pattern only rejected `>/dev/...` leaving `> /tmp/exfil` undetected.
+  // F3-R7-05 closure: reject shell I/O redirection (>, >>, <), command substitution ($(...),
+  // backticks), pipes (|), and known dangerous tool names. The previous pattern only caught
+  // redirection to /dev/...; now any `>` redirection is rejected. (Note: `&&` is the SEGMENT
+  // separator and is intentionally not flagged at the full-script level.)
+  var FORBIDDEN_TOKENS = /\b(curl|wget|npx|fetch|eval|base64|ssh|scp|rsync|nc|netcat|telnet)\b|\bsh\s+-c\b|https?:\/\/|\$\(|`|\|\s*\w|\|\||\s>\s|\s>>\s|\s<\s|2\s*>|&\s*>/i;
   var ALLOWED_NODE_DASH_FLAGS_FORBIDDEN = /\bnode\s+-/;
   var ALLOWED_NODE_ROOTS = ['tests', 'scripts', 'tools'];
 
