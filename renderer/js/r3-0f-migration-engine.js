@@ -906,12 +906,28 @@
             if (_sanitizedHash(observedPriorStateForHash) !== priorStateHash) {
               throw new Error('CONCURRENT_STATE_WRITE_DETECTED');
             }
-            // Strip sourceHash from data writes — that field is engine-internal, must NOT be persisted.
-            var sanitizedDataWrites = allWrites.map(function (w) { return { store: w.store, key: w.key, value: w.value }; });
-            var allWritesCombined = sanitizedDataWrites.concat([
-              { store: META, key: JOURNAL_KEY, value: compactedJournal },
-              { store: META, key: STATE_KEY,   value: stateNext }
-            ]);
+            // F1-R16-01: build allWritesCombined with a plain index loop instead of
+            // Array.prototype.map/concat. Ambient Array.prototype.map poisoning could otherwise
+            // return [] for data writes while META journal/state still commits, falsely claiming
+            // "complete" without persisting the migrated records. Strip sourceHash from data
+            // writes here — that field is engine-internal, must NOT be persisted.
+            var sanitizedDataWrites = [];
+            for (var sdwI = 0; sdwI < allWrites.length; sdwI++) {
+              var w = allWrites[sdwI];
+              sanitizedDataWrites[sdwI] = { store: w.store, key: w.key, value: w.value };
+            }
+            var allWritesCombined = [];
+            for (var awcI = 0; awcI < sanitizedDataWrites.length; awcI++) {
+              allWritesCombined[awcI] = sanitizedDataWrites[awcI];
+            }
+            allWritesCombined[allWritesCombined.length] = { store: META, key: JOURNAL_KEY, value: compactedJournal };
+            allWritesCombined[allWritesCombined.length] = { store: META, key: STATE_KEY,   value: stateNext };
+            // Cross-check: dataWrites count must equal allWrites.length and the actual combined
+            // length must equal allWrites.length + 2. If ambient Array tampering somehow corrupted
+            // either count, the backend transact return-shape validation downstream will catch it.
+            if (sanitizedDataWrites.length !== allWrites.length || allWritesCombined.length !== allWrites.length + 2) {
+              throw new Error('COMMIT_WRITE_PROJECTION_CORRUPTED');
+            }
             return {
               writes: allWritesCombined,
               result: { journalLen: compactedJournal.length, dropped: totalDropped, dataWrites: sanitizedDataWrites.length }
