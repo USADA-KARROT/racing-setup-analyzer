@@ -95,14 +95,16 @@ try {
   for (var i = 0; i < allSources.length; i++) {
     var src = allSources[i].src;
     var srcName = allSources[i].name;
-    // F3-R13-01 closure: collapse ALL multi-line formats of the assignment statement:
-    //   .innerHTML <NL> = <NL> RHS    →    .innerHTML = RHS  (single line)
-    //   ['innerHTML'] <NL> = <NL> RHS →    ['innerHTML'] = RHS
-    // Apply iteratively to handle any whitespace-newline combination.
+    // F3-R14-01 closure: also collapse newlines INSIDE member expressions. JavaScript allows
+    // `element.\n  innerHTML = X` and `element\n  ['innerHTML'] = X` — both legal multi-line
+    // splits that the line-based scanner would miss.
     var collapsed = src;
-    // First: collapse newline IMMEDIATELY BEFORE `=` (when `=` is on a separate line)
+    // Collapse newlines around member-access dot/computed-access bracket
+    collapsed = collapsed.replace(/\.\s*\r?\n\s*/g, '.');
+    collapsed = collapsed.replace(/\s*\r?\n\s*\.\s*/g, '.');
+    collapsed = collapsed.replace(/\s*\r?\n\s*(\[)/g, ' $1');
+    // Collapse newlines around `=`
     collapsed = collapsed.replace(/\s*\r?\n\s*=\s*/g, ' = ');
-    // Second: collapse newline IMMEDIATELY AFTER `=` (RHS on separate line)
     collapsed = collapsed.replace(/=\s*\r?\n\s*/g, '= ');
     var lines = collapsed.split(/\n/);
     for (var l = 0; l < lines.length; l++) {
@@ -241,11 +243,14 @@ try {
       unsafeApis.push(srcName2 + ': new Function with non-literal arg → ' + nfMatches[nfi].slice(0, 60));
     }
 
-    // F3-R13-01: collapse multi-line assignments in BOTH directions (before + after `=`).
+    // F3-R14-01: apply the SAME bidirectional collapse + member-expression normalization
+    // to the outerHTML+computed scanner.
     var sCollapsed = s;
+    sCollapsed = sCollapsed.replace(/\.\s*\r?\n\s*/g, '.');
+    sCollapsed = sCollapsed.replace(/\s*\r?\n\s*\.\s*/g, '.');
+    sCollapsed = sCollapsed.replace(/\s*\r?\n\s*(\[)/g, ' $1');
     sCollapsed = sCollapsed.replace(/\s*\r?\n\s*=\s*/g, ' = ');
     sCollapsed = sCollapsed.replace(/=\s*\r?\n\s*/g, '= ');
-    // (iii) variable-RHS outerHTML/innerHTML assignment via dot OR computed access
     var lines2 = sCollapsed.split(/\n/);
     for (var l2 = 0; l2 < lines2.length; l2++) {
       var line2 = lines2[l2];
