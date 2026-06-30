@@ -95,10 +95,15 @@ try {
   for (var i = 0; i < allSources.length; i++) {
     var src = allSources[i].src;
     var srcName = allSources[i].name;
-    // F3-R12-01 closure: collapse multi-line assignment patterns before line-by-line scanning.
-    // A pattern like `element.innerHTML =\n  case.title;` would otherwise split into two lines
-    // with no detectable assignment. Join any line ending with `=` to the next line.
-    var collapsed = src.replace(/=\s*\r?\n\s*/g, '= ');
+    // F3-R13-01 closure: collapse ALL multi-line formats of the assignment statement:
+    //   .innerHTML <NL> = <NL> RHS    →    .innerHTML = RHS  (single line)
+    //   ['innerHTML'] <NL> = <NL> RHS →    ['innerHTML'] = RHS
+    // Apply iteratively to handle any whitespace-newline combination.
+    var collapsed = src;
+    // First: collapse newline IMMEDIATELY BEFORE `=` (when `=` is on a separate line)
+    collapsed = collapsed.replace(/\s*\r?\n\s*=\s*/g, ' = ');
+    // Second: collapse newline IMMEDIATELY AFTER `=` (RHS on separate line)
+    collapsed = collapsed.replace(/=\s*\r?\n\s*/g, '= ');
     var lines = collapsed.split(/\n/);
     for (var l = 0; l < lines.length; l++) {
       var line = lines[l];
@@ -236,8 +241,10 @@ try {
       unsafeApis.push(srcName2 + ': new Function with non-literal arg → ' + nfMatches[nfi].slice(0, 60));
     }
 
-    // F3-R12-01: collapse multi-line assignments for outerHTML/computed scans too.
-    var sCollapsed = s.replace(/=\s*\r?\n\s*/g, '= ');
+    // F3-R13-01: collapse multi-line assignments in BOTH directions (before + after `=`).
+    var sCollapsed = s;
+    sCollapsed = sCollapsed.replace(/\s*\r?\n\s*=\s*/g, ' = ');
+    sCollapsed = sCollapsed.replace(/=\s*\r?\n\s*/g, '= ');
     // (iii) variable-RHS outerHTML/innerHTML assignment via dot OR computed access
     var lines2 = sCollapsed.split(/\n/);
     for (var l2 = 0; l2 < lines2.length; l2++) {
