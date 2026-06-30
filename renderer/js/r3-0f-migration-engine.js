@@ -634,9 +634,23 @@
             counts.rejected += 1;
             continue;
           }
-          var toVersion = (typeof postSan.value.schemaVersion === 'number' && _isFinite(postSan.value.schemaVersion)) ? postSan.value.schemaVersion : mg.targetVersion;
+          // F1-R13-01: post-migration schemaVersion MUST be exactly mg.targetVersion. Missing,
+          // string, fractional, negative, or below-target values would let a hostile or buggy
+          // migrator corrupt an at-target record (e.g. schemaVersion: -1, 1.5, "1", undefined).
+          // Any deviation → POST_MIGRATION_INVALID, no write.
+          var toVersion = postSan.value.schemaVersion;
+          if (typeof toVersion !== 'number' || !_isFinite(toVersion) || _MathFloor(toVersion) !== toVersion) {
+            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', _ArrayIsArray(result.migrations) ? result.migrations : [], '', 'POST_MIGRATION_INVALID', ['post_migration_schema_version_invalid']));
+            counts.failed += 1;
+            continue;
+          }
           if (toVersion > mg.targetVersion) {
             entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', _ArrayIsArray(result.migrations) ? result.migrations : [], '', 'POST_MIGRATION_INVALID', ['version_overshoot']));
+            counts.failed += 1;
+            continue;
+          }
+          if (toVersion !== mg.targetVersion) {
+            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'failed', _ArrayIsArray(result.migrations) ? result.migrations : [], '', 'POST_MIGRATION_INVALID', ['post_migration_schema_version_below_target']));
             counts.failed += 1;
             continue;
           }

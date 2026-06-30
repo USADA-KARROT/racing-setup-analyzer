@@ -1413,6 +1413,49 @@ asyncCase('F1-R12-01: engine boundary is checked BEFORE migrator is called (migr
     .then(function () { chk('migrator was NOT invoked on future-version row', migratorCalled === 0); });
 });
 
+// F1-R13-01: post-migration schemaVersion must equal exactly mg.targetVersion. Missing,
+// string, fractional, negative, NaN, or below-target values are POST_MIGRATION_INVALID.
+function _r13Probe(label, returnedRecord) {
+  return asyncCase('F1-R13-01: ' + label + ' rejected as POST_MIGRATION_INVALID', function () {
+    var b = SB.MemoryBackend();
+    var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function () {
+      return { ok: true, record: returnedRecord, migrations: ['evil-corrupt'] };
+    } } };
+    return b.put('cases', 'c1', { schemaVersion: 1, caseId: 'c1' })
+      .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+      .then(function (r) {
+        chk(label + ': failed=1', r.report.perStore.cases.failed === 1);
+        chk(label + ': migrated=0', r.report.perStore.cases.migrated === 0);
+        return b.get('cases', 'c1');
+      })
+      .then(function (persisted) {
+        chk(label + ': source record UNTOUCHED (schemaVersion=1)', persisted && persisted.schemaVersion === 1);
+        return freshJournalReader(b);
+      })
+      .then(function (j) {
+        var entry = j.filter(function (e) { return e.store === 'cases'; })[0];
+        chk(label + ': journal reasonCode=POST_MIGRATION_INVALID', entry && entry.reasonCode === 'POST_MIGRATION_INVALID');
+      });
+  });
+}
+
+_r13Probe('schemaVersion=-1 negative', { schemaVersion: -1, caseId: 'c1', corrupted: true });
+_r13Probe('schemaVersion=0 below-target', { schemaVersion: 0, caseId: 'c1' });
+_r13Probe('schemaVersion=1.5 fractional', { schemaVersion: 1.5, caseId: 'c1' });
+_r13Probe('schemaVersion="1" string', { schemaVersion: '1', caseId: 'c1' });
+_r13Probe('schemaVersion missing (undefined)', { caseId: 'c1' });
+_r13Probe('schemaVersion=NaN', { schemaVersion: NaN, caseId: 'c1' });
+
+asyncCase('F1-R13-01 negative: legitimate at-target migration still works', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, x: 1 }, migrations: ['delta'] };
+  } } };
+  return b.put('cases', 'cOk', { schemaVersion: 1, caseId: 'cOk' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('legitimate at-target migration succeeds', r.report.perStore.cases.migrated === 1 && r.report.perStore.cases.failed === 0); });
+});
+
 asyncCase('F1-R6-01 negative: legitimate lapAuthority/projectionSignature/experimentVerified still accepted', function () {
   var b = SB.MemoryBackend();
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
