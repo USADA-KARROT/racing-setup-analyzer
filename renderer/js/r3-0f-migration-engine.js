@@ -170,7 +170,11 @@
     var n = _normalizeKey(k);
     if (!n) return false;
     if (PRODUCER_ATTESTATION_NORMALIZED[n]) return true;
-    if (k.charCodeAt(0) !== 0x5F /* '_' */) return false; // not a private-sentinel name → accept
+    // F1-R4-01: check the NORMALIZED first char, not the raw key's first char. NFKC normalizes
+    // Unicode low-line confusables (U+FF3F fullwidth, U+FE33 presentation form, etc.) to '_';
+    // a hostile migrator using `＿fakeSignatureHere` would bypass a raw-char check while still
+    // collapsing to a private-sentinel-looking key under NFKC.
+    if (n.charCodeAt(0) !== 0x5F /* '_' */) return false;
     for (var i = 0; i < PRODUCER_ATTESTATION_TOKENS.length; i++) {
       if (n.indexOf(PRODUCER_ATTESTATION_TOKENS[i]) !== -1) return true;
     }

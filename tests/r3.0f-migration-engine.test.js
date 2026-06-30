@@ -946,6 +946,40 @@ asyncCase('F1-R3-01: underscore-prefixed token-bearing private name STILL reject
     });
 });
 
+asyncCase('F1-R4-01: U+FF3F fullwidth low-line confusable rejected', function () {
+  var b = SB.MemoryBackend();
+  var hostileKey = '＿fakeSignatureHere'; // NFKC normalizes leading char to '_'
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var record = { schemaVersion: 1, caseId: rec.caseId };
+    record[hostileKey] = 'forged';
+    return { ok: true, record: record, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cFF3F', { schemaVersion: 1, caseId: 'cFF3F' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function () { return freshJournalReader(b); })
+    .then(function (j) {
+      var c = j.filter(function (e) { return e.store === 'cases'; });
+      chk('U+FF3F-prefixed token-bearing key rejected', c.length === 1 && c[0].reasonCode === 'PRODUCER_ATTESTATION_REFUSED');
+    });
+});
+
+asyncCase('F1-R4-01: U+FE33 presentation-form low-line confusable rejected', function () {
+  var b = SB.MemoryBackend();
+  var hostileKey = '︳customAuthority'; // NFKC normalizes leading char to '_'
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var record = { schemaVersion: 1, caseId: rec.caseId };
+    record[hostileKey] = 'forged';
+    return { ok: true, record: record, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cFE33', { schemaVersion: 1, caseId: 'cFE33' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function () { return freshJournalReader(b); })
+    .then(function (j) {
+      var c = j.filter(function (e) { return e.store === 'cases'; });
+      chk('U+FE33-prefixed token-bearing key rejected', c.length === 1 && c[0].reasonCode === 'PRODUCER_ATTESTATION_REFUSED');
+    });
+});
+
 asyncCase('F1-R3-01: triple-underscore __signature private name rejected', function () {
   var b = SB.MemoryBackend();
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
