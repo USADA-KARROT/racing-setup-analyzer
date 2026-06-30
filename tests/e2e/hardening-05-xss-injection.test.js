@@ -95,6 +95,9 @@ try {
   for (var i = 0; i < allSources.length; i++) {
     var src = allSources[i].src;
     var srcName = allSources[i].name;
+    // F3-R15-01 closure: strip JS comments BEFORE normalization so comment-separated dot-member
+    // expressions (e.g., `element./* note */ innerHTML = X`) cannot disguise a sink.
+    src = stripJsComments(src);
     // F3-R14-01 closure: also collapse newlines INSIDE member expressions. JavaScript allows
     // `element.\n  innerHTML = X` and `element\n  ['innerHTML'] = X` — both legal multi-line
     // splits that the line-based scanner would miss.
