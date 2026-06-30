@@ -783,6 +783,41 @@ console.log('Section T — Codex E4 R4 closure (Proxy listForParent rejection)')
   }
 })();
 
+// ==================================================================
+// Section U — Codex E4 R5 closure (E4-R5-01) — id derivation tamper resistance
+// ==================================================================
+console.log('Section U — Codex E4 R5 closure (padStart tamper resistance)');
+
+// U1 — String.prototype.padStart rebind cannot forge linkId
+(function () {
+  var out = runChildProbe('async function(){'
+    + 'String.prototype.padStart=function(){return "deadbeef";};'
+    + 'var svc=mkService();'
+    + 'var r=await svc.createFollowUpLink({parentCaseId:"case_demo_a",followUpCaseId:"case_demo_b",experimentId:"exp_0123456789abcdef"},{clock:function(){return "2026-06-30T11:00:00Z";}});'
+    + 'process.stdout.write(JSON.stringify({valid:r.valid,linkId:r.link&&r.link.linkId}));'
+    + '}');
+  var parsed = JSON.parse(out.trim());
+  chk('U1: padStart tamper cannot forge linkId to "deadbeefdeadbeef"',
+    parsed.valid === true && parsed.linkId !== 'link_deadbeefdeadbeef'
+      && /^link_[0-9a-f]{16}$/.test(parsed.linkId),
+    parsed);
+})();
+
+// U2 — Number.prototype.toString rebind cannot affect linkId
+(function () {
+  var out = runChildProbe('async function(){'
+    + 'Number.prototype.toString=function(){return "ffffffff";};'
+    + 'var svc=mkService();'
+    + 'var r=await svc.createFollowUpLink({parentCaseId:"case_demo_a",followUpCaseId:"case_demo_b",experimentId:"exp_0123456789abcdef"},{clock:function(){return "2026-06-30T11:00:00Z";}});'
+    + 'process.stdout.write(JSON.stringify({valid:r.valid,linkId:r.link&&r.link.linkId}));'
+    + '}');
+  var parsed = JSON.parse(out.trim());
+  chk('U2: Number.prototype.toString tamper cannot forge linkId',
+    parsed.valid === true && parsed.linkId !== 'link_ffffffffffffffff'
+      && /^link_[0-9a-f]{16}$/.test(parsed.linkId),
+    parsed);
+})();
+
 // ------------------------------------------------------------------
 // Summary
 // ------------------------------------------------------------------

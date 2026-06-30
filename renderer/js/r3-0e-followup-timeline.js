@@ -258,6 +258,22 @@
   }
 
   // ---------- Deterministic ID generators ----------------------------------------------------
+  // Codex E4-R5-01 closure: capture-free hex-padding. Both Number.prototype.toString
+  // and String.prototype.padStart could be rebound post-load to subvert deterministic
+  // id derivation. Manual 8-char hex emission via local lookup table is
+  // tamper-immune (uses only basic operators + string concatenation).
+  function _toHex8(h) {
+    var hexChars = '0123456789abcdef';
+    var out = '';
+    var x = h >>> 0;
+    for (var i = 7; i >= 0; i--) {
+      var nibble = (x >>> (i * 4)) & 0xF;
+      // Bracket access on a string primitive resolves via internal slot indexed-access,
+      // avoiding ambient String.prototype.charAt.
+      out += hexChars[nibble];
+    }
+    return out;
+  }
   function _hash32(s) {
     var h = 0x811c9dc5;
     var len = typeof s === 'string' ? s.length : 0;
@@ -265,7 +281,7 @@
       h ^= s.charCodeAt(i);
       h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
     }
-    return h.toString(16).padStart(8, '0');
+    return _toHex8(h);
   }
   function _fnv2(s) {
     var slen = typeof s === 'string' ? s.length : 0;
