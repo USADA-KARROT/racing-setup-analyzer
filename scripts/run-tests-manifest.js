@@ -33,7 +33,24 @@ function discover() {
     return { file: argv[0], args: argv.slice(1), command: 'node ' + m[1].trim() };
   });
   // cross-check vs disk: catch both a forgotten file (coverage gap) and a referenced-but-missing file.
-  const onDisk = fs.readdirSync(path.join(REPO, 'tests')).filter(f => f.endsWith('.js')).map(f => 'tests/' + f).sort();
+  // R3.0F F2 added tests/e2e/*.test.js — walk one level into authorized E2E subdirectory too.
+  function _listTestsRecursive(dir, prefix) {
+    let out = [];
+    let names; try { names = fs.readdirSync(dir); } catch (_) { return out; }
+    for (const n of names) {
+      const full = path.join(dir, n);
+      let st; try { st = fs.statSync(full); } catch (_) { continue; }
+      if (st.isDirectory()) {
+        // Only descend into the explicitly-authorized E2E subdirectory (per
+        // governance/r3.0f/schema.json allowedRoots which lists tests/e2e/).
+        if (n === 'e2e' && prefix === 'tests/') out = out.concat(_listTestsRecursive(full, prefix + n + '/'));
+      } else if (n.endsWith('.js')) {
+        out.push(prefix + n);
+      }
+    }
+    return out;
+  }
+  const onDisk = _listTestsRecursive(path.join(REPO, 'tests'), 'tests/').sort();
   const refTests = entries.map(e => e.file).filter(f => f.startsWith('tests/')).sort();
   const discoveryMissing = onDisk.filter(f => !refTests.includes(f)); // on disk but NOT run
   const discoveryGhost = refTests.filter(f => !onDisk.includes(f));   // referenced but absent

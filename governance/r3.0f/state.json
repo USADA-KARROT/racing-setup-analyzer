@@ -1,14 +1,24 @@
 {
   "schemaVersion": 1,
   "program": "R3.0F",
-  "currentCheckpoint": "F1_MIGRATION_ENGINE",
+  "currentCheckpoint": "F2_E2E_AUTOMATION",
   "authorizedProductionPaths": [
-    { "path": "renderer/js/r3-0f-migration-engine.js", "capability": "migration_engine_present" }
+    { "path": "renderer/js/r3-0f-migration-engine.js",           "capability": "migration_engine_present" },
+    { "path": "tests/e2e/helpers/flow-harness.js",               "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-01-new-user.test.js",              "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-02-real-telemetry.test.js",        "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-03-measured.test.js",              "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-04-reference-lap.test.js",         "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-05-vre.test.js",                   "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-06-setup-experiment.test.js",      "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-07-driver-experiment.test.js",     "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-08-export-import.test.js",         "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-09-electron-smoke.test.js",        "capability": "e2e_automation_present" }
   ],
-  "enabledCapabilities": ["governance_bootstrap_present", "migration_engine_present"],
+  "enabledCapabilities": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present"],
   "runtimeConsumersAllowed": true,
   "uiAllowed": false,
   "featureRegistryActivationAllowed": false,
   "algorithmsAllowed": true,
-  "note": "R3.0F F1_MIGRATION_ENGINE state. F1 authorizes renderer/js/r3-0f-migration-engine.js (the unified migration orchestrator). Supporting modules under contracts/r3.0f/ and scripts/migrators/ are authorized by the same checkpoint via the F1.json checkpoint manifest (their roots are listed in governance/r3.0f/schema.json allowedRoots and the per-file scan is restricted to renderer/js/ + main.js + preload.js — script-tree files do not need entry in this state.authorizedProductionPaths array). uiAllowed and featureRegistryActivationAllowed remain false (F3/F6 floor). algorithmsAllowed=true to permit migrator step functions. R3.0B case-record schema NOT modified; engine never fabricates producer attestation; future-version records REJECTED fail-closed; migration is idempotent + deterministic + append-only-journaled."
+  "note": "R3.0F F2_E2E_AUTOMATION state. F1 authorized renderer/js/r3-0f-migration-engine.js (unified migration orchestrator); F2 authorizes 9 end-to-end flow tests + harness under tests/e2e/ (per schema.allowedRoots which lists tests/e2e/ explicitly). The e2e_automation_present capability is satisfied by deterministic logic-level flow validation that composes the existing R3.0B + R3.0C + R3.0D + R3.0E + R3.0F surfaces over MemoryBackend with a console-error / unhandled-rejection guard and a forbidden-action gate. F2 does NOT add a new production renderer module beyond the F1 engine — the engine remains the only renderer/js path authorized. uiAllowed and featureRegistryActivationAllowed remain false (F3/F6 floor). R3.0B case-record schema NOT modified. Frozen R3.0C/D/E contracts NOT modified."
 }
