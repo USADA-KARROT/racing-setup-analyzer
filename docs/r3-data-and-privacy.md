@@ -6,6 +6,14 @@ The contract is conservative on purpose: the same fail-closed posture that gover
 
 R3.0F preserves all data invariants frozen at R3.0B (the case-record schema, frozen at v1.4.0) and adds the migration / E2E / hardening evidence that the same posture holds end-to-end.
 
+The source files this document is derived from, and against which every claim below can be verified:
+
+- `renderer/js/case-store.js` — R3.0B case CRUD (PURE logic; backend injected).
+- `renderer/js/r3-0e-stores.js` — R3.0E experiment / outcome / timeline / follow-up-link stores (PRODUCTION; IndexedDB-backed).
+- `renderer/js/r3-0f-migration-engine.js` — R3.0F F1 unified migration engine (PURE logic; backend injected).
+- `contracts/r3.0f/migration-envelope.js` — R3.0F envelope schema (engineVersion, storageVersion, perStore targets).
+- `scripts/migrators/{case,session,experiment,outcome,timeline,followup}-migrator.js` — the six per-store migrator modules registered with the engine.
+
 ---
 
 ## Storage locations
@@ -14,39 +22,94 @@ Racing Setup Analyzer runs in two host contexts. Both contexts use the same stor
 
 | Host context | Backend | Where the bytes live | Lifetime |
 |---|---|---|---|
-| Browser (renderer in dev / web build) | IndexedDB | Per-origin IndexedDB database, owned by the browser profile | Until the user clears site data, or the app calls `remove({ confirm: true })` |
-| Electron desktop | IndexedDB under Chromium, scoped to `app.getPath('userData')` | OS user-data folder (macOS: `~/Library/Application Support/<app>`, Windows: `%APPDATA%/<app>`, Linux: `~/.config/<app>`) | Until the user deletes `userData`, uninstalls the app, or the app calls `remove({ confirm: true })` |
+| Browser (renderer in dev / web build) | IndexedDB | Per-origin IndexedDB database, owned by the browser profile | Until the user clears site data, or the app calls `caseStore.remove({ confirm: true })` and the equivalent removal calls on the other stores |
+| Electron desktop | IndexedDB under Chromium, scoped to `app.getPath('userData')` | OS user-data folder (macOS: `~/Library/Application Support/<app>`, Windows: `%APPDATA%/<app>`, Linux: `~/.config/<app>`) | Until the user deletes `userData`, uninstalls the app, or the app calls the store-level removal APIs |
 | Node test harness | In-memory `Map` shim | Process memory only | Discarded at process exit |
 
 There is **no cloud database, no remote object store, no syncing service, no user account, no remote ID broker**. The product has no notion of a remote user. Two installations of the app on two machines share zero state.
 
 ### Object stores
 
-The persistence layer is organized into logical stores introduced across three phases. Only the R3.0B case-record schema is frozen at v1.4.0; the R3.0E and R3.0F stores were added later under their own contracts and are not part of the frozen schema.
+The persistence layer is organized into logical stores introduced across three phases. Only the R3.0B case-record schema is frozen at v1.4.0; the R3.0E and R3.0F additions live in their own stores under their own contracts and are not part of the frozen schema.
 
-**R3.0B original stores (case-record schema frozen at v1.4.0; not modified by R3.0C, R3.0D, R3.0E, or R3.0F):**
+**R3.0B stores (case-record schema frozen at v1.4.0; not modified by R3.0C, R3.0D, R3.0E, or R3.0F):**
 
-| Store | Purpose | Identity | Append-only |
+| Store | Purpose | Identity | Mutation model |
 |---|---|---|---|
-| `cases` | R3 case records (vehicle + setup + optional imported telemetry summary) | `caseId` | No (records can be updated by their owning case) |
-| `sessions` | Per-case sessions; each session owns its laps, track identity, normalized distance frames | `sessionId` (scoped to a `caseId`) | No (a session's contents grow during a run, but a session cannot be re-parented) |
+| `cases` | R3 case records (vehicle + setup + optional imported telemetry summary) | `caseId` | Updatable in place via `caseStore.save` for `local_full` records; `imported_summary` records refuse updates (`CANNOT_OVERWRITE_IMPORTED`) |
+| `caseIndex` | Single-key index document at key `__index` containing the case-list summary | Constant key `__index` | Rewritten atomically alongside every `cases` write |
+| `sessions` | Per-case sessions; each session owns its laps, track identity, normalized distance frames | `sessionId` (scoped to a `caseId`) | Sessions grow during a run; a session cannot be re-parented across cases |
 
-**R3.0E additions (append-only audit chain for the experiment loop):**
+The `caseStore` public API is exactly `create`, `save`, `open`, `duplicate`, `archive`, `unarchive`, `setPinned`, `remove`, `list`, `exportCase`, `importBundle`, `compact`. Imported bundles are stored with `recordType: 'imported_summary'` and the update path throws `CANNOT_OVERWRITE_IMPORTED` to prevent silent promotion to `local_full`.
 
-| Store | Purpose | Identity | Append-only |
+**R3.0E additions (separately versioned, schema-isolated; see the module's "schema isolation" ruling in `renderer/js/r3-0e-stores.js`):**
+
+Per the SKYLINE D12/E1 ruling, R3.0E persistence lives in **separate versioned stores** and **must not** extend the frozen R3.0B portable case-record schema body. The R3.0E layer is therefore eight discrete object stores:
+
+| Store name (exact) | Purpose | Key | Notes |
 |---|---|---|---|
-| `experiments` | Experiment records bound to a case | Composite store-metadata key | **Yes** — monotonic `createdAt`, no in-place mutation |
-| `outcomes` | Outcome classifier outputs (append-only) | Composite store-metadata key | **Yes** |
-| `timelines` | Per-experiment timeline entries | Composite store-metadata key | **Yes** |
-| `followUpLinks` | Follow-up links between experiments | Composite store-metadata key | **Yes** |
+| `r3_0e_experiments` | Experiment records bound to a source case | `experimentId` | Payload keyed by `experimentId`; binding field is `sourceCaseId` |
+| `r3_0e_experimentsIndex` | Summary index for experiments | `experimentId` | Index value: `{ experimentId, sourceCaseId, status, createdAt, updatedAt }` |
+| `r3_0e_outcomes` | Outcome classifier outputs | `outcomeId` | Payload keyed by `outcomeId`; binding field is `experimentId` |
+| `r3_0e_outcomesIndex` | Summary index for outcomes | `outcomeId` | Index value: `{ outcomeId, experimentId, class, createdAt }` |
+| `r3_0e_timelines` | Per-case timeline document with `events: []` | `caseId` | The timeline doc itself is keyed by `caseId`; only the `events` array is append-only |
+| `r3_0e_followupLinks` | Follow-up links between experiments | `linkId` | Binding fields: `parentCaseId`, `followUpCaseId`, `experimentId` |
+| `r3_0e_followupLinksByCase` | **Reverse** index for follow-up links | `parentCaseId` | Value: `{ parentCaseId, linkIds: [linkId, ...] }` |
+| `r3_0e_storeMetadata` | Schema-version map for the R3.0E layer | Constant key `__r3_0e_version` | Value: `{ versions: { experiment, outcome, timeline, followUpLink }, updatedAt }`; all four schema versions are `1` |
 
-The R3.0E append-only stores additionally maintain a `storeMetadata` record with monotonic-clock invariants. Re-parenting a follow-up across cases is rejected at the store boundary (`caseAssociation` cross-case is forbidden).
+Persistence semantics shared by every R3.0E store:
 
-**R3.0F additions (migration audit chain):**
+- Every payload is validated by its E1 contract **before** the write (inside `compute()`).
+- Every payload is **re-validated on read**. A persisted record whose `schemaVersion` exceeds the current `SCHEMA_VERSIONS[kind]` value is rejected fail-closed with the corresponding `R3_0E_*_FUTURE_SCHEMA` reason; a corrupted payload is rejected with `R3_0E_*_CORRUPTED`.
+- Persisted records carry **no runtime authority**. The `WeakSet` identity that the live producer modules use to gate authority is closure-private and cannot survive reload. Any consumer that rehydrates an R3.0E record must re-validate it through the E1 contracts before treating its content as authoritative.
 
-| Store | Purpose | Identity | Append-only |
+Per-store behavior worth being precise about:
+
+- **`r3_0e_experiments`** — exposes `create`, `update`, `get`, `list`, `remove`. `remove(experimentId)` deletes the row in `r3_0e_experiments` and the matching row in `r3_0e_experimentsIndex`; it does **not** cascade into outcomes, timelines, or follow-up links. Error codes include `R3_0E_EXPERIMENT_INVALID`, `R3_0E_EXPERIMENT_SCHEMA_MISMATCH`, `R3_0E_EXPERIMENT_ID_COLLISION`, `R3_0E_EXPERIMENT_MISSING`, `R3_0E_EXPERIMENT_FUTURE_SCHEMA`, `R3_0E_EXPERIMENT_STALE_WRITE`, `R3_0E_EXPERIMENT_CORRUPTED`.
+- **`r3_0e_outcomes`** — exposes `create`, `get`, `listForExperiment`. There is **no `remove()` method** on the outcome store; outcomes are write-once. Error codes include `R3_0E_OUTCOME_INVALID`, `R3_0E_OUTCOME_ID_COLLISION`, `R3_0E_OUTCOME_FUTURE_SCHEMA`, `R3_0E_OUTCOME_CORRUPTED`.
+- **`r3_0e_timelines`** — exposes `getTimeline(caseId)` and `appendEvent(caseId, event)`. The timeline **document** is updated in place by appending to its `events` array (`existing.events.concat([event])`, never in-place mutation), so the document itself is rewritten on each append while the array is monotonic. Duplicate `eventId` is rejected with `R3_0E_TIMELINE_DUPLICATE_EVENT`; out-of-order timestamps (`Date.parse(event.createdAt) < Date.parse(prev.createdAt)`, or `NaN`) are rejected with `R3_0E_TIMELINE_OUT_OF_ORDER`; existing documents whose `schemaVersion` exceeds the current timeline schema are rejected with `R3_0E_TIMELINE_FUTURE_SCHEMA`. There is **no `remove()`**.
+- **`r3_0e_followupLinks`** — exposes link creation, `listForParent(parentCaseId)`, and `markParentStatus(linkId, status)` where `status ∈ {present, archived, deleted}`. `markParentStatus` updates the `parentStatus` enum on the link record; it does **not** remove the record. There is no re-parent operation: links are keyed by `linkId` and the reverse index `r3_0e_followupLinksByCase` is keyed by `parentCaseId`. `listForParent` validates that the reverse-index entry's `parentCaseId` matches the caller-supplied `parentCaseId`, that `linkIds` is an array, and that each fetched link's `parentCaseId` matches; any mismatch is rejected fail-closed with `R3_0E_LINK_CORRUPTED` (this is the E2-R2-01 reverse-index parent-membership defense).
+
+There is **no `caseAssociation` field** in any R3.0E record. The actual binding fields are: `experiment.sourceCaseId`, `outcome.experimentId`, `timeline.caseId` (used as the document key), and `followUpLink.parentCaseId` plus `linkId`.
+
+**R3.0F additions (migration journal + state, NOT a dedicated store):**
+
+R3.0F's F1 migration engine does **not** create a dedicated `migrations` object store. It writes its journal and its state as two **named keys inside an existing META store** that already lives in the backend. The defaults are:
+
+| Key | Meta store | Default key name | Purpose |
 |---|---|---|---|
-| `migrations` | Producer-attestation records for each schema/version transition | `migrationId` | **Yes** |
+| Migration journal | `meta` (configurable via `spec.metaStore`) | `__r3_0f_migration_journal__` (configurable via `spec.journalKey`) | Capped append ring buffer of per-record migration entries |
+| Migration state | `meta` (same) | `__r3_0f_migration_state__` (configurable via `spec.stateKey`) | Latest engine/storage version reached, plus envelope summary |
+
+The journal is **capped** at `MAX_JOURNAL_ENTRIES_DEF = 256` entries by default (`spec.maxJournalEntries` overrides it). A preflight rejects a migration that would exceed `MAX_JOURNAL × JOURNAL_OVERFLOW_FACTOR (= 4)` entries with the `JOURNAL_OVERFLOW` reason **before any mutation occurs** (F1-R1-05).
+
+Each journal entry has the shape `{ schemaVersion: 1, recordedAt, store, key, fromVersion, toVersion, status, recordHash, migrationsApplied, limitations, reasonCode? }`. The entry is keyed by the `{store, key}` of the record being migrated; **there is no `migrationId`** and there is no separate audit-chain identity. `recordHash` is a non-cryptographic FNV-1a 64-bit fingerprint useful for audit comparison within one repository; it is **not** a tamper-proof signature.
+
+The migration envelope (see `contracts/r3.0f/migration-envelope.js`) is fixed at:
+
+```
+{
+  schemaVersion: 1,
+  engineVersion: 1,
+  storageVersion: 1,
+  perStore: {
+    cases:                1,
+    sessions:             1,
+    r3_0e_experiments:    1,
+    r3_0e_outcomes:       1,
+    r3_0e_timelines:      1,
+    r3_0e_followupLinks:  1
+  }
+}
+```
+
+`engineVersion` mismatches against the envelope are rejected with `ENVELOPE_VERSION_MISMATCH`.
+
+The closed enum of reason codes emitted by the engine is exactly:
+
+`UNSUPPORTED_FUTURE_VERSION`, `NO_MIGRATION_PATH`, `RECORD_NOT_AN_OBJECT`, `RECORD_BAD_VERSION`, `RECORD_TOO_LARGE`, `RECORD_CIRCULAR`, `PROXY_INPUT_REJECTED`, `POST_MIGRATION_INVALID`, `MIGRATOR_THREW`, `BACKEND_REJECTED`, `CONFIRM_REQUIRED`, `ENVELOPE_VERSION_MISMATCH`, `JOURNAL_OVERFLOW`, `PRODUCER_ATTESTATION_REFUSED`.
+
+Per-entry `status ∈ {migrated, no-op, rejected, failed}`. Per-report `status ∈ {complete, partial, halted, no-op}`.
 
 ---
 
@@ -58,12 +121,12 @@ The decision of what to persist follows a single rule: **persist what the user a
 
 These survive a process restart:
 
-- The R3 case record (vehicle preset reference, setup levers, notes, free-text fields the user wrote).
-- The session container (track identity stamped by the user, lap boundaries computed and stored once per session, normalized distance frames stored once per lap because they are deterministic and expensive).
+- The R3 case record (vehicle preset reference, setup levers, notes, free-text fields the user wrote) in `cases`, summarized in `caseIndex.__index`.
+- The session container in `sessions` (track identity stamped by the user, lap boundaries computed and stored once per session, normalized distance frames stored once per lap because they are deterministic and expensive).
 - The imported telemetry **summary** (channel inventory, mapping decisions, calibration confirmations, sample-quality flags, provenance markers). See "Raw telemetry is NEVER in case bundle" below.
-- The R3.0D Engineer Brief artifacts (evidence-graph IDs, hypotheses, priorities, brief text) — these are append-only outputs of authoritative-only inputs and are stored alongside the session they were derived from.
-- R3.0E append-only stores: experiments, outcomes, timelines, follow-up links — all with monotonic `createdAt` and no in-place mutation.
-- R3.0F migration attestation records (which version produced what, structured-clone fingerprint, fail-closed reasons if any).
+- The R3.0D Engineer Brief artifacts (evidence-graph IDs, hypotheses, priorities, brief text) — outputs of authoritative-only inputs, stored alongside the session they were derived from.
+- R3.0E records across `r3_0e_experiments`, `r3_0e_outcomes`, `r3_0e_timelines`, `r3_0e_followupLinks`, plus their index/reverse-index stores and the schema-version map in `r3_0e_storeMetadata`. Only the timeline `events` array is append-only as a contract; experiment records have `create`/`update`/`remove`, outcome records are write-once, follow-up-link records have `markParentStatus` for state transitions (present/archived/deleted).
+- The R3.0F migration **journal** and **state** at `meta['__r3_0f_migration_journal__']` and `meta['__r3_0f_migration_state__']`. The journal records what each transition did (from-version → to-version, applied migrators, structured-clone fingerprint, fail-closed reason if any). It does **not** carry per-record producer-attestation; in fact F1 refuses migrated records that contain attestation-like field names (see "Migration boundary" below).
 
 ### Ephemeral
 
@@ -73,7 +136,7 @@ These live only in memory and are recomputed from persisted inputs on every run:
 - Reason-code arrays attached to a run's blocked/eligible state.
 - The R3.0D `LIMITATION_IMPORTED_SUMMARY` propagation chain — re-derived on every D2 → D3 → D5 traversal.
 - Capability eligibility (`eligible` / `confirmed` / `validated`). A caller's flag is never trusted; eligibility is re-derived from raw evidence on every run.
-- The R3.0D closure-private references `_authoritativeGraphs` (D2 WeakSet) and `_CAPTURED_EG_VERIFY_GRAPH` (D3 mandatory capture, established at the Formal D Gate) — these are closure-private and not serializable.
+- The R3.0D closure-private references `_authoritativeGraphs` (D2 WeakSet) and `_CAPTURED_EG_VERIFY_GRAPH` (D3 mandatory capture, established at the Formal D Gate) — closure-private and not serializable.
 
 If a stored record contained an `eligible:true` flag, the runtime would still ignore it: **authority, not presence**.
 
@@ -122,7 +185,7 @@ The credibility ladder distinguishes:
 
 If any of those is missing, the value remains `imported_summary` and the capability that would have consumed it as `Measured` is blocked with a reason — never approximated. When the input cannot reach `Measured`, the credibility ladder still has lower rungs available: a `Derived` value (computed from `Measured` predecessors on the same run) or a `Heuristic` substitute (e.g. a directional tendency in place of a measured K_us) is offered explicitly labelled, never relabelled as `Measured`. If even those substitutes are not warranted, the capability is `Unavailable`.
 
-This rule is enforced at the boundary of every consumer (R3.0C delta-metrics, R3.0D evidence-graph, R3.0E outcome classifier, R3.0F migration). It is **not** a UI-layer check — promotion would be impossible regardless of UI.
+This rule is enforced at the boundary of every consumer (R3.0C delta-metrics, R3.0D evidence-graph, R3.0E outcome classifier, R3.0F migration). It is **not** a UI-layer check — promotion would be impossible regardless of UI. The `caseStore` enforces a sibling invariant at the bundle layer: `importBundle` writes the record with `recordType: 'imported_summary'` and the `save` path throws `CANNOT_OVERWRITE_IMPORTED` if anything later tries to overwrite an imported record with a `local_full` payload.
 
 ---
 
@@ -141,7 +204,7 @@ A comparison bundle contains:
 - Delta metrics (the six allowlisted metrics) with fixed sign convention.
 - The imported_summary for any channels referenced by the delta metrics.
 - The R3.0D Engineer Brief artifact for this session (if one exists), including evidence-graph IDs, hypotheses, priorities, reason codes, and limitations.
-- Provenance metadata: app version, schema version, structured-clone fingerprint (R3.0F producer-attestation).
+- Provenance metadata: app version, schema version, and the R3.0F envelope's `engineVersion` / `storageVersion` (1 / 1 at this milestone).
 
 A comparison bundle does **not** contain:
 
@@ -150,6 +213,7 @@ A comparison bundle does **not** contain:
 - Any `eligible`/`confirmed`/`validated` flag that the importer should trust — the importer re-derives.
 - Any path on the originating filesystem.
 - Any user identifier — the product has none.
+- Any field name from the producer-attestation sentinel list (see "Migration boundary"). The F1 engine refuses to write such fields into migrated records, and the bundle exporter likewise excludes them.
 
 ### Reference lap and delta sign
 
@@ -160,7 +224,7 @@ Two invariants travel with every bundle:
 
 ### Same-case + same-session only
 
-Comparison is **same-case + same-session only**. A bundle that attempted to compare laps from different cases or different sessions would be rejected at the C4 pairing boundary with a reason code; it cannot be produced and therefore cannot be exported.
+Comparison is **same-case + same-session only**. A bundle that attempted to compare laps from different cases or different sessions would be rejected at the C4 pairing boundary with a reason code; it cannot be produced and therefore cannot be exported. The R3.0E follow-up-link layer carries the same invariant from a different direction: a follow-up Case Link records a *navigational* relationship between two cases, but it carries **no comparison authority** — cross-case comparison is forbidden regardless of whether a follow-up link exists.
 
 ---
 
@@ -234,9 +298,31 @@ R3.0F's F3 electron-boundary hardening probe asserts each of these denials and p
 
 ### Migration boundary (R3.0F F1)
 
-R3.0F's migration engine runs inside the same renderer-side sandbox. It is **deterministic**, **fail-closed**, and uses a **structured-clone-only firewall** for any value crossing the migration boundary: a value that cannot be structured-cloned (functions, symbols, DOM nodes, class instances with non-cloneable internals) is rejected at the boundary, never silently dropped. The JSON serializer used inside the engine is trap-free (no getters with side effects can fire during serialization), and a producer-attestation record is written for every migration so that a future consumer can verify it was produced by a trusted version.
+R3.0F's migration engine (`renderer/js/r3-0f-migration-engine.js`) is a **pure-logic** module that is constructed via `createMigrationEngine({ backend, registry?, metaStore?, journalKey?, stateKey?, clock?, stamp?, maxJournalEntries?, maxRecordBytes? })` and returns `{ detect, plan, migrate, journal, envelope, knownStores }`.
 
-The migration attestation records live in the dedicated `migrations` store and form a **standalone audit chain**. They are retained even when the records they describe are later removed by the user (see "Removing a case"), because the chain's value is recording *what producer version performed each transition*; tying its lifetime to a single mutable referent would defeat the audit purpose. A user who wants to discard the migration audit chain can do so only by deleting the `userData` folder (see "Full local deletion").
+The engine has three properties that are load-bearing for this section.
+
+1. **Deterministic, idempotent, fail-closed.** Same inputs + same injected clock + same backend state produce the same writes and the same journal entries. Running `migrate()` against a fully-migrated store performs zero writes and zero journal appends. Future-version records (a record whose `schemaVersion` exceeds the per-store target in the envelope) are rejected with `UNSUPPORTED_FUTURE_VERSION` — never coerced.
+2. **Atomic commit across stores + META.** Every successful `migrate()` call writes the migrated records to their owning stores **and** writes the journal append **and** writes the latest state, in a single `backend.transact()` (F1-R1-03). A backend transact failure rolls back all of them together, and the journal/state never become inconsistent with the data stores.
+3. **Structured-clone-only firewall.** Any value crossing the migration boundary is first vetted by `structuredClone`. Values containing functions, symbols, `BigInt`, `Date`, `Map`, `Set`, typed arrays, non-plain prototypes, or proxies are rejected at the boundary (e.g. `PROXY_INPUT_REJECTED`, `RECORD_NOT_AN_OBJECT`, `RECORD_BAD_VERSION`). The internal JSON serializer (`_safeJsonStringify`) walks own enumerable keys directly without consulting `toJSON`, so a value with a side-effecting getter cannot fire arbitrary code during serialization. Records larger than `MAX_RECORD_BYTES_DEF = 8 000 000` bytes are rejected with `RECORD_TOO_LARGE`; cyclic records are rejected with `RECORD_CIRCULAR`.
+
+**The engine never fabricates a producer attestation.** This is the inverse of what an older draft of this document claimed. The live producer modules (R3.0B, R3.0C, R3.0D, R3.0E) use closure-private `WeakSet` attestation that is never serialized. The migration engine therefore treats well-known attestation-shaped field names as **reserved sentinels** and refuses to write a migrated record that contains them. A migrated record carrying any of the following field names (case-insensitive substring match against the sentinel token list) is rejected with `PRODUCER_ATTESTATION_REFUSED` (F1-R1-09 / F1-R2-03):
+
+- Reserved field names: `_authoritative`, `_producerAttested`, `_attested`, `__attested`, `_verified`, `__verified`, `_signature`, `__signature`, `_proof`, `__proof`, `_authority`, `__authority`, `_authoritativeSession`, `_authoritativeCase`, `_authoritativeOutcome`.
+- Reserved tokens that trigger the substring match: `authoritative`, `producerattested`, `attested`, `verified`, `signature`, `proof`, `authority`.
+
+A downstream auditor can therefore rely on "no migrated record in persisted data carries an attestation-like field name" as a hard property of the persisted state. The journal itself records *what producer version performed each transition* via the envelope's `engineVersion` / `storageVersion` and the per-entry `migrationsApplied` list — not via any in-record marker.
+
+**Known stores and migrators.** The engine's `knownStores` is exactly `['cases', 'sessions', 'r3_0e_experiments', 'r3_0e_outcomes', 'r3_0e_timelines', 'r3_0e_followupLinks']`, each with a per-store target of `1`. The six per-store migrator modules registered at the F1 baseline are:
+
+- `scripts/migrators/case-migrator.js`
+- `scripts/migrators/session-migrator.js`
+- `scripts/migrators/experiment-migrator.js`
+- `scripts/migrators/outcome-migrator.js`
+- `scripts/migrators/timeline-migrator.js`
+- `scripts/migrators/followup-migrator.js`
+
+Migrator-returned reason codes outside the closed enum are mapped to `NO_MIGRATION_PATH` at the engine boundary (F1-R1-01), so a misbehaving migrator cannot introduce a novel reason code into the journal. A migrator that throws is recorded as `status: 'failed'` with reason `MIGRATOR_THREW`; a post-migration record that fails its target-version validator is recorded as `status: 'failed'` with `POST_MIGRATION_INVALID`; an unrecognized `confirm` requirement triggers `CONFIRM_REQUIRED`.
 
 ---
 
@@ -246,23 +332,29 @@ The product gives the user explicit, local control over their data. There is no 
 
 ### Removing a case
 
-A case is deleted via `caseStore.remove(caseId, { confirm: true })`. The `confirm: true` flag is **required**; the store rejects a removal call without it as a fail-closed safeguard against accidental UI wiring. Removal:
+A case is deleted via `caseStore.remove(caseId, { confirm: true })`. The `confirm: true` flag is **required**; without it the store returns `{ ok: false, code: 'CONFIRM_REQUIRED' }` as a fail-closed safeguard against accidental UI wiring.
 
-- Deletes the case record from the `cases` store.
-- Deletes all sessions owned by that case from the `sessions` store.
-- Deletes all R3.0E append-only records (`experiments`, `outcomes`, `timelines`, `followUpLinks`) whose `caseAssociation` points at that case.
-- Deletes all R3.0D Engineer Brief artifacts for that case.
+Internally, `remove` runs a single atomic `backend.transact()` across the two stores it owns, namely `cases` and `caseIndex`. The writes are: delete the row at `cases[caseId]`, and write a new `caseIndex.__index` value with that `caseId` removed from the index summary. Error paths include `CONFIRM_REQUIRED`, `CASE_NOT_FOUND`, `STORE_ERROR`, and the sibling guards on the import path (`ID_COLLISION`, `CANNOT_OVERWRITE_IMPORTED`, `CANNOT_OVERWRITE_FUTURE`, `CANNOT_DUPLICATE_IMPORTED_SUMMARY`, `RECORD_NOT_STORABLE`).
 
-R3.0F migration attestation records in the `migrations` store are **not** cascaded; they are retained as a standalone audit chain (see "Migration boundary"). The records they describe may be gone, but the attestation that "producer version X performed transition Y at time T" remains.
+**`caseStore.remove` does not cascade.** It does not delete from `sessions`, it does not delete from any R3.0E store (`r3_0e_experiments`, `r3_0e_experimentsIndex`, `r3_0e_outcomes`, `r3_0e_outcomesIndex`, `r3_0e_timelines`, `r3_0e_followupLinks`, `r3_0e_followupLinksByCase`), and it does not delete R3.0D Engineer Brief artifacts. This is a deliberate boundary — the case store knows about cases, not about everything that has ever referenced a case — and there is no `caseAssociation` field on the dependent records that would let it cascade safely without a second pass.
+
+A workspace-level UI that wants to fully retire a case is therefore responsible for issuing the additional removal calls in sequence after the case-store call has succeeded:
+
+- Deletion of the case's sessions from the `sessions` store.
+- Deletion of any R3.0E experiments tied to that case via the experiment store's `remove(experimentId)` — which itself deletes only the row in `r3_0e_experiments` plus the matching row in `r3_0e_experimentsIndex`, and does not cascade to outcomes, timelines, or follow-up links.
+- Per-record cleanup of the dependent R3.0E artifacts, observing that the outcome store and the timeline store have **no `remove()` method** (outcomes are write-once; timelines are append-only per case). The follow-up-link store exposes `markParentStatus(linkId, 'deleted')`, which transitions the link's `parentStatus` enum but does not remove the row.
+- Deletion of the R3.0D Engineer Brief artifacts associated with the case's sessions.
+
+The R3.0F migration **journal** is unaffected by these removals. The journal is not a per-case ledger; it is a global record of schema/version transitions performed on the storage layer, keyed by `{store, key}` of the records that were migrated. Whether the underlying records still exist is independent of whether the engine recorded that it once migrated them.
 
 A deletion is **immediate and local**. No tombstone is uploaded, no analytics event is emitted, no remote service is informed (because there are none).
 
 ### Full local deletion
 
-A user who wants to wipe the product's state entirely — including the migration audit chain — has two equivalent options:
+A user who wants to wipe the product's state entirely — including the migration journal at `meta['__r3_0f_migration_journal__']` and the migration state at `meta['__r3_0f_migration_state__']` — has two equivalent options:
 
-1. From within the app: remove each case via the workspace UI (which calls `remove({ confirm: true })` per case), then delete the residual migration audit chain only by option 2 below.
-2. From the OS: delete the Electron `userData` folder (paths under "Storage locations" above) while the app is closed. This discards every store, including `migrations`.
+1. From within the app: remove each case via the workspace UI (which calls `caseStore.remove({ confirm: true })` per case) and the equivalent removal calls on `sessions` and the R3.0E stores. The migration journal/state inside the `meta` store remain afterward; they can only be wiped via option 2.
+2. From the OS: delete the Electron `userData` folder (paths under "Storage locations" above) while the app is closed. This discards every IndexedDB store, including the `meta` store that houses the migration journal and state.
 
 Either path leaves nothing behind. There is no recovery service to ask, because there is no remote copy.
 
@@ -277,15 +369,38 @@ Deletion is what it claims to be: a removal of the local store entries. It is no
 
 ---
 
+## R3.0F F2 end-to-end coverage
+
+The F2 phase ships nine end-to-end flows under `tests/e2e/` that each exercise the full storage + migration + producer pipeline once. They are listed here so a reader of this document can trace any data-flow claim above to a concrete test:
+
+| File | Purpose |
+|---|---|
+| `tests/e2e/flow-01-new-user.test.js` | Fresh launch with empty IndexedDB produces a deterministic empty Case Library; F1 reports zero records; envelope is at v1; forbidden actions are disabled. |
+| `tests/e2e/flow-02-real-telemetry.test.js` | A CSV-import-style telemetry session lands deterministically into `sessions`; F1 treats the session as at-target; no raw telemetry leaks into the case bundle. |
+| `tests/e2e/flow-03-measured.test.js` | A case with measured-metric data preserves the credibility rung exactly `Measured` through storage roundtrip and migration; no credibility upgrade; qualifiers go in `limitations[]`, not the rung. |
+| `tests/e2e/flow-04-reference-lap.test.js` | R3.0C reference-lap contract: explicit user selection only (no `fastestValid`, no `medianValid`, no `bestSectorComposite`); comparison authority requires same Case + same Session; delta sign = `comparison − reference`. |
+| `tests/e2e/flow-05-vre.test.js` | R3.0D Engineer Brief: authoritative-only inputs; the brief does not classify, does not claim causation, does not blame the driver. |
+| `tests/e2e/flow-06-setup-experiment.test.js` | R3.0E Experiment Loop end-to-end: create setup experiment, classify outcome (authoritative inputs only), append timeline event, F1 sees the records as at-target. |
+| `tests/e2e/flow-07-driver-experiment.test.js` | Driver-instruction-only experiment plus follow-up Case-link semantics; follow-up Case Links carry no comparison authority (cross-case forbidden). |
+| `tests/e2e/flow-08-export-import.test.js` | Case export produces an R3.0B-validated portable bundle with no raw telemetry; reimport creates an `imported_summary` record, never promoted to `local_full`. |
+| `tests/e2e/flow-09-electron-smoke.test.js` | Electron host process can be invoked and reports a version (no window launch in CI). |
+
+## R3.0F F3 hardening probes
+
+The F3 phase ships six adversarial probes under `tests/e2e/hardening-{01..06}-*.test.js` covering 133 assertions total. Each probe targets a specific attack surface relevant to the data-flow guarantees above (Electron host boundary, XSS surface in the renderer, supply-chain regressions, structured-clone firewall, migration journal overflow, and producer-attestation field defense). The F3 manifest passes at the milestone baseline; the assertions are the canonical machine-readable counterpart to the prose in this document.
+
+---
+
 ## Summary of guarantees
 
 - All persistence is local. No cloud, no account, no remote ID.
 - Raw telemetry is never in a case bundle. Only the structured `imported_summary` is.
 - `imported_summary` is never promoted to `Measured` automatically. Promotion requires confirmed mapping + verified calibration + sample-quality gate + re-derived authority. When promotion is not warranted, a `Derived` or `Heuristic` substitute is offered explicitly, or the capability is `Unavailable`.
-- Comparison is same-case + same-session, reference-lap explicit-user-only, delta sign `(comparison − reference)`.
+- Comparison is same-case + same-session, reference-lap explicit-user-only, delta sign `(comparison − reference)`. Follow-up Case Links never carry comparison authority.
 - No production network egress. Enforced by CSP `connect-src 'self'` + absence of remote fetch call sites in production paths + R3.0F F3 supply-chain probe verification.
 - Electron host enforces `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, strict CSP, and a preload surface of exactly `{ platform, version }`. R3.0F F3 electron-boundary and XSS probes assert this surface.
-- User control is local and immediate: `remove({ confirm: true })` per case, or delete `userData`. Migration attestation records are retained as a standalone audit chain; the only way to discard them is to delete `userData`.
-- All of the above held across R3.0F F1 migration, F2 nine E2E flows, and F3 six hardening probes at the milestone baseline.
+- User control is local and immediate. `caseStore.remove({ confirm: true })` deletes the case row and rewrites `caseIndex.__index` atomically; it does **not** cascade. Sessions, R3.0E records (experiment/outcome/timeline/follow-up-link), and R3.0D briefs require separate removal calls; outcomes and timelines have no `remove()` (write-once / append-only by contract). The R3.0F migration journal and state live as two named keys inside the `meta` store and are wiped only by deleting `userData`.
+- R3.0F F1 is deterministic, idempotent, fail-closed, structured-clone-only at the boundary, and **refuses to write producer-attestation field names** with `PRODUCER_ATTESTATION_REFUSED`. There is no `migrations` object store and no `migrationId`; the journal at `meta['__r3_0f_migration_journal__']` (capped at 256 entries by default) and the state at `meta['__r3_0f_migration_state__']` are the audit surface.
+- All of the above held across R3.0F F1 migration, F2 nine E2E flows, and F3 six hardening probes (133 assertions) at the milestone baseline.
 
 The same fail-closed posture that governs the credibility ladder governs the data layer: when a guarantee cannot be honoured on a given run, the operation is blocked with a reason, never approximated, never silently downgraded.

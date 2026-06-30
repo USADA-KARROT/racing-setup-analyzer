@@ -56,50 +56,124 @@ ladders that A through E established.
 ### F1 — Migration engine
 
 - **Deterministic migration from the 1.4.0 baseline toward the 2.0.0 release candidate; the
-  version remains pinned at 1.4.0 until the release gate flips.** Every transform is pure
-  and replayable.
-- **Fail-closed**: any unrecognized record shape, any producer attestation mismatch, any
-  schema drift outside the R3.0B-frozen surface → migration blocked with a reason code; no
-  silent best-effort upgrade.
-- **Structured-clone-only firewall** at the persistence boundary. Inputs that cannot be
-  structured-cloned are rejected at the door; nothing crosses the trust boundary as a live
-  reference.
-- **Trap-free JSON serializer**: getters, proxies, and throwing accessors cannot be used to
+  version remains pinned at 1.4.0 until the release gate flips.** Same inputs + same
+  injected clock + same backend state → identical writes and identical journal entries.
+- **Idempotent.** Running `migrate({confirm:true})` against a fully-migrated store performs
+  zero writes and zero journal appends.
+- **Fail-closed**: any unrecognized record shape, any schema drift outside the R3.0B-frozen
+  surface, or any future-version record → migration blocked with a reason code; no silent
+  best-effort upgrade. Future-version records are **rejected** with
+  `UNSUPPORTED_FUTURE_VERSION` — never coerced.
+- **Structured-clone-only firewall** at the persistence boundary. `structuredClone` is
+  required at module load; the engine refuses to construct without it. Inputs that cannot be
+  structured-cloned are rejected at the door with `PROXY_INPUT_REJECTED`; nothing crosses
+  the trust boundary as a live reference.
+- **Trap-free JSON serializer.** `_safeJsonStringify` walks own enumerable keys directly and
+  **never invokes any `toJSON` hook**, defending against a hostile `Object.prototype.toJSON`
+  installed after engine load. Getters, proxies, and throwing accessors cannot be used to
   exfiltrate state or poison output during serialization.
-- **Producer-attestation defense**: migrated records carry a producer attestation; records
-  whose attestation does not match the migration engine's identity are quarantined.
-- `runtimeConsumersAllowed = true` enabled at F1 entry; UI activation remains gated.
+- **Producer-attestation refusal.** The migration engine **never fabricates or persists
+  runtime producer authority**. Live producer modules (R3.0B / R3.0C / R3.0D / R3.0E) use
+  closure-private `WeakSet` attestation that is never serialized; persisted data must remain
+  attestation-free so downstream auditors can trust that those sentinel field names are
+  *not* present after migration. The engine therefore **rejects** any migrated record whose
+  top-level *or* nested object contains an attestation sentinel field (allowlist of
+  15 well-known names such as `_authoritative`, `_producerAttested`, `_attested`,
+  `_verified`, `_signature`, `_proof`, `_authority`, `_authoritativeSession`,
+  `_authoritativeCase`, `_authoritativeOutcome`, and their double-underscore variants;
+  rejection also covers any key beginning with one or more underscores whose
+  NFKC+lowercase form contains one of seven reserved tokens: `authoritative`,
+  `producerattested`, `attested`, `verified`, `signature`, `proof`, `authority`). Records
+  carrying those sentinels are rejected with reason code
+  **`PRODUCER_ATTESTATION_REFUSED`**. Ordinary contract fields such as `lapAuthority`,
+  `projectionSignature`, and `experimentVerified` are *not* sentinels and pass through.
+  Depth-bomb guard: any object nested deeper than 64 levels is treated as
+  attestation-suspect and rejected.
+- **Closed reason-code enum.** Any migrator-supplied reason that is not in the
+  `REASON_CODES` set declared in `contracts/r3.0f/migration-envelope.js` is mapped to
+  `NO_MIGRATION_PATH`. Malformed envelopes produce `ENVELOPE_VERSION_MISMATCH`.
+- **Atomic commit.** Store writes, the journal append, and the META state are committed in
+  a single `backend.transact()` across all six known stores plus META. A journal-overflow
+  preflight (`MAX_JOURNAL × 4`) halts before any mutation if the journal would exceed its
+  bound.
+- **Non-cryptographic fingerprint.** `recordHash` uses FNV-1a and is *not* a tamper-proof
+  signature; it is a deterministic content fingerprint for journal correlation only.
+- **Public surface.** `createMigrationEngine({ backend, registry?, metaStore?, journalKey?,
+  stateKey?, clock?, stamp?, maxJournalEntries?, maxRecordBytes? })` returns
+  `{ detect, plan, migrate, journal, envelope, knownStores }`. The six known stores are
+  `cases`, `sessions`, `r3_0e_experiments`, `r3_0e_outcomes`, `r3_0e_timelines`, and
+  `r3_0e_followupLinks`.
+- `runtimeConsumersAllowed = true` is enabled at F1 entry; UI activation remains gated.
 
 ### F2 — End-to-end flow coverage
 
-Nine E2E flows exercised against production code (no UI stubs, no mocked engines — see the
-E2E harness governance manifest at `governance/r3.0f/F2/manifest.json` and the harness
-entrypoint under `test/e2e/r3-0f-flows/` for the enforcement that production services, not
-mocks, are bound at flow setup):
+Nine E2E flows exercise production code (no UI stubs, no mocked engines). The F2 governance
+checkpoint lives at **`governance/r3.0f/checkpoints/F2.json`**. The flow files live at
+**`tests/e2e/flow-{01..09}-*.test.js`**, each bound to production services at setup:
 
-1. Demo Analysis Case → load → run → observe (golden path).
-2. Setup edit → re-run → comparison authority refresh.
-3. Telemetry import → channel mapping → preflight → observation gating.
-4. Reference-lap explicit selection → corner segmentation → corner pairing → delta metrics.
-5. Comparison export → workspace persistence → reopen.
-6. Decision engine: evidence graph → hypothesis → priority → Engineer Brief.
-7. Experiment proposal → follow-up case linkage → timeline append.
-8. Outcome classification → append-only timeline write.
-9. Cross-session reopen → frozen-schema replay → no capability regression.
+1. **`flow-01-new-user.test.js`** — New-user empty-state journey. A fresh launch with an
+   empty IndexedDB backend produces a deterministic empty Case Library state; the F1
+   migration engine reports zero records; the F1 envelope is at v1; and the forbidden
+   actions (auto reference-lap, auto setup apply, runtime-LLM authority, causation
+   inference, driver blame) are not enabled.
+2. **`flow-02-real-telemetry.test.js`** — Real telemetry import. A CSV-import-style
+   telemetry session lands deterministically into the session store; the F1 migration
+   engine treats the session as at-target (no migration needed); the session is
+   retrievable; no raw telemetry leaks into a case bundle.
+3. **`flow-03-measured.test.js`** — Measured-metrics flow. A Case with a measured metric
+   (e.g. K_us measured against a verified steering calibration) preserves the credibility
+   rung **exactly** = `measured` across a storage round-trip and through migration. No
+   credibility upgrade occurs. Qualifiers stay in `limitations[]`, never in the rung
+   itself.
+4. **`flow-04-reference-lap.test.js`** — Reference-lap explicit selection. The R3.0C
+   reference-lap selection contract enforces explicit user selection only (no
+   `fastest_valid`, no `median_valid`, no `best_sector_composite`); comparison authority
+   requires same Case + same Session; the delta sign convention is
+   `(comparison − reference)`.
+5. **`flow-05-vre.test.js`** — Engineer Brief (R3.0D) authoritative-only inputs. Inputs are
+   the **verified** outputs of the R3.0D hypothesis and priority modules; the brief does
+   not classify outcomes, does not claim causation, does not blame the driver; no runtime
+   LLM holds decision authority; the brief is a **read projection**, never a
+   re-classification. A forged `HypothesisSet` is rejected by the `WeakSet` authority gate.
+6. **`flow-06-setup-experiment.test.js`** — Setup experiment create + outcome classify +
+   timeline append. Drives the R3.0E Experiment Loop end-to-end: create a setup experiment
+   in the store, classify the outcome through the R3.0E classifier on authoritative inputs
+   only, append a timeline event, and verify the F1 migration engine sees the records as
+   at-target. The append-only timeline contract is enforced — a correction is a *new*
+   timeline event, never a mutation of a prior one.
+7. **`flow-07-driver-experiment.test.js`** — Driver experiment with follow-up case link.
+   Same Experiment Loop as Flow 06 but for a driver-instruction-only experiment
+   (`driverInstruction` populated, no `setupChange`); also exercises the follow-up-link
+   store semantics. Follow-up case links carry **no comparison authority**; cross-case
+   comparison is forbidden. `create`, `listForParent`, and state transitions all work.
+8. **`flow-08-export-import.test.js`** — Case export + re-import. Case export produces a
+   portable bundle (R3.0B schema-validated, no raw telemetry); importing the bundle into a
+   fresh backend creates an `imported_summary` record that is **never** promoted to
+   `local_full`; the imported record carries no producer attestation (the engine never
+   fabricates one); the F1 migration engine sees `imported_summary` as at-target; the
+   round-trip preserves the public fields.
+9. **`flow-09-electron-smoke.test.js`** — Electron startup smoke. The Electron CLI is
+   reachable (devDependency installed); `main.js` exposes a stable Electron-compatible
+   entry shape; `preload.js` exposes only the minimal `contextBridge` surface
+   (`nodeIntegration: false`, `contextIsolation: true`). Smoke only — does not launch a
+   window or render the UI.
 
 Each flow asserts the same fail-closed rules at runtime that the unit tests assert in
 isolation. Flow output is never used to widen a credibility rung.
 
 ### F3 — Hardening probes (six)
 
+Six hardening probes live at **`tests/e2e/hardening-{01..06}-*.test.js`**, carrying
+**133 assertions** in aggregate against production code paths:
+
 | Probe | Scope | Fail-closed assertion |
 |---|---|---|
-| Electron boundary | Preload surface, contextIsolation, nodeIntegration | Preload exposes EXACTLY `{platform, version}`; no Node/Electron primitives reach the renderer |
-| Storage failure | IndexedDB quota / corruption / version mismatch | Capability blocks with reason; in-flight state is not partially written |
+| Electron boundary | Preload surface, `contextIsolation`, `nodeIntegration` | Preload exposes EXACTLY `{platform, version}`; no Node/Electron primitives reach the renderer |
+| Storage failure | IndexedDB quota / corruption / version mismatch | Capability blocks with reason; in-flight state is not partially written; F1 commit is atomic across stores + META |
 | No-stale-UI | View-model identity across reopen / migration / refresh | Stale-eligibility flags from a prior session never re-authorize a capability |
 | Large library | 501-preset catalogue + extended case history | No O(n²) regressions; persistence boundary remains structured-clone-only |
-| XSS | Any text rendered from a case / telemetry / Engineer Brief | Renderer never interprets case content as HTML; no innerHTML on untrusted payloads |
-| Supply-chain | Producer attestation + structured-clone boundary | Foreign-origin records are quarantined; no live-reference smuggling |
+| XSS | Any text rendered from a case / telemetry / Engineer Brief | Renderer never interprets case content as HTML; no `innerHTML` on untrusted payloads |
+| Supply-chain | Attestation refusal + structured-clone boundary | Foreign-origin records carrying sentinel fields are rejected with `PRODUCER_ATTESTATION_REFUSED`; no live-reference smuggling |
 
 ### Documentation sweep
 
@@ -123,25 +197,38 @@ When the release gate flips `featureRegistryActivationAllowed = true`, the versi
 ## R3.0E — Experiment loop
 
 R3.0E adds the experiment / outcome / follow-up / timeline ladder on top of the decision
-engine. All four stores are **append-only with monotonic `createdAt`**. `caseAssociation`
-cross-case writes are forbidden — a follow-up case is a new case linked by ID, not a mutation
-of a prior case.
+engine. **Only the timeline store is append-only with monotonic `createdAt`.** The
+experiment store, outcome store, and follow-up-link store all permit controlled state
+transitions (`update`, `remove`, `markParentStatus`), but **none** of them ever promote
+comparison authority across cases. `caseAssociation` cross-case writes are forbidden — a
+follow-up case is a new case linked by ID, not a mutation of a prior case.
 
 | Capability | Credibility | Required input | Fail-closed when |
 |---|---|---|---|
 | Experiment proposal | Derived | Authoritative Engineer Brief priority item | Brief absent or stale token; cross-case association attempted |
 | Outcome classification | Heuristic | Same-case + same-session comparison authority + controlled-variable witness | Comparison authority degraded; controlled variables not held; final-outcome flag from caller (never trusted) |
-| Follow-up case link | Derived | Parent case ID + link grammar (parentCaseId, followUpCaseId, experimentId) | Reverse-index parent membership fails; path grammar violated |
-| Timeline append | Derived | Outcome + follow-up records with monotonic `createdAt` | Out-of-order `createdAt`; mutation of a prior entry attempted |
+| Follow-up case link | Derived | Parent case ID + link grammar (`parentCaseId`, `followUpCaseId`, `experimentId`) | Reverse-index parent membership fails; path grammar violated; cross-case comparison authority attempted |
+| Timeline append | Derived | Outcome + follow-up records with monotonic `createdAt` | Duplicate `eventId`; out-of-order `createdAt`; mutation of a prior entry attempted |
 
-Outcomes are classified into one of the following classes: `confirmed`, `refuted`,
-`inconclusive`, `invalid_comparison`, `cannotConclude`. `invalid_comparison` takes
-precedence over `inconclusive` and `cannotConclude` whenever the comparison authority
-itself is not valid for this experiment; `cannotConclude` is the explicit terminal class
-when the controlled-variable witness, credibility floor, or evidence linkage is missing
-even though comparison authority is otherwise valid. The Outcome classifier is Heuristic
-because its class assignment is a structured judgment over authoritative inputs, not a
-measured magnitude — consistent with `docs/r3-experiment-loop.md`.
+Store contract reminders:
+
+- **Experiments**: `create`, `update`, `remove` permitted; `EXPERIMENTS` and
+  `EXPERIMENTS_INDEX` are kept in lockstep on delete.
+- **Outcomes**: `update` permitted; `updatedAt` advances on each accepted update; class
+  assignment never upgrades a credibility rung.
+- **Timeline**: append-only per case; duplicate `eventId` rejected; out-of-order timestamps
+  rejected; a correction is a new event, not a mutation.
+- **Follow-up links**: `create`, `listForParent`, `markParentStatus` permitted; the link
+  itself carries no comparison authority.
+
+Outcomes are classified into one of `confirmed`, `refuted`, `inconclusive`,
+`invalid_comparison`, `cannotConclude`. `invalid_comparison` takes precedence over
+`inconclusive` and `cannotConclude` whenever the comparison authority itself is not valid
+for this experiment; `cannotConclude` is the explicit terminal class when the
+controlled-variable witness, credibility floor, or evidence linkage is missing even though
+comparison authority is otherwise valid. The Outcome classifier sits at **Heuristic** on
+the ladder because its class assignment is a structured judgment over authoritative
+inputs, not a measured magnitude — consistent with `docs/r3-experiment-loop.md`.
 
 ---
 
@@ -154,7 +241,7 @@ hardware clicks are never emitted.**
 
 | Stage | Credibility ceiling | Authoritative-only input | Fail-closed when |
 |---|---|---|---|
-| Evidence graph (D2) | Derived | Closure-private WeakSet verifies every node before admission | Caller-provided `eligible`/`confirmed`/`validated` flags are never trusted |
+| Evidence graph (D2) | Derived | Closure-private `WeakSet` verifies every node before admission | Caller-provided `eligible`/`confirmed`/`validated` flags are never trusted |
 | Hypothesis engine (D3) | Derived | D2-verified graph only; verifier-first | Graph identity check fails; `_authoritativeGraphs` membership absent |
 | Priority engine (D4) | Heuristic | Hypotheses + capability availability + fail-closed reason codes | Hypothesis input not D3-issued |
 | Engineer Brief (D5) | Heuristic | Priorities + provenance + limitations | Brief is regenerated on every prepare; no retired-token replay; no blocked-prepare poisoning |

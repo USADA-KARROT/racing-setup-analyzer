@@ -7,7 +7,7 @@ of the product where the system stops *recommending* and starts *bookkeeping*.
 
 Like every other layer in R3.0, the loop is fail-closed and authoritative-only.
 It never decides on behalf of the engineer, never auto-applies a setup change,
-never auto-selects a reference, never overwrites history, and never
+never auto-selects a reference, never overwrites the timeline, and never
 cross-pollinates cases. When a required input is missing, the corresponding
 capability is **blocked with a reason** — never approximated.
 
@@ -37,7 +37,7 @@ only *lower* the rung of an input as it propagates; it may never *raise* it.
 | Priority | R3.0D D4 | Verified hypotheses | Ranked candidates | Heuristic |
 | Engineer Brief | R3.0D D5 | Priority list + evidence graph | Authoritative brief (read-only) | Heuristic |
 | Recommendation | R3.0E E3 | Engineer Brief (authoritative-only) | Physical-unit recommendation | Derived / Heuristic |
-| Experiment Plan | R3.0E E1 | Recommendation + brief + case | Append-only experiment record | Derived |
+| Experiment Plan | R3.0E E1 | Recommendation + brief + case | Experiment record (mutable; timeline is append-only) | Derived |
 
 *The rung shown is the maximum a stage can emit; actual rung is set per-run by
 the underlying input credibility.* A Priority or Engineer Brief node whose
@@ -60,7 +60,8 @@ The chain has two non-negotiable properties:
   causation claim downstream. A hypothesis stays a hypothesis until an
   experiment outcome is **confirmed** with same-case + same-session evidence,
   and even then "confirmed" means *the predicted direction was observed under
-  the stated control variables*, not *the setup caused the lap time*.
+  the stated control variables*, not *the setup caused the lap time*, and never
+  *the driver caused the result*. Driver behaviour is not a vehicle finding.
 
 The recommendation stage emits **physical units only** (Nm/deg, N/mm, mm, %).
 Hardware clicks are never emitted — no validated per-car click→rate mapping
@@ -73,13 +74,20 @@ the follow-up comparison looks.
 
 ## Experiment shape (E1 schema)
 
-The E1 store is the append-only ledger of plans. Every experiment record has
-exactly the following authoritative fields. The record is deep-frozen at write
-time and reads return structured clones; callers cannot mutate it in place.
+The E1 store is the ledger of experiment plans. It is **mutable** — its
+`createExperimentStore` exposes `create(rec)`, `update(rec)`, `get(experimentId)`,
+`list()`, and `remove(experimentId)`. `update` enforces a stale-write check by
+comparing the persisted `createdAt` against the candidate; `remove` deletes both
+the payload and the index entry. The append-only ledger of *what the product
+told the engineer* lives in the Timeline store (see below), not here.
+
+Every experiment record has the following authoritative fields. The record is
+deep-frozen at write time and reads return structured clones; callers cannot
+mutate it in place.
 
 | Field | Type | Authority | Meaning |
 |-------|------|-----------|---------|
-| `experimentId` | opaque id | Generated | Stable identity. Never reused, never overwritten. |
+| `experimentId` | opaque id | Generated | Stable identity. Never reused. |
 | `sourceCaseId` | case id | Producer-attested | The case the experiment was authored against. |
 | `sourceHypothesisId` | hypothesis id | R3.0D D3 | The hypothesis being tested. Must exist in the source case's authoritative evidence graph. |
 | `sourceRecommendationId` | recommendation id | R3.0E E3 | The recommendation that produced the plan. |
@@ -93,13 +101,74 @@ time and reads return structured clones; callers cannot mutate it in place.
 | `validationPlan` | structured | Authoritative | Which lap selection rule applies for the follow-up reference (still **EXPLICIT USER ONLY** at consumption time — the plan can describe *intent*, never auto-pick). |
 | `stopConditions` | array of reason-codes | Allowlist | Pre-enumerated conditions that abort the experiment (e.g. `RAIN_DETECTED`, `TYRE_SET_CHANGED_UNDECLARED`). |
 | `status` | enumerated | State machine | `draft` → `applied` → `awaiting_followup` → `classified` → `closed`. No back-transitions. |
-| `followUpCaseIds` | append-only array | Producer-attested | Cases authored as the experimental follow-up. Each entry is a one-way link, validated against the link grammar. |
+| `followUpCaseIds` | array | Producer-attested | Cases authored as the experimental follow-up. Each entry is a one-way link, validated against the link grammar. |
 | `outcome` | classifier result \| null | E3 classifier | Set once, when classification runs. Never overwritten. |
-| `createdAt` | monotonic timestamp | Authority | Monotonic per-store; out-of-order writes are rejected. |
+| `createdAt` | ISO-8601 timestamp | Authority | Used as the stale-write guard on `update`. |
 
 Fields not in this list are silently dropped at write time — a recursive
 descriptor audit on the input rejects future-schema bleed-through and overflow.
 The store has a hard cap on field-shape and a fail-closed write path.
+
+## Persistence semantics (R3.0E E2 stores)
+
+The E2 surface is a set of IndexedDB-backed stores reached through the R3.0B
+storage backend contract: `backend.transact({ stores, reads, compute })`. The
+production module is `renderer/js/r3-0e-stores.js` (UMD export
+`R3_0E_Stores`), which composes five factories — `createExperimentStore`,
+`createOutcomeStore`, `createTimelineStore`, `createFollowUpLinkStore`, and
+`createStoreMetadata`. Per the D12/E1 ruling, R3.0E persistence lives in
+**separate versioned stores**; it does not extend the frozen R3.0B portable
+case-record schema body (which remains at v1.4.0).
+
+| Object store name | Keyed by | Holds |
+|-------------------|----------|-------|
+| `r3_0e_experiments` | `experimentId` | Experiment payload (E1 schemaVersion 1) |
+| `r3_0e_experimentsIndex` | `experimentId` | Summary index for `list()` |
+| `r3_0e_outcomes` | `outcomeId` | Outcome payload (schemaVersion 1) |
+| `r3_0e_outcomesIndex` | `outcomeId` | Summary index for `listForExperiment` |
+| `r3_0e_timelines` | `caseId` | One append-only timeline doc per case (schemaVersion 1) |
+| `r3_0e_followupLinks` | `linkId` | Follow-up link payload (schemaVersion 1) |
+| `r3_0e_followupLinksByCase` | `parentCaseId` | Reverse index, `Array<linkId>` |
+| `r3_0e_storeMetadata` | constant key `__r3_0e_version` | Migration / schema-version marker |
+
+Mutability is **per store**, not global:
+
+- **`createExperimentStore`** — mutable. `create / update / get / list / remove`.
+  `update` enforces equality of the persisted `createdAt` against the candidate
+  and otherwise emits `R3_0E_EXPERIMENT_STALE_WRITE`. `remove` deletes both
+  payload and index in one transaction.
+- **`createOutcomeStore`** — write-once-ish. Exposes only `create`, `get`, and
+  `listForExperiment`. There is no `update` and no `remove` — an outcome is
+  classified once.
+- **`createTimelineStore`** — **append-only**. Exposes only `getTimeline(caseId)`
+  and `appendEvent(caseId, event)`. No `update`, no `remove`. See the next
+  section for the append rules.
+- **`createFollowUpLinkStore`** — mutable in a constrained way. Exposes
+  `create`, `get`, `listForParent`, and `markParentStatus(linkId, newStatus)`.
+  `markParentStatus` accepts only `'present' | 'archived' | 'deleted'`; any
+  other value is rejected with `R3_0E_LINK_PARENT_STATUS_INVALID`.
+- **`createStoreMetadata`** — `readVersion()` and `writeVersion(versionMap)`,
+  used by the F1 migration runner.
+
+Across every store the contract is the same:
+
+- Every payload is validated by its E1 contract **before** write inside the
+  `compute()` of the `transact` call.
+- Every payload is re-validated on read; a payload with a `schemaVersion`
+  greater than the current supported version (`1` for every E2 store today)
+  fails closed with `R3_0E_*_FUTURE_SCHEMA`.
+- Persisted records carry **no runtime authority**: the closure-private
+  WeakSets that R3.0D and R3.0E E3 use to verify authoritative inputs cannot
+  survive a reload. Rehydration consumers must re-validate via the E1 contracts
+  before treating a payload as authoritative again.
+- Reason-codes are pre-enumerated. The full E2 set includes the
+  `R3_0E_EXPERIMENT_*` family (invalid, schema mismatch, id collision, missing,
+  future schema, stale write, corrupted), the `R3_0E_OUTCOME_*` family
+  (invalid, id collision, future schema, corrupted), the `R3_0E_TIMELINE_*`
+  family (future schema, corrupted, duplicate event, out of order, invalid),
+  the `R3_0E_LINK_*` family (invalid, id collision, future schema, corrupted,
+  missing, parent status invalid), plus `R3_0E_STORE_BACKEND_INVALID` and
+  `R3_0E_VERSION_INVALID`.
 
 ## Apply change → follow-up case
 
@@ -128,16 +197,20 @@ The follow-up link itself has its own strict shape:
 | `parentCaseId` | The case the experiment was authored against. |
 | `experimentId` | The experiment this follow-up is associated with. |
 | `followUpCaseId` | The case that holds the post-change session. |
-| `createdAt` | Monotonic per-store. |
+| `createdAt` | ISO-8601 timestamp. |
 
 The link store enforces:
 
-- **Path grammar** on `linkId`, `parentCaseId`, `followUpCaseId`, `experimentId`.
+- **Path grammar** on `linkId`, `parentCaseId`, `followUpCaseId`, `experimentId`
+  (Codex E2-R1-03 closure).
 - **Re-validation per fetched link** in `listForParent` — a presence-only check
-  on the parent is never enough; the store re-derives membership from the
-  authoritative reverse index.
-- **Reverse-index parent-membership** check at read time, so a malformed write
-  cannot leak follow-ups under the wrong parent.
+  on the parent is never enough; every link is re-validated as it is fetched
+  (Codex E2-R1-02 closure).
+- **Reverse-index parent-membership** check (`r3_0e_followupLinksByCase` →
+  `r3_0e_followupLinks`), so a malformed write cannot leak follow-ups under the
+  wrong parent (Codex E2-R2-01 closure).
+- **Parent status mutation only via `markParentStatus(linkId, newStatus)`**,
+  with `newStatus` restricted to `'present' | 'archived' | 'deleted'`.
 
 There is intentionally no "merge" or "promote" operation. A follow-up case
 never *becomes* the source case, and the source case is never edited to reflect
@@ -187,7 +260,7 @@ flag, and never reads anything outside the producer chain.
 
 Its inputs, in order:
 
-1. **The Experiment record** (E1), retrieved by id from the append-only store
+1. **The Experiment record** (E1), retrieved by id from the experiment store
    and verified through a closure-private WeakSet (`_authoritativeGraphs` /
    `verifyAuthoritativeGraph` pattern from R3.0D, extended for E3).
 2. **The applied change**, as declared in `experiment.setupChange`. The
@@ -227,7 +300,7 @@ The output shape is:
   limitations,                 // honest scope caveats (always populated, even on confirmed)
   cannotConclude,              // boolean shortcut mirroring class === 'cannotConclude'
   provenance,                  // { syntheticOrReal, mappingTrusted, calibrationPresent }
-  createdAt,                   // monotonic
+  createdAt,                   // ISO-8601
   generationToken              // single-use token; bumped per case-transition
 }
 ```
@@ -274,59 +347,89 @@ Every outcome — including `confirmed` — carries:
   with the same tyre set to corroborate"). This field is required on every
   outcome, not just blocked ones.
 
-## Append-only Timeline (monotonic createdAt, no overwrite, out-of-order rejected)
+## Append-only Timeline (non-decreasing `createdAt`, no overwrite, out-of-order rejected)
 
 The Timeline is the canonical, ordered view of the experiment loop's history
-for a given case lineage. It is its own store (E4 — the timeline-store) and
-is **append-only** with the following hard invariants:
+for a given case lineage. It is **its own store** —
+`createTimelineStore` in `renderer/js/r3-0e-stores.js`, with the contract in
+`contracts/r3.0e/case-timeline-contract.js` (UMD export
+`R3_0E_CaseTimelineContract`). It is the **only** append-only store in
+R3.0E; the experiment / outcome / follow-up-link stores allow targeted
+mutation. The timeline-store does not.
 
-1. **Monotonic `createdAt` per store.** A write whose `createdAt` is not
-   strictly greater than the latest entry's `createdAt` for the same parent
-   lineage is rejected. There is no clock-skew tolerance and no "renumber on
-   import" — out-of-order writes fail closed with a reason-code.
-2. **No overwrite.** A timeline entry's id is single-write. A second write
-   with the same id is rejected. There is no `PUT` semantics, only append.
-3. **No deletion.** The store has no delete operation in the runtime API.
-   Migrations (R3.0F F1) only ever *add* entries when upgrading older stores;
-   they do not remove existing ones.
+The store keys timelines by `caseId`: the persisted document for a case is
+`{ schemaVersion, caseId, events }`, with `schemaVersion = 1` (the constant
+`SUPPORTED_SCHEMA_VERSION`) and `events.length` hard-capped at the constant
+`ARRAY_CAP = 64`. Each event is a plain object with exactly the keys
+`{ eventId, kind, createdAt, i18nKey, params }`.
+
+The runtime API is just two methods: `getTimeline(caseId)` and
+`appendEvent(caseId, event)`. Append enforces:
+
+1. **Non-decreasing `createdAt`.** The append path runs
+   `if (isNaN(newMs) || newMs < prevMs) throw R3_0E_TIMELINE_OUT_OF_ORDER;`
+   against the most-recent event. **Equal timestamps are accepted**; only a
+   strictly-earlier timestamp is rejected. The contract validator follows the
+   same rule — `if (msNow < prevTime) reasons.push(TIMELINE_ORDERING_INVALID);
+   else prevTime = msNow;`. There is no clock-skew tolerance beyond the
+   equality case and no "renumber on import".
+2. **No duplicate `eventId`.** `appendEvent` rejects when any existing event's
+   `eventId` matches the new event's `eventId` with
+   `R3_0E_TIMELINE_DUPLICATE_EVENT`. Single-write per id, full stop.
+3. **No deletion / no update.** The store has no delete and no update operation
+   in its runtime API. F1 migration (R3.0F) only ever *adds* events when
+   upgrading older timelines; it does not remove or rewrite existing ones.
 4. **Deep-freeze on write, structured-clone on read.** Callers cannot mutate
    an entry by holding its reference, and a returned entry cannot be used to
    smuggle a mutation back into the store.
-5. **Pre-clone audit.** Every entry is recursively audited before clone — any
-   non-allowlisted property, prototype-poisoning attempt, or accessor-throwing
-   shape is rejected, not stripped.
-6. **Producer attestation.** Each entry declares its producer (`E1` /
-   `E2` / `E3` / `E4` viewmodel) and is verified through the same
-   closure-private WeakSet pattern that R3.0D uses for evidence graphs. An
-   entry whose producer attestation does not verify is invisible to the
-   viewmodel.
+5. **Recursive descriptor audit before clone.** The contract walks the
+   timeline and each event recursively, rejecting any non-allowlisted
+   property, prototype-poisoning attempt, or accessor-throwing shape — the
+   audit runs *before* `toCleanCopy` (Codex E1-R2-02 closure), not after.
+6. **Future-schema fail-closed.** `schemaVersion > 1` →
+   `UNSUPPORTED_FUTURE_SCHEMA`; `schemaVersion < 1` or non-integer →
+   `TIMELINE_INVALID`.
+7. **Producer attestation (R3.0F F1).** F1 is the only producer that fabricates
+   timeline events during a migration, and it refuses to fabricate
+   attestation sentinel fields — see the R3.0F migration doc for the
+   `PRODUCER_ATTESTATION_REFUSED` contract.
 
-The Timeline entry types are intentionally narrow:
+The Timeline event-kind enum is closed. The full allowed set, verbatim from
+the contract, is:
 
-| Entry type | Producer | Carries |
-|-----------|----------|---------|
-| `experiment_authored` | E1 | `experimentId`, `sourceCaseId`, `targetMetric`, `expectedDirection` |
-| `change_applied` | E1 (status transition) | `experimentId`, declared `setupChange` summary |
-| `followup_linked` | E2 | `linkId`, `experimentId`, `followUpCaseId` |
-| `outcome_classified` | E3 | `experimentId`, `class`, `reasonCodes`, `controlledVariableIntegrity`, `credibility`, `limitations` |
-| `experiment_closed` | E1 (status transition) | `experimentId` |
+| `kind` | Producer | Carries |
+|--------|----------|---------|
+| `baseline_captured` | R3.0E producer chain (case admission) | The case-record snapshot reference that becomes the baseline reading |
+| `hypothesis_recorded` | R3.0D D3 | `hypothesisId`, target metric, expected direction |
+| `recommendation_made` | R3.0E E3 | `recommendationId`, physical-unit setup lever(s), expected direction/range |
+| `experiment_planned` | R3.0E E1 (`status: draft`) | `experimentId`, `sourceCaseId`, `targetMetric`, `expectedDirection` |
+| `experiment_applied` | R3.0E E1 (`status: applied`) | `experimentId`, declared `setupChange` summary |
+| `follow_up_case_created` | R3.0E E2 link store | `linkId`, `experimentId`, `followUpCaseId`, `parentCaseId` |
+| `outcome_classified` | R3.0E E3 classifier | `experimentId`, `class`, `reasonCodes`, `controlledVariableIntegrity`, `credibility`, `limitations` |
+| `experiment_abandoned` | R3.0E E1 (stop-condition or explicit abandon) | `experimentId`, abandon reason-code |
+
+No other `kind` values exist. A timeline event whose `kind` is not in this
+list is rejected with `TIMELINE_INVALID`; there is no `experiment_authored`,
+no `change_applied`, no `followup_linked`, no `experiment_closed`, no future
+extension by free text.
 
 The Timeline never carries free-form narrative, and it never embeds a
 caller-provided summary. The viewmodel renders each entry by reading its
-reason-codes and lifting them through the same i18n code-resolution that the
-rest of R3.0 uses.
+reason-codes and `i18nKey` and lifting them through the same i18n code
+resolution that the rest of R3.0 uses.
 
 Because the Timeline is the only ordered, append-only record of *what the
 product told the engineer*, two product invariants follow:
 
-- A classified outcome is visible in the Timeline exactly once. Re-running
-  the classifier on the same experiment does not produce a second
-  `outcome_classified` entry — the second run is rejected with
-  `OUTCOME_ALREADY_CLASSIFIED`.
+- A classified outcome appears in the Timeline exactly once. Re-running the
+  classifier on the same experiment does not produce a second
+  `outcome_classified` event — the second append is rejected by the
+  duplicate-`eventId` rule. The experiment store may itself update other
+  fields, but it cannot rewrite history.
 - A `cannotConclude` or `invalid_comparison` outcome is **not** silently
-  upgraded by a later, better follow-up. The original outcome stays in the
-  Timeline. A later follow-up is a new experiment with its own outcome — the
-  history is preserved, not overwritten.
+  upgraded by a later, better follow-up. The original `outcome_classified`
+  event stays in the Timeline. A later follow-up is a new experiment with
+  its own outcome — the history is preserved, not overwritten.
 
 This is the experiment loop's honesty contract in storage form: the product
 remembers what it could and could not honestly say, in the order it said it,

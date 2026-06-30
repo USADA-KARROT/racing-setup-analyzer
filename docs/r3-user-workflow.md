@@ -16,7 +16,7 @@ A note on version numbers used in this document: the **R3 case-record schema ver
 
 On the very first launch the local store is empty. R3.0B has provisioned an IndexedDB-backed `case-store`, `session-store`, and `caseAssociation` index through `storage-backend.js`; in Node test mode the same contracts run against an in-memory backend. There is no remote sync, no account, no cloud — every artefact lives on the user's device.
 
-The application runs inside an Electron host configured with `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true` by default; the preload bridge exposes exactly two values to the renderer — `{platform, version}` — and nothing else. The renderer cannot reach Node, the file system, or arbitrary IPC; every privileged operation goes through the storage backend's typed contract.
+The application runs inside an Electron host configured with `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true` by default; the preload bridge exposes exactly two values to the renderer — `{platform, version}` — and nothing else. The renderer cannot reach Node, the file system, or arbitrary IPC; every privileged operation goes through the storage backend's typed contract — the R3.0B `backend.transact({ stores, reads, compute })` contract is the single channel for persistent reads and writes.
 
 Across the entire R3.0F surface, two activation flags govern what the runtime is allowed to do today. `runtimeConsumersAllowed` has been `true` since F1 — production services bind to authoritative inputs and emit results. `featureRegistryActivationAllowed` is `false` and remains `false` until `F6_RELEASE`; any path that would activate a deferred capability through the feature registry fails closed with a named reason code, regardless of whether the underlying service is otherwise ready.
 
@@ -124,7 +124,7 @@ If any step in this chain fails — track identity mismatch, missing normalized-
 | Corner segmentation | C4 | Distance-based segmentation degenerate. |
 | Corner pairing | C4 | Corner counts/identities disagree between laps. |
 | Delta metrics | C5 | Any pre-requisite (lap-auth / track / distance / pairing) blocked. |
-| Comparison export | C6 | Any upstream step blocked, or the exporter cannot structured-clone the payload. |
+| Comparison export | C6 | Any upstream step blocked, or the bounded comparison-summary envelope cannot be assembled within the contract's bounds (see "Export comparison summary" below). |
 | Comparison workspace | C7 | No green comparison authority is in scope for the active Case + session. |
 | Activation | C8 | Case transition (`_r3cBeginCaseTransition`) has bumped the session-authority token mid-flight. |
 
@@ -160,13 +160,15 @@ Things the brief will never contain at runtime, by construction:
 - An engineer-grade sign-off framing.
 - Any number derived from synthetic data presented as real — the provenance label rides with the value through every stage.
 
-The brief is read-only. Acting on it requires the user to start an experiment.
+The brief is read-only. Acting on it requires the user to start an experiment. There is no runtime LLM authority anywhere in this pipeline; D3 and D4 are deterministic services over the verified evidence graph.
 
 ---
 
 ## Plan an experiment
 
-R3.0E introduced the experiment loop. An experiment is a user-authored plan, not an automated recommendation execution. The experiment store is append-only with monotonic `createdAt`; experiments cannot be edited in place, only superseded by new experiments that reference them.
+R3.0E introduced the experiment loop. An experiment is a user-authored plan, not an automated recommendation execution. R3.0E persistence lives in separate versioned stores under the `r3_0e_*` namespace (`r3_0e_experiments`, `r3_0e_experimentsIndex`, `r3_0e_outcomes`, `r3_0e_outcomesIndex`, `r3_0e_timelines`, `r3_0e_followupLinks`, `r3_0e_followupLinksByCase`, `r3_0e_storeMetadata`) — these stores deliberately do not extend the frozen R3.0B portable case-record schema body, and they carry no runtime authority of their own. WeakSet identity is closure-private and cannot survive reload; rehydration consumers must re-validate via the E1 contracts before treating persisted values as authoritative.
+
+The experiment store (`createExperimentStore`) is **not append-only**. Its public surface is `create` / `update` / `get` / `list` / `remove`. `update` requires an existing record, rejects future-schema writes (`R3_0E_EXPERIMENT_FUTURE_SCHEMA`), and rejects stale writes by createdAt mismatch (`R3_0E_EXPERIMENT_STALE_WRITE`). `get` re-validates and deep-freezes the record on every read; `remove` deletes from both the payload store and the index. Outcomes, by contrast, have a create-only public surface (`create` / `get` / `listForExperiment`): there is no `update` and no `remove` exposed on the outcome store, so once written an outcome is effectively immutable from the application's API, though this is "immutable through the public surface", not "strictly append-only across all stores". Only the timeline store, described later, is strictly append-only.
 
 An experiment record carries:
 
@@ -195,14 +197,13 @@ After import the follow-up Case goes through exactly the same gates as the origi
 
 ## Link the follow-up Case (same parent only)
 
-R3.0E added the follow-up link store. Linking is the user's explicit act of saying "this new Case is the post-change measurement of that earlier experiment."
+R3.0E added the follow-up link store (`createFollowUpLinkStore`). Linking is the user's explicit act of saying "this new Case is the post-change measurement of that earlier experiment."
 
 The link store enforces:
 
-- **Same parent only.** The followUpLink record's `parentCaseId` is path-grammar-validated and re-checked against the parent Case's existence on every fetch. Cross-case association where the new Case's parent differs from the experiment's parent Case is rejected at the store boundary — `caseAssociation cross-case forbidden`.
-- **Re-validation on listForParent.** Each fetched link is re-validated; a stale or tampered link surfaces as a failed lookup, not a silent acceptance.
-- **Reverse-index parent-membership check.** The reverse index is not trusted alone; the actual parent-membership relationship is verified.
-- **Append-only.** The link record is never edited; corrections are new records that supersede.
+- **Same parent only.** The `followUpLink` record's `parentCaseId` is path-grammar-validated and re-checked against the parent Case's existence on every fetch. Cross-case association where the new Case's parent differs from the experiment's parent Case is rejected at the store boundary — `caseAssociation cross-case forbidden`.
+- **Re-validation on listForParent.** The reverse index `r3_0e_followupLinksByCase` is read first, but it is not trusted alone: the actual link record is then fetched, re-validated through the E1 contract, and rejected if its `parentCaseId` does not match the index key (the E2-R2-01 reverse-index parent-membership closure).
+- **Parent-status mutation through a typed surface, not edits.** The link store exposes `create` / `get` / `listForParent` / `markParentStatus`. `markParentStatus(linkId, newStatus)` mutates only the `parentStatus` field in place, and only accepts values from a closed enum `['present', 'archived', 'deleted']` (any other value rejects with `R3_0E_LINK_PARENT_STATUS_INVALID`). Missing records reject with `R3_0E_LINK_MISSING`; the merged record is re-validated through the E1 contract (`R3_0E_LINK_INVALID`). There is no general-purpose `update` or `remove` on the link store — `markParentStatus` is the only mutation, and it is bounded to the closed enum above. Corrections that need to change other fields are made through new records that supersede.
 
 Once linked, the follow-up Case is now eligible to be the subject of an outcome classification against its parent experiment.
 
@@ -234,7 +235,7 @@ The outcome class names — including `refuted` rather than any softer term — 
 
 The classifier output record carries: class, reason codes, supporting and contradicting evidence IDs, controlled-variable integrity result, comparison validity result, expected-vs-observed direction summary, limitations, `cannotConclude` flag where applicable, provenance, `createdAt`, and a generation token tying the outcome to the exact authoritative inputs used.
 
-The classifier never produces a measured K_us magnitude, a lap-time gain, a causal claim, or a setup-click recommendation. Its output is a typed directional + diagnostic record, attached to the experiment in the append-only timeline.
+The classifier never produces a measured K_us magnitude, a lap-time gain, a causal claim, or a setup-click recommendation. Its output is a typed directional + diagnostic record, attached to the experiment through a new outcome-store `create` (recall: outcomes are written once through the public surface; there is no update path), and the timeline store records the event separately.
 
 ---
 
@@ -251,44 +252,79 @@ The Timeline view shows the user the complete chronological record of work on a 
 - Outcomes classified.
 - Notes (free text the user attached at any step).
 
-Timeline entries are append-only. `createdAt` is monotonic per store — a new entry's timestamp is strictly greater than the previous entry's. The timeline store pre-clones inputs before audit so callers cannot mutate fields underneath the audit. The audit itself fail-closes on overflow.
+The timeline store (`createTimelineStore`) is the only R3.0E store that is strictly append-only. Its public surface is `getTimeline(caseId)` and `appendEvent(caseId, event)`; there is no `update` and no `remove`. Keying is per-case (`r3_0e_timelines` stores one timeline document per `caseId`). `appendEvent` rejects duplicate `eventId` (`R3_0E_TIMELINE_DUPLICATE_EVENT`), rejects out-of-order timestamps where the new event's createdAt is less than the previous event's or is unparseable (`R3_0E_TIMELINE_OUT_OF_ORDER`), rejects future-schema documents (`R3_0E_TIMELINE_FUTURE_SCHEMA`), and re-validates the resulting timeline before write (`R3_0E_TIMELINE_INVALID`). The store pre-clones inputs before audit so callers cannot mutate fields underneath the audit. The audit itself fail-closes on overflow.
 
-The user cannot edit a past entry. Corrections are new entries. This is intentional: the timeline is the evidence chain that the Engineer Brief, Outcome Classifier, and any future export rely on. Mutability in the timeline would let earlier conclusions be silently re-justified by later edits.
+The user cannot edit a past entry. Corrections are new entries. This is intentional: the timeline is the evidence chain that the Engineer Brief, Outcome Classifier, and any future export rely on. Mutability in the timeline would let earlier conclusions be silently re-justified by later edits — and it would conflict with the per-store `appendOnly: true` invariant the timeline contract is built around.
 
-Reading the timeline is the user's audit interface. Every conclusion they ever saw is reproducible from the timeline plus the case-record + session-record + telemetry artefacts.
+Reading the timeline is the user's audit interface. Every conclusion they ever saw is reproducible from the timeline plus the case-record + session-record + telemetry artefacts and the R3.0E payload stores.
 
 ---
 
-## Export comparison bundle / import roundtrip
+## Export comparison summary (R3.0C C6 bounded envelope)
 
-R3.0C C6 produces the Comparison Export. It is a self-contained, fail-closed-validated bundle that captures everything needed to reproduce a comparison authority on another machine running the same application version:
+R3.0C C6 produces the **Comparison Export**, defined by `contracts/r3.0c/comparison-export-contract.js` (module global `R3_0C_ComparisonExportContract`). It is a **bounded comparison-summary envelope**, not a full integrated case bundle. The contract is explicit about both its identity and its bounds.
 
-- Case identity and case record (schema-versioned at `v1.4.0`).
-- Session identity and session record.
-- Track identity and normalized-distance support metadata.
-- Reference lap ID, comparison lap ID, and the user-explicit-selection marker.
-- Corner segmentation result and corner pairing result.
-- The six allowlisted delta metrics with the fixed `(comparison − reference)` sign.
-- Provenance of every contributing telemetry artefact.
-- Engineer Brief, where one was generated, with full credibility / confidence / provenance / limitations / blockers / evidence references / next validation step.
-- Experiments, follow-up links, outcomes, and timeline entries reachable from the Case.
+The envelope shape is closed:
 
-The export is structured-clone-safe (R3.0F F1's structured-clone-only firewall) and serialised by a trap-free JSON serializer; producer-attestation defends against tampering at the producer side. On reimport, F1 migration treats the bundle as a `v1.4.0` baseline and runs deterministic migration if the schema baseline ever advances. Today the baseline is `v1.4.0` and the migration is a no-op identity; this is not an accident — the schema has not been modified through R3.0F and will not be until a major.
+```
+{ schemaIdentity: 'racing-analyzer/comparison-export',
+  schemaVersion: 1,
+  generatedAt: <ISO timestamp set by the production exporter, or null in CP1>,
+  payload:     null | <bounded plain object> }
+```
 
-What the export deliberately does NOT carry:
+Only the own-keys `schemaIdentity`, `schemaVersion`, `generatedAt`, `payload` are allowed; any other own-key on the envelope fails closed with `EXPORT_ENVELOPE_UNKNOWN_KEY`. The schema identity is deliberately distinct from the R3.0B / R2.3 case-export identity — the contract exposes a helper `isDistinctFromCaseExportIdentity(caseExportIdentity)` that makes this requirement first-class so a comparison-export consumer cannot be fed a case-export bundle and vice versa.
+
+The payload is bounded by the contract:
+
+- `payload` may be `null` (the CP1 default) or a plain object — nothing else.
+- Arrays inside the payload are capped at `MAX_BOUNDED_ARRAY = 64`, mirroring `MAX_CORNERS_COMPARED`. **No raw sample arrays.** If a payload is provided it must already be a bounded comparison *summary*, not a window of telemetry samples.
+- Numeric scalars must be finite — `NaN`, `Infinity`, `-Infinity` reject with `EXPORT_PAYLOAD_NON_FINITE_NUMBER`.
+- Each string field is capped at `MAX_STRING_UTF8_BYTES = 4 * 1024` (4 KiB) with `EXPORT_PAYLOAD_STRING_TOO_LONG`.
+- The whole envelope's serialised UTF-8 size is capped at `MAX_ENVELOPE_UTF8_BYTES = 256 * 1024` (256 KiB) with `EXPORT_PAYLOAD_ENVELOPE_TOO_LARGE`.
+- Depth greater than 8 is refused.
+- Exotic objects — `Date`, `Map`, `Set`, `RegExp`, `Proxy`, `Buffer`, typed arrays — are refused.
+- Non-scalar values — `function`, `symbol`, `bigint`, `undefined` — are refused.
+
+The public API surface for this envelope is exactly `buildComparisonExportEnvelope(payload)`, `validateComparisonExportEnvelope(env)`, `isDistinctFromCaseExportIdentity(caseExportIdentity)`, plus the named constants `COMPARISON_EXPORT_IDENTITY`, `COMPARISON_EXPORT_SCHEMA_VERSION`, `MAX_BOUNDED_ARRAY`, `MAX_STRING_UTF8_BYTES`, `MAX_ENVELOPE_UTF8_BYTES`, and `ENVELOPE_KEYS`.
+
+The CP1 implementation that ships today wires no real export command yet and embeds no data: `payload` defaults to `null` and `generatedAt` is stamped `null`. A future production exporter is the place where a bounded comparison summary will be assembled from upstream C2–C5 results and stamped with a real timestamp. **Even then, the envelope will carry a bounded summary — not engineer briefs, not experiment records, not follow-up links, not outcomes, not the timeline.** Those R3.0D / R3.0E artefacts live in their own stores and have their own contracts; they are not co-bundled into the comparison-export envelope.
+
+## Export and reimport a Case (R3.0B portable case bundle)
+
+The Case-level export/import path is a **separate** path from the comparison export. It is verified end-to-end by `tests/e2e/flow-08-export-import.test.js` (header: *R3.0F F2 · Flow 08: case export + reimport*). The shape of the path:
+
+- The producing instance calls `src.caseStore.exportCase(caseId)` and receives `{ ok, bundle }`. The bundle is **R3.0B schema-validated** and explicitly contains **no raw telemetry array** (the flow test asserts the bundle has no `"raw":[` substring).
+- The bundle is producer-attestation-checked. R3.0F F1 never fabricates attestation, and refuses producer-attestation sentinel fields with `PRODUCER_ATTESTATION_REFUSED`. Imported records carry no producer attestation because the engine never fabricates one.
+- The receiving instance calls `dst.caseStore.importBundle(bundle)` and receives `{ ok, caseId }`. The imported record's `recordType` is `imported_summary` and is **never** promoted to `local_full` — that promotion path does not exist by construction.
+- `dst.caseStore.open(caseId)` on the imported record reports `degraded: true`. Imported records are degraded summaries; capability evaluation against them runs through the same fail-closed gates as any other degraded input.
+- A duplicate import of the same `imported_summary` is refused with a code matching `/IMPORTED_SUMMARY|IMPORTED/`.
+- F1 migration sees `imported_summary` as **at-target** — running the migration engine on an already-imported case is a no-op (`noop = 1`).
+- A stale `cachedCaseId` reference after import throws `STALE_CASE_REF` through `assertNoStaleCaseRef`; nothing downstream is allowed to keep operating on a no-longer-valid case handle.
+- The roundtrip preserves the public fields the bundle is meant to carry (the flow test pins `metadata.title` as the explicit example), and ends with zero console errors.
+
+Both paths — the bounded comparison-summary envelope (R3.0C C6) and the case-export bundle (R3.0B / flow-08) — are intentionally bounded. **Neither path roundtrips a full integrated C+D+E payload** containing engineer briefs, experiment records, follow-up links, outcomes, and the full timeline. The comparison export is bounded by its envelope contract; the case export is bounded by the R3.0B schema and the `imported_summary` degraded-rehydration semantics. Any consumer that wants the R3.0D/E artefacts has to query the producing instance's stores directly — those artefacts are not co-bundled into either export today.
+
+What both exports deliberately do NOT carry:
 
 - Any setting that would let the receiving instance auto-pick a reference lap. Reference selection on the receiving side remains user-explicit.
 - Any hardware-click recommendation.
 - Any measured K_us magnitude that was not eligible at production time.
-- Any conclusion stripped of its credibility / provenance / limitations metadata. The honesty contract is part of the payload, not optional decoration.
+- A producer-attestation field synthesised by the import engine. Imported records carry the producer's attestation if any, or none at all; the engine never fabricates one.
 
-Roundtripping a Case (export, reimport into a clean library) produces an equivalent capability evaluation. If the receiving instance has the same vehicle preset (one of 501) and the same application version, the Engineer Brief and Outcome Classifier produce the same substantive record — with timestamps and generation tokens naturally differing per run, since each invocation regenerates its own time-anchored identity. If the preset count or version do not match, the application refuses to start rather than running with drifted invariants.
+Where a conclusion does cross a boundary (a comparison summary on the C6 path, or the public fields the R3.0B case bundle preserves), it carries its credibility / provenance / limitations metadata as part of the payload — the honesty contract is not stripped to fit either envelope's bounds.
+
+If the receiving instance's preset count or application version drift from the producing side's invariants, the application refuses to start rather than running with drifted invariants.
 
 ---
 
 ## End-to-end verification posture
 
-The workflow described above is exercised under R3.0F's verification harness. F2 ships nine end-to-end flows that walk the full path from first-launch through Case creation, telemetry import, capability evaluation, reference selection, comparison, Engineer Brief, experiment planning, follow-up linking, outcome classification, and bundle export / roundtrip. F3 hardens six probe areas: the Electron boundary (preload surface, IPC contract, sandbox posture), storage-backend failure modes (write rejection, quota exhaustion, partial-write detection), no-stale-UI invariants (the UI never renders a derived value that was produced from inputs since invalidated), large-library behaviour (the 501-preset browser and case lists at realistic scale), XSS surfaces (the rendered Engineer Brief, timeline notes, and CSV-derived strings are untrusted-by-default), and supply-chain integrity (build reproducibility and dependency provenance at packaging time).
+The workflow described above is exercised under R3.0F's verification harness.
+
+**F2 ships nine end-to-end flows** under `tests/e2e/flow-{01..09}-*.test.js`. Each flow walks a user-visible path from the first-launch surface through the relevant gates, and each flow ends with zero console errors. The flows cover Case creation and persistence, telemetry import and preflight, capability tier evaluation, reference-lap selection and comparison authority, Engineer Brief production, experiment planning, follow-up linking, outcome classification, the timeline append-only invariant, and — relevant to this section — `flow-08-export-import.test.js`, the case export + reimport flow described above.
+
+**F3 hardens six probe areas** under `tests/e2e/hardening-{01..06}-*.test.js`, totalling 133 assertions: the Electron boundary (preload surface, IPC contract, sandbox posture), storage-backend failure modes (write rejection, quota exhaustion, partial-write detection), no-stale-UI invariants (the UI never renders a derived value that was produced from inputs since invalidated), large-library behaviour (the 501-preset browser and case lists at realistic scale), XSS surfaces (the rendered Engineer Brief, timeline notes, and CSV-derived strings are untrusted-by-default), and supply-chain integrity (build reproducibility and dependency provenance at packaging time).
 
 These flows and probes are the empirical floor under every fail-closed promise made in this workflow document. When the workflow says a step blocks with a named reason code, F2 walks the user-visible path that hits that block; when it says a boundary is enforced, F3 attacks the boundary directly.
 
@@ -307,5 +343,6 @@ The workflow described above is exhaustive for R3.0F. The following remain expli
 - Automatic steering or sensor calibration.
 - Runtime LLM decision authority of any kind.
 - Cloud collaboration, multi-user, or remote sync.
+- A single export envelope that roundtrips the full integrated C+D+E payload. The comparison-export envelope is a bounded summary; the case-export bundle is bounded by R3.0B schema and `imported_summary` semantics. R3.0D/E artefacts are not co-bundled into either export.
 
 Synthetic data never masquerades as real. Driver behaviour is never silently promoted to a vehicle characteristic. Correlation is never silently promoted to causation. Prediction is never silently promoted to a guaranteed result. Wherever any of those promotions would have to happen, the product blocks instead, with a named reason code and an honest substitute where one exists.

@@ -1,167 +1,202 @@
 # R3.0 Credibility Model
 
-This document is the R3.0-specific extension of [`docs/credibility-and-trust.md`](./credibility-and-trust.md). It does not replace the ladder defined there; it pins down the **closed-rung enum** that every R3.0 producer must emit, the **conditions under which each rung may be granted**, what each rung **guarantees and explicitly does NOT guarantee**, and the governance rules — producer attestation, fail-closed defaults, cross-case + cross-session forbidden propagation — that prevent a rung from being upgraded by anything other than the producer that originally derived it.
+This document is the R3.0-specific extension of [`docs/credibility-and-trust.md`](./credibility-and-trust.md). It does not replace the ladder defined there; it pins down the **closed-rung enums** that each R3.0 producer must emit, the **conditions under which each rung may be granted**, what each rung **guarantees and explicitly does NOT guarantee**, and the governance rules — producer attestation, fail-closed defaults, cross-case + cross-session forbidden propagation — that prevent a rung from being upgraded by anything other than the producer that originally derived it.
 
-The credibility ladder defined in `credibility-and-trust.md` (Physics > Model > Measured > Derived > Heuristic > Unavailable) is the higher-level taxonomy and remains the user-facing labelling throughout R3.0. R3.0 producers — case-store (R3.0B), comparison authority (R3.0C), decision engine (R3.0D), experiment loop (R3.0E), and integrated delivery (R3.0F) — emit values tagged with the closed-rung enum below, which maps directly onto the ladder rungs the producer is authorised to claim. The full ladder Physics > Model > Measured > Derived > Heuristic > Unavailable remains the user-facing taxonomy; the enum is the machine-level tag the producers emit.
+The credibility ladder defined in `credibility-and-trust.md` (Physics > Model > Measured > Derived > Heuristic > Unavailable) is the higher-level taxonomy and remains the user-facing labelling throughout R3.0. The contracts that R3.0 producers consume are **closed enums defined in code**: the R3.0C comparison-authority contract (`contracts/r3.0c/credibility-contract.js`) and the R3.0D evidence/conclusion contracts (`contracts/r3.0d/credibility-contract.js`). Both contract modules carry the same opening statement in their headers: *credibility is OWNED by the domain/service (it is an INPUT here); a UI/consumer never derives it. This module only VALIDATES caller-supplied authority — it computes no new measurement and reads no telemetry.*
 
 Nothing in this document permits a downstream consumer to **upgrade** a rung. A rung may only be **demoted** to `Unavailable` (blocked, with a reason) when a quality gate fails. Upgrade is structurally impossible by the producer-attestation contract: the producer that derived the value is the only authority for its rung, and that producer's attestation is verified, not trusted.
 
 ---
 
-## The closed rung enum: measured / derived / heuristic, plus the synthetic provenance flag
+## The contract enums: three distinct closed enums, defined in code
 
-Every value an R3.0 producer emits carries a `credibility` field whose value is drawn from a **closed runtime enum of exactly three rungs**, and a separate `provenance` flag that may carry a `synthetic` tag travelling alongside the rung. The runtime enum and the provenance flag are independent fields on the emission envelope; together with `limitations[]`, `blockers[]`, `evidenceRefs[]`, and `nextValidationStep` they form the honesty-contract envelope mandatory on every R3.0 emission.
+There is no single universal three-rung enum in R3.0. There are **three distinct closed enums**, each defined in a contract module and consumed by a specific producer family. A pipeline boundary that crosses between two of them re-validates against the receiving contract; values are never silently re-tagged.
 
-| Rung         | Ladder mapping                    | Producer authority                                                                                                                  |
-|--------------|-----------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|
-| `measured`   | Measured (or Physics if closed-form on confirmed inputs) | A producer that consumed **real, confirmed, calibration-bound telemetry** and produced a magnitude.                                  |
-| `derived`    | Derived                           | A producer that applied a **deterministic transform** to authoritative inputs whose rungs were already established.                  |
-| `heuristic`  | Heuristic                         | A producer that emitted a **rule-of-thumb observation** — directional, bounded, never magnitude.                                     |
+### R3.0C `CREDIBILITY_LADDER` — comparison-authority credibility (6 values)
 
-The full ladder Physics > Model > Measured > Derived > Heuristic > Unavailable remains the user-facing taxonomy. At the runtime-enum level, R3.0 producers collapse `Physics` and `Model` into `measured` (when the closed-form physical relation was evaluated on confirmed-measured inputs) or `derived` (when the model prediction is a deterministic transform of inputs) — they do not get their own runtime enum value because R3.0 producers never need to distinguish them at the credibility-field level. The ladder names remain the user-facing labels; the enum is the machine-level tag.
+Defined in `contracts/r3.0c/credibility-contract.js` (UMD global `R3_0C_CredibilityContract`). The header comment reads verbatim: *credibility ladder (docs/credibility-and-trust.md) + provenance (R3.0B case-record enums). Frozen.*
 
-The enum is **closed**: a producer that cannot fit its output into one of these three rungs **must emit `Unavailable`** (the higher-level ladder rung, surfaced as a blocked capability with a fail-closed reason). There is no fourth rung, no "estimated", no "approximate", no "best-effort".
+```
+CREDIBILITY_LADDER = ["Physics", "Model", "Measured", "Derived", "Heuristic", "Unavailable"]
+```
 
-Alongside the rung, the **`provenance` flag** carries one of `real` / `synthetic` / `unverified`. The `synthetic` provenance tag is **not a rung** — it is an off-ladder provenance flag that travels alongside whichever rung the producer emits. A value derived from the Demo Analysis Case (the clean-room golden-path case shipped with the product) carries `provenance: "synthetic"` regardless of whether its rung is `measured`, `derived`, or `heuristic`, because the underlying data did not originate from a real measurement of the user's vehicle. The synthetic flag is the laundering-prevention mechanism: it never gets stripped by a downstream transform, and it forbids any consumer from claiming the value is a real-world result.
+This is the same six-rung ladder that `credibility-and-trust.md` exposes as the user-facing taxonomy. R3.0C carries it across the comparison-authority boundary as a frozen closed enum. The contract's `REQUIRED_FIELDS` are `["credibility", "provenance", "confidence", "limitations", "blockedReasons"]`; any missing, blank, or out-of-enum field yields the reason code `INSUFFICIENT_CREDIBILITY_METADATA` and the validator returns `{ valid: false, reasonCodes: [...] }`. The companion `PROVENANCE` enum is `["synthetic", "real", "unverified"]` and the companion `CONFIDENCE` enum is `["low", "medium", "high"]`. The R3.0C normalizer (`normalizeCredibilityMetadata`) is a **pass-through assembler**: it validates and then returns a frozen copy of caller-supplied authority, or a blocked result; it derives nothing. `derivedHere: false` on every successful return.
 
-The enum is **monotonic on demotion only**. A pipeline step that consumes a `measured` input and applies a non-deterministic or calibration-loose transform must emit `heuristic` or `Unavailable` — it may **never** re-emit `measured`. A pipeline step that consumes a `provenance: "synthetic"` input emits a `provenance: "synthetic"` output; the synthetic flag travels through the entire chain. This is the no-laundering rule (see *Cross-case + cross-session forbidden propagation* below).
+### R3.0D `EVIDENCE_CREDIBILITY` — evidence-credibility ladder (4 values)
 
----
+Defined in `contracts/r3.0d/credibility-contract.js` (UMD global `R3_0D_CredibilityContract`).
 
-## measured: when, what calibration is required, what limitations apply
+```
+EVIDENCE_CREDIBILITY = ["measured", "derived", "heuristic", "synthetic"]
+```
 
-A producer may emit `credibility: "measured"` **only** when every one of the following gates is satisfied on the run that produced the value:
+The contract's own header comment reads verbatim: *R3.0D credibility ladder. Directive §8 mandates `measured / derived / heuristic / synthetic` for EVIDENCE credibility (i.e., where the data came from). The five-step ladder from R3.0C is the CONCLUSION credibility (the strength of a downstream claim). D1 keeps both vocabularies cleanly separated so a heuristic source cannot be re-labelled as a measured conclusion.*
 
-1. The underlying channel is **mapped and confirmed** in the active session's channel-map. A merely mapped channel is blocked. Confirmation is a user action, not an inference from presence.
-2. The channel's **provenance is `real`** (machine-read from the source; not `synthetic` and not `unverified`). A value computed on a `provenance: "synthetic"` channel may still be rung-tagged but carries the synthetic flag forward; it does not produce a real-world `measured` magnitude.
-3. The **timebase is monotonic and well-conditioned**: strictly increasing timestamps, sample density above the producer's per-capability floor, no gaps exceeding the producer's stated tolerance.
-4. The required **calibration is present, valid, and bound to the active session + channel mapping**. A calibration imported under a different mapping or a different session is not transferable; it must be re-bound explicitly by the user. R3.0 carries no implicit cross-session calibration.
-5. The window the value was computed over is **same-case + same-session** (see *Cross-case + cross-session forbidden propagation*). Aggregation across cases is forbidden. Aggregation across sessions within a case is forbidden.
+Two practical consequences of the two-vocabulary split:
 
-If any gate fails, the producer emits `Unavailable` with a machine-readable reason code (one of the 55+ R3.0C reason codes, or its R3.0D/R3.0E equivalent — the reason-code catalogs live alongside each producer's module: `renderer/js/r3-0c-*.js` for comparison authority codes, `renderer/js/r3-0d-*.js` for decision-engine codes, and `renderer/js/r3-0e-*.js` for experiment-loop codes). The producer does **not** demote to `derived` or `heuristic` as a fallback — those rungs have their own input requirements that the failing run almost certainly does not satisfy. Silent demotion would launder a fail-closed condition into a soft answer, which violates the honesty contract.
+1. In the R3.0D evidence layer, **`synthetic` is a credibility rung**, not a provenance flag. An evidence node sourced from the Demo Analysis Case is tagged `credibility: "synthetic"` at the evidence layer, and the cross-layer assertion `SYNTHETIC_LIMITATION_REQUIRED` (constant `CODES.LIMITATION_SYNTHETIC_ONLY`) requires the node to carry the `LIMITATION_SYNTHETIC_ONLY` marker among its limitations. The contract header restates the constraint verbatim: *synthetic-honesty constraint: a `synthetic` provenance MUST carry the LIMITATION_SYNTHETIC_ONLY marker among its limitations.*
+2. In R3.0C and at the R3.0D *conclusion* layer (see below), **`synthetic` is a provenance value**, not a rung. The same word names different things at different layers — and the validators at each boundary enforce the layer-correct enum.
 
-**What `measured` guarantees**: the magnitude was produced by a calibration-bound transform of real telemetry on a monotonic timebase within a single same-case + same-session window. The producer attests to the calibration binding and the window boundary on every emission.
+### R3.0D `CONCLUSION_CREDIBILITY` — conclusion-credibility ladder (6 values)
 
-**What `measured` does NOT guarantee**:
-- It is not a professional-grade verdict. It carries the standard handling-analysis confounds — tyre state, track state, driver input, sensor drift — that `credibility-and-trust.md` enumerates.
-- It is not a vehicle characteristic. A measured magnitude in a corner is a *measurement on this run*; it does not generalise to other runs, other tyres, other track states, other drivers without the experiment loop (R3.0E) drawing that link explicitly.
-- It is not a setup recommendation. A measured magnitude is evidence the decision engine (R3.0D) may consult; the recommendation, if any, is derived separately and may emit a lower rung.
-- It is not a lap-time claim. R3.0 produces no lap-time gain quantities at any rung.
+Defined alongside `EVIDENCE_CREDIBILITY` in `contracts/r3.0d/credibility-contract.js`.
 
-A specific named example: **measured K_us**. A measured K_us would only be emitted when (1) steering-angle channel confirmed, (2) road-wheel steering calibration imported and verified, (3) calibration bound to the active mapping + session, (4) yaw + lateral-acceleration + speed channels confirmed and monotonic, (5) same-case + same-session window — every condition satisfied. If any single condition fails, the producer emits `Unavailable` and the decision engine substitutes a `heuristic`-rung **directional tendency** observation — never a fabricated magnitude.
+```
+CONCLUSION_CREDIBILITY = ["Physics", "Model", "Measured", "Derived", "Heuristic", "Unavailable"]
+```
 
----
+Identical in members and ordering to R3.0C's `CREDIBILITY_LADDER`. The R3.0D contract uses it for the *strength of a downstream claim* — a hypothesis, a brief, an outcome class — separately from the evidence-layer ladder that names *where the data came from*. The split is what the contract calls "cleanly separated so a heuristic source cannot be re-labelled as a measured conclusion."
 
-## derived: deterministic transform + what counts as deterministic
+### Confidence at D1: closed-state enum only, no numeric value
 
-A producer may emit `credibility: "derived"` when its output is a **deterministic function of authoritative inputs whose rungs were already established by their respective producers**. "Deterministic" in R3.0 has a precise, narrow definition:
+R3.0D's confidence contract at D1 is unusually strict and worth reproducing in full. `CONFIDENCE_STATES` is the closed enum `["unresolved", "not_computed"]`, with the contract comment verbatim: *Confidence state at D1 — closed enum. There is NO numeric `value` field allowed at D1.* The discipline comment elaborates: *A caller CANNOT directly supply a numeric confidence at D1. Confidence is either: (a) UNRESOLVED — explicit `{ state: 'unresolved' }` marker, OR (b) NOT_COMPUTED — explicit `{ state: 'not_computed' }` marker. The numeric confidence value is produced ONLY by a deterministic engine at D4_PRIORITY_ENGINE. Any D1 confidence object that carries a numeric `value` field is rejected with HYPOTHESIS_CONFIDENCE_FORBIDDEN.* `validateConfidenceShape(c)` therefore enforces a closed-key plain object whose only allowed own key is `state`; numeric `value`, `score`, `numeric`, or `probability` keys are rejected, and any extra own key returns `UNKNOWN_OWN_KEY`.
 
-A transform is **deterministic** if and only if:
+The earlier R3.0 drafts spoke of "heuristic confidence capped at medium" as a runtime rule. That is not what the D1 contract layer encodes — D1 has no numeric confidence at all. The D4 priority engine is the only producer authorised to attach a numeric confidence, and any cap that engine applies lives in its module, not in this contract.
 
-1. Given the same inputs, it produces the same output on every invocation, byte-equivalent. No timestamps in output. No `Date.now()` reads, no `Math.random()`, no environment reads, no clock drift, no I/O.
-2. Its inputs are **authoritative**: they originated from a producer that emitted them with a rung already (`measured`, `derived`, or `heuristic`), and they passed the consumer's authority check. A caller-supplied `eligible: true` flag is **not** authoritative — eligibility is re-derived from raw evidence on every run (see *Authority, not presence* in `credibility-and-trust.md`).
-3. The transform is a **closed-form composition** of arithmetic, comparison, indexing, and the producer's own pure helpers. It does **not** include a model run, a heuristic threshold, a tunable constant chosen at runtime, or any decision a human would call "judgement".
-4. The output **does not exceed the rung floor of its lowest-rung input**. A transform consuming a `heuristic` input emits at most `heuristic`. A transform consuming a `provenance: "synthetic"` input emits a `provenance: "synthetic"` output at the same rung floor. The floor rule prevents upgrade by composition; the synthetic flag rule prevents laundering by composition.
+### Availability at D1: closed evidence-graph enum
 
-R3.0C delta metrics are the canonical example. The delta sign convention is fixed: **delta = (comparison − reference)**. The delta metric set is allowlisted (the 6 allowlisted delta metrics live in the R3.0C delta-metrics module); the segmentation is deterministic over the normalized-distance grid; the pairing is deterministic over the corner-identity assignment. Every step is closed-form. Inputs are `measured` (real telemetry on confirmed channels with a same-case + same-session pair of laps **explicitly selected by the user** — there is no fastest_valid auto-pick, no median auto-pick, no best_sector_composite auto-pick). The delta-metric emission is therefore `derived`.
+```
+AVAILABILITY = ["available", "unavailable", "partial", "unconfirmed"]
+```
 
-R3.0F migration outputs are another example. The v1.4.0 migration engine is deterministic by mandate — given the same input record byte-for-byte, it produces the same output record byte-for-byte. It consumes no clock, no random source, no environment. Its output rung is `derived` because the transform is closed-form over the R3.0B schema; the underlying values keep whatever rung they had pre-migration, and the synthetic flag (if any) is preserved across the v1.3 → v1.4.0 transform.
+Contract comment verbatim: *Availability enum — used by the evidence graph (whether a metric / channel is currently usable).* The validator (`validateAvailability`) rejects out-of-enum values with `EVIDENCE_OBSERVATION_INVALID`.
 
-**What `derived` guarantees**: byte-equivalent reproducibility given the same inputs; rung-floor preservation; synthetic-flag preservation; producer attestation of determinism.
+### Why the enums are closed
 
-**What `derived` does NOT guarantee**:
-- It is not a measurement. A derived value is a transform; if you want a magnitude tied to telemetry, look at the upstream `measured` input the transform consumed.
-- It is not a vehicle fact. A derived corner-pair, a derived segmentation boundary, a derived delta — these are deterministic geometric/numeric facts about the inputs, not statements about the vehicle, the driver, or the setup.
-- It is not a professional-grade verdict. The derivation is mechanical; it does no judgement.
+Each enum is **closed**: a producer whose output cannot fit one of the listed values **must emit `Unavailable`** at the conclusion layer (with a fail-closed reason) or fail its evidence validator (with an `EVIDENCE_*_INVALID` reason code). There is no "estimated", no "approximate", no "best-effort" path. The R3.0C and R3.0D validators are both `buildBlockedResult`-shaped: a failing input does not return a degraded value, it returns `{ valid: false, reasonCodes: [...] }` and the consumer fails closed.
 
 ---
 
-## heuristic: rule-of-thumb + boundary
+## How values move between the enums
 
-A producer may emit `credibility: "heuristic"` when its output is a **rule-of-thumb observation** — a directional, bounded statement that the producer can defend as informative without claiming magnitude, causation, or calibration. The boundary on `heuristic` is the strictest of the three rungs because it is the easiest to abuse.
+A value's rung at the evidence layer (`EVIDENCE_CREDIBILITY`) and its rung at the conclusion layer (`CONCLUSION_CREDIBILITY`) are **separately attested by separately validated emissions**. There is no implicit promotion path between them. The decision engine is what binds an evidence-layer rung to a conclusion-layer rung, and it does so under the authoritative-only-inputs rule (R3.0D's closure-private WeakSet verification): conclusions are admitted only when their evidence inputs were verified to originate from the live evidence-graph producer in the current run.
 
-Rules a `heuristic` emission must obey:
+Two patterns this enables:
 
-1. **Directional, never magnitude**. A `heuristic` emission may say "more understeer than reference" or "elevated steering corrections" or "front-bias trend"; it may **not** say "0.3 deg/g more understeer" or "12% more correction" or "0.4 N/mm stiffer". Any magnitude claim demands `measured` or `derived` rung and the gates that go with them.
-2. **Bounded confidence**. R3.0D caps the confidence scalar on a heuristic observation at `medium` (verified against the R3.0D hypothesis-engine confidence-cap table; a heuristic observation cannot carry `high` confidence regardless of how strong the underlying signal looks). An `high`-confidence assertion would imply calibration-bounded magnitude, which is a different rung.
-3. **Three-way separation**. A heuristic observation about driver input is **not** a vehicle characteristic and **not** a setup finding. The decision engine (R3.0D) will not promote a driver-behaviour heuristic to a vehicle hypothesis without multi-lap + multi-corner + measured-consistent + mapping-trusted + calibration-trusted evidence — and that evidence carries its own rung, not the heuristic's. R3.0D explicitly forbids driver-blame surfacing; a heuristic about driver input is reported as a driver observation, never as a coaching directive.
-4. **Honest substitute role**. When `measured` is blocked, the honest substitute is the directional `heuristic`. The substitute is offered **with the blocker explicit**: the user sees that K_us is `Unavailable` because the calibration is missing, and that the directional tendency is offered in its place. The substitute does not replace the blocker; both are surfaced.
-5. **No causation**. A heuristic correlates two observations or two windows. It does not assert that one caused the other. R3.0D explicitly enforces the no-causation rule on every hypothesis it raises, and a heuristic input cannot launder that constraint.
+- **Evidence `measured` → Conclusion `Measured`** is the canonical "honest pass-through" path: the evidence-graph producer attested a `measured` evidence node on confirmed, calibrated channels in a same-case + same-session window; the conclusion producer consumed it through the WeakSet verifier and emitted a `Measured` conclusion. The synthetic-honesty constraint did not fire because the evidence rung was not `synthetic`.
+- **Evidence `synthetic` → Conclusion at any rung, but with `LIMITATION_SYNTHETIC_ONLY`** is the Demo Analysis Case path: an evidence node carries `credibility: "synthetic"` (evidence layer) plus the `LIMITATION_SYNTHETIC_ONLY` marker; any conclusion built on it carries the limitation forward and may never be presented as a real-world claim. The contract validators at both layers refuse to forget the synthetic origin.
 
-**What `heuristic` guarantees**: the producer has a defensible rule of thumb behind the emission, the rule is applied deterministically, the output is directional only, and the confidence is capped at `medium`.
-
-**What `heuristic` does NOT guarantee**:
-- It is not a vehicle fact. It is an observation.
-- It is not a measured magnitude. Any UI surface that renders a `heuristic` value as a number with units is a bug in the surface, not in the producer.
-- It is not a setup recommendation. The decision engine may consult heuristics, but it carries the consultation forward with the rung preserved.
-- It is not exempt from driver-blame discipline. A heuristic about driver input is reported as a driver observation; it does **not** become a coaching directive without further authoritative-only inputs.
+A value emitted on a prior run, persisted, and rehydrated on a later run does **not** retain runtime authority. The R3.0E stores module header makes this explicit, verbatim: *Persisted records carry NO runtime authority (WeakSet identity is closure-private and cannot survive reload). Rehydration consumers MUST re-validate via the E1 contracts before treating values as authoritative.*
 
 ---
 
-## The synthetic provenance flag: explicit synthetic-data tag, never promoted
+## R3.0C comparison authority: same-case + same-session, explicit reference only
 
-The `provenance: "synthetic"` flag is **not a rung**; it is an off-ladder provenance tag whose entire purpose is to make the synthetic origin of a value **machine-readable and unforgeable** through the rest of the pipeline. A value with `provenance: "synthetic"` still carries one of the three runtime rungs (`measured`, `derived`, `heuristic`) describing how it was computed, but the synthetic flag rides alongside the rung and forbids any consumer from treating the value as a real-world measurement.
+R3.0C's comparison-authority contract carries the full six-rung `CREDIBILITY_LADDER` and validates caller-supplied credibility metadata in a single direction: it accepts a producer's emission and returns a frozen pass-through, or it returns a blocked result. The contract has no producer of its own — it is the authority gate between the comparison-authority pipeline and downstream consumers.
 
-The R3.0 source of synthetic data is the **Demo Analysis Case** (the clean-room golden-path case shipped with the product), plus any fixture loaded under a `synthetic` provenance flag, plus any test-time payload the producer recognises as synthetic by its provenance — never by its shape and never by a caller's say-so.
+The comparison authority itself is structurally constrained by three rules that the contract validator presupposes:
 
-Hard rules on the synthetic provenance flag:
+1. **Same-case + same-session only.** Comparison and reference laps must both belong to the same Analysis Case and the same session of that case. Cross-case comparison is forbidden by the case-store; cross-session comparison within a case is forbidden by the comparison-authority layer.
+2. **Reference lap = explicit user selection.** There is no `fastest_valid` auto-pick, no `median` auto-pick, no `best_sector_composite` auto-pick. The user names the reference lap by its identity in the current session.
+3. **Delta = comparison − reference** with a fixed sign convention. The delta metric set is allowlisted (the six allowlisted delta metrics live in the R3.0C delta-metrics module). Segmentation is deterministic over the normalized-distance grid. Pairing is deterministic over the corner-identity assignment. Every emission carries `derivedHere: false` because the contract is a pass-through, but the upstream delta producer carries `Derived` on the rung field and `real` (or `synthetic`, preserved) on the provenance field.
 
-1. **Synthetic is never stripped**. There is no transform — deterministic or otherwise — that can take a `provenance: "synthetic"` input and emit a `provenance: "real"` output. The output of any producer that consumes a synthetic input is also `provenance: "synthetic"`. This is the laundering-prevention rule and it has no exceptions.
-2. **Synthetic travels with every value**. A field whose computation consumed even one synthetic input carries `provenance: "synthetic"` for its whole life in storage, in UI, in export, in migration output. R3.0F's migration engine preserves the synthetic flag across the v1.3 → v1.4.0 transform.
-3. **Synthetic is visibly disclosed**. Every UI surface that renders a synthetic value renders the synthetic flag alongside it. There is no "demo mode" toggle that hides the flag. The Demo Analysis Case golden path is built from production code on synthetic inputs, and the synthetic flag rides along on every observation, hypothesis, brief, and experiment outcome in that path.
-4. **Synthetic does not block production capabilities for its own consumers**, but it does forbid those consumers from claiming the value is real. A R3.0D hypothesis built on synthetic evidence is a valid hypothesis demonstration; it is not a vehicle claim about the user's actual car.
-5. **Synthetic does not poison the producer's own real-data emissions**. Producers are pure modules; a synthetic invocation has no effect on a subsequent real-data invocation. The rule applies per-value, not per-producer.
-
-**What the synthetic flag guarantees**: the value is machine-readable as synthetic, and that fact cannot be lost by any downstream transform or migration.
-
-**What the synthetic flag does NOT guarantee**:
-- It does not guarantee the underlying *model* is wrong. The Demo Analysis Case's model values may be physically reasonable; they are simply not measurements of a real vehicle.
-- It does not protect a UI surface that ignores the flag from making a misleading claim. The flag is the contract; honouring it is the surface's responsibility.
+When any of those preconditions fails, the comparison-authority pipeline emits an `Unavailable` envelope with one of the 55+ R3.0C reason codes. The blocked envelope still satisfies `REQUIRED_FIELDS` (the contract refuses to accept a missing `limitations` array even when blocked) and the consumer fails closed.
 
 ---
 
-## How limitations[] travels with every value
+## R3.0D Engineer Brief: authoritative-only inputs, no LLM, no causation, no driver blame
 
-Every R3.0 producer emission — at every rung, including `Unavailable` — carries a `limitations[]` field. The field is an **array of machine-readable limitation codes** that name the honest scope caveats the producer attaches to the value. The field is never absent and never empty for non-trivial emissions: a clean run with no caveats still carries the producer's standard baseline limitations (e.g. "linear regime; not a full MBD", "kinematic, confounded; not a professional-grade verdict", "single representative session").
+R3.0D's Engineer Brief is the user-facing surface of the decision engine. Its contract demands authoritative-only inputs, drawn from the current run's live evidence graph plus the applied-change record plus the controlled-variables record plus the explicit reference-lap selection from R3.0C. The brief is **deterministic** and contains **no runtime LLM call**: there is no model invocation, no external network call, no probabilistic sampling. Every sentence the brief surfaces is produced by a closed-form composition of the authoritative inputs through R3.0D's emit modules.
 
-Rules on `limitations[]`:
+Three substantive constraints the brief honours on every emission:
 
-1. **Append-only propagation**. A consumer of an emission appends its own limitations to the producer's; it never removes a producer's limitation. R3.0D's Engineer Brief carries the union of all upstream `limitations[]` lists from every evidence input that fed into the brief.
-2. **Stable codes**. Each limitation is a stable identifier (an enum value, not a free-form string), so that surfaces, exports, and migrations can translate them without re-parsing English. The catalogs of stable codes live alongside each producer module (R3.0C delta-metrics codes; R3.0D hypothesis-engine and Engineer Brief codes; R3.0E outcome-classifier and follow-up codes).
-3. **i18n via lookup, not via emission**. Producers emit codes; surfaces resolve codes to user-facing strings via the locale layer. A producer never emits a localised limitation string directly.
-4. **Crosses every boundary**. `limitations[]` survives R3.0B persistence (it is part of the frozen v1.4.0 schema), R3.0C export, R3.0D evidence-graph traversal, R3.0E outcome and timeline append, and R3.0F migration. There is no boundary at which it is dropped.
-5. **No "limitations cleared" event**. A limitation is not a state; it is a fact about how the value was produced. Subsequent runs can produce new values with different limitations, but no run "clears" a prior value's limitations.
+- **No causation.** A correlation in the evidence graph is not promoted to a causal claim. The hypothesis engine surfaces directional and consistency observations; it does not assert "X caused Y." `LIMITATION_NO_CAUSAL_CLAIM` rides on every hypothesis the brief consumes.
+- **No driver blame.** Driver-input observations are reported as driver observations and never re-framed as coaching directives. The Engineer Brief is a vehicle-and-setup surface; a coaching directive requires an entirely separate authority chain (which R3.0F does not enable).
+- **Synthetic stays synthetic.** Evidence rungs of `synthetic` arrive carrying `LIMITATION_SYNTHETIC_ONLY` and the brief preserves the marker on every conclusion it builds from them. There is no "demo mode" that strips synthetic limitations.
 
-The `limitations[]` field is paired with the `blockers[]` field (machine-readable fail-closed reasons when the rung is `Unavailable`), the `provenance` field (`real` / `synthetic` / `unverified`), the `evidenceRefs[]` field (identifiers of the raw inputs the value is anchored in), and the `nextValidationStep` field (what the user would have to do to upgrade the claim's credibility). Together these are the honesty-contract envelope, mandatory on every conclusion R3.0 surfaces.
+The Engineer Brief also obeys the `limitations[]` propagation rule: it carries the union of all upstream `limitations[]` lists from every evidence input that fed into it, plus its own brief-level limitations (which always include at least a no-causation marker).
 
 ---
 
-## R3.0E append-only stores: experiment, outcome, follow-up, timeline
+## R3.0E stores: only the timeline is contractually append-only
 
-R3.0E builds the experiment loop on top of the comparison authority (R3.0C) and the decision engine (R3.0D). It comprises four producer modules — Experiment store, Outcome classifier, Follow-up store, Timeline store — plus the Experiment view-model that orchestrates the user's flow through them.
+The R3.0E stores live in `renderer/js/r3-0e-stores.js` (UMD global `R3_0E_Stores`). The module header lists four persistence semantics, verbatim:
 
-**R3.0E experiment, outcome, follow-up, and timeline stores are append-only with monotonic createdAt; no entry is mutated or reordered after emission.** Once an outcome is classified and persisted, its classification, its evidence refs, its reason codes, its `limitations[]`, and its `createdAt` timestamp are fixed in the store for the life of the record. A subsequent classification of the same underlying event produces a **new** entry with a later `createdAt`; it does not overwrite the prior one. The timeline likewise grows by append only — there is no reorder, no merge, no delete. The experiment store's experiment definitions are append-only at the experiment-identity grain; revisions create a new experiment, not a mutation of the existing one. Follow-up links are append-only and `caseAssociation` cross-case linkage is forbidden (a follow-up case may *reference* a prior case as context, but its outcome classifier, timeline, and experiment store never aggregate values from a different case into authoritative inputs).
+- *Every payload validated by its E1 contract BEFORE write (in `compute()`).*
+- *Every payload re-validated on read; future-schemaVersion → fail-closed reject.*
+- *Timeline events append-only; duplicate eventId rejected; out-of-order timestamp rejected.*
+- *Persisted records carry NO runtime authority (WeakSet identity is closure-private and cannot survive reload). Rehydration consumers MUST re-validate via the E1 contracts before treating values as authoritative.*
 
-The append-only discipline is what makes the R3.0E history auditable: every entry's provenance is fixed at emit time, every entry's credibility envelope is fixed at emit time, and a later observation of the same physical event produces an additional record with its own envelope rather than rewriting the prior one. The timeline UI surface reads the store in `createdAt` order and renders each entry with its own envelope (rung, provenance, limitations, blockers, evidence refs). No surface offers an "edit outcome" or "redate event" affordance — the only writes the store accepts are appends.
+The four producer stores are distinct in their mutation discipline. Earlier drafts of this document spoke of "experiment, outcome, follow-up, and timeline stores all append-only with monotonic createdAt; no entry is mutated or reordered after emission." That is not what the code does. The accurate picture:
+
+### Timeline store — true append-only (the only store with that contract)
+
+`createTimelineStore(backend)` exposes `getTimeline(caseId)` and `appendEvent(caseId, event)`. The append path uses the non-mutating pattern `var nextEvents = existing.events.concat([event])` and enforces, on every append, the reason codes:
+
+- `R3_0E_TIMELINE_FUTURE_SCHEMA` on schemaVersion overflow,
+- `R3_0E_TIMELINE_DUPLICATE_EVENT` if `eventId` already exists in `events[]`,
+- `R3_0E_TIMELINE_OUT_OF_ORDER` if a new `createdAt` is earlier than the previous event's `createdAt` (strict monotonic by createdAt),
+- `R3_0E_TIMELINE_INVALID` on contract validation failure.
+
+The E4 service `renderer/js/r3-0e-followup-timeline.js` makes the contract even stricter for the production entry points (`createFollowUpLink`, `appendTimelineEvent`, `projectTimeline`, `listFollowUpLinksForParent`). Its header reads verbatim:
+
+- *Append-only timeline. Existing events are NEVER overwritten. Corrections are expressed as NEW events whose params reference the prior eventId.*
+- *Timeline event eventIds are deterministic: hash(caseId, sequence, kind, i18nKey).*
+- *Timeline strictly monotonic by createdAt; duplicate eventId rejected; clock rollback yielding a timestamp earlier than the previous event → reject.*
+- *Every link / event / projection is deep-frozen and registered in a closure-private WeakSet. The exported verifiers check identity + structural witnesses.*
+- *Clock invoked AT MOST ONCE per call, AFTER authority and contract gates. Forged input → zero clock invocations.*
+
+### Experiment store — not append-only; supports `update()` and `remove()`
+
+`createExperimentStore(backend)` exposes `create(rec)`, `update(rec)`, `get(experimentId)`, `list()`, and `remove(experimentId)`. Existing experiment definitions can be revised in place and deleted entirely. The store does enforce identity discipline and stale-write protection:
+
+- `create()` rejects `R3_0E_EXPERIMENT_ID_COLLISION` if the key already exists, and rejects records whose `schemaVersion` does not match the contract.
+- `update()` rejects `R3_0E_EXPERIMENT_MISSING` (no prior record), `R3_0E_EXPERIMENT_FUTURE_SCHEMA` (schemaVersion overflow), and `R3_0E_EXPERIMENT_STALE_WRITE` (the caller's `createdAt` does not match the persisted record). On success it writes a fresh `updatedAt` from the clock.
+- `remove()` deletes both the `EXPERIMENTS` and `EXPERIMENTS_INDEX` entries.
+
+The mutation discipline is therefore "identity-stable, schema-checked, stale-write-protected" — not append-only.
+
+### Outcome store — no exposed mutator, but no contractual append-only assertion either
+
+`createOutcomeStore(backend)` exposes `create(rec)`, `get(outcomeId)`, and `listForExperiment(experimentId)`. There is no `update` and no `remove`. The store is effectively append-only by the absence of mutating verbs, but the code does not declare append-only as a contract (no equivalent of the timeline's "append-only" header line), so the discipline is structural rather than asserted. `create()` rejects `R3_0E_OUTCOME_ID_COLLISION` on duplicate `outcomeId`.
+
+### Follow-up link store — mutable via `markParentStatus()`
+
+`createFollowUpLinkStore(backend)` exposes `create(link)`, `get(linkId)`, `listForParent(parentCaseId)`, and `markParentStatus(linkId, newStatus)`. The `markParentStatus()` method **mutates `parentStatus` on existing records** — it reads the current record, builds `Object.assign({}, cur, { parentStatus: newStatus })`, and writes the result back to the same key. Valid statuses are `['present', 'archived', 'deleted']`. `create()` rejects `R3_0E_LINK_ID_COLLISION` on duplicate `linkId` and updates the reverse index `r3_0e_followupLinksByCase` keyed by `parentCaseId`. `listForParent()` additionally closes two earlier Codex findings: (E2-R1-02) every fetched link is re-validated against its contract before being returned; (E2-R2-01) each validated link's `parentCaseId` must match the caller-supplied `parentCaseId`, otherwise the entry is rejected as corruption.
+
+### Why the distinction matters
+
+The append-only timeline is the audit substrate: every event's provenance is fixed at emit time, and a later observation of the same physical phenomenon produces an additional event with its own envelope rather than rewriting the prior one. Experiment definitions, by contrast, are editable artefacts in the user's working set — they are not history. The outcome store sits between the two: structurally history-shaped, but without the explicit contract gate the timeline carries. The follow-up link store's `markParentStatus` exists so a follow-up case's parent can be marked archived or deleted without rewriting the link itself; the link record's identity and `parentCaseId` are stable, the lifecycle marker is not.
+
+Persistence-layer credibility discipline is independent of the store's mutation discipline. Every payload is validated by its E1 contract on write **and** on read; future-schemaVersion records fail closed on read; rehydrated values must be re-validated by the E1 contract before any consumer treats them as authoritative. The closure-private WeakSet identity that the runtime uses to recognise an authoritative emission does not survive reload, by design.
 
 The R3.0E outcome classifier obeys the authoritative-only-inputs rule inherited from R3.0D: outcomes are classified from the live evidence graph plus the explicit reference-lap selection plus the applied-change record plus the controlled-variables record. Caller-supplied outcome labels are not accepted. An `invalid_comparison` outcome is emitted whenever the comparison authority for the experiment's measurement window is not legitimate, taking precedence over `inconclusive` or `confirmed`. A `confirmed` outcome requires same-case, same-session, explicit reference, controlled variables, and a minimum credibility floor on the underlying evidence — and even then it is `confirmed for this experiment's measurement window`, not a generalised vehicle claim.
 
 ---
 
-## Producer attestation (R3.0F): no fabrication; live producer modules are the only authoritative source
+## R3.0F F1 migration: never fabricates attestation
 
-R3.0F formalises the **producer-attestation defense**: the only authoritative source of an R3.0 value at runtime is the **live producer module** that derived it, executing in the current process, on the current load of the codebase. The migration engine, the case-store, the comparison-authority pipeline, the decision-engine pipeline, and the experiment-loop pipeline are each their own producer; each attests to the rung, the calibration binding, the determinism boundary, and the synthetic flag on every emission.
+R3.0F F1 is the v1.3 → v1.4.0 migration engine. It is **deterministic by mandate** — given the same input record byte-for-byte, it produces the same output record byte-for-byte. It consumes no clock, no random source, no environment. Its output rung at the conclusion layer is `Derived` because the transform is closed-form over the R3.0B schema; the underlying values keep whatever credibility envelope they had pre-migration.
 
-What producer attestation enforces:
+The migration engine's central rule on credibility is that it **never fabricates attestation**. A v1.3 input record that lacks producer attestation fields does not gain them across the migration: the migrator does not invent a `producerId`, a `derivedHere` flag, a calibration binding, or a synthetic-vs-real provenance. Worse, an input record that arrives **carrying** attestation sentinel fields the migrator does not consider trustworthy is refused outright with the reason code `PRODUCER_ATTESTATION_REFUSED`. The migrator does not "best-effort coerce" attested-looking fields into a valid attestation shape; it refuses the record and surfaces the reason.
 
-1. **No fabrication**. A consumer may not synthesise a credibility-tagged value to "fill a gap". If the producer did not emit it on this run, it does not exist on this run. The R3.0D decision engine's authoritative-only-inputs rule (closure-private WeakSet verification) is the canonical implementation: hypotheses are admitted only when their inputs were verified to originate from the live evidence-graph producer in the current run.
-2. **No replay**. A value emitted on a prior run, persisted, and rehydrated on a later run does not retain runtime authority — it retains its rung and its `limitations[]` as historical fact, but capability eligibility is **re-derived from raw evidence by the producers on the current run**. The shell, the view-model, and the migration engine never trust a stored `eligible: true` / `confirmed: true` flag.
-3. **No cross-module forgery**. A producer's emission carries the producer's identity in its provenance trail. A different module cannot mint a value that claims to come from R3.0D's hypothesis engine, because the hypothesis engine's outputs are admitted only through its own closure-private verification path.
-4. **Structured-clone-only firewall**. R3.0F's migration engine and storage backend pass values across persistence and IPC boundaries via structured clone only. Function references, prototypes, getters, and other live-object channels do not cross the firewall, so a stored value cannot smuggle in a fabricated producer identity on rehydrate.
-5. **Trap-free JSON serializer**. R3.0F's JSON serializer rejects values whose serialization would require trapping an exotic property (proxy traps, throwing getters, non-enumerable side channels). A would-be-serialised value with a hostile shape is rejected at emit time, fail-closed, with a reason code — not silently coerced.
-6. **Live module check at consumer boundaries**. R3.0F's integrated-delivery flows verify on every consumer boundary that the producer module loaded in the current process is the canonical one (path-identity + frozen-export check). A swapped or shadowed producer is treated as a corrupted-state fault and the affected capability fails closed.
+Two practical consequences:
 
-The combined effect of producer attestation is that **no value's credibility tag can be upgraded by a downstream module, and no value can be fabricated by a downstream module to look like a producer's emission**. A consumer's only options are: pass the value through with its rung intact, demote it to `Unavailable` with a reason, or refuse it.
+1. The synthetic flag (in whichever layer's enum carries it) is preserved across the v1.3 → v1.4.0 transform. A `provenance: "synthetic"` value at R3.0C, or a `credibility: "synthetic"` evidence node at R3.0D, retains its tag and its `LIMITATION_SYNTHETIC_ONLY` marker after migration.
+2. The `limitations[]` field is preserved verbatim. The migrator does not collapse, dedupe, or rewrite limitation codes — it carries them across in their stable-code form.
+
+---
+
+## R3.0F F2 end-to-end flows: nine production flows under `tests/e2e/`
+
+R3.0F F2 is the end-to-end verification surface. Nine flows live under `tests/e2e/flow-{01..09}-*.test.js`. Each is a closed flow that exercises one production path through R3.0B persistence, R3.0C comparison authority, R3.0D decision engine, and R3.0E stores end-to-end, on the Demo Analysis Case fixture (`provenance: "synthetic"`, with `LIMITATION_SYNTHETIC_ONLY` riding through). The flows are not unit tests — they are sequence tests that confirm the producer-attestation chain is intact across module boundaries.
+
+The honesty-contract envelope (rung, provenance, limitations, blockers, evidenceRefs, nextValidationStep) is asserted on every emission a flow surfaces. The synthetic marker is asserted on every conclusion the flow produces from Demo Analysis Case inputs. The append-only timeline is asserted in flows that touch R3.0E by attempting (and being rejected for) a duplicate `eventId` or an out-of-order `createdAt`. The same-case + same-session boundary is asserted by attempting a cross-case or cross-session reference lap and being rejected by the R3.0C contract.
+
+---
+
+## R3.0F F3 hardening probes: six probes, 133 assertions
+
+R3.0F F3 is the hardening surface. Six probes live under `tests/e2e/hardening-{01..06}-*.test.js`, totalling 133 assertions. The probes exist to verify the structural defences the rest of this document describes:
+
+- Closure-private WeakSet identity holds across module boundaries.
+- The structured-clone-only firewall refuses function references, prototype channels, and live-object getters on persistence and IPC paths.
+- The trap-free JSON serializer rejects exotic property shapes (proxy traps, throwing getters, non-enumerable side channels) at emit time.
+- The live module check at consumer boundaries rejects swapped or shadowed producers with a corrupted-state fault.
+- The contract validators (R3.0C and R3.0D) refuse every malformed-attestation shape with the documented reason code rather than silently coercing.
+- `PRODUCER_ATTESTATION_REFUSED` fires on the migration path for attestation-sentinel inputs that the migrator does not consider trustworthy.
+
+The probes are not coverage-shaped; they are adversary-shaped. Each probe presents a forged input the producer would have to accept to launder a value's origin, and each probe asserts the producer's refusal with the documented reason code.
 
 ---
 
@@ -169,27 +204,43 @@ The combined effect of producer attestation is that **no value's credibility tag
 
 R3.0 forbids three specific propagations of credibility-tagged values, all of which would, in different ways, launder a value's origin and break the honesty contract. The forbidden propagations are enforced by the producers themselves, not by convention.
 
-**1. Cross-case propagation is forbidden.** An R3.0 Analysis Case is the unit of evidence boundary. A value emitted in Case A's session may not be consumed as evidence by Case B's producers, regardless of how similar the cases look on the surface. R3.0E's experiment loop is the most prominent enforcer: `caseAssociation` linkage across cases is explicitly forbidden — a follow-up case may *reference* a prior case as context, but its outcome classifier, timeline, and experiment store never aggregate values from a different case into authoritative inputs. The decision engine's evidence-graph (R3.0D) is keyed on the case identity; an evidence node from a different case identity fails the closure-private verification and is rejected.
+**1. Cross-case propagation is forbidden.** An R3.0 Analysis Case is the unit of evidence boundary. A value emitted in Case A's session may not be consumed as evidence by Case B's producers, regardless of how similar the cases look on the surface. R3.0E's experiment loop is the most prominent enforcer: a follow-up case may *reference* a prior case as context, but its outcome classifier, timeline, and experiment store never aggregate values from a different case into authoritative inputs. The decision engine's evidence-graph (R3.0D) is keyed on the case identity; an evidence node from a different case identity fails the closure-private verification and is rejected.
 
 **2. Cross-session propagation within a case is forbidden for comparison and decision authority.** R3.0C comparison is **same-case + same-session only**. A reference lap from a prior session — even from the same case, even from the same track, even from the same vehicle setup — is **not** an admissible reference. The reference lap must be **explicitly selected by the user** from the current session's laps; there is no fastest_valid auto-pick, no median auto-pick, no best_sector_composite auto-pick. R3.0D's hypothesis engine respects the same boundary: hypotheses are formed on evidence drawn from the current session's authoritative graph. Persistent stores (R3.0B) preserve cross-session history for the user to read; they do not feed it back into producer authority.
 
-**3. Cross-rung promotion is forbidden.** Already covered above but worth repeating here as the third leg: no transform takes a `heuristic` to a `measured` or a `derived` to a `measured`, and the synthetic provenance flag is never stripped. The transform may consume the input and emit a new value at the input's rung or lower, with the synthetic flag preserved. There is no upgrade path; upgrade requires a fresh emission by the appropriate producer on fresh authoritative inputs.
+**3. Cross-rung promotion is forbidden.** A transform may consume an input and emit a new value at the input's rung or lower; it may never emit at a higher rung. At the R3.0D evidence layer the rule is enforced by the closed `EVIDENCE_CREDIBILITY` enum and the synthetic-honesty constraint (a `synthetic` evidence node never loses its `LIMITATION_SYNTHETIC_ONLY` marker). At the R3.0D conclusion layer the rule is enforced by the closed `CONCLUSION_CREDIBILITY` enum and the WeakSet identity check (a conclusion is admitted only when its evidence inputs were verified to originate from the live evidence-graph producer in the current run). At the R3.0C comparison layer the rule is enforced by the pass-through normalizer (which derives nothing and refuses to upgrade what the caller supplied).
 
-The combined effect of the three forbidden propagations is that **the credibility envelope on a value is anchored to a specific case, a specific session, and a specific producer**, and it cannot drift. A user comparing two runs across sessions is doing that comparison as a user action, with the surface labelling each value with its own envelope; the product never silently aggregates across the boundary and presents the result as a single producer's emission.
+The combined effect of the three forbidden propagations is that **the credibility envelope on a value is anchored to a specific case, a specific session, a specific producer, and a specific layer's enum**, and it cannot drift. A user comparing two runs across sessions is doing that comparison as a user action, with the surface labelling each value with its own envelope; the product never silently aggregates across the boundary and presents the result as a single producer's emission.
 
 ---
 
-## Summary: how to read a rung correctly
+## The honesty-contract envelope
 
-When an R3.0 surface renders a value, read it as a four-tuple plus the envelope:
+Every R3.0 producer emission — at every rung in whichever enum applies, including the `Unavailable` / blocked path — carries a `limitations[]` field. The field is an **array of machine-readable limitation codes** that name the honest scope caveats the producer attaches to the value. The field is never absent and never empty for non-trivial emissions: a clean run with no caveats still carries the producer's standard baseline limitations (e.g. "linear regime; not a full MBD", "kinematic, confounded; not a professional-grade verdict", "single representative session").
 
-- **Rung** (`measured` / `derived` / `heuristic`) — how the value was produced. The user-facing label may also include the higher ladder rungs (Physics / Model) when the producer's emission qualifies; the runtime enum is the three values above.
-- **Provenance** (`real` / `synthetic` / `unverified`) — what kind of data the value originated from. The `synthetic` flag travels alongside the rung; it is never stripped.
-- **Limitations** — the honest caveats the producer attached.
-- **Blockers** — present only when the value is `Unavailable`; the machine-readable reason the capability failed closed on this run.
+Rules on `limitations[]`:
+
+1. **Append-only propagation across emissions.** A consumer of an emission appends its own limitations to the producer's; it never removes a producer's limitation. R3.0D's Engineer Brief carries the union of all upstream `limitations[]` lists from every evidence input that fed into the brief.
+2. **Stable codes.** Each limitation is a stable identifier (an enum value, not a free-form string), so that surfaces, exports, and migrations can translate them without re-parsing English. The catalogs of stable codes live alongside each producer module (R3.0C delta-metrics codes; R3.0D hypothesis-engine and Engineer Brief codes; R3.0E outcome-classifier and follow-up codes).
+3. **i18n via lookup, not via emission.** Producers emit codes; surfaces resolve codes to user-facing strings via the locale layer. A producer never emits a localised limitation string directly.
+4. **Crosses every boundary.** `limitations[]` survives R3.0B persistence (it is part of the frozen v1.4.0 schema), R3.0C export, R3.0D evidence-graph traversal, R3.0E outcome and timeline append, and R3.0F migration. There is no boundary at which it is dropped.
+5. **No "limitations cleared" event.** A limitation is not a state; it is a fact about how the value was produced. Subsequent runs can produce new values with different limitations, but no run "clears" a prior value's limitations.
+
+The `limitations[]` field is paired with the `blockedReasons[]` field (machine-readable fail-closed reasons when the conclusion rung is `Unavailable`), the `provenance` field (`real` / `synthetic` / `unverified` at R3.0C and at the R3.0D conclusion layer), the `evidenceRefs[]` field (identifiers of the raw inputs the value is anchored in), and the `nextValidationStep` field (what the user would have to do to upgrade the claim's credibility). Together these are the honesty-contract envelope, mandatory on every conclusion R3.0 surfaces.
+
+---
+
+## Summary: how to read a credibility-tagged value correctly
+
+When an R3.0 surface renders a value, read it as a four-tuple plus the envelope, with the layer made explicit:
+
+- **Which enum applies.** R3.0C comparison-authority values draw from the six-value `CREDIBILITY_LADDER`. R3.0D evidence nodes draw from the four-value `EVIDENCE_CREDIBILITY`. R3.0D conclusions draw from the six-value `CONCLUSION_CREDIBILITY`. The same word can mean different things at different layers — `synthetic` is a rung at the evidence layer and a provenance value at the conclusion layer — and the validators at each boundary enforce the layer-correct enum.
+- **Provenance** (`real` / `synthetic` / `unverified`, at R3.0C and at the R3.0D conclusion layer) — what kind of data the value originated from. Synthetic origin is never stripped by any downstream transform and carries `LIMITATION_SYNTHETIC_ONLY` through the chain.
+- **Limitations** — the honest caveats the producer attached, as stable codes.
+- **Blockers** — present only when the conclusion rung is `Unavailable`; the machine-readable reason the capability failed closed on this run.
 - **Evidence refs** — what raw inputs the value is anchored in.
-- **Next validation step** — what the user would have to do to upgrade the value's rung.
+- **Next validation step** — what the user would have to do to upgrade the claim's credibility.
 
-A rung is **not** a trust score. It is a structural claim about how the value came to exist. The ladder (`credibility-and-trust.md`) and this document together pin down what each rung permits a producer to claim and — more importantly — what it permits no one, downstream or upstream, to assume on the producer's behalf.
+A rung is **not** a trust score. It is a structural claim about how the value came to exist, drawn from a closed contract enum. The ladder in `credibility-and-trust.md` and the contract modules `contracts/r3.0c/credibility-contract.js` and `contracts/r3.0d/credibility-contract.js` together pin down what each rung in each enum permits a producer to claim and — more importantly — what it permits no one, downstream or upstream, to assume on the producer's behalf.
 
-Fail-closed is the default. Authority is re-derived, not presented. Producer attestation is verified, not trusted. The synthetic provenance flag stays attached. Cross-case and cross-session never propagate authority. These five rules, applied at every R3.0 producer boundary, are what the R3.0 credibility model amounts to.
+Fail-closed is the default. Authority is re-derived, not presented. Producer attestation is verified, not trusted. The synthetic marker stays attached at whichever layer it was applied. Cross-case and cross-session never propagate authority. These five rules, applied at every R3.0 producer boundary, are what the R3.0 credibility model amounts to.

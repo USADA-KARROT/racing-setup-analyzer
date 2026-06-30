@@ -2,7 +2,7 @@
 
 The R3.0 series turns the analyzer from a setup calculator into a **case-centric, evidence-bounded analysis
 workspace** with local persistence, an explicit-only comparison pipeline, an authoritative-only decision engine,
-an append-only experiment loop, and a hardening + migration layer.
+a per-store experiment / outcome / timeline / follow-up record set, and a hardening + migration layer.
 
 This document is the runtime map: what the modules are, how they fit together, where the trust boundaries sit,
 and which checks are fail-closed. Every conclusion the product surfaces carries
@@ -57,14 +57,15 @@ tree and one persistence contract; the host differences are confined to a small 
 |     D4 priority engine                                                                                      |
 |     D5 engineer brief generator                                                                             |
 |                                                                                                             |
-|  R3.0E EXPERIMENT LOOP  (contracts/r3.0e/* + renderer/js/r3-0e-*.js)                                        |
+|  R3.0E EXPERIMENT / OUTCOME / TIMELINE / FOLLOW-UP STORES  (contracts/r3.0e/* + renderer/js/r3-0e-stores.js)|
 |     experiment-store, outcome-store, timeline-store, followup-link-store, outcome-classifier, viewmodel     |
-|       - independent IndexedDB namespaces; append-only; monotonic createdAt; case-scoped                     |
+|       - independent versioned IndexedDB namespaces (r3_0e_*)                                                |
+|       - append-only property is PER STORE (timeline-store), not per phase — see §R3.0E                      |
 |                                                                                                             |
 |  R3.0F INTEGRATED DELIVERY                                                                                  |
-|     F1 migration-engine.js  (sanitize / structured-clone-only firewall / trap-free serializer / atomic txn) |
-|     F2 e2e-harness         (9 flows, browser + Electron)                                                    |
-|     F3 hardening probes    (boundary / storage failure / no-stale-UI / large library / XSS / supply-chain)  |
+|     F1 r3-0f-migration-engine.js  (sanitize / structured-clone firewall / trap-free serializer / atomic txn)|
+|     F2 e2e-harness               (9 flows: tests/e2e/flow-01..09-*.test.js)                                 |
+|     F3 hardening probes          (6 probes: tests/e2e/hardening-01..06-*.test.js)                           |
 |                                                                                                             |
 +-------------------------------------------------------------------------------------------------------------+
 ```
@@ -116,9 +117,9 @@ Two implementations:
 Two strictly different shapes:
 
 - **Local record** — full sanitized analysis view model. `sanitizeForStorage` is **all-or-nothing**: JSON-safe;
-  cyclic / non-plain / function values are rejected; every array bounded at 256 elements; depth ≤ 12; total
-  size capped. Any node that violates → the save is **rejected**, never lossily stored. Raw telemetry sample
-  arrays can never be written even locally — they exceed the bounds by construction.
+  cyclic / non-plain / function values are rejected; bounded enumeration and size caps are enforced. Any node
+  that violates → the save is **rejected**, never lossily stored. Raw telemetry sample arrays can never be
+  written even locally — they exceed the bounds by construction.
 - **Portable bundle** — a curated, strictly-allowlisted, value-constrained closed schema with enum vocabularies,
   code/id patterns, and length caps. Any off-allowlist or constraint-failing field is **excluded and logged**;
   required fields are validated; a future bundle version is rejected fail-closed. An imported bundle is stored
@@ -132,8 +133,8 @@ Two strictly different shapes:
 
 **Frozen v1.4.0 baseline.** The R3.0B `case-record-schema` was frozen at v1.4.0 and **has not been modified
 through R3.0F**. Every downstream phase (D / E / F) carries an explicit `r3bCaseRecordSchemaUntouched: true`
-governance assertion. Hypothesis / experiment / outcome / follow-up / timeline state lives in **independent
-IndexedDB namespaces**, not on the case record.
+governance assertion. R3.0E experiment / outcome / timeline / follow-up state lives in **independent versioned
+IndexedDB namespaces** (`r3_0e_*`), not on the case record.
 
 ### Stores
 
@@ -141,10 +142,11 @@ IndexedDB namespaces**, not on the case record.
 | --- | --- | --- |
 | `case-store` | `cases` + `caseIndex` (one atomic txn) | `create / save / open / duplicate / archive / unarchive / remove(confirm:true) / list / exportCase / importBundle / compact`. `save`-update requires an existing entry — a deleted case is **not** resurrected. `delete` is fail-closed without `confirm:true`. |
 | `session-store` | separate namespace | Raw telemetry is **byte-bounded** (`maxSessionBytes` / `maxRawBytes`); oldest-evicted with a bounded eviction log embedded in the index envelope so index/log can't diverge. Never auto-uploaded. Never in a portable case bundle. `exportRawArchive(id)` is an explicit opt-in distinct from the case export. |
-| `experiment-store` | `r3_0e_experiments` + `Index` | R3.0E — see below. |
-| `outcome-store` | `r3_0e_outcomes` + `Index` | R3.0E — append-only. |
-| `timeline-store` | `r3_0e_timelines` | R3.0E — append-only per case. |
-| `followup-link-store` | `r3_0e_followupLinks` + reverse index | R3.0E — case-scoped link graph. |
+| `experiment-store` | `r3_0e_experiments` + `r3_0e_experimentsIndex` | R3.0E — **mutable** (`create / update / get / list / remove`). See §R3.0E. |
+| `outcome-store` | `r3_0e_outcomes` + `r3_0e_outcomesIndex` | R3.0E — API surface is `create / get / listForExperiment` (no update or remove API exposed). |
+| `timeline-store` | `r3_0e_timelines` | R3.0E — **append-only** per-case event document. See §R3.0E. |
+| `followup-link-store` | `r3_0e_followupLinks` + `r3_0e_followupLinksByCase` (reverse index) | R3.0E — `create / get / listForParent / markParentStatus`. **Not** append-only. |
+| `store-metadata` | `r3_0e_storeMetadata` (key `__r3_0e_version`) | Per-namespace schema-version map: `experiment / outcome / timeline / followUpLink → 1`. |
 
 ### Honesty boundary
 
@@ -331,17 +333,88 @@ adversarial cases.
 
 ---
 
-## R3.0E — Experiment loop stores
+## R3.0E — Experiment / outcome / timeline / follow-up stores
 
-R3.0E records what the user **did about** a Brief: ran an experiment, observed an outcome, scheduled a follow-up.
-The stores are append-only, case-scoped, and live in independent IndexedDB namespaces.
+R3.0E records what the user **did about** a Brief: ran an experiment, observed an outcome, walked the case
+timeline, scheduled a follow-up to another case. The four stores live in **independent versioned IndexedDB
+namespaces** and are implemented in `renderer/js/r3-0e-stores.js`. The module header is explicit about the
+boundary:
 
-| Store | Append-only? | Cross-case allowed? | Notes |
+> R3.0E persistence lives in SEPARATE versioned stores and MUST NOT extend the frozen R3.0B portable
+> case-record schema body.
+
+Every payload is validated by its E1 contract **before write** inside `compute()`, re-validated on read, and
+a future `schemaVersion` is rejected fail-closed. Persisted records carry **no runtime authority** — the D2
+WeakSet identity is closure-private and cannot survive reload, so rehydration consumers must re-validate against
+the E1 contracts before treating any value as authoritative. Writes go through the same
+`backend.transact({ stores, reads, compute })` primitive as R3.0B.
+
+### Per-store mutability — the append-only property is per store, not per phase
+
+| Store | Mutation API | Append-only? | Cross-case allowed? |
 | --- | --- | --- | --- |
-| `experiment-store` (`r3_0e_experiments`) | Yes | No | Each experiment carries a parent caseId, a snapshot of inputs, applied change, control variables, stop conditions, and a monotonic `createdAt`. |
-| `outcome-store` (`r3_0e_outcomes`) | Yes | No | An outcome is bound to an experiment id within the same case. `outcome-on-draft` rejection guards against attaching an outcome to a not-yet-final experiment. |
-| `timeline-store` (`r3_0e_timelines`) | Yes | No | Per-case timeline entries; ordered by monotonic `createdAt`. |
-| `followup-link-store` (`r3_0e_followupLinks` + reverse index) | Yes | No (cross-case forbidden) | Each link carries `linkId / parentCaseId / followUpCaseId / experimentId`. `caseAssociation` cross-case is forbidden; the store validates parent membership per fetched link via the reverse index. |
+| `experiment-store` (`r3_0e_experiments`) | `create / update / get / list / remove` | **No** | No |
+| `outcome-store` (`r3_0e_outcomes`) | `create / get / listForExperiment` (no `update` / `remove` exposed) | API surface is **append-only by omission**; the store does not advertise itself as append-only the way `timeline-store` does | No (bound to an experiment within the same case) |
+| `timeline-store` (`r3_0e_timelines`) | `getTimeline(caseId) / appendEvent(caseId, event)` | **Yes — strictly append-only** | No (per case) |
+| `followup-link-store` (`r3_0e_followupLinks` + `r3_0e_followupLinksByCase`) | `create / get / listForParent / markParentStatus` | **No** — `markParentStatus(linkId, newStatus)` mutates state | No cross-case authority (see below) |
+
+#### `experiment-store` — mutable, schema-guarded, stale-write-guarded
+
+Records are keyed by `experimentId`; the index is keyed by `experimentId` and carries
+`{ experimentId, sourceCaseId, status, createdAt, updatedAt }`. `update` enforces two guards:
+
+- `existing.schemaVersion > SCHEMA_VERSIONS.experiment` → reject with `R3_0E_EXPERIMENT_FUTURE_SCHEMA`.
+- `existing.createdAt !== rec.createdAt` → reject with `R3_0E_EXPERIMENT_STALE_WRITE`.
+
+Reason codes: `R3_0E_EXPERIMENT_INVALID`, `R3_0E_EXPERIMENT_SCHEMA_MISMATCH`, `R3_0E_EXPERIMENT_ID_COLLISION`,
+`R3_0E_EXPERIMENT_MISSING`, `R3_0E_EXPERIMENT_FUTURE_SCHEMA`, `R3_0E_EXPERIMENT_STALE_WRITE`,
+`R3_0E_EXPERIMENT_CORRUPTED`.
+
+#### `outcome-store` — create-only API surface
+
+`outcomeStore.create / get / listForExperiment`. There is no `update` and no `remove` API exposed; in
+practice the API surface is append-only, but the module does not declare itself with the strict append-only
+invariants `timeline-store` uses. Reason codes: `R3_0E_OUTCOME_INVALID`, `R3_0E_OUTCOME_ID_COLLISION`,
+`R3_0E_OUTCOME_FUTURE_SCHEMA`, `R3_0E_OUTCOME_CORRUPTED`.
+
+#### `timeline-store` — the only strictly append-only store
+
+`timeline-store` is keyed per case (`r3_0e_timelines`); the document shape is
+`{ schemaVersion, caseId, events: [] }`. `appendEvent(caseId, event)` enforces, in order:
+
+- **Duplicate `eventId`** within the same case → `R3_0E_TIMELINE_DUPLICATE_EVENT`.
+- **Out-of-order timestamp** — `Date.parse(event.createdAt) < Date.parse(lastEvent.createdAt)` (or NaN on
+  either side) → `R3_0E_TIMELINE_OUT_OF_ORDER`.
+- **Future `schemaVersion`** → `R3_0E_TIMELINE_FUTURE_SCHEMA`.
+- **Re-validation** of the resulting document shape via `validateCaseTimelineShape` before write.
+
+A correction is therefore a **new event**, never a mutation of an existing event. Reason codes:
+`R3_0E_TIMELINE_FUTURE_SCHEMA`, `R3_0E_TIMELINE_CORRUPTED`, `R3_0E_TIMELINE_DUPLICATE_EVENT`,
+`R3_0E_TIMELINE_OUT_OF_ORDER`, `R3_0E_TIMELINE_INVALID`.
+
+#### `followup-link-store` — mutable parent-status, reverse-index integrity
+
+A link carries `linkId / parentCaseId / followUpCaseId / experimentId`. The reverse index is keyed by
+`parentCaseId` and stores a `linkIds[]` payload. `listForParent(parentCaseId)` re-validates membership on every
+read:
+
+- Reverse-index row's `parentCaseId` must equal the caller-supplied `parentCaseId`, otherwise
+  `R3_0E_LINK_CORRUPTED` `'reverse-index parentCaseId mismatch'`.
+- Reverse-index `linkIds` must be an array, otherwise `R3_0E_LINK_CORRUPTED` `'reverse-index linkIds not array'`.
+- Every fetched link's `parentCaseId` must equal the caller's `parentCaseId`, otherwise
+  `R3_0E_LINK_CORRUPTED` `'reverse-index points at link with mismatched parentCaseId'`.
+
+`markParentStatus(linkId, newStatus)` is a **mutation API**: the allowed statuses are exactly
+`'present' / 'archived' / 'deleted'`; any other value is rejected with `R3_0E_LINK_PARENT_STATUS_INVALID`. The
+follow-up link **never** carries comparison authority — cross-case comparison is forbidden by R3.0C.
+
+Reason codes: `R3_0E_LINK_INVALID`, `R3_0E_LINK_ID_COLLISION`, `R3_0E_LINK_FUTURE_SCHEMA`,
+`R3_0E_LINK_CORRUPTED`, `R3_0E_LINK_MISSING`, `R3_0E_LINK_PARENT_STATUS_INVALID`.
+
+#### `store-metadata` — per-namespace schema-version map
+
+`storeMetadata.readVersion() / writeVersion(versionMap)` against the metadata key `__r3_0e_version`. The
+authoritative schema versions are `{ experiment: 1, outcome: 1, timeline: 1, followUpLink: 1 }`.
 
 ### Outcome classifier
 
@@ -379,59 +452,160 @@ Absent any one of those, the classifier emits `cannotConclude` with the reason �
 
 ### Honesty contract for the experiment loop
 
-The experiment loop records intent and observation. It does **not** validate that a setup change "worked"
-beyond what the comparison authority and controlled-variable bookkeeping can support. A `confirmed` outcome is
-a structured statement that *the controlled change is consistent with the observed comparison delta within
-declared limitations* — not a measured performance gain.
+The experiment + outcome + timeline + follow-up stores record intent and observation. They do **not** validate
+that a setup change "worked" beyond what the comparison authority and controlled-variable bookkeeping can
+support. A `confirmed` outcome is a structured statement that *the controlled change is consistent with the
+observed comparison delta within declared limitations* — not a measured performance gain.
 
 ---
 
-## R3.0F — Migration engine
+## R3.0F — Migration engine, e2e flows, hardening probes
 
-R3.0F's migration engine is the bridge between persisted records produced under R3.0B/C/D/E and the
-in-memory shapes the runtime consumes. It is **deterministic**, **fail-closed**, and assumes nothing about the
-provenance of its input.
+R3.0F is three things in one phase: the migration engine that bridges persisted records to the runtime, the
+end-to-end flow harness that exercises the full product path, and the hardening probes that assert the
+fail-closed boundaries hold under pressure.
 
-The engine is built from four layered defences.
+### F1 — Migration engine
 
-### 1. `sanitize` — JSON-safe shape gate
+The migration engine (`renderer/js/r3-0f-migration-engine.js`) is **deterministic**, **fail-closed**, and
+assumes nothing about the provenance of its input. The public factory is:
 
-`sanitize` is run on every record before it touches a downstream module. It enforces:
+```
+createMigrationEngine({ backend, registry?, metaStore?, journalKey?, stateKey?,
+                        clock?, stamp?, maxJournalEntries?, maxRecordBytes? })
+  -> { detect, plan, migrate, journal, envelope, knownStores }
+```
 
-- JSON-safe primitives only. Functions, symbols, BigInts, class instances, getters, and `Proxy`/Reflect-trapped
-  objects are **rejected** — not stripped silently.
-- Plain-object / plain-array invariants. A prototype other than `Object.prototype` / `Array.prototype` is a
-  rejection, not a coercion.
-- Universal array / depth / size caps inherited from R3.0B (≤ 256, depth ≤ 12, size cap).
-- Cyclic structure → rejection.
+- `detect()` → frozen `{ ok, currentEnvelope?, targetEnvelope, perStoreStatus, knownStores, envelopeMismatch }`.
+- `plan()` → frozen `{ ok, generatedAt, steps, blockers, perStoreSummary }`.
+- `migrate({ confirm: true })` → frozen `{ ok, report | reasonCode }`. `confirm:true` is required;
+  any other value short-circuits with `CONFIRM_REQUIRED`.
+- `journal()` → frozen array of journal entries (most recent last).
+- `envelope` → frozen target envelope.
+- `knownStores` covers `cases`, `sessions`, `r3_0e_experiments`, `r3_0e_outcomes`, `r3_0e_timelines`,
+  `r3_0e_followupLinks`.
+
+Meta is persisted in the `meta` store under `__r3_0f_migration_journal__` (journal) and
+`__r3_0f_migration_state__` (state); journals retain `MAX_JOURNAL_ENTRIES_DEF = 256` entries (overflow factor
+4 → `JOURNAL_OVERFLOW`), and `maxJournalEntries` is overridable via constructor. Record-integrity hashes are
+FNV-1a 64 (non-cryptographic) per F1-R1-08.
+
+The engine is built from four layered defences, in order.
+
+#### 1. `_sanitize` — JSON-safe shape gate (actual limits)
+
+`_sanitize` is run on every record before it touches a downstream module. The actual structural limits, read
+from `renderer/js/r3-0f-migration-engine.js`, are:
+
+| Walker | Depth cap | Effect at cap |
+| --- | --- | --- |
+| `_isJsonSafe` | **256** | `if (depth > 256) return false;` — record rejected as not JSON-safe. |
+| `_isAccessorFreeDescriptorTree` | **256** | `if (depth > 256) return false;` — descriptor walk fails closed. |
+| `_safeJsonStringify` | **256** | `if (depth > 256) return null;` — serializer fails closed. |
+| `_containsAttestationField` | **64** | `if (depth > 64) return true;` — depth-bomb defence treats the input as attestation-suspect. |
+
+There is **no universal `Array.length ≤ 256` cap and no depth-12 cap** anywhere in `_sanitize` /
+`_isJsonSafe` / `_safeJsonStringify`. Arrays are walked element-by-element, bounded only by the depth-256
+ceiling above and by the byte cap below. The effective size ceiling is the byte cap:
+
+- `MAX_RECORD_BYTES_DEF = 8_000_000` (**8 MB**), enforced by `_safeJsonStringify` length against
+  the engine's captured `String.prototype` methods. Override via the `maxRecordBytes` constructor option.
+  Exceeding the cap → `RECORD_TOO_LARGE`.
+
+`_isJsonSafe` rejects:
+
+- `BigInt`, `function`, `symbol`,
+- `NaN` / `Infinity` (non-finite numbers),
+- `Date` / `Map` / `Set` / `RegExp` / typed arrays — any value whose prototype is not `Object.prototype` and
+  not `null`,
+- accessor descriptors and any descriptor lacking the `value` key (pre-clone walk via
+  `_isAccessorFreeDescriptorTree`),
+- `Proxy` inputs (caught by the structured-clone firewall below).
+
+`undefined` **on a property** is JSON-safe — it is stripped by JSON serialization per ECMA-262 §25.5.2, and
+the R3.0B `importBundle` already relies on this (`schema: undefined`).
 
 A sanitize failure is a typed error with a path pointer; the migration aborts, the existing record stays
-intact, and the UI surfaces a readable block.
+intact, and the UI surfaces a readable block. Sanitize reason codes: `RECORD_NOT_AN_OBJECT`,
+`PROXY_INPUT_REJECTED`, `RECORD_CIRCULAR`, `RECORD_TOO_LARGE`.
 
-### 2. Structured-clone-only firewall
+#### 2. Structured-clone-only firewall
 
 After sanitize passes, every record crosses module boundaries through a **structured-clone-only firewall**.
-Direct reference passing is disallowed by contract: the engine `structuredClone`s on entry and on emit, so a
-caller cannot retain a live reference into the engine's internal graph and a producer cannot pass a captured
-prototype through. The clone semantics are exactly the ones MemoryBackend already used at every R3.0B
-boundary, lifted to a per-call contract.
+The engine refuses to construct at module load if `structuredClone` is unavailable, and rejects an input that
+`structuredClone` throws on (`PROXY_INPUT_REJECTED`). A caller cannot retain a live reference into the engine's
+internal graph and a producer cannot pass a captured prototype through. The clone semantics are exactly the
+ones `MemoryBackend` already used at every R3.0B boundary, lifted to a per-call contract.
 
-### 3. Trap-free serializer
+#### 3. Trap-free serializer
 
-When the engine has to emit a string (export envelopes, debug artifacts, integrity hashes), it routes through a
-**trap-free JSON serializer** built on the captured `Array.isArray`, captured `Object.prototype.hasOwnProperty`,
-and a hand-walked enumeration that ignores accessors. A `toJSON` method on an input is **not honoured** — the
-serializer is producer-attestation-defended: the producer does not get to decide what its own bytes look like.
+When the engine has to emit a string (export envelopes, debug artifacts, integrity hashes), it routes through
+the **trap-free `_safeJsonStringify`** built on the closure-captured `Array.isArray`, captured
+`Object.prototype.hasOwnProperty`, captured `String.prototype` / `Number.prototype` methods invoked through
+`_ReflectApply`, and own-enumerable-key enumeration that ignores accessors. A `toJSON` method on an input is
+**not honoured** — the serializer is producer-attestation-defended: the producer does not get to decide what
+its own bytes look like. `JSON.stringify` is intentionally **not** used post-clone, to neutralize hostile
+`Object.prototype.toJSON` hooks added after engine load.
 
-### 4. Atomic `transact` with TOCTOU defence
+The engine also defends a producer-attestation field-name allowlist. The 15 sentinel field names are:
+`_authoritative`, `_producerAttested`, `_attested`, `__attested`, `_verified`, `__verified`, `_signature`,
+`__signature`, `_proof`, `__proof`, `_authority`, `__authority`, `_authoritativeSession`, `_authoritativeCase`,
+`_authoritativeOutcome`. The 7 tokens are `authoritative`, `producerattested`, `attested`, `verified`,
+`signature`, `proof`, `authority`. A key is refused if its NFKC-lowercased form exactly matches a sentinel name
+**or** the key starts with `_` (normalized) and contains one of the tokens. Ordinary fields such as
+`lapAuthority` / `projectionSignature` / `experimentVerified` pass — the rule is a sentinel match, not a
+keyword scan. Defang is via the regex
+`/[\p{Default_Ignorable_Code_Point}\p{Mn}\p{Cc}\p{Cs}\p{White_Space}⠀]/gu`. A refused field surfaces
+`PRODUCER_ATTESTATION_REFUSED`. **F1 never fabricates an attestation field on its own output.**
+
+#### 4. Atomic `transact` with TOCTOU defence
 
 All migration writes go through the R3.0B `transact({ stores, reads, compute })` primitive. `reads` are
-declared up front; `compute` is synchronous and pure; the writes are committed or aborted as one. This closes
-the TOCTOU window that would otherwise exist between "read the old record, decide what to migrate to, write the
-new record" — there is no in-between state where two writers can race.
+declared up front; `compute` is synchronous and pure; the writes are committed or aborted as one. Per
+F1-R1-03, the commit covers the store writes AND the journal AND the migration state in **one atomic
+`backend.transact()`** across all stores + META — there is no in-between state where two writers can race.
+
+The migrator-result boundary further enforces an explicit closed enum: `ok` must be an explicit boolean;
+`migrationsApplied` must be an array of plain strings; `reason` must be one of the envelope reason codes (or
+mapped to `NO_MIGRATION_PATH`). The full envelope reason-code set is `UNSUPPORTED_FUTURE_VERSION`,
+`NO_MIGRATION_PATH`, `RECORD_NOT_AN_OBJECT`, `RECORD_BAD_VERSION`, `RECORD_TOO_LARGE`, `RECORD_CIRCULAR`,
+`PROXY_INPUT_REJECTED`, `POST_MIGRATION_INVALID`, `MIGRATOR_THREW`, `BACKEND_REJECTED`, `CONFIRM_REQUIRED`,
+`ENVELOPE_VERSION_MISMATCH`, `JOURNAL_OVERFLOW`, `PRODUCER_ATTESTATION_REFUSED`. Envelope `status` is one of
+`migrated / no-op / rejected / failed`.
 
 The migration engine is the first F-phase module with `runtimeConsumersAllowed = true` and
 `algorithmsAllowed = true`; **UI activation and Feature Registry activation remain blocked until F6**.
+
+### F2 — End-to-end flow harness (9 flows)
+
+Nine flows under `tests/e2e/flow-{01..09}-*.test.js` drive the production tree from cold start through
+import, comparison, brief, experiment, follow-up, and Electron smoke. The exact filenames and purposes are:
+
+| File | Purpose |
+| --- | --- |
+| `tests/e2e/flow-01-new-user.test.js` | New-user empty-state journey. Fresh launch with empty IndexedDB produces a deterministic empty Case Library; F1 reports zero records; envelope at v1; forbidden actions (auto reference lap / auto setup apply / runtime-LLM authority / causation / driver blame) disabled. Zero console error. |
+| `tests/e2e/flow-02-real-telemetry.test.js` | Real telemetry import. |
+| `tests/e2e/flow-03-measured.test.js` | Measured-metrics flow. |
+| `tests/e2e/flow-04-reference-lap.test.js` | Reference-lap explicit selection (no auto fastest / median / best-sector composite). |
+| `tests/e2e/flow-05-vre.test.js` | VRE / R3.0D Engineer Brief on authoritative-only inputs. The brief does **not** classify, claim causation, blame the driver, or take runtime-LLM authority — it is a **read projection** of upstream services. |
+| `tests/e2e/flow-06-setup-experiment.test.js` | Setup experiment create + outcome classify (authoritative-only) + timeline append-only. A correction is a NEW timeline event, not a mutation of an existing one. |
+| `tests/e2e/flow-07-driver-experiment.test.js` | Driver experiment with follow-up Case link. Follow-up Case Links carry **no comparison authority** (cross-case forbidden). Covers `create` + `listForParent` + `markParentStatus` state transitions. |
+| `tests/e2e/flow-08-export-import.test.js` | Case export + reimport. |
+| `tests/e2e/flow-09-electron-smoke.test.js` | Electron startup smoke. Verifies the Electron CLI is reachable, `main.js` has a stable entry shape, the preload exposes only the minimal `contextBridge` surface, and there is no `nodeIntegration` leak. Does **not** launch a window or render UI. |
+
+### F3 — Hardening probes (6 probes)
+
+Six adversarial probes under `tests/e2e/hardening-{01..06}-*.test.js` (133 assertions across the suite)
+target the fail-closed boundaries identified earlier in this document:
+
+| File | Target |
+| --- | --- |
+| `tests/e2e/hardening-01-electron-boundary.test.js` | Electron preload surface is exactly `{ platform, version }`; no IPC channel, no FS, no shell spawn, no `webContents` exposure. Drift fails the gate. |
+| `tests/e2e/hardening-02-storage-failure.test.js` | Injects `STORAGE_UNAVAILABLE` / `STORAGE_QUOTA_EXCEEDED`; confirms the UI blocks the affected capability with a reason — not a partial save, not a silent skip. |
+| `tests/e2e/hardening-03-no-stale-ui.test.js` | After a fail-closed block the view does not retain a previous "success" cell. |
+| `tests/e2e/hardening-04-large-library.test.js` | Opening a library at the bounded ceiling number of cases does not exceed declared memory or freeze the renderer. |
+| `tests/e2e/hardening-05-xss-injection.test.js` | Sanitization at every place a user-supplied string crosses into the DOM (case title, vehicle name, custom notes). |
+| `tests/e2e/hardening-06-supply-chain.test.js` | The dependency-free CI lane: a transitive dependency added under cover would fail the install-lane assertion. |
 
 ---
 
@@ -459,17 +633,10 @@ Frozen `webPreferences`:
 
 The preload surface is **exactly** `{ platform, version }`. There is no `ipcRenderer.invoke` channel, no FS
 access, no shell spawn, no `webContents` exposure. A renderer-side feature that "would need a native API" is
-either solved without one or stays out of scope. The **F3-boundary hardening probe** (see below) verifies this
-no-IPC contract byte by byte against an expected schema and fails closed on any drift — a preload that grew an
-unexpected property would block the release gate.
-
-R3.0F hardening probe F3-large-library asserts that opening a library with the bounded ceiling number of cases
-does not exceed declared memory or freeze the renderer. F3-storage-failure injects `STORAGE_UNAVAILABLE` /
-`STORAGE_QUOTA_EXCEEDED` and confirms the UI blocks the affected capability with a reason — not a partial save,
-not a silent skip. F3-no-stale-UI verifies that after a fail-closed block the view does not retain a previous
-"success" cell. F3-XSS verifies sanitization at every place a user-supplied string crosses into the DOM (case
-title, vehicle name, custom notes). F3-supply-chain verifies the dependency-free CI lane: a transitive
-dependency added under cover would fail the install-lane assertion.
+either solved without one or stays out of scope. The F3 boundary hardening probe
+(`hardening-01-electron-boundary.test.js`) verifies this no-IPC contract byte by byte against an expected
+schema and fails closed on any drift — a preload that grew an unexpected property would block the release
+gate.
 
 ---
 
@@ -482,22 +649,25 @@ R3.0 production paths are deterministic by construction:
 - **No `Math.random` in production paths.** Sampling, ordering, and pairing are deterministic. Where a random
   source would be tempting (tie-breaking, jitter), an explicit declared rule replaces it.
 - **No wall-clock dependence in decision logic.** Time values consumed by the decision engine come from
-  declared monotonic record timestamps, not `Date.now()`. The append-only stores use a monotonic `createdAt`
-  derived from the platform clock at insertion, never re-evaluated downstream.
+  declared monotonic record timestamps, not `Date.now()`. R3.0E records use a monotonic `createdAt` derived
+  from the platform clock at insertion, never re-evaluated downstream — and `timeline-store` rejects
+  out-of-order timestamps with `R3_0E_TIMELINE_OUT_OF_ORDER`.
 - **No floating-point ordering drift.** Comparators carry an explicit tie-break rule; integer-key sort orders
   are preferred where one is available.
 - **Captured intrinsics.** D2 captures `Array.isArray` and similar predicates at module load so a later tamper
-  cannot retroactively shift authority. The migration engine captures its serialization intrinsics for the
-  same reason.
+  cannot retroactively shift authority. The migration engine captures `Object.*` / `Array.*` / `JSON.*` /
+  `String.*` / `Number.*` at module load for the same reason, and requires `structuredClone` to be available
+  at module load or it refuses to construct.
 
 ### Fail-closed contracts (consolidated)
 
 | Layer | Open the gate when | Fail-closed when | Substitute offered |
 | --- | --- | --- | --- |
 | Storage | IndexedDB available + quota present | `STORAGE_UNAVAILABLE` / `STORAGE_QUOTA_EXCEEDED` | Block save; readable error in UI. |
-| Case record | Sanitize all-or-nothing pass | Any unbounded array / unsupported type / cycle / prototype drift | Reject save; existing record untouched. |
+| Case record | Sanitize all-or-nothing pass | Any unbounded value / unsupported type / cycle / prototype drift | Reject save; existing record untouched. |
 | Portable bundle | Strict allowlist + value constraints satisfied | Off-allowlist or constraint failure | Field excluded + logged; required-field failure rejects the bundle. |
-| Migration | sanitize + structured-clone + trap-free serialize all pass | Any layer fails | Reject migration; record stays at prior schema; UI blocks the capability with a reason. |
+| Migration (`_sanitize`) | All four walks pass: `_isJsonSafe` (depth ≤ 256), `_isAccessorFreeDescriptorTree` (depth ≤ 256), `_safeJsonStringify` (depth ≤ 256), byte size ≤ `MAX_RECORD_BYTES_DEF` (8 MB or override) | Depth exceeded, non-plain prototype, accessor descriptor, BigInt/symbol/function/non-finite number, cyclic, Proxy input, byte cap exceeded | `RECORD_NOT_AN_OBJECT` / `PROXY_INPUT_REJECTED` / `RECORD_CIRCULAR` / `RECORD_TOO_LARGE`; record stays at prior schema; UI blocks the capability with a reason. |
+| Migration envelope | Migrator result is well-shaped + writes commit atomically | Future version, missing path, post-migration invalid, migrator threw, backend rejected, confirm missing, envelope-version mismatch, journal overflow, producer-attestation field | One of the 14 envelope reason codes; envelope `status ∈ { migrated, no-op, rejected, failed }`. |
 | C2 lap | All 5 authorities pass | Any single authority blocks | Reason code, no value. |
 | C3 distance | Declared lap-distance authority + policy pass | Any of 16 distance reason codes | Reason code, no normalized axis. |
 | C4 reference | Explicit user selection present | No selection (no auto fastest_valid / median / best_sector_composite) | `REFERENCE_NOT_SELECTED`; comparison blocked. |
@@ -507,6 +677,8 @@ R3.0 production paths are deterministic by construction:
 | D2 graph | Authoritative inputs verified via WeakSet | Any input not WeakSet-member | Graph build aborts. |
 | D3 hypothesis | Verified graph + inputs satisfy hypothesis preconditions | Any precondition fails (e.g. no calibration for a magnitude claim) | Hypothesis downgraded to directional or omitted. |
 | D5 brief | Deep-frozen emit; generation token bound to inputs | Token stale / retired / replayed against a different case | Brief refused. |
+| R3.0E timeline | Append-only invariants pass (unique `eventId`, monotonic `createdAt`, current schema, shape re-validated) | Duplicate / out-of-order / future schema / shape mismatch | Reason code, no append. |
+| R3.0E follow-up link | `parentCaseId` matches reverse index AND link; `markParentStatus` in `{present, archived, deleted}` | Reverse-index mismatch / non-array / status off-allowlist | `R3_0E_LINK_CORRUPTED` / `R3_0E_LINK_PARENT_STATUS_INVALID`. |
 | Outcome classifier | Authority + same-case/same-session + controlled-variables + min credibility | Any precondition fails | `cannotConclude` with reason; `invalid_comparison` takes precedence when the comparison authority itself is invalid. |
 | Feature Registry | `featureRegistryActivationAllowed === true` | Otherwise | Feature deferred (navigation hidden / disabled). |
 
@@ -531,6 +703,10 @@ qualitative substitute is offered where it is honestly available; otherwise the 
 - **Delta sign** — `comparison − reference`. Single convention. No alternate.
 - **Reference selection** — explicit user only. `fastest_valid / median_valid / best_sector_composite` are
   permanently disabled.
+- **R3.0E append-only is per store, not per phase.** Only `timeline-store` is strictly append-only.
+  `experiment-store` exposes `create / update / remove`; `follow-up-link-store` exposes `markParentStatus`;
+  `outcome-store` exposes `create / get / listForExperiment` only. The honesty contract is preserved through
+  schema-version, stale-write, duplicate-event, out-of-order, and reverse-index guards.
 - **No intermediate release, and no branch protection bypass.** No tag, no GitHub release, no semver bump
   between R3.0C and F6; the R3-GATE0 ruleset on `main` (required PR + required `trusted-verification` check +
   no force-push + no deletion, 0 bypass actors) holds across every R3 phase. A force-merge or rule-bypass would
