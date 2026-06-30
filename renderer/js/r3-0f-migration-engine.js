@@ -147,11 +147,20 @@
   // (combining acute U+0301, combining grapheme joiner U+034F, variation selectors supplement
   // U+E0100..U+E01EF) that are NOT in DICP but are still used in token-splicing attacks.
   // Unicode property escapes require the `u` flag and are stable since Node 12.
-  // Also strip \p{Cc} (C0 U+0000..U+001F + C1 U+0080..U+009F control characters — NULL, BEL,
-  // ESC, etc.) and \p{Cs} (isolated surrogate halves in malformed UTF-16). Neither category is
-  // in DICP nor in Mn, but both can be spliced inside attestation tokens to bypass substring
-  // matching. They are never legitimate in serialized field names.
-  var _DEFANG_RE = /[\p{Default_Ignorable_Code_Point}\p{Mn}\p{Cc}\p{Cs}]/gu;
+  // F1-R8-01: additionally strip \p{White_Space} (covers space U+0020, NBSP U+00A0, narrow
+  // NBSP U+202F, ideographic space U+3000, line/paragraph separators U+2028/U+2029, and all
+  // other Unicode-spec whitespace) AND Braille pattern blank U+2800 (a visually-blank `Lo`
+  // character that survives every other strip).
+  //
+  // The full defang covers:
+  //   \p{Default_Ignorable_Code_Point} — Cf + Hangul fillers + Cn unassigned-DICPs (R7)
+  //   \p{Mn} — combining marks (R6)
+  //   \p{Cc} — C0/C1 control characters (R8 pre-emptive)
+  //   \p{Cs} — isolated surrogate halves (R8 pre-emptive)
+  //   \p{White_Space} — all Unicode whitespace (R8)
+  //   U+2800 — Braille blank (R8)
+  // Field names in R3.0B/C/D/E contracts are camelCase ASCII; whitespace is never legitimate.
+  var _DEFANG_RE = /[\p{Default_Ignorable_Code_Point}\p{Mn}\p{Cc}\p{Cs}\p{White_Space}⠀]/gu;
   function _normalizeKey(k) {
     if (typeof k !== 'string') return '';
     var stripped;

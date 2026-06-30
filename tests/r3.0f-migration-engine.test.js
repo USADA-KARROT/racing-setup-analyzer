@@ -1158,6 +1158,79 @@ asyncCase('F1-R8 pre-emptive: C1 control (U+0080) splice rejected', function () 
     .then(function (r) { chk('C1 control splice rejected', r.report.perStore.cases.rejected === 1); });
 });
 
+// F1-R8-01 closures: whitespace + Braille blank splices
+asyncCase('F1-R8-01: SPACE splice in _author itative rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var k = '_author itative';
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r[k] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cSP', { schemaVersion: 1, caseId: 'cSP' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('SPACE splice rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+asyncCase('F1-R8-01: NBSP (U+00A0) splice rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var k = '_author' + String.fromCodePoint(0xA0) + 'itative';
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r[k] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cNBSP', { schemaVersion: 1, caseId: 'cNBSP' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('NBSP splice rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+asyncCase('F1-R8-01: NNBSP (U+202F) splice rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var k = '_author' + String.fromCodePoint(0x202F) + 'itative';
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r[k] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cNNBSP', { schemaVersion: 1, caseId: 'cNNBSP' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('NNBSP splice rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+asyncCase('F1-R8-01: Ideographic Space (U+3000) splice rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var k = '_author' + String.fromCodePoint(0x3000) + 'itative';
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r[k] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cIdeo', { schemaVersion: 1, caseId: 'cIdeo' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('Ideographic Space splice rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+asyncCase('F1-R8-01: Braille blank (U+2800) splice rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var k = '_author' + String.fromCodePoint(0x2800) + 'itative';
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r[k] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cBraille', { schemaVersion: 1, caseId: 'cBraille' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('Braille blank splice rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+asyncCase('F1-R8-01: Line Separator (U+2028) splice rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var k = '_author' + String.fromCodePoint(0x2028) + 'itative';
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r[k] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cLS', { schemaVersion: 1, caseId: 'cLS' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('Line Separator splice rejected', r.report.perStore.cases.rejected === 1); });
+});
+
 asyncCase('F1-R6-01 negative: legitimate lapAuthority/projectionSignature/experimentVerified still accepted', function () {
   var b = SB.MemoryBackend();
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
