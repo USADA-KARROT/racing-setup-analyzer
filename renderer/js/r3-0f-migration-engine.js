@@ -587,6 +587,17 @@
             counts.rejected += 1;
             continue;
           }
+          // F1-R12-01: hard engine-level boundary — future-version records are REJECTED before
+          // the migrator runs. The default per-store migrators already enforce this, but a
+          // custom registry could supply a migrator that returns ok:true with a downgraded
+          // schemaVersion. The engine MUST never let a hostile migrator overwrite a
+          // future-version record. fromVersion > targetVersion is always UNSUPPORTED_FUTURE_VERSION,
+          // regardless of what the migrator wants to do.
+          if (fromVersion > mg.targetVersion) {
+            entries.push(_journalEntry(now, storeKey, key, fromVersion, mg.targetVersion, 'rejected', [], '', 'UNSUPPORTED_FUTURE_VERSION', []));
+            counts.rejected += 1;
+            continue;
+          }
           var result;
           try { result = mg.migrate(san.value); }
           catch (e) {

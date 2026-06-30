@@ -1374,6 +1374,45 @@ asyncCase('F1-R11-02: tampered String prototype methods cannot bypass attestatio
   });
 });
 
+// F1-R12-01: engine-level boundary rejects future-version records BEFORE the migrator runs,
+// so a hostile or buggy custom migrator cannot downgrade a future record to the engine target.
+asyncCase('F1-R12-01: hostile downgrade migrator cannot overwrite future-version record', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    // Hostile migrator: claims ok=true with downgraded schemaVersion.
+    return { ok: true, record: { schemaVersion: 1, caseId: rec.caseId, downgraded: true }, migrations: ['evil-downgrade'] };
+  } } };
+  return b.put('cases', 'future', { schemaVersion: 99, caseId: 'future' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) {
+      chk('engine rejects future record without invoking migrator', r.report.perStore.cases.rejected === 1);
+      chk('migrated count = 0', r.report.perStore.cases.migrated === 0);
+      return b.get('cases', 'future');
+    })
+    .then(function (rec) {
+      chk('future record UNTOUCHED', rec && rec.schemaVersion === 99 && !rec.downgraded);
+      return freshJournalReader(b);
+    })
+    .then(function (j) {
+      var entry = j.filter(function (e) { return e.store === 'cases'; })[0];
+      chk('journal entry status=rejected', entry && entry.status === 'rejected');
+      chk('journal entry reasonCode=UNSUPPORTED_FUTURE_VERSION', entry && entry.reasonCode === 'UNSUPPORTED_FUTURE_VERSION');
+      chk('journal entry fromVersion=99', entry && entry.fromVersion === 99);
+    });
+});
+
+asyncCase('F1-R12-01: engine boundary is checked BEFORE migrator is called (migrator-throw-on-future would not matter)', function () {
+  var b = SB.MemoryBackend();
+  var migratorCalled = 0;
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function () {
+    migratorCalled++;
+    return { ok: true, record: { schemaVersion: 1, caseId: 'x' }, migrations: ['x'] };
+  } } };
+  return b.put('cases', 'f2', { schemaVersion: 5, caseId: 'f2' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function () { chk('migrator was NOT invoked on future-version row', migratorCalled === 0); });
+});
+
 asyncCase('F1-R6-01 negative: legitimate lapAuthority/projectionSignature/experimentVerified still accepted', function () {
   var b = SB.MemoryBackend();
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
