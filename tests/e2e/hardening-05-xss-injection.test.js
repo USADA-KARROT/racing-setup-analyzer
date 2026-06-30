@@ -143,6 +143,11 @@ try {
     var strCh = '';
     var lastSig = '';
     var lastWasRegexPrecedingKw = false;
+    // F3-R16-01: template-literal `${...}` interpolation must be lexed as JS code.
+    // Track template-stack depth; inside `${...}` we re-enter the main scanner state.
+    var tplStack = []; // each entry: braceDepth (closes the interpolation when matched)
+    var inTplInterp = false;
+    var tplBraceDepth = 0;
     function couldStartRegex(prev) {
       if (lastWasRegexPrecedingKw) return true;
       if (prev === '') return true;
@@ -159,8 +164,34 @@ try {
       var ch = src.charAt(i);
       var nxt = i + 1 < n ? src.charAt(i + 1) : '';
       if (inStr) {
+        // Inside a template literal, watch for `${` to enter an interpolation context.
+        if (strCh === '`' && ch === '$' && nxt === '{') {
+          out += ch + nxt;
+          tplStack.push({ braceDepth: tplBraceDepth + 1 });
+          inStr = false;
+          inTplInterp = true;
+          tplBraceDepth++;
+          i += 2;
+          continue;
+        }
         if (ch === '\\' && i + 1 < n) { out += ch + nxt; i += 2; continue; }
         if (ch === strCh) { inStr = false; out += ch; i++; lastSig = ch; continue; }
+        out += ch; i++; continue;
+      }
+      // Inside template interpolation, watch for `}` closing the interpolation back into the template.
+      if (inTplInterp && ch === '{') { tplBraceDepth++; out += ch; i++; continue; }
+      if (inTplInterp && ch === '}') {
+        tplBraceDepth--;
+        var top = tplStack[tplStack.length - 1];
+        if (top && tplBraceDepth === top.braceDepth - 1) {
+          // Back to template string body
+          tplStack.pop();
+          inTplInterp = tplStack.length > 0;
+          inStr = true;
+          strCh = '`';
+          out += ch; i++;
+          continue;
+        }
         out += ch; i++; continue;
       }
       if (ch === '/' && nxt === '/') { while (i < n && src.charAt(i) !== '\n') i++; continue; }
@@ -178,7 +209,6 @@ try {
         lastSig = ident.charAt(ident.length - 1);
         continue;
       }
-      // F3-R6-01 closure: numbers consume keyword context.
       if (/[0-9]/.test(ch)) {
         var numStart = i;
         while (i < n && /[0-9.eE_xboBOXn+\-]/.test(src.charAt(i))) {
