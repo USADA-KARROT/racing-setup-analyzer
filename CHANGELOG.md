@@ -141,28 +141,33 @@ checkpoint lives at **`governance/r3.0f/checkpoints/F2.json`**. The flow files l
    not classify outcomes, does not claim causation, does not blame the driver; no runtime
    LLM holds decision authority; the brief is a **read projection**, never a
    re-classification. A forged `HypothesisSet` is rejected by the `WeakSet` authority gate.
-6. **`flow-06-setup-experiment.test.js`** — Setup experiment create + outcome classify +
-   timeline append. Drives the R3.0E Experiment Loop end-to-end: create a setup experiment
-   in the store, classify the outcome through the R3.0E classifier on authoritative inputs
-   only, append a timeline event, and verify the F1 migration engine sees the records as
-   at-target. The append-only timeline contract is enforced — a correction is a *new*
+6. **`flow-06-setup-experiment.test.js`** — Setup experiment create + timeline append.
+   Drives the R3.0E Experiment Loop end-to-end: create a setup experiment in the store,
+   append an `outcome_classified` timeline event (the flow appends the event directly; it
+   does not invoke `classifyOutcome`), and verify the F1 migration engine sees the records
+   as at-target. The append-only timeline contract is enforced — a correction is a *new*
    timeline event, never a mutation of a prior one.
 7. **`flow-07-driver-experiment.test.js`** — Driver experiment with follow-up case link.
    Same Experiment Loop as Flow 06 but for a driver-instruction-only experiment
    (`driverInstruction` populated, no `setupChange`); also exercises the follow-up-link
-   store semantics. Follow-up case links carry **no comparison authority**; cross-case
-   comparison is forbidden. `create`, `listForParent`, and state transitions all work.
+   store's `create` path. Follow-up case links carry **no comparison authority**; cross-case
+   comparison is forbidden. The flow's link write uses `parentStatus: 'follow_up_required'`,
+   which is outside the contract's allowed enum (`'present' | 'archived' | 'deleted'`); the
+   assertion tolerates either a successful create or a rejection carrying an `R3_0E_LINK_*`
+   reason code — it does not assert that `listForParent` or a `markParentStatus` transition
+   succeeds.
 8. **`flow-08-export-import.test.js`** — Case export + re-import. Case export produces a
    portable bundle (R3.0B schema-validated, no raw telemetry); importing the bundle into a
    fresh backend creates an `imported_summary` record that is **never** promoted to
    `local_full`; the imported record carries no producer attestation (the engine never
    fabricates one); the F1 migration engine sees `imported_summary` as at-target; the
    round-trip preserves the public fields.
-9. **`flow-09-electron-smoke.test.js`** — Electron startup smoke. The Electron CLI is
-   reachable (devDependency installed); `main.js` exposes a stable Electron-compatible
-   entry shape; `preload.js` exposes only the minimal `contextBridge` surface
-   (`nodeIntegration: false`, `contextIsolation: true`). Smoke only — does not launch a
-   window or render the UI.
+9. **`flow-09-electron-smoke.test.js`** — Electron startup smoke. Reads `package.json` to
+   confirm `electron` is declared as a devDependency with a valid semver-range string;
+   `main.js` exposes a stable Electron-compatible entry shape; `preload.js` exposes only
+   the minimal `contextBridge` surface (`nodeIntegration: false`, `contextIsolation: true`).
+   The flow does not invoke the `electron` binary or launch a window — it is a
+   declaration-level smoke check, not a process-launch check.
 
 Each flow asserts the same fail-closed rules at runtime that the unit tests assert in
 isolation. Flow output is never used to widen a credibility rung.
