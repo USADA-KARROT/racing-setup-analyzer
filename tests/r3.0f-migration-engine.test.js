@@ -963,6 +963,54 @@ asyncCase('F1-R4-01: U+FF3F fullwidth low-line confusable rejected', function ()
     });
 });
 
+asyncCase('F1-R5-01: U+200F RLM-prefixed _fakeSignatureHere rejected', function () {
+  var b = SB.MemoryBackend();
+  var hostileKey = '‏_fakeSignatureHere';
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r[hostileKey] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cRLM', { schemaVersion: 1, caseId: 'cRLM' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('RLM-prefixed key rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+asyncCase('F1-R5-01: ZWJ inside token (_author<ZWJ>itative) rejected', function () {
+  var b = SB.MemoryBackend();
+  var hostileKey = '_author‍itative';
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r[hostileKey] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cZWJ', { schemaVersion: 1, caseId: 'cZWJ' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('ZWJ-spliced token rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+asyncCase('F1-R5-01: ZWSP-prefixed _customAuthority rejected', function () {
+  var b = SB.MemoryBackend();
+  var hostileKey = '​_customAuthority';
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r[hostileKey] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cZWSP', { schemaVersion: 1, caseId: 'cZWSP' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('ZWSP-prefixed key rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+asyncCase('F1-R5-01: BOM-prefixed _verified rejected', function () {
+  var b = SB.MemoryBackend();
+  var hostileKey = '﻿_verified';
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r[hostileKey] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cBOM', { schemaVersion: 1, caseId: 'cBOM' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('BOM-prefixed key rejected', r.report.perStore.cases.rejected === 1); });
+});
+
 asyncCase('F1-R4-01: U+FE33 presentation-form low-line confusable rejected', function () {
   var b = SB.MemoryBackend();
   var hostileKey = '︳customAuthority'; // NFKC normalizes leading char to '_'

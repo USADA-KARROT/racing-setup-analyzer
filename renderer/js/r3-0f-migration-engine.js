@@ -140,10 +140,18 @@
     'signature', 'proof', 'authority'
   ]);
   // Pre-compute the normalized form of the exact-name set for fast lookup.
+  // F1-R5-01: strip Unicode format controls + default-ignorable code points BEFORE NFKC. NFKC
+  // does not remove ZWJ/ZWNJ/RTL/LTR marks, bidi isolates, BOM, soft hyphen, or variation
+  // selectors. A hostile migrator could splice e.g. `‏_fakeSignatureHere` or
+  // `_author‍itative` to bypass the sentinel-prefix and token-substring checks. Pre-strip
+  // these and only THEN normalize.
+  var _FORMAT_CTRL_RE = /[­؜᠎​-‏‪-‮⁠-⁯︀-️﻿]/g;
   function _normalizeKey(k) {
     if (typeof k !== 'string') return '';
+    var stripped;
+    try { stripped = k.replace(_FORMAT_CTRL_RE, ''); } catch (_) { stripped = k; }
     var s;
-    try { s = (typeof k.normalize === 'function') ? k.normalize('NFKC') : k; } catch (_) { s = k; }
+    try { s = (typeof stripped.normalize === 'function') ? stripped.normalize('NFKC') : stripped; } catch (_) { s = stripped; }
     return s.toLowerCase();
   }
   var PRODUCER_ATTESTATION_NORMALIZED = (function () {
