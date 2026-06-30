@@ -25,8 +25,8 @@ try {
   //   - document.write
   //   - new Function(string) / eval(string)
   var forbidden = [
-    { name: 'innerHTML =', re: /\.innerHTML\s*=\s*[^"']/, allowEmptyAssign: true },
-    { name: 'outerHTML =', re: /\.outerHTML\s*=\s*[^"']/, allowEmptyAssign: true },
+    { name: 'innerHTML =', re: /\.innerHTML\s*(?:\+=|\|\|=|\?\?=|=)\s*[^"']/, allowEmptyAssign: true },
+    { name: 'outerHTML =', re: /\.outerHTML\s*(?:\+=|\|\|=|\?\?=|=)\s*[^"']/, allowEmptyAssign: true },
     { name: 'document.write', re: /document\.write\(/ },
     { name: 'document.writeln', re: /document\.writeln\(/ },
     { name: 'new Function(', re: /new\s+Function\s*\(/ },
@@ -114,14 +114,14 @@ try {
       var line = lines[l];
       // F3-R9-04 closure: accept assignments terminated by `;`, `)`, end-of-line, OR end-of-input.
       // ASI (Automatic Semicolon Insertion) allows `element.innerHTML = userValue` without `;`.
-      var m = line.match(/\.innerHTML\s*=\s*(.+?)\s*(?:[;)]|$)/);
+      var m = line.match(/\.innerHTML\s*(?:\+=|\|\|=|\?\?=|=)\s*(.+?)\s*(?:[;)]|$)/);
       if (m) {
         var rhs = m[1].trim();
         if (rhs && !isSafeStringLiteral(rhs)) {
           unsafeInnerHtmlAssigns.push(srcName + ':' + (l + 1) + ' ' + line.trim().slice(0, 120));
         }
       }
-      var mIcomp = line.match(/\[\s*['"`]innerHTML['"`]\s*\]\s*=\s*(.+?)\s*(?:[;)]|$)/);
+      var mIcomp = line.match(/\[\s*['"`]innerHTML['"`]\s*\]\s*(?:\+=|\|\|=|\?\?=|=)\s*(.+?)\s*(?:[;)]|$)/);
       if (mIcomp) {
         var rhsIcomp = mIcomp[1].trim();
         if (rhsIcomp && !isSafeStringLiteral(rhsIcomp)) {
@@ -288,21 +288,21 @@ try {
     for (var l2 = 0; l2 < lines2.length; l2++) {
       var line2 = lines2[l2];
       // F3-R9-04 closure: also accept end-of-line termination (ASI).
-      var mO = line2.match(/\.outerHTML\s*=\s*(.+?)\s*(?:[;)]|$)/);
+      var mO = line2.match(/\.outerHTML\s*(?:\+=|\|\|=|\?\?=|=)\s*(.+?)\s*(?:[;)]|$)/);
       if (mO) {
         var rhsO = mO[1].trim();
         if (rhsO && !isSafeStringLiteral(rhsO)) {
           unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' outerHTML = variable RHS');
         }
       }
-      var mOc = line2.match(/\[\s*['"`]outerHTML['"`]\s*\]\s*=\s*(.+?)\s*(?:[;)]|$)/);
+      var mOc = line2.match(/\[\s*['"`]outerHTML['"`]\s*\]\s*(?:\+=|\|\|=|\?\?=|=)\s*(.+?)\s*(?:[;)]|$)/);
       if (mOc) {
         var rhsOc = mOc[1].trim();
         if (rhsOc && !isSafeStringLiteral(rhsOc)) {
           unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' ["outerHTML"] = variable RHS (computed)');
         }
       }
-      var mIc = line2.match(/\[\s*['"`]innerHTML['"`]\s*\]\s*=\s*(.+?)\s*(?:[;)]|$)/);
+      var mIc = line2.match(/\[\s*['"`]innerHTML['"`]\s*\]\s*(?:\+=|\|\|=|\?\?=|=)\s*(.+?)\s*(?:[;)]|$)/);
       if (mIc) {
         var rhsIc = mIc[1].trim();
         if (rhsIc && !isSafeStringLiteral(rhsIc)) {
@@ -336,14 +336,15 @@ try {
       }
     }
 
-    // (vi) setAttribute('on...', X) — direct event-handler attribute injection
-    var saMatches = s.match(/\.setAttribute\s*\(\s*['"]on[a-z]+['"][^)]*\)/gi) || [];
+    // F3-R17-02 closure: also match backtick-template-literal attribute names.
+    // (vi) setAttribute('on*', X) — direct event-handler attribute injection
+    var saMatches = s.match(/\.setAttribute\s*\(\s*['"`]on[a-z]+['"`][^)]*\)/gi) || [];
     if (saMatches.length > 0) {
       unsafeApis.push(srcName2 + ': setAttribute("on*", ...) injection → ' + saMatches[0].slice(0, 60));
     }
 
     // (vii) Dynamic x-html attribute construction in inline scripts (setAttribute('x-html', X))
-    var dxhMatches = s.match(/\.setAttribute\s*\(\s*['"]x-html['"][^)]*\)/gi) || [];
+    var dxhMatches = s.match(/\.setAttribute\s*\(\s*['"`]x-html['"`][^)]*\)/gi) || [];
     if (dxhMatches.length > 0) {
       unsafeApis.push(srcName2 + ': dynamic x-html attribute construction → ' + dxhMatches[0].slice(0, 60));
     }
