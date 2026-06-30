@@ -56,17 +56,70 @@
   var _ARR_SLICE = Array.prototype.slice;
   function _arrSlice(a) { try { return _CAPTURED_REFLECT_APPLY(_ARR_SLICE, a, []); } catch (e) { return []; } }
 
+  // Codex E5-R1-01 closure: WeakSet integrity canary. Verifies at module init that a
+  // fresh WeakSet containing object A does NOT report unrelated object B as a member.
+  // Pre-load WeakSet.prototype.has tampering (returning true unconditionally) is caught
+  // here — if the canary fails, the module throws at load and the viewmodel is unusable.
+  var _WEAKSET_CANARY_OK = (function () {
+    try {
+      var canarySet = new _WeakSetCtor();
+      var a = {}, b = {};
+      if (!_wsAdd(canarySet, a)) return false;
+      if (!_wsHas(canarySet, a)) return false;
+      if (_wsHas(canarySet, b)) return false; // poisoned has → true for non-member
+      return true;
+    } catch (e) { return false; }
+  })();
+  if (!_WEAKSET_CANARY_OK) {
+    throw new Error('r3-0e-experiment-viewmodel.js: WeakSet integrity canary failed (pre-load tampering detected)');
+  }
+
+  // Codex E5-R1-02 closure: Object.freeze + Object.isFrozen integrity canary. Verifies
+  // that freezing actually prevents new own keys AND that isFrozen reports true for a
+  // frozen object. Tamper → throw at module load.
+  var _CAPTURED_OBJECT_GET_OWN_NAMES = Object.getOwnPropertyNames;
+  var _FREEZE_CANARY_OK = (function () {
+    try {
+      var probe = { a: 1 };
+      _CAPTURED_OBJECT_FREEZE(probe);
+      if (_CAPTURED_OBJECT_IS_FROZEN(probe) !== true) return false;
+      try { probe.b = 2; } catch (e) { /* strict mode throws — fine */ }
+      // Either the assignment threw (strict) OR silently failed; in BOTH cases
+      // probe.b must not become an own key.
+      var names;
+      try { names = _CAPTURED_OBJECT_GET_OWN_NAMES(probe); } catch (e) { return false; }
+      for (var i = 0; i < names.length; i++) if (names[i] === 'b') return false;
+      return true;
+    } catch (e) { return false; }
+  })();
+  if (!_FREEZE_CANARY_OK) {
+    throw new Error('r3-0e-experiment-viewmodel.js: Object.freeze integrity canary failed (pre-load tampering detected)');
+  }
+
   function _deepFreeze(v) {
     if (v === null || typeof v !== 'object') return v;
     try { _CAPTURED_OBJECT_FREEZE(v); } catch (e) { /* swallow */ }
     var names;
-    try { names = Object.getOwnPropertyNames(v); } catch (e) { return v; }
+    try { names = _CAPTURED_OBJECT_GET_OWN_NAMES(v); } catch (e) { return v; }
     for (var i = 0; i < names.length; i++) {
       var child;
       try { child = v[names[i]]; } catch (e) { continue; }
       _deepFreeze(child);
     }
     return v;
+  }
+  function _ownKeysEqual(o, expected) {
+    try {
+      var names = _CAPTURED_OBJECT_GET_OWN_NAMES(o);
+      if (names.length !== expected.length) return false;
+      var seen = {};
+      for (var i = 0; i < names.length; i++) {
+        if (expected.indexOf(names[i]) === -1) return false;
+        if (seen[names[i]]) return false;
+        seen[names[i]] = true;
+      }
+      return true;
+    } catch (e) { return false; }
   }
 
   // ---------- Constants -----------------------------------------------------------------------
@@ -77,6 +130,19 @@
     'available',       // outcome + timeline ready
     'stale-cleared',   // case/session/applied-change changed since last derivation
     'error-sanitized', // internal contract violation; never propagate raw error
+  ]);
+  // Codex E5-R1-03 closure: closed allowlist for outcome.class. Even if an
+  // authoritative outcome somehow carried an unrecognized class string (it shouldn't —
+  // E1 contract validates this — but defence-in-depth), the viewmodel refuses to map
+  // it to an i18n key.
+  var OUTCOME_CLASS_ALLOWED = _CAPTURED_OBJECT_FREEZE([
+    'confirmed', 'partially_confirmed', 'contradicted', 'inconclusive',
+    'invalid_comparison', 'inconclusive_due_to_confounders',
+  ]);
+  var STATE_KEYS = _CAPTURED_OBJECT_FREEZE([
+    'schemaVersion', 'displayState', 'caseId', 'sessionId', 'outcome',
+    'outcomeClass', 'outcomeClassI18nKey', 'projection', 'projectionEventCount',
+    'links', 'linksCount', 'activation', 'disclaimers',
   ]);
 
   // ---------- Producer attestation (WeakSet) -------------------------------------------------
@@ -91,6 +157,13 @@
       if (typeof candidate.displayState !== 'string') return false;
       if (DISPLAY_STATES.indexOf(candidate.displayState) === -1) return false;
       if (!candidate.activation || typeof candidate.activation !== 'object') return false;
+      // Codex E5-R1-02 closure: exact own-key set enforcement + nested frozen check.
+      if (!_ownKeysEqual(candidate, STATE_KEYS)) return false;
+      if (_CAPTURED_OBJECT_IS_FROZEN(candidate.activation) !== true) return false;
+      if (!_CAPTURED_ARRAY_IS_ARRAY(candidate.disclaimers)) return false;
+      if (_CAPTURED_OBJECT_IS_FROZEN(candidate.disclaimers) !== true) return false;
+      if (!_CAPTURED_ARRAY_IS_ARRAY(candidate.links)) return false;
+      if (_CAPTURED_OBJECT_IS_FROZEN(candidate.links) !== true) return false;
       return true;
     } catch (e) { return false; }
   }
@@ -122,18 +195,22 @@
    */
   function createExperimentViewmodel(deps) {
     if (!deps || typeof deps !== 'object') throw new Error('R3_0E_VIEWMODEL_DEPS_INVALID');
-    var classifier = deps.classifier || CL;
-    var timelineModule = deps.timelineModule || deps.timelineService || TL_SVC;
-    if (!classifier || typeof classifier.verifyAuthoritativeOutcome !== 'function') {
+    // Codex E5-R1-03 closure: ignore injected verifier deps entirely. Production code
+    // ALWAYS uses the closure-captured CL + TL_SVC modules loaded at viewmodel module
+    // init. The deps parameter is kept for backward-compat / test isolation but the
+    // verifier references it can supply are NOT trusted — only the module-init
+    // captures CL.verifyAuthoritativeOutcome / TL_SVC.verifyAuthoritativeTimelineProjection
+    // / TL_SVC.verifyAuthoritativeFollowUpLink are used. A hostile caller passing a
+    // {verifyAuthoritativeOutcome: () => true} stub cannot bypass authority.
+    if (typeof CL.verifyAuthoritativeOutcome !== 'function') {
       throw new Error('R3_0E_VIEWMODEL_CLASSIFIER_INVALID');
     }
-    if (!timelineModule
-        || typeof timelineModule.verifyAuthoritativeTimelineProjection !== 'function'
-        || typeof timelineModule.verifyAuthoritativeFollowUpLink !== 'function') {
+    if (typeof TL_SVC.verifyAuthoritativeTimelineProjection !== 'function'
+        || typeof TL_SVC.verifyAuthoritativeFollowUpLink !== 'function') {
       throw new Error('R3_0E_VIEWMODEL_TIMELINE_MODULE_INVALID');
     }
-    // Alias for the rest of the closure
-    var timelineService = timelineModule;
+    var classifier = CL;
+    var timelineService = TL_SVC;
 
     // Internal: build a frozen state envelope with closed key set.
     function _makeState(opts) {
@@ -240,6 +317,12 @@
         var sessionId = null; // outcome envelope does not currently carry sessionId; UI shows it from links
 
         var outcomeClass = outcome !== null ? outcome['class'] : null;
+        // Codex E5-R1-03 closure: outcomeClass must be in the closed allowlist.
+        // Even though E1 validates this upstream, the viewmodel double-checks before
+        // building the i18n key — neutralizes any future leakage path.
+        if (outcomeClass !== null && OUTCOME_CLASS_ALLOWED.indexOf(outcomeClass) === -1) {
+          return error();
+        }
         var outcomeClassI18nKey = outcomeClass !== null ? ('r3.0e.outcome.class.' + outcomeClass) : null;
 
         // Activation decision:
