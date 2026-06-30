@@ -7,8 +7,8 @@
   "previousCheckpoint": "E4_CASE_TIMELINE",
   "shaSeparation": {
     "note": "Three-way SHA separation per the established R3.0 convention.",
-    "reviewedCandidateSha": null,
-    "reviewedCandidateNote": "Filled after Codex E5 PASS verdict. Tier 1 raw evidence: governance/r3.0e/codex-checkpoint-evidence/E5/round-N-<sha>.raw.txt.",
+    "reviewedCandidateSha": "64b07139a77e7be77e387123f6bd360448ff9a80",
+    "reviewedCandidateNote": "Codex E5 Round 2 reviewed this exact SHA and issued FINAL VERDICT: PASS. 3 distinct adversarial findings closed across 1 review round: R1-01 WeakSet integrity canary / R1-02 Object.freeze canary + exact own-keys + nested frozen verifier / R1-03 ignore injected verifier deps + closed outcomeClass allowlist.",
     "manifestCommitSha": null,
     "integrationSha": null
   },
@@ -48,11 +48,14 @@
   "artifactId": null,
   "artifactBoundSha": null,
   "codexVerdict": {
-    "verdict": "pending",
-    "verdictRound": 0,
-    "reviewedCandidateSha": null,
-    "verdictEvidenceFile": null,
-    "rounds": []
+    "verdict": "PASS",
+    "verdictRound": 2,
+    "reviewedCandidateSha": "64b07139a77e7be77e387123f6bd360448ff9a80",
+    "verdictEvidenceFile": "governance/r3.0e/codex-checkpoint-evidence/E5/round-2-64b0713-PASS.raw.txt",
+    "rounds": [
+      { "round": 1, "reviewedSha": "914aea6", "verdict": "BLOCK", "findings": "3 BLOCK (E5-R1-01..03)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E5/round-1-914aea6.raw.txt" },
+      { "round": 2, "reviewedSha": "64b0713", "verdict": "PASS", "findings": "0", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E5/round-2-64b0713-PASS.raw.txt" }
+    ]
   },
   "r3bCaseRecordSchemaUntouched": true,
   "scopeBoundary": {
