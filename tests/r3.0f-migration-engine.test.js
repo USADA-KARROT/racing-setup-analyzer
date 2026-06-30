@@ -1649,6 +1649,78 @@ asyncCase('F1-R14-01 negative: legitimate ASCII-only record with nested object s
   chk('F1-R16-01: no orphan journal claim (migrated claim without data write)', !(result.migratedClaim > 0 && !result.dataPersisted));
 })();
 
+// F1-R17-01: priorJournal.concat replaced with plain for-loop. Ambient
+// Array.prototype.concat poisoning can no longer drop migration journal entries while
+// still committing the data write. Same (data) ↔ (journal) invariant as F1-R16-01.
+(function () {
+  var cp = require('child_process');
+  var script = "'use strict';\n" +
+    "var ENG = require(" + JSON.stringify(_path.join(_repo, 'renderer/js/r3-0f-migration-engine.js')) + ");\n" +
+    "var SB = require(" + JSON.stringify(_path.join(_repo, 'renderer/js/storage-backend.js')) + ");\n" +
+    "var rec = { schemaVersion: 1, caseId: 'c1' };\n" +
+    "var dataStore = { c1: rec };\n" +
+    "var metaStore = {};\n" +
+    "var sb = {\n" +
+    "  list: function (ns) {\n" +
+    "    if (ns === 'cases') {\n" +
+    "      var out = []; var keys = Object.keys(dataStore);\n" +
+    "      for (var i = 0; i < keys.length; i++) out[i] = { key: keys[i], value: JSON.parse(JSON.stringify(dataStore[keys[i]])) };\n" +
+    "      return Promise.resolve(out);\n" +
+    "    }\n" +
+    "    return Promise.resolve([]);\n" +
+    "  },\n" +
+    "  get: function (ns, key) {\n" +
+    "    if (ns === 'cases') return Promise.resolve(dataStore[key] ? JSON.parse(JSON.stringify(dataStore[key])) : undefined);\n" +
+    "    if (ns === 'meta') return Promise.resolve(metaStore[key] ? JSON.parse(JSON.stringify(metaStore[key])) : undefined);\n" +
+    "    return Promise.resolve(undefined);\n" +
+    "  },\n" +
+    "  put: function (ns, key, val) {\n" +
+    "    if (ns === 'cases') dataStore[key] = JSON.parse(JSON.stringify(val));\n" +
+    "    return Promise.resolve();\n" +
+    "  },\n" +
+    "  transact: function (spec) {\n" +
+    "    var reads = [];\n" +
+    "    for (var i = 0; i < (spec.reads || []).length; i++) {\n" +
+    "      var r = spec.reads[i]; var src = r.store === 'cases' ? dataStore : metaStore;\n" +
+    "      reads[i] = src[r.key] !== undefined ? JSON.parse(JSON.stringify(src[r.key])) : undefined;\n" +
+    "    }\n" +
+    "    var out = spec.compute(reads);\n" +
+    "    for (var w = 0; w < (out.writes || []).length; w++) {\n" +
+    "      var entry = out.writes[w]; var target = entry.store === 'cases' ? dataStore : metaStore;\n" +
+    "      if (entry.op === 'delete') delete target[entry.key];\n" +
+    "      else target[entry.key] = JSON.parse(JSON.stringify(entry.value));\n" +
+    "    }\n" +
+    "    return Promise.resolve(out.result);\n" +
+    "  }\n" +
+    "};\n" +
+    "var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (r) {\n" +
+    "  return { ok: true, record: { schemaVersion: 1, caseId: r.caseId, x: 1 }, migrations: ['delta'] };\n" +
+    "} } };\n" +
+    "var origConcat = Array.prototype.concat;\n" +
+    "Array.prototype.concat = function () { return this; };\n" +
+    "(async function () {\n" +
+    "  var res = await ENG.createMigrationEngine({ backend: sb, registry: registry, stamp: '2026-07-01T00:00:00.000Z' }).migrate({ confirm: true });\n" +
+    "  Array.prototype.concat = origConcat;\n" +
+    "  var persisted = dataStore.c1;\n" +
+    "  var journalRaw = metaStore['__r3_0f_migration_journal__'];\n" +
+    "  var migratedClaim = 0;\n" +
+    "  if (Array.isArray(journalRaw)) {\n" +
+    "    for (var j = 0; j < journalRaw.length; j++) if (journalRaw[j].status === 'migrated') migratedClaim++;\n" +
+    "  }\n" +
+    "  var dataPersisted = persisted && persisted.x === 1;\n" +
+    "  process.stdout.write(JSON.stringify({\n" +
+    "    status: res.report.status,\n" +
+    "    migratedClaim: migratedClaim,\n" +
+    "    dataPersisted: dataPersisted,\n" +
+    "    consistent: (migratedClaim === 0 && !dataPersisted) || (migratedClaim === 1 && dataPersisted)\n" +
+    "  }));\n" +
+    "})();\n";
+  var out = cp.execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' });
+  var result = JSON.parse(out);
+  chk('F1-R17-01: journal claim and data persistence consistent under Array.prototype.concat poisoning', result.consistent === true);
+  chk('F1-R17-01: no orphan migrated data without journal entry (data ↔ journal invariant)', !(result.dataPersisted && result.migratedClaim === 0));
+})();
+
 asyncCase('F1-R13-01 negative: legitimate at-target migration still works', function () {
   var b = SB.MemoryBackend();
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {

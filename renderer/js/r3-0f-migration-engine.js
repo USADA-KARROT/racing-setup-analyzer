@@ -839,11 +839,30 @@
 
       // Read prior journal, append new entries, compact, build state.
       return _readJournal().then(function (priorJournal) {
-        var compactedJournal = priorJournal.concat(allEntries);
+        // F1-R17-01: build compactedJournal with plain index loops instead of
+        // priorJournal.concat / .slice. Ambient Array.prototype.concat or .slice poisoning
+        // could otherwise return only priorJournal (or []) while META state still claims
+        // "journalAppended:N" — orphaning migrated data without an audit row.
+        var combined = [];
+        for (var pj = 0; pj < priorJournal.length; pj++) combined[pj] = priorJournal[pj];
+        for (var ne = 0; ne < allEntries.length; ne++) combined[combined.length] = allEntries[ne];
+        if (combined.length !== priorJournal.length + allEntries.length) {
+          // Sanity gate: ambient tampering caused a length discrepancy. Abort the entire commit.
+          throw new Error('COMMIT_JOURNAL_PROJECTION_CORRUPTED');
+        }
+        var compactedJournal;
         var totalDropped = 0;
+        if (combined.length > MAX_JOURNAL) {
+          totalDropped = combined.length - MAX_JOURNAL;
+          compactedJournal = [];
+          // Keep the NEWEST MAX_JOURNAL entries.
+          var startIdx = combined.length - MAX_JOURNAL;
+          for (var ci = 0; ci < MAX_JOURNAL; ci++) compactedJournal[ci] = combined[startIdx + ci];
+        } else {
+          compactedJournal = combined;
+        }
         if (compactedJournal.length > MAX_JOURNAL) {
-          totalDropped = compactedJournal.length - MAX_JOURNAL;
-          compactedJournal = compactedJournal.slice(compactedJournal.length - MAX_JOURNAL); // keep newest
+          throw new Error('COMMIT_JOURNAL_COMPACTION_CORRUPTED');
         }
         var stateNext = {
           schemaVersion: 1,
