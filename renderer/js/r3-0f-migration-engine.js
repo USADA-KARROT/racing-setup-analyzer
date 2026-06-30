@@ -140,20 +140,14 @@
     'signature', 'proof', 'authority'
   ]);
   // Pre-compute the normalized form of the exact-name set for fast lookup.
-  // F1-R5-01 / F1-R6-01: strip ALL Unicode format controls AND combining marks AND known
-  // default-ignorable code points BEFORE NFKC. Hostile vectors include:
-  //   - Format controls (Cf): ZWJ U+200D, ZWNJ U+200C, ZWSP U+200B, LRM/RLM U+200E/U+200F,
-  //     bidi isolates U+2066-U+2069, BOM U+FEFF, soft hyphen U+00AD, Mongolian VS U+180E,
-  //     tag characters U+E0020-U+E007F (all gc=Cf).
-  //   - Combining marks (Mn): combining acute U+0301, combining grapheme joiner U+034F,
-  //     plus all other diacritical marks (a hostile splice like `_áuthoritative` collapses
-  //     to `_authoritative` after Mn strip).
-  //   - Hangul fillers (Lo category): U+115F, U+1160, U+3164, U+FFA0 are default-ignorable
-  //     but NOT in Cf or Mn — they are listed explicitly.
-  //   - Variation selectors supplement: U+E0100-U+E01EF (gc=Mn, already covered, but listed
-  //     for clarity).
-  // Unicode property escapes (\p{Cf}, \p{Mn}) require the `u` flag and are stable since Node 12.
-  var _DEFANG_RE = /[\p{Cf}\p{Mn}ᅟᅠㅤﾠ]/gu;
+  // F1-R5-01 / F1-R6-01 / F1-R7-01: strip ALL Unicode Default_Ignorable_Code_Point characters
+  // AND all combining marks (\p{Mn}) BEFORE NFKC. DICP covers a superset of \p{Cf}: it also
+  // includes Cn (unassigned default-ignorables like U+2065, U+FFF0..U+FFF8, U+E0000..U+E0FFF)
+  // and the Hangul fillers (U+115F/U+1160/U+3164/U+FFA0). \p{Mn} covers combining marks
+  // (combining acute U+0301, combining grapheme joiner U+034F, variation selectors supplement
+  // U+E0100..U+E01EF) that are NOT in DICP but are still used in token-splicing attacks.
+  // Unicode property escapes require the `u` flag and are stable since Node 12.
+  var _DEFANG_RE = /[\p{Default_Ignorable_Code_Point}\p{Mn}]/gu;
   function _normalizeKey(k) {
     if (typeof k !== 'string') return '';
     var stripped;

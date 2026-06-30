@@ -1060,6 +1060,54 @@ asyncCase('F1-R6-01: U+0301 combining acute splice (a + U+0301 + uthoritative) r
 // F1-R6-01 negative coverage: legitimate non-ASCII field names that happen to contain attestation
 // tokens after combining-mark strip must STILL pass. Repeats the F1-R3-01 acceptance test for
 // the Unicode-property defense.
+asyncCase('F1-R7-01: U+2065 splice (Cn DICP) rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var k = '_author' + String.fromCodePoint(0x2065) + 'itative';
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r[k] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cU2065', { schemaVersion: 1, caseId: 'cU2065' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('U+2065 splice rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+asyncCase('F1-R7-01: U+FFF0 splice rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var k = '_author' + String.fromCodePoint(0xFFF0) + 'itative';
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r[k] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cUFFF0', { schemaVersion: 1, caseId: 'cUFFF0' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('U+FFF0 splice rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+asyncCase('F1-R7-01: U+E0000 tag-supplementary splice rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var k = '_author' + String.fromCodePoint(0xE0000) + 'itative';
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r[k] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cUE0000', { schemaVersion: 1, caseId: 'cUE0000' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('U+E0000 splice rejected', r.report.perStore.cases.rejected === 1); });
+});
+
+asyncCase('F1-R7-01: U+E01F0 high-plane reserved-DICP splice rejected', function () {
+  var b = SB.MemoryBackend();
+  var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
+    var k = '_author' + String.fromCodePoint(0xE01F0) + 'itative';
+    var r = { schemaVersion: 1, caseId: rec.caseId }; r[k] = 'forged';
+    return { ok: true, record: r, migrations: ['evil'] };
+  } } };
+  return b.put('cases', 'cUE01F0', { schemaVersion: 1, caseId: 'cUE01F0' })
+    .then(function () { return ENG.createMigrationEngine({ backend: b, registry: registry, stamp: STAMP }).migrate({ confirm: true }); })
+    .then(function (r) { chk('U+E01F0 splice rejected', r.report.perStore.cases.rejected === 1); });
+});
+
 asyncCase('F1-R6-01 negative: legitimate lapAuthority/projectionSignature/experimentVerified still accepted', function () {
   var b = SB.MemoryBackend();
   var registry = { cases: { storeKey: 'cases', targetVersion: 1, migrate: function (rec) {
