@@ -46,11 +46,15 @@
   "artifactId": null,
   "artifactBoundSha": null,
   "codexVerdict": {
-    "verdict": "pending",
-    "verdictRound": 0,
-    "reviewedCandidateSha": null,
-    "verdictEvidenceFile": null,
-    "rounds": []
+    "verdict": "PASS",
+    "verdictRound": 3,
+    "reviewedCandidateSha": "e0030258f9989d9c841aecabc4bd886bf1869f44",
+    "verdictEvidenceFile": "governance/r3.0e/codex-checkpoint-evidence/E2/round-3-e003025-PASS.raw.txt",
+    "rounds": [
+      { "round": 1, "reviewedSha": "7e1cfc3", "verdict": "BLOCK", "findings": "3 BLOCK (E2-R1-01..03)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E2/round-1-7e1cfc3.raw.txt" },
+      { "round": 2, "reviewedSha": "891ee93", "verdict": "BLOCK", "findings": "1 BLOCK (E2-R2-01)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E2/round-2-891ee93.raw.txt" },
+      { "round": 3, "reviewedSha": "e003025", "verdict": "PASS", "findings": "0", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E2/round-3-e003025-PASS.raw.txt" }
+    ]
   },
   "r3bCaseRecordSchemaUntouched": true,
   "scopeBoundary": {
