@@ -27,12 +27,43 @@ try {
   var indexPath = path.join(__dirname, '..', '..', 'renderer', 'index.html');
   var indexSrc = fs.readFileSync(indexPath, 'utf8');
 
-  // F3-R1-01 closure: strip JS comments BEFORE running security regexes so a `// contextIsolation: true`
-  // decoy comment can never satisfy the positive check while the live config sets a different value.
+  // F3-R3-01 closure: lexical scanner that strips comments while respecting string/template
+  // contexts. Regex-only stripping mistakes `//` inside a string-literal for a line comment
+  // and can swallow subsequent code, including unsafe flags. The scanner walks characters,
+  // tracks string/template/regex state, and only treats `//` and `/*` as comments OUTSIDE
+  // those contexts.
   function stripJsComments(src) {
-    src = src.replace(/\/\*[\s\S]*?\*\//g, '');
-    src = src.replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-    return src;
+    var out = '';
+    var i = 0;
+    var n = src.length;
+    var inStr = false;
+    var strCh = '';
+    while (i < n) {
+      var ch = src.charAt(i);
+      var nxt = i + 1 < n ? src.charAt(i + 1) : '';
+      if (inStr) {
+        if (ch === '\\' && i + 1 < n) { out += ch + nxt; i += 2; continue; }
+        if (ch === strCh) { inStr = false; out += ch; i++; continue; }
+        out += ch; i++; continue;
+      }
+      // Not in string: detect comment start
+      if (ch === '/' && nxt === '/') {
+        // line comment — skip to newline (preserve the newline)
+        while (i < n && src.charAt(i) !== '\n') i++;
+        continue;
+      }
+      if (ch === '/' && nxt === '*') {
+        i += 2;
+        while (i < n && !(src.charAt(i) === '*' && i + 1 < n && src.charAt(i + 1) === '/')) i++;
+        if (i < n) i += 2;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') {
+        inStr = true; strCh = ch; out += ch; i++; continue;
+      }
+      out += ch; i++;
+    }
+    return out;
   }
   var mainSrc = stripJsComments(mainRaw);
   var preloadSrc = stripJsComments(preloadRaw);

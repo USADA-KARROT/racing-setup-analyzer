@@ -125,6 +125,56 @@ function instrument(realBackend) {
     var res3 = await eng3.migrate({ confirm: true });
     chk('engine architecture: backend ops do not scale with N at all (single-list/single-transact)', res3.ok === true && ib3.counts.transact <= 2);
 
+    // ---- (3) F3-R3-02 closure — Proxy-wrapped record-array catches single-pass quadratic CPU.
+    // A migrator-call counter catches re-call regressions but NOT single-pass quadratic work
+    // (e.g., a nested loop over `records` BEFORE each `migrate(records[i])` call). We wrap the
+    // backend.list result in a Proxy that counts integer-key + .length reads. The engine's
+    // normal linear pass over N records produces ~N reads. A quadratic regression that scans
+    // ALL records for each record produces ~N² reads. At N=200/N=50, linear ratio ≈ 4; a
+    // quadratic regression would inflate the ratio to ~16. Bound at 8 (linear + constant overhead).
+    function listProbeBackend(realBackend) {
+      var counter = { reads: 0 };
+      return {
+        counter: counter,
+        list: function (storeKey) {
+          return realBackend.list(storeKey).then(function (arr) {
+            return new Proxy(arr, {
+              get: function (t, p, r) {
+                if (typeof p === 'string' && /^\d+$/.test(p)) counter.reads++;
+                else if (p === 'length') counter.reads++;
+                return Reflect.get(t, p, r);
+              }
+            });
+          });
+        },
+        get: function (storeKey, key) { return realBackend.get(storeKey, key); },
+        put: function (storeKey, key, value) { return realBackend.put(storeKey, key, value); },
+        transact: function (spec) { return realBackend.transact(spec); }
+      };
+    }
+
+    async function _runWithReadCounter(n) {
+      var raw = SB.MemoryBackend();
+      var lpb = listProbeBackend(raw);
+      var cs = CS.createCaseStore(raw, { stamp: '2026-07-01T00:00:00.000Z' });
+      for (var k = 0; k < n; k++) {
+        await cs.create({ metadata: { title: 'r' + k, status: 'complete' }, associations: {}, setupSnapshot: {}, analysisResults: {}, shellEvidence: { source: 's' } });
+      }
+      lpb.counter.reads = 0;
+      var eng = ENG.createMigrationEngine({ backend: lpb, stamp: '2026-07-01T00:00:00.000Z' });
+      var res = await eng.migrate({ confirm: true });
+      return { ok: res.ok, reads: lpb.counter.reads };
+    }
+
+    var rd50 = await _runWithReadCounter(50);
+    var rd200 = await _runWithReadCounter(200);
+    chk('read-probe migration ok at N=50', rd50.ok === true);
+    chk('read-probe migration ok at N=200', rd200.ok === true);
+    chk('@N=50 record-array reads recorded', rd50.reads > 0);
+    chk('@N=200 record-array reads recorded', rd200.reads > 0);
+    var readRatio = rd50.reads === 0 ? Infinity : rd200.reads / rd50.reads;
+    chk('record-array-read ratio @N=200/N=50 ≤ 8 (bounded-linear): ' + readRatio.toFixed(2), readRatio <= 8, { n50: rd50.reads, n200: rd200.reads, ratio: readRatio });
+
     // ---- (3) Console-error guard ----
     chk('zero console.error during large-library hardening', h.consoleErrorCount === 0);
   } finally {

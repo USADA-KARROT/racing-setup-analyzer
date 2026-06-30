@@ -35,16 +35,26 @@ try {
   // tokens (curl, wget, npx, fetch, sh -c, eval, base64, ssh, scp, rsync) trigger fail-closed
   // even within a longer command. URL substrings and shell metacharacters (pipe/redirect to
   // /dev/something, $(...), backticks) are rejected.
+  // F3-R3-04 closure: `^node\s+\S+` was too permissive — it accepted `node -e <code>` and
+  // similar arbitrary-execution forms. Tighten to ONLY repo-local script paths and explicit
+  // tool commands. Disallow `-e` / `--eval` / `-p` / `--print` / stdin (`-`) / `--input-type`
+  // / `--experimental-*` / leading flags.
   var FORBIDDEN_TOKENS = /\b(curl|wget|npx|fetch|eval|base64|ssh|scp|rsync)\b|\bsh\s+-c\b|https?:\/\/|\$\(|`|\|\s*sh|>\s*\/dev/i;
+  // Allowed node usage: `node <local-path>` where <local-path> is one of a fixed allowlist of
+  // repo-local directories (tests/, scripts/, tools/). No flags between `node` and the path.
+  var ALLOWED_NODE_PATH = /^node\s+(tests|scripts|tools)\/[\w@\-./]+(\s+\S+)*$/;
+  var ALLOWED_NODE_DASH_FLAGS_FORBIDDEN = /\bnode\s+-/; // any `node -X` form (any short or long flag)
   var ALLOWED_SEGMENT_PATTERNS = [
-    /^node\s+\S+/,          // node <path>
-    /^electron-builder(\s|$)/, // electron-builder ...
-    /^electron(\s+\.|\s*$)/    // electron .
+    ALLOWED_NODE_PATH,
+    /^electron-builder(\s|$)/,
+    /^electron(\s+\.|\s*$)/
   ];
   function _segmentAllowed(seg) {
     seg = seg.trim();
     if (seg === '') return false;
     if (FORBIDDEN_TOKENS.test(seg)) return false;
+    // Reject any `node -X` form (covers -e / --eval / -p / --print / -- / --input-type / -)
+    if (ALLOWED_NODE_DASH_FLAGS_FORBIDDEN.test(seg)) return false;
     for (var p = 0; p < ALLOWED_SEGMENT_PATTERNS.length; p++) {
       if (ALLOWED_SEGMENT_PATTERNS[p].test(seg)) return true;
     }

@@ -36,14 +36,42 @@ try {
   var files = fs.readdirSync(rendererJsDir).filter(function (f) { return f.endsWith('.js'); });
   chk('renderer/js has files to scan', files.length > 0);
 
+  // F3-R3-03 closure: also scan INLINE script bodies in renderer/index.html. The main app
+  // module lives in a <script>...</script> block in the renderer document, which the previous
+  // scanner missed. We extract every inline <script> body and treat each as a synthetic
+  // "renderer-inline-N.js" source for the same DOM-sink rules.
+  var indexHtmlRaw = fs.readFileSync(indexHtmlPath, 'utf8');
+  function extractInlineScripts(html) {
+    var bodies = [];
+    var re = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+      var attrs = m[1] || '';
+      // Skip external <script src="...">
+      if (/\bsrc\s*=/.test(attrs)) continue;
+      bodies.push(m[2]);
+    }
+    return bodies;
+  }
+  var inlineScripts = extractInlineScripts(indexHtmlRaw);
+  chk('renderer/index.html inline scripts extracted for DOM-sink scan', inlineScripts.length >= 1, { inline_count: inlineScripts.length });
+  // Treat each inline script as a synthetic file in the scanner pipeline.
+  var allSources = []; // {name, src}
+  for (var fi = 0; fi < files.length; fi++) {
+    allSources.push({ name: files[fi], src: fs.readFileSync(path.join(rendererJsDir, files[fi]), 'utf8') });
+  }
+  for (var ii = 0; ii < inlineScripts.length; ii++) {
+    allSources.push({ name: 'index.html-inline[' + ii + ']', src: inlineScripts[ii] });
+  }
+
   // We don't ban innerHTML wholesale — Alpine.js + tailwind use it indirectly via x-html.
   // The F3 hardening is: NO production module assigns innerHTML/outerHTML to a variable
   // user-supplied value. We check that any innerHTML assignment in renderer/js is to a
   // STRING LITERAL (whitelisted) or to `''` (clearing).
   var unsafeInnerHtmlAssigns = [];
-  for (var i = 0; i < files.length; i++) {
-    var fpath = path.join(rendererJsDir, files[i]);
-    var src = fs.readFileSync(fpath, 'utf8');
+  for (var i = 0; i < allSources.length; i++) {
+    var src = allSources[i].src;
+    var srcName = allSources[i].name;
     // Find lines like `.innerHTML = X` where X is NOT a string literal
     var lines = src.split(/\n/);
     for (var l = 0; l < lines.length; l++) {
@@ -51,16 +79,13 @@ try {
       var m = line.match(/\.innerHTML\s*=\s*(.+?)\s*[;)]/);
       if (m) {
         var rhs = m[1].trim();
-        // Allow: empty string '', "", literal HTML strings
         if (rhs === "''" || rhs === '""') continue;
-        // Allow: literal strings (quoted)
         if (/^['"`].*['"`]$/.test(rhs)) continue;
-        // Anything else = potential XSS taint
-        unsafeInnerHtmlAssigns.push(files[i] + ':' + (l + 1) + ' ' + line.trim().slice(0, 120));
+        unsafeInnerHtmlAssigns.push(srcName + ':' + (l + 1) + ' ' + line.trim().slice(0, 120));
       }
     }
   }
-  chk('no unsafe variable-RHS innerHTML assignments in renderer/js', unsafeInnerHtmlAssigns.length === 0, unsafeInnerHtmlAssigns.slice(0, 5));
+  chk('no unsafe variable-RHS innerHTML in renderer/js AND inline scripts', unsafeInnerHtmlAssigns.length === 0, unsafeInnerHtmlAssigns.slice(0, 5));
 
   // F3-R1-05 closure: scan for all forbidden DOM API patterns and fail-closed on ALL of them.
   // Strip JS comments first so block-comment decoys cannot mask a real sink.
@@ -70,26 +95,26 @@ try {
     return src;
   }
 
+  // F3-R3-03 closure: run the same forbidden-API scan over inline scripts AND renderer/js files.
   var unsafeApis = [];
-  for (var j = 0; j < files.length; j++) {
-    var fp = path.join(rendererJsDir, files[j]);
-    var rawSrc = fs.readFileSync(fp, 'utf8');
+  for (var j = 0; j < allSources.length; j++) {
+    var rawSrc = allSources[j].src;
+    var srcName2 = allSources[j].name;
     var s = stripJsComments(rawSrc);
 
     // (i) document.write / document.writeln
-    if (/document\.write\(/.test(s)) unsafeApis.push(files[j] + ': document.write');
-    if (/document\.writeln\(/.test(s)) unsafeApis.push(files[j] + ': document.writeln');
+    if (/document\.write\(/.test(s)) unsafeApis.push(srcName2 + ': document.write');
+    if (/document\.writeln\(/.test(s)) unsafeApis.push(srcName2 + ': document.writeln');
 
     // (ii) new Function( with any non-pure-string-literal argument
     var nfMatches = s.match(/new\s+Function\s*\([^)]*\)/g) || [];
     for (var nfi = 0; nfi < nfMatches.length; nfi++) {
       var args = nfMatches[nfi].replace(/^new\s+Function\s*\(/, '').replace(/\)$/, '').trim();
-      // Allow: empty args, or arg is purely string literals (e.g. 'return this')
       if (args === '' || /^['"`][^'"`]*['"`]$/.test(args)) continue;
-      unsafeApis.push(files[j] + ': new Function with non-literal arg → ' + nfMatches[nfi].slice(0, 60));
+      unsafeApis.push(srcName2 + ': new Function with non-literal arg → ' + nfMatches[nfi].slice(0, 60));
     }
 
-    // (iii) variable-RHS outerHTML assignment (mirror innerHTML rule)
+    // (iii) variable-RHS outerHTML assignment
     var lines2 = s.split(/\n/);
     for (var l2 = 0; l2 < lines2.length; l2++) {
       var line2 = lines2[l2];
@@ -98,16 +123,14 @@ try {
         var rhsO = mO[1].trim();
         if (rhsO === "''" || rhsO === '""') continue;
         if (/^['"`].*['"`]$/.test(rhsO)) continue;
-        unsafeApis.push(files[j] + ':' + (l2 + 1) + ' outerHTML = variable RHS');
+        unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' outerHTML = variable RHS');
       }
     }
 
     // (iv) insertAdjacentHTML with non-literal htmlText
     var iaMatches = s.match(/\.insertAdjacentHTML\s*\([^)]*\)/g) || [];
     for (var iai = 0; iai < iaMatches.length; iai++) {
-      // insertAdjacentHTML(position, text) — both args. We require text (2nd arg) to be a string literal.
       var iaArgs = iaMatches[iai].replace(/^\.insertAdjacentHTML\s*\(/, '').replace(/\)$/, '').trim();
-      // Split on first comma at depth 0
       var depth = 0; var commaIdx = -1;
       for (var ic = 0; ic < iaArgs.length; ic++) {
         var ch = iaArgs.charAt(ic);
@@ -115,26 +138,30 @@ try {
         else if (ch === ')' || ch === ']' || ch === '}') depth--;
         else if (ch === ',' && depth === 0) { commaIdx = ic; break; }
       }
-      if (commaIdx === -1) { unsafeApis.push(files[j] + ': malformed insertAdjacentHTML — ' + iaMatches[iai].slice(0, 60)); continue; }
+      if (commaIdx === -1) { unsafeApis.push(srcName2 + ': malformed insertAdjacentHTML — ' + iaMatches[iai].slice(0, 60)); continue; }
       var textArg = iaArgs.slice(commaIdx + 1).trim();
       if (!/^['"`].*['"`]$/.test(textArg)) {
-        unsafeApis.push(files[j] + ': insertAdjacentHTML with non-literal text arg → ' + iaMatches[iai].slice(0, 60));
+        unsafeApis.push(srcName2 + ': insertAdjacentHTML with non-literal text arg → ' + iaMatches[iai].slice(0, 60));
       }
     }
 
-    // (v) DOMParser.parseFromString — direct sink for arbitrary HTML
+    // (v) DOMParser.parseFromString — non-literal first arg
     if (/DOMParser\s*\(\s*\)/.test(s) || /new\s+DOMParser/.test(s)) {
-      // We don't ban DOMParser outright (it can be safe with text/xml), but record its usage
-      // so a future review notices. F3 BLOCKS only if combined with .parseFromString(varInput).
       if (/\.parseFromString\s*\(\s*(?!['"`])/.test(s)) {
-        unsafeApis.push(files[j] + ': DOMParser.parseFromString with non-literal first arg');
+        unsafeApis.push(srcName2 + ': DOMParser.parseFromString with non-literal first arg');
       }
     }
 
     // (vi) setAttribute('on...', X) — direct event-handler attribute injection
     var saMatches = s.match(/\.setAttribute\s*\(\s*['"]on[a-z]+['"][^)]*\)/gi) || [];
     if (saMatches.length > 0) {
-      unsafeApis.push(files[j] + ': setAttribute("on*", ...) injection → ' + saMatches[0].slice(0, 60));
+      unsafeApis.push(srcName2 + ': setAttribute("on*", ...) injection → ' + saMatches[0].slice(0, 60));
+    }
+
+    // (vii) Dynamic x-html attribute construction in inline scripts (setAttribute('x-html', X))
+    var dxhMatches = s.match(/\.setAttribute\s*\(\s*['"]x-html['"][^)]*\)/gi) || [];
+    if (dxhMatches.length > 0) {
+      unsafeApis.push(srcName2 + ': dynamic x-html attribute construction → ' + dxhMatches[0].slice(0, 60));
     }
   }
 
