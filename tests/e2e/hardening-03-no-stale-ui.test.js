@@ -143,6 +143,44 @@ try {
   } catch (e) { threwReal = /STALE_CASE_REF/.test(String(e && e.message)); }
   chk('real experiment with mismatched activeCaseId THROWS', threwReal === true);
 
+  // ---- (3.5) F3-R2-02 closure — object-shape caseAssociation + deep nesting ─────────
+  // (s) R3.0D production-shape caseAssociation as an OBJECT {caseId, sessionId, lapId}
+  var threwObj = false;
+  try {
+    h.assertNoStaleCaseRef({
+      activeCaseId: caseB.caseId,
+      currentBrief: { caseAssociation: { caseId: caseA.caseId, sessionId: 'sX' } }
+    });
+  } catch (e) { threwObj = /STALE_CASE_REF/.test(String(e && e.message)); }
+  chk('stale object-shape currentBrief.caseAssociation.caseId throws', threwObj === true);
+
+  // (t) 3-level-deep nested stale sourceCaseId (wrapper object defeats allowlist)
+  var threw3deep = false;
+  try {
+    h.assertNoStaleCaseRef({
+      activeCaseId: caseB.caseId,
+      wrapper: { inner: { sourceCaseId: caseA.caseId } }
+    });
+  } catch (e) { threw3deep = /STALE_CASE_REF/.test(String(e && e.message)); }
+  chk('stale 3-level-deep sourceCaseId throws', threw3deep === true);
+
+  // (u) Array-nested stale caseId
+  var threwArr = false;
+  try {
+    h.assertNoStaleCaseRef({
+      activeCaseId: caseB.caseId,
+      experiments: [{ sourceCaseId: caseA.caseId }]
+    });
+  } catch (e) { threwArr = /STALE_CASE_REF/.test(String(e && e.message)); }
+  chk('stale array-nested sourceCaseId throws', threwArr === true);
+
+  // (v) Coherent object-shape caseAssociation passes
+  h.assertNoStaleCaseRef({
+    activeCaseId: caseA.caseId,
+    currentBrief: { caseAssociation: { caseId: caseA.caseId, sessionId: 'sX' } }
+  });
+  chk('coherent object-shape currentBrief.caseAssociation passes', true);
+
   // ---- (4) Console-error guard ─────────────────────────────────────────────
   chk('zero console.error during no-stale-UI hardening', h.consoleErrorCount === 0);
   chk('harness consoleErrorCount accessor reachable', typeof h.consoleErrorCount === 'number');

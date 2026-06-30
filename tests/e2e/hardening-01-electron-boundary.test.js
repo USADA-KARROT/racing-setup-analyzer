@@ -37,12 +37,34 @@ try {
   var mainSrc = stripJsComments(mainRaw);
   var preloadSrc = stripJsComments(preloadRaw);
 
-  // F3-R1-01 closure: extract the webPreferences object body and verify security flags are set
-  // with LITERAL keys + LITERAL true/false values. Computed-key bypass (e.g. `['contextIsolation']: false`)
-  // is rejected outright.
-  var wpMatch = mainSrc.match(/webPreferences\s*:\s*\{([\s\S]*?)\n\s*\}/);
-  chk('main.js declares webPreferences block', wpMatch !== null);
-  var wpBody = wpMatch ? wpMatch[1] : '';
+  // F3-R2-01 closure: extract the webPreferences object body via balanced-brace scanning,
+  // not a naive regex. A regex like `webPreferences\s*:\s*\{([\s\S]*?)\n\s*\}` truncates at the
+  // FIRST nested object's closing brace, leaving subsequent unsafe flags invisible.
+  function extractWebPrefsBody(src) {
+    var startMatch = src.match(/webPreferences\s*:\s*\{/);
+    if (!startMatch) return null;
+    var start = startMatch.index + startMatch[0].length;
+    var depth = 1;
+    var i = start;
+    var inStr = false;
+    var strCh = '';
+    while (i < src.length && depth > 0) {
+      var ch = src.charAt(i);
+      if (inStr) {
+        if (ch === '\\' && i + 1 < src.length) { i += 2; continue; }
+        if (ch === strCh) { inStr = false; }
+      } else {
+        if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; }
+        else if (ch === '{') depth++;
+        else if (ch === '}') { depth--; if (depth === 0) return src.slice(start, i); }
+      }
+      i++;
+    }
+    return null;
+  }
+  var wpBody = extractWebPrefsBody(mainSrc);
+  chk('main.js declares webPreferences block (balanced-brace extract)', wpBody !== null);
+  if (wpBody == null) wpBody = '';
 
   chk('webPreferences uses NO computed-key syntax for security flags',
     !/\[\s*['"`](?:contextIsolation|nodeIntegration|webSecurity|allowRunningInsecureContent|experimentalFeatures|enableRemoteModule|nodeIntegrationInWorker|nodeIntegrationInSubFrames|sandbox)['"`]\s*\]\s*:/.test(wpBody));

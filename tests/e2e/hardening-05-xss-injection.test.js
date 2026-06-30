@@ -146,25 +146,30 @@ try {
   // x-text is safe (sets textContent). x-html is taint-prone — must only bind to frozen-i18n
   // helper outputs, never to raw user input. We extract every x-html RHS and check it routes
   // through one of the known-safe helpers (t / tCode / tErr / credCode / i18n calls).
-  var xHtmlRe = /x-html\s*=\s*"([^"]+)"/g;
+  // F3-R2-04 closure: HTML allows double-quoted, single-quoted, and unquoted attribute values.
+  // The scan must match all three forms; otherwise a single-quoted unsafe `x-html='case.title'`
+  // slips past. Use [\s\S] to handle multi-line attribute values.
+  var xHtmlPatterns = [
+    /x-html\s*=\s*"([\s\S]+?)"/g,    // double-quoted
+    /x-html\s*=\s*'([\s\S]+?)'/g,    // single-quoted
+    /x-html\s*=\s*([^\s>'"][^\s>]*)/g // unquoted (rare, but allowed by HTML)
+  ];
   var unsafeXHtml = [];
   var xHtmlCount = 0;
-  var m;
-  while ((m = xHtmlRe.exec(indexSrc)) !== null) {
-    xHtmlCount++;
-    var rhs = m[1].trim();
-    // Safe pattern: every x-html binding MUST be a function call into a named helper
-    // (e.g., t(...), tCode(...), tErr(...), credCode(...), credBadge(...), tierBadge(...),
-    // any other internal i18n / badge / formatter). Naked variables or raw property accesses
-    // (e.g., `userText` or `case.title`) are NOT safe and must be flagged.
-    // Acceptable: <identifier>(...) — function call. Also acceptable: a ternary whose branches
-    // are all function calls or string literals.
-    var safe = /^[a-zA-Z_$][\w$]*\s*\(/.test(rhs) // bare function call
-            || /^['"`].*['"`]$/.test(rhs)         // string literal (rare but harmless)
-            || /\?\s*[a-zA-Z_$][\w$]*\s*\(/.test(rhs); // ternary with helper-call branches
-    if (!safe) unsafeXHtml.push(rhs.slice(0, 80));
+  for (var xpi = 0; xpi < xHtmlPatterns.length; xpi++) {
+    var pat = xHtmlPatterns[xpi];
+    var m;
+    while ((m = pat.exec(indexSrc)) !== null) {
+      xHtmlCount++;
+      var rhs = m[1].trim();
+      // Safe pattern: every x-html binding MUST be a function call into a named helper.
+      var safe = /^[a-zA-Z_$][\w$]*\s*\(/.test(rhs)
+              || /^['"`].*['"`]$/.test(rhs)
+              || /\?\s*[a-zA-Z_$][\w$]*\s*\(/.test(rhs);
+      if (!safe) unsafeXHtml.push(rhs.slice(0, 80));
+    }
   }
-  chk('every x-html RHS is a function call (not a raw variable)', unsafeXHtml.length === 0, { count: xHtmlCount, unsafe_examples: unsafeXHtml.slice(0, 3) });
+  chk('every x-html RHS (double/single/unquoted) is a function call, not a raw variable', unsafeXHtml.length === 0, { count: xHtmlCount, unsafe_examples: unsafeXHtml.slice(0, 3) });
 
   // Step 4: i18n interpolation safety — no `t('key', userValue)` shapes that re-template
   // (the existing tCode/tErr helpers from R3.0E i18n parity scan are validated separately).

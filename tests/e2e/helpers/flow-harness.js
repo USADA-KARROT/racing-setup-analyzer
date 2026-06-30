@@ -97,35 +97,54 @@ function createFlowHarness(opts) {
     var active = viewmodelLike.activeCaseId || viewmodelLike.caseId || null;
     if (!active) return;
     var seen = new WeakSet();
+    // F3-R2-02 closure: caseAssociation (and other id fields) may be an OBJECT-shape value
+    // ({caseId, sessionId, lapId}) in R3.0D production outputs, not just a string. Also,
+    // bounded recursion must traverse ALL own object/array values, not only a fixed allowlist
+    // of nested-field names — otherwise wrapper objects defeat the gate.
+    var ID_FIELDS = ['sourceCaseId', 'priorCaseId', 'cachedCaseId', 'parentCaseId', 'followUpCaseId', 'caseAssociation'];
+    var DEPTH = 4; // top + 3 nested levels — production data structures stay within this
     function check(obj, pathPrefix, depthRemaining) {
       if (!obj || typeof obj !== 'object') return;
       if (seen.has(obj)) return;
       seen.add(obj);
-      // Known case-id-bearing fields. Top-level activeCaseId/caseId are the ANCHOR, not stale.
-      var idFields = ['sourceCaseId', 'priorCaseId', 'cachedCaseId', 'parentCaseId', 'followUpCaseId', 'caseAssociation'];
-      for (var i = 0; i < idFields.length; i++) {
-        var f = idFields[i];
-        if (Object.prototype.hasOwnProperty.call(obj, f) && typeof obj[f] === 'string' && obj[f].length > 0 && obj[f] !== active) {
-          throw new Error('STALE_CASE_REF: ' + pathPrefix + f + '=' + obj[f] + ' active=' + active);
+      // 1) Known string-or-object case-id fields. Object-shape: take its .caseId.
+      for (var i = 0; i < ID_FIELDS.length; i++) {
+        var f = ID_FIELDS[i];
+        if (!Object.prototype.hasOwnProperty.call(obj, f)) continue;
+        var v = obj[f];
+        if (typeof v === 'string' && v.length > 0 && v !== active) {
+          throw new Error('STALE_CASE_REF: ' + pathPrefix + f + '=' + v + ' active=' + active);
+        }
+        if (v && typeof v === 'object' && !Array.isArray(v) && typeof v.caseId === 'string' && v.caseId.length > 0 && v.caseId !== active) {
+          throw new Error('STALE_CASE_REF: ' + pathPrefix + f + '.caseId=' + v.caseId + ' active=' + active);
         }
       }
-      // lastSession-style nested {caseId, sourceCaseId} container fields — recurse for known names
-      var nestedFields = ['lastSession', 'lastReassertion', 'currentBrief', 'currentExperiment', 'currentOutcome', 'currentTimeline'];
+      // 2) Bare `.caseId` field on any nested object (not just the explicit nested-field allowlist).
+      if (Object.prototype.hasOwnProperty.call(obj, 'caseId') && typeof obj.caseId === 'string' && obj.caseId.length > 0 && obj.caseId !== active && pathPrefix !== '') {
+        // (pathPrefix === '' means this is the top-level viewmodel — its caseId IS the anchor.)
+        throw new Error('STALE_CASE_REF: ' + pathPrefix + 'caseId=' + obj.caseId + ' active=' + active);
+      }
+      // 3) Bounded recursion through ALL own properties whose value is an object or array.
       if (depthRemaining > 0) {
-        for (var j = 0; j < nestedFields.length; j++) {
-          var nf = nestedFields[j];
-          if (obj[nf] && typeof obj[nf] === 'object' && !Array.isArray(obj[nf])) {
-            // nested objects also check caseId field (in addition to *CaseId)
-            var ns = obj[nf];
-            if (ns.caseId && typeof ns.caseId === 'string' && ns.caseId !== active) {
-              throw new Error('STALE_CASE_REF: ' + pathPrefix + nf + '.caseId=' + ns.caseId + ' active=' + active);
+        var keys = Object.keys(obj);
+        for (var k = 0; k < keys.length; k++) {
+          var kn = keys[k];
+          var val = obj[kn];
+          if (val && typeof val === 'object') {
+            if (Array.isArray(val)) {
+              for (var ai = 0; ai < val.length; ai++) {
+                if (val[ai] && typeof val[ai] === 'object') {
+                  check(val[ai], pathPrefix + kn + '[' + ai + '].', depthRemaining - 1);
+                }
+              }
+            } else {
+              check(val, pathPrefix + kn + '.', depthRemaining - 1);
             }
-            check(ns, pathPrefix + nf + '.', depthRemaining - 1);
           }
         }
       }
     }
-    check(viewmodelLike, '', 2);
+    check(viewmodelLike, '', DEPTH);
   }
 
   // Forbidden-action gate: documented invariants the engine must never permit during F2 E2E.
