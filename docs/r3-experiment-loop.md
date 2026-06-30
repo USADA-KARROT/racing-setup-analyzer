@@ -15,11 +15,13 @@ This document covers the R3.0E surface only. R3.0F integrated-delivery concerns
 (migration, E2E, hardening) are described elsewhere.
 
 **Scope note.** R3.0E's own `featureRegistryActivationAllowed` flipped to `true`
-at `E5_ACTIVATION` (`governance/r3.0e/state.json`). The Experiment Loop and
-Case Timeline panes (`case:experiment_loop`, `case:case_timeline` in
-`renderer/js/feature-registry.js`) are registered as `available_conditional`
-— live in the navigation, but each pane's viewmodel returns an `unavailable`
-display state for a given case until that case actually carries an
+at `E5_ACTIVATION` (`governance/r3.0e/state.json`). The nav nodes
+`case:experiment_loop` / `case:case_timeline` (`NAV_NODES` in
+`renderer/js/feature-registry.js`) carry `availability: 'available'` — they
+are live in the navigation. The corresponding **features**
+`experiment_loop` / `case_timeline` (`FEATURES`, a separate keyspace) carry
+`availability: 'available_conditional'` — each pane's viewmodel returns an
+`unavailable` display state for a given case until that case actually carries an
 authoritative E3 outcome / E4 timeline projection. This is a per-case data
 gate, not a feature-registry gate.
 
@@ -213,10 +215,12 @@ The follow-up link itself has its own strict shape:
 
 | Field | Meaning |
 |-------|---------|
+| `schemaVersion` | Integer, currently `1`. |
 | `linkId` | Stable opaque id. |
 | `parentCaseId` | The case the experiment was authored against. |
 | `experimentId` | The experiment this follow-up is associated with. |
 | `followUpCaseId` | The case that holds the post-change session. |
+| `parentStatus` | `'present' \| 'archived' \| 'deleted'`. Mutated only via `markParentStatus(linkId, newStatus)`. |
 | `createdAt` | ISO-8601 timestamp. |
 
 The link store enforces:

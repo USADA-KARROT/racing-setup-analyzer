@@ -8,7 +8,7 @@ The ladder, in shorthand, is the only basis for what the UI is allowed to render
 
 Every conclusion described below carries credibility, confidence (where relevant), provenance, limitations, blockers, evidence references, and a next validation step. The product never approximates around a missing input; it blocks with a machine-readable reason.
 
-A note on version numbers used in this document: the **R3 case-record schema version** is `v1.4.0` and is frozen — that string identifies the on-disk shape of a Case record and has not been modified through R3.0F. The **package application version** is also `1.4.0` today, with a target of `2.0.0` post-merge of the integrated delivery train. These two versions are related but distinct: a future application version bump does not, on its own, advance the case-record schema. F1 migration treats `v1.4.0` as the baseline regardless of which application version is reading it.
+A note on version numbers used in this document: "the case-record schema frozen at v1.4.0" is a human-readable label for "the on-disk shape of a Case record as it stood when the package version was 1.4.0" — it is **not** a literal version string stored in code. The actual schema-version field is `CASE_SCHEMA_VERSION` in `renderer/js/schema-migration.js`, a plain integer (`1` today), and F1's migrators compare against that integer, not against any `"v1.4.0"` string. The **package application version** is `1.4.0` today, with a target of `2.0.0` post-merge of the integrated delivery train. The two are related but distinct: a future application version bump does not, on its own, advance `CASE_SCHEMA_VERSION`.
 
 ---
 

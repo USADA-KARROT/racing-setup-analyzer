@@ -219,8 +219,11 @@ partition each lap into corner windows. Segmentation is fail-closed: a degenerat
 the lap **unsegmented for that corner**, never approximated.
 
 **Corner pairing** pairs reference corners to comparison corners by normalized-distance identity, not by index
-or by name. Mis-paired corners (e.g. a missing corner in one lap) are surfaced as `CORNER_PAIRING_UNRESOLVED`
-and excluded from delta computation.
+or by name. A missing corner in one lap reduces aggregate coverage; below the minimum coverage threshold this
+is recorded as the limitation `CORNER_PAIRING_PARTIAL_COVERAGE` (non-blocking — downstream consumers see the
+limitation). Other corner-pairing failure modes have their own codes:
+`CORNER_PAIRING_UNAVAILABLE`, `CORNER_PAIRING_INSUFFICIENT_OVERLAP`, `CORNER_PAIRING_AMBIGUOUS`, and
+`CORNER_PAIRING_ORDINAL_FORBIDDEN`. There is no `CORNER_PAIRING_UNRESOLVED` code.
 
 ### C5 — Delta metrics
 
