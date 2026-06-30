@@ -62,24 +62,84 @@ try {
   }
   chk('no unsafe variable-RHS innerHTML assignments in renderer/js', unsafeInnerHtmlAssigns.length === 0, unsafeInnerHtmlAssigns.slice(0, 5));
 
-  // Step 2: scan for document.write and new Function
+  // F3-R1-05 closure: scan for all forbidden DOM API patterns and fail-closed on ALL of them.
+  // Strip JS comments first so block-comment decoys cannot mask a real sink.
+  function stripJsComments(src) {
+    src = src.replace(/\/\*[\s\S]*?\*\//g, '');
+    src = src.replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    return src;
+  }
+
   var unsafeApis = [];
   for (var j = 0; j < files.length; j++) {
     var fp = path.join(rendererJsDir, files[j]);
-    var s = fs.readFileSync(fp, 'utf8');
+    var rawSrc = fs.readFileSync(fp, 'utf8');
+    var s = stripJsComments(rawSrc);
+
+    // (i) document.write / document.writeln
     if (/document\.write\(/.test(s)) unsafeApis.push(files[j] + ': document.write');
     if (/document\.writeln\(/.test(s)) unsafeApis.push(files[j] + ': document.writeln');
-    // new Function( with non-string-literal arg is a yellow flag; check for bare new Function(
-    if (/new\s+Function\s*\([^)]*\w[^)]*\)/.test(s)) {
-      // Allow new Function('"use strict"; return this')() bootstraps (no taint vars)
-      // Practical check: is the call inside a comment? Skip if so.
-      var bareLines = s.split(/\n/).filter(function (ln) {
-        return /new\s+Function\s*\(/.test(ln) && !/^\s*\/\//.test(ln) && !/^\s*\*/.test(ln);
-      });
-      if (bareLines.length > 0) unsafeApis.push(files[j] + ': new Function( with variable arg');
+
+    // (ii) new Function( with any non-pure-string-literal argument
+    var nfMatches = s.match(/new\s+Function\s*\([^)]*\)/g) || [];
+    for (var nfi = 0; nfi < nfMatches.length; nfi++) {
+      var args = nfMatches[nfi].replace(/^new\s+Function\s*\(/, '').replace(/\)$/, '').trim();
+      // Allow: empty args, or arg is purely string literals (e.g. 'return this')
+      if (args === '' || /^['"`][^'"`]*['"`]$/.test(args)) continue;
+      unsafeApis.push(files[j] + ': new Function with non-literal arg → ' + nfMatches[nfi].slice(0, 60));
+    }
+
+    // (iii) variable-RHS outerHTML assignment (mirror innerHTML rule)
+    var lines2 = s.split(/\n/);
+    for (var l2 = 0; l2 < lines2.length; l2++) {
+      var line2 = lines2[l2];
+      var mO = line2.match(/\.outerHTML\s*=\s*(.+?)\s*[;)]/);
+      if (mO) {
+        var rhsO = mO[1].trim();
+        if (rhsO === "''" || rhsO === '""') continue;
+        if (/^['"`].*['"`]$/.test(rhsO)) continue;
+        unsafeApis.push(files[j] + ':' + (l2 + 1) + ' outerHTML = variable RHS');
+      }
+    }
+
+    // (iv) insertAdjacentHTML with non-literal htmlText
+    var iaMatches = s.match(/\.insertAdjacentHTML\s*\([^)]*\)/g) || [];
+    for (var iai = 0; iai < iaMatches.length; iai++) {
+      // insertAdjacentHTML(position, text) — both args. We require text (2nd arg) to be a string literal.
+      var iaArgs = iaMatches[iai].replace(/^\.insertAdjacentHTML\s*\(/, '').replace(/\)$/, '').trim();
+      // Split on first comma at depth 0
+      var depth = 0; var commaIdx = -1;
+      for (var ic = 0; ic < iaArgs.length; ic++) {
+        var ch = iaArgs.charAt(ic);
+        if (ch === '(' || ch === '[' || ch === '{') depth++;
+        else if (ch === ')' || ch === ']' || ch === '}') depth--;
+        else if (ch === ',' && depth === 0) { commaIdx = ic; break; }
+      }
+      if (commaIdx === -1) { unsafeApis.push(files[j] + ': malformed insertAdjacentHTML — ' + iaMatches[iai].slice(0, 60)); continue; }
+      var textArg = iaArgs.slice(commaIdx + 1).trim();
+      if (!/^['"`].*['"`]$/.test(textArg)) {
+        unsafeApis.push(files[j] + ': insertAdjacentHTML with non-literal text arg → ' + iaMatches[iai].slice(0, 60));
+      }
+    }
+
+    // (v) DOMParser.parseFromString — direct sink for arbitrary HTML
+    if (/DOMParser\s*\(\s*\)/.test(s) || /new\s+DOMParser/.test(s)) {
+      // We don't ban DOMParser outright (it can be safe with text/xml), but record its usage
+      // so a future review notices. F3 BLOCKS only if combined with .parseFromString(varInput).
+      if (/\.parseFromString\s*\(\s*(?!['"`])/.test(s)) {
+        unsafeApis.push(files[j] + ': DOMParser.parseFromString with non-literal first arg');
+      }
+    }
+
+    // (vi) setAttribute('on...', X) — direct event-handler attribute injection
+    var saMatches = s.match(/\.setAttribute\s*\(\s*['"]on[a-z]+['"][^)]*\)/gi) || [];
+    if (saMatches.length > 0) {
+      unsafeApis.push(files[j] + ': setAttribute("on*", ...) injection → ' + saMatches[0].slice(0, 60));
     }
   }
-  chk('no document.write / document.writeln in renderer/js', unsafeApis.filter(function (s) { return /document\.write/.test(s); }).length === 0, unsafeApis);
+
+  // F3-R1-05 closure: assert ALL forbidden APIs land in unsafeApis empty.
+  chk('NO unsafe DOM API usage in renderer/js (post-comment-strip)', unsafeApis.length === 0, { count: unsafeApis.length, examples: unsafeApis.slice(0, 5) });
 
   // Step 3: scan renderer/index.html for safe Alpine.js binding patterns
   var indexSrc = fs.readFileSync(indexHtmlPath, 'utf8');

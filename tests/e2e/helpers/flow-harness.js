@@ -81,18 +81,51 @@ function createFlowHarness(opts) {
   }
 
   // No-stale-case-ref contract: after a Case transition, viewmodels MUST clear any reference
-  // to the prior caseId. This helper inspects a viewmodel-like object (or the lastSession state)
-  // and asserts no stale caseId exists relative to the current activeCaseId.
+  // to the prior caseId. This helper inspects a viewmodel-like object and asserts no stale caseId
+  // exists relative to the current activeCaseId — across ALL documented case-id-bearing fields:
+  //   • lastSession.sourceCaseId | lastSession.caseId
+  //   • cachedCaseId | sourceCaseId | priorCaseId | parentCaseId | followUpCaseId
+  //   • R3.0C C8 lastReassertion.caseId
+  //   • R3.0D engineer-brief caseAssociation
+  //   • R3.0E experiment.caseAssociation / outcome.caseAssociation / timeline.caseAssociation
+  //   • Any *.caseId / *.caseAssociation field one level deep
+  // Recursion depth is bounded to 2 (top-level and one nested level) to keep the scan
+  // deterministic and fail-closed without runaway cycles. Objects with cycles are tolerated
+  // via a visited-WeakSet.
   function assertNoStaleCaseRef(viewmodelLike) {
     if (!viewmodelLike || typeof viewmodelLike !== 'object') return;
     var active = viewmodelLike.activeCaseId || viewmodelLike.caseId || null;
-    var lastSession = viewmodelLike.lastSession || null;
-    if (active && lastSession && lastSession.sourceCaseId && lastSession.sourceCaseId !== active) {
-      throw new Error('STALE_CASE_REF: lastSession.sourceCaseId=' + lastSession.sourceCaseId + ' active=' + active);
+    if (!active) return;
+    var seen = new WeakSet();
+    function check(obj, pathPrefix, depthRemaining) {
+      if (!obj || typeof obj !== 'object') return;
+      if (seen.has(obj)) return;
+      seen.add(obj);
+      // Known case-id-bearing fields. Top-level activeCaseId/caseId are the ANCHOR, not stale.
+      var idFields = ['sourceCaseId', 'priorCaseId', 'cachedCaseId', 'parentCaseId', 'followUpCaseId', 'caseAssociation'];
+      for (var i = 0; i < idFields.length; i++) {
+        var f = idFields[i];
+        if (Object.prototype.hasOwnProperty.call(obj, f) && typeof obj[f] === 'string' && obj[f].length > 0 && obj[f] !== active) {
+          throw new Error('STALE_CASE_REF: ' + pathPrefix + f + '=' + obj[f] + ' active=' + active);
+        }
+      }
+      // lastSession-style nested {caseId, sourceCaseId} container fields — recurse for known names
+      var nestedFields = ['lastSession', 'lastReassertion', 'currentBrief', 'currentExperiment', 'currentOutcome', 'currentTimeline'];
+      if (depthRemaining > 0) {
+        for (var j = 0; j < nestedFields.length; j++) {
+          var nf = nestedFields[j];
+          if (obj[nf] && typeof obj[nf] === 'object' && !Array.isArray(obj[nf])) {
+            // nested objects also check caseId field (in addition to *CaseId)
+            var ns = obj[nf];
+            if (ns.caseId && typeof ns.caseId === 'string' && ns.caseId !== active) {
+              throw new Error('STALE_CASE_REF: ' + pathPrefix + nf + '.caseId=' + ns.caseId + ' active=' + active);
+            }
+            check(ns, pathPrefix + nf + '.', depthRemaining - 1);
+          }
+        }
+      }
     }
-    if (viewmodelLike.cachedCaseId && active && viewmodelLike.cachedCaseId !== active) {
-      throw new Error('STALE_CASE_REF: cachedCaseId=' + viewmodelLike.cachedCaseId + ' active=' + active);
-    }
+    check(viewmodelLike, '', 2);
   }
 
   // Forbidden-action gate: documented invariants the engine must never permit during F2 E2E.

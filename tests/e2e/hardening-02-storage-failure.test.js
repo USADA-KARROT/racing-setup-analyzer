@@ -24,11 +24,27 @@ var chk = t.chk;
     var removeNoConfirm = await caseStore.remove(c.caseId, {});
     chk('case remove WITHOUT confirm:true is fail-closed', removeNoConfirm.ok === false && removeNoConfirm.code === 'CONFIRM_REQUIRED');
 
-    var removeBadConfirm = await caseStore.remove(c.caseId, { confirm: 'yes' });
-    chk('case remove with non-boolean confirm is fail-closed', removeBadConfirm.ok === false && removeBadConfirm.code === 'CONFIRM_REQUIRED');
+    // F3-R1-02 closure: full truthy-non-boolean class must be rejected. Only literal `true` succeeds.
+    var truthyNonBoolean = [
+      ['confirm: "yes" (string)', { confirm: 'yes' }],
+      ['confirm: "true" (string)', { confirm: 'true' }],
+      ['confirm: 1 (number)', { confirm: 1 }],
+      ['confirm: -1 (negative number)', { confirm: -1 }],
+      ['confirm: {} (object)', { confirm: {} }],
+      ['confirm: [] (array)', { confirm: [] }],
+      ['confirm: new Boolean(true)', { confirm: new Boolean(true) }],
+      ['confirm: null', { confirm: null }],
+      ['confirm: undefined explicit', { confirm: undefined }]
+    ];
+    for (var k = 0; k < truthyNonBoolean.length; k++) {
+      var label = truthyNonBoolean[k][0];
+      var opts = truthyNonBoolean[k][1];
+      var r = await caseStore.remove(c.caseId, opts);
+      chk('case remove rejects ' + label, r.ok === false && r.code === 'CONFIRM_REQUIRED');
+    }
 
     var removeWithConfirm = await caseStore.remove(c.caseId, { confirm: true });
-    chk('case remove with confirm:true succeeds', removeWithConfirm.ok === true);
+    chk('case remove with confirm:true (literal boolean) succeeds', removeWithConfirm.ok === true);
 
     // Step 2: backend.transact() failure → BACKEND_REJECTED, no partial write, no journal corruption
     var failBackend = {

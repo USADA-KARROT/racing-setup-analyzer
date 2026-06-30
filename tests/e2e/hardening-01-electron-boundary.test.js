@@ -21,32 +21,52 @@ var path = require('path');
 var h = H.createFlowHarness({ stamp: '2026-07-01T00:00:00.000Z' });
 try {
   var mainPath = path.join(__dirname, '..', '..', 'main.js');
-  var mainSrc = fs.readFileSync(mainPath, 'utf8');
+  var mainRaw = fs.readFileSync(mainPath, 'utf8');
   var preloadPath = path.join(__dirname, '..', '..', 'preload.js');
-  var preloadSrc = fs.readFileSync(preloadPath, 'utf8');
+  var preloadRaw = fs.readFileSync(preloadPath, 'utf8');
   var indexPath = path.join(__dirname, '..', '..', 'renderer', 'index.html');
   var indexSrc = fs.readFileSync(indexPath, 'utf8');
 
-  // Step 1: main.js webPreferences — strict isolation
-  chk('main.js contextIsolation: true', /contextIsolation\s*:\s*true/.test(mainSrc));
-  chk('main.js nodeIntegration: false', /nodeIntegration\s*:\s*false/.test(mainSrc));
-  chk('main.js does NOT enable allowRunningInsecureContent', !/allowRunningInsecureContent\s*:\s*true/.test(mainSrc));
-  chk('main.js does NOT disable webSecurity', !/webSecurity\s*:\s*false/.test(mainSrc));
-  chk('main.js does NOT enable experimentalFeatures', !/experimentalFeatures\s*:\s*true/.test(mainSrc));
-  chk('main.js does NOT enable enableRemoteModule', !/enableRemoteModule\s*:\s*true/.test(mainSrc));
-  chk('main.js does NOT enable nodeIntegrationInWorker', !/nodeIntegrationInWorker\s*:\s*true/.test(mainSrc));
-  chk('main.js does NOT enable nodeIntegrationInSubFrames', !/nodeIntegrationInSubFrames\s*:\s*true/.test(mainSrc));
+  // F3-R1-01 closure: strip JS comments BEFORE running security regexes so a `// contextIsolation: true`
+  // decoy comment can never satisfy the positive check while the live config sets a different value.
+  function stripJsComments(src) {
+    src = src.replace(/\/\*[\s\S]*?\*\//g, '');
+    src = src.replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+    return src;
+  }
+  var mainSrc = stripJsComments(mainRaw);
+  var preloadSrc = stripJsComments(preloadRaw);
 
-  // Step 2: preload.js minimal surface
+  // F3-R1-01 closure: extract the webPreferences object body and verify security flags are set
+  // with LITERAL keys + LITERAL true/false values. Computed-key bypass (e.g. `['contextIsolation']: false`)
+  // is rejected outright.
+  var wpMatch = mainSrc.match(/webPreferences\s*:\s*\{([\s\S]*?)\n\s*\}/);
+  chk('main.js declares webPreferences block', wpMatch !== null);
+  var wpBody = wpMatch ? wpMatch[1] : '';
+
+  chk('webPreferences uses NO computed-key syntax for security flags',
+    !/\[\s*['"`](?:contextIsolation|nodeIntegration|webSecurity|allowRunningInsecureContent|experimentalFeatures|enableRemoteModule|nodeIntegrationInWorker|nodeIntegrationInSubFrames|sandbox)['"`]\s*\]\s*:/.test(wpBody));
+
+  chk('main.js webPreferences.contextIsolation === literal true', /(^|[\s,{])contextIsolation\s*:\s*true\s*(,|$|\s)/m.test(wpBody));
+  chk('main.js webPreferences.nodeIntegration === literal false', /(^|[\s,{])nodeIntegration\s*:\s*false\s*(,|$|\s)/m.test(wpBody));
+
+  chk('webPreferences.allowRunningInsecureContent NOT set to true', !/allowRunningInsecureContent\s*:\s*true/.test(wpBody));
+  chk('webPreferences.webSecurity NOT set to false', !/webSecurity\s*:\s*false/.test(wpBody));
+  chk('webPreferences.experimentalFeatures NOT set to true', !/experimentalFeatures\s*:\s*true/.test(wpBody));
+  chk('webPreferences.enableRemoteModule NOT set to true', !/enableRemoteModule\s*:\s*true/.test(wpBody));
+  chk('webPreferences.nodeIntegrationInWorker NOT set to true', !/nodeIntegrationInWorker\s*:\s*true/.test(wpBody));
+  chk('webPreferences.nodeIntegrationInSubFrames NOT set to true', !/nodeIntegrationInSubFrames\s*:\s*true/.test(wpBody));
+
+  // Step 2: preload.js minimal surface — post-strip checks (no comment-decoy false positives)
   chk('preload.js uses contextBridge', /contextBridge/.test(preloadSrc));
-  chk('preload.js does NOT import ipcRenderer', !/ipcRenderer/.test(preloadSrc));
-  chk('preload.js does NOT require fs', !/require\(['"]fs['"]\)/.test(preloadSrc));
-  chk('preload.js does NOT require child_process', !/require\(['"]child_process['"]\)/.test(preloadSrc));
-  chk('preload.js does NOT require net', !/require\(['"]net['"]\)/.test(preloadSrc));
-  chk('preload.js does NOT require http', !/require\(['"]http['"]\)/.test(preloadSrc));
-  chk('preload.js does NOT require https', !/require\(['"]https['"]\)/.test(preloadSrc));
-  chk('preload.js does NOT require os', !/require\(['"]os['"]\)/.test(preloadSrc));
-  chk('preload.js does NOT eval untrusted content', !/eval\(|new\s+Function\(/.test(preloadSrc));
+  chk('preload.js does NOT reference ipcRenderer (post-strip)', !/ipcRenderer/.test(preloadSrc));
+  chk('preload.js does NOT require fs (post-strip)', !/require\s*\(\s*['"]fs['"]\s*\)/.test(preloadSrc));
+  chk('preload.js does NOT require child_process (post-strip)', !/require\s*\(\s*['"]child_process['"]\s*\)/.test(preloadSrc));
+  chk('preload.js does NOT require net (post-strip)', !/require\s*\(\s*['"]net['"]\s*\)/.test(preloadSrc));
+  chk('preload.js does NOT require http (post-strip)', !/require\s*\(\s*['"]http['"]\s*\)/.test(preloadSrc));
+  chk('preload.js does NOT require https (post-strip)', !/require\s*\(\s*['"]https['"]\s*\)/.test(preloadSrc));
+  chk('preload.js does NOT require os (post-strip)', !/require\s*\(\s*['"]os['"]\s*\)/.test(preloadSrc));
+  chk('preload.js does NOT eval untrusted content (post-strip)', !/eval\s*\(|new\s+Function\s*\(/.test(preloadSrc));
 
   // Step 3: preload exposed surface is tiny + read-only
   // The expected surface is { platform, version } — both read-only metadata.

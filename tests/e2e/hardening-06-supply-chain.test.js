@@ -30,14 +30,38 @@ try {
   var unexpectedDevDeps = devDepNames.filter(function (n) { return allowedDevDeps.indexOf(n) === -1; });
   chk('devDependencies are within the allowed list', unexpectedDevDeps.length === 0, { unexpected: unexpectedDevDeps });
 
-  // Step 2: scripts (npm scripts) reference only local files
+  // F3-R1-06 closure: anchored, segment-by-segment allowlist for npm scripts. Each `&&`
+  // or `;`-separated segment must INDEPENDENTLY match a local-toolchain shape. Forbidden
+  // tokens (curl, wget, npx, fetch, sh -c, eval, base64, ssh, scp, rsync) trigger fail-closed
+  // even within a longer command. URL substrings and shell metacharacters (pipe/redirect to
+  // /dev/something, $(...), backticks) are rejected.
+  var FORBIDDEN_TOKENS = /\b(curl|wget|npx|fetch|eval|base64|ssh|scp|rsync)\b|\bsh\s+-c\b|https?:\/\/|\$\(|`|\|\s*sh|>\s*\/dev/i;
+  var ALLOWED_SEGMENT_PATTERNS = [
+    /^node\s+\S+/,          // node <path>
+    /^electron-builder(\s|$)/, // electron-builder ...
+    /^electron(\s+\.|\s*$)/    // electron .
+  ];
+  function _segmentAllowed(seg) {
+    seg = seg.trim();
+    if (seg === '') return false;
+    if (FORBIDDEN_TOKENS.test(seg)) return false;
+    for (var p = 0; p < ALLOWED_SEGMENT_PATTERNS.length; p++) {
+      if (ALLOWED_SEGMENT_PATTERNS[p].test(seg)) return true;
+    }
+    return false;
+  }
+
   var scripts = pkg.scripts || {};
   var scriptNames = Object.keys(scripts);
   for (var i = 0; i < scriptNames.length; i++) {
     var s = scripts[scriptNames[i]];
-    // Whitelisted shapes: node ... / electron-builder ... / electron .
-    var allowed = /^node\s+/.test(s) || /^electron-builder\s+/.test(s) || /^electron\s*\.?$/.test(s) || /^node\s+tests\//.test(s);
-    chk('package.json script "' + scriptNames[i] + '" uses only local toolchain', allowed || /node\s+/.test(s));
+    // Reject the whole script if it contains any forbidden token anywhere.
+    var bannedAnywhere = FORBIDDEN_TOKENS.test(s);
+    // Split on && and ; (top-level only; we don't shell-parse for nested quoting because
+    // the allowlist patterns are themselves restrictive — anything exotic fails).
+    var segments = s.split(/&&|;/);
+    var allSegOk = !bannedAnywhere && segments.length > 0 && segments.every(_segmentAllowed);
+    chk('package.json script "' + scriptNames[i] + '" passes anchored per-segment allowlist', allSegOk, { script: s, segments: segments });
   }
 
   // Step 3: no bare third-party require in renderer/js (cross-check with dependency-audit)
