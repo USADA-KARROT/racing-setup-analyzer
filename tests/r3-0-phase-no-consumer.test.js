@@ -9,7 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const os = require('os');
+const H = require('./helpers/managed-temp-dir.js');
 
 const REPO = path.resolve(__dirname, '..');
 const SCRIPT = 'scripts/check-r3-phase-no-consumer.js';
@@ -24,7 +24,7 @@ function chk(name, cond, detail) {
 }
 
 function runValidator(phase, scanBase) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-noc-art-'));
+  const tmp = H.acquireTempDir('r3-phase-noc-art-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp, R3_PHASE_PROGRAM: phase });
   if (scanBase) env.R3_PHASE_NO_CONSUMER_BASE_OVERRIDE = scanBase;
   const r = cp.spawnSync('node', [SCRIPT], { cwd: REPO, encoding: 'utf8', env });
@@ -34,7 +34,7 @@ function runValidator(phase, scanBase) {
 }
 
 function buildSyntheticTree(consumerLine) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-noc-tree-'));
+  const dir = H.acquireTempDir('r3-phase-noc-tree-');
   fs.mkdirSync(path.join(dir, 'renderer', 'js'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'renderer'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'renderer', 'js', 'maybe-consumer.js'), consumerLine || '// no consumer\nmodule.exports = {};\n');
@@ -59,7 +59,7 @@ for (const phase of PHASES) {
 
 // ── FAIL: missing R3_PHASE_PROGRAM ──
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-noc-art-'));
+  const tmp = H.acquireTempDir('r3-phase-noc-art-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp });
   delete env.R3_PHASE_PROGRAM;
   const r = cp.spawnSync('node', [SCRIPT], { cwd: REPO, encoding: 'utf8', env });
@@ -86,7 +86,7 @@ for (const phase of PHASES) {
 // ── FAIL: synthetic index.html loads contracts/<phase>/ script ──
 for (const phase of PHASES) {
   const prefix = CONTRACT_PREFIX[phase];
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-noc-html-'));
+  const dir = H.acquireTempDir('r3-phase-noc-html-');
   fs.mkdirSync(path.join(dir, 'renderer', 'js'), { recursive: true });
   fs.mkdirSync(path.join(dir, 'renderer'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'renderer', 'js', 'clean.js'), '// clean\n');
@@ -98,8 +98,8 @@ for (const phase of PHASES) {
 // ── Codex D2 Round 1 RN-10 closure — malformed state.json entries fail closed ──
 // Build a synthetic state.json with each shape defect and confirm the script fails.
 function runWithSyntheticState(phase, stateJson, sceneSrc) {
-  const tmpArt = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-noc-art-'));
-  const tmpScan = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-noc-scan-'));
+  const tmpArt = H.acquireTempDir('r3-phase-noc-art-');
+  const tmpScan = H.acquireTempDir('r3-phase-noc-scan-');
   const tmpState = path.join(tmpArt, 'state.json');
   fs.mkdirSync(path.join(tmpScan, 'renderer', 'js'), { recursive: true });
   fs.writeFileSync(path.join(tmpScan, 'renderer', 'js', 'maybe-consumer.js'), sceneSrc || '// clean\n');
@@ -154,7 +154,7 @@ function runWithSyntheticState(phase, stateJson, sceneSrc) {
     const prefix = CONTRACT_PREFIX[phase];
     // file contains string-concat-near-require AND r3.0d/e/f literal somewhere
     const sceneSrc = "var prefix = '../../contracts/';\nvar phase = '" + prefix.split('/').pop() + "';\nvar p = prefix + phase + '/index.js';\nvar c = require(p);\nmodule.exports = c;\n";
-    const tmpScan = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-noc-scan-'));
+    const tmpScan = H.acquireTempDir('r3-phase-noc-scan-');
     fs.mkdirSync(path.join(tmpScan, 'renderer', 'js'), { recursive: true });
     fs.writeFileSync(path.join(tmpScan, 'renderer', 'js', 'sneaky.js'), sceneSrc);
     fs.writeFileSync(path.join(tmpScan, 'renderer', 'index.html'), '<!doctype html><html><body></body></html>');
@@ -171,7 +171,7 @@ function runWithSyntheticState(phase, stateJson, sceneSrc) {
     const phaseTail = CONTRACT_PREFIX[phase].split('/').pop().slice(-2); // '0d' | '0e' | '0f'
     // Template literal split: `${"r3"}.0d` — round 1 detector missed this; round 2 must catch.
     const sceneSrc = "var p = '../../contracts/' + `${\"r3\"}.` + '" + phaseTail + "/index.js';\nvar c = require(p);\nmodule.exports = c;\n";
-    const tmpScan = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-noc-scan-tmpl-'));
+    const tmpScan = H.acquireTempDir('r3-phase-noc-scan-tmpl-');
     fs.mkdirSync(path.join(tmpScan, 'renderer', 'js'), { recursive: true });
     fs.writeFileSync(path.join(tmpScan, 'renderer', 'js', 'tmpl-sneaky.js'), sceneSrc);
     fs.writeFileSync(path.join(tmpScan, 'renderer', 'index.html'), '<!doctype html><html><body></body></html>');
@@ -182,5 +182,6 @@ function runWithSyntheticState(phase, stateJson, sceneSrc) {
   }
 })();
 
+H.cleanupAll();
 console.log('phase-no-consumer: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

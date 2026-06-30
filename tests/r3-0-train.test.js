@@ -26,7 +26,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const os = require('os');
+const H = require('./helpers/managed-temp-dir.js');
 
 const REPO = path.resolve(__dirname, '..');
 const SCRIPT = 'scripts/check-r3-0-train.js';
@@ -38,7 +38,7 @@ function chk(name, cond, detail) {
 }
 
 function runValidator(base) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-train-art-'));
+  const tmp = H.acquireTempDir('r3-train-art-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp });
   if (base) env.R3_TRAIN_BASE_OVERRIDE = base;
   const r = cp.spawnSync('node', [SCRIPT], { cwd: REPO, encoding: 'utf8', env });
@@ -52,7 +52,7 @@ function hasViolation(artifact, code) {
 }
 
 function buildFixture() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-train-fix-'));
+  const dir = H.acquireTempDir('r3-train-fix-');
   fs.mkdirSync(path.join(dir, 'governance'), { recursive: true });
   for (const sub of ['r3.0', 'r3.0c', 'r3.0d', 'r3.0e', 'r3.0f']) {
     fs.cpSync(path.join(REPO, 'governance', sub), path.join(dir, 'governance', sub), { recursive: true });
@@ -387,5 +387,6 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
   chk('FAIL invalid trainStatus', hasViolation(r.artifact, 'TRAIN_STATUS_INVALID'));
 }
 
+H.cleanupAll();
 console.log('r3-0-train: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

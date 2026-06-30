@@ -15,7 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const os = require('os');
+const H = require('./helpers/managed-temp-dir.js');
 
 const REPO = path.resolve(__dirname, '..');
 const CONTRACT_DIR = path.join(REPO, 'contracts', 'r3.0c');
@@ -536,7 +536,7 @@ const _r30cActAllowed = (function () { try { return JSON.parse(fs.readFileSync(p
 // authorized C8 milestone change and the allowlist surfaces it. Otherwise (C0–C7) the allowlist is
 // empty and the original frozen invariant holds (a malicious touch is still blocked).
 function runScript(rel, artifactName, extraEnv) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-cp1-'));
+  const tmp = H.acquireTempDir('r3c-cp1-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp }, extraEnv || {});
   const r = cp.spawnSync('node', [rel], { cwd: REPO, encoding: 'utf8', env });
   let artifact = null;
@@ -561,5 +561,6 @@ function _frozenAllowForActivation() {
   chk('frozen-boundary 0 diff', !!(f.artifact && f.artifact.frozenDiffCount === 0 && f.artifact.ok === true), f.artifact);
 })();
 
+H.cleanupAll();
 console.log(`r3.0c-contract-foundation: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

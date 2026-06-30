@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const os = require('os');
+const H = require('./helpers/managed-temp-dir.js');
 
 const REPO = path.resolve(__dirname, '..');
 const SCRIPT = 'scripts/check-r3-phase-governance.js';
@@ -26,7 +26,7 @@ function chk(name, cond, detail) {
 }
 
 function runValidator(phase, govDir) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-gov-art-'));
+  const tmp = H.acquireTempDir('r3-phase-gov-art-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp, R3_PHASE_PROGRAM: phase });
   if (govDir) env.R3_PHASE_GOV_DIR_OVERRIDE = govDir;
   const r = cp.spawnSync('node', [SCRIPT], { cwd: REPO, encoding: 'utf8', env });
@@ -81,7 +81,7 @@ function baseState(phase) {
 }
 
 function writeFixture(state, schema, caps, manifestSchema) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-gov-fix-'));
+  const dir = H.acquireTempDir('r3-phase-gov-fix-');
   fs.mkdirSync(path.join(dir, 'checkpoints'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'schema.json'), JSON.stringify(schema));
   fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify(state));
@@ -116,7 +116,7 @@ for (const phase of PHASES) {
 
 // ── FAIL: missing R3_PHASE_PROGRAM ──
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-gov-art-'));
+  const tmp = H.acquireTempDir('r3-phase-gov-art-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp });
   delete env.R3_PHASE_PROGRAM;
   const r = cp.spawnSync('node', [SCRIPT], { cwd: REPO, encoding: 'utf8', env });
@@ -300,5 +300,6 @@ for (const phase of PHASES) {
   }
 }
 
+H.cleanupAll();
 console.log('phase-governance: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);
