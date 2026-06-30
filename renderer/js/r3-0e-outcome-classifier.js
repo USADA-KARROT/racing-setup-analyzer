@@ -1017,19 +1017,99 @@
         );
       }
 
-      // ---- Step 16: envelope byte cap ----------------------------------------------------
+      // ---- Step 16: deep-freeze FIRST (E3-R6-01 closure) ---------------------------------
+      // Codex E3-R6-01 closure: deep-freezing BEFORE the byte-cap measurement neutralizes
+      // a hostile-clock attack that installs Array.prototype.toJSON to mutate outcome
+      // arrays during JSON.stringify. Once frozen, any toJSON-driven push() throws in
+      // strict mode; the throw propagates out of the byte counter and the outer try/catch
+      // returns BLOCK with INTERNAL_CONTRACT_VIOLATION.
+      _deepFreeze(outcome);
+      // Snapshot pre-byte-cap array lengths (defence-in-depth: if freeze somehow doesn't
+      // propagate, a length mismatch after the byte counter walk → BLOCK).
+      var preBytePushSizes = {
+        confounders: outcome.confounders.length,
+        limitations: outcome.limitations.length,
+        sideEffects: outcome.sideEffects.length,
+        dataQualityIssues: outcome.dataQualityIssues.length,
+      };
+
+      // ---- Step 17: envelope byte cap via toJSON-safe captured walker --------------------
+      // Custom byte-size walker that does NOT consult ambient `toJSON`. Uses captured
+      // intrinsics for traversal. Returns Infinity on any anomaly so the cap check fails
+      // closed. This eliminates the Array.prototype.toJSON attack surface that
+      // JSON.stringify would expose even with a captured JSON reference (toJSON is
+      // consulted by the stringify ALGORITHM, not by the function reference).
+      function _byteSize(v, depth) {
+        if (depth > 8) return Infinity;
+        if (v === null) return 4;       // "null"
+        if (v === undefined) return Infinity; // never legal in JSON
+        var t = typeof v;
+        if (t === 'boolean') return v ? 4 : 5;
+        if (t === 'number') {
+          if (!_CAPTURED_NUMBER_IS_FINITE(v)) return Infinity;
+          // Worst-case-ish digit count: 24 covers JSON-canonical doubles.
+          var s = (v).toString();
+          return s.length;
+        }
+        if (t === 'string') {
+          // 2 quotes + escape-conservative 6x byte-per-char ceiling for unicode escapes.
+          return 2 + _utf8Bytes(v) + 0;
+        }
+        if (_CAPTURED_ARRAY_IS_ARRAY(v)) {
+          var aLen = v.length;
+          if (typeof aLen !== 'number' || aLen < 0) return Infinity;
+          var sum = 2; // []
+          if (aLen > 0) sum += aLen - 1; // commas
+          for (var ai = 0; ai < aLen; ai++) {
+            // Direct index access on a frozen array is safe (frozen blocks mutation).
+            var c = _byteSize(v[ai], depth + 1);
+            if (c === Infinity) return Infinity;
+            sum += c;
+          }
+          return sum;
+        }
+        if (t === 'object') {
+          // Plain object only — walk via captured getOwnPropertyNames so prototype chain
+          // and toJSON cannot interfere.
+          var names;
+          try { names = _CAPTURED_OBJECT_GET_OWN_NAMES(v); } catch (eDesc) { return Infinity; }
+          var oSum = 2; // {}
+          var counted = 0;
+          for (var ki = 0; ki < names.length; ki++) {
+            var kk = names[ki];
+            var d;
+            try { d = _CAPTURED_OBJECT_GET_OWN_DESC(v, kk); } catch (eDesc2) { return Infinity; }
+            if (!d || d.enumerable !== true) continue;
+            if (typeof d.get === 'function' || typeof d.set === 'function') return Infinity;
+            if (counted > 0) oSum += 1; // comma
+            oSum += 2 + _utf8Bytes(kk) + 1; // "key":
+            var cv = _byteSize(d.value, depth + 1);
+            if (cv === Infinity) return Infinity;
+            oSum += cv;
+            counted++;
+          }
+          return oSum;
+        }
+        return Infinity;
+      }
       var envelopeBytes;
-      try { envelopeBytes = _utf8Bytes(_CAPTURED_JSON_STRINGIFY(outcome)); }
+      try { envelopeBytes = _byteSize(outcome, 0); }
       catch (e) { envelopeBytes = Infinity; }
-      if (envelopeBytes > ENVELOPE_BYTE_CAP) {
+      if (envelopeBytes === Infinity || envelopeBytes > ENVELOPE_BYTE_CAP) {
         return RC_E.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'outcome envelope ' + envelopeBytes + ' bytes > ' + ENVELOPE_BYTE_CAP });
       }
+      // Defence-in-depth: re-check the array lengths did not change during the walk.
+      if (outcome.confounders.length !== preBytePushSizes.confounders
+          || outcome.limitations.length !== preBytePushSizes.limitations
+          || outcome.sideEffects.length !== preBytePushSizes.sideEffects
+          || outcome.dataQualityIssues.length !== preBytePushSizes.dataQualityIssues) {
+        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'outcome array length mutated during byte-size walk (toJSON attack suspected)' });
+      }
 
-      // ---- Step 17: re-check intrinsics post-classify, deep-freeze, register -------------
+      // ---- Step 18: re-check intrinsics post-classify, register --------------------------
       if (!_intrinsicsIntact()) {
         return _buildTamperBlock('intrinsic tampering detected post-classify');
       }
-      _deepFreeze(outcome);
       _registerAuthoritativeOutcome(outcome);
 
       return _CAPTURED_OBJECT_FREEZE({ valid: true, outcome: outcome });

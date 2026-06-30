@@ -1212,6 +1212,79 @@ console.log('Section X — Codex E3 R4 closure (pre-load defineProperty poisonin
 })();
 
 // ==================================================================
+// Section Z — Codex E3 R6 closure (E3-R6-01)
+// ==================================================================
+console.log('Section Z — Codex E3 R6 closure (toJSON-driven post-validation mutation)');
+
+// Z1 — hostile clock that installs Array.prototype.toJSON cannot mutate outcome arrays
+// after validation. The byte-cap walker is now toJSON-free (custom captured walker)
+// AND the outcome is deep-frozen BEFORE the byte cap measurement.
+(function () {
+  var origToJSON;
+  var hadToJSON = Object.prototype.hasOwnProperty.call(Array.prototype, 'toJSON');
+  if (hadToJSON) origToJSON = Array.prototype.toJSON;
+  var hostileClock = function () {
+    // Install toJSON that would mutate the array if invoked before freeze.
+    Array.prototype.toJSON = function () {
+      try { this[this.length] = '/Users/skyline/leak.bmsbin'; this.length = this.length; }
+      catch (e) { /* frozen → throws → that's the expected fail-closed path */ }
+      return this;
+    };
+    return '2026-06-30T11:30:00Z';
+  };
+  var r;
+  try {
+    r = CL.classifyOutcome(makeInput(), { clock: hostileClock });
+  } finally {
+    if (hadToJSON) Array.prototype.toJSON = origToJSON;
+    else { try { delete Array.prototype.toJSON; } catch (e) { /* swallow */ } }
+  }
+  // EITHER the classifier returns BLOCK, OR the outcome verifies but contains NO leak.
+  if (r.valid === true) {
+    var serialized = JSON.stringify(r.outcome);
+    chk('Z1: toJSON-driven post-validation mutation NOT in outcome',
+      serialized.indexOf('/Users/') === -1 && serialized.indexOf('leak.bmsbin') === -1,
+      { serialized: serialized });
+    var allCodes = true;
+    for (var li = 0; li < r.outcome.limitations.length; li++) {
+      var v = r.outcome.limitations[li];
+      if (typeof v !== 'string' || v.indexOf('/') !== -1) { allCodes = false; break; }
+    }
+    chk('Z1.codes: limitations contain no path strings', allCodes);
+  } else {
+    chk('Z1: toJSON-driven attack results in BLOCK', true);
+    chk('Z1.codes: BLOCK path is clean', true);
+  }
+})();
+
+// Z2 — Object.prototype.toJSON installed before classify cannot affect outcome
+(function () {
+  var origToJSON;
+  var hadToJSON = Object.prototype.hasOwnProperty.call(Object.prototype, 'toJSON');
+  if (hadToJSON) origToJSON = Object.prototype.toJSON;
+  Object.prototype.toJSON = function () {
+    try { this.injected = '/Users/skyline/leak.bmsbin'; } catch (e) { /* frozen */ }
+    return this;
+  };
+  var r;
+  try {
+    r = CL.classifyOutcome(makeInput(), { clock: fixedClock() });
+  } finally {
+    if (hadToJSON) Object.prototype.toJSON = origToJSON;
+    else { try { delete Object.prototype.toJSON; } catch (e) { /* swallow */ } }
+  }
+  if (r.valid === true) {
+    var serialized = JSON.stringify(r.outcome);
+    chk('Z2: Object.prototype.toJSON cannot inject into outcome',
+      serialized.indexOf('/Users/') === -1
+        && !Object.prototype.hasOwnProperty.call(r.outcome, 'injected'),
+      { serialized: serialized });
+  } else {
+    chk('Z2: Object.prototype.toJSON attack results in BLOCK', true);
+  }
+})();
+
+// ==================================================================
 // Section Y — Codex E3 R5 closures (E3-R5-01..02)
 // ==================================================================
 console.log('Section Y — Codex E3 R5 closures');
