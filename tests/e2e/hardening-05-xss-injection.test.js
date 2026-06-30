@@ -440,17 +440,20 @@ try {
       //   1. Direct call to an allowlisted helper: t(...) / credBadge(...) / tierBadge(...)
       //   2. String literal (rare)
       //   3. Ternary whose BOTH branches are either helper-calls or string literals
+      // F3-R11-01 closure: route ALL "is this a safe string" decisions through
+      // isSafeStringLiteral, which correctly rejects backtick template literals containing
+      // `${...}` interpolation. The previous loose /^['"`].*['"`]$/ regex accepted
+      // `${case.title}` interpolations.
       var safe = false;
-      if (/^['"`].*['"`]$/.test(rhs)) safe = true;
+      if (isSafeStringLiteral(rhs)) safe = true;
       else if (isSafeHelperCall(rhs)) safe = true;
       else {
-        // Ternary: cond ? lhs : rhs — accept ONLY if both lhs+rhs are helper-calls or literals.
         var ternMatch = rhs.match(/^[\s\S]+?\?\s*([\s\S]+?)\s*:\s*([\s\S]+?)$/);
         if (ternMatch) {
           var lhs = ternMatch[1].trim();
           var rhs2 = ternMatch[2].trim();
-          var lhsOk = isSafeHelperCall(lhs) || /^['"`].*['"`]$/.test(lhs);
-          var rhsOk = isSafeHelperCall(rhs2) || /^['"`].*['"`]$/.test(rhs2);
+          var lhsOk = isSafeHelperCall(lhs) || isSafeStringLiteral(lhs);
+          var rhsOk = isSafeHelperCall(rhs2) || isSafeStringLiteral(rhs2);
           if (lhsOk && rhsOk) safe = true;
         }
       }
