@@ -48,8 +48,9 @@ try {
   // F3-R9-05 closure: shell redirection rejection no longer requires whitespace around `>`.
   // `electron-builder >out` (no space) must fail. Use ANY `>` / `<` / `|` shell-metachar
   // outside string-literal contexts. The previous pattern required `\s>\s` and missed compact forms.
-  // F3-R18-01 closure: reject ANY unquoted pipe character (not just pipe-followed-by-word).
-  var FORBIDDEN_TOKENS = /\b(curl|wget|npx|fetch|eval|base64|ssh|scp|rsync|nc|netcat|telnet)\b|\bsh\s+-c\b|https?:\/\/|\$\(|`|\||>|<\s|2>|&>/i;
+  // F3-R19-01 closure: also reject standalone '&' (background command separator) and newlines
+  // (which would let a contributor chain commands via multi-line script values).
+  var FORBIDDEN_TOKENS = /\b(curl|wget|npx|fetch|eval|base64|ssh|scp|rsync|nc|netcat|telnet)\b|\bsh\s+-c\b|https?:\/\/|\$\(|`|\||>|<\s|2>|&>|(?<![&])&(?![&])|[\r\n]/i;
   var ALLOWED_NODE_DASH_FLAGS_FORBIDDEN = /\bnode\s+-/;
   var ALLOWED_NODE_ROOTS = ['tests', 'scripts', 'tools'];
 
