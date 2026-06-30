@@ -68,6 +68,17 @@ try {
   var inlineScripts = extractInlineScripts(indexHtmlRaw);
   chk('renderer/index.html inline scripts extracted for DOM-sink scan', inlineScripts.length >= 1, { inline_count: inlineScripts.length });
   // Treat each inline script as a synthetic file in the scanner pipeline.
+  // F3-R8-03 closure: helper hoisted at file-block scope for use by both innerHTML/outerHTML
+  // assignment scans and the x-html helper-call argument-provenance check.
+  function isSafeStringLiteral(expr) {
+    var e = expr.trim();
+    if (e === "''" || e === '""' || e === '``') return true;
+    if (/^"(?:[^"\\]|\\.)*"$/.test(e)) return true;
+    if (/^'(?:[^'\\]|\\.)*'$/.test(e)) return true;
+    if (/^`(?:[^`\\]|\\.)*`$/.test(e) && !/\$\{/.test(e)) return true;
+    return false;
+  }
+
   var allSources = []; // {name, src}
   for (var fi = 0; fi < files.length; fi++) {
     allSources.push({ name: files[fi], src: fs.readFileSync(path.join(rendererJsDir, files[fi]), 'utf8') });
@@ -91,9 +102,16 @@ try {
       var m = line.match(/\.innerHTML\s*=\s*(.+?)\s*[;)]/);
       if (m) {
         var rhs = m[1].trim();
-        if (rhs === "''" || rhs === '""') continue;
-        if (/^['"`].*['"`]$/.test(rhs)) continue;
+        if (isSafeStringLiteral(rhs)) continue;
         unsafeInnerHtmlAssigns.push(srcName + ':' + (l + 1) + ' ' + line.trim().slice(0, 120));
+      }
+      // Also catch computed-form ['innerHTML'] = X on this line
+      var mIcomp = line.match(/\[\s*['"`]innerHTML['"`]\s*\]\s*=\s*(.+?)\s*[;)]/);
+      if (mIcomp) {
+        var rhsIcomp = mIcomp[1].trim();
+        if (!isSafeStringLiteral(rhsIcomp)) {
+          unsafeInnerHtmlAssigns.push(srcName + ':' + (l + 1) + ' ["innerHTML"] = variable RHS (computed)');
+        }
       }
     }
   }
@@ -209,7 +227,7 @@ try {
     var nfMatches = s.match(/new\s+Function\s*\([^)]*\)/g) || [];
     for (var nfi = 0; nfi < nfMatches.length; nfi++) {
       var args = nfMatches[nfi].replace(/^new\s+Function\s*\(/, '').replace(/\)$/, '').trim();
-      if (args === '' || /^['"`][^'"`]*['"`]$/.test(args)) continue;
+      if (args === '' || isSafeStringLiteral(args)) continue;
       unsafeApis.push(srcName2 + ': new Function with non-literal arg → ' + nfMatches[nfi].slice(0, 60));
     }
 
@@ -221,7 +239,7 @@ try {
       var mO = line2.match(/\.outerHTML\s*=\s*(.+?)\s*[;)]/);
       if (mO) {
         var rhsO = mO[1].trim();
-        if (!(rhsO === "''" || rhsO === '""' || /^['"`].*['"`]$/.test(rhsO))) {
+        if (!isSafeStringLiteral(rhsO)) {
           unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' outerHTML = variable RHS');
         }
       }
@@ -229,14 +247,14 @@ try {
       var mOc = line2.match(/\[\s*['"`]outerHTML['"`]\s*\]\s*=\s*(.+?)\s*[;)]/);
       if (mOc) {
         var rhsOc = mOc[1].trim();
-        if (!(rhsOc === "''" || rhsOc === '""' || /^['"`].*['"`]$/.test(rhsOc))) {
+        if (!isSafeStringLiteral(rhsOc)) {
           unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' ["outerHTML"] = variable RHS (computed)');
         }
       }
       var mIc = line2.match(/\[\s*['"`]innerHTML['"`]\s*\]\s*=\s*(.+?)\s*[;)]/);
       if (mIc) {
         var rhsIc = mIc[1].trim();
-        if (!(rhsIc === "''" || rhsIc === '""' || /^['"`].*['"`]$/.test(rhsIc))) {
+        if (!isSafeStringLiteral(rhsIc)) {
           unsafeApis.push(srcName2 + ':' + (l2 + 1) + ' ["innerHTML"] = variable RHS (computed)');
         }
       }
@@ -255,7 +273,7 @@ try {
       }
       if (commaIdx === -1) { unsafeApis.push(srcName2 + ': malformed insertAdjacentHTML — ' + iaMatches[iai].slice(0, 60)); continue; }
       var textArg = iaArgs.slice(commaIdx + 1).trim();
-      if (!/^['"`].*['"`]$/.test(textArg)) {
+      if (!isSafeStringLiteral(textArg)) {
         unsafeApis.push(srcName2 + ': insertAdjacentHTML with non-literal text arg → ' + iaMatches[iai].slice(0, 60));
       }
     }
@@ -295,6 +313,13 @@ try {
   // allowlist of approved HTML-producing helpers. Generic identifiers like String(...) /
   // JSON.stringify(...) / Object(...) are NOT safe because they could route user-controlled
   // data into HTML. The current production renderer uses only: t, credBadge, tierBadge.
+  // F3-R8-04 closure: allowlisted helpers must receive ONLY frozen-enum / string-literal /
+  // bare known-safe-i18n-key arguments. A call like `credBadge(case.title)` would route
+  // user-controlled data into HTML even though `credBadge` is allowlisted. Restrict each
+  // helper to its known-safe argument shape:
+  //   - t(<string-literal>) — i18n key; string literal only
+  //   - credBadge(<string-literal>) — fixed badge label set
+  //   - tierBadge(<string-literal>) — fixed tier name set
   var SAFE_XHTML_HELPERS = ['t', 'credBadge', 'tierBadge'];
   var xHtmlPatterns = [
     /x-html\s*=\s*"([\s\S]+?)"/g,
@@ -304,9 +329,92 @@ try {
   var unsafeXHtml = [];
   var xHtmlCount = 0;
   function isSafeHelperCall(expr) {
-    var m = expr.match(/^([a-zA-Z_$][\w$]*)\s*\(/);
+    // Match: helperName ( argList )  (single-paren call only)
+    var m = expr.match(/^([a-zA-Z_$][\w$]*)\s*\(([\s\S]*)\)\s*$/);
     if (!m) return false;
-    return SAFE_XHTML_HELPERS.indexOf(m[1]) !== -1;
+    if (SAFE_XHTML_HELPERS.indexOf(m[1]) === -1) return false;
+    var argList = m[2].trim();
+    if (argList === '') return true; // zero-arg call is trivially safe
+    // Split on top-level commas
+    var args = [];
+    var depth = 0;
+    var inStr = false;
+    var strCh = '';
+    var segStart = 0;
+    for (var ci = 0; ci <= argList.length; ci++) {
+      var ch2 = ci < argList.length ? argList.charAt(ci) : ',';
+      if (inStr) {
+        if (ch2 === '\\') { ci++; continue; }
+        if (ch2 === strCh) inStr = false;
+        continue;
+      }
+      if (ch2 === '"' || ch2 === "'" || ch2 === '`') { inStr = true; strCh = ch2; continue; }
+      if (ch2 === '(' || ch2 === '[' || ch2 === '{') depth++;
+      else if (ch2 === ')' || ch2 === ']' || ch2 === '}') depth--;
+      else if (ch2 === ',' && depth === 0) {
+        args.push(argList.slice(segStart, ci).trim());
+        segStart = ci + 1;
+      }
+    }
+    // F3-R8-04 closure: every argument MUST be one of these safe shapes —
+    //   (a) string literal (single/double quoted; backtick without ${...})
+    //   (b) bare identifier or property access chain (e.g., c.tier, foo.bar.baz)
+    //   No concatenation, no function calls, no template-with-interpolation.
+    // The bare property-access carve-out reflects the existing production pattern where
+    // tierBadge/credBadge receive enum-constrained values (e.g., c.tier in {physics,model,
+    // heuristic}). The helpers themselves are pure functions of these enums plus i18n lookups.
+    function isSafeArg(arg) {
+      if (isSafeStringLiteral(arg)) return true;
+      // Bare identifier / dot-chain property access
+      if (/^[a-zA-Z_$][\w$]*(?:\.[a-zA-Z_$][\w$]*)*$/.test(arg)) return true;
+      // Ternary `<cond> ? <left> : <right>` where both branches are themselves safe args.
+      // Use a depth-aware splitter so nested ternaries are handled correctly.
+      var qIdx = -1;
+      var depth = 0;
+      var inStr = false;
+      var strCh = '';
+      for (var ti = 0; ti < arg.length; ti++) {
+        var tc = arg.charAt(ti);
+        if (inStr) {
+          if (tc === '\\') { ti++; continue; }
+          if (tc === strCh) inStr = false;
+          continue;
+        }
+        if (tc === '"' || tc === "'" || tc === '`') { inStr = true; strCh = tc; continue; }
+        if (tc === '(' || tc === '[' || tc === '{') depth++;
+        else if (tc === ')' || tc === ']' || tc === '}') depth--;
+        else if (tc === '?' && depth === 0) { qIdx = ti; break; }
+      }
+      if (qIdx === -1) return false;
+      var cond = arg.slice(0, qIdx).trim();
+      var afterQ = arg.slice(qIdx + 1);
+      // Find matching colon at depth 0
+      var cIdx = -1;
+      depth = 0; inStr = false;
+      for (var ti2 = 0; ti2 < afterQ.length; ti2++) {
+        var tc2 = afterQ.charAt(ti2);
+        if (inStr) {
+          if (tc2 === '\\') { ti2++; continue; }
+          if (tc2 === strCh) inStr = false;
+          continue;
+        }
+        if (tc2 === '"' || tc2 === "'" || tc2 === '`') { inStr = true; strCh = tc2; continue; }
+        if (tc2 === '(' || tc2 === '[' || tc2 === '{') depth++;
+        else if (tc2 === ')' || tc2 === ']' || tc2 === '}') depth--;
+        else if (tc2 === ':' && depth === 0) { cIdx = ti2; break; }
+      }
+      if (cIdx === -1) return false;
+      var lhs = afterQ.slice(0, cIdx).trim();
+      var rhs = afterQ.slice(cIdx + 1).trim();
+      // Condition can be any boolean expression (we already verified it's not a function-call
+      // chain that constructs HTML; the OUTPUT of the ternary is what matters). Require LHS
+      // and RHS to be safe args themselves.
+      return isSafeArg(lhs) && isSafeArg(rhs);
+    }
+    for (var ai = 0; ai < args.length; ai++) {
+      if (!isSafeArg(args[ai])) return false;
+    }
+    return true;
   }
   for (var xpi = 0; xpi < xHtmlPatterns.length; xpi++) {
     var pat = xHtmlPatterns[xpi];

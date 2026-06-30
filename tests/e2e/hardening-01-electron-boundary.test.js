@@ -185,6 +185,13 @@ try {
     chk(lbl + '.enableRemoteModule NOT set to true', !/enableRemoteModule\s*:\s*true/.test(wpBody));
     chk(lbl + '.nodeIntegrationInWorker NOT set to true', !/nodeIntegrationInWorker\s*:\s*true/.test(wpBody));
     chk(lbl + '.nodeIntegrationInSubFrames NOT set to true', !/nodeIntegrationInSubFrames\s*:\s*true/.test(wpBody));
+    // F3-R8-01 closure: sandbox must NOT be explicitly disabled. If the key is present, it
+    // must be set to literal `true`. If absent, Electron's default (sandbox enabled when
+    // contextIsolation:true) applies.
+    chk(lbl + '.sandbox NOT set to false', !/(^|[\s,{])sandbox\s*:\s*false\s*(,|$|\s)/m.test(wpBody));
+    if (/(^|[\s,{])sandbox\s*:/.test(wpBody)) {
+      chk(lbl + '.sandbox (when set) === literal true', /(^|[\s,{])sandbox\s*:\s*true\s*(,|$|\s)/m.test(wpBody));
+    }
   }
 
   // Step 2: preload.js minimal surface — post-strip checks (no comment-decoy false positives)
@@ -198,35 +205,43 @@ try {
   chk('preload.js does NOT require os (post-strip)', !/require\s*\(\s*['"]os['"]\s*\)/.test(preloadSrc));
   chk('preload.js does NOT eval untrusted content (post-strip)', !/eval\s*\(|new\s+Function\s*\(/.test(preloadSrc));
 
-  // F3-R7-02 closure: parse the exposed object and require EXACTLY {platform, version} as
-  // the only two data keys. Reject spreads, computed keys, accessors, methods, or any extra
-  // own property.
-  function extractExposedSurfaceBody(src) {
-    // Match: contextBridge.exposeInMainWorld('<name>', { ... });
-    var startMatch = src.match(/contextBridge\.exposeInMainWorld\s*\(\s*['"`][^'"`]+['"`]\s*,\s*\{/);
-    if (!startMatch) return null;
-    var start = startMatch.index + startMatch[0].length;
-    var depth = 1;
-    var i = start;
-    var inStr = false;
-    var strCh = '';
-    while (i < src.length && depth > 0) {
-      var ch = src.charAt(i);
-      if (inStr) {
-        if (ch === '\\' && i + 1 < src.length) { i += 2; continue; }
-        if (ch === strCh) { inStr = false; }
-      } else {
-        if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; }
-        else if (ch === '{') depth++;
-        else if (ch === '}') { depth--; if (depth === 0) return src.slice(start, i); }
+  // F3-R8-02 closure: enumerate EVERY exposeInMainWorld call. There must be EXACTLY ONE
+  // and its surface must be exactly {platform, version}.
+  function extractAllExposedSurfaces(src) {
+    var entries = [];
+    var startIdx = 0;
+    while (true) {
+      var sub = src.slice(startIdx);
+      var sm = sub.match(/contextBridge\.exposeInMainWorld\s*\(\s*(['"`])([^'"`]+)\1\s*,\s*\{/);
+      if (!sm) break;
+      var absStart = startIdx + sm.index + sm[0].length;
+      var worldName = sm[2];
+      var depth = 1;
+      var i = absStart;
+      var inStr = false;
+      var strCh = '';
+      while (i < src.length && depth > 0) {
+        var ch = src.charAt(i);
+        if (inStr) {
+          if (ch === '\\' && i + 1 < src.length) { i += 2; continue; }
+          if (ch === strCh) { inStr = false; }
+        } else {
+          if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; }
+          else if (ch === '{') depth++;
+          else if (ch === '}') { depth--; if (depth === 0) { entries.push({ name: worldName, body: src.slice(absStart, i) }); break; } }
+        }
+        i++;
       }
-      i++;
+      startIdx = i + 1;
+      if (startIdx >= src.length) break;
     }
-    return null;
+    return entries;
   }
-  var exposedBody = extractExposedSurfaceBody(preloadSrc);
-  chk('preload.js exposes a contextBridge surface block', exposedBody !== null);
-  if (exposedBody == null) exposedBody = '';
+  var exposedSurfaces = extractAllExposedSurfaces(preloadSrc);
+  chk('preload.js exposes EXACTLY ONE contextBridge surface', exposedSurfaces.length === 1, { surfaces: exposedSurfaces.map(function (e) { return e.name; }) });
+  var exposedEntry = exposedSurfaces[0] || { name: '', body: '' };
+  var exposedBody = exposedEntry.body || '';
+  chk('preload.js exposes the surface as "electronAPI"', exposedEntry.name === 'electronAPI');
 
   // No spread (...) — exposes hidden properties
   chk('preload.js exposed surface has NO spread operator', !/\.\.\./.test(exposedBody));
