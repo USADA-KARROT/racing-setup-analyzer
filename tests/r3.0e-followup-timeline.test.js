@@ -600,6 +600,70 @@ console.log('Section R — Codex E4 R2 closures');
   }
 })();
 
+// ==================================================================
+// Section S — Codex E4 R3 closures (E4-R3-01..02) via child-process isolation
+// ==================================================================
+console.log('Section S — Codex E4 R3 closures (child-process isolation)');
+
+// Section S tests poison ambient intrinsics globally; running them inline would
+// race with the other parallel async sections (which still use the E1 contracts
+// that read ambient RegExp.prototype.test). Each S test runs in its own node
+// subprocess so the rebind is fully isolated.
+function runChildProbe(probeBody) {
+  var cp = require('child_process');
+  var path = require('path');
+  var svcPath = path.resolve(__dirname, '..', 'renderer/js/r3-0e-followup-timeline.js');
+  var storesPath = path.resolve(__dirname, '..', 'renderer/js/r3-0e-stores.js');
+  var sbPath = path.resolve(__dirname, '..', 'renderer/js/storage-backend.js');
+  var script = ''
+    + 'var SVC=require("' + svcPath + '");'
+    + 'var STORES=require("' + storesPath + '");'
+    + 'var SB=require("' + sbPath + '");'
+    + 'function mkService(){var be=SB.MemoryBackend();return SVC.createFollowUpTimelineService({timelineStore:STORES.createTimelineStore(be),followUpLinkStore:STORES.createFollowUpLinkStore(be)});}'
+    + '(' + probeBody + ')();';
+  return cp.execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' });
+}
+
+// S1 — E4-R3-01: String.prototype.toLowerCase rebind cannot subvert blocklist
+(function () {
+  var out = runChildProbe('async function(){'
+    + 'String.prototype.toLowerCase=function(){return "not_hostile";};'
+    + 'var svc=mkService();'
+    + 'var r=await svc.appendTimelineEvent({caseId:"case_demo_a",kind:"baseline_captured",i18nKey:"r3.0e.tl.x",params:{blame:1}},{clock:function(){return "2026-06-30T11:00:00Z";}});'
+    + 'process.stdout.write(JSON.stringify({valid:r.valid,reasons:r.reasonCodes||[]}));'
+    + '}');
+  var parsed = JSON.parse(out.trim());
+  chk('S1: String.prototype.toLowerCase rebind cannot bypass blocklist',
+    parsed.valid !== true, parsed);
+})();
+
+// S2 — E4-R3-02: RegExp.prototype.test rebind cannot subvert caseId grammar
+(function () {
+  var out = runChildProbe('async function(){'
+    + 'RegExp.prototype.test=function(){return true;};'
+    + 'var svc=mkService();'
+    + 'var r=await svc.appendTimelineEvent({caseId:"../etc/passwd",kind:"baseline_captured",i18nKey:"r3.0e.tl.x"},{clock:function(){return "2026-06-30T11:00:00Z";}});'
+    + 'process.stdout.write(JSON.stringify({valid:r.valid,reasons:r.reasonCodes||[]}));'
+    + '}');
+  var parsed = JSON.parse(out.trim());
+  chk('S2: RegExp.prototype.test rebind cannot bypass caseId grammar',
+    parsed.valid !== true, parsed);
+})();
+
+// S3 — Combined intrinsic tampering cannot launder hostile params string
+(function () {
+  var out = runChildProbe('async function(){'
+    + 'String.prototype.toLowerCase=function(){return "not_hostile";};'
+    + 'RegExp.prototype.test=function(){return true;};'
+    + 'var svc=mkService();'
+    + 'var r=await svc.appendTimelineEvent({caseId:"case_demo_a",kind:"baseline_captured",i18nKey:"r3.0e.tl.s3",params:{note:"driver_caused_crash"}},{clock:function(){return "2026-06-30T11:00:00Z";}});'
+    + 'process.stdout.write(JSON.stringify({valid:r.valid,reasons:r.reasonCodes||[]}));'
+    + '}');
+  var parsed = JSON.parse(out.trim());
+  chk('S3: combined tampering cannot launder hostile string',
+    parsed.valid !== true, parsed);
+})();
+
 // ------------------------------------------------------------------
 // Summary
 // ------------------------------------------------------------------

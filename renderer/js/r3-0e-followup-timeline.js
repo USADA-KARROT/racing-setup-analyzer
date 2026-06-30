@@ -78,11 +78,31 @@
   var _ARR_PUSH = Array.prototype.push;
   var _ARR_SLICE = Array.prototype.slice;
   var _ARR_INDEX_OF = Array.prototype.indexOf;
+  // Codex E4-R3-01/02 closures: capture String.prototype.toLowerCase + RegExp.prototype.test
+  // so post-load ambient mutation cannot subvert the reserved-token blocklist or any
+  // grammar regex (ID, i18n key, sober identifier).
+  var _STR_TO_LOWER = String.prototype.toLowerCase;
+  var _STR_INDEX_OF = String.prototype.indexOf;
+  var _RE_TEST = RegExp.prototype.test;
   function _wsAdd(s, v) { try { _CAPTURED_REFLECT_APPLY(_WS_ADD, s, [v]); return true; } catch (e) { return false; } }
   function _wsHas(s, v) { try { return _CAPTURED_REFLECT_APPLY(_WS_HAS, s, [v]) === true; } catch (e) { return false; } }
   function _arrPush(a, v) { try { _CAPTURED_REFLECT_APPLY(_ARR_PUSH, a, [v]); return true; } catch (e) { return false; } }
   function _arrSlice(a) { try { return _CAPTURED_REFLECT_APPLY(_ARR_SLICE, a, []); } catch (e) { return []; } }
   function _arrIndexOf(a, v) { try { return _CAPTURED_REFLECT_APPLY(_ARR_INDEX_OF, a, [v]); } catch (e) { return -1; } }
+  // Codex E4-R3-01 closure: capture-based ASCII lowercase via captured String.prototype.toLowerCase.
+  function _lower(s) {
+    if (typeof s !== 'string') return '';
+    try { return _CAPTURED_REFLECT_APPLY(_STR_TO_LOWER, s, []); } catch (e) { return ''; }
+  }
+  function _strIndexOf(haystack, needle) {
+    if (typeof haystack !== 'string') return -1;
+    try { return _CAPTURED_REFLECT_APPLY(_STR_INDEX_OF, haystack, [needle]); } catch (e) { return -1; }
+  }
+  // Codex E4-R3-02 closure: capture-based regex test.
+  function _reTest(re, s) {
+    if (typeof s !== 'string') return false;
+    try { return _CAPTURED_REFLECT_APPLY(_RE_TEST, re, [s]) === true; } catch (e) { return false; }
+  }
   function _isFrozenSafe(v) { try { return _CAPTURED_OBJECT_IS_FROZEN(v) === true; } catch (e) { return false; } }
   function _isArraySafe(v) { try { return _CAPTURED_ARRAY_IS_ARRAY(v) === true; } catch (e) { return false; } }
   function _isoToMs(s) {
@@ -121,14 +141,16 @@
   ]);
   function _containsReservedHostileToken(s) {
     if (typeof s !== 'string') return false;
-    var lower = s.toLowerCase();
+    var lower = _lower(s);
     for (var i = 0; i < RESERVED_HOSTILE_TOKENS.length; i++) {
       var tok = RESERVED_HOSTILE_TOKENS[i];
       if (lower === tok) return true;
-      if (lower.indexOf(tok) !== -1) return true;
+      if (_strIndexOf(lower, tok) !== -1) return true;
     }
     return false;
   }
+  // Codex E4-R3-02 closure: pre-compile sober-identifier regex once; use captured test.
+  var SOBER_PARAM_KEY_RE = /^[a-z][a-z0-9_]{0,31}$/;
 
   // ---------- Constants ----------------------------------------------------------------------
   var SERVICE_VERSION = 1;
@@ -169,14 +191,14 @@
   }
   function _idGrammarOk(s) {
     if (!_nonEmptyStr(s)) return false;
-    if (ID_FORBIDDEN_RE.test(s)) return false;
-    if (!ID_GRAMMAR_RE.test(s)) return false;
+    if (_reTest(ID_FORBIDDEN_RE, s)) return false;
+    if (!_reTest(ID_GRAMMAR_RE, s)) return false;
     return true;
   }
   function _i18nKeyOk(s) {
     if (!_nonEmptyStr(s)) return false;
     if (s.length > I18N_KEY_MAX_LEN) return false;
-    if (!I18N_KEY_RE.test(s)) return false;
+    if (!_reTest(I18N_KEY_RE, s)) return false;
     return true;
   }
   function _hasSymbolOwnKey(o) {
@@ -333,7 +355,7 @@
     for (var pi = 0; pi < names.length; pi++) {
       var pk = names[pi];
       // 'correction_of' is the canonical reserved key — its value is a strict id.
-      var keyOk = /^[a-z][a-z0-9_]{0,31}$/.test(pk);
+      var keyOk = _reTest(SOBER_PARAM_KEY_RE, pk);
       if (!keyOk) return { valid: false, code: 'params key not sober: ' + pk };
       // Codex E4-R2-03 closure: even sober ids that match reserved hostile tokens (blame,
       // cause, driver_error, ...) are forbidden in BOTH keys and string values. Narrative
