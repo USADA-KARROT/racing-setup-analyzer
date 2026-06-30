@@ -129,12 +129,14 @@ R30C_IDS.forEach(function (id) {
   chk('train.phaseStates.R3.0C.finalActivationReached=true', r3c && r3c.finalActivationReached === true);
   chk('train.phaseStates.R3.0C.finalActivationCheckpoint=C8_ACTIVATION', r3c && r3c.finalActivationCheckpoint === 'C8_ACTIVATION');
   chk('train.currentPhase=R3.0C OR train has advanced to a later phase', train.currentPhase === 'R3.0C' || ['R3.0D', 'R3.0E', 'R3.0F'].indexOf(train.currentPhase) !== -1);
-  // R3.0F MUST still be NOT started (R3.0D and R3.0E may have started after R3.0C / R3.0D
-  // finalActivationReached respectively). R3.0E is permitted to be started once R3.0D
-  // D5_ENGINEER_BRIEF_ACTIVATION finalActivation is reached on Train.
+  // R3.0F MUST NOT have reached its final activation (F6_RELEASE) before R3.0C C8_ACTIVATION;
+  // it MAY be started (R3.0F.started=true) once R3.0E E5_ACTIVATION finalActivationReached=true,
+  // mirroring the precedent that allowed R3.0D to start after R3.0C C8 and R3.0E to start after
+  // R3.0D D5. Per the SKYLINE-pinned scope (no intermediate release), F6_RELEASE itself is the
+  // single boundary that authorizes the version bump and the post-merge tag.
   ['R3.0F'].forEach(function (p) {
     const s = train.phaseStates && train.phaseStates[p];
-    chk('train.phaseStates.' + p + '.started=false', s && s.started === false);
+    chk('train.phaseStates.' + p + '.started is boolean', s && (s.started === true || s.started === false));
     chk('train.phaseStates.' + p + '.finalActivationReached=false', s && s.finalActivationReached === false);
   });
   // R3.0E is started; after E5_ACTIVATION the finalActivationReached flag may be

@@ -1,12 +1,14 @@
 {
   "schemaVersion": 1,
   "program": "R3.0F",
-  "currentCheckpoint": "F0_BOOTSTRAP",
-  "authorizedProductionPaths": [],
-  "enabledCapabilities": [],
-  "runtimeConsumersAllowed": false,
+  "currentCheckpoint": "F1_MIGRATION_ENGINE",
+  "authorizedProductionPaths": [
+    { "path": "renderer/js/r3-0f-migration-engine.js", "capability": "migration_engine_present" }
+  ],
+  "enabledCapabilities": ["governance_bootstrap_present", "migration_engine_present"],
+  "runtimeConsumersAllowed": true,
   "uiAllowed": false,
   "featureRegistryActivationAllowed": false,
-  "algorithmsAllowed": false,
-  "note": "R3.0F Integrated Delivery Governance state. F0 BOOTSTRAP fixes every production switch OFF. authorizedProductionPaths is intentionally empty; enabledCapabilities is intentionally empty. The four *Allowed flags are intentionally false. Mutating any field above the F0 baseline requires a separately-authorized Integrated Delivery Train checkpoint AND requires R3.0E state.currentCheckpoint === 'E5_ACTIVATION' per cross-phase rule. F6_RELEASE is the only checkpoint that may bump package.json version (1.4.0 → 2.0.0) and may authorize tag/release creation post-merge."
+  "algorithmsAllowed": true,
+  "note": "R3.0F F1_MIGRATION_ENGINE state. F1 authorizes renderer/js/r3-0f-migration-engine.js (the unified migration orchestrator). Supporting modules under contracts/r3.0f/ and scripts/migrators/ are authorized by the same checkpoint via the F1.json checkpoint manifest (their roots are listed in governance/r3.0f/schema.json allowedRoots and the per-file scan is restricted to renderer/js/ + main.js + preload.js — script-tree files do not need entry in this state.authorizedProductionPaths array). uiAllowed and featureRegistryActivationAllowed remain false (F3/F6 floor). algorithmsAllowed=true to permit migrator step functions. R3.0B case-record schema NOT modified; engine never fabricates producer attestation; future-version records REJECTED fail-closed; migration is idempotent + deterministic + append-only-journaled."
 }

@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0F",
+  "checkpoint": "F1_MIGRATION_ENGINE",
+  "baseSha": "49bdaad9e157b182debc18da667d6bc07b716d83",
+  "headSha": null,
+  "previousCheckpoint": "F0_BOOTSTRAP",
+  "shaSeparation": {
+    "note": "R3.0F F1 candidate branch SHA convention. headSha is filled at anchor commit; integrationSha at Train merge.",
+    "reviewedCandidateSha": null,
+    "manifestCommitSha": null,
+    "integrationSha": null
+  },
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0f-migration-engine.js", "capability": "migration_engine_present" }
+  ],
+  "newlyAuthorizedPaths": [
+    "renderer/js/r3-0f-migration-engine.js"
+  ],
+  "newlyEnabledCapabilities": ["migration_engine_present"],
+  "enabledCapabilitiesBefore": ["governance_bootstrap_present"],
+  "enabledCapabilitiesAfter": ["governance_bootstrap_present", "migration_engine_present"],
+  "forbiddenCapabilities": [
+    "e2e_automation_present",
+    "quality_hardening_present",
+    "documentation_present",
+    "release_gate_present",
+    "release_executed"
+  ],
+  "contractEnforcements": {
+    "engineScope": "renderer/js/r3-0f-migration-engine.js exports createMigrationEngine({backend, registry, ...}) → { detect, plan, migrate, journal, envelope, knownStores }. Default registry covers cases / sessions / r3_0e_experiments / r3_0e_outcomes / r3_0e_timelines / r3_0e_followupLinks. Backend-agnostic: works against the live R3.0B MemoryBackend / IndexedDBBackend transact surface. F1 introduces no new IndexedDB object stores; all six target stores already exist or are created by the live store modules on first write.",
+    "failClosed": "Future-version records REJECTED (UNSUPPORTED_FUTURE_VERSION). Malformed records (non-object / sparse array / bad schemaVersion) REJECTED with closed reasonCode enum. Hostile inputs (Proxy / accessors / symbols / non-enumerables / __proto__ pollution / hostile toJSON / cycles / oversized records) stripped by structuredClone → JSON deep-clone input firewall. Migrator throwing → MIGRATOR_THREW. Migrator returning non-ok-boolean → failed. Migrator returning version > target → POST_MIGRATION_INVALID. Backend.transact() rejection → BACKEND_REJECTED + no partial write (per-store atomic batch). ENVELOPE_VERSION_MISMATCH refuses when persisted state envelope.engineVersion exceeds engine's known version.",
+    "idempotency": "Running migrate() against an already-at-target store is a no-op (zero writes, status='no-op'). Re-running migrate() after a successful migration is also a no-op (deterministic).",
+    "noProducerAttestation": "Engine NEVER fabricates producer attestation. The migrated record handed to backend.put has Object.prototype as its prototype, is NOT frozen, and the live store re-validates on subsequent read via its own contract path (R3.0B case-store sanitizeForStorage / R3.0E store .validateXxxShape).",
+    "appendOnlyJournal": "Migration journal lives at meta['__r3_0f_migration_journal__']. Bounded ring buffer (default 256 entries); compaction increments state.lifetimeJournalDropped. JOURNAL_OVERFLOW gate inside a single migrate() halts at 4× maxJournalEntries to prevent runaway fill. Each entry is deep-frozen and validates against contract.validateJournalEntry().",
+    "noAuthorityCrossStore": "Migration of one record does NOT touch another record in any other store. Secondary indexes (caseIndex / sessionIndex / r3_0e_experimentsIndex / r3_0e_outcomesIndex / r3_0e_followupLinksByCase) are NOT rebuilt by the engine — they are owned by the live stores and are re-validated next time the live store reads them.",
+    "r3bSchemaUntouched": "The R3.0B persistence modules (case-record-schema.js / storage-backend.js / schema-migration.js / case-store.js / session-store.js / case-library-viewmodel.js) are NOT modified by F1. The case- and session-migrators are thin literal-require wrappers delegating to the existing schema-migration.js.",
+    "literalRequiresOnly": "Engine + migrators use literal-string require specifiers only. Avoids triggering scripts/check-r3-phase-no-consumer.js PROD_SUSPECTED_DYNAMIC_PHASE_REQUIRE heuristic against other phase scans.",
+    "stateFloors": "F1 unlocks runtimeConsumersAllowed=true (engine consumes contracts/r3.0f/) and algorithmsAllowed=true (step migrators are algorithms). uiAllowed and featureRegistryActivationAllowed remain false (F3/F6 floor). R3.0B case-record schema NOT modified."
+  },
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3.0f-migration-engine.test.js",
+    "newSuiteAssertions": 105,
+    "evidenceTier": "TIER 3 — Claude-verified on F1 branch HEAD; CI re-run on integrationSha is the authority."
+  },
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": null,
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta", "engineer_brief", "experiment_loop", "case_timeline"],
+    "expectedRendererAdapter": false,
+    "note": "F1 does NOT touch the feature registry. R3.0C/D/E activations remain in their state; the engine itself does NOT register a feature node."
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "crossPhaseGate": {
+    "r3eCheckpoint": "E5_ACTIVATION",
+    "requiredFor": "F1_MIGRATION_ENGINE",
+    "satisfied": true,
+    "note": "R3.0E reached E5_ACTIVATION at Train HEAD 49bdaad. F1 may advance."
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "releaseRecord": null,
+  "note": "R3.0F F1 establishes the unified migration engine and per-store migrators. No version bump (1.4.0 unchanged). No tag, no release. The engine is invokable from the Electron renderer via globalThis.R3_0F_MigrationEngine.createMigrationEngine({backend, ...}) but is NOT yet wired to the boot path — that activation happens at F6_RELEASE per cross-phase rule. F1 ships the engine + tests so the F2/F3 checkpoints have a stable migration foundation to build on."
+}
