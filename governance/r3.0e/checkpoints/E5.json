@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0E",
+  "checkpoint": "E5_ACTIVATION",
+  "baseSha": "b99beffd7d7fba5454c232d6bee4b7eaaa78ea6d",
+  "headSha": null,
+  "previousCheckpoint": "E4_CASE_TIMELINE",
+  "shaSeparation": {
+    "note": "Three-way SHA separation per the established R3.0 convention.",
+    "reviewedCandidateSha": "64b07139a77e7be77e387123f6bd360448ff9a80",
+    "reviewedCandidateNote": "Codex E5 Round 2 reviewed this exact SHA and issued FINAL VERDICT: PASS. 3 distinct adversarial findings closed across 1 review round: R1-01 WeakSet integrity canary / R1-02 Object.freeze canary + exact own-keys + nested frozen verifier / R1-03 ignore injected verifier deps + closed outcomeClass allowlist.",
+    "manifestCommitSha": null,
+    "integrationSha": null
+  },
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0e-stores.js", "capability": "experiment_store_present" },
+    { "path": "renderer/js/r3-0e-outcome-classifier.js", "capability": "outcome_classifier_present" },
+    { "path": "renderer/js/r3-0e-followup-timeline.js", "capability": "case_timeline_present" },
+    { "path": "renderer/js/r3-0e-experiment-viewmodel.js", "capability": "feature_registry_active" },
+    { "path": "renderer/js/i18n-r3-0e.js", "capability": "feature_registry_active" },
+    { "path": "renderer/js/feature-registry.js", "capability": "feature_registry_active" }
+  ],
+  "newlyAuthorizedPaths": [
+    "renderer/js/r3-0e-experiment-viewmodel.js",
+    "renderer/js/i18n-r3-0e.js",
+    "renderer/js/feature-registry.js"
+  ],
+  "newlyEnabledCapabilities": ["feature_registry_active"],
+  "enabledCapabilitiesBefore": ["contract_foundation_present", "experiment_store_present", "outcome_classifier_present", "case_timeline_present"],
+  "enabledCapabilitiesAfter": ["contract_foundation_present", "experiment_store_present", "outcome_classifier_present", "case_timeline_present", "feature_registry_active"],
+  "forbiddenCapabilities": [],
+  "contractEnforcements": {
+    "viewmodelScope": "renderer/js/r3-0e-experiment-viewmodel.js exports createExperimentViewmodel({classifier, timelineModule}) + verifyAuthoritativeViewmodelState. Returns frozen service api with derive/empty/error/stale methods. Each returned state is deep-frozen, registered in a closure-private WeakSet, and exposes displayState ∈ {unavailable, loading, available, stale-cleared, error-sanitized}.",
+    "noServiceInversion": "Viewmodel NEVER classifies, NEVER calls back into classifier.classifyOutcome, NEVER appends timeline events, NEVER creates follow-up links. It ONLY accepts already-authoritative outputs and maps them to display state. Any non-authoritative input → error-sanitized state.",
+    "activationGate": "derive() returns activation.uiCapabilityReady = true iff BOTH an authoritative outcome AND an authoritative projection are present; otherwise false with deferredCapabilities populated. featureRegistryActivationAllowed mirrors uiCapabilityReady. rationaleI18nKey switches between r3.0e.activation.ready / r3.0e.activation.deferred / case_required / applied_experiment_required.",
+    "i18nParity": "i18n-r3-0e.js carries en + zh-TW + ja keys for every nav label, feature label, outcome class, timeline kind, display state, activation rationale, and disclaimers — all three languages contain the SAME set of keys (tests/i18n-parity.test.js enforces).",
+    "featureRegistry": "feature-registry.js adds 2 NAV_NODES (case:experiment_loop order=9 + case:case_timeline order=10) and 2 FEATURES (experiment_loop + case_timeline, case_scoped, available_conditional, mounted on the analysis pane). Activation completes when E5_ACTIVATION's governance flag goes true.",
+    "disclaimers": "Every authoritative viewmodel state carries the four R3.0E disclaimers as a frozen array (no_causation / no_driver_blame / no_auto_setup / same_case_session_only). UI host code MUST render at least one disclaimer alongside any outcome display.",
+    "stateFloors": "E5 unlocks uiAllowed=true AND featureRegistryActivationAllowed=true. algorithmsAllowed remains true (unchanged from E3/E4). R3.0B case-record schema NOT modified."
+  },
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3.0e-experiment-viewmodel.test.js",
+    "newSuiteAssertions": 54,
+    "evidenceTier": "TIER 3 — Claude-verified on E5 branch HEAD; CI re-run on integrationSha is the authority."
+  },
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 2,
+    "reviewedCandidateSha": "64b07139a77e7be77e387123f6bd360448ff9a80",
+    "verdictEvidenceFile": "governance/r3.0e/codex-checkpoint-evidence/E5/round-2-64b0713-PASS.raw.txt",
+    "rounds": [
+      { "round": 1, "reviewedSha": "914aea6", "verdict": "BLOCK", "findings": "3 BLOCK (E5-R1-01..03)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E5/round-1-914aea6.raw.txt" },
+      { "round": 2, "reviewedSha": "64b0713", "verdict": "PASS", "findings": "0", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E5/round-2-64b0713-PASS.raw.txt" }
+    ]
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "scopeBoundary": {
+    "frozenFilesUntouched": true,
+    "r30bPersistenceUntouched": true,
+    "r30cContractsUntouched": true,
+    "r30cProductionUntouched": true,
+    "r30dContractsUntouched": true,
+    "r30dProductionUntouched": true,
+    "r30eContractsUntouched": true,
+    "r30eStoresUntouched": true,
+    "r30eOutcomeClassifierUntouched": true,
+    "r30eFollowupTimelineUntouched": true,
+    "featureRegistryChanged": true,
+    "indexHtmlUnchanged": true,
+    "noR30eFeatureIdInRegistryBefore": false,
+    "runtimeConsumerCount": 4,
+    "productionPathCount": 6,
+    "uiSurfaceCount": 0
+  },
+  "frozenDiff": 0,
+  "productionDiff": 3,
+  "runtimeConsumerCount": 4,
+  "featureRegistryState": {
+    "expectedRegisteredIds": ["experiment_loop", "case_timeline"],
+    "expectedDeferredIds": [],
+    "note": "E5 REGISTERS the R3.0E feature IDs (experiment_loop + case_timeline) as case_scoped/available_conditional. Activation is governed by state.json featureRegistryActivationAllowed=true."
+  },
+  "crossPhaseGate": {
+    "r3dCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+    "requiredFor": "E5_ACTIVATION",
+    "satisfied": true
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": "2026-06-30T00:00:00Z",
+  "status": "candidate",
+  "governanceChanged": true,
+  "changedFiles": [
+    "renderer/js/r3-0e-experiment-viewmodel.js",
+    "renderer/js/i18n-r3-0e.js",
+    "renderer/js/feature-registry.js",
+    "tests/r3.0e-experiment-viewmodel.test.js",
+    "governance/r3.0e/checkpoints/E5.json",
+    "governance/r3.0e/state.json",
+    "governance/r3.0/train.json",
+    "package.json"
+  ],
+  "note": "R3.0E E5_ACTIVATION — viewmodel + activation gate + i18n three-language + feature-registry registration completes the R3.0E phase. R3.0E features (experiment_loop + case_timeline) are now mounted in the registry as case_scoped/available_conditional; activation is gated by the governance flag."
+}

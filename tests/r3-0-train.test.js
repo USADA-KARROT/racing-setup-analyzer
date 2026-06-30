@@ -121,13 +121,19 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
   chk('FAIL E before D5 CROSS_PHASE_PREMATURE_ADVANCE', hasViolation(r.artifact, 'CROSS_PHASE_PREMATURE_ADVANCE'));
 }
 
-// ── 2c. F current=F1 but R3.0E still at E0 ──
+// ── 2c. F current=F1 but R3.0E NOT yet at E5 ──
 {
   const dir = buildFixture();
+  // Force R3.0E back to E2 (pre-E5) for this test scenario.
+  const es = readJson(path.join(dir, 'governance', 'r3.0e', 'state.json'));
+  es.currentCheckpoint = 'E2_EXPERIMENT_STORE';
+  writeJson(path.join(dir, 'governance', 'r3.0e', 'state.json'), es);
   const fs2 = readJson(path.join(dir, 'governance', 'r3.0f', 'state.json'));
   fs2.currentCheckpoint = 'F1_MIGRATION_ENGINE';
   writeJson(path.join(dir, 'governance', 'r3.0f', 'state.json'), fs2);
   const ts = readJson(path.join(dir, 'governance', 'r3.0', 'train.json'));
+  ts.phaseStates['R3.0E'].currentCheckpoint = 'E2_EXPERIMENT_STORE';
+  ts.phaseStates['R3.0E'].finalActivationReached = false;
   ts.phaseStates['R3.0F'].currentCheckpoint = 'F1_MIGRATION_ENGINE';
   writeJson(path.join(dir, 'governance', 'r3.0', 'train.json'), ts);
   const r = runValidator(dir);

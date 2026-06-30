@@ -1,0 +1,2412 @@
+Reading additional input from stdin...
+OpenAI Codex v0.141.0
+--------
+workdir: /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: none
+reasoning summaries: none
+session id: 019f1696-902b-7300-a99f-8b407b333c31
+--------
+user
+# Codex E5 Round 1 — initial adversarial review
+
+## Subject
+- Candidate SHA: **914aea624a4dffb9e83101caa3ccf759d9be9493**
+- PR #31 on `feat/r3.0e-e5-ui-activation` → base `feat/r3.0-integrated-delivery`
+- Train HEAD (base): `b99beffd7d7fba5454c232d6bee4b7eaaa78ea6d`
+- main: `506012afea7b0296f2c1506cc77d4b39ffdf6ccb` (unchanged)
+
+## What was added
+
+### Production modules (E5 authorized)
+- `renderer/js/r3-0e-experiment-viewmodel.js` (new) — createExperimentViewmodel({classifier, timelineModule}) + verifyAuthoritativeViewmodelState. Closure-private WeakSet for state authority. Captured intrinsics + Reflect.apply. derive/empty/error/stale methods. displayState ∈ {unavailable, loading, available, stale-cleared, error-sanitized}. Activation signals (uiCapabilityReady, featureRegistryActivationAllowed, deferredCapabilities, rationaleI18nKey). Disclaimers (no_causation/no_driver_blame/no_auto_setup/same_case_session_only) always present.
+- `renderer/js/i18n-r3-0e.js` (new) — en/zh-TW/ja keys for nav labels, feature labels+descs, outcome class enum, timeline kind enum, activation rationale, display state, disclaimers.
+- `renderer/js/feature-registry.js` (modified) — +2 nav nodes (case:experiment_loop order=9 + case:case_timeline order=10) + 2 features (experiment_loop + case_timeline, case_scoped, available_conditional).
+
+### Tests
+- tests/r3.0e-experiment-viewmodel.test.js (54 assertions, sections A..G)
+- Existing fixture updates: tests/r3.0a-ui.test.js (9 → 11), tests/feature-registry.test.js (24 → 26 features, 9 → 11 subviews), tests/r3-0c-activation.test.js (R3.0E finalActivationReached boolean), tests/r3-0-train.test.js (cross-phase test 2c forces R3.0E back to E2 for the violation scenario)
+- renderer/js/i18n-shell.js: +ui.caseNav.experiment_loop +ui.caseNav.case_timeline in en/zh/ja
+
+### Governance
+- state.json: currentCheckpoint=E5_ACTIVATION; capability feature_registry_active enabled; uiAllowed=true; featureRegistryActivationAllowed=true; algorithmsAllowed=true (unchanged); 6 authorizedProductionPaths cumulative
+- checkpoints/E5.json with cumulative paths + closures
+- train.json: R3.0E.currentCheckpoint=E5_ACTIVATION + finalActivationReached=true
+
+### Test status
+- Local: npm test 89 test files all green; r3.0e-experiment-viewmodel 54/0; r3-0-train 34/0; r3.0a-ui 67/0; feature-registry 27/0
+- CI: 28418346495 SUCCESS on `914aea6`
+
+## Round 1 task
+
+Adversarial review. Specifically:
+
+1. Can verifyAuthoritativeViewmodelState be fooled (clone / Proxy / WeakSet rebind / Reflect.apply rebind)?
+2. Can derive() be tricked into producing 'available' state from non-authoritative outcome/projection (forged objects matching the verifier surface but not in the WeakSet)?
+3. Can the viewmodel state leak path / blame / causation content through outcomeClassI18nKey or any other field?
+4. Are activation gate signals correctly conservative (deferredCapabilities populated when not ready; featureRegistryActivationAllowed only true when both outcome AND projection authoritative)?
+5. Is i18n-r3-0e.js three-language parity actually maintained (same key set in all three languages)?
+6. Does feature-registry registration not break existing nav reachability checks?
+7. Pre-load Object.* / Array.* / String.* / RegExp.* tampering — can it subvert this module's WeakSet / authority?
+8. Disclaimers immutable across derived states?
+9. State envelope shape — extra own keys forbidden?
+10. Closure-private WeakSet not exposed via any path?
+
+Up to 8 findings. Format:
+
+```
+Finding E5-R1-NN: <one-line>
+  evidence: file:line
+  severity: BLOCK | NIT
+  proposed closure: <change>
+```
+
+End with EXACTLY one of:
+
+```
+FINAL VERDICT: PASS
+FINAL VERDICT: BLOCK
+```
+codex
+I’ll use the GitHub review workflow for PR context, then inspect the local candidate files and tests directly. Since this is an adversarial review, I’ll focus on concrete break paths and cite exact lines.
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/SKYLINE/.codex/plugins/cache/openai-curated-remote/github/0.1.5/skills/github/SKILL.md && sed -n '1,260p' renderer/js/r3-0e-experiment-viewmodel.js && sed -n '1,260p' tests/r3.0e-experiment-viewmodel.test.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+---
+name: github
+description: Triage and orient GitHub repository, pull request, and issue work through the connected GitHub app. Use when the user asks for general GitHub help, wants PR or issue summaries, or needs repository context before choosing a more specific GitHub workflow.
+---
+
+# GitHub
+
+## Overview
+
+Use this skill as the umbrella entrypoint for general GitHub work in this plugin. It should decide whether the task stays in repo and PR triage or should be handed off to a more specific review, CI, or publish workflow.
+
+This plugin is intentionally hybrid:
+
+- Prefer the GitHub app from this plugin for repository, issue, pull request, comment, label, reaction, and PR creation workflows.
+- Use local `git` and `gh` only when the connector does not cover the job well, especially for current-branch PR discovery, branch creation, commit and push, `gh auth status`, and GitHub Actions log inspection.
+- Keep connector state and local checkout context aligned. If the request is about the current branch, resolve the local repo and branch before acting.
+
+Once the intent is clear, route to the specialist skill immediately and do not keep broad GitHub triage in scope longer than needed.
+
+## Connector-First Responsibilities
+
+Handle these directly in this skill when the request does not need a narrower specialist workflow:
+
+- repository orientation once the repo, PR, issue, or local checkout is identified
+- recent PR or issue triage
+- PR metadata summaries
+- PR patch inspection
+- PR comments, labels, and reactions
+- issue lookup and summarization
+- PR creation after a branch is already pushed
+
+Prefer the GitHub app from this plugin for those flows because it provides structured PR, issue, and review-adjacent data without depending on a local checkout. If the repository is not already identifiable from the user request or local git context, ask for the repo instead of pretending there is a repo-search flow that may not exist.
+
+## Routing Rules
+
+1. Resolve the operating context first:
+   - If the user provides a repository, PR number, issue number, or URL, use that.
+   - If the request is about "this branch" or "the current PR", resolve local git context and use `gh` only as needed to discover the branch PR.
+   - If the repository is still ambiguous after local inspection, ask for the repo identifier.
+2. Classify the request before taking action:
+   - `repo or PR triage`: summarize PRs, issues, patches, comments, labels, reactions, or repository state
+   - `review follow-up`: unresolved review threads, requested changes, or inline review feedback
+   - `CI debugging`: failing checks, Actions logs, or CI root-cause analysis
+   - `publish changes`: create or switch branches, stage changes, commit, push, and open a draft PR
+3. Route to the specialist skill as soon as the category is clear:
+   - Review comments and requested changes: `../gh-address-comments/SKILL.md`
+   - Failing GitHub Actions checks: `../gh-fix-ci/SKILL.md`
+   - Commit, push, and open PR: `../yeet/SKILL.md`
+4. Keep the hybrid model consistent after routing:
+   - connector first for PR and issue data
+   - local `git` and `gh` only for the specific gaps the connector does not cover
+
+## Default Workflow
+
+1. Resolve repository and item scope.
+2. Gather structured PR or issue context through the GitHub app from this plugin.
+3. Decide whether the task stays in connector-backed triage or needs a specialist skill.
+4. Route immediately when the work becomes review follow-up, CI debugging, or publish workflow.
+5. End with a clear summary of what was inspected, what changed, and what remains.
+
+## Output Expectations
+
+- For triage requests, return a concise summary of the repository, PR, or issue state and the next likely action.
+- For mixed requests, tell the user which specialist path you are taking and why.
+- For connector-backed write actions, restate the exact PR, issue, label, or reaction target before applying the change.
+- Never imply that GitHub Actions logs are available through the connector alone. That remains a `gh` workflow.
+
+## Examples
+
+- "Use GitHub to summarize the open PRs in this repo and tell me what needs attention."
+- "Help with this PR."
+- "Review the latest comments on PR 482 and tell me what is actionable."
+- "Debug the failing checks on this branch."
+- "Commit these changes, push them, and open a draft PR."
+/**
+ * renderer/js/r3-0e-experiment-viewmodel.js — R3.0E E5 · Experiment Loop + Case Timeline
+ * viewmodel + activation gate (PRODUCTION).
+ *
+ * Authoritative entries:
+ *   createExperimentViewmodel({ classifier, timelineService })
+ *   verifyAuthoritativeViewmodelState(candidate)
+ *
+ * Hard contract (SKYLINE 2026-06-30 R3.0 Continuous Resume Directive §8):
+ *   • Contracts validate / services decide / viewmodel maps / UI renders.
+ *   • The viewmodel ONLY derives display state from authoritative classifier / timeline
+ *     outputs. It NEVER classifies, NEVER marks confirmed, NEVER recomputes
+ *     comparabilityScore, NEVER reorders evidence, NEVER hides contradictions.
+ *   • Stale state is invalidated when caseId / sessionId / applied-change generation
+ *     differ from the last classifier+timeline call. The viewmodel exposes
+ *     `displayState` ∈ { unavailable, available, loading, stale-cleared, error-sanitized }
+ *     so the UI host can render accordingly.
+ *   • Activation gate: exposes derived booleans (uiCapabilityReady,
+ *     featureRegistryActivationAllowed, deferredCapabilities[]). The UI host wiring
+ *     code consumes these. The viewmodel does NOT mutate feature-registry.js.
+ *   • Output is deep-frozen and registered in a closure-private WeakSet. Verifier
+ *     checks identity + structural witnesses.
+ *   • All ambient intrinsic operations dispatch via captured intrinsics + captured
+ *     Reflect.apply so post-load tampering cannot affect derivation.
+ *   • NO mutation of vehicle preset / setup file / calibration / model / telemetry /
+ *     feature-registry / R3.0B case-record schema. NO LLM. NO randomness. NO clock
+ *     beyond freshness reference time.
+ *
+ * UMD: Node require / Electron renderer global (R3_0E_ExperimentViewmodel).
+ */
+(function (root) {
+  'use strict';
+
+  // ---------- Module-init dependencies (E3 + E4 verifiers) ----------------------------------
+  var CL = null, TL_SVC = null;
+  if (typeof module !== 'undefined' && module.exports) {
+    try { CL = require('./r3-0e-outcome-classifier.js'); } catch (e) { CL = null; }
+    try { TL_SVC = require('./r3-0e-followup-timeline.js'); } catch (e) { TL_SVC = null; }
+  }
+  if (CL === null && typeof R3_0E_OutcomeClassifier !== 'undefined') CL = R3_0E_OutcomeClassifier;
+  if (TL_SVC === null && typeof R3_0E_FollowUpTimeline !== 'undefined') TL_SVC = R3_0E_FollowUpTimeline;
+  if (!CL || !TL_SVC) {
+    throw new Error('r3-0e-experiment-viewmodel.js: requires r3-0e-outcome-classifier + r3-0e-followup-timeline');
+  }
+
+  // ---------- Module-init captured intrinsics ------------------------------------------------
+  var _CAPTURED_OBJECT_FREEZE = Object.freeze;
+  var _CAPTURED_OBJECT_IS_FROZEN = Object.isFrozen;
+  var _CAPTURED_ARRAY_IS_ARRAY = Array.isArray;
+  var _CAPTURED_REFLECT_APPLY = Reflect.apply;
+  var _WeakSetCtor = WeakSet;
+  var _WS_ADD = WeakSet.prototype.add;
+  var _WS_HAS = WeakSet.prototype.has;
+  function _wsAdd(s, v) { try { _CAPTURED_REFLECT_APPLY(_WS_ADD, s, [v]); return true; } catch (e) { return false; } }
+  function _wsHas(s, v) { try { return _CAPTURED_REFLECT_APPLY(_WS_HAS, s, [v]) === true; } catch (e) { return false; } }
+  var _ARR_SLICE = Array.prototype.slice;
+  function _arrSlice(a) { try { return _CAPTURED_REFLECT_APPLY(_ARR_SLICE, a, []); } catch (e) { return []; } }
+
+  function _deepFreeze(v) {
+    if (v === null || typeof v !== 'object') return v;
+    try { _CAPTURED_OBJECT_FREEZE(v); } catch (e) { /* swallow */ }
+    var names;
+    try { names = Object.getOwnPropertyNames(v); } catch (e) { return v; }
+    for (var i = 0; i < names.length; i++) {
+      var child;
+      try { child = v[names[i]]; } catch (e) { continue; }
+      _deepFreeze(child);
+    }
+    return v;
+  }
+
+  // ---------- Constants -----------------------------------------------------------------------
+  var VIEWMODEL_SCHEMA_VERSION = 1;
+  var DISPLAY_STATES = _CAPTURED_OBJECT_FREEZE([
+    'unavailable',     // no case loaded OR no experiment applied yet
+    'loading',         // background derivation in progress
+    'available',       // outcome + timeline ready
+    'stale-cleared',   // case/session/applied-change changed since last derivation
+    'error-sanitized', // internal contract violation; never propagate raw error
+  ]);
+
+  // ---------- Producer attestation (WeakSet) -------------------------------------------------
+  var _authoritativeStates = new _WeakSetCtor();
+  function _registerAuthoritativeState(s) { _wsAdd(_authoritativeStates, s); }
+  function verifyAuthoritativeViewmodelState(candidate) {
+    try {
+      if (candidate === null || typeof candidate !== 'object') return false;
+      if (!_wsHas(_authoritativeStates, candidate)) return false;
+      if (_CAPTURED_OBJECT_IS_FROZEN(candidate) !== true) return false;
+      if (candidate.schemaVersion !== VIEWMODEL_SCHEMA_VERSION) return false;
+      if (typeof candidate.displayState !== 'string') return false;
+      if (DISPLAY_STATES.indexOf(candidate.displayState) === -1) return false;
+      if (!candidate.activation || typeof candidate.activation !== 'object') return false;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // ---------- Factory --------------------------------------------------------------------------
+  /**
+   * createExperimentViewmodel({ classifier, timelineModule })
+   *
+   * Both parameters are MODULE references (NOT service instances):
+   *   `classifier`     — R3_0E_OutcomeClassifier module (has verifyAuthoritativeOutcome)
+   *   `timelineModule` — R3_0E_FollowUpTimeline module (has verifyAuthoritativeTimelineProjection
+   *                       + verifyAuthoritativeFollowUpLink as module-level statics)
+   *
+   * Service instances (returned by createFollowUpTimelineService) do NOT carry the
+   * verifiers — those are module-level. The viewmodel only needs the verifiers to
+   * gate inputs; it does not call append/get/project/etc.
+   *
+   * Backward-compatible: the deprecated parameter name `timelineService` is still
+   * accepted IF it refers to the module (i.e. has the verifiers).
+   *
+   * Returned object has methods:
+   *   - derive({outcome, projection, links}) → frozen viewmodel state (authoritative)
+   *   - empty(caseId) → frozen empty state for cases with no applied experiment yet
+   *   - error() → frozen error-sanitized state
+   *   - stale(caseId) → frozen stale-cleared state
+   *
+   * The viewmodel REQUIRES the caller to pass already-authoritative outputs from E3 + E4.
+   * Each input must pass its module's verifier. Otherwise → error-sanitized state.
+   */
+  function createExperimentViewmodel(deps) {
+    if (!deps || typeof deps !== 'object') throw new Error('R3_0E_VIEWMODEL_DEPS_INVALID');
+    var classifier = deps.classifier || CL;
+    var timelineModule = deps.timelineModule || deps.timelineService || TL_SVC;
+    if (!classifier || typeof classifier.verifyAuthoritativeOutcome !== 'function') {
+      throw new Error('R3_0E_VIEWMODEL_CLASSIFIER_INVALID');
+    }
+    if (!timelineModule
+        || typeof timelineModule.verifyAuthoritativeTimelineProjection !== 'function'
+        || typeof timelineModule.verifyAuthoritativeFollowUpLink !== 'function') {
+      throw new Error('R3_0E_VIEWMODEL_TIMELINE_MODULE_INVALID');
+    }
+    // Alias for the rest of the closure
+    var timelineService = timelineModule;
+
+    // Internal: build a frozen state envelope with closed key set.
+    function _makeState(opts) {
+      var state = {
+        schemaVersion: VIEWMODEL_SCHEMA_VERSION,
+        displayState: opts.displayState,
+        caseId: opts.caseId || null,
+        sessionId: opts.sessionId || null,
+        outcome: opts.outcome || null,
+        outcomeClass: opts.outcomeClass || null,
+        outcomeClassI18nKey: opts.outcomeClassI18nKey || null,
+        projection: opts.projection || null,
+        projectionEventCount: typeof opts.projectionEventCount === 'number' ? opts.projectionEventCount : 0,
+        links: opts.links || _CAPTURED_OBJECT_FREEZE([]),
+        linksCount: typeof opts.linksCount === 'number' ? opts.linksCount : 0,
+        activation: opts.activation,
+        disclaimers: _CAPTURED_OBJECT_FREEZE([
+          'r3.0e.disclaimer.no_causation',
+          'r3.0e.disclaimer.no_driver_blame',
+          'r3.0e.disclaimer.no_auto_setup',
+          'r3.0e.disclaimer.same_case_session_only',
+        ]),
+      };
+      _deepFreeze(state);
+      _registerAuthoritativeState(state);
+      return state;
+    }
+
+    function empty(caseId) {
+      return _makeState({
+        displayState: 'unavailable',
+        caseId: typeof caseId === 'string' ? caseId : null,
+        activation: _CAPTURED_OBJECT_FREEZE({
+          uiCapabilityReady: false,
+          featureRegistryActivationAllowed: false,
+          deferredCapabilities: _CAPTURED_OBJECT_FREEZE(['experiment_loop', 'case_timeline']),
+          rationaleI18nKey: typeof caseId === 'string'
+            ? 'r3.0e.activation.rationale.applied_experiment_required'
+            : 'r3.0e.activation.rationale.case_required',
+          rationaleParams: _CAPTURED_OBJECT_FREEZE({}),
+        }),
+      });
+    }
+
+    function error() {
+      return _makeState({
+        displayState: 'error-sanitized',
+        activation: _CAPTURED_OBJECT_FREEZE({
+          uiCapabilityReady: false,
+          featureRegistryActivationAllowed: false,
+          deferredCapabilities: _CAPTURED_OBJECT_FREEZE(['experiment_loop', 'case_timeline']),
+          rationaleI18nKey: 'r3.0e.state.error-sanitized',
+          rationaleParams: _CAPTURED_OBJECT_FREEZE({}),
+        }),
+      });
+    }
+
+    function stale(caseId) {
+      return _makeState({
+        displayState: 'stale-cleared',
+        caseId: typeof caseId === 'string' ? caseId : null,
+        activation: _CAPTURED_OBJECT_FREEZE({
+          uiCapabilityReady: false,
+          featureRegistryActivationAllowed: false,
+          deferredCapabilities: _CAPTURED_OBJECT_FREEZE(['experiment_loop', 'case_timeline']),
+          rationaleI18nKey: 'r3.0e.state.stale-cleared',
+          rationaleParams: _CAPTURED_OBJECT_FREEZE({}),
+        }),
+      });
+    }
+
+    /**
+     * derive({outcome, projection, links}) — produces an authoritative viewmodel state.
+     *
+     * Inputs:
+     *   outcome    — an authoritative outcome envelope from classifier.classifyOutcome
+     *   projection — an authoritative timeline projection from timelineService.projectTimeline
+     *   links      — an array of authoritative follow-up link records (each from createFollowUpLink
+     *                or listFollowUpLinksForParent)
+     *
+     * Any input failing its verifier → error-sanitized state. This is the SAME pattern as
+     * the D5 brief: refuse to mix authoritative + non-authoritative content.
+     */
+    function derive(inputIn) {
+      try {
+        if (!inputIn || typeof inputIn !== 'object') return error();
+        var outcome = inputIn.outcome || null;
+        var projection = inputIn.projection || null;
+        var links = inputIn.links || [];
+
+        // Authority gates.
+        if (outcome !== null && classifier.verifyAuthoritativeOutcome(outcome) !== true) return error();
+        if (projection !== null && timelineService.verifyAuthoritativeTimelineProjection(projection) !== true) return error();
+        if (!_CAPTURED_ARRAY_IS_ARRAY(links)) return error();
+        for (var li = 0; li < links.length; li++) {
+          if (timelineService.verifyAuthoritativeFollowUpLink(links[li]) !== true) return error();
+        }
+
+        // Cross-binding: if outcome AND projection both present, they should refer to
+        // the same case (projection.caseId === <some link's parentCaseId> OR outcome's
+        // experimentId is in the projection's events; we keep the binding LOOSE here
+        // because the data model has no direct outcome→projection link).
+        var caseId = projection !== null ? projection.caseId : null;
+        var sessionId = null; // outcome envelope does not currently carry sessionId; UI shows it from links
+
+        var outcomeClass = outcome !== null ? outcome['class'] : null;
+        var outcomeClassI18nKey = outcomeClass !== null ? ('r3.0e.outcome.class.' + outcomeClass) : null;
+
+        // Activation decision:
+        //   uiCapabilityReady requires BOTH an authoritative outcome AND an authoritative
+        //   projection (the experiment-loop UI surfaces classifier output AND the
+        //   timeline surfaces project history; missing either deferrs activation).
+        //   featureRegistryActivationAllowed mirrors uiCapabilityReady — the feature
+        //   registry entry stays mounted but indicates conditional availability.
+        var uiCapabilityReady = (outcome !== null && projection !== null);
+        var deferred = [];
+        if (outcome === null) deferred.push('experiment_loop');
+        if (projection === null) deferred.push('case_timeline');
+
+        var activation = _CAPTURED_OBJECT_FREEZE({
+          uiCapabilityReady: uiCapabilityReady,
+          featureRegistryActivationAllowed: uiCapabilityReady,
+          deferredCapabilities: _CAPTURED_OBJECT_FREEZE(deferred),
+          rationaleI18nKey: uiCapabilityReady ? 'r3.0e.activation.ready' : 'r3.0e.activation.deferred',
+/**
+ * tests/r3.0e-experiment-viewmodel.test.js — R3.0E E5 · Experiment viewmodel tests.
+ *
+ * Coverage:
+ *   - empty/error/stale state factories
+ *   - derive() with authoritative outcome + projection + links → 'available'
+ *   - derive() rejects non-authoritative inputs (clones, plain lookalikes) → 'error-sanitized'
+ *   - activation gate signals (uiCapabilityReady, featureRegistryActivationAllowed,
+ *     deferredCapabilities)
+ *   - all states are deep-frozen + verify via verifyAuthoritativeViewmodelState
+ *   - displayState ∈ closed enum
+ *   - feature-registry registration (experiment_loop + case_timeline features and
+ *     case:experiment_loop + case:case_timeline nav nodes are present)
+ *   - viewmodel never propagates raw error; error-sanitized state has no detail leak
+ *   - disclaimers always present
+ */
+'use strict';
+var VM = require('../renderer/js/r3-0e-experiment-viewmodel.js');
+var CL = require('../renderer/js/r3-0e-outcome-classifier.js');
+var TL = require('../renderer/js/r3-0e-followup-timeline.js');
+var STORES = require('../renderer/js/r3-0e-stores.js');
+var SB = require('../renderer/js/storage-backend.js');
+var FR = require('../renderer/js/feature-registry.js');
+
+var pass = 0, fail = 0;
+function chk(msg, cond, detail) {
+  if (cond) pass += 1;
+  else { fail += 1; console.log('  FAIL ' + msg + (detail !== undefined ? '  ' + JSON.stringify(detail) : '')); }
+}
+
+function deepFreeze(v) {
+  if (v === null || typeof v !== 'object') return v;
+  Object.freeze(v);
+  Object.getOwnPropertyNames(v).forEach(function (k) { deepFreeze(v[k]); });
+  return v;
+}
+
+var EXP_ID = 'exp_0123456789abcdef';
+var CASE_A = 'case_demo_a';
+var CASE_B = 'case_demo_b';
+var SESSION_A = 'session_demo_a';
+
+function makeBackend() { return SB.MemoryBackend(); }
+function makeTimelineService(be) {
+  return TL.createFollowUpTimelineService({
+    timelineStore: STORES.createTimelineStore(be),
+    followUpLinkStore: STORES.createFollowUpLinkStore(be),
+  });
+}
+function fixedClock(iso) { return function () { return iso; }; }
+
+function makeExperiment() {
+  return deepFreeze({
+    schemaVersion: 1, experimentId: EXP_ID, sourceCaseId: CASE_A,
+    sourceHypothesisId: 'hyp_demo_001', sourceRecommendationId: 'pri_demo_001',
+    targetMetric: 'roll_gradient_deg_per_g', baselineValue: 3.5,
+    expectedDirection: 'decrease', expectedMagnitudeRange: { min: 0.5, max: 1.5 },
+    setupChange: { component: 'front_arb', delta_nm_per_deg: 200 },
+    driverInstruction: null,
+    controlVariables: [{ name: 'tyre_temp_window', description: 'r3.0e.cv.tyre_temp_window', expectedValue: 85, allowedRange: { min: 75, max: 95 }, observedValue: null, withinRange: null }],
+    validationPlan: 'r3.0e.plan.controlled_repeat_lap',
+    stopConditions: [{ i18nKey: 'r3.0e.stop.lap_time_increase', params: { threshold_s: 0.5 } }],
+    status: 'applied', followUpCaseIds: [CASE_B], outcome: null,
+    createdAt: '2026-06-30T10:00:00Z',
+  });
+}
+function makeClassifyInput() {
+  return {
+    experiment: makeExperiment(),
+    appliedChange: { changeId: 'change_demo_001', sourceExperimentId: EXP_ID, appliedAt: '2026-06-30T11:00:00Z' },
+    followUp: {
+      followUpCaseId: CASE_B, parentCaseId: CASE_A,
+      sessionId: SESSION_A, parentSessionId: SESSION_A,
+      hasExplicitReference: true, comparabilityScore: 0.9,
+    },
+    observation: {
+      observedDirection: 'decrease', observedMagnitude: 1.0,
+      driverFeedback: 'r3.0e.driver.feedback.balance_improved',
+      dataQualityIssues: [], sideEffects: [],
+      contradictingEvidenceIds: [],
+      supportingEvidenceIds: ['ev_demo_001'],
+    },
+    controlVariableObservations: [{
+      name: 'tyre_temp_window', description: 'r3.0e.cv.tyre_temp_window',
+      expectedValue: 85, allowedRange: { min: 75, max: 95 },
+      observedValue: 84, withinRange: true,
+    }],
+  };
+}
+
+// ------------------------------------------------------------------
+// Section A — empty / error / stale states
+// ------------------------------------------------------------------
+console.log('Section A — empty / error / stale factories');
+(function () {
+  var vm = VM.createExperimentViewmodel({ classifier: CL, timelineModule: TL });
+  var e1 = vm.empty(null);
+  chk('A1: empty(null) → unavailable', e1.displayState === 'unavailable' && e1.caseId === null);
+  chk('A2: empty(null) → activation.rationaleI18nKey = case_required',
+    e1.activation.rationaleI18nKey === 'r3.0e.activation.rationale.case_required');
+  var e2 = vm.empty(CASE_A);
+  chk('A3: empty(caseId) → unavailable but caseId set', e2.displayState === 'unavailable' && e2.caseId === CASE_A);
+  chk('A4: empty(caseId) → rationale = applied_experiment_required',
+    e2.activation.rationaleI18nKey === 'r3.0e.activation.rationale.applied_experiment_required');
+  var err = vm.error();
+  chk('A5: error() → error-sanitized', err.displayState === 'error-sanitized');
+  chk('A6: error() has no detail leak (no caseId, no outcome, no projection)',
+    err.caseId === null && err.outcome === null && err.projection === null);
+  var st = vm.stale(CASE_A);
+  chk('A7: stale(caseId) → stale-cleared + caseId', st.displayState === 'stale-cleared' && st.caseId === CASE_A);
+  // All authoritative
+  chk('A8: empty state verifies', VM.verifyAuthoritativeViewmodelState(e1) === true);
+  chk('A9: error state verifies', VM.verifyAuthoritativeViewmodelState(err) === true);
+  chk('A10: stale state verifies', VM.verifyAuthoritativeViewmodelState(st) === true);
+  // All deep-frozen
+  chk('A11: empty deep-frozen', Object.isFrozen(e1) && Object.isFrozen(e1.activation));
+  chk('A12: error deep-frozen', Object.isFrozen(err) && Object.isFrozen(err.activation));
+  chk('A13: stale deep-frozen', Object.isFrozen(st) && Object.isFrozen(st.activation));
+})();
+
+// ------------------------------------------------------------------
+// Section B — derive() golden path
+// ------------------------------------------------------------------
+console.log('Section B — derive golden path');
+(async function () {
+  var be = makeBackend();
+  var tlSvc = makeTimelineService(be);
+  var vm = VM.createExperimentViewmodel({ classifier: CL, timelineModule: TL });
+  // Build an authoritative outcome
+  var clsR = CL.classifyOutcome(makeClassifyInput(), { clock: fixedClock('2026-06-30T11:30:00Z') });
+  chk('B0: classifier returned valid outcome', clsR.valid === true);
+  // Build an authoritative timeline projection
+  await tlSvc.appendTimelineEvent({ caseId: CASE_A, kind: 'experiment_applied', i18nKey: 'r3.0e.tl.applied' },
+    { clock: fixedClock('2026-06-30T11:00:00Z') });
+  await tlSvc.appendTimelineEvent({ caseId: CASE_A, kind: 'outcome_classified', i18nKey: 'r3.0e.tl.outcome' },
+    { clock: fixedClock('2026-06-30T11:30:00Z') });
+  var prjR = await tlSvc.projectTimeline(CASE_A, { clock: fixedClock('2026-06-30T12:00:00Z') });
+  chk('B0b: projection returned valid', prjR.valid === true);
+  // Build an authoritative link
+  var linkR = await tlSvc.createFollowUpLink({
+    parentCaseId: CASE_A, followUpCaseId: CASE_B, experimentId: EXP_ID,
+  }, { clock: fixedClock('2026-06-30T11:00:00Z') });
+  chk('B0c: link returned valid', linkR.valid === true);
+
+  var state = vm.derive({ outcome: clsR.outcome, projection: prjR.projection, links: [linkR.link] });
+  chk('B1: derive → available', state.displayState === 'available');
+  chk('B2: outcomeClass = confirmed', state.outcomeClass === 'confirmed');
+  chk('B3: outcomeClassI18nKey set',
+    state.outcomeClassI18nKey === 'r3.0e.outcome.class.confirmed');
+  chk('B4: projectionEventCount = 2', state.projectionEventCount === 2);
+  chk('B5: linksCount = 1', state.linksCount === 1);
+  chk('B6: activation.uiCapabilityReady = true', state.activation.uiCapabilityReady === true);
+  chk('B7: activation.featureRegistryActivationAllowed = true', state.activation.featureRegistryActivationAllowed === true);
+  chk('B8: activation.deferredCapabilities = []', state.activation.deferredCapabilities.length === 0);
+  chk('B9: rationale = ready', state.activation.rationaleI18nKey === 'r3.0e.activation.ready');
+  chk('B10: state verifies', VM.verifyAuthoritativeViewmodelState(state) === true);
+  chk('B11: state deep-frozen', Object.isFrozen(state) && Object.isFrozen(state.activation));
+  chk('B12: disclaimers always present',
+    state.disclaimers.length === 4
+      && state.disclaimers.indexOf('r3.0e.disclaimer.no_causation') !== -1
+      && state.disclaimers.indexOf('r3.0e.disclaimer.no_driver_blame') !== -1
+      && state.disclaimers.indexOf('r3.0e.disclaimer.no_auto_setup') !== -1
+      && state.disclaimers.indexOf('r3.0e.disclaimer.same_case_session_only') !== -1);
+})();
+
+// ------------------------------------------------------------------
+// Section C — derive() with missing outcome / projection
+// ------------------------------------------------------------------
+console.log('Section C — derive missing inputs');
+(async function () {
+  var be = makeBackend();
+  var tlSvc = makeTimelineService(be);
+  var vm = VM.createExperimentViewmodel({ classifier: CL, timelineModule: TL });
+  // No outcome, no projection, no links
+  var s1 = vm.derive({});
+  chk('C1: no inputs → unavailable',
+    s1.displayState === 'unavailable' && s1.activation.uiCapabilityReady === false);
+  chk('C2: deferred includes both capabilities',
+    s1.activation.deferredCapabilities.indexOf('experiment_loop') !== -1
+      && s1.activation.deferredCapabilities.indexOf('case_timeline') !== -1);
+  // Only projection, no outcome
+  await tlSvc.appendTimelineEvent({ caseId: CASE_A, kind: 'baseline_captured', i18nKey: 'r3.0e.tl.x' },
+    { clock: fixedClock('2026-06-30T11:00:00Z') });
+  var prjR = await tlSvc.projectTimeline(CASE_A, { clock: fixedClock('2026-06-30T12:00:00Z') });
+  var s2 = vm.derive({ projection: prjR.projection });
+  chk('C3: only projection → still unavailable (outcome missing)',
+    s2.displayState === 'unavailable' && s2.activation.uiCapabilityReady === false);
+  chk('C4: deferred includes experiment_loop only',
+    s2.activation.deferredCapabilities.indexOf('experiment_loop') !== -1
+      && s2.activation.deferredCapabilities.indexOf('case_timeline') === -1);
+})();
+
+// ------------------------------------------------------------------
+// Section D — derive() rejects non-authoritative inputs
+// ------------------------------------------------------------------
+console.log('Section D — non-authoritative input rejection');
+(async function () {
+  var be = makeBackend();
+  var tlSvc = makeTimelineService(be);
+  var vm = VM.createExperimentViewmodel({ classifier: CL, timelineModule: TL });
+  // Cloned outcome
+  var clsR = CL.classifyOutcome(makeClassifyInput(), { clock: fixedClock('2026-06-30T11:30:00Z') });
+  var cloned = JSON.parse(JSON.stringify(clsR.outcome));
+  var s1 = vm.derive({ outcome: cloned });
+  chk('D1: cloned outcome → error-sanitized', s1.displayState === 'error-sanitized');
+  // Plain lookalike
+  var fake = Object.freeze({
+    schemaVersion: 1, outcomeId: 'outcome_fakefakefakefake', experimentId: EXP_ID,
+    'class': 'confirmed', observedDirection: 'decrease', observedMagnitude: 1.0,
+    comparabilityScore: 0.9, confounders: Object.freeze([]),
+    driverFeedback: null, dataQualityIssues: Object.freeze([]),
+    sideEffects: Object.freeze([]), limitations: Object.freeze([]),
+    createdAt: '2026-06-30T11:30:00Z',
+  });
+  var s2 = vm.derive({ outcome: fake });
+  chk('D2: hand-forged outcome → error-sanitized', s2.displayState === 'error-sanitized');
+  // Forged projection
+  var s3 = vm.derive({ projection: Object.freeze({
+    schemaVersion: 1, projectionId: 'projection_fake', caseId: CASE_A,
+    eventCount: 0, events: Object.freeze([]), generatedAt: '2026-06-30T12:00:00Z',
+  }) });
+  chk('D3: forged projection → error-sanitized', s3.displayState === 'error-sanitized');
+  // Forged link
+  var s4 = vm.derive({ links: [Object.freeze({
+    schemaVersion: 1, linkId: 'link_fake', parentCaseId: CASE_A,
+    followUpCaseId: CASE_B, experimentId: EXP_ID, parentStatus: 'present',
+    createdAt: '2026-06-30T11:00:00Z',
+  })] });
+  chk('D4: forged link → error-sanitized', s4.displayState === 'error-sanitized');
+  // Non-array links
+  var s5 = vm.derive({ links: 'not-an-array' });
+  chk('D5: non-array links → error-sanitized', s5.displayState === 'error-sanitized');
+})();
+
+// ------------------------------------------------------------------
+// Section E — feature-registry registration
+// ------------------------------------------------------------------
+console.log('Section E — feature-registry registration');
+(function () {
+  // The viewmodel module does NOT mutate feature-registry directly; we verify the
+  // registry now carries the expected entries (added as part of the E5 commit).
+  var navIds = FR.deriveCaseSubviewIds();
+  chk('E1: case:experiment_loop nav node present',
+    navIds.indexOf('experiment_loop') !== -1);
+  chk('E2: case:case_timeline nav node present',
+    navIds.indexOf('case_timeline') !== -1);
+  // Features
+  var allFeatures = FR.FEATURES;
+  chk('E3: experiment_loop feature registered + case_scoped',
+    allFeatures.experiment_loop && allFeatures.experiment_loop.area === 'case_scoped');
+  chk('E4: case_timeline feature registered + case_scoped',
+    allFeatures.case_timeline && allFeatures.case_timeline.area === 'case_scoped');
+  chk('E5: experiment_loop availability = available_conditional',
+    allFeatures.experiment_loop.availability === 'available_conditional');
+  chk('E6: case_timeline availability = available_conditional',
+    allFeatures.case_timeline.availability === 'available_conditional');
+  chk('E7: experiment_loop nav target is case:experiment_loop',
+    allFeatures.experiment_loop.navNodeId === 'case:experiment_loop');
+  chk('E8: case_timeline nav target is case:case_timeline',
+    allFeatures.case_timeline.navNodeId === 'case:case_timeline');
+
+codex
+The viewmodel does register states in a private WeakSet and validates identity first. I’m now checking the surrounding tests and the upstream E3/E4 verifier implementation, because the main risk is whether injected verifier functions or ambient tampering can authorize forged inputs before this module maps them.
+exec
+/bin/bash -lc "sed -n '220,520p' renderer/js/r3-0e-experiment-viewmodel.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+exec
+/bin/bash -lc "sed -n '1,260p' renderer/js/r3-0e-outcome-classifier.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+    function derive(inputIn) {
+      try {
+        if (!inputIn || typeof inputIn !== 'object') return error();
+        var outcome = inputIn.outcome || null;
+        var projection = inputIn.projection || null;
+        var links = inputIn.links || [];
+
+        // Authority gates.
+        if (outcome !== null && classifier.verifyAuthoritativeOutcome(outcome) !== true) return error();
+        if (projection !== null && timelineService.verifyAuthoritativeTimelineProjection(projection) !== true) return error();
+        if (!_CAPTURED_ARRAY_IS_ARRAY(links)) return error();
+        for (var li = 0; li < links.length; li++) {
+          if (timelineService.verifyAuthoritativeFollowUpLink(links[li]) !== true) return error();
+        }
+
+        // Cross-binding: if outcome AND projection both present, they should refer to
+        // the same case (projection.caseId === <some link's parentCaseId> OR outcome's
+        // experimentId is in the projection's events; we keep the binding LOOSE here
+        // because the data model has no direct outcome→projection link).
+        var caseId = projection !== null ? projection.caseId : null;
+        var sessionId = null; // outcome envelope does not currently carry sessionId; UI shows it from links
+
+        var outcomeClass = outcome !== null ? outcome['class'] : null;
+        var outcomeClassI18nKey = outcomeClass !== null ? ('r3.0e.outcome.class.' + outcomeClass) : null;
+
+        // Activation decision:
+        //   uiCapabilityReady requires BOTH an authoritative outcome AND an authoritative
+        //   projection (the experiment-loop UI surfaces classifier output AND the
+        //   timeline surfaces project history; missing either deferrs activation).
+        //   featureRegistryActivationAllowed mirrors uiCapabilityReady — the feature
+        //   registry entry stays mounted but indicates conditional availability.
+        var uiCapabilityReady = (outcome !== null && projection !== null);
+        var deferred = [];
+        if (outcome === null) deferred.push('experiment_loop');
+        if (projection === null) deferred.push('case_timeline');
+
+        var activation = _CAPTURED_OBJECT_FREEZE({
+          uiCapabilityReady: uiCapabilityReady,
+          featureRegistryActivationAllowed: uiCapabilityReady,
+          deferredCapabilities: _CAPTURED_OBJECT_FREEZE(deferred),
+          rationaleI18nKey: uiCapabilityReady ? 'r3.0e.activation.ready' : 'r3.0e.activation.deferred',
+          rationaleParams: _CAPTURED_OBJECT_FREEZE({
+            outcomeAvailable: outcome !== null,
+            projectionAvailable: projection !== null,
+            linksCount: links.length,
+          }),
+        });
+
+        return _makeState({
+          displayState: uiCapabilityReady ? 'available' : 'unavailable',
+          caseId: caseId,
+          sessionId: sessionId,
+          outcome: outcome,
+          outcomeClass: outcomeClass,
+          outcomeClassI18nKey: outcomeClassI18nKey,
+          projection: projection,
+          projectionEventCount: projection !== null ? projection.eventCount : 0,
+          links: _CAPTURED_OBJECT_FREEZE(_arrSlice(links)),
+          linksCount: links.length,
+          activation: activation,
+        });
+      } catch (e) {
+        return error();
+      }
+    }
+
+    var api = {
+      derive: derive,
+      empty: empty,
+      error: error,
+      stale: stale,
+      VIEWMODEL_SCHEMA_VERSION: VIEWMODEL_SCHEMA_VERSION,
+      DISPLAY_STATES: DISPLAY_STATES,
+    };
+    _CAPTURED_OBJECT_FREEZE(api);
+    return api;
+  }
+
+  // ---------- Public API ---------------------------------------------------------------------
+  var api = {
+    VIEWMODEL_SCHEMA_VERSION: VIEWMODEL_SCHEMA_VERSION,
+    DISPLAY_STATES: DISPLAY_STATES,
+    createExperimentViewmodel: createExperimentViewmodel,
+    verifyAuthoritativeViewmodelState: verifyAuthoritativeViewmodelState,
+  };
+  _CAPTURED_OBJECT_FREEZE(api);
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = api;
+  } else if (root) {
+    try { Object.defineProperty(root, 'R3_0E_ExperimentViewmodel', { value: api, writable: false, enumerable: false, configurable: false }); }
+    catch (e) { root.R3_0E_ExperimentViewmodel = api; }
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+ succeeded in 0ms:
+/**
+ * renderer/js/r3-0e-outcome-classifier.js — R3.0E E3 · Outcome Classifier (PRODUCTION).
+ *
+ * Authoritative entry: classifyOutcome(input, opts)
+ *
+ * Hard contract (SKYLINE 2026-06-30 R3.0 Continuous Resume Directive §6):
+ *   • Inputs are authoritative-only:
+ *       - experiment            (E1-valid Experiment; status MUST be 'applied'.
+ *                                 outcome field MUST be null — E1 already enforces this
+ *                                 invariant for draft/planned/applied, so caller-provided
+ *                                 final outcomes are rejected at the contract layer.)
+ *       - appliedChange         (audit record bound to experiment.experimentId).
+ *       - followUp              (R3.0B follow-up identity + R3.0C comparison-authority
+ *                                 attestation: parentCaseId, sessionId, parentSessionId,
+ *                                 hasExplicitReference, comparabilityScore).
+ *       - observation           (observed direction/magnitude + evidence id arrays;
+ *                                 i18n-keyed driverFeedback ONLY; no free text;
+ *                                 no causal claim; no raw telemetry).
+ *       - controlVariableObservations (E1-valid Control Variables with observedValue +
+ *                                 withinRange filled per the E3 algorithm requirement).
+ *   • E3 NEVER accepts a caller-provided `class`, `confounders`, `comparabilityScore` on
+ *     the outcome side — the classifier derives all of them. The input wrapper has a
+ *     CLOSED key set; any caller-supplied outcome / class / classification field is an
+ *     UNKNOWN_OWN_KEY → BLOCK before any further read.
+ *   • Confirmed requires ALL of:
+ *       same case (sourceCaseId match)
+ *       same session
+ *       explicit reference selected
+ *       applied change audit bound to this experiment
+ *       expected observation predefined (E1 enforces expectedDirection + range)
+ *       every declared control variable observed AND withinRange === true
+ *       no major data-quality issue
+ *       no contradicting evidence ids
+ *       direction matches AND magnitude inside expectedMagnitudeRange
+ *   • invalid_comparison takes PRECEDENCE over inconclusive / confirmed when:
+ *       cross-case, cross-session, or no explicit reference, or comparabilityScore<0.5.
+ *   • inconclusive_due_to_confounders takes precedence over confirmed/contradicted when
+ *     control variables are missing or out-of-range.
+ *   • Output never contains: free-text driver feedback, blame language, causation claim,
+ *     raw telemetry samples, filesystem paths, source filenames, usernames, machine IDs,
+ *     internal database handles, stack traces, or Electron private paths.
+ *   • Clock is invoked at most ONCE, AFTER all authority/structural gates pass. Forged
+ *     or malformed input → zero clock invocations.
+ *   • All ambient intrinsic references (Object.isFrozen, Object.is, Date.parse,
+ *     Array.isArray, Reflect.apply, WeakSet ctor/add/has) are captured at module init
+ *     so a post-load rebind of the global cannot defeat verification.
+ *   • Producer attestation: every successfully-classified outcome envelope is registered
+ *     in a closure-private WeakSet. The exported verifyAuthoritativeOutcome(candidate)
+ *     checks identity (WeakSet membership) AND structural witnesses (deep-frozen +
+ *     schemaVersion + outcomeId + experimentId). The WeakSet, register function, and
+ *     captured WeakSet primitives are NEVER exposed.
+ *
+ * UMD: Node require / Electron renderer global (R3_0E_OutcomeClassifier).
+ */
+(function (root) {
+  'use strict';
+
+  // ---------- Module-init: load E1 contracts (literal-string require for no-consumer scan) ----
+  var RC_E = null, EXP = null, OUT = null, CV = null;
+  if (typeof module !== 'undefined' && module.exports) {
+    try { RC_E = require('../../contracts/r3.0e/reason-codes.js'); } catch (e) { RC_E = null; }
+    try { EXP = require('../../contracts/r3.0e/experiment-contract.js'); } catch (e) { EXP = null; }
+    try { OUT = require('../../contracts/r3.0e/outcome-contract.js'); } catch (e) { OUT = null; }
+    try { CV = require('../../contracts/r3.0e/control-variables-contract.js'); } catch (e) { CV = null; }
+  }
+  if (RC_E === null && typeof R3_0E_ReasonCodes !== 'undefined') RC_E = R3_0E_ReasonCodes;
+  if (EXP === null && typeof R3_0E_ExperimentContract !== 'undefined') EXP = R3_0E_ExperimentContract;
+  if (OUT === null && typeof R3_0E_OutcomeContract !== 'undefined') OUT = R3_0E_OutcomeContract;
+  if (CV === null && typeof R3_0E_ControlVariablesContract !== 'undefined') CV = R3_0E_ControlVariablesContract;
+  if (!RC_E || !EXP || !OUT || !CV) {
+    throw new Error('r3-0e-outcome-classifier.js: requires R3.0E E1 contracts');
+  }
+
+  var CODES = RC_E.REASON_CODES;
+
+  // ---------- Module-init: captured intrinsics ------------------------------------------------
+  var _CAPTURED_OBJECT_FREEZE = Object.freeze;
+  var _CAPTURED_OBJECT_IS_FROZEN = Object.isFrozen;
+  var _CAPTURED_OBJECT_IS = Object.is;
+  var _CAPTURED_OBJECT_CREATE = Object.create;
+  var _CAPTURED_OBJECT_GET_OWN_NAMES = Object.getOwnPropertyNames;
+  var _CAPTURED_OBJECT_GET_OWN_DESC = Object.getOwnPropertyDescriptor;
+  var _CAPTURED_OBJECT_GET_OWN_SYMS = Object.getOwnPropertySymbols;
+  var _CAPTURED_OBJECT_GET_PROTO = Object.getPrototypeOf;
+  var _CAPTURED_OBJECT_DEFINE_PROPERTY = Object.defineProperty;
+  var _CAPTURED_ARRAY_IS_ARRAY = Array.isArray;
+  var _CAPTURED_DATE_PARSE = Date.parse;
+  var _CAPTURED_REFLECT_APPLY = Reflect.apply;
+  var _CAPTURED_JSON_STRINGIFY = JSON.stringify;
+  var _CAPTURED_TEXT_ENCODER = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;
+  var _CAPTURED_NUMBER_IS_FINITE = Number.isFinite;
+  var _CAPTURED_NUMBER_IS_INTEGER = Number.isInteger;
+
+  // WeakSet captures — defeat post-load WeakSet.prototype.has rebinds.
+  var _WeakSetCtor = WeakSet;
+  var _WS_ADD = WeakSet.prototype.add;
+  var _WS_HAS = WeakSet.prototype.has;
+  function _wsAdd(set, value) {
+    try { _CAPTURED_REFLECT_APPLY(_WS_ADD, set, [value]); return true; }
+    catch (e) { return false; }
+  }
+  function _wsHas(set, value) {
+    try { return _CAPTURED_REFLECT_APPLY(_WS_HAS, set, [value]) === true; }
+    catch (e) { return false; }
+  }
+
+  // Codex E3-R5-01 closure: capture Array.prototype methods so a hostile clock (or any
+  // post-authority code path) that rebinds Array.prototype.push / slice / indexOf cannot
+  // affect the classifier's internal array operations. ALL classifier arrays (confounders,
+  // limitations, rebuiltSideEffects, dataQualityIssues snapshots) are mutated and read
+  // exclusively through these captured methods via captured Reflect.apply.
+  var _ARR_PUSH = Array.prototype.push;
+  var _ARR_SLICE = Array.prototype.slice;
+  var _ARR_INDEX_OF = Array.prototype.indexOf;
+  function _arrPush(arr, v) {
+    try { _CAPTURED_REFLECT_APPLY(_ARR_PUSH, arr, [v]); return true; }
+    catch (e) { return false; }
+  }
+  function _arrSlice(arr) {
+    try { return _CAPTURED_REFLECT_APPLY(_ARR_SLICE, arr, []); }
+    catch (e) { return []; }
+  }
+  function _arrIndexOf(arr, v) {
+    try { return _CAPTURED_REFLECT_APPLY(_ARR_INDEX_OF, arr, [v]); }
+    catch (e) { return -1; }
+  }
+
+  // Captured intrinsic helpers — all defensive wrappers.
+  function _isFrozenSafe(v) { try { return _CAPTURED_OBJECT_IS_FROZEN(v) === true; } catch (e) { return false; } }
+  function _isArraySafe(v) { try { return _CAPTURED_ARRAY_IS_ARRAY(v) === true; } catch (e) { return false; } }
+  function _exactlyEqual(a, b) { try { return _CAPTURED_OBJECT_IS(a, b) === true; } catch (e) { return false; } }
+  function _isoToMs(s) {
+    try {
+      if (typeof s !== 'string' || s.length === 0) return null;
+      var n = _CAPTURED_DATE_PARSE(s);
+      if (typeof n !== 'number' || n !== n /* NaN */) return null;
+      return n;
+    } catch (e) { return null; }
+  }
+  // Codex E3-R7-01 closure: do NOT route byte-counting through TextEncoder. A hostile
+  // clock (or any post-load tampering) could rebind TextEncoder.prototype.encode to
+  // return { length: 0 }, undercounting the envelope and letting an oversized outcome
+  // bypass the ENVELOPE_BYTE_CAP. UTF-8 byte length is conservatively bounded by
+  // (string.length * 4) — every code unit emits at most 4 UTF-8 bytes. This overcounts
+  // for ASCII-heavy strings but NEVER undercounts. The cap is generous (128 KiB) so the
+  // overcount is acceptable. We read `.length` via a captured String access to keep
+  // intrinsic stability.
+  var _CAPTURED_STRING_PROTO_LENGTH_DESC = (function () {
+    try { return _CAPTURED_OBJECT_GET_OWN_DESC(String.prototype, 'length') || null; }
+    catch (e) { return null; }
+  })();
+  function _utf8Bytes(s) {
+    if (typeof s !== 'string') return 0;
+    // `string.length` is a built-in primitive read; it is not overridable on strings.
+    // We multiply by 4 (worst-case UTF-8 expansion per UTF-16 code unit) for a safe
+    // upper-bound that intrinsic tampering cannot undercount.
+    return s.length * 4;
+  }
+
+  // ---------- Module-init integrity snapshot --------------------------------------------------
+  // The captures above MUST themselves still resolve as expected at call time. If the host
+  // mutates Object.isFrozen between module load and the first classifyOutcome call, the
+  // captured reference remains intact (we hold the function value), but defence-in-depth
+  // we re-verify the contract surfaces are frozen at call entry.
+  var _CONTRACTS_FROZEN_AT_LOAD = (function () {
+    try {
+      return _CAPTURED_OBJECT_IS_FROZEN(EXP) === true
+          && _CAPTURED_OBJECT_IS_FROZEN(OUT) === true
+          && _CAPTURED_OBJECT_IS_FROZEN(CV) === true
+          && _CAPTURED_OBJECT_IS_FROZEN(RC_E) === true;
+    } catch (e) { return false; }
+  })();
+
+  function _intrinsicsIntact() {
+    if (!_CONTRACTS_FROZEN_AT_LOAD) return false;
+    if (typeof EXP.validateExperimentShape !== 'function') return false;
+    if (typeof OUT.validateOutcomeShape !== 'function') return false;
+    if (typeof CV.validateControlVariableShape !== 'function') return false;
+    if (typeof RC_E.buildBlockedResult !== 'function') return false;
+    return true;
+  }
+
+  function _buildTamperBlock(detail) {
+    return _CAPTURED_OBJECT_FREEZE({
+      valid: false,
+      reasonCodes: _CAPTURED_OBJECT_FREEZE([CODES.INTERNAL_CONTRACT_VIOLATION]),
+      explanationKeys: _CAPTURED_OBJECT_FREEZE(['r3_0e.reason.internal_contract_violation']),
+      detail: typeof detail === 'string' ? detail : 'intrinsic tampering detected',
+      result: null,
+    });
+  }
+
+  // ---------- Constants -----------------------------------------------------------------------
+  var SERVICE_VERSION = 1;
+  var OUTCOME_SCHEMA_VERSION = 1;
+  var ARRAY_CAP = 32;
+  var ENVELOPE_BYTE_CAP = 128 * 1024;
+  var DEFAULT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+  // E3 thresholds — comparison validity gates.
+  var MIN_COMPARABILITY_FOR_VALID_COMPARISON = 0.5;
+  // Data-quality threshold: a non-empty issues list reduces conclusion strength. A single
+  // minor issue still permits classification; more than this count → inconclusive.
+  var DATA_QUALITY_ISSUE_BLOCK_THRESHOLD = 4;
+
+  // Closed key sets for the E3 input wrapper and nested authoritative sub-objects.
+  var INPUT_KEYS_ALLOWED = _CAPTURED_OBJECT_FREEZE([
+    'experiment',
+    'appliedChange',
+    'followUp',
+    'observation',
+    'controlVariableObservations',
+  ]);
+  var APPLIED_CHANGE_KEYS_ALLOWED = _CAPTURED_OBJECT_FREEZE([
+    'changeId',
+    'sourceExperimentId',
+    'appliedAt',
+  ]);
+  var FOLLOWUP_KEYS_ALLOWED = _CAPTURED_OBJECT_FREEZE([
+    'followUpCaseId',
+    'parentCaseId',
+    'sessionId',
+    'parentSessionId',
+    'hasExplicitReference',
+    'comparabilityScore',
+  ]);
+  var OBSERVATION_KEYS_ALLOWED = _CAPTURED_OBJECT_FREEZE([
+    'observedDirection',
+    'observedMagnitude',
+    'driverFeedback',
+    'dataQualityIssues',
+    'sideEffects',
+    'contradictingEvidenceIds',
+    'supportingEvidenceIds',
+  ]);
+  var OPTS_KEYS_ALLOWED = _CAPTURED_OBJECT_FREEZE([
+    'clock',
+    'referenceNowMs',
+    'maxAgeMs',
+  ]);
+
+  var DIRECTION_ALLOWED = _CAPTURED_OBJECT_FREEZE(['increase', 'decrease', 'no_change']);
+  var ID_GRAMMAR_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+  var ID_FORBIDDEN_RE = /(\.\.|[\/\\]|^\.)/;
+  // Codex E3-R1-02 closure: strict i18n-key grammar — dotted tokens of [a-z0-9_], 2..6
+  // segments, total length bounded. First segment must start with [a-z]; subsequent
+  // segments may start with [a-z0-9] (the project convention uses tokens like "0e" / "0d"
+  // for R3.0E / R3.0D namespacing, e.g. `r3.0e.driver.feedback.balance_improved`).
+  // Rejects spaces, slashes, blame phrasing, causal wording, capital letters, and any
+  // character outside the closed alphabet so a hostile caller cannot launder
+  // driver-blame / causation text / path traversal through `driverFeedback`.
+  var I18N_KEY_RE = /^[a-z][a-z0-9_]*(?:\.[a-z0-9][a-z0-9_]*){1,5}$/;
+  var I18N_KEY_MAX_LEN = 128;
+  // Canonical array index check — captured because Number is reachable via ambient.
+  var ARRAY_INDEX_RE = /^(?:0|[1-9][0-9]*)$/;
+
+  // ---------- Producer attestation (closure-private WeakSet) ----------------------------------
+  // After successful classifyOutcome → registered. The exported verifyAuthoritativeOutcome
+  // checks identity (WeakSet) + shape (deep-frozen + required fields). Clones and JSON
+  // round-trips lose identity → verifier returns false.
+
+exec
+/bin/bash -lc "sed -n '260,620p' tests/r3.0e-experiment-viewmodel.test.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+    allFeatures.case_timeline.navNodeId === 'case:case_timeline');
+})();
+
+// ------------------------------------------------------------------
+// Section F — API hardening
+// ------------------------------------------------------------------
+console.log('Section F — API hardening');
+(function () {
+  chk('F1: top-level api is frozen', Object.isFrozen(VM));
+  chk('F2: createExperimentViewmodel exported', typeof VM.createExperimentViewmodel === 'function');
+  chk('F3: verifyAuthoritativeViewmodelState exported', typeof VM.verifyAuthoritativeViewmodelState === 'function');
+  chk('F4: NO WeakSet / register exposed',
+    VM._authoritativeStates === undefined && VM.register === undefined);
+  chk('F5: viewmodel api is frozen',
+    (function () { var v = VM.createExperimentViewmodel({ classifier: CL, timelineModule: TL }); return Object.isFrozen(v); })());
+})();
+
+// ------------------------------------------------------------------
+// Section G — Verifier boundary
+// ------------------------------------------------------------------
+console.log('Section G — Verifier boundary');
+(function () {
+  chk('G1: null → false', VM.verifyAuthoritativeViewmodelState(null) === false);
+  chk('G2: empty obj → false', VM.verifyAuthoritativeViewmodelState({}) === false);
+  chk('G3: number → false', VM.verifyAuthoritativeViewmodelState(42) === false);
+  chk('G4: frozen lookalike → false',
+    VM.verifyAuthoritativeViewmodelState(Object.freeze({
+      schemaVersion: 1, displayState: 'available',
+      activation: {}, disclaimers: [],
+    })) === false);
+})();
+
+// ------------------------------------------------------------------
+// Summary
+// ------------------------------------------------------------------
+setTimeout(function () {
+  console.log('R3.0E experiment viewmodel suite: ' + pass + ' passed, ' + fail + ' failed');
+  if (fail > 0) process.exit(1);
+}, 200);
+
+exec
+/bin/bash -lc "sed -n '1,280p' renderer/js/r3-0e-followup-timeline.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+/**
+ * renderer/js/r3-0e-followup-timeline.js — R3.0E E4 · Follow-up Link + Case Timeline service
+ * (PRODUCTION).
+ *
+ * Authoritative entries:
+ *   createFollowUpLink(input, opts)
+ *   appendTimelineEvent(input, opts)
+ *   projectTimeline(caseId, opts)
+ *   listFollowUpLinksForParent(parentCaseId, opts)
+ *
+ * Verifiers (exported for downstream E5 / R3.0F consumers):
+ *   verifyAuthoritativeFollowUpLink(candidate)
+ *   verifyAuthoritativeTimelineProjection(candidate)
+ *
+ * Hard contract (SKYLINE 2026-06-30 R3.0 Continuous Resume Directive §7):
+ *   • Append-only timeline. Existing events are NEVER overwritten. Corrections are
+ *     expressed as NEW events whose params reference the prior eventId.
+ *   • Timeline event eventIds are deterministic: hash(caseId, sequence, kind, i18nKey).
+ *   • Timeline strictly monotonic by createdAt; duplicate eventId rejected; clock rollback
+ *     yielding a timestamp earlier than the previous event → reject.
+ *   • Follow-up link existence does NOT imply comparison validity. The classifier (E3)
+ *     enforces same-case / same-session / explicit-reference / comparabilityScore as a
+ *     separate authority chain.
+ *   • Every link / event / projection is deep-frozen and registered in a closure-private
+ *     WeakSet. The exported verifiers check identity + structural witnesses.
+ *   • All ambient intrinsic operations dispatch via captured intrinsics so post-load
+ *     Array.prototype / Object.* / TextEncoder rebinds cannot subvert validation.
+ *   • Clock invoked AT MOST ONCE per call, AFTER authority and contract gates. Forged
+ *     input → zero clock invocations.
+ *   • Output never contains causal claims, driver-blame, raw telemetry, paths, or stacks.
+ *
+ * UMD: Node require / Electron renderer global (R3_0E_FollowUpTimeline).
+ */
+(function (root) {
+  'use strict';
+
+  // ---------- Module-init contracts -----------------------------------------------------------
+  var RC_E = null, TL = null, FU = null;
+  if (typeof module !== 'undefined' && module.exports) {
+    try { RC_E = require('../../contracts/r3.0e/reason-codes.js'); } catch (e) { RC_E = null; }
+    try { TL = require('../../contracts/r3.0e/case-timeline-contract.js'); } catch (e) { TL = null; }
+    try { FU = require('../../contracts/r3.0e/follow-up-link-contract.js'); } catch (e) { FU = null; }
+  }
+  if (RC_E === null && typeof R3_0E_ReasonCodes !== 'undefined') RC_E = R3_0E_ReasonCodes;
+  if (TL === null && typeof R3_0E_CaseTimelineContract !== 'undefined') TL = R3_0E_CaseTimelineContract;
+  if (FU === null && typeof R3_0E_FollowUpLinkContract !== 'undefined') FU = R3_0E_FollowUpLinkContract;
+  if (!RC_E || !TL || !FU) {
+    throw new Error('r3-0e-followup-timeline.js: requires R3.0E E1 contracts');
+  }
+
+  var CODES = RC_E.REASON_CODES;
+
+  // ---------- Module-init captured intrinsics ------------------------------------------------
+  var _CAPTURED_OBJECT_FREEZE = Object.freeze;
+  var _CAPTURED_OBJECT_IS_FROZEN = Object.isFrozen;
+  var _CAPTURED_OBJECT_IS = Object.is;
+  var _CAPTURED_OBJECT_CREATE = Object.create;
+  var _CAPTURED_OBJECT_GET_OWN_NAMES = Object.getOwnPropertyNames;
+  var _CAPTURED_OBJECT_GET_OWN_DESC = Object.getOwnPropertyDescriptor;
+  var _CAPTURED_OBJECT_GET_OWN_SYMS = Object.getOwnPropertySymbols;
+  var _CAPTURED_OBJECT_GET_PROTO = Object.getPrototypeOf;
+  var _CAPTURED_OBJECT_DEFINE_PROPERTY = Object.defineProperty;
+  var _CAPTURED_ARRAY_IS_ARRAY = Array.isArray;
+  var _CAPTURED_DATE_PARSE = Date.parse;
+  // Codex E4-R2-01 closure: capture Date constructor + Date.prototype.toISOString at
+  // module init so a post-load Date / Date.prototype mutation cannot subvert the
+  // canonicalization step. _canonicalIso uses these captured references via captured
+  // Reflect.apply and ALSO re-parses the produced ISO to verify it round-trips to the
+  // same ms.
+  var _CAPTURED_DATE_CTOR = Date;
+  var _CAPTURED_DATE_PROTO_TO_ISO = Date.prototype.toISOString;
+  var _CAPTURED_REFLECT_APPLY = Reflect.apply;
+  // Codex E4-R4-01 closure: capture structuredClone (when available) for clean-copy
+  // Proxy stripping. Falls back to JSON.parse(JSON.stringify(...)) which already strips
+  // Proxy semantics (the resulting tree is plain). Either path drops Proxy traps; the
+  // returned tree is a fresh plain object/array hierarchy.
+  var _CAPTURED_STRUCTURED_CLONE = (typeof structuredClone === 'function') ? structuredClone : null;
+  var _CAPTURED_JSON_PARSE = JSON.parse;
+  var _CAPTURED_JSON_STRINGIFY = JSON.stringify;
+  function _cleanClone(v) {
+    if (v === null || v === undefined) return v;
+    try {
+      if (_CAPTURED_STRUCTURED_CLONE !== null) return _CAPTURED_STRUCTURED_CLONE(v);
+      return _CAPTURED_JSON_PARSE(_CAPTURED_JSON_STRINGIFY(v));
+    } catch (e) { return null; }
+  }
+  var _CAPTURED_NUMBER_IS_FINITE = Number.isFinite;
+  var _CAPTURED_NUMBER_IS_INTEGER = Number.isInteger;
+  var _WeakSetCtor = WeakSet;
+  var _WS_ADD = WeakSet.prototype.add;
+  var _WS_HAS = WeakSet.prototype.has;
+  var _ARR_PUSH = Array.prototype.push;
+  var _ARR_SLICE = Array.prototype.slice;
+  var _ARR_INDEX_OF = Array.prototype.indexOf;
+  // Codex E4-R3-01/02 closures: capture String.prototype.toLowerCase + RegExp.prototype.test
+  // so post-load ambient mutation cannot subvert the reserved-token blocklist or any
+  // grammar regex (ID, i18n key, sober identifier).
+  var _STR_TO_LOWER = String.prototype.toLowerCase;
+  var _STR_INDEX_OF = String.prototype.indexOf;
+  var _RE_TEST = RegExp.prototype.test;
+  // Codex E4-R6-01 closure: capture String.prototype.charCodeAt so hash derivation
+  // is immune to post-load String.prototype.charCodeAt tampering. The deterministic
+  // linkId/eventId/projectionId derivation must not depend on mutable string methods.
+  var _STR_CHAR_CODE_AT = String.prototype.charCodeAt;
+  function _charCodeAt(s, i) {
+    if (typeof s !== 'string') return 0;
+    try { return _CAPTURED_REFLECT_APPLY(_STR_CHAR_CODE_AT, s, [i]); } catch (e) { return 0; }
+  }
+  function _wsAdd(s, v) { try { _CAPTURED_REFLECT_APPLY(_WS_ADD, s, [v]); return true; } catch (e) { return false; } }
+  function _wsHas(s, v) { try { return _CAPTURED_REFLECT_APPLY(_WS_HAS, s, [v]) === true; } catch (e) { return false; } }
+  function _arrPush(a, v) { try { _CAPTURED_REFLECT_APPLY(_ARR_PUSH, a, [v]); return true; } catch (e) { return false; } }
+  function _arrSlice(a) { try { return _CAPTURED_REFLECT_APPLY(_ARR_SLICE, a, []); } catch (e) { return []; } }
+  function _arrIndexOf(a, v) { try { return _CAPTURED_REFLECT_APPLY(_ARR_INDEX_OF, a, [v]); } catch (e) { return -1; } }
+  // Codex E4-R3-01 closure: capture-based ASCII lowercase via captured String.prototype.toLowerCase.
+  function _lower(s) {
+    if (typeof s !== 'string') return '';
+    try { return _CAPTURED_REFLECT_APPLY(_STR_TO_LOWER, s, []); } catch (e) { return ''; }
+  }
+  function _strIndexOf(haystack, needle) {
+    if (typeof haystack !== 'string') return -1;
+    try { return _CAPTURED_REFLECT_APPLY(_STR_INDEX_OF, haystack, [needle]); } catch (e) { return -1; }
+  }
+  // Codex E4-R3-02 closure: capture-based regex test.
+  function _reTest(re, s) {
+    if (typeof s !== 'string') return false;
+    try { return _CAPTURED_REFLECT_APPLY(_RE_TEST, re, [s]) === true; } catch (e) { return false; }
+  }
+  function _isFrozenSafe(v) { try { return _CAPTURED_OBJECT_IS_FROZEN(v) === true; } catch (e) { return false; } }
+  function _isArraySafe(v) { try { return _CAPTURED_ARRAY_IS_ARRAY(v) === true; } catch (e) { return false; } }
+  function _isoToMs(s) {
+    try {
+      if (typeof s !== 'string' || s.length === 0) return null;
+      var n = _CAPTURED_DATE_PARSE(s);
+      if (typeof n !== 'number' || n !== n) return null;
+      return n;
+    } catch (e) { return null; }
+  }
+  // Codex E4-R2-01 closure: capture-based canonical ISO. Builds a Date via the captured
+  // constructor, calls captured toISOString via Reflect.apply, then re-parses to verify
+  // the produced string round-trips to the exact same ms. Any divergence (post-load
+  // tampering, Symbol.toPrimitive shenanigans, etc.) → null → caller blocks.
+  function _canonicalIso(ms) {
+    try {
+      if (typeof ms !== 'number' || ms !== ms || !_CAPTURED_NUMBER_IS_FINITE(ms)) return null;
+      var d = new _CAPTURED_DATE_CTOR(ms);
+      var iso = _CAPTURED_REFLECT_APPLY(_CAPTURED_DATE_PROTO_TO_ISO, d, []);
+      if (typeof iso !== 'string' || iso.length === 0) return null;
+      var roundTrip = _CAPTURED_DATE_PARSE(iso);
+      if (typeof roundTrip !== 'number' || roundTrip !== roundTrip || roundTrip !== ms) return null;
+      return iso;
+    } catch (e) { return null; }
+  }
+  function _utf8Bytes(s) { if (typeof s !== 'string') return 0; return s.length * 4; }
+
+  // Codex E4-R2-03 closure: reserved-token blocklist for params keys + string values.
+  // Even though strict id grammar permits "blame", "cause" as keys and "driver_error"
+  // as values, these specific tokens are NEVER legitimate diagnostic content. The
+  // blocklist is applied to BOTH keys (lowercased) AND string values (lowercased).
+  // This pushes the design boundary toward i18n-keyed content for any narrative info.
+  var RESERVED_HOSTILE_TOKENS = _CAPTURED_OBJECT_FREEZE([
+    'blame', 'cause', 'caused', 'because', 'fault', 'guilt',
+    'driver_error', 'driver_fault', 'driver_caused', 'crashed',
+  ]);
+  function _containsReservedHostileToken(s) {
+    if (typeof s !== 'string') return false;
+    var lower = _lower(s);
+    for (var i = 0; i < RESERVED_HOSTILE_TOKENS.length; i++) {
+      var tok = RESERVED_HOSTILE_TOKENS[i];
+      if (lower === tok) return true;
+      if (_strIndexOf(lower, tok) !== -1) return true;
+    }
+    return false;
+  }
+  // Codex E4-R3-02 closure: pre-compile sober-identifier regex once; use captured test.
+  var SOBER_PARAM_KEY_RE = /^[a-z][a-z0-9_]{0,31}$/;
+
+  // ---------- Constants ----------------------------------------------------------------------
+  var SERVICE_VERSION = 1;
+  var LINK_SCHEMA_VERSION = 1;
+  var TIMELINE_SCHEMA_VERSION = 1;
+  var PROJECTION_SCHEMA_VERSION = 1;
+  var EVENT_ID_BYTE_CAP = 256;
+  var I18N_KEY_RE = /^[a-z][a-z0-9_]*(?:\.[a-z0-9][a-z0-9_]*){1,5}$/;
+  var I18N_KEY_MAX_LEN = 128;
+  var ID_GRAMMAR_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+  var ID_FORBIDDEN_RE = /(\.\.|[\/\\]|^\.)/;
+  var EVENT_KIND_ALLOWED = _CAPTURED_OBJECT_FREEZE([
+    'baseline_captured',
+    'hypothesis_recorded',
+    'recommendation_made',
+    'experiment_planned',
+    'experiment_applied',
+    'follow_up_case_created',
+    'outcome_classified',
+    'experiment_abandoned',
+  ]);
+  var LINK_INPUT_KEYS = _CAPTURED_OBJECT_FREEZE([
+    'parentCaseId', 'followUpCaseId', 'experimentId', 'parentStatus',
+  ]);
+  var EVENT_INPUT_KEYS = _CAPTURED_OBJECT_FREEZE([
+    'caseId', 'kind', 'i18nKey', 'params', 'correctionOf',
+  ]);
+  var OPTS_KEYS = _CAPTURED_OBJECT_FREEZE(['clock', 'referenceNowMs']);
+
+  function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
+  function _isFiniteNumber(v) { return typeof v === 'number' && _CAPTURED_NUMBER_IS_FINITE(v) === true; }
+  function _isOriginalPlainObject(v) {
+    try {
+      if (v === null || typeof v !== 'object' || _CAPTURED_ARRAY_IS_ARRAY(v)) return false;
+      var p = _CAPTURED_OBJECT_GET_PROTO(v);
+      return p === Object.prototype || p === null;
+    } catch (e) { return false; }
+  }
+  function _idGrammarOk(s) {
+    if (!_nonEmptyStr(s)) return false;
+    if (_reTest(ID_FORBIDDEN_RE, s)) return false;
+    if (!_reTest(ID_GRAMMAR_RE, s)) return false;
+    return true;
+  }
+  function _i18nKeyOk(s) {
+    if (!_nonEmptyStr(s)) return false;
+    if (s.length > I18N_KEY_MAX_LEN) return false;
+    if (!_reTest(I18N_KEY_RE, s)) return false;
+    return true;
+  }
+  function _hasSymbolOwnKey(o) {
+    try {
+      var syms = _CAPTURED_OBJECT_GET_OWN_SYMS(o);
+      return _CAPTURED_ARRAY_IS_ARRAY(syms) && syms.length > 0;
+    } catch (e) { return true; }
+  }
+  function _snapshotPlain(o, allowedKeys, invalidCode) {
+    if (!_isOriginalPlainObject(o)) return { valid: false, reasonCodes: [invalidCode, CODES.PROTOTYPE_POLLUTION_REJECTED], detail: 'not plain' };
+    if (_hasSymbolOwnKey(o)) return { valid: false, reasonCodes: [invalidCode, CODES.UNKNOWN_OWN_KEY], detail: 'symbol own key' };
+    var names;
+    try { names = _CAPTURED_OBJECT_GET_OWN_NAMES(o); }
+    catch (e) { return { valid: false, reasonCodes: [invalidCode], detail: 'desc fail' }; }
+    var snap = _CAPTURED_OBJECT_CREATE(null);
+    for (var i = 0; i < names.length; i++) {
+      var k = names[i];
+      if (_arrIndexOf(allowedKeys, k) === -1) {
+        return { valid: false, reasonCodes: [invalidCode, CODES.UNKNOWN_OWN_KEY], detail: 'unknown key ' + k };
+      }
+      var d;
+      try { d = _CAPTURED_OBJECT_GET_OWN_DESC(o, k); }
+      catch (e) { return { valid: false, reasonCodes: [invalidCode], detail: 'desc inaccessible' }; }
+      if (!d || d.enumerable !== true) return { valid: false, reasonCodes: [invalidCode], detail: 'non-enum ' + k };
+      if (typeof d.get === 'function' || typeof d.set === 'function') {
+        return { valid: false, reasonCodes: [invalidCode], detail: 'accessor ' + k };
+      }
+      snap[k] = d.value;
+    }
+    return { valid: true, snapshot: snap };
+  }
+  function _deepFreeze(v) {
+    if (v === null || typeof v !== 'object') return v;
+    try { _CAPTURED_OBJECT_FREEZE(v); } catch (e) { /* swallow */ }
+    var keys;
+    try { keys = _CAPTURED_OBJECT_GET_OWN_NAMES(v); } catch (e) { return v; }
+    for (var i = 0; i < keys.length; i++) {
+      var child;
+      try { child = v[keys[i]]; } catch (e) { continue; }
+      _deepFreeze(child);
+    }
+    return v;
+  }
+
+  // ---------- Deterministic ID generators ----------------------------------------------------
+  // Codex E4-R5-01 closure: capture-free hex-padding. Both Number.prototype.toString
+  // and String.prototype.padStart could be rebound post-load to subvert deterministic
+  // id derivation. Manual 8-char hex emission via local lookup table is
+  // tamper-immune (uses only basic operators + string concatenation).
+  function _toHex8(h) {
+    var hexChars = '0123456789abcdef';
+    var out = '';
+    var x = h >>> 0;
+    for (var i = 7; i >= 0; i--) {
+      var nibble = (x >>> (i * 4)) & 0xF;
+      // Bracket access on a string primitive resolves via internal slot indexed-access,
+      // avoiding ambient String.prototype.charAt.
+
+codex
+One concrete weakness is emerging around the “pre-load tampering” part of the prompt: captured intrinsics only help after module initialization, and this file does not sanity-check that the captured functions are the native ones it thinks they are. I’m checking whether there are additional independent blockers, especially i18n parity and injected verifier behavior.
+exec
+/bin/bash -lc "nl -ba renderer/js/i18n-r3-0e.js | sed -n '1,260p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+exec
+/bin/bash -lc "nl -ba renderer/js/r3-0e-experiment-viewmodel.js | sed -n '35,270p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+     1	/**
+     2	 * i18n-r3-0e.js — R3.0E E5 · Experiment Loop + Case Timeline three-language dictionary
+     3	 * (en / zh-TW / ja).
+     4	 *
+     5	 * Same pattern as i18n-r3-0d.js. Loaded AFTER i18n.js / i18n-ui.js / i18n-shell.js,
+     6	 * BEFORE the app script.
+     7	 *
+     8	 * Scope (UI layer only — E3 / E4 service codes stay FROZEN, this only maps display labels):
+     9	 *   - casenav.experiment_loop  / casenav.case_timeline — case-subview labels
+    10	 *   - feat.experiment_loop / feat.experiment_loop.desc — feature label + description
+    11	 *   - feat.case_timeline / feat.case_timeline.desc — feature label + description
+    12	 *   - r3.0e.outcome.class.<enum>   — outcome class display labels
+    13	 *   - r3.0e.timeline.kind.<enum>   — timeline event kind labels
+    14	 *   - r3.0e.activation.<ready|deferred>
+    15	 *   - r3.0e.state.<unavailable|available|loading|stale-cleared|error-sanitized>
+    16	 *
+    17	 * Directive: NO causal-overclaim, NO driver-blame phrasing. Every key audited by
+    18	 * tests/i18n-parity.test.js.
+    19	 */
+    20	const R3_0E_I18N = {
+    21	  en: {
+    22	    // —— case navigation ——
+    23	    'casenav.experiment_loop': 'Experiment Loop',
+    24	    'casenav.case_timeline': 'Case Timeline',
+    25	    'feat.experiment_loop': 'Experiment Loop',
+    26	    'feat.experiment_loop.desc': 'Track experiments through application, follow-up, and deterministic outcome classification with controlled-variable integrity.',
+    27	    'feat.case_timeline': 'Case Timeline',
+    28	    'feat.case_timeline.desc': 'Append-only chronological log of case events: baseline, hypothesis, recommendation, experiment, applied change, follow-up, outcome.',
+    29	
+    30	    // —— display state labels ——
+    31	    'r3.0e.state.unavailable': 'Unavailable',
+    32	    'r3.0e.state.loading': 'Loading…',
+    33	    'r3.0e.state.available': 'Available',
+    34	    'r3.0e.state.stale-cleared': 'Cleared (state changed)',
+    35	    'r3.0e.state.error-sanitized': 'Internal error (sanitized)',
+    36	
+    37	    // —— outcome class labels ——
+    38	    'r3.0e.outcome.class.confirmed': 'Confirmed (within expectation)',
+    39	    'r3.0e.outcome.class.partially_confirmed': 'Partially confirmed (direction match, magnitude outside range)',
+    40	    'r3.0e.outcome.class.contradicted': 'Contradicted (observation does not match expectation)',
+    41	    'r3.0e.outcome.class.inconclusive': 'Inconclusive (insufficient data quality or unclear direction)',
+    42	    'r3.0e.outcome.class.invalid_comparison': 'Invalid comparison (cross-case, cross-session, or comparability insufficient)',
+    43	    'r3.0e.outcome.class.inconclusive_due_to_confounders': 'Inconclusive — control variables missing or out of range',
+    44	
+    45	    // —— timeline kind labels ——
+    46	    'r3.0e.timeline.kind.baseline_captured': 'Baseline captured',
+    47	    'r3.0e.timeline.kind.hypothesis_recorded': 'Hypothesis recorded',
+    48	    'r3.0e.timeline.kind.recommendation_made': 'Recommendation made',
+    49	    'r3.0e.timeline.kind.experiment_planned': 'Experiment planned',
+    50	    'r3.0e.timeline.kind.experiment_applied': 'Experiment applied',
+    51	    'r3.0e.timeline.kind.follow_up_case_created': 'Follow-up case created',
+    52	    'r3.0e.timeline.kind.outcome_classified': 'Outcome classified',
+    53	    'r3.0e.timeline.kind.experiment_abandoned': 'Experiment abandoned',
+    54	
+    55	    // —— activation rationale ——
+    56	    'r3.0e.activation.ready': 'Experiment Loop + Case Timeline capabilities are active for this case.',
+    57	    'r3.0e.activation.deferred': 'Experiment Loop + Case Timeline capabilities are deferred — the case lacks an applied experiment record or has an outstanding linkage break.',
+    58	    'r3.0e.activation.rationale.case_required': 'Open a case to view its experiment loop and timeline.',
+    59	    'r3.0e.activation.rationale.applied_experiment_required': 'An experiment must reach status \'applied\' before the outcome classifier surface activates.',
+    60	
+    61	    // —— honest disclaimers (always visible) ——
+    62	    'r3.0e.disclaimer.no_causation': 'Outcomes do not assert causation. Confirmed only means observation matched expectation under controlled variables in this single comparison.',
+    63	    'r3.0e.disclaimer.no_driver_blame': 'Outcomes never attribute results to driver action. Driver feedback (when present) is recorded as an i18n key only.',
+    64	    'r3.0e.disclaimer.no_auto_setup': 'No setup change is ever applied automatically. Applied Change records reflect user-initiated actions only.',
+    65	    'r3.0e.disclaimer.same_case_session_only': 'Comparison is restricted to the same case and same session; cross-session inferences are NOT supported.',
+    66	  },
+    67	  zh: {
+    68	    'casenav.experiment_loop': '實驗迴圈',
+    69	    'casenav.case_timeline': '案例時間軸',
+    70	    'feat.experiment_loop': '實驗迴圈',
+    71	    'feat.experiment_loop.desc': '追蹤實驗從套用、追蹤到結果分類，以對照變數完整性為基礎的確定性判定。',
+    72	    'feat.case_timeline': '案例時間軸',
+    73	    'feat.case_timeline.desc': '案例事件的僅追加時序紀錄：基線、假設、建議、實驗、套用變更、追蹤、結果。',
+    74	
+    75	    'r3.0e.state.unavailable': '尚未可用',
+    76	    'r3.0e.state.loading': '載入中…',
+    77	    'r3.0e.state.available': '可用',
+    78	    'r3.0e.state.stale-cleared': '已清除（狀態變動）',
+    79	    'r3.0e.state.error-sanitized': '內部錯誤（已脫敏）',
+    80	
+    81	    'r3.0e.outcome.class.confirmed': '確認（符合預期）',
+    82	    'r3.0e.outcome.class.partially_confirmed': '部分確認（方向相符、幅度超出範圍）',
+    83	    'r3.0e.outcome.class.contradicted': '矛盾（觀測與預期不符）',
+    84	    'r3.0e.outcome.class.inconclusive': '無結論（資料品質不足或方向不明）',
+    85	    'r3.0e.outcome.class.invalid_comparison': '比較無效（跨案例、跨工作階段或可比性不足）',
+    86	    'r3.0e.outcome.class.inconclusive_due_to_confounders': '無結論 — 對照變數缺失或超出範圍',
+    87	
+    88	    'r3.0e.timeline.kind.baseline_captured': '基線擷取',
+    89	    'r3.0e.timeline.kind.hypothesis_recorded': '假設記錄',
+    90	    'r3.0e.timeline.kind.recommendation_made': '建議提出',
+    91	    'r3.0e.timeline.kind.experiment_planned': '實驗規劃',
+    92	    'r3.0e.timeline.kind.experiment_applied': '實驗套用',
+    93	    'r3.0e.timeline.kind.follow_up_case_created': '建立追蹤案例',
+    94	    'r3.0e.timeline.kind.outcome_classified': '結果分類',
+    95	    'r3.0e.timeline.kind.experiment_abandoned': '實驗放棄',
+    96	
+    97	    'r3.0e.activation.ready': '此案例的實驗迴圈與時間軸功能已啟動。',
+    98	    'r3.0e.activation.deferred': '實驗迴圈與時間軸功能延後啟動 — 案例尚無已套用的實驗紀錄或有未解決的關聯斷裂。',
+    99	    'r3.0e.activation.rationale.case_required': '請開啟案例以檢視其實驗迴圈與時間軸。',
+   100	    'r3.0e.activation.rationale.applied_experiment_required': '實驗需先到達「已套用」狀態，結果分類介面才會啟動。',
+   101	
+   102	    'r3.0e.disclaimer.no_causation': '結果不主張因果關係。「確認」僅代表在此次對照變數受控的單一比較中觀測符合預期。',
+   103	    'r3.0e.disclaimer.no_driver_blame': '結果絕不歸因於駕駛動作。駕駛回饋（若有）僅以 i18n 鍵紀錄。',
+   104	    'r3.0e.disclaimer.no_auto_setup': '系統絕不自動套用任何設定變更。套用變更紀錄僅反映使用者主動執行的動作。',
+   105	    'r3.0e.disclaimer.same_case_session_only': '比較僅限同案例同工作階段；不支援跨工作階段推論。',
+   106	  },
+   107	  ja: {
+   108	    'casenav.experiment_loop': '実験ループ',
+   109	    'casenav.case_timeline': 'ケースタイムライン',
+   110	    'feat.experiment_loop': '実験ループ',
+   111	    'feat.experiment_loop.desc': '実験を適用、フォローアップ、確定的な結果分類まで追跡し、対照変数の完全性を担保します。',
+   112	    'feat.case_timeline': 'ケースタイムライン',
+   113	    'feat.case_timeline.desc': 'ケースイベントの追記専用時系列ログ：ベースライン、仮説、推奨、実験、適用変更、フォローアップ、結果。',
+   114	
+   115	    'r3.0e.state.unavailable': '利用不可',
+   116	    'r3.0e.state.loading': '読込中…',
+   117	    'r3.0e.state.available': '利用可能',
+   118	    'r3.0e.state.stale-cleared': 'クリア済み（状態変更）',
+   119	    'r3.0e.state.error-sanitized': '内部エラー（サニタイズ済み）',
+   120	
+   121	    'r3.0e.outcome.class.confirmed': '確認済み（期待通り）',
+   122	    'r3.0e.outcome.class.partially_confirmed': '部分確認（方向は一致、振幅は範囲外）',
+   123	    'r3.0e.outcome.class.contradicted': '矛盾（観測が期待と一致しない）',
+   124	    'r3.0e.outcome.class.inconclusive': '結論なし（データ品質不足または方向不明）',
+   125	    'r3.0e.outcome.class.invalid_comparison': '比較無効（ケース・セッション横断または比較性不足）',
+   126	    'r3.0e.outcome.class.inconclusive_due_to_confounders': '結論なし — 対照変数が欠落または範囲外',
+   127	
+   128	    'r3.0e.timeline.kind.baseline_captured': 'ベースライン取得',
+   129	    'r3.0e.timeline.kind.hypothesis_recorded': '仮説記録',
+   130	    'r3.0e.timeline.kind.recommendation_made': '推奨提示',
+   131	    'r3.0e.timeline.kind.experiment_planned': '実験計画',
+   132	    'r3.0e.timeline.kind.experiment_applied': '実験適用',
+   133	    'r3.0e.timeline.kind.follow_up_case_created': 'フォローアップケース作成',
+   134	    'r3.0e.timeline.kind.outcome_classified': '結果分類',
+   135	    'r3.0e.timeline.kind.experiment_abandoned': '実験中止',
+   136	
+   137	    'r3.0e.activation.ready': 'このケースの実験ループとタイムライン機能はアクティブです。',
+   138	    'r3.0e.activation.deferred': '実験ループとタイムライン機能は保留中です — 適用された実験記録がないか、未解決のリンク破損があります。',
+   139	    'r3.0e.activation.rationale.case_required': 'ケースを開いて実験ループとタイムラインを表示してください。',
+   140	    'r3.0e.activation.rationale.applied_experiment_required': '結果分類サーフェスがアクティブになるには、実験が「適用済」状態に達する必要があります。',
+   141	
+   142	    'r3.0e.disclaimer.no_causation': '結果は因果関係を主張しません。「確認済み」は、対照変数が制御された今回の比較において観測が期待と一致したことのみを意味します。',
+   143	    'r3.0e.disclaimer.no_driver_blame': '結果はドライバーの行為に起因するものとは絶対に判定しません。ドライバーフィードバック（存在する場合）は i18n キーとしてのみ記録されます。',
+   144	    'r3.0e.disclaimer.no_auto_setup': 'いかなるセットアップ変更も自動的に適用されません。適用変更記録はユーザー主導のアクションのみを反映します。',
+   145	    'r3.0e.disclaimer.same_case_session_only': '比較は同一ケース・同一セッションに限定されます。セッション横断的な推論はサポートされません。',
+   146	  },
+   147	};
+   148	
+   149	// merge into the global I18N
+   150	(function () {
+   151	  var I = (typeof I18N !== 'undefined') ? I18N : null;
+   152	  if (!I && typeof globalThis !== 'undefined' && globalThis.I18N) I = globalThis.I18N;
+   153	  if (!I && typeof window !== 'undefined' && window.I18N) I = window.I18N;
+   154	  if (!I) return;
+   155	  Object.assign(I.en = I.en || {}, R3_0E_I18N.en);
+   156	  Object.assign(I.zh = I.zh || {}, R3_0E_I18N.zh);
+   157	  Object.assign(I.ja = I.ja || {}, R3_0E_I18N.ja);
+   158	})();
+   159	
+   160	if (typeof module !== 'undefined' && module.exports) {
+   161	  module.exports = { R3_0E_I18N: R3_0E_I18N };
+   162	}
+
+ succeeded in 0ms:
+    35	  var CL = null, TL_SVC = null;
+    36	  if (typeof module !== 'undefined' && module.exports) {
+    37	    try { CL = require('./r3-0e-outcome-classifier.js'); } catch (e) { CL = null; }
+    38	    try { TL_SVC = require('./r3-0e-followup-timeline.js'); } catch (e) { TL_SVC = null; }
+    39	  }
+    40	  if (CL === null && typeof R3_0E_OutcomeClassifier !== 'undefined') CL = R3_0E_OutcomeClassifier;
+    41	  if (TL_SVC === null && typeof R3_0E_FollowUpTimeline !== 'undefined') TL_SVC = R3_0E_FollowUpTimeline;
+    42	  if (!CL || !TL_SVC) {
+    43	    throw new Error('r3-0e-experiment-viewmodel.js: requires r3-0e-outcome-classifier + r3-0e-followup-timeline');
+    44	  }
+    45	
+    46	  // ---------- Module-init captured intrinsics ------------------------------------------------
+    47	  var _CAPTURED_OBJECT_FREEZE = Object.freeze;
+    48	  var _CAPTURED_OBJECT_IS_FROZEN = Object.isFrozen;
+    49	  var _CAPTURED_ARRAY_IS_ARRAY = Array.isArray;
+    50	  var _CAPTURED_REFLECT_APPLY = Reflect.apply;
+    51	  var _WeakSetCtor = WeakSet;
+    52	  var _WS_ADD = WeakSet.prototype.add;
+    53	  var _WS_HAS = WeakSet.prototype.has;
+    54	  function _wsAdd(s, v) { try { _CAPTURED_REFLECT_APPLY(_WS_ADD, s, [v]); return true; } catch (e) { return false; } }
+    55	  function _wsHas(s, v) { try { return _CAPTURED_REFLECT_APPLY(_WS_HAS, s, [v]) === true; } catch (e) { return false; } }
+    56	  var _ARR_SLICE = Array.prototype.slice;
+    57	  function _arrSlice(a) { try { return _CAPTURED_REFLECT_APPLY(_ARR_SLICE, a, []); } catch (e) { return []; } }
+    58	
+    59	  function _deepFreeze(v) {
+    60	    if (v === null || typeof v !== 'object') return v;
+    61	    try { _CAPTURED_OBJECT_FREEZE(v); } catch (e) { /* swallow */ }
+    62	    var names;
+    63	    try { names = Object.getOwnPropertyNames(v); } catch (e) { return v; }
+    64	    for (var i = 0; i < names.length; i++) {
+    65	      var child;
+    66	      try { child = v[names[i]]; } catch (e) { continue; }
+    67	      _deepFreeze(child);
+    68	    }
+    69	    return v;
+    70	  }
+    71	
+    72	  // ---------- Constants -----------------------------------------------------------------------
+    73	  var VIEWMODEL_SCHEMA_VERSION = 1;
+    74	  var DISPLAY_STATES = _CAPTURED_OBJECT_FREEZE([
+    75	    'unavailable',     // no case loaded OR no experiment applied yet
+    76	    'loading',         // background derivation in progress
+    77	    'available',       // outcome + timeline ready
+    78	    'stale-cleared',   // case/session/applied-change changed since last derivation
+    79	    'error-sanitized', // internal contract violation; never propagate raw error
+    80	  ]);
+    81	
+    82	  // ---------- Producer attestation (WeakSet) -------------------------------------------------
+    83	  var _authoritativeStates = new _WeakSetCtor();
+    84	  function _registerAuthoritativeState(s) { _wsAdd(_authoritativeStates, s); }
+    85	  function verifyAuthoritativeViewmodelState(candidate) {
+    86	    try {
+    87	      if (candidate === null || typeof candidate !== 'object') return false;
+    88	      if (!_wsHas(_authoritativeStates, candidate)) return false;
+    89	      if (_CAPTURED_OBJECT_IS_FROZEN(candidate) !== true) return false;
+    90	      if (candidate.schemaVersion !== VIEWMODEL_SCHEMA_VERSION) return false;
+    91	      if (typeof candidate.displayState !== 'string') return false;
+    92	      if (DISPLAY_STATES.indexOf(candidate.displayState) === -1) return false;
+    93	      if (!candidate.activation || typeof candidate.activation !== 'object') return false;
+    94	      return true;
+    95	    } catch (e) { return false; }
+    96	  }
+    97	
+    98	  // ---------- Factory --------------------------------------------------------------------------
+    99	  /**
+   100	   * createExperimentViewmodel({ classifier, timelineModule })
+   101	   *
+   102	   * Both parameters are MODULE references (NOT service instances):
+   103	   *   `classifier`     — R3_0E_OutcomeClassifier module (has verifyAuthoritativeOutcome)
+   104	   *   `timelineModule` — R3_0E_FollowUpTimeline module (has verifyAuthoritativeTimelineProjection
+   105	   *                       + verifyAuthoritativeFollowUpLink as module-level statics)
+   106	   *
+   107	   * Service instances (returned by createFollowUpTimelineService) do NOT carry the
+   108	   * verifiers — those are module-level. The viewmodel only needs the verifiers to
+   109	   * gate inputs; it does not call append/get/project/etc.
+   110	   *
+   111	   * Backward-compatible: the deprecated parameter name `timelineService` is still
+   112	   * accepted IF it refers to the module (i.e. has the verifiers).
+   113	   *
+   114	   * Returned object has methods:
+   115	   *   - derive({outcome, projection, links}) → frozen viewmodel state (authoritative)
+   116	   *   - empty(caseId) → frozen empty state for cases with no applied experiment yet
+   117	   *   - error() → frozen error-sanitized state
+   118	   *   - stale(caseId) → frozen stale-cleared state
+   119	   *
+   120	   * The viewmodel REQUIRES the caller to pass already-authoritative outputs from E3 + E4.
+   121	   * Each input must pass its module's verifier. Otherwise → error-sanitized state.
+   122	   */
+   123	  function createExperimentViewmodel(deps) {
+   124	    if (!deps || typeof deps !== 'object') throw new Error('R3_0E_VIEWMODEL_DEPS_INVALID');
+   125	    var classifier = deps.classifier || CL;
+   126	    var timelineModule = deps.timelineModule || deps.timelineService || TL_SVC;
+   127	    if (!classifier || typeof classifier.verifyAuthoritativeOutcome !== 'function') {
+   128	      throw new Error('R3_0E_VIEWMODEL_CLASSIFIER_INVALID');
+   129	    }
+   130	    if (!timelineModule
+   131	        || typeof timelineModule.verifyAuthoritativeTimelineProjection !== 'function'
+   132	        || typeof timelineModule.verifyAuthoritativeFollowUpLink !== 'function') {
+   133	      throw new Error('R3_0E_VIEWMODEL_TIMELINE_MODULE_INVALID');
+   134	    }
+   135	    // Alias for the rest of the closure
+   136	    var timelineService = timelineModule;
+   137	
+   138	    // Internal: build a frozen state envelope with closed key set.
+   139	    function _makeState(opts) {
+   140	      var state = {
+   141	        schemaVersion: VIEWMODEL_SCHEMA_VERSION,
+   142	        displayState: opts.displayState,
+   143	        caseId: opts.caseId || null,
+   144	        sessionId: opts.sessionId || null,
+   145	        outcome: opts.outcome || null,
+   146	        outcomeClass: opts.outcomeClass || null,
+   147	        outcomeClassI18nKey: opts.outcomeClassI18nKey || null,
+   148	        projection: opts.projection || null,
+   149	        projectionEventCount: typeof opts.projectionEventCount === 'number' ? opts.projectionEventCount : 0,
+   150	        links: opts.links || _CAPTURED_OBJECT_FREEZE([]),
+   151	        linksCount: typeof opts.linksCount === 'number' ? opts.linksCount : 0,
+   152	        activation: opts.activation,
+   153	        disclaimers: _CAPTURED_OBJECT_FREEZE([
+   154	          'r3.0e.disclaimer.no_causation',
+   155	          'r3.0e.disclaimer.no_driver_blame',
+   156	          'r3.0e.disclaimer.no_auto_setup',
+   157	          'r3.0e.disclaimer.same_case_session_only',
+   158	        ]),
+   159	      };
+   160	      _deepFreeze(state);
+   161	      _registerAuthoritativeState(state);
+   162	      return state;
+   163	    }
+   164	
+   165	    function empty(caseId) {
+   166	      return _makeState({
+   167	        displayState: 'unavailable',
+   168	        caseId: typeof caseId === 'string' ? caseId : null,
+   169	        activation: _CAPTURED_OBJECT_FREEZE({
+   170	          uiCapabilityReady: false,
+   171	          featureRegistryActivationAllowed: false,
+   172	          deferredCapabilities: _CAPTURED_OBJECT_FREEZE(['experiment_loop', 'case_timeline']),
+   173	          rationaleI18nKey: typeof caseId === 'string'
+   174	            ? 'r3.0e.activation.rationale.applied_experiment_required'
+   175	            : 'r3.0e.activation.rationale.case_required',
+   176	          rationaleParams: _CAPTURED_OBJECT_FREEZE({}),
+   177	        }),
+   178	      });
+   179	    }
+   180	
+   181	    function error() {
+   182	      return _makeState({
+   183	        displayState: 'error-sanitized',
+   184	        activation: _CAPTURED_OBJECT_FREEZE({
+   185	          uiCapabilityReady: false,
+   186	          featureRegistryActivationAllowed: false,
+   187	          deferredCapabilities: _CAPTURED_OBJECT_FREEZE(['experiment_loop', 'case_timeline']),
+   188	          rationaleI18nKey: 'r3.0e.state.error-sanitized',
+   189	          rationaleParams: _CAPTURED_OBJECT_FREEZE({}),
+   190	        }),
+   191	      });
+   192	    }
+   193	
+   194	    function stale(caseId) {
+   195	      return _makeState({
+   196	        displayState: 'stale-cleared',
+   197	        caseId: typeof caseId === 'string' ? caseId : null,
+   198	        activation: _CAPTURED_OBJECT_FREEZE({
+   199	          uiCapabilityReady: false,
+   200	          featureRegistryActivationAllowed: false,
+   201	          deferredCapabilities: _CAPTURED_OBJECT_FREEZE(['experiment_loop', 'case_timeline']),
+   202	          rationaleI18nKey: 'r3.0e.state.stale-cleared',
+   203	          rationaleParams: _CAPTURED_OBJECT_FREEZE({}),
+   204	        }),
+   205	      });
+   206	    }
+   207	
+   208	    /**
+   209	     * derive({outcome, projection, links}) — produces an authoritative viewmodel state.
+   210	     *
+   211	     * Inputs:
+   212	     *   outcome    — an authoritative outcome envelope from classifier.classifyOutcome
+   213	     *   projection — an authoritative timeline projection from timelineService.projectTimeline
+   214	     *   links      — an array of authoritative follow-up link records (each from createFollowUpLink
+   215	     *                or listFollowUpLinksForParent)
+   216	     *
+   217	     * Any input failing its verifier → error-sanitized state. This is the SAME pattern as
+   218	     * the D5 brief: refuse to mix authoritative + non-authoritative content.
+   219	     */
+   220	    function derive(inputIn) {
+   221	      try {
+   222	        if (!inputIn || typeof inputIn !== 'object') return error();
+   223	        var outcome = inputIn.outcome || null;
+   224	        var projection = inputIn.projection || null;
+   225	        var links = inputIn.links || [];
+   226	
+   227	        // Authority gates.
+   228	        if (outcome !== null && classifier.verifyAuthoritativeOutcome(outcome) !== true) return error();
+   229	        if (projection !== null && timelineService.verifyAuthoritativeTimelineProjection(projection) !== true) return error();
+   230	        if (!_CAPTURED_ARRAY_IS_ARRAY(links)) return error();
+   231	        for (var li = 0; li < links.length; li++) {
+   232	          if (timelineService.verifyAuthoritativeFollowUpLink(links[li]) !== true) return error();
+   233	        }
+   234	
+   235	        // Cross-binding: if outcome AND projection both present, they should refer to
+   236	        // the same case (projection.caseId === <some link's parentCaseId> OR outcome's
+   237	        // experimentId is in the projection's events; we keep the binding LOOSE here
+   238	        // because the data model has no direct outcome→projection link).
+   239	        var caseId = projection !== null ? projection.caseId : null;
+   240	        var sessionId = null; // outcome envelope does not currently carry sessionId; UI shows it from links
+   241	
+   242	        var outcomeClass = outcome !== null ? outcome['class'] : null;
+   243	        var outcomeClassI18nKey = outcomeClass !== null ? ('r3.0e.outcome.class.' + outcomeClass) : null;
+   244	
+   245	        // Activation decision:
+   246	        //   uiCapabilityReady requires BOTH an authoritative outcome AND an authoritative
+   247	        //   projection (the experiment-loop UI surfaces classifier output AND the
+   248	        //   timeline surfaces project history; missing either deferrs activation).
+   249	        //   featureRegistryActivationAllowed mirrors uiCapabilityReady — the feature
+   250	        //   registry entry stays mounted but indicates conditional availability.
+   251	        var uiCapabilityReady = (outcome !== null && projection !== null);
+   252	        var deferred = [];
+   253	        if (outcome === null) deferred.push('experiment_loop');
+   254	        if (projection === null) deferred.push('case_timeline');
+   255	
+   256	        var activation = _CAPTURED_OBJECT_FREEZE({
+   257	          uiCapabilityReady: uiCapabilityReady,
+   258	          featureRegistryActivationAllowed: uiCapabilityReady,
+   259	          deferredCapabilities: _CAPTURED_OBJECT_FREEZE(deferred),
+   260	          rationaleI18nKey: uiCapabilityReady ? 'r3.0e.activation.ready' : 'r3.0e.activation.deferred',
+   261	          rationaleParams: _CAPTURED_OBJECT_FREEZE({
+   262	            outcomeAvailable: outcome !== null,
+   263	            projectionAvailable: projection !== null,
+   264	            linksCount: links.length,
+   265	          }),
+   266	        });
+   267	
+   268	        return _makeState({
+   269	          displayState: uiCapabilityReady ? 'available' : 'unavailable',
+   270	          caseId: caseId,
+
+exec
+/bin/bash -lc "nl -ba renderer/js/feature-registry.js | sed -n '1,260p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+     1	/**
+     2	 * feature-registry.js — R3-UX0: the SINGLE source of truth for feature identity + navigation structure (PURE/UMD).
+     3	 *
+     4	 * FEATURES  — the 23 stable, locale/renderer-invariant Feature IDs (see docs/r3-ux0-feature-id-contract.md).
+     5	 * NAV_NODES — the navigation STRUCTURE (shell sections / setup-library areas / case subviews) that is NOT itself a
+     6	 *             feature but is needed to render navigation (Dashboard/Import/Settings/Comparisons + overview/telemetry).
+     7	 *
+     8	 * Every navigation surface (mainNav, caseNav, the former caseSubviewIds, setupLibraryTabs, the showPane /
+     9	 * setShellSection / setCaseSubview routing) is a PROJECTION of this one structure via the derivation functions
+    10	 * below — no second whitelist. The only place legacy UI-state names (shellSection/currentTab/caseSubview/paneId)
+    11	 * live is `NAV_NODES[].legacyRouting` + `FEATURES[].rendererAdapter`.
+    12	 *
+    13	 * UMD: Node require / Electron renderer global (FeatureRegistry).
+    14	 */
+    15	(function (root) {
+    16	  'use strict';
+    17	
+    18	  // ── NAV_NODES — navigation structure (not features) ──
+    19	  var NAV_NODES = {
+    20	    dashboard: { id: 'dashboard', kind: 'shell_section', labelKey: 'nav.dashboard', order: 0, availability: 'available', legacyRouting: { shellSection: 'dashboard', currentTab: 'dashboard' } },
+    21	    cases: { id: 'cases', kind: 'shell_section', labelKey: 'nav.cases', order: 1, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'overview', currentTab: 'analysis' } },
+    22	    import: { id: 'import', kind: 'shell_section', labelKey: 'nav.import', order: 2, availability: 'available', legacyRouting: { shellSection: 'import', caseSubview: 'overview', currentTab: 'analysis' } },
+    23	    setup_library: { id: 'setup_library', kind: 'shell_section', labelKey: 'nav.setup_library', order: 3, availability: 'available', legacyRouting: { shellSection: 'setup_library' } },
+    24	    comparisons: { id: 'comparisons', kind: 'shell_section', labelKey: 'nav.comparisons', order: 4, availability: 'available', legacyRouting: { shellSection: 'comparisons', currentTab: 'comparisons' } },
+    25	    settings: { id: 'settings', kind: 'shell_section', labelKey: 'nav.settings', order: 5, availability: 'available', legacyRouting: { shellSection: 'settings', currentTab: 'guide' } },
+    26	    // setup-library areas
+    27	    'setuplib:vehicle_setup': { id: 'setuplib:vehicle_setup', kind: 'setuplib_area', parentNodeId: 'setup_library', labelKey: 'setuplib.area.vehicle_setup', order: 0, availability: 'available' },
+    28	    'setuplib:engineering_tools': { id: 'setuplib:engineering_tools', kind: 'setuplib_area', parentNodeId: 'setup_library', labelKey: 'setuplib.area.engineering_tools', order: 1, availability: 'available' },
+    29	    'setuplib:analysis_support': { id: 'setuplib:analysis_support', kind: 'setuplib_area', parentNodeId: 'setup_library', labelKey: 'setuplib.area.analysis_support', order: 2, availability: 'available' },
+    30	    // case subviews (parent 'cases'); overview + telemetry are nav nodes, not features
+    31	    'case:overview': { id: 'case:overview', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'overview', labelKey: 'casenav.overview', order: 0, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'overview', currentTab: 'analysis' } },
+    32	    'case:setup_model': { id: 'case:setup_model', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'setup_model', labelKey: 'casenav.setup_model', order: 1, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'setup_model', currentTab: 'predict' } },
+    33	    'case:telemetry': { id: 'case:telemetry', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'telemetry', labelKey: 'casenav.telemetry', order: 2, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'telemetry', currentTab: 'analysis' } },
+    34	    'case:measured_metrics': { id: 'case:measured_metrics', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'measured_metrics', labelKey: 'casenav.measured_metrics', order: 3, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'measured_metrics', currentTab: 'analysis' } },
+    35	    'case:model_vs_actual': { id: 'case:model_vs_actual', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'model_vs_actual', labelKey: 'casenav.model_vs_actual', order: 4, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'model_vs_actual', currentTab: 'analysis' } },
+    36	    'case:recommendations': { id: 'case:recommendations', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'recommendations', labelKey: 'casenav.recommendations', order: 5, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'recommendations', currentTab: 'analysis' } },
+    37	    'case:corner_coaching': { id: 'case:corner_coaching', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'corner_coaching', labelKey: 'casenav.corner_coaching', order: 6, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'corner_coaching', currentTab: 'analysis' } },
+    38	    'case:evidence_trust': { id: 'case:evidence_trust', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'evidence_trust', labelKey: 'casenav.evidence_trust', order: 7, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'evidence_trust', currentTab: 'analysis' } },
+    39	    // R3.0D D5 — Engineer Brief subview. Mounts the render-only Engineer Brief pane wired via
+    40	    // R3_0D_EngineerOrchestrator (case/session-scoped; cleared on case/session/mapping/calibration
+    41	    // /telemetry change). Activation governed by governance/r3.0d/state.json
+    42	    // (featureRegistryActivationAllowed=true at D5_ENGINEER_BRIEF_ACTIVATION).
+    43	    'case:engineer_brief': { id: 'case:engineer_brief', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'engineer_brief', labelKey: 'casenav.engineer_brief', order: 8, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'engineer_brief', currentTab: 'analysis' } },
+    44	    // R3.0E E5 — Experiment Loop + Case Timeline subviews. Mount the render-only viewmodel
+    45	    // pane wired via R3_0E_ExperimentViewmodel (case/session-scoped; cleared on case/session/
+    46	    // applied-change change). Activation governed by governance/r3.0e/state.json
+    47	    // (featureRegistryActivationAllowed=true at E5_UI_ACTIVATION).
+    48	    'case:experiment_loop': { id: 'case:experiment_loop', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'experiment_loop', labelKey: 'casenav.experiment_loop', order: 9, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'experiment_loop', currentTab: 'analysis' } },
+    49	    'case:case_timeline': { id: 'case:case_timeline', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'case_timeline', labelKey: 'casenav.case_timeline', order: 10, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'case_timeline', currentTab: 'analysis' } },
+    50	  };
+    51	
+    52	  // ── FEATURES — the 23 stable Feature IDs ──
+    53	  function F(id, area, navNodeId, paneId, opts) {
+    54	    opts = opts || {};
+    55	    var e = { id: id, area: area, labelKey: 'feat.' + id, descriptionKey: 'feat.' + id + '.desc', availability: opts.availability || 'available', navNodeId: navNodeId, capabilities: opts.capabilities || [], allowedActions: opts.allowedActions || [], entryPoints: opts.entryPoints || { desktop: true, mobile: true } };
+    56	    if (opts.deferredReason) e.deferredReason = opts.deferredReason;
+    57	    if (paneId) e.rendererAdapter = { paneId: paneId, focusTarget: opts.focusTarget || null };
+    58	    return e;
+    59	  }
+    60	  var FEATURES = {
+    61	    // A — Vehicle & Setup (predict pane → fixes the Setup-Library orphan)
+    62	    vehicle_presets: F('vehicle_presets', 'vehicle_setup', 'setuplib:vehicle_setup', 'predict', { focusTarget: 'vp-browser', allowedActions: ['browse', 'build_draft'] }),
+    63	    vehicle_preset_detail: F('vehicle_preset_detail', 'vehicle_setup', 'setuplib:vehicle_setup', 'predict', { focusTarget: 'vp-detail', allowedActions: ['browse'], entryPoints: { desktop: false, mobile: false } }),
+    64	    custom_setup: F('custom_setup', 'vehicle_setup', 'setuplib:vehicle_setup', 'predict', { focusTarget: 'custom-setup', allowedActions: ['edit'] }),
+    65	    handling_prediction: F('handling_prediction', 'vehicle_setup', 'setuplib:vehicle_setup', 'predict', { focusTarget: 'handling-gauge', capabilities: ['Physics', 'Model'] }),
+    66	    // B — Engineering Tools
+    67	    spring_calculator: F('spring_calculator', 'engineering_tools', 'setuplib:engineering_tools', 'spring'),
+    68	    arb_calculator: F('arb_calculator', 'engineering_tools', 'setuplib:engineering_tools', 'spring', { focusTarget: 'arb-section' }),
+    69	    suspension_kinematics: F('suspension_kinematics', 'engineering_tools', 'setuplib:engineering_tools', 'spring', { focusTarget: 'kinematics-section' }),
+    70	    corner_weight: F('corner_weight', 'engineering_tools', 'setuplib:engineering_tools', 'predict', { focusTarget: 'corner-weight-section' }),
+    71	    tire_analysis: F('tire_analysis', 'engineering_tools', 'setuplib:engineering_tools', 'tire'),
+    72	    wheel_upgrade: F('wheel_upgrade', 'engineering_tools', 'setuplib:engineering_tools', 'predict', { focusTarget: 'wheel-upgrade-section' }),
+    73	    // C — Analysis & Support
+    74	    setup_advisor: F('setup_advisor', 'analysis_support', 'setuplib:analysis_support', 'advisor'),
+    75	    lihpao_simulator: F('lihpao_simulator', 'analysis_support', 'setuplib:analysis_support', 'lihpao'),
+    76	    telemetry_viewer: F('telemetry_viewer', 'analysis_support', 'setuplib:analysis_support', 'telemetry'),
+    77	    // Case-scoped
+    78	    analysis_cases: F('analysis_cases', 'case_scoped', 'cases', 'analysis'),
+    79	    case_setup_model: F('case_setup_model', 'case_scoped', 'case:setup_model', 'predict'),
+    80	    measured_metrics: F('measured_metrics', 'case_scoped', 'case:measured_metrics', 'analysis', { availability: 'available_conditional' }),
+    81	    model_vs_actual: F('model_vs_actual', 'case_scoped', 'case:model_vs_actual', 'analysis', { availability: 'available_conditional' }),
+    82	    recommendations: F('recommendations', 'case_scoped', 'case:recommendations', 'analysis', { availability: 'available_conditional' }),
+    83	    corner_coaching: F('corner_coaching', 'case_scoped', 'case:corner_coaching', 'analysis', { availability: 'available_conditional' }),
+    84	    evidence_trust: F('evidence_trust', 'case_scoped', 'case:evidence_trust', 'analysis'),
+    85	    // R3.0D D5 — Engineer Brief feature. case_scoped; available_conditional because the
+    86	    // pane only populates when the case carries an authoritative D3/D4/D5 chain (no
+    87	    // hypothesis set → 'unavailable' / 'inconclusive' display state, NOT a missing feature).
+    88	    engineer_brief: F('engineer_brief', 'case_scoped', 'case:engineer_brief', 'analysis', { availability: 'available_conditional' }),
+    89	    // R3.0E E5 — Experiment Loop + Case Timeline features. case_scoped;
+    90	    // available_conditional because the panes only populate when the case carries an
+    91	    // authoritative E3 outcome (Experiment Loop) AND an authoritative E4 projection
+    92	    // (Case Timeline). When either is missing, the viewmodel returns 'unavailable'
+    93	    // display state. NOT a missing feature — the registry entry stays mounted with
+    94	    // its deferred-rationale i18n key (handled by the host wiring layer).
+    95	    experiment_loop: F('experiment_loop', 'case_scoped', 'case:experiment_loop', 'analysis', { availability: 'available_conditional' }),
+    96	    case_timeline: F('case_timeline', 'case_scoped', 'case:case_timeline', 'analysis', { availability: 'available_conditional' }),
+    97	    // R3.0C — activated at C8_ACTIVATION (governance/r3.0c/state.json featureRegistryActivationAllowed=true).
+    98	    // Pane id 'comparisons' is served by the Comparison Workspace UI (renderer/index.html data-r3c-c7-pane).
+    99	    // Same-Analysis-Case / same-session scope is enforced by the orchestrator + viewmodel; feature-router only
+   100	    // resolves the route (shellSection=comparisons / currentTab=comparisons via NAV_NODES.comparisons.legacyRouting).
+   101	    // Mobile entry point stays false: the workspace is a multi-pane desktop surface.
+   102	    case_comparison: F('case_comparison', 'case_comparison', 'comparisons', 'comparisons', { allowedActions: ['compare'], entryPoints: { desktop: true, mobile: false } }),
+   103	    reference_lap: F('reference_lap', 'case_comparison', 'comparisons', 'comparisons', { allowedActions: ['select_reference'], entryPoints: { desktop: true, mobile: false } }),
+   104	    corner_delta: F('corner_delta', 'case_comparison', 'comparisons', 'comparisons', { allowedActions: ['inspect_corner'], entryPoints: { desktop: true, mobile: false } }),
+   105	  };
+   106	
+   107	  // ── derivation (the single projection algorithm) ──
+   108	  function _byOrder(a, b) { return (a.order || 0) - (b.order || 0); }
+   109	  function _nodes(kind) { return Object.keys(NAV_NODES).map(function (k) { return NAV_NODES[k]; }).filter(function (n) { return n.kind === kind; }).sort(_byOrder); }
+   110	  function _features() { return Object.keys(FEATURES).map(function (k) { return FEATURES[k]; }); }
+   111	
+   112	  function deriveMainNav() { return _nodes('shell_section').map(function (n) { var o = { id: n.id, labelKey: n.labelKey }; if (n.availability === 'deferred') o.deferred = n.deferredReason; return o; }); }
+   113	  function deriveCaseNav() { return _nodes('case_subview').map(function (n) { return { id: n.subviewId, labelKey: n.labelKey }; }); }
+   114	  function deriveCaseSubviewIds() { return _nodes('case_subview').map(function (n) { return n.subviewId; }); }
+   115	  function deriveSetupLibraryAreas() {
+   116	    return _nodes('setuplib_area').map(function (area) {
+   117	      var feats = _features().filter(function (f) { return f.navNodeId === area.id && f.entryPoints && f.entryPoints.desktop === true; })
+   118	        .map(function (f) { return { id: f.id, labelKey: f.labelKey, descriptionKey: f.descriptionKey, availability: f.availability, allowedActions: f.allowedActions }; });
+   119	      return { areaId: area.id, labelKey: area.labelKey, features: feats };
+   120	    });
+   121	  }
+   122	  // the pane-id whitelist for the setup_library section — DERIVED (replaces the inline array; INCLUDES 'predict')
+   123	  function deriveSetupLibraryPaneIds() {
+   124	    var set = {}; _features().forEach(function (f) { if ((f.area === 'vehicle_setup' || f.area === 'engineering_tools' || f.area === 'analysis_support') && f.rendererAdapter) set[f.rendererAdapter.paneId] = true; });
+   125	    return Object.keys(set);
+   126	  }
+   127	
+   128	  function getFeature(id) { return FEATURES[id] || null; }
+   129	  function getNode(id) { return NAV_NODES[id] || null; }
+   130	
+   131	  // NOTE: featureId → legacy UI-state (shellSection/currentTab/caseSubview) is constructed ONLY in feature-router.js
+   132	  // (the single translator). The registry stays declarative data (FEATURES/NAV_NODES) + navigation derivations.
+   133	
+   134	  function getFeatureBreadcrumb(featureId) {
+   135	    var f = FEATURES[featureId]; if (!f) return [];
+   136	    var crumbs = [], node = NAV_NODES[f.navNodeId];
+   137	    if (node && node.kind === 'setuplib_area') { crumbs.push({ id: 'setup_library', labelKey: NAV_NODES.setup_library.labelKey }); crumbs.push({ id: node.id, labelKey: node.labelKey }); }
+   138	    else if (node && node.parentNodeId) { var p = NAV_NODES[node.parentNodeId]; if (p) crumbs.push({ id: p.id, labelKey: p.labelKey }); crumbs.push({ id: node.id, labelKey: node.labelKey }); }
+   139	    else if (node) { crumbs.push({ id: node.id, labelKey: node.labelKey }); }
+   140	    crumbs.push({ id: f.id, labelKey: f.labelKey });
+   141	    return crumbs;
+   142	  }
+   143	  function isFeatureReachable(featureId) {
+   144	    var f = FEATURES[featureId]; if (!f) return false;
+   145	    if (f.availability === 'deferred') return true; // reachable as an explicit deferred panel
+   146	    return !!(f.navNodeId && NAV_NODES[f.navNodeId] && (f.rendererAdapter || f.area === 'deferred'));
+   147	  }
+   148	  function getFeatureEntryPoints(featureId) { var f = FEATURES[featureId]; return f ? f.entryPoints : null; }
+   149	
+   150	  // registry self-validation (used by contract tests)
+   151	  function validateRegistry() {
+   152	    var errors = [];
+   153	    var ids = Object.keys(FEATURES);
+   154	    var seen = {};
+   155	    ids.forEach(function (id) {
+   156	      var f = FEATURES[id];
+   157	      if (f.id !== id) errors.push('id_mismatch:' + id);
+   158	      if (seen[id]) errors.push('duplicate_id:' + id); seen[id] = true;
+   159	      ['id', 'area', 'labelKey', 'availability', 'navNodeId', 'entryPoints'].forEach(function (k) { if (f[k] === undefined || f[k] === null) errors.push('missing_field:' + id + '.' + k); });
+   160	      if (!NAV_NODES[f.navNodeId]) errors.push('dangling_navNode:' + id + '->' + f.navNodeId);
+   161	      if (f.availability === 'deferred') { if (!f.deferredReason) errors.push('deferred_no_reason:' + id); }
+   162	      else if (!f.rendererAdapter) errors.push('no_renderer_adapter:' + id);
+   163	      if (f.availability !== 'deferred' && !isFeatureReachable(id)) errors.push('unreachable:' + id);
+   164	    });
+   165	    return { ok: errors.length === 0, errors: errors };
+   166	  }
+   167	
+   168	  var api = {
+   169	    FEATURES: FEATURES, NAV_NODES: NAV_NODES,
+   170	    getFeature: getFeature, getNode: getNode,
+   171	    deriveMainNav: deriveMainNav, deriveCaseNav: deriveCaseNav, deriveCaseSubviewIds: deriveCaseSubviewIds,
+   172	    deriveSetupLibraryAreas: deriveSetupLibraryAreas, deriveSetupLibraryPaneIds: deriveSetupLibraryPaneIds,
+   173	    getFeatureBreadcrumb: getFeatureBreadcrumb,
+   174	    isFeatureReachable: isFeatureReachable, getFeatureEntryPoints: getFeatureEntryPoints,
+   175	    validateRegistry: validateRegistry,
+   176	  };
+   177	  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+   178	  if (root) root.FeatureRegistry = api;
+   179	})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+exec
+/bin/bash -lc "rg -n \"verifyAuthoritativeOutcome|verifyAuthoritativeTimelineProjection|verifyAuthoritativeFollowUpLink|Object\\.getOwnPropertyNames|DISPLAY_STATES.indexOf|outcomeClassI18nKey|disclaimers|deferredCapabilities|featureRegistryActivationAllowed\" renderer/js tests contracts" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+contracts/r3.0e/reason-codes.js:100:      var names = Object.getOwnPropertyNames(o);
+contracts/r3.0e/reason-codes.js:146:        var names = Object.getOwnPropertyNames(v);
+contracts/r3.0d/hardened-intrinsics.js:67:  var _ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
+contracts/r3.0d/hardened-intrinsics.js:178:  // safeGetOwnPropertyNames(obj) — Object.getOwnPropertyNames via captured ref. Returns ALL
+tests/r3-0c-activation.test.js:11: *     featureRegistryActivationAllowed=true, feature_registry_active in enabledCapabilities,
+tests/r3-0c-activation.test.js:97:  chk('state.featureRegistryActivationAllowed=true', st.featureRegistryActivationAllowed === true);
+tests/r3-0c-activation.test.js:159:  chk('C8 manifest activationContract.featureRegistryActivationAllowed=true', mf.activationContract && mf.activationContract.featureRegistryActivationAllowed === true);
+tests/r3.0a-ui.test.js:88:// governance/r3.0c/state.json.featureRegistryActivationAllowed=false (C0–C7). After C8 flips the
+tests/r3.0a-ui.test.js:91:var _r30cActAllowed = (function () { try { var p = require('path'); var fsm = require('fs'); var st = JSON.parse(fsm.readFileSync(p.join(__dirname, '..', 'governance', 'r3.0c', 'state.json'), 'utf8')); return st && st.featureRegistryActivationAllowed === true; } catch (_) { return false; } })();
+tests/r3-0c-no-consumer.test.js:92:  // featureRegistryActivationAllowed=true, or the deferred contract while it is still false. Both
+tests/feature-registry.test.js:8: * shapes depending on governance/r3.0c/state.json.featureRegistryActivationAllowed:
+tests/feature-registry.test.js:26:    return st && st.featureRegistryActivationAllowed === true;
+renderer/js/r3-0e-outcome-classifier.js:48: *     in a closure-private WeakSet. The exported verifyAuthoritativeOutcome(candidate)
+renderer/js/r3-0e-outcome-classifier.js:81:  var _CAPTURED_OBJECT_GET_OWN_NAMES = Object.getOwnPropertyNames;
+renderer/js/r3-0e-outcome-classifier.js:258:  // After successful classifyOutcome → registered. The exported verifyAuthoritativeOutcome
+renderer/js/r3-0e-outcome-classifier.js:265:  function verifyAuthoritativeOutcome(candidate) {
+renderer/js/r3-0e-outcome-classifier.js:1147:    verifyAuthoritativeOutcome: verifyAuthoritativeOutcome,
+renderer/js/r3-0e-stores.js:78:    var keys = Object.getOwnPropertyNames(v);
+renderer/js/case-record-schema.js:54:        var ak = Object.getOwnPropertyNames(v);
+renderer/js/case-record-schema.js:62:        var names = Object.getOwnPropertyNames(v);
+tests/r3.0e-followup-timeline.test.js:48:  chk('A5: link verifies via verifyAuthoritativeFollowUpLink',
+tests/r3.0e-followup-timeline.test.js:49:    r.valid === true && SVC.verifyAuthoritativeFollowUpLink(r.link) === true);
+tests/r3.0e-followup-timeline.test.js:55:    SVC.verifyAuthoritativeFollowUpLink(got) === true);
+tests/r3.0e-followup-timeline.test.js:117:    list.every(function (l) { return SVC.verifyAuthoritativeFollowUpLink(l); }));
+tests/r3.0e-followup-timeline.test.js:266:  chk('J3: projection verifies via verifyAuthoritativeTimelineProjection',
+tests/r3.0e-followup-timeline.test.js:267:    SVC.verifyAuthoritativeTimelineProjection(p1.projection) === true);
+tests/r3.0e-followup-timeline.test.js:274:  chk('J6: cloned projection does NOT verify', SVC.verifyAuthoritativeTimelineProjection(cloned) === false);
+tests/r3.0e-followup-timeline.test.js:324:    SVC.verifyAuthoritativeTimelineProjection(pB.projection) === true);
+tests/r3.0e-followup-timeline.test.js:359:  chk('N3: verifyAuthoritativeFollowUpLink exported', typeof SVC.verifyAuthoritativeFollowUpLink === 'function');
+tests/r3.0e-followup-timeline.test.js:360:  chk('N4: verifyAuthoritativeTimelineProjection exported', typeof SVC.verifyAuthoritativeTimelineProjection === 'function');
+tests/r3.0e-followup-timeline.test.js:378:  chk('O1: null link → false', SVC.verifyAuthoritativeFollowUpLink(null) === false);
+tests/r3.0e-followup-timeline.test.js:379:  chk('O2: empty obj link → false', SVC.verifyAuthoritativeFollowUpLink({}) === false);
+tests/r3.0e-followup-timeline.test.js:380:  chk('O3: number link → false', SVC.verifyAuthoritativeFollowUpLink(42) === false);
+tests/r3.0e-followup-timeline.test.js:381:  chk('O4: null projection → false', SVC.verifyAuthoritativeTimelineProjection(null) === false);
+tests/r3.0e-followup-timeline.test.js:382:  chk('O5: empty obj projection → false', SVC.verifyAuthoritativeTimelineProjection({}) === false);
+tests/r3.0e-followup-timeline.test.js:566:      && Object.getOwnPropertyNames(list[0]).sort().join(',') === 'createdAt,experimentId,followUpCaseId,linkId,parentCaseId,parentStatus,schemaVersion');
+tests/r3.0e-followup-timeline.test.js:567:  chk('R2.verifies: listed link verifies via verifyAuthoritativeFollowUpLink',
+tests/r3.0e-followup-timeline.test.js:568:    SVC.verifyAuthoritativeFollowUpLink(list[0]) === true);
+tests/r3.0e-followup-timeline.test.js:728:      Object.getOwnPropertyNames(list[0]).indexOf('injectedField') === -1
+tests/r3.0e-followup-timeline.test.js:731:      SVC.verifyAuthoritativeFollowUpLink(list[0]) === true);
+tests/r3.0e-followup-timeline.test.js:780:        || SVC.verifyAuthoritativeFollowUpLink(list[0]) === true);
+tests/r3.0e-outcome-classifier.test.js:38:  var names = Object.getOwnPropertyNames(v);
+tests/r3.0e-outcome-classifier.test.js:151:  chk('A13: confirmed passes verifyAuthoritativeOutcome',
+tests/r3.0e-outcome-classifier.test.js:152:    r.valid === true && CL.verifyAuthoritativeOutcome(r.outcome) === true);
+tests/r3.0e-outcome-classifier.test.js:428:  chk('K0 setup: confirmed verifies', r.valid === true && CL.verifyAuthoritativeOutcome(r.outcome));
+tests/r3.0e-outcome-classifier.test.js:432:    CL.verifyAuthoritativeOutcome(cloned) === false);
+tests/r3.0e-outcome-classifier.test.js:437:      CL.verifyAuthoritativeOutcome(sc) === false);
+tests/r3.0e-outcome-classifier.test.js:452:    CL.verifyAuthoritativeOutcome(forged) === false);
+tests/r3.0e-outcome-classifier.test.js:464:  // Proxy input wrapper — descriptor snapshot should reject (Object.getOwnPropertyNames
+tests/r3.0e-outcome-classifier.test.js:652:// Section R — verifyAuthoritativeOutcome boundary
+tests/r3.0e-outcome-classifier.test.js:654:console.log('Section R — verifyAuthoritativeOutcome');
+tests/r3.0e-outcome-classifier.test.js:656:  chk('R1: null candidate → false', CL.verifyAuthoritativeOutcome(null) === false);
+tests/r3.0e-outcome-classifier.test.js:657:  chk('R2: undefined → false', CL.verifyAuthoritativeOutcome(undefined) === false);
+tests/r3.0e-outcome-classifier.test.js:658:  chk('R3: primitive → false', CL.verifyAuthoritativeOutcome('outcome_abc') === false);
+tests/r3.0e-outcome-classifier.test.js:659:  chk('R4: empty object → false', CL.verifyAuthoritativeOutcome({}) === false);
+tests/r3.0e-outcome-classifier.test.js:660:  chk('R5: number → false', CL.verifyAuthoritativeOutcome(42) === false);
+tests/r3.0e-outcome-classifier.test.js:677:    CL.verifyAuthoritativeOutcome(fakeOutcome) === false);
+tests/r3.0e-outcome-classifier.test.js:687:  chk('S3: API exports verifyAuthoritativeOutcome', typeof CL.verifyAuthoritativeOutcome === 'function');
+tests/r3.0e-outcome-classifier.test.js:1165:    + 'function df(v){if(v&&typeof v==="object"&&!Object.isFrozen(v)){Object.freeze(v);Object.getOwnPropertyNames(v).forEach(function(k){df(v[k]);});}return v;}'
+tests/r3.0e-outcome-classifier.test.js:1186:    + 'var verified=r.valid===true?CL.verifyAuthoritativeOutcome(r.outcome):false;'
+tests/r3.0e-outcome-classifier.test.js:1234:    + 'function df(v){if(v&&typeof v==="object"&&!Object.isFrozen(v)){Object.freeze(v);Object.getOwnPropertyNames(v).forEach(function(k){df(v[k]);});}return v;}'
+tests/r3.0e-outcome-classifier.test.js:1466:    + 'function df(v){if(v&&typeof v==="object"&&!Object.isFrozen(v)){Object.freeze(v);Object.getOwnPropertyNames(v).forEach(function(k){df(v[k]);});}return v;}'
+renderer/js/r3-0e-followup-timeline.js:12: *   verifyAuthoritativeFollowUpLink(candidate)
+renderer/js/r3-0e-followup-timeline.js:13: *   verifyAuthoritativeTimelineProjection(candidate)
+renderer/js/r3-0e-followup-timeline.js:58:  var _CAPTURED_OBJECT_GET_OWN_NAMES = Object.getOwnPropertyNames;
+renderer/js/r3-0e-followup-timeline.js:315:  function verifyAuthoritativeFollowUpLink(candidate) {
+renderer/js/r3-0e-followup-timeline.js:328:  function verifyAuthoritativeTimelineProjection(candidate) {
+renderer/js/r3-0e-followup-timeline.js:790:    verifyAuthoritativeFollowUpLink: verifyAuthoritativeFollowUpLink,
+renderer/js/r3-0e-followup-timeline.js:791:    verifyAuthoritativeTimelineProjection: verifyAuthoritativeTimelineProjection,
+tests/r3-0-phase-no-consumer.test.js:121:  const r1 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/maybe-consumer.js' }], enabledCapabilities: goodEnabled, runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
+tests/r3-0-phase-no-consumer.test.js:124:  const r2 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/maybe-consumer.js', capability: 'evidence_graph_present', extra: 1 }], enabledCapabilities: goodEnabled, runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
+tests/r3-0-phase-no-consumer.test.js:127:  const r3 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: '../renderer/js/x.js', capability: 'evidence_graph_present' }], enabledCapabilities: goodEnabled, runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
+tests/r3-0-phase-no-consumer.test.js:130:  const r4 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/*.js', capability: 'evidence_graph_present' }], enabledCapabilities: goodEnabled, runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, consumerSrc);
+tests/r3-0-phase-no-consumer.test.js:133:  const r5 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/x.js', capability: 'evidence_graph_present' }, { path: 'renderer/js/x.js', capability: 'evidence_graph_present' }], enabledCapabilities: goodEnabled, runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, '// clean\n');
+tests/r3-0-phase-no-consumer.test.js:138:  const r6 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/r3-0d-evidence-graph.js', capability: ' evidence_graph_present' }], enabledCapabilities: goodEnabled, runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, '// clean\n');
+tests/r3-0-phase-no-consumer.test.js:141:  const r7 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/r3-0d-evidence-graph.js', capability: 'not_a_real_cap' }], enabledCapabilities: goodEnabled, runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, '// clean\n');
+tests/r3-0-phase-no-consumer.test.js:144:  const r8 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D2_EVIDENCE_GRAPH', authorizedProductionPaths: [{ path: 'renderer/js/r3-0d-evidence-graph.js', capability: 'evidence_graph_present' }], enabledCapabilities: ['contract_foundation_present'], runtimeConsumersAllowed: true, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: true }, '// clean\n');
+tests/r3-0-phase-no-consumer.test.js:147:  const r9 = runWithSyntheticState('R3.0D', { schemaVersion: 1, program: 'R3.0D', currentCheckpoint: 'D1_CONTRACT_FOUNDATION', authorizedProductionPaths: [{ path: 'renderer/js/r3-0d-evidence-graph.js', capability: 'evidence_graph_present' }], enabledCapabilities: ['contract_foundation_present', 'evidence_graph_present'], runtimeConsumersAllowed: false, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: false }, '// clean\n');
+tests/r3.0c-contract-foundation.test.js:516://      governance/r3.0c/state.json.featureRegistryActivationAllowed=true. This assertion now reads
+tests/r3.0c-contract-foundation.test.js:519:const _r30cActAllowed = (function () { try { return JSON.parse(fs.readFileSync(path.join(REPO, 'governance', 'r3.0c', 'state.json'), 'utf8')).featureRegistryActivationAllowed === true; } catch (_) { return false; } })();
+tests/r3.0c-contract-foundation.test.js:534:// featureRegistryActivationAllowed flag is true AND feature-registry.js is among the
+tests/r3.0c-contract-foundation.test.js:549:    if (st && st.featureRegistryActivationAllowed === true && Array.isArray(st.authorizedProductionPaths)) {
+renderer/js/r3-0e-experiment-viewmodel.js:19: *     featureRegistryActivationAllowed, deferredCapabilities[]). The UI host wiring
+renderer/js/r3-0e-experiment-viewmodel.js:63:    try { names = Object.getOwnPropertyNames(v); } catch (e) { return v; }
+renderer/js/r3-0e-experiment-viewmodel.js:92:      if (DISPLAY_STATES.indexOf(candidate.displayState) === -1) return false;
+renderer/js/r3-0e-experiment-viewmodel.js:103:   *   `classifier`     — R3_0E_OutcomeClassifier module (has verifyAuthoritativeOutcome)
+renderer/js/r3-0e-experiment-viewmodel.js:104:   *   `timelineModule` — R3_0E_FollowUpTimeline module (has verifyAuthoritativeTimelineProjection
+renderer/js/r3-0e-experiment-viewmodel.js:105:   *                       + verifyAuthoritativeFollowUpLink as module-level statics)
+renderer/js/r3-0e-experiment-viewmodel.js:127:    if (!classifier || typeof classifier.verifyAuthoritativeOutcome !== 'function') {
+renderer/js/r3-0e-experiment-viewmodel.js:131:        || typeof timelineModule.verifyAuthoritativeTimelineProjection !== 'function'
+renderer/js/r3-0e-experiment-viewmodel.js:132:        || typeof timelineModule.verifyAuthoritativeFollowUpLink !== 'function') {
+renderer/js/r3-0e-experiment-viewmodel.js:147:        outcomeClassI18nKey: opts.outcomeClassI18nKey || null,
+renderer/js/r3-0e-experiment-viewmodel.js:153:        disclaimers: _CAPTURED_OBJECT_FREEZE([
+renderer/js/r3-0e-experiment-viewmodel.js:171:          featureRegistryActivationAllowed: false,
+renderer/js/r3-0e-experiment-viewmodel.js:172:          deferredCapabilities: _CAPTURED_OBJECT_FREEZE(['experiment_loop', 'case_timeline']),
+renderer/js/r3-0e-experiment-viewmodel.js:186:          featureRegistryActivationAllowed: false,
+renderer/js/r3-0e-experiment-viewmodel.js:187:          deferredCapabilities: _CAPTURED_OBJECT_FREEZE(['experiment_loop', 'case_timeline']),
+renderer/js/r3-0e-experiment-viewmodel.js:200:          featureRegistryActivationAllowed: false,
+renderer/js/r3-0e-experiment-viewmodel.js:201:          deferredCapabilities: _CAPTURED_OBJECT_FREEZE(['experiment_loop', 'case_timeline']),
+renderer/js/r3-0e-experiment-viewmodel.js:228:        if (outcome !== null && classifier.verifyAuthoritativeOutcome(outcome) !== true) return error();
+renderer/js/r3-0e-experiment-viewmodel.js:229:        if (projection !== null && timelineService.verifyAuthoritativeTimelineProjection(projection) !== true) return error();
+renderer/js/r3-0e-experiment-viewmodel.js:232:          if (timelineService.verifyAuthoritativeFollowUpLink(links[li]) !== true) return error();
+renderer/js/r3-0e-experiment-viewmodel.js:243:        var outcomeClassI18nKey = outcomeClass !== null ? ('r3.0e.outcome.class.' + outcomeClass) : null;
+renderer/js/r3-0e-experiment-viewmodel.js:249:        //   featureRegistryActivationAllowed mirrors uiCapabilityReady — the feature
+renderer/js/r3-0e-experiment-viewmodel.js:258:          featureRegistryActivationAllowed: uiCapabilityReady,
+renderer/js/r3-0e-experiment-viewmodel.js:259:          deferredCapabilities: _CAPTURED_OBJECT_FREEZE(deferred),
+renderer/js/r3-0e-experiment-viewmodel.js:274:          outcomeClassI18nKey: outcomeClassI18nKey,
+renderer/js/r3-0d-evidence-graph.js:152:  var _ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
+tests/r3.0d-engineer-brief.test.js:537:  chk('O4: activation.featureRegistryActivationAllowed is boolean',
+tests/r3.0d-engineer-brief.test.js:538:    typeof a.featureRegistryActivationAllowed === 'boolean');
+tests/r3.0d-engineer-brief.test.js:539:  chk('O5: activation.deferredCapabilities is array',
+tests/r3.0d-engineer-brief.test.js:540:    Array.isArray(a.deferredCapabilities));
+tests/r3.0d-engineer-brief.test.js:541:  chk('O6: featureRegistryActivationAllowed implies uiCapabilityReady',
+tests/r3.0d-engineer-brief.test.js:542:    a.featureRegistryActivationAllowed === false || a.uiCapabilityReady === true);
+renderer/js/feature-registry.js:42:    // (featureRegistryActivationAllowed=true at D5_ENGINEER_BRIEF_ACTIVATION).
+renderer/js/feature-registry.js:47:    // (featureRegistryActivationAllowed=true at E5_UI_ACTIVATION).
+renderer/js/feature-registry.js:97:    // R3.0C — activated at C8_ACTIVATION (governance/r3.0c/state.json featureRegistryActivationAllowed=true).
+tests/r3-0c-governance.test.js:91:    featureRegistryActivationAllowed: false,
+tests/r3-0c-governance.test.js:119:  chk('A8 real-repo featureActivationAllowed=true (C8 reached)', r.artifact && r.artifact.featureRegistryActivationAllowed === true);
+tests/r3-0c-governance.test.js:254:  const state = baseC0State(); state.featureRegistryActivationAllowed = true;
+tests/r3.0e-experiment-viewmodel.test.js:8: *   - activation gate signals (uiCapabilityReady, featureRegistryActivationAllowed,
+tests/r3.0e-experiment-viewmodel.test.js:9: *     deferredCapabilities)
+tests/r3.0e-experiment-viewmodel.test.js:15: *   - disclaimers always present
+tests/r3.0e-experiment-viewmodel.test.js:34:  Object.getOwnPropertyNames(v).forEach(function (k) { deepFreeze(v[k]); });
+tests/r3.0e-experiment-viewmodel.test.js:148:  chk('B3: outcomeClassI18nKey set',
+tests/r3.0e-experiment-viewmodel.test.js:149:    state.outcomeClassI18nKey === 'r3.0e.outcome.class.confirmed');
+tests/r3.0e-experiment-viewmodel.test.js:153:  chk('B7: activation.featureRegistryActivationAllowed = true', state.activation.featureRegistryActivationAllowed === true);
+tests/r3.0e-experiment-viewmodel.test.js:154:  chk('B8: activation.deferredCapabilities = []', state.activation.deferredCapabilities.length === 0);
+tests/r3.0e-experiment-viewmodel.test.js:158:  chk('B12: disclaimers always present',
+tests/r3.0e-experiment-viewmodel.test.js:159:    state.disclaimers.length === 4
+tests/r3.0e-experiment-viewmodel.test.js:160:      && state.disclaimers.indexOf('r3.0e.disclaimer.no_causation') !== -1
+tests/r3.0e-experiment-viewmodel.test.js:161:      && state.disclaimers.indexOf('r3.0e.disclaimer.no_driver_blame') !== -1
+tests/r3.0e-experiment-viewmodel.test.js:162:      && state.disclaimers.indexOf('r3.0e.disclaimer.no_auto_setup') !== -1
+tests/r3.0e-experiment-viewmodel.test.js:163:      && state.disclaimers.indexOf('r3.0e.disclaimer.same_case_session_only') !== -1);
+tests/r3.0e-experiment-viewmodel.test.js:179:    s1.activation.deferredCapabilities.indexOf('experiment_loop') !== -1
+tests/r3.0e-experiment-viewmodel.test.js:180:      && s1.activation.deferredCapabilities.indexOf('case_timeline') !== -1);
+tests/r3.0e-experiment-viewmodel.test.js:189:    s2.activation.deferredCapabilities.indexOf('experiment_loop') !== -1
+tests/r3.0e-experiment-viewmodel.test.js:190:      && s2.activation.deferredCapabilities.indexOf('case_timeline') === -1);
+tests/r3.0e-experiment-viewmodel.test.js:288:      activation: {}, disclaimers: [],
+tests/r3-0-train.test.js:86:  cs.currentCheckpoint = 'C7_UI'; cs.featureRegistryActivationAllowed = false;
+tests/r3-0-train.test.js:110:  ds.currentCheckpoint = 'D4_PRIORITY_ENGINE'; ds.uiAllowed = false; ds.featureRegistryActivationAllowed = false;
+renderer/js/r3-0d-engineer-brief.js:25: *     (uiCapabilityReady, featureRegistryActivationAllowed, deferredCapabilities[]). The
+renderer/js/r3-0d-engineer-brief.js:644:      var deferredCapabilities = [];
+renderer/js/r3-0d-engineer-brief.js:645:      if (!uiCapabilityReady) HI.safeArrayPush(deferredCapabilities, 'engineer_brief_present');
+renderer/js/r3-0d-engineer-brief.js:646:      if (limitations.length > 0) HI.safeArrayPush(deferredCapabilities, 'feature_registry_active');
+renderer/js/r3-0d-engineer-brief.js:649:        featureRegistryActivationAllowed: uiCapabilityReady && limitations.length === 0,
+renderer/js/r3-0d-engineer-brief.js:650:        deferredCapabilities: HI.deepFreeze(deferredCapabilities),
+tests/r3.0d-hardened-intrinsics.test.js:166:    chk('safeGetOwnPropertyNames: hostile Object.getOwnPropertyNames never invoked', r.hits === 0);
+tests/r3-0-phase-governance.test.js:80:  return { schemaVersion: 1, program: phase, currentCheckpoint: BOOTSTRAP[phase], authorizedProductionPaths: [], enabledCapabilities: [], runtimeConsumersAllowed: false, uiAllowed: false, featureRegistryActivationAllowed: false, algorithmsAllowed: false };
+tests/r3-0-phase-governance.test.js:107:    chk(phase + ' BOOTSTRAP all *Allowed false', r.artifact && r.artifact.runtimeConsumersAllowed === false && r.artifact.uiAllowed === false && r.artifact.featureRegistryActivationAllowed === false && r.artifact.algorithmsAllowed === false);
+tests/feature-router.test.js:5: * are deferred while governance/r3.0c/state.json.featureRegistryActivationAllowed=false (C0–C7) and
+tests/feature-router.test.js:15:  try { const st = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'governance', 'r3.0c', 'state.json'), 'utf8')); return st && st.featureRegistryActivationAllowed === true; } catch (_) { return false; }
+renderer/js/r3-0d-contracts-bundle.js:73:  var _ObjectGetOwnPropertyNames = Object.getOwnPropertyNames;
+renderer/js/r3-0d-contracts-bundle.js:184:  // safeGetOwnPropertyNames(obj) — Object.getOwnPropertyNames via captured ref. Returns ALL
+renderer/js/i18n-r3-0e.js:61:    // —— honest disclaimers (always visible) ——
+tests/r3.0d-contract-foundation.test.js:365:    // uiAllowed / featureRegistryActivationAllowed transition at D5_ENGINEER_BRIEF_ACTIVATION.
+tests/r3.0d-contract-foundation.test.js:369:      chk('R3.0D D5: featureRegistryActivationAllowed=true', st.featureRegistryActivationAllowed === true);
+tests/r3.0d-contract-foundation.test.js:372:      chk('R3.0D pre-D5: featureRegistryActivationAllowed=false', st.featureRegistryActivationAllowed === false);
+
+codex
+The registry additions are declarative and still go through the existing derived nav functions, so I do not see a reachability regression there. I’m going to run a couple of small read-only Node probes to confirm the suspected exploit paths instead of relying only on static reading.
+codex
+The shell cannot use here-documents in this read-only sandbox because bash tries to create a temp file. I’m rerunning the probes with `node -e` so they stay read-only.
+exec
+/bin/bash -lc "node -e \"Object.freeze=function(v){return v};Object.isFrozen=function(){return true};const VM=require('./renderer/js/r3-0e-experiment-viewmodel.js');const CL=require('./renderer/js/r3-0e-outcome-classifier.js');const TL=require('./renderer/js/r3-0e-followup-timeline.js');const vm=VM.createExperimentViewmodel({classifier:CL,timelineModule:TL});const s=vm.error();s.extraOwnKey='accepted-after-registration';s.disclaimers[0]='r3.0e.disclaimer.driver_blame_injected';console.log(JSON.stringify({verifies:VM.verifyAuthoritativeViewmodelState(s),extraOwnKey:s.extraOwnKey,disclaimer0:s.disclaimers[0],frozen:Object.isFrozen(s)}));\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"verifies":true,"extraOwnKey":"accepted-after-registration","disclaimer0":"r3.0e.disclaimer.driver_blame_injected","frozen":true}
+
+exec
+/bin/bash -lc "node -e \"const I=require('./renderer/js/i18n-r3-0e.js').R3_0E_I18N;const langs=Object.keys(I);const base=Object.keys(I.en).sort();const out={};for(const lang of langs){const keys=Object.keys(I[lang]).sort();out[lang]={count:keys.length,missing:base.filter(k=>"'!keys.includes(k)),extra:keys.filter(k=>!base.includes(k))};}console.log(JSON.stringify(out,null,2));"' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{
+  "en": {
+    "count": 33,
+    "missing": [],
+    "extra": []
+  },
+  "zh": {
+    "count": 33,
+    "missing": [],
+    "extra": []
+  },
+  "ja": {
+    "count": 33,
+    "missing": [],
+    "extra": []
+  }
+}
+
+exec
+/bin/bash -lc "node -e \"const FR=require('./renderer/js/feature-registry.js');const v=FR.validateRegistry();console.log(JSON.stringify({ok:v.ok,errors:v.errors,subviews:FR.deriveCaseSubviewIds()}));\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"ok":true,"errors":[],"subviews":["overview","setup_model","telemetry","measured_metrics","model_vs_actual","recommendations","corner_coaching","evidence_trust","engineer_brief","experiment_loop","case_timeline"]}
+
+exec
+/bin/bash -lc "node -e \"const VM=require('./renderer/js/r3-0e-experiment-viewmodel.js');const vm=VM.createExperimentViewmodel({classifier:{verifyAuthoritativeOutcome:function(){return true}},timelineModule:{verifyAuthoritativeTimelineProjection:function(){return true},verifyAuthoritativeFollowUpLink:function(){return true}}});const s=vm.derive({outcome:Object.freeze({class:'../../Users/SKYLINE/.ssh/id_rsa',secret:'path blame caused by driver'}),projection:Object.freeze({caseId:'/private/tmp/leak',eventCount:1}),links:[]});console.log(JSON.stringify({displayState:s.displayState,verifies:VM.verifyAuthoritativeViewmodelState(s),outcomeClassI18nKey:s.outcomeClassI18nKey,caseId:s.caseId,featureRegistryActivationAllowed:s.activation.featureRegistryActivationAllowed}));\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"displayState":"available","verifies":true,"outcomeClassI18nKey":"r3.0e.outcome.class.../../Users/SKYLINE/.ssh/id_rsa","caseId":"/private/tmp/leak","featureRegistryActivationAllowed":true}
+
+codex
+The probes confirmed two exploitable paths: pre-load intrinsic replacement leaves verified states mutable, and dependency injection can bless forged outcome/projection objects into an `available` state. I’m doing one last pass for line references that make each finding actionable.
+exec
+/bin/bash -lc "nl -ba renderer/js/r3-0e-experiment-viewmodel.js | sed -n '268,325p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+exec
+/bin/bash -lc "nl -ba tests/r3.0e-experiment-viewmodel.test.js | sed -n '220,292p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+   268	        return _makeState({
+   269	          displayState: uiCapabilityReady ? 'available' : 'unavailable',
+   270	          caseId: caseId,
+   271	          sessionId: sessionId,
+   272	          outcome: outcome,
+   273	          outcomeClass: outcomeClass,
+   274	          outcomeClassI18nKey: outcomeClassI18nKey,
+   275	          projection: projection,
+   276	          projectionEventCount: projection !== null ? projection.eventCount : 0,
+   277	          links: _CAPTURED_OBJECT_FREEZE(_arrSlice(links)),
+   278	          linksCount: links.length,
+   279	          activation: activation,
+   280	        });
+   281	      } catch (e) {
+   282	        return error();
+   283	      }
+   284	    }
+   285	
+   286	    var api = {
+   287	      derive: derive,
+   288	      empty: empty,
+   289	      error: error,
+   290	      stale: stale,
+   291	      VIEWMODEL_SCHEMA_VERSION: VIEWMODEL_SCHEMA_VERSION,
+   292	      DISPLAY_STATES: DISPLAY_STATES,
+   293	    };
+   294	    _CAPTURED_OBJECT_FREEZE(api);
+   295	    return api;
+   296	  }
+   297	
+   298	  // ---------- Public API ---------------------------------------------------------------------
+   299	  var api = {
+   300	    VIEWMODEL_SCHEMA_VERSION: VIEWMODEL_SCHEMA_VERSION,
+   301	    DISPLAY_STATES: DISPLAY_STATES,
+   302	    createExperimentViewmodel: createExperimentViewmodel,
+   303	    verifyAuthoritativeViewmodelState: verifyAuthoritativeViewmodelState,
+   304	  };
+   305	  _CAPTURED_OBJECT_FREEZE(api);
+   306	  if (typeof module !== 'undefined' && module.exports) {
+   307	    module.exports = api;
+   308	  } else if (root) {
+   309	    try { Object.defineProperty(root, 'R3_0E_ExperimentViewmodel', { value: api, writable: false, enumerable: false, configurable: false }); }
+   310	    catch (e) { root.R3_0E_ExperimentViewmodel = api; }
+   311	  }
+   312	})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+ succeeded in 0ms:
+   220	    eventCount: 0, events: Object.freeze([]), generatedAt: '2026-06-30T12:00:00Z',
+   221	  }) });
+   222	  chk('D3: forged projection → error-sanitized', s3.displayState === 'error-sanitized');
+   223	  // Forged link
+   224	  var s4 = vm.derive({ links: [Object.freeze({
+   225	    schemaVersion: 1, linkId: 'link_fake', parentCaseId: CASE_A,
+   226	    followUpCaseId: CASE_B, experimentId: EXP_ID, parentStatus: 'present',
+   227	    createdAt: '2026-06-30T11:00:00Z',
+   228	  })] });
+   229	  chk('D4: forged link → error-sanitized', s4.displayState === 'error-sanitized');
+   230	  // Non-array links
+   231	  var s5 = vm.derive({ links: 'not-an-array' });
+   232	  chk('D5: non-array links → error-sanitized', s5.displayState === 'error-sanitized');
+   233	})();
+   234	
+   235	// ------------------------------------------------------------------
+   236	// Section E — feature-registry registration
+   237	// ------------------------------------------------------------------
+   238	console.log('Section E — feature-registry registration');
+   239	(function () {
+   240	  // The viewmodel module does NOT mutate feature-registry directly; we verify the
+   241	  // registry now carries the expected entries (added as part of the E5 commit).
+   242	  var navIds = FR.deriveCaseSubviewIds();
+   243	  chk('E1: case:experiment_loop nav node present',
+   244	    navIds.indexOf('experiment_loop') !== -1);
+   245	  chk('E2: case:case_timeline nav node present',
+   246	    navIds.indexOf('case_timeline') !== -1);
+   247	  // Features
+   248	  var allFeatures = FR.FEATURES;
+   249	  chk('E3: experiment_loop feature registered + case_scoped',
+   250	    allFeatures.experiment_loop && allFeatures.experiment_loop.area === 'case_scoped');
+   251	  chk('E4: case_timeline feature registered + case_scoped',
+   252	    allFeatures.case_timeline && allFeatures.case_timeline.area === 'case_scoped');
+   253	  chk('E5: experiment_loop availability = available_conditional',
+   254	    allFeatures.experiment_loop.availability === 'available_conditional');
+   255	  chk('E6: case_timeline availability = available_conditional',
+   256	    allFeatures.case_timeline.availability === 'available_conditional');
+   257	  chk('E7: experiment_loop nav target is case:experiment_loop',
+   258	    allFeatures.experiment_loop.navNodeId === 'case:experiment_loop');
+   259	  chk('E8: case_timeline nav target is case:case_timeline',
+   260	    allFeatures.case_timeline.navNodeId === 'case:case_timeline');
+   261	})();
+   262	
+   263	// ------------------------------------------------------------------
+   264	// Section F — API hardening
+   265	// ------------------------------------------------------------------
+   266	console.log('Section F — API hardening');
+   267	(function () {
+   268	  chk('F1: top-level api is frozen', Object.isFrozen(VM));
+   269	  chk('F2: createExperimentViewmodel exported', typeof VM.createExperimentViewmodel === 'function');
+   270	  chk('F3: verifyAuthoritativeViewmodelState exported', typeof VM.verifyAuthoritativeViewmodelState === 'function');
+   271	  chk('F4: NO WeakSet / register exposed',
+   272	    VM._authoritativeStates === undefined && VM.register === undefined);
+   273	  chk('F5: viewmodel api is frozen',
+   274	    (function () { var v = VM.createExperimentViewmodel({ classifier: CL, timelineModule: TL }); return Object.isFrozen(v); })());
+   275	})();
+   276	
+   277	// ------------------------------------------------------------------
+   278	// Section G — Verifier boundary
+   279	// ------------------------------------------------------------------
+   280	console.log('Section G — Verifier boundary');
+   281	(function () {
+   282	  chk('G1: null → false', VM.verifyAuthoritativeViewmodelState(null) === false);
+   283	  chk('G2: empty obj → false', VM.verifyAuthoritativeViewmodelState({}) === false);
+   284	  chk('G3: number → false', VM.verifyAuthoritativeViewmodelState(42) === false);
+   285	  chk('G4: frozen lookalike → false',
+   286	    VM.verifyAuthoritativeViewmodelState(Object.freeze({
+   287	      schemaVersion: 1, displayState: 'available',
+   288	      activation: {}, disclaimers: [],
+   289	    })) === false);
+   290	})();
+   291	
+   292	// ------------------------------------------------------------------
+
+exec
+/bin/bash -lc "nl -ba renderer/js/r3-0e-outcome-classifier.js | sed -n '258,286p' && nl -ba renderer/js/r3-0e-followup-timeline.js | sed -n '315,342p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+   258	  // After successful classifyOutcome → registered. The exported verifyAuthoritativeOutcome
+   259	  // checks identity (WeakSet) + shape (deep-frozen + required fields). Clones and JSON
+   260	  // round-trips lose identity → verifier returns false.
+   261	  var _authoritativeOutcomes = new _WeakSetCtor();
+   262	  function _registerAuthoritativeOutcome(envelope) {
+   263	    _wsAdd(_authoritativeOutcomes, envelope);
+   264	  }
+   265	  function verifyAuthoritativeOutcome(candidate) {
+   266	    try {
+   267	      if (candidate === null || typeof candidate !== 'object') return false;
+   268	      if (!_wsHas(_authoritativeOutcomes, candidate)) return false;
+   269	      if (_CAPTURED_OBJECT_IS_FROZEN(candidate) !== true) return false;
+   270	      if (candidate.schemaVersion !== OUTCOME_SCHEMA_VERSION) return false;
+   271	      if (typeof candidate.outcomeId !== 'string') return false;
+   272	      if (typeof candidate.experimentId !== 'string') return false;
+   273	      if (typeof candidate['class'] !== 'string') return false;
+   274	      if (!_isArraySafe(candidate.confounders)) return false;
+   275	      if (!_isArraySafe(candidate.limitations)) return false;
+   276	      return true;
+   277	    } catch (e) { return false; }
+   278	  }
+   279	
+   280	  // ---------- Structural helpers --------------------------------------------------------------
+   281	  function _isOriginalPlainObject(v) {
+   282	    try {
+   283	      if (v === null || typeof v !== 'object' || _CAPTURED_ARRAY_IS_ARRAY(v)) return false;
+   284	      var p = _CAPTURED_OBJECT_GET_PROTO(v);
+   285	      return p === Object.prototype || p === null;
+   286	    } catch (e) { return false; }
+   315	  function verifyAuthoritativeFollowUpLink(candidate) {
+   316	    try {
+   317	      if (candidate === null || typeof candidate !== 'object') return false;
+   318	      if (!_wsHas(_authoritativeLinks, candidate)) return false;
+   319	      if (_CAPTURED_OBJECT_IS_FROZEN(candidate) !== true) return false;
+   320	      if (candidate.schemaVersion !== LINK_SCHEMA_VERSION) return false;
+   321	      if (typeof candidate.linkId !== 'string') return false;
+   322	      if (typeof candidate.parentCaseId !== 'string') return false;
+   323	      if (typeof candidate.followUpCaseId !== 'string') return false;
+   324	      if (typeof candidate.experimentId !== 'string') return false;
+   325	      return true;
+   326	    } catch (e) { return false; }
+   327	  }
+   328	  function verifyAuthoritativeTimelineProjection(candidate) {
+   329	    try {
+   330	      if (candidate === null || typeof candidate !== 'object') return false;
+   331	      if (!_wsHas(_authoritativeProjections, candidate)) return false;
+   332	      if (_CAPTURED_OBJECT_IS_FROZEN(candidate) !== true) return false;
+   333	      if (candidate.schemaVersion !== PROJECTION_SCHEMA_VERSION) return false;
+   334	      if (typeof candidate.projectionId !== 'string') return false;
+   335	      if (typeof candidate.caseId !== 'string') return false;
+   336	      if (!_isArraySafe(candidate.events)) return false;
+   337	      return true;
+   338	    } catch (e) { return false; }
+   339	  }
+   340	
+   341	  function _resolveClock(optsIn) {
+   342	    var snap;
+
+exec
+/bin/bash -lc 'git status --short && git rev-parse HEAD && git show --stat --oneline --no-renames 914aea624a4dffb9e83101caa3ccf759d9be9493' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-hybp6xIp' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-CjUKVWHI' (errno=Operation not permitted)
+?? governance/r3.0e/codex-checkpoint-evidence/E5/
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-VGi8XPLl' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-XUuzHJup' (errno=Operation not permitted)
+914aea624a4dffb9e83101caa3ccf759d9be9493
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-Z8bqUcc0' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-ERfR9dHS' (errno=Operation not permitted)
+914aea6 e5(initial): R3.0E E5_ACTIVATION — viewmodel + i18n + feature registry
+ governance/r3.0/train.json                |   6 +-
+ governance/r3.0e/checkpoints/E5.json      | 104 ++++++++++
+ governance/r3.0e/state.json               |  15 +-
+ package.json                              |   2 +-
+ renderer/js/feature-registry.js           |  14 ++
+ renderer/js/i18n-r3-0e.js                 | 162 ++++++++++++++++
+ renderer/js/i18n-shell.js                 |   6 +
+ renderer/js/r3-0e-experiment-viewmodel.js | 312 ++++++++++++++++++++++++++++++
+ tests/feature-registry.test.js            |   4 +-
+ tests/r3-0-train.test.js                  |   8 +-
+ tests/r3-0c-activation.test.js            |  11 +-
+ tests/r3.0a-ui.test.js                    |   9 +-
+ tests/r3.0e-experiment-viewmodel.test.js  | 298 ++++++++++++++++++++++++++++
+ 13 files changed, 930 insertions(+), 21 deletions(-)
+
+codex
+Finding E5-R1-01: Pre-load WeakSet tampering can fool `verifyAuthoritativeViewmodelState`
+  evidence: renderer/js/r3-0e-experiment-viewmodel.js:51
+  severity: BLOCK
+  proposed closure: Add module-init integrity canaries for `WeakSet`/`WeakSet.prototype.add`/`has` before creating `_authoritativeStates`; fail closed if a fresh set containing object A also reports object B present.
+
+Finding E5-R1-02: Pre-load `Object.freeze` / `Object.isFrozen` tampering leaves authoritative states mutable after verification
+  evidence: renderer/js/r3-0e-experiment-viewmodel.js:47
+  severity: BLOCK
+  proposed closure: Add a freeze canary proving a frozen object rejects new own keys, capture `Object.getOwnPropertyNames`, and make verification enforce exact own-key sets plus frozen nested `activation`, `links`, and `disclaimers`.
+
+Finding E5-R1-03: Injected verifier deps can authorize forged outcome/projection into `available` state and leak unsanitized fields
+  evidence: renderer/js/r3-0e-experiment-viewmodel.js:125
+  severity: BLOCK
+  proposed closure: In production, require `classifier === CL` and `timelineModule === TL_SVC` or use closure-captured verifiers only; additionally whitelist `outcome.class` to the closed outcome enum before building `outcomeClassI18nKey`, and avoid exposing full foreign `outcome`/`projection` objects.
+
+FINAL VERDICT: BLOCK
+tokens used
+79,597
+Finding E5-R1-01: Pre-load WeakSet tampering can fool `verifyAuthoritativeViewmodelState`
+  evidence: renderer/js/r3-0e-experiment-viewmodel.js:51
+  severity: BLOCK
+  proposed closure: Add module-init integrity canaries for `WeakSet`/`WeakSet.prototype.add`/`has` before creating `_authoritativeStates`; fail closed if a fresh set containing object A also reports object B present.
+
+Finding E5-R1-02: Pre-load `Object.freeze` / `Object.isFrozen` tampering leaves authoritative states mutable after verification
+  evidence: renderer/js/r3-0e-experiment-viewmodel.js:47
+  severity: BLOCK
+  proposed closure: Add a freeze canary proving a frozen object rejects new own keys, capture `Object.getOwnPropertyNames`, and make verification enforce exact own-key sets plus frozen nested `activation`, `links`, and `disclaimers`.
+
+Finding E5-R1-03: Injected verifier deps can authorize forged outcome/projection into `available` state and leak unsanitized fields
+  evidence: renderer/js/r3-0e-experiment-viewmodel.js:125
+  severity: BLOCK
+  proposed closure: In production, require `classifier === CL` and `timelineModule === TL_SVC` or use closure-captured verifiers only; additionally whitelist `outcome.class` to the closed outcome enum before building `outcomeClassI18nKey`, and avoid exposing full foreign `outcome`/`projection` objects.
+
+FINAL VERDICT: BLOCK
