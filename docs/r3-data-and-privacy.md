@@ -124,7 +124,6 @@ These survive a process restart:
 - The R3 case record (vehicle preset reference, setup levers, notes, free-text fields the user wrote) in `cases`, summarized in `caseIndex.__index`.
 - The session container in `sessions` (track identity stamped by the user, lap boundaries computed and stored once per session, normalized distance frames stored once per lap because they are deterministic and expensive).
 - The imported telemetry **summary** (channel inventory, mapping decisions, calibration confirmations, sample-quality flags, provenance markers). See "Raw telemetry is NEVER in case bundle" below.
-- The R3.0D Engineer Brief artifacts (evidence-graph IDs, hypotheses, priorities, brief text) — outputs of authoritative-only inputs, stored alongside the session they were derived from.
 - R3.0E records across `r3_0e_experiments`, `r3_0e_outcomes`, `r3_0e_timelines`, `r3_0e_followupLinks`, plus their index/reverse-index stores and the schema-version map in `r3_0e_storeMetadata`. Only the timeline `events` array is append-only as a contract; experiment records have `create`/`update`/`remove`, outcome records are write-once, follow-up-link records have `markParentStatus` for state transitions (present/archived/deleted).
 - The R3.0F migration **journal** and **state** at `meta['__r3_0f_migration_journal__']` and `meta['__r3_0f_migration_state__']`. The journal records what each transition did (from-version → to-version, applied migrators, structured-clone fingerprint, fail-closed reason if any). It does **not** carry per-record producer-attestation; in fact F1 refuses migrated records that contain attestation-like field names (see "Migration boundary" below).
 
@@ -137,6 +136,7 @@ These live only in memory and are recomputed from persisted inputs on every run:
 - The R3.0D `LIMITATION_IMPORTED_SUMMARY` propagation chain — re-derived on every D2 → D3 → D5 traversal.
 - Capability eligibility (`eligible` / `confirmed` / `validated`). A caller's flag is never trusted; eligibility is re-derived from raw evidence on every run.
 - The R3.0D closure-private references `_authoritativeGraphs` (D2 WeakSet) and `_CAPTURED_EG_VERIFY_GRAPH` (D3 mandatory capture, established at the Formal D Gate) — closure-private and not serializable.
+- The R3.0D Engineer Brief. `r3-0d-engineer-orchestrator.js` holds the current brief and viewmodel in module-level variables (`_currentEnvelope`, `_currentViewModel`) that are never written through `backend.transact()`. Neither `case-store.js`'s record shape (`metadata`/`associations`/`setupSnapshot`/`analysisResults`/`shellEvidence`) nor `session-store.js`'s (`schemaVersion`/`sessionId`/`summary`/`raw`/`createdAt`) has a field for it. The brief is regenerated from the D2–D4 chain each time it is needed and does not survive a process restart.
 
 If a stored record contained an `eligible:true` flag, the runtime would still ignore it: **authority, not presence**.
 
@@ -193,22 +193,32 @@ This rule is enforced at the boundary of every consumer (R3.0C delta-metrics, R3
 
 Comparison export (R3.0C C6) is a user-initiated action. It produces a single structured artifact suitable for sharing with a teammate or archiving locally.
 
-A comparison bundle contains:
+The envelope itself (`contracts/r3.0c/comparison-export-contract.js`) has exactly four keys: `{ schemaIdentity,
+schemaVersion, generatedAt, payload }`. The production exporter (`renderer/js/r3-0c-comparison-export.js`,
+`buildComparisonExport(request)`) builds `payload` with exactly these keys:
 
-- The R3 case record (the v1.4.0 frozen schema).
-- The session container for the run being exported.
-- The reference lap descriptor (explicit-user-selected; see below) and the comparison lap descriptor.
-- Track identity authority output (the immutable identity stamped by the user, not auto-inferred).
-- Normalized distance frames for the relevant laps.
-- Corner segmentation and corner pairing authority outputs.
-- Delta metrics (the six allowlisted metrics) with fixed sign convention.
-- The imported_summary for any channels referenced by the delta metrics.
-- The R3.0D Engineer Brief artifact for this session (if one exists), including evidence-graph IDs, hypotheses, priorities, reason codes, and limitations.
-- Provenance metadata: app version, schema version, and the R3.0F envelope's `engineVersion` / `storageVersion` (1 / 1 at this milestone).
+- `comparisonStatus` — `'success'` or `'partial'` (partial when any metric carries a `partial` flag).
+- `referenceLap` / `comparisonLap` — each `{ sessionId, lapId, lapTimeMs }`. `lapTimeMs` is the lap's
+  duration, not a selection timestamp — there is no separate "when the user selected this lap" field.
+- `association` — `{ caseId, trackId, layoutId, positionBasis, positionDirection }`.
+- `cumulativeDelta`, `corners`, `metricAvailability` — the delta-metrics summary and per-corner breakdown.
+- `credibility`, `confidence`, `provenance` — echoed from the credibility metadata.
+- `limitations`, `blockers` — allowlisted reason codes.
+- `cannotConclude`, `alternativeExplanations`, `nextValidationAction` — the framing fields.
 
 A comparison bundle does **not** contain:
 
+- The R3 case record or the session container (the bundle is a derived summary, not a copy of either store).
 - Raw telemetry rows.
+- Normalized-distance frames, track-identity authority output, or corner-pairing authority output as
+  separate fields — only the already-computed `corners`/`cumulativeDelta` summary travels.
+- The R3.0D Engineer Brief or any R3.0E artefact (experiment, outcome, follow-up link, timeline). Those live
+  in their own stores and have their own contracts; they are not co-bundled into the comparison-export
+  envelope.
+- App version, `engineVersion`, or `storageVersion` — the envelope's only metadata fields are
+  `schemaIdentity`, `schemaVersion`, and `generatedAt`.
+- A literal "comparison − reference" sign-convention string — the convention is structural (how
+  `cumulativeDelta`/`corners` are computed upstream at C5), not a field stored in the export payload.
 - Any authority object (WeakSet membership cannot be serialized; consumers re-derive authority on import).
 - Any `eligible`/`confirmed`/`validated` flag that the importer should trust — the importer re-derives.
 - Any path on the originating filesystem.
@@ -217,10 +227,10 @@ A comparison bundle does **not** contain:
 
 ### Reference lap and delta sign
 
-Two invariants travel with every bundle:
+Two invariants hold for every bundle, even though neither is stored as a literal field in the payload:
 
-- **Reference lap is EXPLICIT-USER-SELECTION only.** There is no `fastest_valid`, no `median`, no `best_sector_composite` auto-selection. The bundle records which lap the user explicitly selected and the timestamp of that selection.
-- **Delta sign convention is `(comparison − reference)`.** Never the other way. The bundle records this string literally so a downstream consumer cannot quietly invert it.
+- **Reference lap is EXPLICIT-USER-SELECTION only.** There is no `fastest_valid`, no `median`, no `best_sector_composite` auto-selection. The bundle records which session/lap the user selected (`referenceLap.sessionId`/`lapId`) — not a separate selection-event timestamp.
+- **Delta sign convention is `(comparison − reference)`.** Never the other way. This is enforced by how `cumulativeDelta`/`corners` are computed upstream (C5 delta-metrics), not by a sign-convention string carried in the export payload.
 
 ### Same-case + same-session only
 

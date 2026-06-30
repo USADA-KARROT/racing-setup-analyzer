@@ -26,7 +26,7 @@ tree and one persistence contract; the host differences are confined to a small 
 +----------------------------------- Electron Host (main.js / preload.js) -----------------------------------+
 |  - contextIsolation: true, nodeIntegration: false explicitly set; no unsafe flag ever flipped on            |
 |  - preload exposes EXACTLY { platform, version } on window.electronAPI — no IPC, no FS, no shell            |
-|  - File:// origin loads renderer/index.html; CSP default-src 'self' (see Electron host boundaries below)    |
+|  - File:// origin loads renderer/index.html; CSP default-src 'self' 'unsafe-inline' 'unsafe-eval'           |
 +-------------------------------------------------------------------------------------------------------------+
             |
             v
@@ -79,7 +79,12 @@ A few invariants are global to the topology:
 - **No cloud, no multi-user, no telemetry beacon.** Persistence is local-first; raw telemetry never leaves the
   device through any export path.
 - **Feature Registry is the navigation truth source.** A capability is reachable only if its feature ID is
-  registered and `featureRegistryActivationAllowed` is `true` for its phase. Until F6, that flag is `false`.
+  registered and `featureRegistryActivationAllowed` is `true` **for its own phase's governance state**. This
+  is a per-phase flag, not one train-wide switch: R3.0C (`C8_ACTIVATION`), R3.0D
+  (`D5_ENGINEER_BRIEF_ACTIVATION`), and R3.0E (`E5_ACTIVATION`) have each already flipped their own flag to
+  `true` — the Comparisons pane, the Engineer Brief pane, and the Experiment Loop / Case Timeline panes are
+  live in the shipped registry today. Only R3.0F's own flag remains `false` until `F6_RELEASE` (R3.0F has no
+  case-scoped pane of its own to gate).
 
 ---
 
@@ -574,7 +579,10 @@ mapped to `NO_MIGRATION_PATH`). The full envelope reason-code set is `UNSUPPORTE
 `migrated / no-op / rejected / failed`.
 
 The migration engine is the first F-phase module with `runtimeConsumersAllowed = true` and
-`algorithmsAllowed = true`; **UI activation and Feature Registry activation remain blocked until F6**.
+`algorithmsAllowed = true`. R3.0F's own `featureRegistryActivationAllowed` remains `false` until F6 —
+the migration engine has no case-scoped pane of its own to gate. (This is separate from R3.0C/D/E's own
+activation flags, which have already flipped to `true` for their respective phases — see "Feature Registry
+is the navigation truth source" above.)
 
 ### F2 — End-to-end flow harness (9 flows)
 
@@ -709,8 +717,10 @@ qualitative substitute is offered where it is honestly available; otherwise the 
 - **Preset count** — 501. The R2 preset library equivalence guard remains green through every R3 phase.
 - **`package.json` version** — `1.4.0`. The version bump to `2.0.0` is staged at F6 (Release Gate). Until F6,
   any version drift fails the train validator closed.
-- **`featureRegistryActivationAllowed`** — `false` until F6_RELEASE. Production modules may pass tests and be
-  authorized in `authorizedProductionPaths`; they are reachable to the user only after F6.
+- **`featureRegistryActivationAllowed`** is a per-phase flag, not one train-wide switch. R3.0C, R3.0D, and
+  R3.0E have each already flipped their own flag to `true` at their respective `*_ACTIVATION` checkpoints —
+  the Comparisons, Engineer Brief, Experiment Loop, and Case Timeline panes are reachable to the user today.
+  Only R3.0F's own flag remains `false` until `F6_RELEASE` (R3.0F introduces no case-scoped pane of its own).
 - **`runtimeConsumersAllowed`** — `true` since F1. The migration engine is the first F-phase runtime consumer.
 - **Comparison scope** — same-case + same-session only. Cross-case and cross-session are permanently forbidden.
 - **Delta sign** — `comparison − reference`. Single convention. No alternate.

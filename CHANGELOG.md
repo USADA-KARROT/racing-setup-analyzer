@@ -26,8 +26,12 @@ is `2.0.0`.
 - The R3 case-record schema introduced in R3.0B is **frozen** and was not modified by any
   later milestone (R3.0C through R3.0F).
 - Preset count = **501**, byte-for-byte unchanged through the train.
-- `featureRegistryActivationAllowed` remains **false** until the release gate; runtime
-  consumers have been allowed since F1 but UI activation is governed phase-by-phase.
+- `featureRegistryActivationAllowed` is tracked **per phase**, not as one train-wide
+  switch. R3.0C, R3.0D, and R3.0E have each already flipped their own flag to `true`
+  (Comparisons, Engineer Brief, Experiment Loop, Case Timeline are live in navigation
+  today); only R3.0F's own flag remains **false** until the release gate, and R3.0F
+  introduces no case-scoped pane of its own. `runtimeConsumersAllowed` has been `true`
+  since F1.
 - `canonicalTrustUpgraded` remains a hard literal `false`. Suspension normalization is numeric
   compatibility, not evidence.
 - Electron host explicitly sets `contextIsolation: true` and `nodeIntegration: false` in

@@ -14,10 +14,14 @@ capability is **blocked with a reason** — never approximated.
 This document covers the R3.0E surface only. R3.0F integrated-delivery concerns
 (migration, E2E, hardening) are described elsewhere.
 
-**Scope note.** Runtime consumers may exercise the experiment loop; UI
-activation of the E3/E4/E5 surfaces remains gated until F6_RELEASE
-(`featureRegistryActivationAllowed = false`). Production code paths described
-here are live behind the activation gate; user-visible panes are not yet lit.
+**Scope note.** R3.0E's own `featureRegistryActivationAllowed` flipped to `true`
+at `E5_ACTIVATION` (`governance/r3.0e/state.json`). The Experiment Loop and
+Case Timeline panes (`case:experiment_loop`, `case:case_timeline` in
+`renderer/js/feature-registry.js`) are registered as `available_conditional`
+— live in the navigation, but each pane's viewmodel returns an `unavailable`
+display state for a given case until that case actually carries an
+authoritative E3 outcome / E4 timeline projection. This is a per-case data
+gate, not a feature-registry gate.
 
 ## Producer chain: R3.0D engineer-brief → recommendation → experiment plan
 
@@ -117,9 +121,12 @@ This table reflects the actual closed key set and validation in
 | `outcome` | Outcome object \| `null` | Status-gated | Must be `null` while `status` is `'draft'`, `'planned'`, or `'applied'`. May be a plain object only when `status` is `'completed'`, `'abandoned'`, or `'invalid'` — this prevents a caller from attaching a classification result before the experiment has actually concluded. |
 | `createdAt` | ISO-8601 string | Non-empty string | Used as the stale-write guard on `update` (compared for exact equality, not freshness). |
 
-Fields not in this list are silently dropped at write time — a recursive
-descriptor audit on the input rejects future-schema bleed-through and overflow.
-The store has a hard cap on field-shape and a fail-closed write path.
+A field not in this list does **not** get silently dropped — the contract
+rejects the whole record fail-closed with `EXPERIMENT_INVALID`/
+`UNKNOWN_OWN_KEY` (`contracts/r3.0e/experiment-contract.js`'s
+`_hasOnlyAllowedKeys` check), and the store surfaces that as
+`R3_0E_EXPERIMENT_INVALID`. There is no silent-truncation path; an unknown
+field is a write failure, not a write-with-fields-removed.
 
 ## Persistence semantics (R3.0E E2 stores)
 
@@ -436,18 +443,24 @@ The runtime API is just two methods: `getTimeline(caseId)` and
    Runtime producer attestation is held in non-serialisable WeakSets and is
    never persisted or exported.
 
-The Timeline event-kind enum is closed. The full allowed set, verbatim from
-the contract, is:
+The Timeline event-kind enum (`EVENT_KIND_ALLOWED` in
+`contracts/r3.0e/case-timeline-contract.js`) is closed and has exactly eight
+values. The contract itself only validates the generic event shape
+`{ eventId, kind, createdAt, i18nKey, params }` — `params` must be `null` or
+a plain object; **there is no per-kind field schema enforced by the
+contract.** The table below shows the plausible producer and a suggested
+`params` payload per kind — illustrative usage, not a contract-enforced
+shape:
 
-| `kind` | Producer | Carries |
+| `kind` | Plausible producer | Suggested `params` content (not contract-enforced) |
 |--------|----------|---------|
-| `baseline_captured` | R3.0E producer chain (case admission) | The case-record snapshot reference that becomes the baseline reading |
+| `baseline_captured` | Case admission into the experiment loop | A case-record snapshot reference |
 | `hypothesis_recorded` | R3.0D D3 | `hypothesisId`, target metric, expected direction |
-| `recommendation_made` | R3.0E E3 | `recommendationId`, physical-unit setup lever(s), expected direction/range |
-| `experiment_planned` | R3.0E E1 (`status: draft`) | `experimentId`, `sourceCaseId`, `targetMetric`, `expectedDirection` |
-| `experiment_applied` | R3.0E E1 (`status: applied`) | `experimentId`, declared `setupChange` summary |
+| `recommendation_made` | R3.0D D4/D5 (recommendation/brief, not an R3.0E module) | `recommendationId`, physical-unit setup lever(s), expected direction/range |
+| `experiment_planned` | R3.0E E1 (`status: 'draft'`) | `experimentId`, `sourceCaseId`, `targetMetric`, `expectedDirection` |
+| `experiment_applied` | R3.0E E1 (`status: 'applied'`) | `experimentId`, declared `setupChange` summary |
 | `follow_up_case_created` | R3.0E E2 link store | `linkId`, `experimentId`, `followUpCaseId`, `parentCaseId` |
-| `outcome_classified` | R3.0E E3 classifier | `experimentId`, `class`, `reasonCodes`, `controlledVariableIntegrity`, `credibility`, `limitations` |
+| `outcome_classified` | R3.0E E3 classifier | `experimentId`, `class`, and a subset of the real 13-key Outcome object (e.g. `limitations`, `confounders`) — not `reasonCodes`/`controlledVariableIntegrity`/`credibility`, which are not real Outcome fields (see "Outcome classes" above) |
 | `experiment_abandoned` | R3.0E E1 (stop-condition or explicit abandon) | `experimentId`, abandon reason-code |
 
 No other `kind` values exist. A timeline event whose `kind` is not in this
