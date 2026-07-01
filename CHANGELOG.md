@@ -118,11 +118,11 @@ Nine E2E flows exercise production code (no UI stubs, no mocked engines). The F2
 checkpoint lives at **`governance/r3.0f/checkpoints/F2.json`**. The flow files live at
 **`tests/e2e/flow-{01..09}-*.test.js`**, each bound to production services at setup:
 
-1. **`flow-01-new-user.test.js`** — New-user empty-state journey. A fresh launch with an
-   empty IndexedDB backend produces a deterministic empty Case Library state; the F1
-   migration engine reports zero records; the F1 envelope is at v1; and the forbidden
-   actions (auto reference-lap, auto setup apply, runtime-LLM authority, causation
-   inference, driver blame) are not enabled.
+1. **`flow-01-new-user.test.js`** — New-user empty-state journey. A fresh `MemoryBackend()`
+   instance in the Node-only F2 logic harness (not IndexedDB, not a browser) produces a
+   deterministic empty Case Library state; the F1 migration engine reports zero records;
+   the F1 envelope is at v1; and the forbidden actions (auto reference-lap, auto setup
+   apply, runtime-LLM authority, causation inference, driver blame) are not enabled.
 2. **`flow-02-real-telemetry.test.js`** — Real telemetry import. A CSV-import-style
    telemetry session lands deterministically into the session store; the F1 migration
    engine treats the session as at-target (no migration needed); the session is

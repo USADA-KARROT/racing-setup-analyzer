@@ -179,7 +179,7 @@ An experiment record carries:
 - Stop conditions, capped at the schema's `stopConditions` shape — these are user-defined and bounded.
 - An outcome slot that must stay `null` while `status` is `'draft'`, `'planned'`, or `'applied'`; it may only become non-null once `status` reaches `'completed'`, `'abandoned'`, or `'invalid'`. The contract layer enforces this gating directly — a caller cannot attach a classification result to an experiment that has not concluded.
 
-The schema is recursively audited. Future-schema fields are rejected at the store boundary; an audit overflow fails closed; pre-clone audits run before timeline and control-variable mutations.
+The schema is recursively audited. Future-schema fields are rejected at the store boundary; the E1 contract's recursive descriptor audit (`hasNonPlainNestedObject` in `contracts/r3.0e/reason-codes.js`) fails closed on traversal overflow (depth or node-count) and runs *before* the contract clones the input (`toCleanCopy`), not after — this audit-then-clone ordering applies to timeline events and control-variable payloads alike, and lives in the E1 contracts, not in the E2 stores.
 
 Nothing in the experiment planner names a hardware click count, a "+N stiffness" delta, or a predicted lap time. The applied change is recorded as the user described it; the model does not silently re-quantify it.
 
@@ -244,22 +244,24 @@ The classifier never produces a measured K_us magnitude, a lap-time gain, a caus
 
 ## Inspect the append-only Timeline
 
-The Timeline view shows the user the complete chronological record of work on a Case and its descendants:
+The Timeline view shows the user an append-only record of the experiment-loop milestones the product recorded for a Case and its descendants — not a complete log of every user action. The event schema is closed to exactly eight `kind` values (`contracts/r3.0e/case-timeline-contract.js`'s `EVENT_KIND_ALLOWED`); there is no event kind for opening a case, importing telemetry, selecting a reference lap, running a comparison, or attaching free-text notes:
 
-- Case opened.
-- Telemetry imported (with provenance).
-- Reference lap selected, comparison run, delta metrics computed.
-- Engineer Brief generated.
-- Experiments planned.
-- Follow-up Cases linked.
-- Outcomes classified.
-- Notes (free text the user attached at any step).
+- Baseline captured (case admission into the experiment loop; `baseline_captured`).
+- Hypothesis recorded (`hypothesis_recorded`).
+- Recommendation made (`recommendation_made`).
+- Experiments planned (`experiment_planned`).
+- Experiments applied (`experiment_applied`).
+- Follow-up Cases linked (`follow_up_case_created`).
+- Outcomes classified (`outcome_classified`).
+- Experiments abandoned (`experiment_abandoned`).
 
-The timeline store (`createTimelineStore`) is the only R3.0E store that is strictly append-only. Its public surface is `getTimeline(caseId)` and `appendEvent(caseId, event)`; there is no `update` and no `remove`. Keying is per-case (`r3_0e_timelines` stores one timeline document per `caseId`). `appendEvent` rejects duplicate `eventId` (`R3_0E_TIMELINE_DUPLICATE_EVENT`), rejects out-of-order timestamps where the new event's createdAt is less than the previous event's or is unparseable (`R3_0E_TIMELINE_OUT_OF_ORDER`), rejects future-schema documents (`R3_0E_TIMELINE_FUTURE_SCHEMA`), and re-validates the resulting timeline before write (`R3_0E_TIMELINE_INVALID`). The store pre-clones inputs before audit so callers cannot mutate fields underneath the audit. The audit itself fail-closes on overflow.
+These are the only eight event kinds the timeline contract accepts. Case opening, telemetry import, reference-lap selection, comparison execution, and free-text notes are not recorded as timeline events — see `docs/r3-experiment-loop.md`'s Timeline event-kind table for the full list and each kind's plausible producer.
+
+The timeline store (`createTimelineStore`) is the only R3.0E store that is strictly append-only. Its public surface is `getTimeline(caseId)` and `appendEvent(caseId, event)`; there is no `update` and no `remove`. Keying is per-case (`r3_0e_timelines` stores one timeline document per `caseId`). `appendEvent` rejects duplicate `eventId` (`R3_0E_TIMELINE_DUPLICATE_EVENT`), rejects out-of-order timestamps where the new event's createdAt is less than the previous event's or is unparseable (`R3_0E_TIMELINE_OUT_OF_ORDER`), rejects future-schema documents (`R3_0E_TIMELINE_FUTURE_SCHEMA`), and re-validates the resulting timeline before write (`R3_0E_TIMELINE_INVALID`). `appendEvent` itself performs no cloning: it concatenates the caller's `event` object directly (`existing.events.concat([event])`) and delegates all structural validation to the E1 contract (`TL.validateCaseTimelineShape`). That contract's recursive descriptor audit runs *before* it clones the input (`hasNonPlainNestedObject` before `toCleanCopy`, in `contracts/r3.0e/case-timeline-contract.js` and `contracts/r3.0e/reason-codes.js`), and fails closed on traversal overflow (`MAX_NODES = 4096` / `MAX_DEPTH = 32`) — this guarantee belongs to the E1 contract layer, not the store. (A genuine pre-validation snapshot of caller input does exist, but it is implemented in the separate E4 follow-up/timeline service, `renderer/js/r3-0e-followup-timeline.js`'s `appendTimelineEvent`/`_snapshotPlain`, not in `createTimelineStore`.)
 
 The user cannot edit a past entry. Corrections are new entries. This is intentional: the timeline is the evidence chain that the Engineer Brief, Outcome Classifier, and any future export rely on. Mutability in the timeline would let earlier conclusions be silently re-justified by later edits — and it would conflict with the per-store `appendOnly: true` invariant the timeline contract is built around.
 
-Reading the timeline is the user's audit interface. Every conclusion they ever saw is reproducible from the timeline plus the case-record + session-record + telemetry artefacts and the R3.0E payload stores.
+Reading the timeline is the user's audit interface for the experiment loop's own milestones. Every experiment-loop conclusion (hypothesis, recommendation, experiment plan/apply, follow-up link, outcome) is reproducible from the timeline plus the case-record + session-record + telemetry artefacts and the R3.0E payload stores — but the timeline itself does not record case-open, telemetry-import, reference-selection, or comparison-run events, so it is not a complete audit trail of every screen the user visited.
 
 ---
 
@@ -325,7 +327,7 @@ The portable case-bundle schema (`renderer/js/case-record-schema.js`) carries no
 
 The workflow described above is exercised under R3.0F's verification harness.
 
-**F2 ships nine end-to-end flows** under `tests/e2e/flow-{01..09}-*.test.js`. Each flow walks a user-visible path from the first-launch surface through the relevant gates, and each flow ends with zero console errors. The flows cover Case creation and persistence, telemetry import and preflight, capability tier evaluation, reference-lap selection and comparison authority, Engineer Brief production, experiment planning, follow-up linking, outcome classification, the timeline append-only invariant, and — relevant to this section — `flow-08-export-import.test.js`, the case export + reimport flow described above.
+**F2 ships nine end-to-end flows** under `tests/e2e/flow-{01..09}-*.test.js`, running as a Node-only logic harness (`tests/e2e/helpers/flow-harness.js`) over an in-memory `MemoryBackend()` — not a browser, DOM, Electron process, or IndexedDB, and not the first-launch surface a user would click through. Each flow drives the same production module surfaces a real session would call, in the same order, and each flow ends with zero console errors. The flows cover Case creation and persistence, telemetry import and preflight, capability tier evaluation, reference-lap selection and comparison authority, Engineer Brief production, experiment planning, follow-up linking, the timeline append-only invariant (flow-06 appends an `outcome_classified` event directly rather than invoking the R3.0E classifier), and — relevant to this section — `flow-08-export-import.test.js`, the case export + reimport flow described above.
 
 **F3 hardens six probe areas** under `tests/e2e/hardening-{01..06}-*.test.js`, totalling 133 assertions: the Electron boundary (preload surface, `webPreferences` never weakened, CSP), storage-failure handling (`case-store.remove`'s confirm-guard, an atomic `backend.transact` failure leaving the source record unchanged, oversized-record rejection), no-stale-UI invariants (no case-id-bearing viewmodel field survives a Case/Session transition), large-library bounded-linear scaling (`backend` operation counts at `N` and `2N` library size), XSS surfaces (no unsafe DOM-injection pattern in the renderer), and supply-chain integrity (a locked dependency/script declaration allowlist and no committed secrets).
 

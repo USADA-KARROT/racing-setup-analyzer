@@ -4,6 +4,9 @@ The experiment loop is the producer chain that turns a R3.0D Engineer Brief into
 concrete, append-only record of *what was tried, what was applied, what happened
 next, and whether the next case could honestly tell us anything*. It is the part
 of the product where the system stops *recommending* and starts *bookkeeping*.
+This bookkeeping record is scoped to the experiment loop's own eight event kinds
+(see "Append-only Timeline" below); it does not log case-open, telemetry-import,
+reference-selection, comparison-execution, or free-text-note events.
 
 Like every other layer in R3.0, the loop is fail-closed and authoritative-only.
 It never decides on behalf of the engineer, never auto-applies a setup change,
@@ -488,8 +491,11 @@ caller-provided summary. The viewmodel renders each entry by reading its
 reason-codes and `i18nKey` and lifting them through the same i18n code
 resolution that the rest of R3.0 uses.
 
-Because the Timeline is the only ordered, append-only record of *what the
-product told the engineer*, two product invariants follow:
+Because the Timeline is the only ordered, append-only record of the
+experiment loop's *what the product told the engineer* milestones (the eight
+kinds above — it does not record case-open, telemetry-import,
+reference-selection, or comparison-run events), two product invariants
+follow:
 
 - Re-running the classifier on the same experiment does **not** rewrite
   history: `eventId` is derived deterministically from

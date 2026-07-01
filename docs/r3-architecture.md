@@ -615,7 +615,7 @@ import, comparison, brief, experiment, follow-up, and Electron smoke. The exact 
 
 | File | Purpose |
 | --- | --- |
-| `tests/e2e/flow-01-new-user.test.js` | New-user empty-state journey. Fresh launch with empty IndexedDB produces a deterministic empty Case Library; F1 reports zero records; envelope at v1; forbidden actions (auto reference lap / auto setup apply / runtime-LLM authority / causation / driver blame) disabled. Zero console error. |
+| `tests/e2e/flow-01-new-user.test.js` | New-user empty-state journey. A fresh `MemoryBackend()` instance (Node-only logic harness, not IndexedDB or a browser — see `tests/e2e/helpers/flow-harness.js:44`) produces a deterministic empty Case Library; F1 reports zero records; envelope at v1; forbidden actions (auto reference lap / auto setup apply / runtime-LLM authority / causation / driver blame) disabled. Zero console error. |
 | `tests/e2e/flow-02-real-telemetry.test.js` | Real telemetry import. |
 | `tests/e2e/flow-03-measured.test.js` | Measured-metrics flow. |
 | `tests/e2e/flow-04-reference-lap.test.js` | Reference-lap explicit selection (no auto fastest / median / best-sector composite). |
@@ -691,8 +691,12 @@ gate.
 
 R3.0 production paths are deterministic by construction:
 
-- **No `Math.random` in production paths.** Sampling, ordering, and pairing are deterministic. Where a random
-  source would be tempting (tie-breaking, jitter), an explicit declared rule replaces it.
+- **No `Math.random` in analysis/decision paths.** Sampling, ordering, and pairing are deterministic. Where a
+  random source would be tempting (tie-breaking, jitter), an explicit declared rule replaces it. The sole
+  exception is opaque local storage key generation — `case-store.js`'s and `session-store.js`'s `_newId()`
+  helpers use `Math.random()` (mixed with `Date.now()`) to mint `caseId`/`sessionId` strings when the caller
+  does not supply one; these ids are never inputs to sampling, ordering, pairing, or any credibility/decision
+  computation, only opaque storage keys.
 - **No wall-clock dependence in decision logic.** Time values consumed by the decision engine come from
   declared monotonic record timestamps, not `Date.now()`. R3.0E records use a monotonic `createdAt` derived
   from the platform clock at insertion, never re-evaluated downstream — and `timeline-store` rejects

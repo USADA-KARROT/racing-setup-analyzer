@@ -22,8 +22,8 @@ Racing Setup Analyzer runs in two host contexts. Both contexts use the same stor
 
 | Host context | Backend | Where the bytes live | Lifetime |
 |---|---|---|---|
-| Browser (renderer in dev / web build) | IndexedDB | Per-origin IndexedDB database, owned by the browser profile | Until the user clears site data, or the app calls `caseStore.remove({ confirm: true })` and the equivalent removal calls on the other stores |
-| Electron desktop | IndexedDB under Chromium, scoped to `app.getPath('userData')` | OS user-data folder (macOS: `~/Library/Application Support/<app>`, Windows: `%APPDATA%/<app>`, Linux: `~/.config/<app>`) | Until the user deletes `userData`, uninstalls the app, or the app calls the store-level removal APIs |
+| Browser (renderer in dev / web build) | IndexedDB | Per-origin IndexedDB database, owned by the browser profile | Until the user clears site data, or the app calls `caseStore.remove({ confirm: true })` plus the corresponding per-store calls described under "Removing a case" below — the outcome and timeline stores have no `remove()` (write-once / append-only) and the follow-up-link store only exposes `markParentStatus(linkId, 'deleted')`, a status transition, not a row deletion |
+| Electron desktop | IndexedDB under Chromium, scoped to `app.getPath('userData')` | OS user-data folder (macOS: `~/Library/Application Support/<app>`, Windows: `%APPDATA%/<app>`, Linux: `~/.config/<app>`) | Until the user deletes `userData`, or the app calls the store-level removal APIs described under "Removing a case" below (which do not fully clear every store — see that section for the outcome/timeline/follow-up-link exceptions). Uninstalling the app does **not** delete `userData` under this app's current packaging (macOS `dmg`, Windows NSIS without `deleteAppDataOnUninstall`); `userData` must be removed manually or via OS-level app-data cleanup |
 | Node test harness | In-memory `Map` shim | Process memory only | Discarded at process exit |
 
 There is **no cloud database, no remote object store, no syncing service, no user account, no remote ID broker**. The product has no notion of a remote user. Two installations of the app on two machines share zero state.
@@ -60,7 +60,7 @@ Per the SKYLINE D12/E1 ruling, R3.0E persistence lives in **separate versioned s
 Persistence semantics shared by every R3.0E store:
 
 - Every payload is validated by its E1 contract **before** the write (inside `compute()`).
-- Every payload is **re-validated on read**. A persisted record whose `schemaVersion` exceeds the current `SCHEMA_VERSIONS[kind]` value is rejected fail-closed with the corresponding `R3_0E_*_FUTURE_SCHEMA` reason; a corrupted payload is rejected with `R3_0E_*_CORRUPTED`.
+- Every payload fetched through a **single-record read** (`get()` on `r3_0e_experiments`/`r3_0e_outcomes`, and the per-link payload reads inside `listForParent()` on `r3_0e_followupLinks`) is **re-validated on read**. A persisted record whose `schemaVersion` exceeds the current `SCHEMA_VERSIONS[kind]` value is rejected fail-closed with the corresponding `R3_0E_*_FUTURE_SCHEMA` reason; a corrupted payload is rejected with `R3_0E_*_CORRUPTED`. **Exception:** `experimentStore.list()` and `outcomeStore.listForExperiment()` read directly from the lightweight `r3_0e_experimentsIndex` / `r3_0e_outcomesIndex` summary stores (`renderer/js/r3-0e-stores.js:149`, `:213`) and return those index values as-is — no `schemaVersion` check and no shape validation is applied on these two list paths. A consumer that needs a validated payload must call the corresponding `get(id)` for each id returned by `list()`/`listForExperiment()`.
 - Persisted records carry **no runtime authority**. The `WeakSet` identity that the live producer modules use to gate authority is closure-private and cannot survive reload. Any consumer that rehydrates an R3.0E record must re-validate it through the E1 contracts before treating its content as authoritative.
 
 Per-store behavior worth being precise about:
@@ -250,7 +250,7 @@ Comparison is **same-case + same-session only**. A bundle that attempted to comp
 - No fonts, scripts, or stylesheets are loaded from CDNs at runtime; all assets are bundled.
 - No cloud account, no login, no remote identity provider.
 
-This is the product's invariant: no data leaves the host unless the user explicitly triggers one of three export paths — a comparison-export bundle (R3.0C C6), a portable case bundle (`caseStore.exportCase`), or a raw-telemetry archive (`sessionStore.exportRawArchive`, an opt-in distinct from both bundle exports) — each writing a file to a path the user picks, or unless the user shares a result themselves out-of-band.
+This is the product's invariant: no data leaves the host unless the user explicitly triggers one of three export paths — a comparison-export bundle (R3.0C C6, `buildComparisonExport`), a portable case bundle (`caseStore.exportCase`), or a raw-telemetry archive (`sessionStore.exportRawArchive`, an opt-in distinct from both bundle exports) — each returning an in-memory JS object/envelope that the caller must then persist or share itself; the preload surface (`preload.js`) exposes no filesystem, IPC, or save-dialog capability, so none of these functions write a file on their own. Persisting or sharing the returned data — e.g. copying it out, or a future UI affordance that saves it to a user-picked path — happens out-of-band, outside these functions.
 
 How the invariant is enforced, in layers:
 
@@ -393,11 +393,11 @@ Deletion is what it claims to be: a removal of the local store entries. It is no
 
 ## R3.0F F2 end-to-end coverage
 
-The F2 phase ships nine end-to-end flows under `tests/e2e/` that each exercise the full storage + migration + producer pipeline once. They are listed here so a reader of this document can trace any data-flow claim above to a concrete test:
+The F2 phase ships nine end-to-end flows under `tests/e2e/` — a Node-only logic harness (`tests/e2e/helpers/flow-harness.js`) that composes the production storage, migration, and R3.0E store modules over an in-memory `MemoryBackend()`, not a browser, DOM, Electron process, or IndexedDB. Each flow exercises the storage + migration pipeline for its scenario; not every flow invokes every producer end-to-end (for example flow-06 appends an `outcome_classified` timeline event directly rather than calling the R3.0E classifier). They are listed here so a reader of this document can trace any data-flow claim above to a concrete test:
 
 | File | Purpose |
 |---|---|
-| `tests/e2e/flow-01-new-user.test.js` | Fresh launch with empty IndexedDB produces a deterministic empty Case Library; F1 reports zero records; envelope is at v1; forbidden actions are disabled. |
+| `tests/e2e/flow-01-new-user.test.js` | A fresh `MemoryBackend()` instance (Node-only logic harness, not IndexedDB or a browser) produces a deterministic empty Case Library; F1 reports zero records; envelope is at v1; forbidden actions are disabled. |
 | `tests/e2e/flow-02-real-telemetry.test.js` | A CSV-import-style telemetry session lands deterministically into `sessions`; F1 treats the session as at-target; no raw telemetry leaks into the case bundle. |
 | `tests/e2e/flow-03-measured.test.js` | A case with measured-metric data preserves the credibility rung exactly `Measured` through storage roundtrip and migration; no credibility upgrade; qualifiers go in `limitations[]`, not the rung. |
 | `tests/e2e/flow-04-reference-lap.test.js` | R3.0C reference-lap contract: explicit user selection only (no `fastestValid`, no `medianValid`, no `bestSectorComposite`); comparison authority requires same Case + same Session; delta sign = `comparison − reference`. |
