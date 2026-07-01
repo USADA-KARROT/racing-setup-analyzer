@@ -737,7 +737,7 @@ R3.0 production paths are deterministic by construction:
 | D2 graph | Authoritative inputs verified via WeakSet | Any input not WeakSet-member | Graph build aborts. |
 | D3 hypothesis | Verified graph + inputs satisfy hypothesis preconditions | Any precondition fails (e.g. no calibration for a magnitude claim) | Hypothesis downgraded to directional or omitted. |
 | D5 brief | Deep-frozen emit; generation token bound to inputs | Token stale / retired / replayed against a different case | Brief refused. |
-| R3.0E timeline | Append-only invariants pass (unique `eventId`, monotonic `createdAt`, current schema, shape re-validated) | Duplicate / out-of-order / future schema / shape mismatch | Reason code, no append. |
+| R3.0E timeline | Append-only invariants pass (unique `eventId`, non-decreasing `createdAt`, current schema, shape re-validated) | Duplicate / out-of-order / future schema / shape mismatch | Reason code, no append. |
 | R3.0E follow-up link | `parentCaseId` matches reverse index AND link; `markParentStatus` in `{present, archived, deleted}` | Reverse-index mismatch / non-array / status off-allowlist | `R3_0E_LINK_CORRUPTED` / `R3_0E_LINK_PARENT_STATUS_INVALID`. |
 | Outcome classifier | Same-case/same-session/explicit-reference attestation + control-variable observations | Cross-case, cross-session, no reference, low comparability, or a missing/out-of-range control variable | `invalid_comparison` (highest precedence) or `inconclusive_due_to_confounders` with the specific limitation code. |
 | Feature Registry | `featureRegistryActivationAllowed === true` | Otherwise | Feature deferred (navigation hidden / disabled). |

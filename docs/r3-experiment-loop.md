@@ -425,7 +425,9 @@ R3.0E. The other R3.0E stores expose different mutation surfaces: the
 narrow `markParentStatus` mutation on an existing link record; the
 **outcome store** is create-only through its public API (`create`, `get`,
 `listForExperiment`), with duplicate-id rejection and no update or remove
-method. The timeline-store has no mutation surface at all.
+method. The timeline store exposes only append mutation (`appendEvent`
+rewrites the per-case document with one more event); it has no update or
+delete surface for existing events.
 
 The store keys timelines by `caseId`: the persisted document for a case is
 `{ schemaVersion, caseId, events }`, with `schemaVersion = 1` (the constant
@@ -455,9 +457,11 @@ The runtime API is just two methods: `getTimeline(caseId)` and
    events, NEVER fabricates events, NEVER weakens the monotonic-time
    guarantee."* Migration validates the existing v1 shape and passes
    records through unchanged.
-4. **Deep-freeze on write, structured-clone on read.** Callers cannot mutate
-   an entry by holding its reference, and a returned entry cannot be used to
-   smuggle a mutation back into the store.
+4. **Structured-clone isolation at storage boundaries; deep-freeze on read.**
+   The backend's `transact` clones values across the persistence boundary,
+   so a caller cannot mutate a stored entry by holding its reference; and
+   `getTimeline()` deep-freezes the validated record it returns, so a
+   returned entry cannot be used to smuggle a mutation back into the store.
 5. **Recursive descriptor audit before clone.** The contract walks the
    timeline and each event recursively, rejecting any non-allowlisted
    property, prototype-poisoning attempt, or accessor-throwing shape — the

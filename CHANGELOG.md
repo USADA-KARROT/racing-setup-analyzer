@@ -222,7 +222,8 @@ When the release gate flips `featureRegistryActivationAllowed = true`, the versi
 
 R3.0E adds the experiment / outcome / follow-up / timeline ladder on top of the decision
 engine. The mutation surfaces are deliberately heterogeneous: **only the timeline store
-is append-only with monotonic `createdAt`** and exposes no mutation surface; the
+is append-only with non-decreasing `createdAt`** — its sole mutation is `appendEvent`,
+with no update or delete surface for existing events; the
 **experiment store** allows targeted mutation through `create`, `update`, and `remove`;
 the **follow-up-link store** allows only the narrow `markParentStatus` on existing links;
 the **outcome store** is **create-only through its public API** (`create`, `get`,
@@ -236,7 +237,7 @@ prior case.
 | Experiment proposal | Derived | `sourceHypothesisId`/`sourceRecommendationId` (id-grammar-checked string references — not a live-verified brief token) | Malformed/missing required field per the E1 contract; `outcome` set before `status` reaches a terminal state |
 | Outcome classification | Heuristic | Same-case + same-session comparison authority + controlled-variable witness | Comparison authority degraded; controlled variables not held; final-outcome flag from caller (never trusted) |
 | Follow-up case link | Derived | Parent case ID + link grammar (`parentCaseId`, `followUpCaseId`, `experimentId`) | Reverse-index parent membership fails; path grammar violated; cross-case comparison authority attempted |
-| Timeline append | Derived | Outcome + follow-up records with monotonic `createdAt` | Duplicate `eventId`; out-of-order `createdAt`; mutation of a prior entry attempted |
+| Timeline append | Derived | Outcome + follow-up records with non-decreasing `createdAt` | Duplicate `eventId`; out-of-order `createdAt`; mutation of a prior entry attempted |
 
 Store contract reminders:
 
