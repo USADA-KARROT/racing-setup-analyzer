@@ -115,7 +115,7 @@ Per-entry `status ∈ {migrated, no-op, rejected, failed}`. Per-report `status �
 
 ## What is stored vs ephemeral
 
-The decision of what to persist follows a single rule: **persist what the user authored or imported; recompute everything else**. Authority is not stored — authority is re-derived from raw evidence on every run.
+The general posture is: **persist what the user authored or imported, plus the system-produced records each phase is responsible for keeping as a durable record (R3.0E outcomes, R3.0E timeline events, the R3.0F migration journal/state); recompute everything else.** Authority itself is never stored — the closure-private WeakSet identity that marks a value as authoritative is re-derived from raw evidence on every run, even for objects (like an Outcome) whose persisted *content* does survive a restart.
 
 ### Persisted
 

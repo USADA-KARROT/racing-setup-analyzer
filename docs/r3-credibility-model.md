@@ -34,7 +34,7 @@ The contract's own header comment reads verbatim: *R3.0D credibility ladder. Dir
 
 Two practical consequences of the two-vocabulary split:
 
-1. In the R3.0D evidence layer, **`synthetic` is a credibility rung**, not a provenance flag. An evidence node sourced from the Demo Analysis Case is tagged `credibility: "synthetic"` at the evidence layer, and the cross-layer assertion `SYNTHETIC_LIMITATION_REQUIRED` (constant `CODES.LIMITATION_SYNTHETIC_ONLY`) requires the node to carry the `LIMITATION_SYNTHETIC_ONLY` marker among its limitations. The contract header restates the constraint verbatim: *synthetic-honesty constraint: a `synthetic` provenance MUST carry the LIMITATION_SYNTHETIC_ONLY marker among its limitations.*
+1. In the R3.0D evidence layer, `'synthetic'` is a value in **two separate enums on the same EvidenceNode**: the 4-value `EVIDENCE_CREDIBILITY` rung (`measured`/`derived`/`heuristic`/`synthetic`) and the 3-value `PROVENANCE` field (`synthetic`/`real`/`unverified`) — they coexist as two distinct keys (`credibility`, `provenance`) on the node, not one flag wearing two names. The synthetic-honesty enforcement constraint is keyed specifically on **`provenance === 'synthetic'`**, not on `credibility`: `contracts/r3.0d/evidence-node-contract.js` checks `if (n.provenance === 'synthetic') { ... require LIMITATION_SYNTHETIC_ONLY ... }`. An evidence node sourced from the Demo Analysis Case is tagged `provenance: "synthetic"`, and that triggers the requirement to carry the `LIMITATION_SYNTHETIC_ONLY` marker among its limitations.
 2. In R3.0C and at the R3.0D *conclusion* layer (see below), **`synthetic` is a provenance value**, not a rung. The same word names different things at different layers — and the validators at each boundary enforce the layer-correct enum.
 
 ### R3.0D `CONCLUSION_CREDIBILITY` — conclusion-credibility ladder (6 values)
@@ -82,7 +82,7 @@ A value's rung at the evidence layer (`EVIDENCE_CREDIBILITY`) and its rung at th
 Two patterns this enables:
 
 - **Evidence `measured` → Conclusion `Measured`** is the canonical "honest pass-through" path: the evidence-graph producer attested a `measured` evidence node on confirmed, calibrated channels in a same-case + same-session window; the conclusion producer consumed it through the WeakSet verifier and emitted a `Measured` conclusion. The synthetic-honesty constraint did not fire because the evidence rung was not `synthetic`.
-- **Evidence `synthetic` → Conclusion at any rung, but with `LIMITATION_SYNTHETIC_ONLY`** is the Demo Analysis Case path: an evidence node carries `credibility: "synthetic"` (evidence layer) plus the `LIMITATION_SYNTHETIC_ONLY` marker; any conclusion built on it carries the limitation forward and may never be presented as a real-world claim. The contract validators at both layers refuse to forget the synthetic origin.
+- **Evidence `provenance: "synthetic"` → Conclusion at any rung, but with `LIMITATION_SYNTHETIC_ONLY`** is the Demo Analysis Case path: an evidence node carries `provenance: "synthetic"` plus the `LIMITATION_SYNTHETIC_ONLY` marker; any conclusion built on it carries the limitation forward and may never be presented as a real-world claim. The contract validators at both layers refuse to forget the synthetic origin.
 
 A value emitted on a prior run, persisted, and rehydrated on a later run does **not** retain runtime authority. The R3.0E stores module header makes this explicit, verbatim: *Persisted records carry NO runtime authority (WeakSet identity is closure-private and cannot survive reload). Rehydration consumers MUST re-validate via the E1 contracts before treating values as authoritative.*
 
@@ -110,7 +110,7 @@ Three substantive constraints the brief honours on every emission:
 
 - **No causation.** A correlation in the evidence graph is not promoted to a causal claim. The hypothesis engine surfaces directional and consistency observations; it does not assert "X caused Y." This is enforced structurally, not by a standing "no-causation" limitation marker: `contracts/r3.0d/engineer-brief-contract.js` and `recommendation-contract.js` scan every i18n-key string for causal-overclaim wording and reject the whole record with `HYPOTHESIS_CAUSAL_OVERCLAIM` if any is found — there is no `LIMITATION_NO_CAUSAL_CLAIM` code anywhere in the codebase.
 - **No driver blame.** Driver-input observations are reported as driver observations and never re-framed as coaching directives. The Engineer Brief is a vehicle-and-setup surface; a coaching directive requires an entirely separate authority chain (which R3.0F does not enable).
-- **Synthetic stays synthetic.** Evidence rungs of `synthetic` arrive carrying `LIMITATION_SYNTHETIC_ONLY` and the brief preserves the marker on every conclusion it builds from them. There is no "demo mode" that strips synthetic limitations.
+- **Synthetic stays synthetic.** Evidence nodes with `provenance: "synthetic"` arrive carrying `LIMITATION_SYNTHETIC_ONLY` and the brief preserves the marker on every conclusion it builds from them. There is no "demo mode" that strips synthetic limitations.
 
 The Engineer Brief also obeys the `limitations[]` propagation rule: `renderer/js/r3-0d-engineer-brief.js` builds `limitations` as the deduplicated union of `hypothesisSet.limitations` and every individual hypothesis's `limitations` — no brief-level limitation is added on top of that union, and there is no standing no-causation marker added to it (no-causation is enforced structurally at the contract layer, as described above, not via a limitation code).
 
@@ -180,7 +180,7 @@ The migration engine's central rule on credibility is that it **never fabricates
 
 Two practical consequences:
 
-1. The synthetic flag (in whichever layer's enum carries it) is preserved across the v1.3 → v1.4.0 transform. A `provenance: "synthetic"` value at R3.0C, or a `credibility: "synthetic"` evidence node at R3.0D, retains its tag and its `LIMITATION_SYNTHETIC_ONLY` marker after migration.
+1. The synthetic flag (in whichever field carries it) is preserved across the v1.3 → v1.4.0 transform. A `provenance: "synthetic"` value at R3.0C, or an R3.0D evidence node's `provenance: "synthetic"` field (the field the synthetic-honesty constraint is actually keyed on — see above), retains its tag and its `LIMITATION_SYNTHETIC_ONLY` marker after migration.
 2. The `limitations[]` field is preserved verbatim. The migrator does not collapse, dedupe, or rewrite limitation codes — it carries them across in their stable-code form.
 
 ---
@@ -254,7 +254,7 @@ Rules on `limitations[]`:
 
 When an R3.0 surface renders a value, read it as a four-tuple plus the envelope, with the layer made explicit:
 
-- **Which enum applies.** R3.0C comparison-authority values draw from the six-value `CREDIBILITY_LADDER`. R3.0D evidence nodes draw from the four-value `EVIDENCE_CREDIBILITY`. R3.0D conclusions draw from the six-value `CONCLUSION_CREDIBILITY`. The same word can mean different things at different layers — `synthetic` is a rung at the evidence layer and a provenance value at the conclusion layer — and the validators at each boundary enforce the layer-correct enum.
+- **Which enum applies.** R3.0C comparison-authority values draw from the six-value `CREDIBILITY_LADDER`. R3.0D evidence nodes draw from the four-value `EVIDENCE_CREDIBILITY` (for their `credibility` key). R3.0D conclusions (Engineer Brief) draw from the six-value `CONCLUSION_CREDIBILITY`. Separately, `'synthetic'` is also a value in the three-value `PROVENANCE` enum (`synthetic`/`real`/`unverified`), which exists as its own `provenance` key on **both** evidence nodes and the Engineer Brief — `credibility` and `provenance` are two distinct keys at both layers, not one name that changes meaning per layer. The synthetic-honesty enforcement constraint is specifically keyed on the `provenance` field, at whichever layer it appears.
 - **Provenance** (`real` / `synthetic` / `unverified`, at R3.0C and at the R3.0D conclusion layer) — what kind of data the value originated from. Synthetic origin is never stripped by any downstream transform and carries `LIMITATION_SYNTHETIC_ONLY` through the chain.
 - **Limitations** — the honest caveats the producer attached, as stable codes.
 - **Blockers** — present only when the conclusion rung is `Unavailable`; the machine-readable reason the capability failed closed on this run.

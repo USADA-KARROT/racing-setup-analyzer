@@ -224,7 +224,7 @@ prior case.
 
 | Capability | Credibility | Required input | Fail-closed when |
 |---|---|---|---|
-| Experiment proposal | Derived | Authoritative Engineer Brief priority item | Brief absent or stale token; cross-case association attempted |
+| Experiment proposal | Derived | `sourceHypothesisId`/`sourceRecommendationId` (id-grammar-checked string references — not a live-verified brief token) | Malformed/missing required field per the E1 contract; `outcome` set before `status` reaches a terminal state |
 | Outcome classification | Heuristic | Same-case + same-session comparison authority + controlled-variable witness | Comparison authority degraded; controlled variables not held; final-outcome flag from caller (never trusted) |
 | Follow-up case link | Derived | Parent case ID + link grammar (`parentCaseId`, `followUpCaseId`, `experimentId`) | Reverse-index parent membership fails; path grammar violated; cross-case comparison authority attempted |
 | Timeline append | Derived | Outcome + follow-up records with monotonic `createdAt` | Duplicate `eventId`; out-of-order `createdAt`; mutation of a prior entry attempted |
