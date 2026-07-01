@@ -49,7 +49,10 @@ is `2.0.0`.
 - The product is not a complete multi-body-dynamics simulator and not a complete tyre model.
 - No runtime LLM holds decision authority. No causation claim is made from correlation.
 - No driver blame is emitted by any service.
-- No automatic setup application. All Engineer Brief output is **authoritative-only** input.
+- No automatic setup application. The Engineer Brief itself is built exclusively from
+  closure-private-WeakSet-verified R3.0D inputs (authoritative-only D2-D5 chain); the
+  downstream R3.0E experiment record retains it only as a grammar-checked id reference,
+  not a re-verified authority token — see "Engineer Brief" below.
 
 ---
 
@@ -173,8 +176,12 @@ checkpoint lives at **`governance/r3.0f/checkpoints/F2.json`**. The flow files l
    The flow does not invoke the `electron` binary or launch a window — it is a
    declaration-level smoke check, not a process-launch check.
 
-Each flow asserts the same fail-closed rules at runtime that the unit tests assert in
-isolation. Flow output is never used to widen a credibility rung.
+Each flow asserts the specific fail-closed rules relevant to its own scenario — not a
+common set repeated across all nine. Some flows (e.g. flow-02, flow-08) mainly assert a
+successful golden-path landing; flow-09 is a declaration-level static-source check (it
+never invokes the Electron binary); others (e.g. flow-04, flow-06) exercise concrete
+rejection paths (`R3_0E_TIMELINE_OUT_OF_ORDER`, reference-selection auto-pick blocks).
+Flow output is never used to widen a credibility rung.
 
 ### F3 — Hardening probes (six)
 
@@ -266,7 +273,12 @@ hardware clicks are never emitted.**
 | Priority engine (D4) | Heuristic | Hypotheses + capability availability + fail-closed reason codes | Hypothesis input not D3-issued |
 | Engineer Brief (D5) | Heuristic | Priorities + provenance + limitations | Brief is regenerated on every prepare; no retired-token replay; no blocked-prepare poisoning |
 
-The Engineer Brief is the **authoritative-only input** to R3.0E experiments. It is never
+The Engineer Brief is built exclusively from **authoritative-only** D2-D5 inputs (the
+closure-private `WeakSet` chain in the table above). When an engineer authors an R3.0E
+experiment referencing the Brief, that reference is an id-grammar-checked string
+(`sourceHypothesisId`/`sourceRecommendationId`) only — R3.0E does not re-verify the
+Brief's producer identity at experiment-creation time (see "Engineer Brief" in
+`docs/r3-experiment-loop.md` for the full boundary). The Brief itself is never
 presented as a measured magnitude, never as a guaranteed result, never as setup clicks, and
 never as a lap-time claim. Any actionable recommendation surfaces in physical units
 (spring rate change in N/mm, ride-height delta in mm, ARB stiffness in Nm/deg, etc.) with
