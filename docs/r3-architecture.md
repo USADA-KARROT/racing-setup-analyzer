@@ -512,8 +512,8 @@ createMigrationEngine({ backend, registry?, metaStore?, journalKey?, stateKey?,
   -> { detect, plan, migrate, journal, envelope, knownStores }
 ```
 
-- `detect()` → frozen `{ ok, currentEnvelope?, targetEnvelope, perStoreStatus, knownStores, envelopeMismatch }`.
-- `plan()` → frozen `{ ok, generatedAt, steps, blockers, perStoreSummary }`.
+- `detect()` → frozen `{ ok, currentEnvelope, targetEnvelope, envelopeMismatch, knownStores, perStoreStatus }` — `currentEnvelope` is always present, `null` when no prior migration state exists.
+- `plan()` → frozen `{ ok, generatedAt, steps, blockers, perStoreSummary, targetEnvelope, currentEnvelope }`.
 - `migrate({ confirm: true })` → frozen `{ ok, report | reasonCode }`. `confirm:true` is required;
   any other value short-circuits with `CONFIRM_REQUIRED`.
 - `journal()` → frozen array of journal entries (most recent last).
