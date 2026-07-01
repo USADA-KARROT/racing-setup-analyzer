@@ -23,10 +23,15 @@ at `E5_ACTIVATION` (`governance/r3.0e/state.json`). The nav nodes
 `renderer/js/feature-registry.js`) carry `availability: 'available'` — they
 are live in the navigation. The corresponding **features**
 `experiment_loop` / `case_timeline` (`FEATURES`, a separate keyspace) carry
-`availability: 'available_conditional'` — each pane's viewmodel returns an
-`unavailable` display state for a given case until that case actually carries an
+`availability: 'available_conditional'` — the R3.0E experiment viewmodel
+(`renderer/js/r3-0e-experiment-viewmodel.js`) returns an `unavailable`
+display state for a given case until that case actually carries an
 authoritative E3 outcome / E4 timeline projection. This is a per-case data
-gate, not a feature-registry gate.
+gate, not a feature-registry gate. Note the shipped `renderer/index.html`
+does not yet load the R3.0E viewmodel scripts or render an Experiment
+Loop / Case Timeline pane — the nav nodes are live, but the pane content
+behind them is a downstream wire-in step; the viewmodel's display-state
+behavior is exercised today by its Node test suite, not by a shipped pane.
 
 ## Producer chain: R3.0D engineer-brief → recommendation → experiment plan
 
@@ -117,6 +122,7 @@ This table reflects the actual closed key set and validation in
 
 | Field | Type | Validation | Meaning |
 |-------|------|-----------|---------|
+| `schemaVersion` | integer, currently `1` | Integer + future-schema check | Non-integer or `< 1` → `EXPERIMENT_INVALID`; `> 1` → `UNSUPPORTED_FUTURE_SCHEMA` (fail-closed). Omitting it fails validation — `Number.isInteger(undefined)` is false. |
 | `experimentId` | string, `exp_<16-32 hex>` | Grammar-checked | Stable identity. Never reused. |
 | `sourceCaseId` | string | Id-grammar-checked only | The case the experiment was authored against. No live cross-check against R3.0B at the contract layer. |
 | `sourceHypothesisId` | string | Id-grammar-checked only | Reference to the R3.0D D3 hypothesis being tested. Not re-verified against the evidence graph at write time. |
@@ -444,7 +450,7 @@ The runtime API is just two methods: `getTimeline(caseId)` and
    in its runtime API. F1 migration (R3.0F) does **not** add, remove,
    reorder, or rewrite timeline events: the migrator at
    `scripts/migrators/timeline-migrator.js` exports `STEPS = []` (confirmed
-   at source line 19) and its header states verbatim: *"F1 has NO step
+   at source line 20) and its header states verbatim: *"F1 has NO step
    migrators (v1). Migration NEVER reorders timeline events, NEVER removes
    events, NEVER fabricates events, NEVER weakens the monotonic-time
    guarantee."* Migration validates the existing v1 shape and passes

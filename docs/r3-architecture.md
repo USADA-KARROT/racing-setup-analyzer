@@ -239,9 +239,12 @@ Allowlisted, signed metrics only:
 
 | Metric | Sign convention | Credibility | Blocked when |
 | --- | --- | --- | --- |
-| Entry / mid / exit delta (per-corner) | comparison − reference | Derived | Required channels unavailable / pairing unresolved / normalization blocked |
-| Speed / time deltas on shared normalized window | comparison − reference | Derived | Either side blocked upstream |
-| Inputs delta (steering, throttle, brake) over shared window | comparison − reference | Derived | Channel missing or unconfirmed |
+| `lap_time` (lap scope) | comparison − reference | Derived | Lap time non-finite (`DELTA_METRIC_NUMERIC_INVALID`) |
+| `delta_cumulative` (lap scope; sum of paired-corner full-time deltas, `lap_time` fallback with zero pairs) | comparison − reference | Derived | No computable pair — partial pairing coverage surfaces a limitation, never a re-derived total |
+| `sector_delta` (per paired corner) | comparison − reference | Derived | Zero pairs (`DELTA_METRIC_CORNER_PAIR_REQUIRED`) / non-finite zone time for that pair (`DELTA_METRIC_NUMERIC_INVALID`) |
+| `entry_delta` / `mid_delta` / `exit_delta` (per paired corner, phase scope) | comparison − reference | Derived | Same as `sector_delta`, plus missing phase-boundary authorisation |
+
+(These six names are the closed `SUPPORTED_DELTA_METRICS` allowlist in `contracts/r3.0c/delta-metrics-contract.js`. Speed deltas are explicitly deferred at the C6 export layer, and the steering/throttle/brake input-delta names exist only in the CP1 eligibility vocabulary — `comparison-eligibility-contract.js`'s `SUPPORTED_METRICS`, which "computes none of them" — not in the C5 computation.)
 
 `delta = comparison − reference` is the **single convention**. The UI may never swap operands; the export
 envelope carries the operand order verbatim. No metric reports a magnitude where any upstream gate is open.
@@ -414,10 +417,11 @@ invariants `timeline-store` uses. Reason codes: `R3_0E_OUTCOME_INVALID`, `R3_0E_
 `timeline-store` is keyed per case (`r3_0e_timelines`); the document shape is
 `{ schemaVersion, caseId, events: [] }`. `appendEvent(caseId, event)` enforces, in order:
 
+- **Future `schemaVersion`** on the stored document → `R3_0E_TIMELINE_FUTURE_SCHEMA`.
 - **Duplicate `eventId`** within the same case → `R3_0E_TIMELINE_DUPLICATE_EVENT`.
 - **Out-of-order timestamp** — `Date.parse(event.createdAt) < Date.parse(lastEvent.createdAt)` (or NaN on
-  either side) → `R3_0E_TIMELINE_OUT_OF_ORDER`.
-- **Future `schemaVersion`** → `R3_0E_TIMELINE_FUTURE_SCHEMA`.
+  the new event's side) → `R3_0E_TIMELINE_OUT_OF_ORDER`. A NaN `createdAt` on the stored last event is not
+  caught by this guard; it surfaces as `R3_0E_TIMELINE_INVALID` via the re-validation step below.
 - **Re-validation** of the resulting document shape via `validateCaseTimelineShape` before write.
 
 A correction is therefore a **new event**, never a mutation of an existing event. Reason codes:
@@ -754,7 +758,10 @@ qualitative substitute is offered where it is honestly available; otherwise the 
   any version drift fails the train validator closed.
 - **`featureRegistryActivationAllowed`** is a per-phase flag, not one train-wide switch. R3.0C, R3.0D, and
   R3.0E have each already flipped their own flag to `true` at their respective `*_ACTIVATION` checkpoints —
-  the Comparisons, Engineer Brief, Experiment Loop, and Case Timeline panes are reachable to the user today.
+  the Comparisons pane is reachable to the user today; the Engineer Brief, Experiment Loop, and Case Timeline
+  nav nodes are registered and live in the shipped registry, but their pane content is not yet wired into
+  `renderer/index.html` (the D5 Engineer Brief mount ships hidden/inert; the R3.0E viewmodel scripts are not
+  loaded by the page).
   Only R3.0F's own flag remains `false` until `F6_RELEASE` (R3.0F introduces no case-scoped pane of its own).
 - **`runtimeConsumersAllowed`** — `true` since F1. The migration engine is the first F-phase runtime consumer.
 - **Comparison scope** — same-case + same-session only. Cross-case and cross-session are permanently forbidden.
