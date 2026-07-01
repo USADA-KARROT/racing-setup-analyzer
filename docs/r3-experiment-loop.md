@@ -161,7 +161,7 @@ case-record schema body (which remains at v1.4.0).
 | `r3_0e_outcomesIndex` | `outcomeId` | Summary index for `listForExperiment` |
 | `r3_0e_timelines` | `caseId` | One append-only timeline doc per case (schemaVersion 1) |
 | `r3_0e_followupLinks` | `linkId` | Follow-up link payload (schemaVersion 1) |
-| `r3_0e_followupLinksByCase` | `parentCaseId` | Reverse index, `Array<linkId>` |
+| `r3_0e_followupLinksByCase` | `parentCaseId` | Reverse index, `{ parentCaseId, linkIds: Array<linkId> }` |
 | `r3_0e_storeMetadata` | constant key `__r3_0e_version` | Migration / schema-version marker |
 
 Mutability is **per store**, not global:
