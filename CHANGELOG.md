@@ -294,7 +294,7 @@ decision-engine layers.
 | Corner segmentation (C4) | Derived | Sign-based grouping with near-centre log-gap guard |
 | Corner pairing (C4) | Derived | Same-corner / same-direction / same-distance band |
 | Delta metrics (C5) | Derived | Sign convention: `(comparison − reference)`. Six allowlisted metrics. |
-| Comparison export (C6) | Derived | Append-only export; reason codes carried through |
+| Comparison export (C6) | Derived | Bounded comparison-summary envelope (not append-only); reason codes carried through |
 | Comparison workspace (C7) | Derived | View model never trusts a `confirmed` flag from a caller |
 | Activation (C8) | Derived | Closure-private session authority; second WeakSet defends against session-ID string-match |
 

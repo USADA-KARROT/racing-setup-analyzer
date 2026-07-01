@@ -121,7 +121,7 @@ This table reflects the actual closed key set and validation in
 | `targetMetric` | non-empty string (≤512 bytes) | Length-checked only | Which metric the experiment is targeting (e.g. a R3.0C C5 delta-metric name). **Not an allowlist** — any non-empty string under the byte cap is accepted at this layer. |
 | `baselineValue` | finite number | `Number.isFinite` | The baseline reading from the source case. A plain number — no `{ value, units, credibility, provenance }` wrapper. |
 | `expectedDirection` | `'increase' \| 'decrease' \| 'no_change'` | Closed enum | The qualitative direction predicted by the model. (Not `"stay"` — the literal enum value is `'no_change'`.) |
-| `expectedMagnitudeRange` | `{ min: number, max: number }`, `min <= max` | Required, not nullable | A plain object with finite `min`/`max`. There is no `units` key in this object and no `null` escape hatch — the contract rejects a non-plain or missing range. |
+| `expectedMagnitudeRange` | `{ min: number, max: number }`, `min <= max` | Required, not nullable | A plain object with finite `min`/`max` where `min <= max`; `null` and non-plain values are rejected (`EXPERIMENT_EXPECTED_MAGNITUDE_RANGE_INVALID`). The contract does not enforce a closed key set on this nested object — only the top-level `EXPERIMENT_KEYS` list is closed (see below) — so an extra key such as a caller-supplied `units` is not itself rejected here; the documented/expected shape simply carries no `units` key. |
 | `setupChange` | plain object | `_isPlain` only | The setup lever(s) being moved. The contract checks it is a plain object; it does not enforce a specific physical-unit shape. |
 | `driverInstruction` | string \| `null` | Optional | Optional driver-facing note when non-null. |
 | `controlVariables` | array, ≤32 entries | `Array.isArray` + length cap only | Declared control variables. The E1 contract does not validate per-element shape; the E3 classifier reads each element's `.name` at runtime to compare against observed control variables. |
@@ -435,10 +435,12 @@ The runtime API is just two methods: `getTimeline(caseId)` and
 3. **No deletion / no update.** The store has no delete and no update operation
    in its runtime API. F1 migration (R3.0F) does **not** add, remove,
    reorder, or rewrite timeline events: the migrator at
-   `scripts/migrators/timeline-migrator.js` exports `STEPS = []` and its
-   header states verbatim *"R3.0F F1 timeline migrator. v1 only; never
-   fabricates events."* Migration validates the existing v1 shape and
-   passes records through unchanged.
+   `scripts/migrators/timeline-migrator.js` exports `STEPS = []` (confirmed
+   at source line 19) and its header states verbatim: *"F1 has NO step
+   migrators (v1). Migration NEVER reorders timeline events, NEVER removes
+   events, NEVER fabricates events, NEVER weakens the monotonic-time
+   guarantee."* Migration validates the existing v1 shape and passes
+   records through unchanged.
 4. **Deep-freeze on write, structured-clone on read.** Callers cannot mutate
    an entry by holding its reference, and a returned entry cannot be used to
    smuggle a mutation back into the store.

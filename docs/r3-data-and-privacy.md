@@ -303,14 +303,14 @@ The preload script exposes **exactly two properties** to the renderer via `conte
 
 Nothing else. No `require`, no `ipcRenderer`, no `fs`, no `path`, no `child_process`, no shell, no remote loader, no `webContents` handle.
 
-The renderer therefore has no way to read or write the user's filesystem directly. IndexedDB is the only persistence mechanism it can reach, and IndexedDB is itself scoped by Chromium to `userData`.
+The renderer therefore has no way to read or write the user's filesystem directly. Its only persistence mechanisms are IndexedDB (all case/session/R3.0E/R3.0F store data) and `localStorage` (a single non-authoritative UI preference, the `lang` key set by `setLang()` in `renderer/index.html`); both are scoped by Chromium to the app's `userData` origin, not to the raw filesystem.
 
 ### What this denies the renderer
 
 Even if the renderer were fully compromised (e.g. via the kind of injection the R3.0F F3 XSS probe is designed to surface), the renderer cannot:
 
-- Read files outside IndexedDB.
-- Write files outside IndexedDB.
+- Read files outside IndexedDB and `localStorage`.
+- Write files outside IndexedDB and `localStorage`.
 - Open network connections to anything but the same origin (and the same origin is a local `file://` or bundled `app://`, with no remote endpoints).
 - Spawn child processes.
 - Load native code.
@@ -335,7 +335,7 @@ The engine has three properties that are load-bearing for this section.
 
 A downstream auditor can therefore rely on "no migrated record in persisted data carries an attestation-like field name" as a hard property of the persisted state. The journal itself records *what producer version performed each transition* via the envelope's `engineVersion` / `storageVersion` and the per-entry `migrationsApplied` list — not via any in-record marker.
 
-**Known stores and migrators.** The engine's `knownStores` is exactly `['cases', 'sessions', 'r3_0e_experiments', 'r3_0e_outcomes', 'r3_0e_timelines', 'r3_0e_followupLinks']`, each with a per-store target of `1`. The six per-store migrator modules registered at the F1 baseline are:
+**Known stores and migrators.** `knownStores` appears in two places with the same six-element content but different shapes: as a **function** on the object `createMigrationEngine(...)` returns — call it as `engine.knownStores()` to get `['cases', 'sessions', 'r3_0e_experiments', 'r3_0e_outcomes', 'r3_0e_timelines', 'r3_0e_followupLinks']` — and as a plain **array** field on the object `detect()` resolves to (`(await engine.detect()).knownStores`), populated with the same six names. Each store has a per-store target of `1`. The six per-store migrator modules registered at the F1 baseline are:
 
 - `scripts/migrators/case-migrator.js`
 - `scripts/migrators/session-migrator.js`
@@ -375,10 +375,10 @@ A deletion is **immediate and local**. No tombstone is uploaded, no analytics ev
 
 A user who wants to wipe the product's state entirely — including the migration journal at `meta['__r3_0f_migration_journal__']` and the migration state at `meta['__r3_0f_migration_state__']` — has two equivalent options:
 
-1. From within the app: remove each case via the workspace UI (which calls `caseStore.remove({ confirm: true })` per case) and the equivalent removal calls on `sessions` and the R3.0E stores. The migration journal/state inside the `meta` store remain afterward; they can only be wiped via option 2.
-2. From the OS: delete the Electron `userData` folder (paths under "Storage locations" above) while the app is closed. This discards every IndexedDB store, including the `meta` store that houses the migration journal and state.
+1. From within the app: remove each case via the workspace UI (which calls `caseStore.remove({ confirm: true })` per case) and the equivalent removal calls on `sessions` and the R3.0E stores. The migration journal/state inside the `meta` store remain afterward; they can only be wiped via option 2. This path also does not clear the `lang` UI-preference key in `localStorage`, since it is not part of any store's removal API.
+2. From the OS: delete the Electron `userData` folder (paths under "Storage locations" above) while the app is closed. This discards every IndexedDB store, including the `meta` store that houses the migration journal and state, as well as the `lang` key in `localStorage`.
 
-Either path leaves nothing behind. There is no recovery service to ask, because there is no remote copy.
+Either path leaves no case, session, R3.0E, or R3.0F data behind; only option 2 also clears the non-authoritative `lang` UI-preference key. There is no recovery service to ask, because there is no remote copy.
 
 ### What deletion does NOT do
 
@@ -420,7 +420,7 @@ The F3 phase ships six adversarial probes under `tests/e2e/hardening-{01..06}-*.
 - `imported_summary` is never promoted to `Measured` automatically. Promotion requires confirmed mapping + verified calibration + sample-quality gate + re-derived authority. When promotion is not warranted, a `Derived` or `Heuristic` substitute is offered explicitly, or the capability is `Unavailable`.
 - Comparison is same-case + same-session, reference-lap explicit-user-only, delta sign `(comparison − reference)`. Follow-up Case Links never carry comparison authority.
 - No production network egress. Enforced by CSP `default-src 'self' 'unsafe-inline' 'unsafe-eval'` (no `connect-src` declared, so it falls back to `default-src 'self'`) + absence of remote fetch call sites in production paths + R3.0F F3 supply-chain probe verification.
-- Electron host explicitly sets `contextIsolation: true` and `nodeIntegration: false`; `sandbox`/`webSecurity`/`allowRunningInsecureContent`/etc. are absent (Electron defaults apply, never explicitly weakened) and the CSP allows `'unsafe-inline'`/`'unsafe-eval'` (not a strict policy). Preload surface is exactly `{ platform, version }` on `window.electronAPI`. R3.0F F3 electron-boundary and XSS probes assert these properties — see "Electron host security" above for the exact contract.
+- Electron host explicitly sets `contextIsolation: true` and `nodeIntegration: false`; `sandbox`/`webSecurity`/`allowRunningInsecureContent`/etc. are absent (Electron defaults apply, never explicitly weakened) and the CSP allows `'unsafe-inline'`/`'unsafe-eval'` (not a strict policy). Preload surface is exactly `{ platform, version }` on `window.electronAPI`. R3.0F F3's electron-boundary probe asserts these properties; the XSS probe covers the adjacent DOM-injection attack surface and the supply-chain probe covers the adjacent dependency-surface attack vector — see "Electron host security" above for the exact contract.
 - User control is local and immediate. `caseStore.remove({ confirm: true })` deletes the case row and rewrites `caseIndex.__index` atomically; it does **not** cascade. Sessions, R3.0E records (experiment/outcome/timeline/follow-up-link), and R3.0D briefs require separate removal calls; outcomes and timelines have no `remove()` (write-once / append-only by contract). The R3.0F migration journal and state live as two named keys inside the `meta` store and are wiped only by deleting `userData`.
 - R3.0F F1 is deterministic, idempotent, fail-closed, structured-clone-only at the boundary, and **refuses to write producer-attestation field names** with `PRODUCER_ATTESTATION_REFUSED`. There is no `migrations` object store and no `migrationId`; the journal at `meta['__r3_0f_migration_journal__']` (capped at 256 entries by default) and the state at `meta['__r3_0f_migration_state__']` are the audit surface.
 - All of the above held across R3.0F F1 migration, F2 nine E2E flows, and F3 six hardening probes (133 assertions) at the milestone baseline.

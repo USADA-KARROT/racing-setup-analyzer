@@ -289,10 +289,14 @@ authoritative case context  +  C5 delta metrics  +  observation
 
 ### D2 — Evidence graph
 
-The evidence-graph builder ingests **only** values that pass authority verification. Each accepted node is
-recorded in a **closure-private WeakSet** (`_authoritativeGraphs`); downstream stages verify membership through
-a `verifyAuthoritativeGraph` helper before reading any field. A graph constructed outside the builder cannot
-re-enter the pipeline — the WeakSet identity check rejects it.
+The evidence-graph builder ingests **only** values that pass authority verification. Once the graph is fully
+validated, sanitized, and deep-frozen, the single materialized `graph` object is registered once in a
+**closure-private WeakSet** (`_authoritativeGraphs`) — not per node; the WeakSet's only members are whole graph
+objects, one per successful `buildEvidenceGraph` call. Downstream stages verify graph identity through a
+`verifyAuthoritativeGraph` helper (checking WeakSet membership of the candidate graph object itself, plus
+structural checks such as `schemaVersion`, `graphId`, and `Array.isArray(candidate.nodes)`) before reading any
+field. A graph object constructed outside the builder cannot re-enter the pipeline — the WeakSet identity check
+rejects it.
 
 The graph carries an explicit `LIMITATION_IMPORTED_SUMMARY` propagation: a case opened from an imported bundle
 carries the limitation forward through D2 → D3 → D5 so the Brief can't silently upgrade an `imported_summary`
@@ -344,7 +348,13 @@ adversarial cases.
 - It is not a recommendation engine that applies a setup. No code path mutates a setup record from a Brief.
 - It is not a measurement engine. Every magnitude in a Brief came from upstream services with their own
   credibility metadata, which the Brief carries forward verbatim.
-- It is not a professional race-engineer replacement. The Brief states this in its limitations.
+- It is not a professional race-engineer replacement. This is a product-level positioning statement, not a
+  Brief `limitations[]` entry: the closed `LIMITATION_*` reason-code enum (`contracts/r3.0d/reason-codes.js`)
+  has no code for it, and `buildEngineerBrief`'s `limitations` union (`renderer/js/r3-0d-engineer-brief.js`)
+  only ever admits values that pass `RC.isReasonCode`. The equivalent guarantee is enforced structurally
+  instead: the causal-overclaim lexical scanner (`contracts/r3.0d/hypothesis-contract.js`
+  `CAUSAL_OVERCLAIM_TERMS`, which includes `professional_diagnosis`) rejects the whole record with
+  `HYPOTHESIS_CAUSAL_OVERCLAIM` if a Brief's text ever claims professional-diagnosis authority.
 - **Setup-related recommendations are emitted in physical units (Nm/deg, N/mm, mm, %) only. Hardware-click
   counts are never emitted — no validated per-car click-to-rate mapping exists.** A user mapping clicks to
   physical rates is a manual, out-of-engine step.
@@ -499,9 +509,10 @@ createMigrationEngine({ backend, registry?, metaStore?, journalKey?, stateKey?,
 - `migrate({ confirm: true })` → frozen `{ ok, report | reasonCode }`. `confirm:true` is required;
   any other value short-circuits with `CONFIRM_REQUIRED`.
 - `journal()` → frozen array of journal entries (most recent last).
-- `envelope` → frozen target envelope.
-- `knownStores` covers `cases`, `sessions`, `r3_0e_experiments`, `r3_0e_outcomes`, `r3_0e_timelines`,
-  `r3_0e_followupLinks`.
+- `envelope()` → frozen target envelope.
+- `knownStores()` covers `cases`, `sessions`, `r3_0e_experiments`, `r3_0e_outcomes`, `r3_0e_timelines`,
+  `r3_0e_followupLinks`. (`detect()`'s return value also carries a separate `knownStores` array field with
+  the same contents.)
 
 Meta is persisted in the `meta` store under `__r3_0f_migration_journal__` (journal) and
 `__r3_0f_migration_state__` (state); journals retain `MAX_JOURNAL_ENTRIES_DEF = 256` entries (overflow factor
@@ -753,7 +764,9 @@ qualitative substitute is offered where it is honestly available; otherwise the 
 
 ### What this architecture is NOT
 
-- **Not a professional race-engineer replacement.** The Engineer Brief carries this in its limitations.
+- **Not a professional race-engineer replacement.** This is a product-level positioning statement, not a
+  Brief `limitations[]` entry — see "What R3.0D refuses to be" above for the structural (causal-overclaim
+  scanner) mechanism that enforces the equivalent guarantee.
 - **Not a full multi-body-dynamics simulator.** The physics core remains the steady-state single-point model
   R2 established.
 - **Not a complete tyre model.** Tyre evidence is consumed where it exists; tyre state is not synthesized.
