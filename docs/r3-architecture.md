@@ -698,9 +698,12 @@ R3.0 production paths are deterministic by construction:
   does not supply one; these ids are never inputs to sampling, ordering, pairing, or any credibility/decision
   computation, only opaque storage keys.
 - **No wall-clock dependence in decision logic.** Time values consumed by the decision engine come from
-  declared monotonic record timestamps, not `Date.now()`. R3.0E records use a monotonic `createdAt` derived
-  from the platform clock at insertion, never re-evaluated downstream — and `timeline-store` rejects
-  out-of-order timestamps with `R3_0E_TIMELINE_OUT_OF_ORDER`.
+  declared record timestamps, not `Date.now()`. The E2 experiment, outcome, follow-up-link, and timeline
+  stores validate and persist a caller-supplied `createdAt` string — they do not generate it at insertion
+  from the platform clock, and only the timeline store's `appendEvent` checks ordering, rejecting a
+  strictly-earlier `createdAt` with `R3_0E_TIMELINE_OUT_OF_ORDER` (equal timestamps are accepted; the E4
+  service `renderer/js/r3-0e-followup-timeline.js` is the one that generates clock-derived timestamps and
+  enforces strict monotonicity for its production entry points).
 - **No floating-point ordering drift.** Comparators carry an explicit tie-break rule; integer-key sort orders
   are preferred where one is available.
 - **Captured intrinsics.** D2 captures `Array.isArray` and similar predicates at module load so a later tamper

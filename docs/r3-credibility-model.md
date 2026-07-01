@@ -133,7 +133,7 @@ The four producer stores are distinct in their mutation discipline. Earlier draf
 
 - `R3_0E_TIMELINE_FUTURE_SCHEMA` on schemaVersion overflow,
 - `R3_0E_TIMELINE_DUPLICATE_EVENT` if `eventId` already exists in `events[]`,
-- `R3_0E_TIMELINE_OUT_OF_ORDER` if a new `createdAt` is earlier than the previous event's `createdAt` (strict monotonic by createdAt),
+- `R3_0E_TIMELINE_OUT_OF_ORDER` if a new `createdAt` is earlier than the previous event's `createdAt` (non-decreasing; equal timestamps are accepted by the store — the E4 service below is stricter and does reject equality),
 - `R3_0E_TIMELINE_INVALID` on contract validation failure.
 
 The E4 service `renderer/js/r3-0e-followup-timeline.js` makes the contract even stricter for the production entry points (`createFollowUpLink`, `appendTimelineEvent`, `projectTimeline`, `listFollowUpLinksForParent`). Its header reads verbatim:
