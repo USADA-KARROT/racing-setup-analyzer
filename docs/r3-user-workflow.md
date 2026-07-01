@@ -173,7 +173,7 @@ The experiment store (`createExperimentStore`) is **not append-only**. Its publi
 An experiment record carries:
 
 - The parent Case ID (`sourceCaseId`) — id-grammar-checked only at the E1 contract layer. The experiment store writes without consulting `case-store`, so there is no live check that the referenced case actually exists or that a write is "same-case" at the store boundary; the constraint is structural (one `sourceCaseId` field, not a list), not a verified existence check.
-- The applied-change descriptor (the setup lever or process change the user intends to make), in physical units only.
+- The applied-change descriptor (`setupChange` — the setup lever or process change the user intends to make). The E1 contract validates only that it is a recursively plain object; it does not enforce a physical-unit shape, a key allowlist, or any prohibition on how the user describes the change. (The "physical units only, never hardware clicks" rule belongs to R3.0D's *recommendations*, which the user reads before authoring this field.)
 - The controlled variables the user pledges to hold constant (tyre set, fuel, track session, driver, weather window).
 - The expected directional effect — a closed enum (`'increase' | 'decrease' | 'no_change'`), not free text. The product does not auto-populate this from the brief; the user must commit to one of the three values so the outcome classifier can later compare expected vs observed.
 - Stop conditions, capped at the schema's `stopConditions` shape — these are user-defined and bounded.
@@ -181,7 +181,7 @@ An experiment record carries:
 
 The schema is recursively audited. Future-schema fields are rejected at the store boundary; the E1 contract's recursive descriptor audit (`hasNonPlainNestedObject` in `contracts/r3.0e/reason-codes.js`) fails closed on traversal overflow (depth or node-count) and runs *before* the contract clones the input (`toCleanCopy`), not after — this audit-then-clone ordering applies to timeline events and control-variable payloads alike, and lives in the E1 contracts, not in the E2 stores.
 
-Nothing in the experiment planner names a hardware click count, a "+N stiffness" delta, or a predicted lap time. The applied change is recorded as the user described it; the model does not silently re-quantify it.
+The product itself never generates a hardware click count, a "+N stiffness" delta, or a predicted lap time into an experiment — R3.0D recommendations are physical-units-only, and the planner does not auto-populate `setupChange` from them. The applied change is recorded exactly as the user described it (the E1 contract does not police its units or vocabulary — a user who types clicks gets clicks stored); the model does not silently re-quantify it.
 
 ---
 
