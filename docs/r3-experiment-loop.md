@@ -187,9 +187,14 @@ Across every store the contract is the same:
 
 - Every payload is validated by its E1 contract **before** write inside the
   `compute()` of the `transact` call.
-- Every payload is re-validated on read; a payload with a `schemaVersion`
-  greater than the current supported version (`1` for every E2 store today)
-  fails closed with `R3_0E_*_FUTURE_SCHEMA`.
+- Every payload reached through a single-record read (`get()`; the per-link
+  reads inside `listForParent()`) is re-validated on read; a payload with a
+  `schemaVersion` greater than the current supported version (`1` for every
+  E2 store today) fails closed with `R3_0E_*_FUTURE_SCHEMA`. **Exception:**
+  `experimentStore.list()` and `outcomeStore.listForExperiment()`
+  (`renderer/js/r3-0e-stores.js:149`, `:213`) read directly from the
+  lightweight index stores and return those values as-is, with no
+  schema-version or shape check.
 - Persisted records carry **no runtime authority**: the closure-private
   WeakSets that R3.0D and R3.0E E3 use to verify authoritative inputs cannot
   survive a reload. Rehydration consumers must re-validate via the E1 contracts

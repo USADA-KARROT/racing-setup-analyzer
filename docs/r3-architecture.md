@@ -371,8 +371,12 @@ boundary:
 > R3.0E persistence lives in SEPARATE versioned stores and MUST NOT extend the frozen R3.0B portable
 > case-record schema body.
 
-Every payload is validated by its E1 contract **before write** inside `compute()`, re-validated on read, and
-a future `schemaVersion` is rejected fail-closed. Persisted records carry **no runtime authority** — the D2
+Every payload is validated by its E1 contract **before write** inside `compute()`. Every payload reached
+through a single-record read (`get()`; the per-link reads inside `listForParent()`) is re-validated on read,
+and a future `schemaVersion` is rejected fail-closed — with one exception: `experimentStore.list()` and
+`outcomeStore.listForExperiment()` (`renderer/js/r3-0e-stores.js:149`, `:213`) read directly from the
+lightweight index stores and return those values as-is, with no schema-version or shape check. Persisted
+records carry **no runtime authority** — the D2
 WeakSet identity is closure-private and cannot survive reload, so rehydration consumers must re-validate against
 the E1 contracts before treating any value as authoritative. Writes go through the same
 `backend.transact({ stores, reads, compute })` primitive as R3.0B.
