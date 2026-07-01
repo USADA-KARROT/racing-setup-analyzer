@@ -324,7 +324,9 @@ not measured**.
 R3.0B introduced the R3 case-record schema and two stores:
 
 - **case-store** — case records keyed by case ID.
-- **session-store** — session records keyed by session ID, linked to case ID.
+- **session-store** — session records keyed by session ID only; the store does not persist or
+  validate a case-ID linkage (see `docs/r3-data-and-privacy.md`'s "Sessions are not case-linked
+  at the store layer").
 
 Backed by `storage-backend.js` (IndexedDB in the browser, in-memory in Node tests). The R3
 case-record schema introduced here is **frozen at v1.4.0** and was not modified by R3.0C,
