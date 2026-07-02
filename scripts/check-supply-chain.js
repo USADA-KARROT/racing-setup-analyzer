@@ -29,7 +29,7 @@ const cp = require('child_process');
 const REPO = path.resolve(__dirname, '..');
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR ? path.resolve(process.env.ARTIFACT_DIR) : path.join(REPO, 'artifacts');
 
-// Permissive licenses acceptable for redistribution in an UNLICENSED (all-rights-reserved) app.
+// Permissive licenses acceptable for redistribution in this MIT-licensed app.
 // NOTE: this list is intentionally permissive-only — no GPL/LGPL/AGPL/MPL/EPL/CDDL copyleft.
 const LICENSE_ALLOWLIST = new Set([
   'MIT', 'ISC', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', '0BSD', 'BlueOak-1.0.0',

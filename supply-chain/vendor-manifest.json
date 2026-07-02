@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "note": "H3 vendor governance. These three third-party libraries ship VENDORED under renderer/lib/ (outside npm), loaded from disk only — no CDN at runtime (see docs/r3-data-and-privacy.md 'Network egress'). Each is pinned by sha256; scripts/check-supply-chain.js fails closed if a file's hash drifts from this manifest. All three are permissive-licensed (MIT). Update policy: bump only via a reviewed PR that updates version + sha256 here in lockstep and re-runs the vulnerability audit.",
+  "note": "H3 vendor governance. These three third-party libraries ship VENDORED under renderer/lib/ (outside npm), loaded from disk only — no CDN at runtime (see docs/r3-data-and-privacy.md 'Network egress'). Each is pinned by sha256; scripts/check-supply-chain.js fails closed if a file's hash drifts from this manifest. All three are permissive-licensed (MIT), matching the project's own MIT license while remaining separately attributed. Update policy: bump only via a reviewed PR that updates version + sha256 here in lockstep and re-runs the vulnerability audit.",
   "libraries": [
     {
       "name": "alpinejs",

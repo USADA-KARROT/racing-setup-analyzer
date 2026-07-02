@@ -74,10 +74,9 @@
     "published": false
   },
   "codexReview": "DEFERRED_OPTIONAL_POST_RELEASE_AUDIT (not a PASS, not a current blocker)",
-  "licenseStatus": "UNLICENSED / all rights reserved — source-visible unsigned Preview; NOT an open-source release; PROJECT_LICENSE_DECISION_PENDING",
+  "licenseStatus": "MIT (PROJECT LICENSE DECISION, SKYLINE 2026-07-02): the project transitioned from UNLICENSED to the MIT License at the final-publish authorization; LICENSE file added, all project-level statements updated; third-party licenses unchanged. (The review above was conducted while the decision was pending — its PASS is unaffected; the MIT transition is covered by the final publish battery.)",
   "releaseReadiness": "READY_FOR_UNSIGNED_PREVIEW",
   "remainingBlockers": [
-    "PROJECT_LICENSE_DECISION_PENDING",
-    "AUTHORIZATION_PUBLISH_PENDING"
+    "AUTHORIZATION_PUBLISH executing (this directive)"
   ]
 }
