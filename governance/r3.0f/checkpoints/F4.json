@@ -12,29 +12,98 @@
     "integrationSha": null
   },
   "authorizedPaths": [
-    { "path": "renderer/js/r3-0f-migration-engine.js",                "capability": "migration_engine_present" },
-    { "path": "tests/e2e/helpers/flow-harness.js",                    "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-01-new-user.test.js",                   "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-02-real-telemetry.test.js",             "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-03-measured.test.js",                   "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-04-reference-lap.test.js",              "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-05-vre.test.js",                        "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-06-setup-experiment.test.js",           "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-07-driver-experiment.test.js",          "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-08-export-import.test.js",              "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-09-electron-smoke.test.js",             "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/hardening-01-electron-boundary.test.js",     "capability": "quality_hardening_present" },
-    { "path": "tests/e2e/hardening-02-storage-failure.test.js",       "capability": "quality_hardening_present" },
-    { "path": "tests/e2e/hardening-03-no-stale-ui.test.js",           "capability": "quality_hardening_present" },
-    { "path": "tests/e2e/hardening-04-large-library.test.js",         "capability": "quality_hardening_present" },
-    { "path": "tests/e2e/hardening-05-xss-injection.test.js",         "capability": "quality_hardening_present" },
-    { "path": "tests/e2e/hardening-06-supply-chain.test.js",          "capability": "quality_hardening_present" },
-    { "path": "docs/r3-architecture.md",                              "capability": "documentation_present" },
-    { "path": "docs/r3-user-workflow.md",                             "capability": "documentation_present" },
-    { "path": "docs/r3-data-and-privacy.md",                          "capability": "documentation_present" },
-    { "path": "docs/r3-credibility-model.md",                         "capability": "documentation_present" },
-    { "path": "docs/r3-experiment-loop.md",                           "capability": "documentation_present" },
-    { "path": "CHANGELOG.md",                                         "capability": "documentation_present" }
+    {
+      "path": "renderer/js/r3-0f-migration-engine.js",
+      "capability": "migration_engine_present"
+    },
+    {
+      "path": "tests/e2e/helpers/flow-harness.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-01-new-user.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-02-real-telemetry.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-03-measured.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-04-reference-lap.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-05-vre.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-06-setup-experiment.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-07-driver-experiment.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-08-export-import.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-09-electron-smoke.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/hardening-01-electron-boundary.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-02-storage-failure.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-03-no-stale-ui.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-04-large-library.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-05-xss-injection.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-06-supply-chain.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "docs/r3-architecture.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-user-workflow.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-data-and-privacy.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-credibility-model.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-experiment-loop.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "capability": "documentation_present"
+    }
   ],
   "newlyAuthorizedPaths": [
     "docs/r3-architecture.md",
@@ -44,9 +113,22 @@
     "docs/r3-experiment-loop.md",
     "CHANGELOG.md"
   ],
-  "newlyEnabledCapabilities": ["documentation_present"],
-  "enabledCapabilitiesBefore": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present", "quality_hardening_present"],
-  "enabledCapabilitiesAfter": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present", "quality_hardening_present", "documentation_present"],
+  "newlyEnabledCapabilities": [
+    "documentation_present"
+  ],
+  "enabledCapabilitiesBefore": [
+    "governance_bootstrap_present",
+    "migration_engine_present",
+    "e2e_automation_present",
+    "quality_hardening_present"
+  ],
+  "enabledCapabilitiesAfter": [
+    "governance_bootstrap_present",
+    "migration_engine_present",
+    "e2e_automation_present",
+    "quality_hardening_present",
+    "documentation_present"
+  ],
   "forbiddenCapabilities": [
     "release_gate_present",
     "release_executed"
@@ -71,12 +153,209 @@
   "workflowRunId": null,
   "artifactId": null,
   "artifactBoundSha": null,
-  "codexVerdict": null,
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 27,
+    "reviewedCandidateSha": "4f4338a11f859d63751045540a751365b5001f76",
+    "verdictEvidenceFile": "governance/r3.0f/codex-checkpoint-evidence/F4/round-27-4f4338a-PASS.raw.txt",
+    "verdictEvidenceSha256": "a4008038faeb51f9234f4961548b8500485c5a704059d01726bc1fde20eff3f8",
+    "totalBlockRounds": 26,
+    "totalDistinctFindings": 97,
+    "rounds": [
+      {
+        "round": 1,
+        "verdict": "BLOCK",
+        "findings": 8
+      },
+      {
+        "round": 2,
+        "verdict": "BLOCK",
+        "findings": 4
+      },
+      {
+        "round": 3,
+        "verdict": "BLOCK",
+        "findings": 3
+      },
+      {
+        "round": 4,
+        "verdict": "BLOCK",
+        "findings": 9
+      },
+      {
+        "round": 5,
+        "verdict": "BLOCK",
+        "findings": 7
+      },
+      {
+        "round": 6,
+        "verdict": "BLOCK",
+        "findings": 6
+      },
+      {
+        "round": 7,
+        "verdict": "BLOCK",
+        "findings": 4
+      },
+      {
+        "round": 8,
+        "verdict": "BLOCK",
+        "findings": 5
+      },
+      {
+        "round": 9,
+        "verdict": "BLOCK",
+        "findings": 3
+      },
+      {
+        "round": 10,
+        "verdict": "BLOCK",
+        "findings": 1
+      },
+      {
+        "round": 11,
+        "verdict": "BLOCK",
+        "findings": 4
+      },
+      {
+        "round": 12,
+        "verdict": "BLOCK",
+        "findings": 1
+      },
+      {
+        "round": 13,
+        "verdict": "BLOCK",
+        "findings": 6
+      },
+      {
+        "round": 14,
+        "verdict": "BLOCK",
+        "findings": 4
+      },
+      {
+        "round": 15,
+        "verdict": "BLOCK",
+        "findings": 4
+      },
+      {
+        "round": 16,
+        "verdict": "BLOCK",
+        "findings": 3
+      },
+      {
+        "round": 17,
+        "verdict": "BLOCK",
+        "findings": 7
+      },
+      {
+        "round": 18,
+        "verdict": "BLOCK",
+        "findings": 2
+      },
+      {
+        "round": 19,
+        "verdict": "BLOCK",
+        "findings": 2
+      },
+      {
+        "round": 20,
+        "verdict": "BLOCK",
+        "findings": 2
+      },
+      {
+        "round": 21,
+        "verdict": "BLOCK",
+        "findings": 2
+      },
+      {
+        "round": 22,
+        "verdict": "BLOCK",
+        "findings": 2
+      },
+      {
+        "round": 23,
+        "verdict": "BLOCK",
+        "findings": 2
+      },
+      {
+        "round": 24,
+        "verdict": "BLOCK",
+        "findings": 3
+      },
+      {
+        "round": 25,
+        "verdict": "BLOCK",
+        "findings": 1
+      },
+      {
+        "round": 26,
+        "verdict": "BLOCK",
+        "findings": 2
+      },
+      {
+        "round": 27,
+        "reviewedSha": "4f4338a11f859d63751045540a751365b5001f76",
+        "verdict": "PASS",
+        "findings": 0,
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F4/round-27-4f4338a-PASS.raw.txt",
+        "evidenceSha256": "a4008038faeb51f9234f4961548b8500485c5a704059d01726bc1fde20eff3f8"
+      }
+    ],
+    "falsePositivesRejected": [
+      {
+        "round": 12,
+        "finding": "F4-R12-02",
+        "note": "confirmed false positive"
+      },
+      {
+        "round": 17,
+        "finding": "F4-R17-06",
+        "note": "authoritative-only wording already precisely scoped by the same document at lines 67-73/301-306"
+      }
+    ],
+    "nonCodexSupplements": [
+      {
+        "commit": "d810996",
+        "source": "workflow-based parallel cross-check",
+        "findings": 4
+      },
+      {
+        "commit": "da37a5e",
+        "source": "Round 15 proactive domain audit additions",
+        "findings": 3
+      },
+      {
+        "commit": "5999c21",
+        "source": "domain-based claim-matrix audit (8-agent parallel, adversarially verified)",
+        "findings": 12
+      },
+      {
+        "commit": "b94f4f6",
+        "source": "exhaustive record-shape + UI-behavior sweep (adversarially/primary-verified)",
+        "findings": 18
+      }
+    ],
+    "externalBlockers": [
+      {
+        "date": "2026-07-01",
+        "note": "Round 23 first attempt aborted on Codex usage-limit error; not counted as a round; retried and completed 2026-07-02"
+      }
+    ],
+    "promptEvidenceNote": "Prompts for rounds 17-27 are archived under codex-checkpoint-evidence/F4/round-{17..27}-prompt.md. Rounds 1-16 ran in an earlier session whose prompt texts were not persisted as files; their findings and closures are fully recorded in the f4(r2)..f4(r18) commit messages.",
+    "tierDisclosure": "TIER 1 for round 27 (raw stdout archived + sha256-anchored). Rounds 1-26 verdicts are TIER 2 (recorded via commit-message closure logs; raw stdout not persisted)."
+  },
   "frozenDiff": null,
   "productionDiff": null,
   "runtimeConsumerCount": null,
   "featureRegistryState": {
-    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta", "engineer_brief", "experiment_loop", "case_timeline"],
+    "expectedDeferredIds": [
+      "case_comparison",
+      "reference_lap",
+      "corner_delta",
+      "engineer_brief",
+      "experiment_loop",
+      "case_timeline"
+    ],
     "expectedRendererAdapter": false,
     "note": "F4 does NOT touch the feature registry. R3.0C/D/E activations remain in their state."
   },
