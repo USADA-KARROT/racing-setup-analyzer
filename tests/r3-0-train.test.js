@@ -593,6 +593,48 @@ function mutateF6(fn) {
   const r2 = runValidator(dir2);
   chk('FAIL missing releaseExecutedRequiresStage', hasViolation(r2.artifact, 'R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID'));
 }
+// mirror-25 (MIRROR-R5-01): +14:59 offset is beyond the +/-14:00 hard cap
+{
+  const r = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00+14:59';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+  });
+  chk('FAIL offset beyond +/-14:00 cap rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+  const r2 = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00+14:00';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+  });
+  chk('PASS-path: exactly +14:00 offset is legal publish evidence', !hasViolation(r2.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
+// mirror-26 (MIRROR-R5-02): a crafted schema with a fake terminal stage cannot enable release_executed
+{
+  const dir = buildFixture();
+  const sch = readJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'));
+  sch.releaseStages.order = ['RELEASE_PREPARED', 'RELEASE_TAGGED_DRAFT', 'RELEASE_YOLO'];
+  sch.releaseStages.releaseExecutedRequiresStage = 'RELEASE_YOLO';
+  writeJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'), sch);
+  const m = readJson(f6Path(dir)); const st = readJson(f6State(dir));
+  m.releaseStage = 'RELEASE_YOLO';
+  m.releaseRecord.githubRelease.state = 'PUBLISHED';
+  m.releaseRecord.githubRelease.draft = false;
+  m.releaseRecord.githubRelease.published = true;
+  m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
+  m.releaseRecord.releaseExecuted = true;
+  st.enabledCapabilities.push('release_executed');
+  writeJson(f6Path(dir), m); writeJson(f6State(dir), st);
+  const r = runValidator(dir);
+  chk('FAIL crafted terminal stage rejected (canonical order pin + rule invalid + executed blocked)', hasViolation(r.artifact, 'R3F_RELEASE_STAGES_ORDER_DRIFT') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
 
 H.cleanupAll();
 console.log('r3-0-train: ' + pass + ' passed, ' + fail + ' failed');

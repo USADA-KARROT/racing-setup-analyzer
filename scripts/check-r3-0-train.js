@@ -236,7 +236,7 @@ function run() {
         // publishedAt must be a real ISO-8601 UTC/offset timestamp whose calendar fields
         // survive round-trip (rejects Date.parse rollover like 2026-02-30) — junk never counts
         const isIsoTs = s => {
-          const t = typeof s === 'string' && s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-](?:0\d|1[0-4]):[0-5]\d)$/);
+          const t = typeof s === 'string' && s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-](?:(?:0\d|1[0-3]):[0-5]\d|14:00))$/);
           if (!t) return false;
           const y = +t[1], mo = +t[2], da = +t[3], h = +t[4], mi = +t[5], se = +t[6];
           const d = new Date(Date.UTC(y, mo - 1, da, h, mi, se));
@@ -254,9 +254,11 @@ function run() {
         // AND the releaseExecutedRequiresStage rule are mandatory; the rule must be the FINAL
         // stage of the declared order (a weakened schema is itself a violation)
         if (!stages.length) fail('R3F_RELEASE_STAGES_SCHEMA_MISSING', 'F6_RELEASE requires schema.json releaseStages.order (missing/unreadable — cannot validate the stage fail-closed)', { phase });
+        const CANON_STAGES = ['RELEASE_PREPARED', 'RELEASE_TAGGED_DRAFT', 'RELEASE_PUBLISHED'];
+        if (stages.length && stages.join('|') !== CANON_STAGES.join('|')) fail('R3F_RELEASE_STAGES_ORDER_DRIFT', 'schema releaseStages.order drifted from the canonical PREPARED->TAGGED_DRAFT->PUBLISHED pin', { phase, order: stages });
         const reqStage = phaseSchema.releaseStages ? phaseSchema.releaseStages.releaseExecutedRequiresStage : undefined;
-        const reqStageValid = stages.length > 0 && typeof reqStage === 'string' && stages.indexOf(reqStage) === stages.length - 1;
-        if (stages.length && !reqStageValid) fail('R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID', 'schema releaseStages.releaseExecutedRequiresStage must exist and be the FINAL stage of the order; got ' + reqStage, { phase, releaseExecutedRequiresStage: reqStage });
+        const reqStageValid = stages.length > 0 && reqStage === 'RELEASE_PUBLISHED' && stages.indexOf(reqStage) === stages.length - 1 && stages.join('|') === CANON_STAGES.join('|');
+        if (stages.length && !reqStageValid) fail('R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID', 'schema releaseStages.releaseExecutedRequiresStage must be exactly RELEASE_PUBLISHED as the final stage of the canonical order; got ' + reqStage, { phase, releaseExecutedRequiresStage: reqStage });
         if (typeof m.releaseStage !== 'string' || !m.releaseStage) fail('R3F_RELEASE_STAGE_MISSING', 'F6_RELEASE checkpoint must declare releaseStage', { phase });
         else if (stages.length && !stages.includes(m.releaseStage)) fail('R3F_RELEASE_STAGE_UNKNOWN', 'F6_RELEASE releaseStage ' + m.releaseStage + ' is not in schema releaseStages.order', { phase, releaseStage: m.releaseStage });
         // release_executed (capability OR record flag) requires an actually-published Release
