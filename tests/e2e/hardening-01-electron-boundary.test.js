@@ -239,6 +239,29 @@ try {
   chk('preload.js has NO generic ipcRenderer.send/sendSync/on/once/postMessage', !/ipcRenderer\s*\.\s*(send|sendSync|sendToHost|on|once|addListener|postMessage)\b/.test(preloadSrc));
   var invokeCalls = preloadSrc.match(/ipcRenderer\s*\.\s*invoke\s*\(\s*([A-Za-z_$][\w$]*|['"`][^'"`]*['"`])/g) || [];
   chk('preload.js ipcRenderer.invoke is used EXACTLY once', invokeCalls.length === 1, { invokeCalls: invokeCalls });
+  // H1-R2-01 closure: STRUCTURAL token accounting — regex-shape checks alone allow
+  // closure-alias smuggling (e.g. an outer `leak = (...args) => ipcRenderer.invoke(...args)`
+  // returned by getAppVersion while one unreachable allowlisted call satisfies the
+  // count). The invariant below is alias-proof: after removing the ONLY two legal
+  // appearances (the fixed destructure and the exact allowlisted invoke), the token
+  // `ipcRenderer` must not appear ANYWHERE else in the file — any alias assignment,
+  // re-destructure, spread, or argument-forwarding wrapper leaves a residue and fails.
+  function ipcResidue(src) {
+    return src
+      .replace(/const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/, '')
+      .replace(/ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*\)/, '');
+  }
+  chk('preload.js ipcRenderer token accounting: ZERO appearances outside the two legal sites',
+    !/ipcRenderer/.test(ipcResidue(preloadSrc)),
+    { residue: (ipcResidue(preloadSrc).match(/.{0,50}ipcRenderer.{0,50}/) || [])[0] });
+  chk('preload.js has EXACTLY one require(), the fixed electron destructure',
+    (preloadSrc.match(/require\s*\(/g) || []).length === 1 && /const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/.test(preloadSrc));
+  chk('preload.js has NO rest/spread token anywhere (post-strip)', preloadSrc.indexOf('...') === -1);
+  // Self-test: the exact round-2 attack shape MUST be caught by the residue invariant.
+  (function adversarialSelfTest() {
+    var attack = preloadSrc.replace('contextBridge.exposeInMainWorld', 'var leak = function () { return ipcRenderer; };\ncontextBridge.exposeInMainWorld');
+    chk('SELF-TEST: alias-smuggling shape is caught by the residue invariant', /ipcRenderer/.test(ipcResidue(attack)));
+  })();
   chk('preload.js invoke uses the APP_VERSION_CHANNEL constant (no inline/caller-chosen channel)', /ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*[),]/.test(preloadSrc));
   var channelConsts = preloadSrc.match(/APP_VERSION_CHANNEL\s*=\s*['"`]([^'"`]+)['"`]/g) || [];
   chk('preload.js declares exactly one channel constant = app:get-version', channelConsts.length === 1 && /['"`]app:get-version['"`]/.test(channelConsts[0]), { channelConsts: channelConsts });
