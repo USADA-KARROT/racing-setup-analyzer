@@ -200,5 +200,19 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2) + '\n'
   } finally { H.releaseTempDir(box); }
 })();
 
+// l) build script carries a forbidden --x64 flag (even while build.mac.target still pins arm64)
+(function () {
+  const box = sandbox();
+  try {
+    cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'generate-sbom.js')], { cwd: box, encoding: 'utf8' });
+    const pk = JSON.parse(fs.readFileSync(path.join(box, 'package.json'), 'utf8'));
+    // keep build.mac.target arm64 (so macConfigArm64 passes) but sneak --x64 into the script
+    pk.scripts['build:mac'] = 'electron-builder --mac --arm64 --x64';
+    writeJson(path.join(box, 'package.json'), pk);
+    const r = runIn(box);
+    chk('FAIL forbidden --x64 flag in build script', r.status !== 0 && r.art && r.art.problems.some(p => /non-arm64\/non-mac target/.test(p)));
+  } finally { H.releaseTempDir(box); }
+})();
+
 console.log('supply-chain: ' + passed + ' passed, ' + failed + ' failed');
 if (failed) process.exit(1);

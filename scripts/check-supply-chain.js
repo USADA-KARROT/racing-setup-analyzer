@@ -148,7 +148,7 @@ function run() {
   if (macConfigForeignArch) fail('build.mac target arch must be arm64-only');
   for (const bs of buildScripts) {
     const v = scripts[bs] || '';
-    if (/--win|--x64|--ia32|--universal/.test(v)) fail('build script ' + bs + ' declares a non-arm64/non-mac target: ' + v);
+    if (/--win\b|--x64\b|--ia32\b|--universal\b/.test(v)) fail('build script ' + bs + ' declares a non-arm64/non-mac target: ' + v);
   }
   if (pkg.build && pkg.build.win) fail('package.json build.win must be absent (arm64 macOS-only public release)');
 
