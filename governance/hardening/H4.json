@@ -72,6 +72,35 @@
       "recovery after corruption"
     ]
   },
-  "codexVerdict": null,
-  "note": "upgrade smoke is now PASS (real 1.4.0 binary authored the fixture). No production runtime code changed. Harness: tests/packaged/h4-upgrade.mjs (real binary, CDP, target-ownership guards) — local evidence tooling, not in the install-free npm-test chain; the deterministic qualification IS in the chain."
+  "codexVerdict": {
+    "verdict": "PENDING_REVIEWER_AVAILABILITY",
+    "roundsRun": [
+      {
+        "round": 1,
+        "verdict": "BLOCK",
+        "findings": 2,
+        "closures": [
+          "H4-R1-01 non-vacuous 1.4.0-authored Local Storage sentinel round-trip",
+          "H4-R1-02 committed auditable evidence"
+        ]
+      },
+      {
+        "round": 2,
+        "verdict": "BLOCK",
+        "findings": 1,
+        "closures": [
+          "H4-R2-01 reproducible authoring script + full transcript (v1.4.0 SHA, electron version, sentinel write/readback, complete tree indexeddb_paths=0, leveldb extract, per-file manifest)"
+        ]
+      }
+    ],
+    "tierDisclosure": "raw stdout of rounds 1-2 archived in the session scratchpad; final verdict deferred to the single cross-phase review"
+  },
+  "note": "upgrade smoke is now PASS (real 1.4.0 binary authored the fixture). No production runtime code changed. Harness: tests/packaged/h4-upgrade.mjs (real binary, CDP, target-ownership guards) — local evidence tooling, not in the install-free npm-test chain; the deterministic qualification IS in the chain.",
+  "reviewStatus": {
+    "implementation": "PASS",
+    "internalVerification": "PASS",
+    "codexStageReview": "PENDING_REVIEWER_AVAILABILITY",
+    "finalCrossPhaseReview": "PENDING",
+    "note": "SINGLE FINAL REVIEW GATE (SKYLINE directive, 2026-07-02): per-phase Codex review is replaced by one final cross-phase Codex review over the whole integration branch before any RC is marked READY. Codex H4 rounds that DID run: R1 BLOCK (2 findings, closed), R2 BLOCK (1 finding, closed in 776ae9e2); the R2-closure re-verification could not run (reviewer usage-limit outage). NOT claimed as a Codex PASS."
+  }
 }
