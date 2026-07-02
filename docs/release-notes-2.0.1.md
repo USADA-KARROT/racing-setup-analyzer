@@ -47,11 +47,11 @@ Windows build. Build targets and tooling enforce this (`scripts/check-supply-cha
 
 ## License / distribution
 
-**UNLICENSED — all rights reserved.** Source visibility on GitHub does **not** grant
-redistribution or reuse rights. Use of compiled binaries is permitted only under the
-project-provided terms in the Release. Third-party components retain their own licenses —
-`THIRD_PARTY_NOTICES.md` is authoritative. The GitHub-generated source archive attached
-to any Release does not itself grant reuse rights.
+**MIT License** (Copyright (c) 2026 USADA-KARROT — see `LICENSE`). You may use, copy,
+modify, merge, publish, distribute, sublicense, and/or sell copies of the software,
+provided the original copyright notice and the MIT permission notice are retained.
+Third-party components retain their own licenses — `THIRD_PARTY_NOTICES.md` is the
+authoritative list for bundled third-party software.
 
 ## Installation status: not code-signed and not notarized (yet)
 
@@ -93,5 +93,5 @@ ID-signed, notarized, and stapled before upload; the release checklist enforces 
    level only (Node tests run on MemoryBackend).
 3. No professional-engineering validation: outputs are advisory with explicit
    credibility/limitations metadata.
-4. Signing/notarization pending credentials; unsigned artifacts are never published.
+4. Signing/notarization deferred to the commercial stage (this Preview is unsigned).
 5. No auto-update channel; the app never contacts any server.

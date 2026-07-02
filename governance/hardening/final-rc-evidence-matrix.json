@@ -21,7 +21,7 @@
     "SBOM": "PASS (CycloneDX 1.5, 419 components, fresh at 2.0.1)",
     "Vendor governance": "PASS (3 libs sha256-pinned, MIT, manifest-enforced)",
     "Third-party notices": "PASS",
-    "License status": "PASS (UNLICENSED + explicit distribution statement; no false open-source claim)",
+    "License status": "PASS (MIT — LICENSE file + package metadata + docs consistent; third-party licenses preserved; THIRD_PARTY_NOTICES authoritative)",
     "Signing config": "PASS (hardened runtime + minimal entitlements wired; env-gated notarize)",
     "Developer ID signature": "BLOCKED (DEVELOPER_ID_APPLICATION_MISSING — credential boundary)",
     "Notarization": "BLOCKED (NOTARY_CREDENTIAL_MISSING)",

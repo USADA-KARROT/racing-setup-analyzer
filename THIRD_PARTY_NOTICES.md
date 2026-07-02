@@ -1,9 +1,9 @@
 # Third-Party Notices
 
 Racing Setup Analyzer bundles third-party software. This file records the components and their
-licenses. The application itself is **UNLICENSED (all rights reserved)** — see the README; that
-status governs *this project's* code, NOT the third-party components below, each of which is
-distributed under its own permissive license.
+licenses. The project's own code is licensed under the **MIT License** (see `LICENSE`); the
+third-party components below are distributed under their own licenses, which are preserved
+unchanged — this file is the authoritative list for bundled third-party software.
 
 ## Vendored runtime libraries (renderer/lib/, non-npm)
 
