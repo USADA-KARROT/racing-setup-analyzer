@@ -1,12 +1,29 @@
 {
   "schemaVersion": 1,
   "program": "R3.0C",
-  "currentCheckpoint": "C0_BOOTSTRAP",
-  "authorizedProductionPaths": [],
-  "enabledCapabilities": [],
-  "runtimeConsumersAllowed": false,
-  "uiAllowed": false,
-  "featureRegistryActivationAllowed": false,
-  "algorithmsAllowed": false,
-  "note": "R3.0C Integrated Delivery Governance state. C0 BOOTSTRAP fixes EVERY production switch OFF. authorizedProductionPaths is intentionally empty; enabledCapabilities is intentionally empty. The four *Allowed flags are intentionally false. The R3.0C feature IDs (case_comparison, reference_lap, corner_delta) remain deferred in renderer/js/feature-registry.js with NO rendererAdapter. Mutating any field above C0 baseline requires a separately-authorized Integrated Delivery Train checkpoint."
+  "currentCheckpoint": "C8_ACTIVATION",
+  "authorizedProductionPaths": [
+    { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
+    { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-track-identity.js", "capability": "track_identity_authoritative" },
+    { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-normalized-distance.js", "capability": "normalized_distance_present" },
+    { "path": "renderer/js/r3-0c-reference-selection.js", "capability": "reference_selection_present" },
+    { "path": "renderer/js/r3-0c-corner-segmentation.js", "capability": "corner_segmentation_present" },
+    { "path": "renderer/js/r3-0c-corner-pairing.js", "capability": "corner_pairing_present" },
+    { "path": "renderer/js/r3-0c-delta-metrics.js", "capability": "delta_metrics_present" },
+    { "path": "renderer/js/r3-0c-comparison-export.js", "capability": "comparison_export_present" },
+    { "path": "renderer/js/r3-0c-comparison-orchestrator.js", "capability": "ui_present" },
+    { "path": "renderer/js/r3-0c-comparison-viewmodel.js", "capability": "ui_present" },
+    { "path": "renderer/js/i18n-comparisons.js", "capability": "ui_present" },
+    { "path": "renderer/js/r3-0c-contracts-bundle.js", "capability": "ui_present" },
+    { "path": "renderer/js/feature-registry.js", "capability": "feature_registry_active" }
+  ],
+  "enabledCapabilities": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present", "comparison_export_present", "ui_present", "viewmodel_state_transition_contract", "framing_source_structured_contract", "feature_registry_active"],
+  "declaredButDisabledGovernanceCapabilities": ["phase_boundary_contract"],
+  "runtimeConsumersAllowed": true,
+  "uiAllowed": true,
+  "featureRegistryActivationAllowed": true,
+  "algorithmsAllowed": true,
+  "note": "R3.0C C8_ACTIVATION state. Adds the activation capability feature_registry_active: the three R3.0C feature IDs (case_comparison, reference_lap, corner_delta) flip from availability='deferred' to 'available' and attach rendererAdapter={paneId:'comparisons',focusTarget:null}; NAV_NODES.comparisons drops its deferredReason. Newly authorized production path: renderer/js/feature-registry.js (the renderer-side single source of truth that performs the activation). featureRegistryActivationAllowed flips true. The activation does NOT widen comparison scope: same-Analysis-Case / same-session-only / explicit reference selection (no auto-fastest / median / composite) / delta=comparison-reference all remain enforced by the orchestrator + viewmodel + contract layer that shipped at C1–C7. The renderer wires case-store open into the renderer-private WeakSet so the orchestrator's authenticityPredicate accepts case records minted by the storage boundary; imported_summary records are refused (fail-closed). phase_boundary_contract remains disabled — phase metrics (entry/mid/exit_delta) continue to be reported metricAvailability:false in viewmodel + export. No frozen R3.0B module is touched; no R3.0D scope is introduced; no preset / cars / physics constant changes."
 }

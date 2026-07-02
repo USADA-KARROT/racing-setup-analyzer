@@ -1,0 +1,523 @@
+/**
+ * tests/r3-0c-comparison-adapter.test.js — R3.0C C1 · Production adapter (renderer-level).
+ *
+ * Verifies the adapter at renderer/js/r3-0c-comparison-adapter.js:
+ *   1. Loads contracts/r3.0c/ deterministically in Node and exposes its surface unchanged.
+ *   2. ADAPTER_VERSION and CHECKPOINT_FLOOR are stable constants (C1_PRODUCTION_ADAPTER).
+ *   3. comparisonScope / deltaSign / deltaSignFormula round-trip the contract values (no rewriting).
+ *   4. supportedMetrics / reasonCodes / allReasonCodes round-trip the contract values.
+ *   5. evaluateMetricSupport delegates to the contract and fails closed on unknown metric.
+ *   6. evaluateComparisonEligibility delegates and returns the contract's eligible_pending_production
+ *      marker (result === null) when fully eligible, else a blocked result with reason codes — every
+ *      gating failure mode (cross-case, cross-session, missing/mismatched track id, missing reference
+ *      lap, missing comparison lap, incompatible normalization, missing credibility metadata) routes
+ *      to its mandated reason code unchanged.
+ *   7. validateCredibilityMetadata / evaluateLapAuthority / assessNormalizationCompatibility delegate
+ *      and produce the same eligible flag and reason codes as the underlying contracts.
+ *   8. The adapter exposes NO algorithm: no lap segmentation, no corner pairing, no delta computation,
+ *      no reference-lap selection, no export, no UI binding — the API keys are a fixed allowlist.
+ *   9. Static-source inspection: the adapter requires '../../contracts/r3.0c/index.js' as a top-level
+ *      literal (so the no-runtime-consumer validator can see it) and does NOT name any C2+ surface
+ *      (corner / delta / segmentation / normalization-distance / export schema / UI / activation).
+ *  10. Round-trip independence: the adapter's output for a blocked input matches the contract's output
+ *      byte-for-byte (no field mutation, no field stripping, no field addition).
+ *
+ * Oracle independence: expected reason codes are literal strings; the contracts are required directly
+ * for cross-checking, but the adapter under test is required from its renderer/js path so the same
+ * artefact the validator sees is exercised.
+ */
+'use strict';
+const fs = require('fs');
+const path = require('path');
+
+const REPO = path.resolve(__dirname, '..');
+const ADAPTER_PATH = path.join(REPO, 'renderer', 'js', 'r3-0c-comparison-adapter.js');
+const Adapter = require('../renderer/js/r3-0c-comparison-adapter.js');
+const Contracts = require('../contracts/r3.0c/index.js');
+const RC = require('../contracts/r3.0c/reason-codes.js');
+const VL = require('../contracts/r3.0c/valid-lap-contract.js');
+const NP = require('../contracts/r3.0c/normalized-position-contract.js');
+const CE = require('../contracts/r3.0c/comparison-eligibility-contract.js');
+const CR = require('../contracts/r3.0c/credibility-contract.js');
+
+let pass = 0, fail = 0;
+const chk = (n, c, d) => { if (c) pass++; else { fail++; console.log('  ✗ ' + n + (d !== undefined ? '  ' + JSON.stringify(d) : '')); } };
+const hasCode = (res, code) => !!(res && Array.isArray(res.reasonCodes) && res.reasonCodes.indexOf(code) !== -1);
+
+// ── fixtures (hand-authored; never derived from SUT) ──
+function fullLapAuthority() {
+  return { lapIdentity: { satisfied: true }, completeness: { satisfied: true }, timingValidity: { satisfied: true }, trackIdentity: { satisfied: true }, sampleContinuity: { satisfied: true } };
+}
+// CP1 round-2 retrofit (F5): identity must declare positionBasis + positionDirection.
+function ident(over) { return Object.assign({ analysisCaseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_1', trackId: 'trackA', layoutId: 'layout1', positionBasis: 'lap_distance', positionDirection: 'increasing' }, over || {}); }
+function normAuth() { return { basis: 'lap_distance', distanceAuthority: { satisfied: true }, positionUnit: 'm' }; }
+function fullComparisonInput(over) {
+  return Object.assign({
+    analysisCaseId: 'case_1',
+    reference: { identity: ident({ lapId: 'lap_3' }), lapAuthority: fullLapAuthority(), normalizationAuthority: normAuth() },
+    comparison: { identity: ident({ lapId: 'lap_5' }), lapAuthority: fullLapAuthority(), normalizationAuthority: normAuth() },
+    credibilityMetadata: { credibility: 'Heuristic', provenance: 'real', confidence: 'low', limitations: [], blockedReasons: [] },
+  }, over || {});
+}
+
+// ── A. constants + identity round-trip ──
+chk('A1 ADAPTER_VERSION === 2 (C2 surface added)', Adapter.ADAPTER_VERSION === 2);
+chk('A2 CHECKPOINT_FLOOR === C1_PRODUCTION_ADAPTER (historical authorization point, does NOT advance)', Adapter.CHECKPOINT_FLOOR === 'C1_PRODUCTION_ADAPTER');
+chk('A2b activeCheckpoint() === C6_EXPORT (latest surface available)', Adapter.activeCheckpoint() === 'C6_EXPORT');
+chk('A2c exposes() includes C1..C5 capability set', (() => {
+  const c = Adapter.exposes();
+  return Array.isArray(c)
+    && c.includes('production_adapter_present')
+    && c.includes('lap_authority_present')
+    && c.includes('track_identity_authoritative')
+    && c.includes('normalized_distance_present')
+    && c.includes('reference_selection_present')
+    && c.includes('corner_segmentation_present')
+    && c.includes('corner_pairing_present')
+    && c.includes('delta_metrics_present');
+})());
+chk('A3 loadContracts() returns contract namespace identity', Adapter.loadContracts() === Contracts);
+chk('A4 deltaSignFormula() === contract.deltaSignFormula()', Adapter.deltaSignFormula() === CE.deltaSignFormula());
+chk('A5 deltaSign() identity-equal to contract DELTA_SIGN', Adapter.deltaSign() === CE.DELTA_SIGN);
+chk('A6 comparisonScope() identity-equal to contract COMPARISON_SCOPE', Adapter.comparisonScope() === CE.COMPARISON_SCOPE);
+chk('A7 supportedMetrics() identity-equal to contract SUPPORTED_METRICS', Adapter.supportedMetrics() === CE.SUPPORTED_METRICS);
+chk('A8 reasonCodes() identity-equal to contract REASON_CODES', Adapter.reasonCodes() === RC.REASON_CODES);
+chk('A9 allReasonCodes() identity-equal to contract ALL_REASON_CODES', Adapter.allReasonCodes() === RC.ALL_REASON_CODES);
+
+// ── B. evaluateMetricSupport delegation ──
+chk('B1 supported metric eligible', Adapter.evaluateMetricSupport('speedDelta').eligible === true);
+chk('B2 unsupported metric → blocked + UNSUPPORTED_METRIC', Adapter.evaluateMetricSupport('telepathyDelta').eligible === false && hasCode(Adapter.evaluateMetricSupport('telepathyDelta'), 'UNSUPPORTED_METRIC'));
+[null, 42, {}, '', 'unknown'].forEach(v => chk('B3 metric junk ' + JSON.stringify(v) + ' → blocked', Adapter.evaluateMetricSupport(v).eligible === false));
+// adapter delegation matches contract output structurally
+['speedDelta', 'timeDelta', 'unknownX'].forEach(m => {
+  const a = Adapter.evaluateMetricSupport(m), c = CE.evaluateMetricSupport(m);
+  chk('B4 metric ' + m + ' eligible flag matches contract', a.eligible === c.eligible);
+  chk('B5 metric ' + m + ' status matches contract', a.status === c.status);
+});
+
+// ── C. evaluateComparisonEligibility delegation: eligible path ──
+(() => {
+  const inp = fullComparisonInput();
+  const r = Adapter.evaluateComparisonEligibility(inp);
+  chk('C1 full input → eligible', r.eligible === true);
+  chk('C2 eligible status === eligible_pending_production', r.status === 'eligible_pending_production');
+  chk('C3 eligible result === null (NO numeric payload at C1)', r.result === null);
+  chk('C4 eligible carries delta sign', r.deltaSign && r.deltaSign.formula === 'comparison_minus_reference');
+  chk('C5 eligible carries scope', r.scope && r.scope.sameAnalysisCaseOnly === true);
+})();
+
+// ── D. evaluateComparisonEligibility: every gate maps to the mandated reason code ──
+const gates = [
+  ['D1 missing track id', i => { i.reference.identity.trackId = ''; }, 'MISSING_TRACK_IDENTITY'],
+  ['D2 mismatched track id', i => { i.comparison.identity.trackId = 'trackZ'; }, 'TRACK_IDENTITY_MISMATCH'],
+  ['D3 cross-case', i => { i.comparison.identity.analysisCaseId = 'case_2'; }, 'CROSS_CASE_COMPARISON_UNSUPPORTED'],
+  ['D4 cross-session', i => { i.comparison.identity.sessionId = 'sess_2'; }, 'CROSS_SESSION_COMPARISON_UNSUPPORTED'],
+  ['D5 broken reference lap authority', i => { delete i.reference.lapAuthority.completeness; }, 'REFERENCE_LAP_UNAVAILABLE'],
+  ['D6 broken comparison lap authority', i => { delete i.comparison.lapAuthority.timingValidity; }, 'COMPARISON_LAP_UNAVAILABLE'],
+  ['D7 non-lap-distance normalization basis', i => { i.comparison.normalizationAuthority.basis = 'gps'; }, 'INCOMPATIBLE_NORMALIZATION'],
+  ['D8 empty credibility metadata', i => { i.credibilityMetadata = {}; }, 'INSUFFICIENT_CREDIBILITY_METADATA'],
+];
+gates.forEach(g => {
+  const inp = fullComparisonInput(); g[1](inp);
+  const r = Adapter.evaluateComparisonEligibility(inp);
+  chk(g[0] + ' → blocked', r.eligible === false);
+  chk(g[0] + ' → carries ' + g[2], hasCode(r, g[2]));
+});
+
+// ── E. adapter result ≡ contract result, byte-for-byte ──
+(() => {
+  const inp = fullComparisonInput();
+  const a = JSON.stringify(Adapter.evaluateComparisonEligibility(inp));
+  const c = JSON.stringify(CE.evaluateComparisonEligibility(inp));
+  chk('E1 eligible adapter ≡ contract output', a === c);
+})();
+(() => {
+  const inp = fullComparisonInput(); inp.reference.identity.trackId = '';
+  const a = JSON.stringify(Adapter.evaluateComparisonEligibility(inp));
+  const c = JSON.stringify(CE.evaluateComparisonEligibility(inp));
+  chk('E2 blocked adapter ≡ contract output', a === c);
+})();
+(() => {
+  const inp = null;
+  const a = JSON.stringify(Adapter.evaluateComparisonEligibility(inp));
+  const c = JSON.stringify(CE.evaluateComparisonEligibility(inp));
+  chk('E3 null-input adapter ≡ contract output', a === c);
+})();
+
+// ── F. credibility / lap / normalization delegation ──
+chk('F1 validateCredibilityMetadata({}) === contract({})', JSON.stringify(Adapter.validateCredibilityMetadata({})) === JSON.stringify(CR.validateCredibilityMetadata({})));
+chk('F2 evaluateLapAuthority(full) === contract(full)', JSON.stringify(Adapter.evaluateLapAuthority(fullLapAuthority())) === JSON.stringify(VL.evaluateLapAuthority(fullLapAuthority())));
+chk('F3 evaluateLapAuthority(broken) === contract(broken)', (() => { const a = fullLapAuthority(); delete a.timingValidity; return JSON.stringify(Adapter.evaluateLapAuthority(a)) === JSON.stringify(VL.evaluateLapAuthority(a)); })());
+chk('F4 assessNormalizationCompatibility(null,null) === contract(null,null)', JSON.stringify(Adapter.assessNormalizationCompatibility(null, null)) === JSON.stringify(NP.assessNormalizationCompatibility(null, null)));
+chk('F5 assessNormalizationCompatibility(matching) === contract(matching)', JSON.stringify(Adapter.assessNormalizationCompatibility(normAuth(), normAuth())) === JSON.stringify(NP.assessNormalizationCompatibility(normAuth(), normAuth())));
+
+// ── G. adapter has NO algorithm surface beyond delegation ──
+const allowedKeys = new Set([
+  'ADAPTER_VERSION', 'CHECKPOINT_FLOOR', 'activeCheckpoint', 'exposes',
+  'loadContracts', 'comparisonScope', 'deltaSign', 'deltaSignFormula',
+  'supportedMetrics', 'reasonCodes', 'allReasonCodes',
+  'evaluateMetricSupport', 'evaluateComparisonEligibility',
+  'validateCredibilityMetadata', 'evaluateLapAuthority', 'assessNormalizationCompatibility',
+  // C2 surface
+  'deriveLapAuthority', 'assessMetricChannelRequirements', 'lapAuthorityDefaultThresholds', 'lapAuthorityMetricChannels',
+  'deriveTrackIdentity', 'equalsTrackIdentity',
+  'deriveDistanceAuthority', 'distanceAuthorityForbiddenSources',
+  // C3 surface
+  'normalizeDistance', 'normalizeAtTarget', 'normalizedDistanceDefaultThresholds', 'normalizedDistanceAcceptedUnits',
+  // C4 surface
+  'selectReference', 'segmentCorners', 'applyCornerUserConfirmation', 'pairCorners', 'referenceAndCornerForbiddenSelectionModes',
+  // C5 surface
+  'computeDeltaMetrics', 'supportedDeltaMetrics', 'deltaMetricsSignFormula',
+  // C6 surface
+  'buildComparisonExport', 'comparisonExportIdentity', 'comparisonExportSchemaVersion', 'comparisonExportEnvelopeKeys',
+]);
+const actualKeys = Object.keys(Adapter).sort();
+const unknownKeys = actualKeys.filter(k => !allowedKeys.has(k));
+chk('G1 adapter exposes exactly the allowlisted keys (no unknown surface)', unknownKeys.length === 0, unknownKeys);
+chk('G2 adapter does not expose lap segmentation as segmentLap', typeof Adapter.segmentLap === 'undefined');
+chk('G3 adapter does not expose matchCorners (pairCorners is C4)', typeof Adapter.matchCorners === 'undefined');
+chk('G4 adapter does not expose lower-level delta helpers', typeof Adapter.computeDelta === 'undefined' && typeof Adapter.deltaCumulative === 'undefined');
+chk('G5 adapter does not expose auto reference selection', typeof Adapter.chooseFastestValidLap === 'undefined' && typeof Adapter.selectReferenceLap === 'undefined');
+chk('G6 adapter does not expose post-C6 surface (UI / feature activation)',
+  typeof Adapter.renderComparisonWorkspace === 'undefined' && typeof Adapter.activateFeature === 'undefined');
+chk('G7 adapter exposes buildComparisonExport (C6 delegation)', typeof Adapter.buildComparisonExport === 'function');
+chk('G8 adapter does not bind into Feature Registry', typeof Adapter.registerWithFeatureRegistry === 'undefined' && typeof Adapter.activateFeature === 'undefined');
+
+// ── H. static-source inspection: top-level literal contract require, no C5+ surface names ──
+(() => {
+  const src = fs.readFileSync(ADAPTER_PATH, 'utf8');
+  // The require must be a literal string the no-consumer validator can see.
+  chk('H1 adapter source contains literal require of contracts/r3.0c/index.js', /require\(\s*(['"`])\.\.\/\.\.\/contracts\/r3\.0c\/index\.js\1\s*\)/.test(src));
+  // Post-C6 surface names must NOT appear in the adapter source (e.g. auto-reference helpers, UI
+  // shortcuts, runtime LLM hooks). normalizeDistance / segmentCorners / pairCorners /
+  // selectReference / buildComparisonExport are all legitimate C3..C6 surface now.
+  const postC6Surface = ['exportComparison', 'fastest_valid', 'median_valid', 'best_sector_composite', 'selectReferenceLap', 'renderComparisonWorkspace'];
+  postC6Surface.forEach(name => chk('H2 adapter source does not implement ' + name, src.indexOf(name + '(') === -1 && src.indexOf('function ' + name) === -1));
+  // The adapter source must NOT include any runtime LLM hook.
+  ['fetch(', 'XMLHttpRequest', 'WebSocket', 'eval(', 'new Function('].forEach(s => chk('H3 adapter source does not include ' + s, src.indexOf(s) === -1));
+})();
+
+// ── I. UMD shape ──
+chk('I1 adapter is a CommonJS export object', typeof Adapter === 'object' && Adapter !== null);
+chk('I2 adapter exposes its API on globalThis under R3_0C_ComparisonAdapter', typeof globalThis.R3_0C_ComparisonAdapter === 'object' && globalThis.R3_0C_ComparisonAdapter === Adapter);
+
+// ── J. C2 delegation — adapter forwards to lap-authority / track-identity / distance-authority services ──
+const LapAuthority = require('../renderer/js/r3-0c-lap-authority.js');
+const TrackIdentity = require('../renderer/js/r3-0c-track-identity.js');
+const DistanceAuthority = require('../renderer/js/r3-0c-distance-authority.js');
+
+// J1: deriveLapAuthority — adapter output ≡ service output (byte-for-byte JSON round-trip).
+(() => {
+  const ev = {
+    caseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_5', sourceId: 'csv_import:foo.csv',
+    provenance: 'real',
+    trackIdentity: { trackId: 'trackA', layoutId: 'layout1', source: 'explicit' },
+    timing: { lapStartTime: 100, lapEndTime: 160, lapTimeMs: 60000 },
+    samples: { count: 600, timebaseMedianSeconds: 0.1, timebaseMaxGapSeconds: 0.15 },
+    distance: null,
+    channelsAvailable: ['time', 'speed', 'lateral_accel', 'steering'],
+  };
+  chk('J1 deriveLapAuthority(adapter) ≡ deriveLapAuthority(service)',
+    JSON.stringify(Adapter.deriveLapAuthority(ev)) === JSON.stringify(LapAuthority.deriveLapAuthority(ev)));
+})();
+
+// J2: assessMetricChannelRequirements — supported metric with channel present → eligible.
+(() => {
+  const ev = { channelsAvailable: ['time', 'speed', 'steering'] };
+  const r = Adapter.assessMetricChannelRequirements('steeringCorrectionDelta', ev);
+  chk('J2 metric channel present → eligible', r.eligible === true && r.metric === 'steeringCorrectionDelta');
+})();
+
+// J3: assessMetricChannelRequirements — supported metric with channel ABSENT → METRIC_REQUIRED_CHANNEL_UNAVAILABLE.
+(() => {
+  const ev = { channelsAvailable: ['time', 'speed'] }; // no brake
+  const r = Adapter.assessMetricChannelRequirements('brakingOnsetDelta', ev);
+  chk('J3 missing required channel → blocked + METRIC_REQUIRED_CHANNEL_UNAVAILABLE',
+    r.eligible === false && Array.isArray(r.reasonCodes) && r.reasonCodes.indexOf('METRIC_REQUIRED_CHANNEL_UNAVAILABLE') !== -1);
+  chk('J3b adapter response includes missingChannels=brake', Array.isArray(r.missingChannels) && r.missingChannels.indexOf('brake') !== -1);
+})();
+
+// J4: lapAuthorityDefaultThresholds — adapter returns the service constant (identity equality).
+chk('J4 lapAuthorityDefaultThresholds() identity-equal to service constant',
+  Adapter.lapAuthorityDefaultThresholds() === LapAuthority.DEFAULT_THRESHOLDS);
+
+// J5: lapAuthorityMetricChannels — adapter returns the service constant.
+chk('J5 lapAuthorityMetricChannels() identity-equal to service constant',
+  Adapter.lapAuthorityMetricChannels() === LapAuthority.METRIC_REQUIRED_CHANNELS);
+
+// J6: deriveTrackIdentity — explicit identity → authoritative.
+(() => {
+  const r = Adapter.deriveTrackIdentity({ trackId: 'silverstone', layoutId: 'gp', source: 'explicit' });
+  chk('J6 explicit track identity → authoritative', r.authoritative === true && r.identity.trackId === 'silverstone');
+})();
+
+// J7: deriveTrackIdentity — name-only metadata → blocked + MISSING_TRACK_IDENTITY.
+(() => {
+  const r = Adapter.deriveTrackIdentity({ name: 'Silverstone GP', filename: 'silverstone.csv' });
+  chk('J7 name-only metadata → blocked + MISSING_TRACK_IDENTITY',
+    r.authoritative === false && r.reasonCodes.indexOf('MISSING_TRACK_IDENTITY') !== -1);
+  chk('J7b adapter records rejected inference signals (name, filename)',
+    Array.isArray(r.rejectedInferenceSignals) && r.rejectedInferenceSignals.indexOf('name') !== -1 && r.rejectedInferenceSignals.indexOf('filename') !== -1);
+})();
+
+// J8: equalsTrackIdentity — equal authoritative identities.
+(() => {
+  const a = { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' };
+  const b = { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' };
+  chk('J8 equalsTrackIdentity equal', Adapter.equalsTrackIdentity(a, b).equal === true);
+})();
+
+// J9: equalsTrackIdentity — different layout → TRACK_IDENTITY_MISMATCH.
+(() => {
+  const a = { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' };
+  const b = { trackId: 'silverstone', layoutId: 'national', source: 'explicit' };
+  const r = Adapter.equalsTrackIdentity(a, b);
+  chk('J9 different layout → blocked + TRACK_IDENTITY_MISMATCH',
+    r.equal === false && r.reasonCodes.indexOf('TRACK_IDENTITY_MISMATCH') !== -1);
+})();
+
+// J10: deriveDistanceAuthority — explicit channel proposal → eligible.
+(() => {
+  const ev = {
+    proposedChannels: [{
+      channelName: 'lap_distance', unit: 'm', direction: 'forward',
+      wrapSemantics: 'no_wrap', authorityStatus: 'channel_source_declared', limitations: [],
+    }],
+    fallbackInferences: [],
+  };
+  const r = Adapter.deriveDistanceAuthority(ev);
+  chk('J10 explicit channel proposal → eligible', r.eligible === true && r.authority.sourceChannel === 'lap_distance');
+})();
+
+// J11: deriveDistanceAuthority — only inferential proposal → blocked + MISSING_NORMALIZED_DISTANCE_AUTHORITY.
+(() => {
+  const ev = {
+    proposedChannels: [{
+      channelName: 'derived_distance', unit: 'm', direction: 'forward',
+      wrapSemantics: 'no_wrap', authorityStatus: 'inferred_from_sample_index', limitations: [],
+    }],
+    fallbackInferences: ['inferred_from_speed_integral'],
+  };
+  const r = Adapter.deriveDistanceAuthority(ev);
+  chk('J11 inferential authority status → blocked + MISSING_NORMALIZED_DISTANCE_AUTHORITY',
+    r.eligible === false && r.reasonCodes.indexOf('MISSING_NORMALIZED_DISTANCE_AUTHORITY') !== -1);
+  chk('J11b records rejected proposal as inferential', r.rejectedProposals.length === 1 && r.rejectedProposals[0].rejectedReason === 'authority_status_inferential_rejected');
+  chk('J11c records rejected fallback inferences', r.rejectedInferentialSources.indexOf('inferred_from_speed_integral') !== -1);
+})();
+
+// J12: distanceAuthorityForbiddenSources — identity-equal to service constant.
+chk('J12 distanceAuthorityForbiddenSources() identity-equal to service constant',
+  Adapter.distanceAuthorityForbiddenSources() === DistanceAuthority.FORBIDDEN_INFERENCE_SOURCES);
+
+// ── J13+: C3 normalize-distance delegation ──
+const NormalizedDistance = require('../renderer/js/r3-0c-normalized-distance.js');
+
+function buildValidNormalizeRequest(over) {
+  const n = 600;
+  const distances = []; const times = [];
+  for (let i = 0; i < n; i++) { distances.push(i * 5); times.push(i * 0.1); }
+  return Object.assign({
+    identity: { caseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_3', sourceId: 'csv_import:foo.csv' },
+    distanceAuthority: { sourceChannel: 'lap_distance', unit: 'm', direction: 'forward', wrapSemantics: 'no_wrap', authorityStatus: 'channel_source_declared' },
+    samples: { distances, times },
+    policy: { monotonicity: 'non_decreasing', duplicatePositions: 'collapse', endpointConvention: 'half_open_0_inclusive_1_exclusive', coverage: 0.95, minimumSamples: 200, normalizedMaxGap: 0.02, timeGapSeconds: 0.5 },
+  }, over || {});
+}
+
+// J13: adapter normalizeDistance ≡ service normalizeDistance (byte-for-byte).
+(() => {
+  const req = buildValidNormalizeRequest();
+  const a = Adapter.normalizeDistance(req);
+  const s = NormalizedDistance.normalizeDistance(req);
+  chk('J13 normalizeDistance adapter ≡ service (eligible)', a.eligible === true && s.eligible === true && JSON.stringify(a) === JSON.stringify(s));
+})();
+
+// J14: forged authority → blocked + NORMALIZED_DISTANCE_AUTHORITY_FORGED.
+(() => {
+  const req = buildValidNormalizeRequest();
+  req.distanceAuthority.authorityStatus = 'inferred_from_sample_index';
+  const r = Adapter.normalizeDistance(req);
+  chk('J14 forged authority → blocked + NORMALIZED_DISTANCE_AUTHORITY_FORGED', r.eligible === false && r.reasonCodes.indexOf('NORMALIZED_DISTANCE_AUTHORITY_FORGED') !== -1);
+})();
+
+// J15: normalizeAtTarget bounded interpolation.
+(() => {
+  const axis = Adapter.normalizeDistance(buildValidNormalizeRequest());
+  const r = Adapter.normalizeAtTarget(axis, 0.5);
+  chk('J15 normalizeAtTarget(0.5) eligible', r.eligible === true && r.normalizedTarget === 0.5);
+  chk('J15b normalizeAtTarget(0.5) brackets [left, right]', r.sampleIndexLeft >= 0 && r.sampleIndexRight === r.sampleIndexLeft + 1);
+  const r2 = Adapter.normalizeAtTarget(axis, 1.5);
+  chk('J15c normalizeAtTarget(1.5) → extrapolation refused', r2.eligible === false && r2.reasonCodes.indexOf('NORMALIZED_DISTANCE_EXTRAPOLATION_REQUIRED') !== -1);
+})();
+
+// J16: adapter exposes normalizedDistanceDefaultThresholds + normalizedDistanceAcceptedUnits via service constants.
+chk('J16 normalizedDistanceDefaultThresholds() identity-equal to service constant',
+  Adapter.normalizedDistanceDefaultThresholds() === NormalizedDistance.DEFAULT_THRESHOLDS);
+chk('J16b normalizedDistanceAcceptedUnits() identity-equal to contract constant',
+  Adapter.normalizedDistanceAcceptedUnits() === Contracts.normalizedPosition.ACCEPTED_DISTANCE_UNITS);
+
+// ── J17+: C4 reference / segmentation / pairing delegation ──
+const ReferenceSelection = require('../renderer/js/r3-0c-reference-selection.js');
+const CornerSegmentation = require('../renderer/js/r3-0c-corner-segmentation.js');
+const CornerPairing = require('../renderer/js/r3-0c-corner-pairing.js');
+
+function validReferenceRequest(over) {
+  return Object.assign({
+    identity: { caseId: 'case_1', sessionId: 'sess_1' },
+    trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' },
+    selection: { selectedBy: 'user', lapId: 'lap_3', sourceId: 'csv_import:foo.csv', selectedAt: '2026-06-23T12:00:00Z' },
+    candidateLap: {
+      caseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_3', sourceId: 'csv_import:foo.csv',
+      provenance: 'real',
+      trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' },
+      timing: { lapStartTime: 100, lapEndTime: 159.95, lapTimeMs: 59950 },
+      samples: { count: 600, timebaseMedianSeconds: 0.1, timebaseMaxGapSeconds: 0.15 },
+      distance: null,
+      channelsAvailable: ['time', 'speed'],
+    },
+  }, over || {});
+}
+
+// J17: adapter selectReference ≡ service selectReference.
+(() => {
+  const req = validReferenceRequest();
+  const a = Adapter.selectReference(req);
+  const s = ReferenceSelection.selectReference(req);
+  chk('J17 selectReference adapter ≡ service (eligible)', a.eligible === true && s.eligible === true && JSON.stringify(a) === JSON.stringify(s));
+})();
+
+// J18: auto-mode selection → REFERENCE_AUTO_SELECTION_FORBIDDEN.
+(() => {
+  const req = validReferenceRequest(); req.selection.selectedBy = 'fastestValid';
+  const r = Adapter.selectReference(req);
+  chk('J18 fastestValid auto-mode → REFERENCE_AUTO_SELECTION_FORBIDDEN', r.eligible === false && r.reasonCodes.indexOf('REFERENCE_AUTO_SELECTION_FORBIDDEN') !== -1);
+})();
+
+// J19: missing candidate lap → REFERENCE_STALE_OR_DELETED.
+(() => {
+  const req = validReferenceRequest(); req.candidateLap = null;
+  const r = Adapter.selectReference(req);
+  chk('J19 missing candidate lap → REFERENCE_STALE_OR_DELETED', r.eligible === false && r.reasonCodes.indexOf('REFERENCE_STALE_OR_DELETED') !== -1);
+})();
+
+// J20: segmentCorners — straight lap (no cornering) → eligible with empty segments.
+(() => {
+  const positions = []; for (let i = 0; i < 600; i++) positions.push(i / 599);
+  const channels = { steering: new Array(600).fill(0), lateral_accel: new Array(600).fill(0.5), yaw_rate: new Array(600).fill(0.01), speed: new Array(600).fill(50) };
+  const req = { identity: { caseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_3', sourceId: 'src' }, trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' }, normalizedDistanceAxis: { eligible: true, positions }, channels, algorithmVersion: 1 };
+  const a = Adapter.segmentCorners(req);
+  chk('J20 straight-lap segmentation eligible (no corners detected)', a.eligible === true && Array.isArray(a.segments) && a.segments.length === 0);
+})();
+
+// J21: segmentCorners — cornering signal exceeds threshold → segments produced.
+(() => {
+  const positions = []; for (let i = 0; i < 600; i++) positions.push(i / 599);
+  const lat = new Array(600).fill(0);
+  for (let i = 100; i < 200; i++) lat[i] = 8; // big cornering load mid-lap
+  const channels = { steering: new Array(600).fill(0.1), lateral_accel: lat, yaw_rate: new Array(600).fill(0.05), speed: new Array(600).fill(40) };
+  const req = { identity: { caseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_3', sourceId: 'src' }, trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' }, normalizedDistanceAxis: { eligible: true, positions }, channels, algorithmVersion: 1 };
+  const a = Adapter.segmentCorners(req);
+  chk('J21 detected one cornering segment', a.eligible === true && a.segments.length === 1);
+  chk('J21b segment has fingerprint id', /^seg:/.test(a.segments[0].id));
+})();
+
+// J22: applyCornerUserConfirmation — refuses confirmation that lifts telemetry credibility.
+(() => {
+  const positions = []; for (let i = 0; i < 600; i++) positions.push(i / 599);
+  const lat = new Array(600).fill(0); for (let i = 100; i < 200; i++) lat[i] = 8;
+  const channels = { steering: new Array(600).fill(0.1), lateral_accel: lat, yaw_rate: new Array(600).fill(0.05), speed: new Array(600).fill(40) };
+  const seg = Adapter.segmentCorners({ identity: { caseId: 'c1', sessionId: 's1', lapId: 'l3', sourceId: 'src' }, trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' }, normalizedDistanceAxis: { eligible: true, positions }, channels, algorithmVersion: 1 });
+  const r = Adapter.applyCornerUserConfirmation(seg, [{ segmentId: seg.segments[0].id, userLabel: 'Copse', confirmedBy: 'user', liftTelemetryCredibility: true }]);
+  chk('J22 confirmation refusing to lift telemetry credibility', r.eligible === false && r.reasonCodes.indexOf('CORNER_CONFIRMATION_CANNOT_UPGRADE_TELEMETRY') !== -1);
+})();
+
+// J23: pairCorners — two laps with one overlapping corner.
+(() => {
+  const seg = function (lapId) {
+    const positions = []; for (let i = 0; i < 600; i++) positions.push(i / 599);
+    const lat = new Array(600).fill(0); for (let i = 100; i < 200; i++) lat[i] = 8;
+    const channels = { steering: new Array(600).fill(0.1), lateral_accel: lat, yaw_rate: new Array(600).fill(0.05), speed: new Array(600).fill(40) };
+    return Adapter.segmentCorners({ identity: { caseId: 'c1', sessionId: 's1', lapId: lapId, sourceId: 'src' }, trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' }, normalizedDistanceAxis: { eligible: true, positions }, channels, algorithmVersion: 1 });
+  };
+  const ref = seg('lap_3'); const cmp = seg('lap_5');
+  const r = Adapter.pairCorners({ referenceSegmentation: ref, comparisonSegmentation: cmp, policy: { allowOrdinalPairing: false } });
+  chk('J23 corner pairing eligible + one pair', r.eligible === true && r.pairs.length === 1);
+  chk('J23b coverage === 1.0', r.coverage === 1);
+})();
+
+// J24: pairCorners — ordinal pairing → blocked.
+(() => {
+  const r = Adapter.pairCorners({
+    referenceSegmentation: { eligible: true, identity: { caseId: 'c1', sessionId: 's1' }, trackIdentity: { trackId: 't', layoutId: 'l' }, segments: [] },
+    comparisonSegmentation: { eligible: true, identity: { caseId: 'c1', sessionId: 's1' }, trackIdentity: { trackId: 't', layoutId: 'l' }, segments: [] },
+    policy: { allowOrdinalPairing: true },
+  });
+  chk('J24 ordinal pairing forbidden', r.eligible === false && r.reasonCodes.indexOf('CORNER_PAIRING_ORDINAL_FORBIDDEN') !== -1);
+})();
+
+// J25: referenceAndCornerForbiddenSelectionModes returns the contract constant.
+chk('J25 referenceAndCornerForbiddenSelectionModes() identity-equal to contract',
+  Adapter.referenceAndCornerForbiddenSelectionModes() === Contracts.referenceAndCorner.FORBIDDEN_REFERENCE_SELECTION_MODES);
+
+// ── J26+: C5 delta-metrics delegation ──
+const DeltaMetricsService = require('../renderer/js/r3-0c-delta-metrics.js');
+// CP1 round-2 retrofit (F6): phase metrics require a service-owned deterministic phase-boundary
+// authorisation; the test fixture supplies a test-only contractRef (governance test elsewhere
+// asserts no renderer/js path supplies it while phase_boundary_contract is disabled).
+const PHASE_BOUNDARY_TEST_FIXTURE = { contractRef: 'r3.0c/phase-boundary-test-fixture', serviceOwned: true, deterministic: true };
+function validDeltaReq(over) {
+  return Object.assign({
+    identity: { caseId: 'c1', sessionId: 's1' },
+    referenceLap: { lapTimeMs: 90000 },
+    comparisonLap: { lapTimeMs: 89500 },
+    pairing: { pairs: [{ referenceCorner: { id: 'r1', fullTimeMs: 10000, entryTimeMs: 3000, midTimeMs: 4000, exitTimeMs: 3000 }, comparisonCorner: { id: 'c1', fullTimeMs: 9800, entryTimeMs: 2900, midTimeMs: 4000, exitTimeMs: 2900 } }] },
+    requestedMetrics: ['lap_time', 'sector_delta', 'entry_delta', 'mid_delta', 'exit_delta'],
+    policy: { deltaSign: 'comparison_minus_reference', phaseBoundaryAuthorisation: PHASE_BOUNDARY_TEST_FIXTURE },
+  }, over || {});
+}
+// J26: adapter computeDeltaMetrics ≡ service.
+(() => {
+  const req = validDeltaReq();
+  const a = Adapter.computeDeltaMetrics(req);
+  const s = DeltaMetricsService.computeDeltaMetrics(req);
+  chk('J26 computeDeltaMetrics adapter ≡ service', a.eligible === true && JSON.stringify(a) === JSON.stringify(s));
+})();
+// J27: sign is comparison - reference (negative when cmp faster).
+(() => {
+  const out = Adapter.computeDeltaMetrics(validDeltaReq());
+  chk('J27 lap_time = cmp - ref = -500ms', out.metrics.lap_time.value === -500);
+})();
+// J28: self-vs-self → all deltas = 0.
+(() => {
+  const req = validDeltaReq();
+  req.comparisonLap = { lapTimeMs: req.referenceLap.lapTimeMs };
+  req.pairing.pairs[0].comparisonCorner = Object.assign({}, req.pairing.pairs[0].referenceCorner, { id: 'c1' });
+  const out = Adapter.computeDeltaMetrics(req);
+  chk('J28 self-vs-self lap_time = 0', out.metrics.lap_time.value === 0);
+  chk('J28b self-vs-self sector_delta[0] = 0', out.metrics.sector_delta.perCorner[0].value === 0);
+})();
+// J29: A/B swap → sign symmetric.
+(() => {
+  const req = validDeltaReq();
+  const a = Adapter.computeDeltaMetrics(req);
+  const swap = validDeltaReq({
+    referenceLap: req.comparisonLap,
+    comparisonLap: req.referenceLap,
+    pairing: { pairs: [{ referenceCorner: req.pairing.pairs[0].comparisonCorner, comparisonCorner: req.pairing.pairs[0].referenceCorner }] },
+  });
+  const b = Adapter.computeDeltaMetrics(swap);
+  chk('J29 swap → lap_time negates', a.metrics.lap_time.value === -b.metrics.lap_time.value);
+  chk('J29b swap → sector_delta negates', a.metrics.sector_delta.perCorner[0].value === -b.metrics.sector_delta.perCorner[0].value);
+})();
+// J30: wrong sign → DELTA_METRIC_SIGN_FORBIDDEN.
+(() => {
+  const req = validDeltaReq(); req.policy.deltaSign = 'reference_minus_comparison';
+  const out = Adapter.computeDeltaMetrics(req);
+  chk('J30 wrong sign → blocked', out.eligible === false && out.reasonCodes.indexOf('DELTA_METRIC_SIGN_FORBIDDEN') !== -1);
+})();
+// J31: supportedDeltaMetrics / sign formula identity.
+chk('J31 supportedDeltaMetrics() identity-equal to contract', Adapter.supportedDeltaMetrics() === Contracts.deltaMetrics.SUPPORTED_DELTA_METRICS);
+chk('J31b deltaMetricsSignFormula() === comparison_minus_reference', Adapter.deltaMetricsSignFormula() === 'comparison_minus_reference');
+
+console.log('r3-0c-comparison-adapter: ' + pass + ' passed, ' + fail + ' failed');
+if (fail) process.exit(1);

@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0F",
+  "checkpoint": "F1_MIGRATION_ENGINE",
+  "baseSha": "49bdaad9e157b182debc18da667d6bc07b716d83",
+  "headSha": null,
+  "previousCheckpoint": "F0_BOOTSTRAP",
+  "shaSeparation": {
+    "note": "R3.0F F1 candidate branch SHA convention. reviewedCandidateSha = the SHA Codex Round 23 inspected and issued FINAL VERDICT: PASS against. manifestCommitSha = the governance anchor commit (this commit) that records the PASS lineage. integrationSha = the squash/merge commit when PR #33 lands on the R3.0 Integrated Delivery Train. The Train post-merge trusted-verification CI artifact is bound to integrationSha and is the authoritative PASS record at the Train level.",
+    "reviewedCandidateSha": "92b860e056dbeab536eb90125fe225b5662b9804",
+    "reviewedCandidateNote": "Codex F1 Round 23 reviewed this exact SHA and issued FINAL VERDICT: PASS. 23 review rounds total: R1 (10 findings) → R2 (3) → R3 (1) → R4 (1) → R5 (1) → R6 (1) → R7 (1) → R8 (1) → R9 (1) → R10 (2) → R11 (2) → R12 (1) → R13 (1) → R14 (1) → R15 (1) → R16 (1) → R17 (1) → R18 (1) → R19 (1) → R20 (1) → R21 (1) → R22 (1) → R23 PASS. 31 distinct adversarial findings closed across 22 BLOCK rounds. Architectural milestones: (a) unified migration envelope + journal contract with closed 14-code reasonCode enum and trap-free deep-frozen journal entries; (b) structured-clone-only input firewall with descriptor-only preflight rejecting accessor properties; (c) trap-free _safeJsonStringify replacing JSON.stringify so ambient Object.prototype.toJSON / inherited toJSON cannot fire; (d) Unicode attestation defang via \\p{Default_Ignorable_Code_Point} + \\p{Mn} + \\p{Cc} + \\p{Cs} + \\p{White_Space} + U+2800 before NFKC; sentinel-token check narrowed to private-prefixed keys so legitimate camelCase contract fields (lapAuthority / distanceAuthority / projectionSignature / experimentVerified) pass; (e) atomic single-transact across all data stores + META with full TOCTOU sourceHash verification (priorJournal + priorState + every data write) inside compute(); engine-level Promise mutex serializes concurrent migrate() calls; (f) engine-level future-version gate before invoking migrator + post-migration schemaVersion exactness gate; (g) every commit-critical .push / .map / .concat / .slice / .sort / Promise.* / Promise.prototype.then|catch / String.prototype.* / Number.prototype.toString / Object.getPrototypeOf / Object.prototype / String.fromCharCode / Reflect.apply captured at module load and routed through closure-captured _ReflectApply or _safe* helpers + index loops; (h) JOURNAL_OVERFLOW preflight halts BEFORE any mutation; pure no-op runs skip META entirely; (i) producer-attestation defense — engine NEVER fabricates attestation, migrated records remain plain JSON-clones with Object.prototype, live stores re-validate on subsequent read; 14 well-known attestation field names rejected even under NFKC / format-control / combining-mark / Hangul-filler / Cn DICP / Cc control / Cs surrogate / whitespace / Braille-blank obfuscation. Producer attestation model: closure-private intrinsic captures + descriptor-only firewall + trap-free serializer + atomic data+META commit + structural envelope/state validation + sentinel-aware attestation token check. R3.0E migrators fail-closed when contracts unavailable. R3.0B persistence schemas NOT modified.",
+    "manifestCommitSha": null,
+    "integrationSha": null
+  },
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0f-migration-engine.js", "capability": "migration_engine_present" }
+  ],
+  "newlyAuthorizedPaths": [
+    "renderer/js/r3-0f-migration-engine.js"
+  ],
+  "newlyEnabledCapabilities": ["migration_engine_present"],
+  "enabledCapabilitiesBefore": ["governance_bootstrap_present"],
+  "enabledCapabilitiesAfter": ["governance_bootstrap_present", "migration_engine_present"],
+  "forbiddenCapabilities": [
+    "e2e_automation_present",
+    "quality_hardening_present",
+    "documentation_present",
+    "release_gate_present",
+    "release_executed"
+  ],
+  "contractEnforcements": {
+    "engineScope": "renderer/js/r3-0f-migration-engine.js exports createMigrationEngine({backend, registry, ...}) → { detect, plan, migrate, journal, envelope, knownStores }. Default registry covers cases / sessions / r3_0e_experiments / r3_0e_outcomes / r3_0e_timelines / r3_0e_followupLinks. Backend-agnostic: works against the live R3.0B MemoryBackend / IndexedDBBackend transact surface. F1 introduces no new IndexedDB object stores.",
+    "failClosed": "Future-version records REJECTED before migrator invocation (UNSUPPORTED_FUTURE_VERSION). Malformed records (non-object / sparse array / bad schemaVersion / BigInt / Date / Map / Set / function / symbol / NaN / Infinity / non-plain-prototype) REJECTED with closed reasonCode enum (14 codes). Hostile inputs (Proxy / accessors / symbols / non-enumerables / __proto__ pollution / hostile toJSON via Object.prototype / cycles / oversized records) stripped via descriptor-only preflight → structuredClone-only firewall → JSON-safety walker → trap-free _safeJsonStringify. Migrator throwing → MIGRATOR_THREW. Migrator returning non-ok-boolean → failed. Migrator returning version > target → POST_MIGRATION_INVALID. Migrator returning schemaVersion ≠ targetVersion → POST_MIGRATION_INVALID. Backend.transact() rejection → BACKEND_REJECTED + no partial write (single atomic batch across all stores + META). ENVELOPE_VERSION_MISMATCH refuses when persisted state envelope structurally drifts or engineVersion exceeds engine's known version. lifetimeJournalDropped must be Number.isSafeInteger && >= 0.",
+    "idempotency": "Running migrate() against an already-at-target store is a no-op (zero writes, status='no-op', report.idempotentSkipped=true). Re-running migrate() after a successful migration is also a no-op (deterministic).",
+    "noProducerAttestation": "Engine NEVER fabricates producer attestation. The migrated record handed to backend.put has Object.prototype as its prototype, is NOT frozen, and the live store re-validates on subsequent read via its own contract path (R3.0B case-store sanitizeForStorage / R3.0E store .validateXxxShape). Migrator output containing any of 14 well-known attestation field names (case-insensitive via NFKC + Unicode defanging) is REJECTED with PRODUCER_ATTESTATION_REFUSED.",
+    "appendOnlyJournal": "Migration journal lives at meta['__r3_0f_migration_journal__']. Bounded ring buffer (default 256 entries); compaction increments state.lifetimeJournalDropped. JOURNAL_OVERFLOW gate inside a single migrate() halts BEFORE any mutation when totalRecords > MAX_JOURNAL × 4. Each entry is deep-frozen and validates against contract.validateJournalEntry(). Engine ensures (data persisted) ↔ (journal contains migrated entry) invariant under every ambient intrinsic-poisoning attack we tested.",
+    "noAuthorityCrossStore": "Migration of one record does NOT touch another record in any other store. Secondary indexes (caseIndex / sessionIndex / r3_0e_experimentsIndex / r3_0e_outcomesIndex / r3_0e_followupLinksByCase) are NOT rebuilt by the engine — they are owned by the live stores and are re-validated next time the live store reads them.",
+    "r3bSchemaUntouched": "The R3.0B persistence modules (case-record-schema.js / storage-backend.js / schema-migration.js / case-store.js / session-store.js / case-library-viewmodel.js) are NOT modified by F1. The case- and session-migrators are thin literal-require wrappers delegating to the existing schema-migration.js.",
+    "literalRequiresOnly": "Engine + migrators use literal-string require specifiers only. Avoids triggering scripts/check-r3-phase-no-consumer.js PROD_SUSPECTED_DYNAMIC_PHASE_REQUIRE heuristic against other phase scans.",
+    "hostileRuntimeDefense": "Closure-captured intrinsics at module load: Object.{freeze, isFrozen, keys, assign, getOwnPropertyNames, getOwnPropertyDescriptor, getPrototypeOf, prototype}; Array.{isArray, prototype.sort}; JSON.{stringify, parse}; structuredClone; isFinite; Math.floor; Date; Number.{isFinite, isSafeInteger}; Reflect.apply; String.{fromCharCode, prototype.{charCodeAt, replace, normalize, toLowerCase, indexOf}}; Number.prototype.toString; Promise.{all, resolve, reject, prototype.{then, catch}}. All engine-owned async transitions route through _safeThen / _safeCatch / _PromiseAll / _PromiseResolve. All commit-critical arrays use _safePush index-assignment instead of Array.prototype.push. Limitation strings truncated via captured _StringFromCharCode + _safeCharCodeAt char-by-char (no ambient String.prototype.slice).",
+    "stateFloors": "F1 unlocks runtimeConsumersAllowed=true (engine consumes contracts/r3.0f/) and algorithmsAllowed=true (step migrators are algorithms). uiAllowed and featureRegistryActivationAllowed remain false (F3/F6 floor). R3.0B case-record schema NOT modified."
+  },
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3.0f-migration-engine.test.js",
+    "newSuiteAssertions": 250,
+    "evidenceTier": "TIER 3 — Claude-verified on F1 branch HEAD at SHA 92b860e056dbeab536eb90125fe225b5662b9804 (250/0 targeted + 90 test files full-suite); CI re-run on integrationSha after Train merge is the authoritative artifact."
+  },
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 23,
+    "reviewedCandidateSha": "92b860e056dbeab536eb90125fe225b5662b9804",
+    "verdictEvidenceFile": "governance/r3.0f/codex-checkpoint-evidence/F1/round-23-92b860e-PASS.raw.txt",
+    "verdictEvidenceSha256": "691f001e6e547dc71f28b2d46e19289f0e0201200ab994cd864e194ee68fc4e2",
+    "rounds": [
+      { "round": 1,  "reviewedSha": "0b4219b6d3adbae9e5542fe808c73355e6346f35", "verdict": "BLOCK", "findings": "10 BLOCK (F1-R1-01..10)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-1-prompt.md" },
+      { "round": 2,  "reviewedSha": "fd1595c2fb7291ba2fdaddcf72f3ad4468fcdf0f", "verdict": "BLOCK", "findings": "3 BLOCK (F1-R2-01..03)",  "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-2-prompt.md" },
+      { "round": 3,  "reviewedSha": "acbc4e69623be810e8d6909d5145d1efbb123459", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R3-01 sentinel-aware token check)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-3-prompt.md" },
+      { "round": 4,  "reviewedSha": "a3bc0c46f9c8fe3f1f8f86bf3e06c3be3a1e8cc3", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R4-01 normalized first-char vs U+FF3F/U+FE33)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-4-prompt.md" },
+      { "round": 5,  "reviewedSha": "2920d7977b2f2598be81e753436d969264f15b81", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R5-01 format-control strip before NFKC)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-5-prompt.md" },
+      { "round": 6,  "reviewedSha": "b0317822df3cbec3ddc41e1d20525f919d2df24d", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R6-01 Unicode \\p{Cf}+\\p{Mn}+Hangul fillers)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-6-prompt.md" },
+      { "round": 7,  "reviewedSha": "1e5fe886a78ec0986f78d2790fca584f25af5476", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R7-01 \\p{Default_Ignorable_Code_Point} replaces hand-picked ranges)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-7-prompt.md" },
+      { "round": 8,  "reviewedSha": "dcbe06c2ce3bac54eb608561004075db9cba93cb", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R8-01 \\p{White_Space}+U+2800 Braille blank)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-8-prompt.md" },
+      { "round": 9,  "reviewedSha": "a25545885f3f8732512f144147b5e7f5fc6c9c31", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R9-01 sourceHash via structuredClone — toJSON cannot fire)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-9-prompt.md" },
+      { "round": 10, "reviewedSha": "f90a57c73c4279003b7e5df66737033ff7c9939a", "verdict": "BLOCK", "findings": "2 BLOCK (F1-R10-01 closure-captured charCodeAt/toString; F1-R10-02 _captureRow one-shot accessor)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-10-prompt.md" },
+      { "round": 11, "reviewedSha": "c610e13de14ef373b9af751275a17cf8a13c6317", "verdict": "BLOCK", "findings": "2 BLOCK (F1-R11-01 Reflect.apply replaces .call; F1-R11-02 captured String prototype methods)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-11-prompt.md" },
+      { "round": 12, "reviewedSha": "069ab368a8c0235562395e5a8ecce2a92ab7a5f4", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R12-01 engine fromVersion>target hard gate)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-12-prompt.md" },
+      { "round": 13, "reviewedSha": "b5acabbb1818e7fe9c9c4ef80a9e027aa20c02c2", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R13-01 post-migration schemaVersion exactness gate)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-13-prompt.md" },
+      { "round": 14, "reviewedSha": "3fbcb9350ee86283f3e32c193233ed8f0f3821a7", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R14-01 JSON-safety walker rejecting BigInt/Date/Map/Set)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-14-prompt.md" },
+      { "round": 15, "reviewedSha": "1d3d18baf6df3cedf6e1570501a091ecc3881e19", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R15-01 capture Object.getPrototypeOf + Object.prototype)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-15-prompt.md" },
+      { "round": 16, "reviewedSha": "0c1b10fe43bcb5d6f9b9c52b589573d1d22f8690", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R16-01 commit projection plain for-loop)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-16-prompt.md" },
+      { "round": 17, "reviewedSha": "6f8d2406ad5d8c7f6cc4221087d986d0054f16b3", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R17-01 journal concat/slice replaced with for-loop)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-17-prompt.md" },
+      { "round": 18, "reviewedSha": "234e8221d22f1e810ed3aee2088ab5202be300d3", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R18-01 _safePush index assignment for all commit-critical .push)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-18-prompt.md" },
+      { "round": 19, "reviewedSha": "097db480881d14a0812ee943213ea640e772724b", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R19-01 trap-free _safeJsonStringify replaces JSON.stringify)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-19-prompt.md" },
+      { "round": 20, "reviewedSha": "fe99c9507ff1994bf8b1ed5ec037b9c532c1172d", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R20-01 descriptor-only preflight before structuredClone)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-20-prompt.md" },
+      { "round": 21, "reviewedSha": "8351fbc2e90c682d4afc8d76d41b3a89eff85b02", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R21-01 capture Promise.all/resolve/reject)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-21-prompt.md" },
+      { "round": 22, "reviewedSha": "3f2ba30adbf4500dffff539722da0bf1f74912a3", "verdict": "BLOCK", "findings": "1 BLOCK (F1-R22-01 capture Promise.prototype.then/.catch via _safeThen)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-22-prompt.md" },
+      { "round": 23, "reviewedSha": "92b860e056dbeab536eb90125fe225b5662b9804", "verdict": "PASS",  "findings": "0", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-23-prompt.md", "evidence": "governance/r3.0f/codex-checkpoint-evidence/F1/round-23-92b860e-PASS.raw.txt" }
+    ]
+  },
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta", "engineer_brief", "experiment_loop", "case_timeline"],
+    "expectedRendererAdapter": false,
+    "note": "F1 does NOT touch the feature registry. R3.0C/D/E activations remain in their state; the engine itself does NOT register a feature node."
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "crossPhaseGate": {
+    "r3eCheckpoint": "E5_ACTIVATION",
+    "requiredFor": "F1_MIGRATION_ENGINE",
+    "satisfied": true,
+    "note": "R3.0E reached E5_ACTIVATION at Train HEAD 49bdaad. F1 may advance."
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "releaseRecord": null,
+  "note": "R3.0F F1 establishes the unified migration engine and per-store migrators. No version bump (1.4.0 unchanged). No tag, no release. The engine is invokable from the Electron renderer via globalThis.R3_0F_MigrationEngine.createMigrationEngine({backend, ...}) but is NOT yet wired to the boot path — that activation happens at F6_RELEASE per cross-phase rule. F1 ships the engine + tests + governance anchor so the F2/F3 checkpoints have a stable migration foundation. PR #33 ready to merge to feat/r3.0-integrated-delivery. main remains 506012afea7b0296f2c1506cc77d4b39ffdf6ccb; no tag, no Release, no deployment."
+}

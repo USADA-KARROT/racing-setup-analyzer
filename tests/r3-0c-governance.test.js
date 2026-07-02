@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const os = require('os');
+const H = require('./helpers/managed-temp-dir.js');
 
 const REPO = path.resolve(__dirname, '..');
 const SCRIPT = 'scripts/check-r3-0c-governance.js';
@@ -23,7 +23,7 @@ function chk(name, cond, detail) {
 }
 
 function runValidator(govDir) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-gov-art-'));
+  const tmp = H.acquireTempDir('r3c-gov-art-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp });
   if (govDir) env.R3_0C_GOV_DIR_OVERRIDE = govDir;
   const r = cp.spawnSync('node', [SCRIPT], { cwd: REPO, encoding: 'utf8', env });
@@ -94,7 +94,7 @@ function baseC0State() {
 }
 
 function writeFixture(opts) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-gov-fix-'));
+  const dir = H.acquireTempDir('r3c-gov-fix-');
   fs.mkdirSync(path.join(dir, 'checkpoints'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'schema.json'), JSON.stringify(opts.schema || baseSchema(), null, 2));
   fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify(opts.state || baseC0State(), null, 2));
@@ -111,13 +111,13 @@ function writeFixture(opts) {
   const r = runValidator(null);
   chk('A1 real-repo validator exits 0', r.status === 0, r.stderr);
   chk('A2 real-repo ok===true', !!(r.artifact && r.artifact.ok === true), r.artifact && r.artifact.violations);
-  chk('A3 real-repo checkpoint=C0_BOOTSTRAP', !!(r.artifact && r.artifact.currentCheckpoint === 'C0_BOOTSTRAP'));
-  chk('A4 real-repo authPathCount=0', !!(r.artifact && r.artifact.authorizedProductionPathCount === 0));
-  chk('A5 real-repo enabledCapCount=0', !!(r.artifact && r.artifact.enabledCapabilityCount === 0));
-  chk('A6 real-repo runtimeConsumers=false', r.artifact && r.artifact.runtimeConsumersAllowed === false);
-  chk('A7 real-repo uiAllowed=false', r.artifact && r.artifact.uiAllowed === false);
-  chk('A8 real-repo featureActivationAllowed=false', r.artifact && r.artifact.featureRegistryActivationAllowed === false);
-  chk('A9 real-repo algorithmsAllowed=false', r.artifact && r.artifact.algorithmsAllowed === false);
+  chk('A3 real-repo checkpoint=C8_ACTIVATION', !!(r.artifact && r.artifact.currentCheckpoint === 'C8_ACTIVATION'));
+  chk('A4 real-repo authPathCount=15 (C1..C6 + 4 C7 paths + 1 C8 path: feature-registry.js)', !!(r.artifact && r.artifact.authorizedProductionPathCount === 15));
+  chk('A5 real-repo enabledCapCount=13 (C1..C6 + ui_present + 2 C7 governance caps + feature_registry_active)', !!(r.artifact && r.artifact.enabledCapabilityCount === 13));
+  chk('A6 real-repo runtimeConsumers=true (C1 floor)', r.artifact && r.artifact.runtimeConsumersAllowed === true);
+  chk('A7 real-repo uiAllowed=true (C7 reached)', r.artifact && r.artifact.uiAllowed === true);
+  chk('A8 real-repo featureActivationAllowed=true (C8 reached)', r.artifact && r.artifact.featureRegistryActivationAllowed === true);
+  chk('A9 real-repo algorithmsAllowed=true (C2 is algorithmCheckpoint per schema)', r.artifact && r.artifact.algorithmsAllowed === true);
 })();
 
 // ── B. schema.json invariants ──
@@ -323,5 +323,6 @@ function fxAuth(paths, opts) {
   chk('K1 real-repo exit==0 when ok==true', (r.status === 0) === !!(r.artifact && r.artifact.ok === true));
 })();
 
+H.cleanupAll();
 console.log('r3-0c-governance: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

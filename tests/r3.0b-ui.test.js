@@ -61,7 +61,7 @@ chk('empty-state honest', /t\('ui\.case\.empty'\)/.test(html) && /No saved cases
 // methods present + honest gates
 chk('delete uses confirm', /deleteCase\(id\)\{[\s\S]{0,200}confirm\(/.test(html));
 chk('remove passes confirm:true', /\.remove\(id, ?\{ ?confirm: ?true ?\}\)/.test(html));
-chk('open restores analysisView + shellEvidence', /openCase\(id\)\{[\s\S]{0,400}self\.analysisView=o\.analysisResults[\s\S]{0,200}self\._shellEvidence/.test(html));
+chk('open restores analysisView + shellEvidence', /openCase\(id\)\{[\s\S]{0,1500}self\.analysisView=o\.analysisResults[\s\S]{0,300}self\._shellEvidence/.test(html));
 chk('save serializes the view model (display-safe)', /analysisResults: JSON\.parse\(JSON\.stringify\(this\.analysisView\)\)/.test(html));
 chk('storageError surfaced', /t\('ui\.case\.storageError'\)\+' '\+tErr\(storageError\)/.test(html) && tri('ui.case.storageError'));
 // CP3: autosave (§7.3) — debounced, gated to a saved local_full case (never auto-creates / never promotes imported)

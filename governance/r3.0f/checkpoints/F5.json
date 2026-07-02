@@ -1,0 +1,277 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0F",
+  "checkpoint": "F5_RELEASE_GATE",
+  "baseSha": "bce141fa82f43af7aace0ce85a2973d77ecd484b",
+  "headSha": "cd5c5c6f18ce376f22f23c434e09b31cb81fc25a",
+  "previousCheckpoint": "F4_DOCUMENTATION",
+  "shaSeparation": "baseSha = Train HEAD after F4 (PR #36) and the test-infra temp-cleanup (PR #37) merges. headSha is stamped at the F5 candidate that Codex reviews.",
+  "authorizedPaths": [
+    {
+      "path": "renderer/js/r3-0f-migration-engine.js",
+      "capability": "migration_engine_present"
+    },
+    {
+      "path": "tests/e2e/helpers/flow-harness.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-01-new-user.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-02-real-telemetry.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-03-measured.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-04-reference-lap.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-05-vre.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-06-setup-experiment.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-07-driver-experiment.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-08-export-import.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-09-electron-smoke.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/hardening-01-electron-boundary.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-02-storage-failure.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-03-no-stale-ui.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-04-large-library.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-05-xss-injection.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-06-supply-chain.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "docs/r3-architecture.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-user-workflow.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-data-and-privacy.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-credibility-model.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-experiment-loop.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "capability": "documentation_present"
+    },
+    "docs/release-notes-2.0.0.md"
+  ],
+  "newlyAuthorizedPaths": [
+    "docs/release-notes-2.0.0.md"
+  ],
+  "newlyEnabledCapabilities": [
+    "release_gate_present"
+  ],
+  "enabledCapabilitiesBefore": [
+    "governance_bootstrap_present",
+    "migration_engine_present",
+    "e2e_automation_present",
+    "quality_hardening_present",
+    "documentation_present"
+  ],
+  "enabledCapabilitiesAfter": [
+    "governance_bootstrap_present",
+    "migration_engine_present",
+    "e2e_automation_present",
+    "quality_hardening_present",
+    "documentation_present",
+    "release_gate_present"
+  ],
+  "forbiddenCapabilities": [
+    "release_executed"
+  ],
+  "contractEnforcements": {
+    "gateDefinition": "governance/r3.0f/capabilities.json release_gate_present: 12-condition release gate script (preflight, tests, E2E, frozen 0, preset 501, i18n parity, reachability, no orphans, Electron build OK, release notes drafted, CHANGELOG, tag policy). MUST run fail-closed.",
+    "gateScript": "scripts/check-release-gate.js — dependency-free; conditions 1,2,4,5,6,7,8,12 DELEGATE to the existing single-purpose validators (child process, judged on exit code + artifact JSON); condition 3 judged from the test manifest (every tests/e2e/ file passed, floor >= 15 files); condition 9 is a declaration-level Electron packaging-readiness check (devDeps exactly {electron, electron-builder}, zero runtime deps, build block shape, files allowlist exactly [main.js, preload.js, renderer/**/*], every config-referenced asset exists, renderer tree free of .DS_Store/.map/node_modules, every index.html script src exists on disk); conditions 10/11 verify the release-notes draft sections and the CHANGELOG hooks. ALL 12 conditions always run (no short-circuit); exit 0 only when 12/12 PASS; exit 1 on any failure; exit 2 on gate crash.",
+    "whyCondition9IsDeclarationLevel": "scripts/check-version-policy.js forbids npm install / electron-builder / build:* text in .github/workflows/*.yml — CI is install-free by governance design, so an actual electron-builder run cannot execute in CI. The actual build is a LOCAL F5 evidence step recorded in localBuildEvidence below; the gate's condition 9 enforces everything about build readiness that is verifiable without installing.",
+    "versionPolicy": "package.json version REMAINS 1.4.0 at F5. The single 1.4.0 -> 2.0.0 bump, the Train merge, tag v2.0.0 and the GitHub Release all belong to F6_RELEASE and are NOT performed here.",
+    "packageMetadataFixes": "F5 removed the dangling build.mac.icon/build.win.icon references (icon.icns/icon.png never existed on disk; 2.0.0 ships the default Electron icon, disclosed in the release notes) and added the truthful license=UNLICENSED / author / repository fields. No version change, no scripts change beyond registering the two new test files.",
+    "releaseNotes": "docs/release-notes-2.0.0.md is a DRAFT (gate condition 10 verifies its required sections: DRAFT status, unsigned/unnotarized disclosure, upgrade guidance, backup/rollback guidance, known limitations, release boundary). It discloses: partial pane wiring (Comparisons live; Engineer Brief / Experiment Loop / Case Timeline nav-only), 15 packaged-but-not-loaded renderer modules, no custom icon, UNLICENSED status, untracked-lockfile policy, vendored renderer/lib third-party libraries, structural-only Electron smoke, IndexedDB-specific paths untested in Node, no professional validation.",
+    "readmeSync": "README.md status tables (en/zh-TW/ja) updated from the stale pre-R3.0C state to the shipped reality (R3.0C live; D/E services shipped with nav-only panes; F complete through F5), fixing the F4-era Gap-I1 contradiction with CHANGELOG.",
+    "bundleDriftGuard": "tests/r3-0d-contracts-bundle-equivalence.test.js closes Gap-B1: regenerates renderer/js/r3-0d-contracts-bundle.js via tools/build-r3-0d-browser-bundle.js (now exporting buildBundle/ORDER for the test; CLI unchanged) and asserts byte-for-byte equality with the committed bundle, mirroring the existing R3.0C guard.",
+    "noProductionCodeChange": "F5 ships ZERO new production renderer module. renderer/, contracts/, main.js, preload.js untouched. The frozen R3.0B case-record schema NOT modified."
+  },
+  "tests": {
+    "command": "npm test",
+    "newSuitesForThisCheckpoint": [
+      "tests/release-gate.test.js",
+      "tests/r3-0d-contracts-bundle-equivalence.test.js"
+    ],
+    "newSuiteAssertionsTotal": 57,
+    "manifestAfterRegistration": {
+      "discovered": 110,
+      "ran": 110,
+      "passedFiles": 110,
+      "failedFiles": 0,
+      "assertionsPassed": 10780,
+      "assertionsFailed": 0,
+      "discoveryMissing": [],
+      "discoveryGhost": []
+    },
+    "evidenceTier": "TIER 3 — Claude-verified on the F5 branch; CI re-run on the candidate SHA is the authority.",
+    "note": "release-gate.test.js: 47 assertions (incl. F5-R1-01/02 and F5-R2-01 closures) via injectable io; bundle-equivalence adds 10."
+  },
+  "localBuildEvidence": {
+    "note": "Actual electron-builder run executed LOCALLY (CI is install-free by policy). Build artifacts and the npm lockfile/node_modules are NOT committed (build/ and package-lock.json are gitignored; verified untracked).",
+    "command": "npm install && npm run build:mac",
+    "installExit": 0,
+    "buildExit": 0,
+    "electronResolved": "33.4.11",
+    "electronBuilderResolved": "25.1.8",
+    "artifact": "build/Racing Setup Analyzer-1.4.0-arm64.dmg",
+    "artifactSha256": "cd729af72f0e09e0a124c06a12e6e4c2f45a6ebdcd42e97a3b25ff9d99025f11",
+    "artifactSizeBytes": 99420125,
+    "signingState": "unsigned (0 identities found — expected; disclosed in release notes)",
+    "iconState": "default Electron icon (no application icon set — intentional, disclosed)",
+    "asarContentsAudit": {
+      "entries": 117,
+      "topLevel": [
+        "main.js",
+        "package.json",
+        "preload.js",
+        "renderer"
+      ],
+      "forbiddenPatternHits": 0,
+      "patternsChecked": [
+        "tests/",
+        "governance/",
+        ".env",
+        "secret",
+        "codex",
+        "node_modules/",
+        ".map",
+        ".DS_Store"
+      ]
+    },
+    "packagedSmoke": {
+      "method": "executed build/mac-arm64/Racing Setup Analyzer.app Contents/MacOS binary directly",
+      "aliveAfterSeconds": 8,
+      "electronProcessCount": 8,
+      "crashed": false,
+      "note": "process tree healthy (main + renderer + GPU helpers); terminated cleanly after the probe"
+    },
+    "performedAt": "2026-07-02"
+  },
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 3,
+    "reviewedCandidateSha": "cd5c5c6f18ce376f22f23c434e09b31cb81fc25a",
+    "verdictEvidenceFile": "governance/r3.0f/codex-checkpoint-evidence/F5/round-3-cd5c5c6-PASS.raw.txt",
+    "verdictEvidenceSha256": "44363e72192fa3e32b29bfcd34565f7bcade88bbe25d58b160ada4a22225118e",
+    "totalBlockRounds": 2,
+    "totalDistinctFindings": 4,
+    "rounds": [
+      {
+        "round": 1,
+        "verdict": "BLOCK",
+        "findings": 2,
+        "closures": [
+          "F5-R1-01 strict assertionsFailed===0 on e2e rows",
+          "F5-R1-02 condition 8 self-delegates the registry validator"
+        ]
+      },
+      {
+        "round": 2,
+        "verdict": "BLOCK",
+        "findings": 2,
+        "closures": [
+          "F5-R2-01 artifact ok===true corroboration on all delegated conditions",
+          "F5-R2-02 README roadmap sections synced tri-lingually"
+        ]
+      },
+      {
+        "round": 3,
+        "reviewedSha": "cd5c5c6f18ce376f22f23c434e09b31cb81fc25a",
+        "verdict": "PASS",
+        "findings": 0,
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F5/round-3-cd5c5c6-PASS.raw.txt",
+        "evidenceSha256": "44363e72192fa3e32b29bfcd34565f7bcade88bbe25d58b160ada4a22225118e"
+      }
+    ],
+    "tierDisclosure": "TIER 1 for round 3 (raw stdout archived + sha256-anchored). Rounds 1-2 raw outputs retained in the session scratchpad; closures recorded in the f5(r2)/f5(r3) commit messages. Prompts for all 3 rounds archived under codex-checkpoint-evidence/F5/."
+  },
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": [
+      "case_comparison",
+      "reference_lap",
+      "corner_delta",
+      "engineer_brief",
+      "experiment_loop",
+      "case_timeline"
+    ],
+    "expectedRendererAdapter": false,
+    "note": "F4 does NOT touch the feature registry. R3.0C/D/E activations remain in their state."
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "crossPhaseGate": {
+    "r3eCheckpoint": "E5_ACTIVATION",
+    "requiredFor": "F5_RELEASE_GATE",
+    "satisfied": true,
+    "note": "F1+F2+F3+F4 all merged into the Train (F4 merge commit 840be1c; infra PR #37 merge bce141f). F5 may advance."
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "releaseRecord": null,
+  "note": "R3.0F F5 ships the 12-condition release gate (script + fail-closed unit tests), the 2.0.0 release-notes draft, the README status-table sync, the R3.0D bundle drift guard, and the truthful package.json metadata fixes. main remains 506012afea7b0296f2c1506cc77d4b39ffdf6ccb. PR #16 remains Draft. No version bump, no tag, no Release, no deployment, no signing, no notarization.",
+  "gateRunEvidence": {
+    "command": "BASE_SHA=origin/feat/r3.0-integrated-delivery HEAD_SHA=HEAD node scripts/check-release-gate.js",
+    "exitCode": 0,
+    "stdout": "RELEASE-GATE {\"ok\":true,\"passed\":12,\"failed\":0,\"failedKeys\":[]}",
+    "artifactSha256": "6b00fbc25536566f9b338cc31298edff0e9440b432912e10c08a9662315dcaa0",
+    "note": "Full 12-condition run on the F5 working tree (conditions 2 spawns the complete 110-file manifest). The FIRST full run (exit 1) fail-closed caught two artifact-schema misreads inside the gate itself (manifest fields live under summary; productionFeatureOrphans is a count) — fixed, unit-test stubs aligned to the real schemas, then this clean 12/12 run. THIRD full run after the Codex F5-R1-01/02 closures (strict assertionsFailed===0; condition 8 delegates the registry validator itself): 12/12 exit 0. FOURTH full run after the Codex F5-R2-01/02 closures (artifact ok===true corroboration on all delegated conditions; README roadmap sections synced tri-lingually): 12/12 exit 0.",
+    "performedAt": "2026-07-02"
+  }
+}

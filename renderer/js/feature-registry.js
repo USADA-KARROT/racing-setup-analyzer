@@ -21,7 +21,7 @@
     cases: { id: 'cases', kind: 'shell_section', labelKey: 'nav.cases', order: 1, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'overview', currentTab: 'analysis' } },
     import: { id: 'import', kind: 'shell_section', labelKey: 'nav.import', order: 2, availability: 'available', legacyRouting: { shellSection: 'import', caseSubview: 'overview', currentTab: 'analysis' } },
     setup_library: { id: 'setup_library', kind: 'shell_section', labelKey: 'nav.setup_library', order: 3, availability: 'available', legacyRouting: { shellSection: 'setup_library' } },
-    comparisons: { id: 'comparisons', kind: 'shell_section', labelKey: 'nav.comparisons', order: 4, availability: 'deferred', deferredReason: 'R3.0C', legacyRouting: { shellSection: 'comparisons', currentTab: 'comparisons' } },
+    comparisons: { id: 'comparisons', kind: 'shell_section', labelKey: 'nav.comparisons', order: 4, availability: 'available', legacyRouting: { shellSection: 'comparisons', currentTab: 'comparisons' } },
     settings: { id: 'settings', kind: 'shell_section', labelKey: 'nav.settings', order: 5, availability: 'available', legacyRouting: { shellSection: 'settings', currentTab: 'guide' } },
     // setup-library areas
     'setuplib:vehicle_setup': { id: 'setuplib:vehicle_setup', kind: 'setuplib_area', parentNodeId: 'setup_library', labelKey: 'setuplib.area.vehicle_setup', order: 0, availability: 'available' },
@@ -36,6 +36,20 @@
     'case:recommendations': { id: 'case:recommendations', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'recommendations', labelKey: 'casenav.recommendations', order: 5, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'recommendations', currentTab: 'analysis' } },
     'case:corner_coaching': { id: 'case:corner_coaching', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'corner_coaching', labelKey: 'casenav.corner_coaching', order: 6, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'corner_coaching', currentTab: 'analysis' } },
     'case:evidence_trust': { id: 'case:evidence_trust', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'evidence_trust', labelKey: 'casenav.evidence_trust', order: 7, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'evidence_trust', currentTab: 'analysis' } },
+    // R3.0D D5 — Engineer Brief subview. NAV NODE ONLY at this milestone: the D5 mount in
+    // renderer/index.html ships hidden/inert and no UI event calls the orchestrator's
+    // prepareEngineerInsight — pane content is a downstream wire-in step (disclosed in
+    // docs/release-notes-2.0.0.md "Known limitations"). Activation governed by
+    // governance/r3.0d/state.json (featureRegistryActivationAllowed=true at
+    // D5_ENGINEER_BRIEF_ACTIVATION).
+    'case:engineer_brief': { id: 'case:engineer_brief', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'engineer_brief', labelKey: 'casenav.engineer_brief', order: 8, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'engineer_brief', currentTab: 'analysis' } },
+    // R3.0E E5 — Experiment Loop + Case Timeline subviews. NAV NODES ONLY at this milestone:
+    // renderer/index.html loads no R3.0E viewmodel script and renders no pane content for
+    // either subview — pane wiring is a downstream step (disclosed in
+    // docs/release-notes-2.0.0.md "Known limitations"). Activation governed by
+    // governance/r3.0e/state.json (featureRegistryActivationAllowed=true at E5_UI_ACTIVATION).
+    'case:experiment_loop': { id: 'case:experiment_loop', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'experiment_loop', labelKey: 'casenav.experiment_loop', order: 9, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'experiment_loop', currentTab: 'analysis' } },
+    'case:case_timeline': { id: 'case:case_timeline', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'case_timeline', labelKey: 'casenav.case_timeline', order: 10, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'case_timeline', currentTab: 'analysis' } },
   };
 
   // ── FEATURES — the 23 stable Feature IDs ──
@@ -71,10 +85,28 @@
     recommendations: F('recommendations', 'case_scoped', 'case:recommendations', 'analysis', { availability: 'available_conditional' }),
     corner_coaching: F('corner_coaching', 'case_scoped', 'case:corner_coaching', 'analysis', { availability: 'available_conditional' }),
     evidence_trust: F('evidence_trust', 'case_scoped', 'case:evidence_trust', 'analysis'),
-    // Deferred (R3.0C) — no rendererAdapter; non-actionable
-    case_comparison: F('case_comparison', 'deferred', 'comparisons', null, { availability: 'deferred', deferredReason: 'R3.0C', allowedActions: [], entryPoints: { desktop: true, mobile: false } }),
-    reference_lap: F('reference_lap', 'deferred', 'comparisons', null, { availability: 'deferred', deferredReason: 'R3.0C', allowedActions: [], entryPoints: { desktop: true, mobile: false } }),
-    corner_delta: F('corner_delta', 'deferred', 'comparisons', null, { availability: 'deferred', deferredReason: 'R3.0C', allowedActions: [], entryPoints: { desktop: true, mobile: false } }),
+    // R3.0D D5 — Engineer Brief feature. case_scoped; available_conditional describes the
+    // per-case DATA gate the D5 viewmodel enforces (no authoritative D3/D4/D5 chain →
+    // 'unavailable' / 'inconclusive' display state). NOTE: at this milestone no shipped
+    // pane renders it — the index.html mount is hidden/inert (nav node only; see
+    // docs/release-notes-2.0.0.md "Known limitations").
+    engineer_brief: F('engineer_brief', 'case_scoped', 'case:engineer_brief', 'analysis', { availability: 'available_conditional' }),
+    // R3.0E E5 — Experiment Loop + Case Timeline features. case_scoped;
+    // available_conditional describes the per-case DATA gate the R3.0E experiment
+    // viewmodel enforces (no authoritative E3 outcome / E4 projection → 'unavailable'
+    // display state — exercised by the Node suites). NOTE: at this milestone
+    // renderer/index.html loads no R3.0E viewmodel script and renders no pane for either
+    // subview (nav nodes only; see docs/release-notes-2.0.0.md "Known limitations").
+    experiment_loop: F('experiment_loop', 'case_scoped', 'case:experiment_loop', 'analysis', { availability: 'available_conditional' }),
+    case_timeline: F('case_timeline', 'case_scoped', 'case:case_timeline', 'analysis', { availability: 'available_conditional' }),
+    // R3.0C — activated at C8_ACTIVATION (governance/r3.0c/state.json featureRegistryActivationAllowed=true).
+    // Pane id 'comparisons' is served by the Comparison Workspace UI (renderer/index.html data-r3c-c7-pane).
+    // Same-Analysis-Case / same-session scope is enforced by the orchestrator + viewmodel; feature-router only
+    // resolves the route (shellSection=comparisons / currentTab=comparisons via NAV_NODES.comparisons.legacyRouting).
+    // Mobile entry point stays false: the workspace is a multi-pane desktop surface.
+    case_comparison: F('case_comparison', 'case_comparison', 'comparisons', 'comparisons', { allowedActions: ['compare'], entryPoints: { desktop: true, mobile: false } }),
+    reference_lap: F('reference_lap', 'case_comparison', 'comparisons', 'comparisons', { allowedActions: ['select_reference'], entryPoints: { desktop: true, mobile: false } }),
+    corner_delta: F('corner_delta', 'case_comparison', 'comparisons', 'comparisons', { allowedActions: ['inspect_corner'], entryPoints: { desktop: true, mobile: false } }),
   };
 
   // ── derivation (the single projection algorithm) ──

@@ -15,7 +15,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const os = require('os');
+const H = require('./helpers/managed-temp-dir.js');
 
 const REPO = path.resolve(__dirname, '..');
 const CONTRACT_DIR = path.join(REPO, 'contracts', 'r3.0c');
@@ -26,6 +26,8 @@ const VL = require('../contracts/r3.0c/valid-lap-contract.js');
 const NP = require('../contracts/r3.0c/normalized-position-contract.js');
 const CE = require('../contracts/r3.0c/comparison-eligibility-contract.js');
 const EX = require('../contracts/r3.0c/comparison-export-contract.js');
+const RAC = require('../contracts/r3.0c/reference-and-corner-contract.js');
+const DM = require('../contracts/r3.0c/delta-metrics-contract.js');
 const IDX = require('../contracts/r3.0c/index.js');
 // distinctness oracles — the real frozen case-export modules (independent of the SUT)
 const CaseExport = require('../renderer/js/analysis-case-export.js');
@@ -40,7 +42,10 @@ const hasCode = (res, code) => !!(res && Array.isArray(res.reasonCodes) && res.r
 function fullLapAuthority() {
   return { lapIdentity: { satisfied: true }, completeness: { satisfied: true }, timingValidity: { satisfied: true }, trackIdentity: { satisfied: true }, sampleContinuity: { satisfied: true } };
 }
-function ident(over) { return Object.assign({ analysisCaseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_1', trackId: 'trackA', layoutId: 'layout1' }, over || {}); }
+// CP1 round-2 retrofit (F5): identity now MUST declare positionBasis + positionDirection. The
+// fixture supplies the architecture v3-aligned values; per-test mutations drop these to exercise
+// the new fail-closed gates.
+function ident(over) { return Object.assign({ analysisCaseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_1', trackId: 'trackA', layoutId: 'layout1', positionBasis: 'lap_distance', positionDirection: 'increasing' }, over || {}); }
 function normAuth() { return { basis: 'lap_distance', distanceAuthority: { satisfied: true }, positionUnit: 'm' }; }
 function fullComparisonInput(over) {
   const base = {
@@ -53,12 +58,41 @@ function fullComparisonInput(over) {
 }
 
 // ── A. reason codes: stable / unique / machine-readable ──
-chk('18 reason codes total (16 mandated + 2 documented extensions)', RC.ALL_REASON_CODES.length === 18, RC.ALL_REASON_CODES.length);
+// CP1 round-2 retrofit (F1+F2+F3+F5+F6) added 9 new codes: 4 position-axis codes (F5), 4 export
+// codes (F1/F2/F3), 1 phase-boundary gate (F6). Formal Codex round-2 F12 adds 1 more
+// (CANNOT_DISTINGUISH) so the framing-source contract is internally satisfiable.
+// Total = 55 + 9 + 1 = 65.
+chk('66 reason codes total (16 mandated + 3 scope/metric + 16 normalized-distance + 16 reference-and-corner + 4 delta-metrics + 9 CP1R retrofit + 1 F12 framing + 1 C7 UI extensions)', RC.ALL_REASON_CODES.length === 66, RC.ALL_REASON_CODES.length);
 chk('reason codes unique', new Set(RC.ALL_REASON_CODES).size === RC.ALL_REASON_CODES.length);
 chk('reason codes are UPPER_SNAKE', RC.ALL_REASON_CODES.every(c => /^[A-Z][A-Z0-9_]*$/.test(c)));
 chk('REASON_CODES keyed by own value (stable)', Object.keys(RC.REASON_CODES).every(k => RC.REASON_CODES[k] === k));
 ['MISSING_TRACK_IDENTITY', 'TRACK_IDENTITY_MISMATCH', 'MISSING_LAP_IDENTITY', 'INCOMPLETE_LAP', 'INVALID_TIMING', 'INSUFFICIENT_SAMPLE_COVERAGE', 'DISCONTINUOUS_SAMPLES', 'MISSING_NORMALIZED_DISTANCE_AUTHORITY', 'INCOMPATIBLE_NORMALIZATION', 'REFERENCE_LAP_UNAVAILABLE', 'COMPARISON_LAP_UNAVAILABLE', 'CORNER_PAIRING_UNAVAILABLE', 'UNSUPPORTED_METRIC', 'INSUFFICIENT_CREDIBILITY_METADATA', 'SYNTHETIC_ONLY_LIMITATION', 'INTERNAL_CONTRACT_VIOLATION'].forEach(c => chk('mandated code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
-['CROSS_CASE_COMPARISON_UNSUPPORTED', 'CROSS_SESSION_COMPARISON_UNSUPPORTED'].forEach(c => chk('extension code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
+['CROSS_CASE_COMPARISON_UNSUPPORTED', 'CROSS_SESSION_COMPARISON_UNSUPPORTED', 'METRIC_REQUIRED_CHANNEL_UNAVAILABLE'].forEach(c => chk('extension code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
+// C3_NORMALIZED_DISTANCE extensions — sixteen distinct refusal semantics over the normalized-distance
+// production surface. Each is asserted as a literal (oracle independence): the test does not derive
+// these names from the module under test.
+['NORMALIZED_DISTANCE_EMPTY_INPUT', 'NORMALIZED_DISTANCE_SINGLE_SAMPLE', 'NORMALIZED_DISTANCE_NUMERIC_INVALID',
+  'NORMALIZED_DISTANCE_UNSUPPORTED_UNIT', 'NORMALIZED_DISTANCE_UNKNOWN_DIRECTION', 'NORMALIZED_DISTANCE_INCONSISTENT_DIRECTION',
+  'NORMALIZED_DISTANCE_NON_MONOTONIC', 'NORMALIZED_DISTANCE_INVALID_WRAP', 'NORMALIZED_DISTANCE_MULTIPLE_WRAPS',
+  'NORMALIZED_DISTANCE_INSUFFICIENT_SAMPLES', 'NORMALIZED_DISTANCE_INSUFFICIENT_COVERAGE', 'NORMALIZED_DISTANCE_GAP_TOO_LARGE',
+  'NORMALIZED_DISTANCE_TIME_GAP_TOO_LARGE', 'NORMALIZED_DISTANCE_EXTRAPOLATION_REQUIRED',
+  'NORMALIZED_DISTANCE_IDENTITY_MISMATCH', 'NORMALIZED_DISTANCE_AUTHORITY_FORGED']
+  .forEach(c => chk('C3 normalized-distance code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
+// C4_REFERENCE_AND_CORNER extensions — seventeen distinct refusal semantics over reference-lap
+// selection, corner segmentation, and cross-lap pairing.
+['REFERENCE_NOT_SELECTED', 'REFERENCE_AUTO_SELECTION_FORBIDDEN', 'REFERENCE_STALE_OR_DELETED', 'REFERENCE_AUTHORITY_FORGED',
+  'CORNER_SEGMENTATION_INSUFFICIENT_CHANNELS', 'CORNER_SEGMENTATION_REDUCED_AUTHORITY', 'CORNER_SEGMENTATION_NO_USABLE_CHANNELS',
+  'CORNER_SEGMENTATION_SEGMENT_TOO_SHORT', 'CORNER_SEGMENTATION_OVERLAPPING_SEGMENTS', 'CORNER_SEGMENTATION_WRAP_BOUNDARY',
+  'CORNER_SEGMENTATION_ALGORITHM_VERSION_MISMATCH', 'CORNER_PAIRING_INSUFFICIENT_OVERLAP', 'CORNER_PAIRING_AMBIGUOUS',
+  'CORNER_PAIRING_ORDINAL_FORBIDDEN', 'CORNER_PAIRING_PARTIAL_COVERAGE', 'CORNER_CONFIRMATION_CANNOT_UPGRADE_TELEMETRY']
+  .forEach(c => chk('C4 reference-and-corner code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
+// C5_DELTA_METRICS extensions — four distinct refusal semantics over the closed-allowlist delta
+// metrics + fixed sign convention.
+['DELTA_METRIC_NUMERIC_INVALID', 'DELTA_METRIC_EMPTY_INPUT', 'DELTA_METRIC_CORNER_PAIR_REQUIRED', 'DELTA_METRIC_SIGN_FORBIDDEN']
+  .forEach(c => chk('C5 delta-metrics code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
+chk('METRIC_REQUIRED_CHANNEL_UNAVAILABLE explanationKey is stable lowercase hook', RC.explanationKeyFor('METRIC_REQUIRED_CHANNEL_UNAVAILABLE') === 'r3_0c.reason.metric_required_channel_unavailable');
+chk('NORMALIZED_DISTANCE_MULTIPLE_WRAPS explanationKey is stable lowercase hook', RC.explanationKeyFor('NORMALIZED_DISTANCE_MULTIPLE_WRAPS') === 'r3_0c.reason.normalized_distance_multiple_wraps');
+chk('NORMALIZED_DISTANCE_AUTHORITY_FORGED explanationKey is stable lowercase hook', RC.explanationKeyFor('NORMALIZED_DISTANCE_AUTHORITY_FORGED') === 'r3_0c.reason.normalized_distance_authority_forged');
 chk('isReasonCode true for valid', RC.isReasonCode('INCOMPLETE_LAP') === true);
 chk('isReasonCode false for junk', RC.isReasonCode('NOPE') === false && RC.isReasonCode(42) === false);
 chk('explanationKey is a stable i18n key (not prose)', RC.explanationKeyFor('INCOMPLETE_LAP') === 'r3_0c.reason.incomplete_lap');
@@ -140,12 +174,308 @@ chk('unsupported metric → blocked UNSUPPORTED_METRIC', CE.evaluateMetricSuppor
 (() => { const inp = fullComparisonInput(); inp.comparison.normalizationAuthority.basis = 'gps'; chk('non-lap-distance basis → INCOMPATIBLE_NORMALIZATION', hasCode(CE.evaluateComparisonEligibility(inp), 'INCOMPATIBLE_NORMALIZATION')); })();
 (() => { const inp = fullComparisonInput(); inp.credibilityMetadata = {}; chk('no credibility → INSUFFICIENT_CREDIBILITY_METADATA', hasCode(CE.evaluateComparisonEligibility(inp), 'INSUFFICIENT_CREDIBILITY_METADATA')); })();
 
+// ── CP1 round-2 retrofit (F5) — positionBasis / positionDirection in identity ──
+// All 9 new codes are present in the reason-code registry.
+['MISSING_POSITION_BASIS', 'INCOMPATIBLE_POSITION_BASIS', 'MISSING_POSITION_DIRECTION', 'INCOMPATIBLE_POSITION_DIRECTION',
+  'EXPORT_ENVELOPE_UNKNOWN_KEY', 'EXPORT_PAYLOAD_NON_FINITE_NUMBER', 'EXPORT_PAYLOAD_STRING_TOO_LONG',
+  'EXPORT_PAYLOAD_ENVELOPE_TOO_LARGE', 'PHASE_BOUNDARY_CONTRACT_UNAUTHORISED', 'CANNOT_DISTINGUISH']
+  .forEach(c => chk('CP1R retrofit code present: ' + c, RC.ALL_REASON_CODES.indexOf(c) !== -1));
+chk('CE.ACCEPTED_POSITION_BASES is closed allowlist', Array.isArray(CE.ACCEPTED_POSITION_BASES) && CE.ACCEPTED_POSITION_BASES.length === 3 && Object.isFrozen(CE.ACCEPTED_POSITION_BASES));
+chk('CE.ACCEPTED_POSITION_DIRECTIONS = increasing / decreasing', CE.ACCEPTED_POSITION_DIRECTIONS.length === 2 && CE.ACCEPTED_POSITION_DIRECTIONS.indexOf('increasing') !== -1 && CE.ACCEPTED_POSITION_DIRECTIONS.indexOf('decreasing') !== -1);
+chk('CE.FRAMING_KEY_SHAPE declared (F12 structural)', !!(CE.FRAMING_KEY_SHAPE && Array.isArray(CE.FRAMING_KEY_SHAPE.requiredKeys) && CE.FRAMING_KEY_SHAPE.requiredKeys.indexOf('reasonCode') !== -1 && CE.FRAMING_KEY_SHAPE.requiredKeys.indexOf('i18nKey') !== -1));
+(() => { const inp = fullComparisonInput(); delete inp.reference.identity.positionBasis; chk('F5 missing reference positionBasis → MISSING_POSITION_BASIS', hasCode(CE.evaluateComparisonEligibility(inp), 'MISSING_POSITION_BASIS')); })();
+(() => { const inp = fullComparisonInput(); inp.reference.identity.positionBasis = 'gps_polar'; chk('F5 bogus positionBasis → MISSING_POSITION_BASIS (out-of-allowlist)', hasCode(CE.evaluateComparisonEligibility(inp), 'MISSING_POSITION_BASIS')); })();
+(() => { const inp = fullComparisonInput(); inp.comparison.identity.positionBasis = 'distance_m'; chk('F5 ref vs cmp basis mismatch → INCOMPATIBLE_POSITION_BASIS', hasCode(CE.evaluateComparisonEligibility(inp), 'INCOMPATIBLE_POSITION_BASIS')); })();
+(() => { const inp = fullComparisonInput(); delete inp.reference.identity.positionDirection; chk('F5 missing reference positionDirection → MISSING_POSITION_DIRECTION', hasCode(CE.evaluateComparisonEligibility(inp), 'MISSING_POSITION_DIRECTION')); })();
+(() => { const inp = fullComparisonInput(); inp.comparison.identity.positionDirection = 'decreasing'; chk('F5 direction mismatch → INCOMPATIBLE_POSITION_DIRECTION', hasCode(CE.evaluateComparisonEligibility(inp), 'INCOMPATIBLE_POSITION_DIRECTION')); })();
+
+// ── CP1 round-2 retrofit (F4) — validateComparisonContextAgainstCase ──
+chk('CE.validateComparisonContextAgainstCase exposed', typeof CE.validateComparisonContextAgainstCase === 'function');
+(() => {
+  const caseRecord = { caseId: 'case_1', associations: { trackId: 'trackA', layoutId: 'layout1', positionBasis: 'lap_distance', positionDirection: 'increasing' } };
+  const context = { analysisCaseId: 'case_1', trackId: 'trackA', layoutId: 'layout1', positionBasis: 'lap_distance', positionDirection: 'increasing' };
+  chk('F4 context binding valid → eligible', CE.validateComparisonContextAgainstCase(caseRecord, context).valid === true);
+})();
+(() => {
+  // self-consistent forged trackId (both ref+cmp claim 'X') but case associates 'Z' → BLOCKED.
+  const caseRecord = { caseId: 'case_1', associations: { trackId: 'trackZ', layoutId: 'layout1' } };
+  const context = { analysisCaseId: 'case_1', trackId: 'trackA', layoutId: 'layout1' };
+  chk('F4 forged trackId → TRACK_IDENTITY_MISMATCH', hasCode(CE.validateComparisonContextAgainstCase(caseRecord, context), 'TRACK_IDENTITY_MISMATCH'));
+})();
+(() => {
+  // case association forces direction; context disagrees → INCOMPATIBLE_POSITION_DIRECTION.
+  const caseRecord = { caseId: 'case_1', associations: { trackId: 'trackA', layoutId: 'layout1', positionDirection: 'increasing' } };
+  const context = { analysisCaseId: 'case_1', trackId: 'trackA', layoutId: 'layout1', positionDirection: 'decreasing' };
+  chk('F4 case-vs-context direction → INCOMPATIBLE_POSITION_DIRECTION', hasCode(CE.validateComparisonContextAgainstCase(caseRecord, context), 'INCOMPATIBLE_POSITION_DIRECTION'));
+})();
+(() => {
+  // wrong analysisCaseId in context → CROSS_CASE_COMPARISON_UNSUPPORTED.
+  const caseRecord = { caseId: 'case_1', associations: { trackId: 'trackA', layoutId: 'layout1' } };
+  const context = { analysisCaseId: 'case_2', trackId: 'trackA', layoutId: 'layout1' };
+  chk('F4 case-id mismatch → CROSS_CASE_COMPARISON_UNSUPPORTED', hasCode(CE.validateComparisonContextAgainstCase(caseRecord, context), 'CROSS_CASE_COMPARISON_UNSUPPORTED'));
+})();
+(() => {
+  // composite eligibility with caseRecord present and binding fails → composite blocks.
+  const inp = fullComparisonInput();
+  inp.caseRecord = { caseId: 'case_1', associations: { trackId: 'trackZ', layoutId: 'layout1' } };
+  chk('F4 composite eligibility with bad caseRecord → blocks', !CE.evaluateComparisonEligibility(inp).eligible && hasCode(CE.evaluateComparisonEligibility(inp), 'TRACK_IDENTITY_MISMATCH'));
+})();
+// Formal Codex round-2 fix (F4 partial → closed): a case record carrying an out-of-allowlist
+// positionBasis / positionDirection used to silently pass because the if-branch only ran when
+// the value was already valid. Now any non-null bogus value emits the INCOMPATIBLE_* code.
+(() => {
+  const caseRecord = { caseId: 'case_1', associations: { trackId: 'trackA', layoutId: 'layout1', positionBasis: 'bogus' } };
+  const context = { analysisCaseId: 'case_1', trackId: 'trackA', layoutId: 'layout1', positionBasis: 'lap_distance', positionDirection: 'increasing' };
+  chk('F4 case associations bogus positionBasis → INCOMPATIBLE_POSITION_BASIS', hasCode(CE.validateComparisonContextAgainstCase(caseRecord, context), 'INCOMPATIBLE_POSITION_BASIS'));
+})();
+(() => {
+  const caseRecord = { caseId: 'case_1', associations: { trackId: 'trackA', layoutId: 'layout1', positionDirection: 'sideways' } };
+  const context = { analysisCaseId: 'case_1', trackId: 'trackA', layoutId: 'layout1', positionBasis: 'lap_distance', positionDirection: 'increasing' };
+  chk('F4 case associations bogus positionDirection → INCOMPATIBLE_POSITION_DIRECTION', hasCode(CE.validateComparisonContextAgainstCase(caseRecord, context), 'INCOMPATIBLE_POSITION_DIRECTION'));
+})();
+(() => {
+  // composite catches it too when caseRecord is supplied.
+  const inp = fullComparisonInput();
+  inp.caseRecord = { caseId: 'case_1', associations: { trackId: 'trackA', layoutId: 'layout1', positionBasis: 'bogus' } };
+  chk('F4 composite catches bogus case positionBasis', hasCode(CE.evaluateComparisonEligibility(inp), 'INCOMPATIBLE_POSITION_BASIS'));
+})();
+
+// ── CP1 round-2 retrofit (F1) — comparison export envelope closed own-key set ──
+(() => {
+  // smuggling a secret field on the envelope → EXPORT_ENVELOPE_UNKNOWN_KEY.
+  const env = { schemaIdentity: 'racing-analyzer/comparison-export', schemaVersion: 1, generatedAt: null, payload: null, secret: 'x'.repeat(100) };
+  const r = EX.validateComparisonExportEnvelope(env);
+  chk('F1 unknown envelope key → EXPORT_ENVELOPE_UNKNOWN_KEY', !r.eligible && r.eligible === false);
+  chk('F1 reason code emitted', hasCode(r, 'EXPORT_ENVELOPE_UNKNOWN_KEY'));
+})();
+(() => {
+  // even a benign-looking extra field is refused.
+  const env = { schemaIdentity: 'racing-analyzer/comparison-export', schemaVersion: 1, generatedAt: null, payload: null, version: '2.0' };
+  chk('F1 extra benign-looking key still refused', hasCode(EX.validateComparisonExportEnvelope(env), 'EXPORT_ENVELOPE_UNKNOWN_KEY'));
+})();
+
+// ── CP1 round-2 retrofit (F2) — non-finite numbers in payload are rejected ──
+[NaN, Infinity, -Infinity].forEach(v => {
+  const r = EX.buildComparisonExportEnvelope({ delta: v });
+  chk('F2 payload number ' + (v === Infinity ? 'Infinity' : (v === -Infinity ? '-Infinity' : 'NaN')) + ' → blocked', !r.eligible && hasCode(r, 'EXPORT_PAYLOAD_NON_FINITE_NUMBER'));
+});
+(() => {
+  // finite numbers still pass.
+  const r = EX.buildComparisonExportEnvelope({ delta: -0.5, count: 0, big: 1e6 });
+  chk('F2 finite numbers still pass', r.schemaIdentity === 'racing-analyzer/comparison-export');
+})();
+
+// ── CP1 round-2 retrofit (F3) — per-string + total envelope byte caps ──
+(() => {
+  const oversized = 'x'.repeat(EX.MAX_STRING_UTF8_BYTES + 1);
+  const r = EX.buildComparisonExportEnvelope({ notes: oversized });
+  chk('F3 per-string cap → EXPORT_PAYLOAD_STRING_TOO_LONG', !r.eligible && hasCode(r, 'EXPORT_PAYLOAD_STRING_TOO_LONG'));
+})();
+(() => {
+  // smuggled base64 raw telemetry (>4 KiB) refused by per-string cap.
+  const r = EX.buildComparisonExportEnvelope({ rawSamplesBase64: 'A'.repeat(5000) });
+  chk('F3 smuggled base64 raw telemetry → blocked', !r.eligible && hasCode(r, 'EXPORT_PAYLOAD_STRING_TOO_LONG'));
+})();
+(() => {
+  // envelope total cap (constructive): every string ≤ MAX_STRING_UTF8_BYTES (4 KiB) but the
+  // sum across many fields crosses MAX_ENVELOPE_UTF8_BYTES (256 KiB). We build 100 fields each
+  // ~3000 bytes → 100 × 3000 ≈ 300 KiB > 256 KiB.
+  const payload = {};
+  for (let i = 0; i < 100; i++) payload['f' + i] = 'a'.repeat(3000);
+  const r = EX.buildComparisonExportEnvelope(payload);
+  chk('F3 envelope total cap → EXPORT_PAYLOAD_ENVELOPE_TOO_LARGE',
+    !r.eligible && hasCode(r, 'EXPORT_PAYLOAD_ENVELOPE_TOO_LARGE'));
+})();
+(() => {
+  // F1 also blocks unknown keys at build time? buildComparisonExportEnvelope wraps a plain payload,
+  // it does NOT accept envelope-style outer keys. We confirm validateComparisonExportEnvelope is the
+  // gate.
+  const env = EX.buildComparisonExportEnvelope({});
+  chk('F1 build returns a clean envelope', env.schemaIdentity === 'racing-analyzer/comparison-export' && env.payload && Object.keys(env.payload).length === 0);
+})();
+(() => {
+  // exotic objects in payload (Date) still refused — existing behaviour preserved.
+  const r = EX.buildComparisonExportEnvelope({ when: new Date() });
+  chk('exotic Date still refused', !r.eligible);
+})();
+
 // ── normalized position contract ──
 chk('lap-distance authority valid', NP.evaluateNormalizedPositionAuthority(normAuth()).eligible === true);
 (() => { const a = normAuth(); a.basis = 'gps_distance'; chk('non-lap-distance → INCOMPATIBLE_NORMALIZATION', hasCode(NP.evaluateNormalizedPositionAuthority(a), 'INCOMPATIBLE_NORMALIZATION')); })();
 (() => { const a = normAuth(); delete a.distanceAuthority; chk('no distance authority → MISSING_NORMALIZED_DISTANCE_AUTHORITY', hasCode(NP.evaluateNormalizedPositionAuthority(a), 'MISSING_NORMALIZED_DISTANCE_AUTHORITY')); })();
 chk('normalized range is [0,1)', NP.NORMALIZED_RANGE.min === 0 && NP.NORMALIZED_RANGE.maxExclusive === 1);
 (() => { const r = normAuth(); const c = normAuth(); c.positionUnit = 'ft'; chk('unit mismatch → INCOMPATIBLE_NORMALIZATION', hasCode(NP.assessNormalizationCompatibility(r, c), 'INCOMPATIBLE_NORMALIZATION')); })();
+
+// ── C3 normalize-distance request shape gate (contract layer; no numerics) ──
+chk('NP.ACCEPTED_DISTANCE_UNITS includes m and normalized', NP.ACCEPTED_DISTANCE_UNITS.indexOf('m') !== -1 && NP.ACCEPTED_DISTANCE_UNITS.indexOf('normalized') !== -1);
+chk('NP.ACCEPTED_DIRECTIONS forward and reverse', NP.ACCEPTED_DIRECTIONS.length === 2 && NP.ACCEPTED_DIRECTIONS.indexOf('forward') !== -1 && NP.ACCEPTED_DIRECTIONS.indexOf('reverse') !== -1);
+chk('NP.ACCEPTED_WRAP_SEMANTICS = no_wrap + wraps_at_lap_end + wraps_at_value', NP.ACCEPTED_WRAP_SEMANTICS.length === 3);
+chk('NP.ACCEPTED_MONOTONICITY non_decreasing + strictly_increasing', NP.ACCEPTED_MONOTONICITY.length === 2);
+chk('NP.ACCEPTED_DUPLICATE_POSITION_POLICIES collapse/retain/reject', NP.ACCEPTED_DUPLICATE_POSITION_POLICIES.length === 3);
+chk('NP.ACCEPTED_ENDPOINT_CONVENTIONS half_open + closed', NP.ACCEPTED_ENDPOINT_CONVENTIONS.length === 2);
+chk('NP.C3_NORMALIZE_REASON_CODES non-empty closed allowlist', Array.isArray(NP.C3_NORMALIZE_REASON_CODES) && NP.C3_NORMALIZE_REASON_CODES.length >= 17 && NP.C3_NORMALIZE_REASON_CODES.every(c => RC.ALL_REASON_CODES.indexOf(c) !== -1));
+chk('NP.ACCEPTED_DISTANCE_UNITS frozen', Object.isFrozen(NP.ACCEPTED_DISTANCE_UNITS));
+chk('NP.C3_NORMALIZE_REASON_CODES frozen', Object.isFrozen(NP.C3_NORMALIZE_REASON_CODES));
+function validNormalizeRequest(over) {
+  return Object.assign({
+    identity: { caseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_3', sourceId: 'src_alpha' },
+    distanceAuthority: { sourceChannel: 'lap_distance', unit: 'm', direction: 'forward', wrapSemantics: 'no_wrap', authorityStatus: 'channel_source_declared' },
+    samples: { distances: [0, 10, 20], times: [0, 1, 2] },
+    policy: { monotonicity: 'non_decreasing', duplicatePositions: 'collapse', endpointConvention: 'half_open_0_inclusive_1_exclusive', coverage: 0.95, minimumSamples: 3, normalizedMaxGap: 0.02, timeGapSeconds: 0.5 },
+  }, over || {});
+}
+chk('shape gate valid request → eligible', NP.evaluateNormalizeDistanceRequestShape(validNormalizeRequest()).eligible === true);
+[null, undefined, 'x', 42, [], true].forEach(v => chk('shape gate malformed ' + JSON.stringify(v) + ' → blocked', NP.evaluateNormalizeDistanceRequestShape(v).eligible === false));
+(() => {
+  const r = validNormalizeRequest(); delete r.identity;
+  chk('missing identity → NORMALIZED_DISTANCE_IDENTITY_MISMATCH', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_IDENTITY_MISMATCH'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.distanceAuthority = null;
+  chk('missing distance authority → MISSING_NORMALIZED_DISTANCE_AUTHORITY', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'MISSING_NORMALIZED_DISTANCE_AUTHORITY'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.distanceAuthority.authorityStatus = 'inferred_from_sample_index';
+  chk('forged authority status → NORMALIZED_DISTANCE_AUTHORITY_FORGED', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_AUTHORITY_FORGED'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.distanceAuthority.unit = 'furlong';
+  chk('unsupported unit → NORMALIZED_DISTANCE_UNSUPPORTED_UNIT', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_UNSUPPORTED_UNIT'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.distanceAuthority.direction = 'diagonal';
+  chk('unknown direction → NORMALIZED_DISTANCE_UNKNOWN_DIRECTION', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_UNKNOWN_DIRECTION'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.distanceAuthority.wrapSemantics = 'spirals';
+  chk('invalid wrap → NORMALIZED_DISTANCE_INVALID_WRAP', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_INVALID_WRAP'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.samples.distances = []; r.samples.times = [];
+  chk('empty samples → NORMALIZED_DISTANCE_EMPTY_INPUT', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_EMPTY_INPUT'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.samples.distances = [0]; r.samples.times = [0];
+  chk('single sample → NORMALIZED_DISTANCE_SINGLE_SAMPLE', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_SINGLE_SAMPLE'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.samples.distances = [0, 10]; r.samples.times = [0, 1, 2];
+  chk('distances/times length mismatch → NORMALIZED_DISTANCE_EMPTY_INPUT', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_EMPTY_INPUT'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.policy.monotonicity = 'random';
+  chk('unknown monotonicity → NORMALIZED_DISTANCE_NON_MONOTONIC', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_NON_MONOTONIC'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.policy.coverage = 0;
+  chk('coverage<=0 → NORMALIZED_DISTANCE_INSUFFICIENT_COVERAGE', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_INSUFFICIENT_COVERAGE'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.policy.minimumSamples = 0;
+  chk('minimumSamples<=0 → NORMALIZED_DISTANCE_INSUFFICIENT_SAMPLES', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_INSUFFICIENT_SAMPLES'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.policy.normalizedMaxGap = 0;
+  chk('normalizedMaxGap<=0 → NORMALIZED_DISTANCE_GAP_TOO_LARGE', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_GAP_TOO_LARGE'));
+})();
+(() => {
+  const r = validNormalizeRequest(); r.policy.timeGapSeconds = 0;
+  chk('timeGapSeconds<=0 → NORMALIZED_DISTANCE_TIME_GAP_TOO_LARGE', hasCode(NP.evaluateNormalizeDistanceRequestShape(r), 'NORMALIZED_DISTANCE_TIME_GAP_TOO_LARGE'));
+})();
+// shape gate result is frozen
+(() => { const r = NP.evaluateNormalizeDistanceRequestShape(validNormalizeRequest()); chk('shape-valid result frozen', Object.isFrozen(r)); })();
+
+// ── C4 reference-and-corner shape gates (contract layer; no algorithm) ──
+chk('RAC.ACCEPTED_REFERENCE_SELECTION_MODES === ["user"]', RAC.ACCEPTED_REFERENCE_SELECTION_MODES.length === 1 && RAC.ACCEPTED_REFERENCE_SELECTION_MODES[0] === 'user');
+chk('RAC.FORBIDDEN_REFERENCE_SELECTION_MODES includes fastestValid / medianValid / bestSectorComposite',
+  RAC.FORBIDDEN_REFERENCE_SELECTION_MODES.indexOf('fastestValid') !== -1
+  && RAC.FORBIDDEN_REFERENCE_SELECTION_MODES.indexOf('medianValid') !== -1
+  && RAC.FORBIDDEN_REFERENCE_SELECTION_MODES.indexOf('bestSectorComposite') !== -1);
+chk('RAC.MIN_SEGMENT_NORMALIZED_LENGTH > 0', RAC.MIN_SEGMENT_NORMALIZED_LENGTH > 0 && RAC.MIN_SEGMENT_NORMALIZED_LENGTH < 1);
+chk('RAC.MIN_PAIR_NORMALIZED_OVERLAP >= 0.5', RAC.MIN_PAIR_NORMALIZED_OVERLAP >= 0.5);
+chk('RAC.R4C_REFERENCE_REASON_CODES closed allowlist', Array.isArray(RAC.R4C_REFERENCE_REASON_CODES) && RAC.R4C_REFERENCE_REASON_CODES.every(c => RC.ALL_REASON_CODES.indexOf(c) !== -1));
+chk('RAC.R4C_SEGMENTATION_REASON_CODES closed allowlist', Array.isArray(RAC.R4C_SEGMENTATION_REASON_CODES) && RAC.R4C_SEGMENTATION_REASON_CODES.every(c => RC.ALL_REASON_CODES.indexOf(c) !== -1));
+chk('RAC.R4C_PAIRING_REASON_CODES closed allowlist', Array.isArray(RAC.R4C_PAIRING_REASON_CODES) && RAC.R4C_PAIRING_REASON_CODES.every(c => RC.ALL_REASON_CODES.indexOf(c) !== -1));
+chk('RAC.R4C_REASON_CODES is the union of three service allowlists', Array.isArray(RAC.R4C_REASON_CODES));
+chk('RAC.ACCEPTED_REFERENCE_SELECTION_MODES frozen', Object.isFrozen(RAC.ACCEPTED_REFERENCE_SELECTION_MODES));
+
+// reference selection shape gate
+function validRefSelectionRequest(over) {
+  return Object.assign({
+    identity: { caseId: 'case_1', sessionId: 'sess_1' },
+    trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' },
+    selection: { selectedBy: 'user', lapId: 'lap_3', sourceId: 'csv_import:foo.csv', selectedAt: '2026-06-23T12:00:00Z' },
+  }, over || {});
+}
+chk('ref selection valid → eligible', RAC.evaluateReferenceSelectionRequestShape(validRefSelectionRequest()).eligible === true);
+[null, undefined, 'x', 42, []].forEach(v => chk('ref selection malformed ' + JSON.stringify(v) + ' → blocked', RAC.evaluateReferenceSelectionRequestShape(v).eligible === false));
+(() => { const r = validRefSelectionRequest(); r.selection = null; chk('ref selection null → REFERENCE_NOT_SELECTED', hasCode(RAC.evaluateReferenceSelectionRequestShape(r), 'REFERENCE_NOT_SELECTED')); })();
+['fastestValid', 'medianValid', 'bestSectorComposite', 'implicitPrevious', 'autoFirstLap', 'auto'].forEach(mode => {
+  const r = validRefSelectionRequest(); r.selection.selectedBy = mode;
+  chk('ref auto mode ' + mode + ' → REFERENCE_AUTO_SELECTION_FORBIDDEN', hasCode(RAC.evaluateReferenceSelectionRequestShape(r), 'REFERENCE_AUTO_SELECTION_FORBIDDEN'));
+});
+(() => { const r = validRefSelectionRequest(); r.selection = { selectedBy: 'user', authoritative: true }; chk('ref forged authority (no lapId/sourceId/selectedAt) → REFERENCE_AUTHORITY_FORGED', hasCode(RAC.evaluateReferenceSelectionRequestShape(r), 'REFERENCE_AUTHORITY_FORGED')); })();
+(() => { const r = validRefSelectionRequest(); r.trackIdentity = { trackId: 'silverstone', layoutId: 'gp' }; chk('ref track identity not explicit → MISSING_TRACK_IDENTITY', hasCode(RAC.evaluateReferenceSelectionRequestShape(r), 'MISSING_TRACK_IDENTITY')); })();
+
+// corner segmentation shape gate
+function validSegRequest(over) {
+  const positions = []; for (let i = 0; i < 600; i++) positions.push(i / 599);
+  const channels = { steering: new Array(600).fill(0), lateral_accel: new Array(600).fill(0), yaw_rate: new Array(600).fill(0), speed: new Array(600).fill(50) };
+  return Object.assign({
+    identity: { caseId: 'case_1', sessionId: 'sess_1', lapId: 'lap_3', sourceId: 'src' },
+    trackIdentity: { trackId: 'silverstone', layoutId: 'gp', source: 'explicit' },
+    normalizedDistanceAxis: { eligible: true, positions },
+    channels,
+    algorithmVersion: 1,
+  }, over || {});
+}
+chk('seg shape valid → eligible', RAC.evaluateCornerSegmentationRequestShape(validSegRequest()).eligible === true);
+(() => { const r = validSegRequest(); r.channels = {}; chk('seg empty channels → NO_USABLE_CHANNELS', hasCode(RAC.evaluateCornerSegmentationRequestShape(r), 'CORNER_SEGMENTATION_NO_USABLE_CHANNELS')); })();
+(() => { const r = validSegRequest(); r.algorithmVersion = 99; chk('seg algorithm version mismatch → ALGORITHM_VERSION_MISMATCH', hasCode(RAC.evaluateCornerSegmentationRequestShape(r), 'CORNER_SEGMENTATION_ALGORITHM_VERSION_MISMATCH')); })();
+(() => { const r = validSegRequest(); r.normalizedDistanceAxis = null; chk('seg missing axis → MISSING_NORMALIZED_DISTANCE_AUTHORITY', hasCode(RAC.evaluateCornerSegmentationRequestShape(r), 'MISSING_NORMALIZED_DISTANCE_AUTHORITY')); })();
+
+// corner pairing shape gate
+function validPairRequest(over) {
+  const refSeg = { eligible: true, identity: { caseId: 'case_1', sessionId: 'sess_1' }, trackIdentity: { trackId: 'silverstone', layoutId: 'gp' }, segments: [{ id: 's1', start: 0, end: 0.1 }] };
+  const cmpSeg = { eligible: true, identity: { caseId: 'case_1', sessionId: 'sess_1' }, trackIdentity: { trackId: 'silverstone', layoutId: 'gp' }, segments: [{ id: 's1', start: 0, end: 0.1 }] };
+  return Object.assign({ referenceSegmentation: refSeg, comparisonSegmentation: cmpSeg, policy: { allowOrdinalPairing: false } }, over || {});
+}
+chk('pair shape valid → eligible', RAC.evaluateCornerPairingRequestShape(validPairRequest()).eligible === true);
+(() => { const r = validPairRequest(); r.policy.allowOrdinalPairing = true; chk('pair ordinal pairing forbidden → ORDINAL_FORBIDDEN', hasCode(RAC.evaluateCornerPairingRequestShape(r), 'CORNER_PAIRING_ORDINAL_FORBIDDEN')); })();
+(() => { const r = validPairRequest(); r.comparisonSegmentation.identity.sessionId = 'sess_2'; chk('pair cross-session → CROSS_SESSION_COMPARISON_UNSUPPORTED', hasCode(RAC.evaluateCornerPairingRequestShape(r), 'CROSS_SESSION_COMPARISON_UNSUPPORTED')); })();
+(() => { const r = validPairRequest(); r.comparisonSegmentation.identity.caseId = 'case_2'; chk('pair cross-case → CROSS_CASE_COMPARISON_UNSUPPORTED', hasCode(RAC.evaluateCornerPairingRequestShape(r), 'CROSS_CASE_COMPARISON_UNSUPPORTED')); })();
+(() => { const r = validPairRequest(); r.comparisonSegmentation.trackIdentity.layoutId = 'national'; chk('pair track mismatch → TRACK_IDENTITY_MISMATCH', hasCode(RAC.evaluateCornerPairingRequestShape(r), 'TRACK_IDENTITY_MISMATCH')); })();
+
+// ── C5 delta-metrics contract shape gate ──
+chk('DM.DELTA_SIGN_FORMULA literal === comparison_minus_reference', DM.DELTA_SIGN_FORMULA === 'comparison_minus_reference');
+chk('DM.SUPPORTED_DELTA_METRICS === 6 items', DM.SUPPORTED_DELTA_METRICS.length === 6
+  && DM.SUPPORTED_DELTA_METRICS.indexOf('lap_time') !== -1
+  && DM.SUPPORTED_DELTA_METRICS.indexOf('delta_cumulative') !== -1
+  && DM.SUPPORTED_DELTA_METRICS.indexOf('sector_delta') !== -1
+  && DM.SUPPORTED_DELTA_METRICS.indexOf('entry_delta') !== -1
+  && DM.SUPPORTED_DELTA_METRICS.indexOf('mid_delta') !== -1
+  && DM.SUPPORTED_DELTA_METRICS.indexOf('exit_delta') !== -1);
+chk('DM.LAP_SCOPE_METRICS frozen', Object.isFrozen(DM.LAP_SCOPE_METRICS));
+chk('DM.CORNER_SCOPE_METRICS frozen', Object.isFrozen(DM.CORNER_SCOPE_METRICS));
+chk('DM.R5_DELTA_REASON_CODES closed allowlist', Array.isArray(DM.R5_DELTA_REASON_CODES) && DM.R5_DELTA_REASON_CODES.every(c => RC.ALL_REASON_CODES.indexOf(c) !== -1));
+function validDeltaRequest(over) {
+  return Object.assign({
+    identity: { caseId: 'c1', sessionId: 's1' },
+    referenceLap: { lapTimeMs: 90000 },
+    comparisonLap: { lapTimeMs: 89500 },
+    pairing: { pairs: [{ referenceCorner: { id: 'r1', fullTimeMs: 10000 }, comparisonCorner: { id: 'c1', fullTimeMs: 9800 } }] },
+    requestedMetrics: ['lap_time', 'sector_delta'],
+    policy: { deltaSign: 'comparison_minus_reference' },
+  }, over || {});
+}
+chk('DM valid shape → eligible', DM.evaluateDeltaMetricsRequestShape(validDeltaRequest()).eligible === true);
+(() => { const r = validDeltaRequest(); r.policy.deltaSign = 'reference_minus_comparison'; chk('DM wrong sign → DELTA_METRIC_SIGN_FORBIDDEN', hasCode(DM.evaluateDeltaMetricsRequestShape(r), 'DELTA_METRIC_SIGN_FORBIDDEN')); })();
+(() => { const r = validDeltaRequest(); r.requestedMetrics = ['nonexistent_metric']; chk('DM unsupported metric → UNSUPPORTED_METRIC', hasCode(DM.evaluateDeltaMetricsRequestShape(r), 'UNSUPPORTED_METRIC')); })();
+(() => { const r = validDeltaRequest(); r.requestedMetrics = []; chk('DM empty requestedMetrics → EMPTY_INPUT', hasCode(DM.evaluateDeltaMetricsRequestShape(r), 'DELTA_METRIC_EMPTY_INPUT')); })();
+(() => { const r = validDeltaRequest(); r.referenceLap.lapTimeMs = -1; chk('DM invalid lapTimeMs → NUMERIC_INVALID', hasCode(DM.evaluateDeltaMetricsRequestShape(r), 'DELTA_METRIC_NUMERIC_INVALID')); })();
+(() => { const r = validDeltaRequest(); r.pairing.pairs = []; r.requestedMetrics = ['sector_delta']; chk('DM corner-scope w/o pairs → CORNER_PAIR_REQUIRED', hasCode(DM.evaluateDeltaMetricsRequestShape(r), 'DELTA_METRIC_CORNER_PAIR_REQUIRED')); })();
+(() => { const r = validDeltaRequest(); r.pairing.pairs = []; r.requestedMetrics = ['lap_time']; chk('DM lap-scope without pairs eligible', DM.evaluateDeltaMetricsRequestShape(r).eligible === true); })();
+[null, undefined, 'x', 42, []].forEach(v => chk('DM malformed ' + JSON.stringify(v) + ' → blocked', DM.evaluateDeltaMetricsRequestShape(v).eligible === false));
 
 // ── export envelope behaviour ──
 (() => { const env = EX.buildComparisonExportEnvelope(); chk('envelope payload null in CP1', env.payload === null && env.generatedAt === null); chk('envelope validates', EX.validateComparisonExportEnvelope(env).valid === true); })();
@@ -161,12 +491,12 @@ chk('eligible lap result has null result', VL.evaluateLapAuthority(fullLapAuthor
 chk('metric-supported result has null result', CE.evaluateMetricSupport('speedDelta').result === null);
 
 // ── index aggregate ──
-chk('index re-exports all surfaces', !!(IDX.reasonCodes && IDX.credibility && IDX.validLap && IDX.normalizedPosition && IDX.comparisonEligibility && IDX.comparisonExport));
+chk('index re-exports all surfaces (incl. referenceAndCorner + deltaMetrics)', !!(IDX.reasonCodes && IDX.credibility && IDX.validLap && IDX.normalizedPosition && IDX.comparisonEligibility && IDX.comparisonExport && IDX.referenceAndCorner && IDX.deltaMetrics));
 chk('index identity constant', IDX.COMPARISON_EXPORT_IDENTITY === 'racing-analyzer/comparison-export');
 
 // ── K/L. contracts have NO renderer dependency and NO algorithm (static scan) ──
 const contractFiles = fs.readdirSync(CONTRACT_DIR).filter(f => f.endsWith('.js'));
-chk('6 contract modules + index', contractFiles.length === 7, contractFiles);
+chk('10 contract modules + index (C7 adds framing + viewmodel-state-transition)', contractFiles.length === 11, contractFiles);
 // strip whole-line comments so the algorithm scan inspects CODE, not the prose that describes what the
 // contract deliberately does NOT do (a JSDoc line may legitimately say "no interpolation").
 function stripComments(s) { return s.split('\n').map(line => { const t = line.trim(); return (t.indexOf('*') === 0 || t.indexOf('/*') === 0 || t.indexOf('*/') === 0 || t.indexOf('//') === 0) ? '' : line; }).join('\n'); }
@@ -180,19 +510,57 @@ contractFiles.forEach(f => {
   ALGO_TOKENS.forEach(t => chk('no algorithm token "' + t + '" in code of ' + f, code.indexOf(t) === -1));
 });
 
-// ── P. the three R3.0C feature ids remain deferred with no renderer adapter (CP1 enables no UI) ──
-['case_comparison', 'reference_lap', 'corner_delta'].forEach(id => { const fdef = Registry.FEATURES[id]; chk('feature ' + id + ' still deferred, no adapter', !!fdef && fdef.availability === 'deferred' && fdef.deferredReason === 'R3.0C' && !fdef.rendererAdapter); });
+// ── P. the three R3.0C feature ids stay in their governance-declared shape.
+//      CP1 ships no UI: at that time the IDs were deferred with no rendererAdapter. C8_ACTIVATION
+//      flips them to availability='available' with rendererAdapter.paneId='comparisons' once
+//      governance/r3.0c/state.json.featureRegistryActivationAllowed=true. This assertion now reads
+//      state.json (fail-closed default = deferred) so the CP1 contract continues to hold pre-C8
+//      while the C8 activation can land without falsely tripping a CP1 invariant.
+const _r30cActAllowed = (function () { try { return JSON.parse(fs.readFileSync(path.join(REPO, 'governance', 'r3.0c', 'state.json'), 'utf8')).featureRegistryActivationAllowed === true; } catch (_) { return false; } })();
+['case_comparison', 'reference_lap', 'corner_delta'].forEach(id => {
+  const fdef = Registry.FEATURES[id];
+  if (_r30cActAllowed) {
+    chk('feature ' + id + ' activated (C8): available + rendererAdapter→comparisons', !!fdef && fdef.availability === 'available' && !!fdef.rendererAdapter && fdef.rendererAdapter.paneId === 'comparisons' && fdef.deferredReason === undefined);
+  } else {
+    chk('feature ' + id + ' still deferred, no adapter', !!fdef && fdef.availability === 'deferred' && fdef.deferredReason === 'R3.0C' && !fdef.rendererAdapter);
+  }
+});
 
 // ── N/O. the R3.0C scope guard + frozen boundary still pass with this change present ──
-function runScript(rel, artifactName) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-cp1-'));
-  const r = cp.spawnSync('node', [rel], { cwd: REPO, encoding: 'utf8', env: Object.assign({}, process.env, { ARTIFACT_DIR: tmp }) });
+// R3.0C C8_ACTIVATION (Codex C-B Round 1): the activation milestone is explicitly authorized to change
+// renderer/js/feature-registry.js (flipping the three R3.0C IDs from deferred to active) — the
+// frozen-boundary mechanism reserves an explicit FROZEN_ALLOW env var for exactly this milestone-
+// authorized boundary touch. We compute the allowlist from governance/r3.0c/state.json: if the
+// featureRegistryActivationAllowed flag is true AND feature-registry.js is among the
+// authorizedProductionPaths for the feature_registry_active capability, this commit is the
+// authorized C8 milestone change and the allowlist surfaces it. Otherwise (C0–C7) the allowlist is
+// empty and the original frozen invariant holds (a malicious touch is still blocked).
+function runScript(rel, artifactName, extraEnv) {
+  const tmp = H.acquireTempDir('r3c-cp1-');
+  const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp }, extraEnv || {});
+  const r = cp.spawnSync('node', [rel], { cwd: REPO, encoding: 'utf8', env });
   let artifact = null;
   try { artifact = JSON.parse(fs.readFileSync(path.join(tmp, artifactName), 'utf8')); } catch (e) { artifact = null; }
   return { status: r.status, artifact, stderr: r.stderr };
 }
+function _frozenAllowForActivation() {
+  try {
+    const st = JSON.parse(fs.readFileSync(path.join(REPO, 'governance', 'r3.0c', 'state.json'), 'utf8'));
+    if (st && st.featureRegistryActivationAllowed === true && Array.isArray(st.authorizedProductionPaths)) {
+      const has = st.authorizedProductionPaths.some(e => e && e.path === 'renderer/js/feature-registry.js' && e.capability === 'feature_registry_active');
+      if (has) return 'renderer/js/feature-registry.js';
+    }
+  } catch (_) {}
+  return '';
+}
 (() => { const g = runScript('scripts/check-r3-0c-guard.js', 'r3-0c-guard.json'); chk('R3.0C scope guard exits 0', g.status === 0, g.stderr); chk('R3.0C scope guard ok===true', !!(g.artifact && g.artifact.ok === true), g.artifact); chk('R3.0C guard sees no R3.0C production diff', !!(g.artifact && g.artifact.r3_0c_production_diff === 0), g.artifact); })();
-(() => { const f = runScript('scripts/check-frozen-boundary.js', 'frozen-boundary-result.json'); chk('frozen-boundary exits 0', f.status === 0, f.stderr); chk('frozen-boundary 0 diff', !!(f.artifact && f.artifact.frozenDiffCount === 0 && f.artifact.ok === true), f.artifact); })();
+(() => {
+  const allow = _frozenAllowForActivation();
+  const f = runScript('scripts/check-frozen-boundary.js', 'frozen-boundary-result.json', allow ? { FROZEN_ALLOW: allow } : null);
+  chk('frozen-boundary exits 0', f.status === 0, f.stderr);
+  chk('frozen-boundary 0 diff', !!(f.artifact && f.artifact.frozenDiffCount === 0 && f.artifact.ok === true), f.artifact);
+})();
 
+H.cleanupAll();
 console.log(`r3.0c-contract-foundation: ${pass} passed, ${fail} failed`);
 process.exit(fail === 0 ? 0 : 1);

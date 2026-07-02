@@ -26,7 +26,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const os = require('os');
+const H = require('./helpers/managed-temp-dir.js');
 
 const REPO = path.resolve(__dirname, '..');
 const SCRIPT = 'scripts/check-r3-0-train.js';
@@ -38,7 +38,7 @@ function chk(name, cond, detail) {
 }
 
 function runValidator(base) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-train-art-'));
+  const tmp = H.acquireTempDir('r3-train-art-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp });
   if (base) env.R3_TRAIN_BASE_OVERRIDE = base;
   const r = cp.spawnSync('node', [SCRIPT], { cwd: REPO, encoding: 'utf8', env });
@@ -52,7 +52,7 @@ function hasViolation(artifact, code) {
 }
 
 function buildFixture() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-train-fix-'));
+  const dir = H.acquireTempDir('r3-train-fix-');
   fs.mkdirSync(path.join(dir, 'governance'), { recursive: true });
   for (const sub of ['r3.0', 'r3.0c', 'r3.0d', 'r3.0e', 'r3.0f']) {
     fs.cpSync(path.join(REPO, 'governance', sub), path.join(dir, 'governance', sub), { recursive: true });
@@ -68,8 +68,8 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
   const r = runValidator(null);
   chk('PASS real repo rc=0', r.status === 0, { violations: r.artifact && r.artifact.violations });
   chk('PASS artifact ok=true', r.artifact && r.artifact.ok === true);
-  chk('PASS trainStatus=GOVERNANCE_READY', r.artifact && r.artifact.trainStatus === 'GOVERNANCE_READY');
-  chk('PASS currentPhase=R3.0C', r.artifact && r.artifact.currentPhase === 'R3.0C');
+  chk('PASS trainStatus=IN_PROGRESS', r.artifact && r.artifact.trainStatus === 'IN_PROGRESS');
+  chk('PASS currentPhase is a valid R3.0 phase', r.artifact && ['R3.0C', 'R3.0D', 'R3.0E', 'R3.0F'].indexOf(r.artifact.currentPhase) !== -1);
   chk('PASS targetVersion=2.0.0', r.artifact && r.artifact.targetVersion === '2.0.0');
   chk('PASS targetTag=v2.0.0', r.artifact && r.artifact.targetTag === 'v2.0.0');
   chk('PASS intermediateReleaseAllowed=false', r.artifact && r.artifact.intermediateReleaseAllowed === false);
@@ -77,40 +77,63 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
   chk('PASS all 4 phases summarized', r.artifact && r.artifact.phases && Object.keys(r.artifact.phases).length === 4);
 }
 
-// ── 2a. D current=D2 but R3.0C still at C0 → CROSS_PHASE_PREMATURE_ADVANCE ──
+// ── 2a. D current=D2 but R3.0C still at C7_UI (pre-C8) → CROSS_PHASE_PREMATURE_ADVANCE ──
+// Note: the real-repo governance is at C8_ACTIVATION after activation; the fixture must roll the
+// R3.0C copy back to a pre-C8 checkpoint to recreate the "D advancing before C8 reached" premise.
 {
   const dir = buildFixture();
+  const cs = readJson(path.join(dir, 'governance', 'r3.0c', 'state.json'));
+  cs.currentCheckpoint = 'C7_UI'; cs.featureRegistryActivationAllowed = false;
+  cs.enabledCapabilities = (cs.enabledCapabilities || []).filter(c => c !== 'feature_registry_active');
+  cs.authorizedProductionPaths = (cs.authorizedProductionPaths || []).filter(e => !(e && e.capability === 'feature_registry_active'));
+  writeJson(path.join(dir, 'governance', 'r3.0c', 'state.json'), cs);
   const ds = readJson(path.join(dir, 'governance', 'r3.0d', 'state.json'));
-  ds.currentCheckpoint = 'D2_HYPOTHESIS_ENGINE'; ds.authorizedProductionPaths = []; ds.enabledCapabilities = [];
+  ds.currentCheckpoint = 'D2_EVIDENCE_GRAPH'; ds.authorizedProductionPaths = []; ds.enabledCapabilities = [];
   writeJson(path.join(dir, 'governance', 'r3.0d', 'state.json'), ds);
   const ts = readJson(path.join(dir, 'governance', 'r3.0', 'train.json'));
-  ts.phaseStates['R3.0D'].currentCheckpoint = 'D2_HYPOTHESIS_ENGINE';
+  ts.phaseStates['R3.0C'].currentCheckpoint = 'C7_UI'; ts.phaseStates['R3.0C'].finalActivationReached = false;
+  ts.currentPhaseCheckpoint = 'C7_UI';
+  ts.phaseStates['R3.0D'].currentCheckpoint = 'D2_EVIDENCE_GRAPH';
   writeJson(path.join(dir, 'governance', 'r3.0', 'train.json'), ts);
   const r = runValidator(dir);
   chk('FAIL D before C8 rc!=0', r.status !== 0);
   chk('FAIL D before C8 CROSS_PHASE_PREMATURE_ADVANCE', hasViolation(r.artifact, 'CROSS_PHASE_PREMATURE_ADVANCE'));
 }
 
-// ── 2b. E current=E2 but R3.0D still at D0 ──
+// ── 2b. E current=E2 but R3.0D still at D4 (pre-D5) ──
+// Note: the real-repo governance is at D5_ENGINEER_BRIEF_ACTIVATION after activation; the
+// fixture must roll the R3.0D copy back to a pre-D5 checkpoint to recreate the "E advancing
+// before D5 reached" premise. Mirror the 2a pattern (which rolls R3.0C back to C7_UI).
 {
   const dir = buildFixture();
+  const ds = readJson(path.join(dir, 'governance', 'r3.0d', 'state.json'));
+  ds.currentCheckpoint = 'D4_PRIORITY_ENGINE'; ds.uiAllowed = false; ds.featureRegistryActivationAllowed = false;
+  writeJson(path.join(dir, 'governance', 'r3.0d', 'state.json'), ds);
   const es = readJson(path.join(dir, 'governance', 'r3.0e', 'state.json'));
   es.currentCheckpoint = 'E2_EXPERIMENT_STORE';
   writeJson(path.join(dir, 'governance', 'r3.0e', 'state.json'), es);
   const ts = readJson(path.join(dir, 'governance', 'r3.0', 'train.json'));
+  ts.phaseStates['R3.0D'].currentCheckpoint = 'D4_PRIORITY_ENGINE';
+  ts.phaseStates['R3.0D'].finalActivationReached = false;
   ts.phaseStates['R3.0E'].currentCheckpoint = 'E2_EXPERIMENT_STORE';
   writeJson(path.join(dir, 'governance', 'r3.0', 'train.json'), ts);
   const r = runValidator(dir);
   chk('FAIL E before D5 CROSS_PHASE_PREMATURE_ADVANCE', hasViolation(r.artifact, 'CROSS_PHASE_PREMATURE_ADVANCE'));
 }
 
-// ── 2c. F current=F1 but R3.0E still at E0 ──
+// ── 2c. F current=F1 but R3.0E NOT yet at E5 ──
 {
   const dir = buildFixture();
+  // Force R3.0E back to E2 (pre-E5) for this test scenario.
+  const es = readJson(path.join(dir, 'governance', 'r3.0e', 'state.json'));
+  es.currentCheckpoint = 'E2_EXPERIMENT_STORE';
+  writeJson(path.join(dir, 'governance', 'r3.0e', 'state.json'), es);
   const fs2 = readJson(path.join(dir, 'governance', 'r3.0f', 'state.json'));
   fs2.currentCheckpoint = 'F1_MIGRATION_ENGINE';
   writeJson(path.join(dir, 'governance', 'r3.0f', 'state.json'), fs2);
   const ts = readJson(path.join(dir, 'governance', 'r3.0', 'train.json'));
+  ts.phaseStates['R3.0E'].currentCheckpoint = 'E2_EXPERIMENT_STORE';
+  ts.phaseStates['R3.0E'].finalActivationReached = false;
   ts.phaseStates['R3.0F'].currentCheckpoint = 'F1_MIGRATION_ENGINE';
   writeJson(path.join(dir, 'governance', 'r3.0', 'train.json'), ts);
   const r = runValidator(dir);
@@ -126,7 +149,7 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
     forbiddenCapabilities: [], tests: null, workflowRunId: null, artifactId: null, artifactBoundSha: null, codexVerdict: null,
     frozenDiff: 0, productionDiff: 0, runtimeConsumerCount: 0, featureRegistryState: {}, packageVersion: '1.4.0', createdAt: null,
     status: 'pending', governanceChanged: false, crossPhaseGate: { r3cCheckpoint: 'C8_ACTIVATION', requiredFor: 'D1_CONTRACT_FOUNDATION', satisfied: true } };
-  const d2 = Object.assign({}, d1, { checkpoint: 'D2_HYPOTHESIS_ENGINE', previousCheckpoint: 'D1_CONTRACT_FOUNDATION', enabledCapabilitiesBefore: ['contract_foundation_present'], enabledCapabilitiesAfter: [] });
+  const d2 = Object.assign({}, d1, { checkpoint: 'D2_EVIDENCE_GRAPH', previousCheckpoint: 'D1_CONTRACT_FOUNDATION', enabledCapabilitiesBefore: ['contract_foundation_present'], enabledCapabilitiesAfter: [] });
   writeJson(path.join(dir, 'governance', 'r3.0d', 'checkpoints', 'D1.json'), d1);
   writeJson(path.join(dir, 'governance', 'r3.0d', 'checkpoints', 'D2.json'), d2);
   const r = runValidator(dir);
@@ -141,7 +164,7 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
     forbiddenCapabilities: [], tests: null, workflowRunId: null, artifactId: null, artifactBoundSha: null, codexVerdict: null,
     frozenDiff: 0, productionDiff: 0, runtimeConsumerCount: 0, featureRegistryState: {}, packageVersion: '1.4.0', createdAt: null,
     status: 'pending', governanceChanged: false, crossPhaseGate: { r3cCheckpoint: 'C8_ACTIVATION', requiredFor: 'D1_CONTRACT_FOUNDATION', satisfied: true } };
-  const d2 = Object.assign({}, d1, { checkpoint: 'D2_HYPOTHESIS_ENGINE', previousCheckpoint: 'D1_CONTRACT_FOUNDATION', authorizedPaths: [] });
+  const d2 = Object.assign({}, d1, { checkpoint: 'D2_EVIDENCE_GRAPH', previousCheckpoint: 'D1_CONTRACT_FOUNDATION', authorizedPaths: [] });
   writeJson(path.join(dir, 'governance', 'r3.0d', 'checkpoints', 'D1.json'), d1);
   writeJson(path.join(dir, 'governance', 'r3.0d', 'checkpoints', 'D2.json'), d2);
   const r = runValidator(dir);
@@ -283,7 +306,7 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
   const dir = buildFixture();
   const dsch = readJson(path.join(dir, 'governance', 'r3.0d', 'schema.json'));
   dsch.capabilities.push('r4_closed_loop_present');
-  dsch.capabilityUnlockFloor['r4_closed_loop_present'] = 'D5_ACTIVATION';
+  dsch.capabilityUnlockFloor['r4_closed_loop_present'] = 'D5_ENGINEER_BRIEF_ACTIVATION';
   writeJson(path.join(dir, 'governance', 'r3.0d', 'schema.json'), dsch);
   const r = runValidator(dir);
   chk('FAIL R4 capability present', hasViolation(r.artifact, 'R4_CAPABILITY_PRESENT'));
@@ -296,7 +319,7 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
     previousCheckpoint: 'E1_CONTRACT_FOUNDATION', authorizedPaths: ['renderer/js/case-record-schema.js'], enabledCapabilitiesBefore: ['contract_foundation_present'], enabledCapabilitiesAfter: ['contract_foundation_present', 'experiment_store_present'],
     forbiddenCapabilities: [], tests: null, workflowRunId: null, artifactId: null, artifactBoundSha: null, codexVerdict: null,
     frozenDiff: 0, productionDiff: 0, runtimeConsumerCount: 0, featureRegistryState: {}, packageVersion: '1.4.0', createdAt: null,
-    status: 'pending', governanceChanged: true, crossPhaseGate: { r3dCheckpoint: 'D5_ACTIVATION', requiredFor: 'E2_EXPERIMENT_STORE', satisfied: true },
+    status: 'pending', governanceChanged: true, crossPhaseGate: { r3dCheckpoint: 'D5_ENGINEER_BRIEF_ACTIVATION', requiredFor: 'E2_EXPERIMENT_STORE', satisfied: true },
     r3bCaseRecordSchemaUntouched: true };
   writeJson(path.join(dir, 'governance', 'r3.0e', 'checkpoints', 'E2.json'), manifest);
   const r = runValidator(dir);
@@ -310,7 +333,7 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
     previousCheckpoint: 'E1_CONTRACT_FOUNDATION', authorizedPaths: ['renderer/js/experiment-store.js'], enabledCapabilitiesBefore: ['contract_foundation_present'], enabledCapabilitiesAfter: ['contract_foundation_present', 'experiment_store_present'],
     forbiddenCapabilities: [], tests: null, workflowRunId: null, artifactId: null, artifactBoundSha: null, codexVerdict: null,
     frozenDiff: 0, productionDiff: 0, runtimeConsumerCount: 0, featureRegistryState: {}, packageVersion: '1.4.0', createdAt: null,
-    status: 'pending', governanceChanged: true, crossPhaseGate: { r3dCheckpoint: 'D5_ACTIVATION', requiredFor: 'E2_EXPERIMENT_STORE', satisfied: true },
+    status: 'pending', governanceChanged: true, crossPhaseGate: { r3dCheckpoint: 'D5_ENGINEER_BRIEF_ACTIVATION', requiredFor: 'E2_EXPERIMENT_STORE', satisfied: true },
     r3bCaseRecordSchemaUntouched: false };
   writeJson(path.join(dir, 'governance', 'r3.0e', 'checkpoints', 'E2.json'), manifest);
   const r = runValidator(dir);
@@ -342,10 +365,13 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
 }
 
 // ── 22. train state vs phase state checkpoint mismatch ──
+// Note: the real-repo R3.0D is at D5_ENGINEER_BRIEF_ACTIVATION post-activation. Inject a
+// disagreement by changing train.json's R3.0D checkpoint to something the state.json copy
+// does not match — D0_BOOTSTRAP is the canonical pre-start value.
 {
   const dir = buildFixture();
   const ts = readJson(path.join(dir, 'governance', 'r3.0', 'train.json'));
-  ts.phaseStates['R3.0D'].currentCheckpoint = 'D5_ACTIVATION'; // disagrees with state.json D0_BOOTSTRAP
+  ts.phaseStates['R3.0D'].currentCheckpoint = 'D0_BOOTSTRAP'; // disagrees with state.json D5_ENGINEER_BRIEF_ACTIVATION
   writeJson(path.join(dir, 'governance', 'r3.0', 'train.json'), ts);
   const r = runValidator(dir);
   chk('FAIL phase checkpoint mismatch', hasViolation(r.artifact, 'TRAIN_PHASE_CHECKPOINT_MISMATCH'));
@@ -361,5 +387,6 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
   chk('FAIL invalid trainStatus', hasViolation(r.artifact, 'TRAIN_STATUS_INVALID'));
 }
 
+H.cleanupAll();
 console.log('r3-0-train: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

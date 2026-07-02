@@ -1,12 +1,116 @@
 {
   "schemaVersion": 1,
   "program": "R3.0F",
-  "currentCheckpoint": "F0_BOOTSTRAP",
-  "authorizedProductionPaths": [],
-  "enabledCapabilities": [],
-  "runtimeConsumersAllowed": false,
-  "uiAllowed": false,
+  "currentCheckpoint": "F5_RELEASE_GATE",
+  "authorizedProductionPaths": [
+    {
+      "path": "renderer/js/r3-0f-migration-engine.js",
+      "capability": "migration_engine_present"
+    },
+    {
+      "path": "tests/e2e/helpers/flow-harness.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-01-new-user.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-02-real-telemetry.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-03-measured.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-04-reference-lap.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-05-vre.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-06-setup-experiment.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-07-driver-experiment.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-08-export-import.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-09-electron-smoke.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/hardening-01-electron-boundary.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-02-storage-failure.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-03-no-stale-ui.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-04-large-library.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-05-xss-injection.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-06-supply-chain.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "docs/r3-architecture.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-user-workflow.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-data-and-privacy.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-credibility-model.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-experiment-loop.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/release-notes-2.0.0.md",
+      "capability": "release_gate_present"
+    }
+  ],
+  "enabledCapabilities": [
+    "governance_bootstrap_present",
+    "migration_engine_present",
+    "e2e_automation_present",
+    "quality_hardening_present",
+    "documentation_present",
+    "release_gate_present"
+  ],
+  "runtimeConsumersAllowed": true,
+  "uiAllowed": true,
   "featureRegistryActivationAllowed": false,
-  "algorithmsAllowed": false,
-  "note": "R3.0F Integrated Delivery Governance state. F0 BOOTSTRAP fixes every production switch OFF. authorizedProductionPaths is intentionally empty; enabledCapabilities is intentionally empty. The four *Allowed flags are intentionally false. Mutating any field above the F0 baseline requires a separately-authorized Integrated Delivery Train checkpoint AND requires R3.0E state.currentCheckpoint === 'E5_ACTIVATION' per cross-phase rule. F6_RELEASE is the only checkpoint that may bump package.json version (1.4.0 → 2.0.0) and may authorize tag/release creation post-merge."
+  "algorithmsAllowed": true,
+  "note": "R3.0F F5_RELEASE_GATE state. F5 enables release_gate_present by shipping the 12-condition fail-closed release gate (scripts/check-release-gate.js: preflight, tests, E2E, frozen 0, preset 501, i18n parity, reachability, no orphans, Electron build readiness, release notes drafted, CHANGELOG, tag policy) plus the docs/release-notes-2.0.0.md draft. The gate has PASSED 12/12. Release boundary: the single 1.4.0 -> 2.0.0 version bump, the Train merge to main, tag v2.0.0 and the GitHub Release all belong to the separately-authorized F6_RELEASE checkpoint; release_executed remains disabled and featureRegistryActivationAllowed remains false until then. The frozen R3.0B case-record schema is NOT modified by any F checkpoint."
 }

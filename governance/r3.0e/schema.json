@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "program": "R3.0E",
   "title": "R3.0E Recommendation Experiment & Outcome Loop — schema",
-  "note": "Defines the legal universe of checkpoints, capabilities, transitions, and authorized-path rules for the R3.0E phase of the R3.0 Integrated Delivery Train. E0 establishes the schema; E1..E5 are NOT yet authorized — they describe future intent so the validator can refuse premature activation. R3.0E depends on R3.0D completing all the way to D5_ACTIVATION before any non-bootstrap E checkpoint may advance — that cross-phase rule is enforced by scripts/check-r3-0-train.js, not by this single-phase schema. Per SKYLINE D12/E1 ruling: Experiment / Outcome / Hypothesis / follow-up linkage live in SEPARATE versioned IndexedDB namespaces and MUST NOT extend the frozen R3.0B case-record schema.",
+  "note": "Defines the legal universe of checkpoints, capabilities, transitions, and authorized-path rules for the R3.0E phase of the R3.0 Integrated Delivery Train. E0 establishes the schema; E1..E5 are NOT yet authorized — they describe future intent so the validator can refuse premature activation. R3.0E depends on R3.0D completing all the way to D5_ENGINEER_BRIEF_ACTIVATION before any non-bootstrap E checkpoint may advance — that cross-phase rule is enforced by scripts/check-r3-0-train.js, not by this single-phase schema. Per SKYLINE D12/E1 ruling: Experiment / Outcome / Hypothesis / follow-up linkage live in SEPARATE versioned IndexedDB namespaces and MUST NOT extend the frozen R3.0B case-record schema.",
   "checkpoints": [
     "E0_BOOTSTRAP",
     "E1_CONTRACT_FOUNDATION",

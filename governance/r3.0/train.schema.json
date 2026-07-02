@@ -19,13 +19,13 @@
   },
   "phaseFinalActivationCheckpoint": {
     "R3.0C": "C8_ACTIVATION",
-    "R3.0D": "D5_ACTIVATION",
+    "R3.0D": "D5_ENGINEER_BRIEF_ACTIVATION",
     "R3.0E": "E5_ACTIVATION",
     "R3.0F": "F6_RELEASE"
   },
   "crossPhaseAdvanceRequires": {
     "R3.0D": "R3.0C:C8_ACTIVATION",
-    "R3.0E": "R3.0D:D5_ACTIVATION",
+    "R3.0E": "R3.0D:D5_ENGINEER_BRIEF_ACTIVATION",
     "R3.0F": "R3.0E:E5_ACTIVATION"
   },
   "scopePin": {

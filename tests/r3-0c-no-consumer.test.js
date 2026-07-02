@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const os = require('os');
+const H = require('./helpers/managed-temp-dir.js');
 
 const REPO = path.resolve(__dirname, '..');
 const SCRIPT = 'scripts/check-r3-0c-no-consumer.js';
@@ -23,7 +23,7 @@ function chk(name, cond, detail) {
 }
 
 function runValidator(opts) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-noc-art-'));
+  const tmp = H.acquireTempDir('r3c-noc-art-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp });
   if (opts && opts.base) env.R3_0C_NO_CONSUMER_BASE_OVERRIDE = opts.base;
   if (opts && Object.prototype.hasOwnProperty.call(opts, 'featuresJson')) env.R3_0C_NO_CONSUMER_FIXTURE_FEATURES_JSON = opts.featuresJson;
@@ -36,7 +36,7 @@ function runValidator(opts) {
 function hasViolation(art, code) { return !!(art && Array.isArray(art.violations) && art.violations.some(v => v.code === code)); }
 
 function buildFixtureBase(extra) {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-noc-fix-'));
+  const base = H.acquireTempDir('r3c-noc-fix-');
   fs.mkdirSync(path.join(base, 'renderer', 'js'), { recursive: true });
   fs.mkdirSync(path.join(base, 'contracts', 'r3.0c'), { recursive: true });
   // benign renderer file (no contracts reference)
@@ -68,8 +68,30 @@ function deferredOk() {
   const r = runValidator();
   chk('A1 real-repo exits 0', r.status === 0, r.stderr);
   chk('A2 real-repo ok===true', !!(r.artifact && r.artifact.ok === true), r.artifact && r.artifact.violations);
-  chk('A3 real-repo runtimeConsumerCount===0', !!(r.artifact && r.artifact.runtimeConsumerCount === 0));
-  chk('A4 real-repo deferredStillDeferred===true', !!(r.artifact && r.artifact.deferredStillDeferred === true));
+  chk('A3 real-repo runtimeConsumerCount===12 (C1..C6 + C7 orchestrator/viewmodel; i18n-comparisons declared but no contract require)', !!(r.artifact && r.artifact.runtimeConsumerCount === 12));
+  chk('A3b real-repo authorizedConsumerCount===12', !!(r.artifact && r.artifact.authorizedConsumerCount === 12));
+  chk('A3c real-repo unauthorizedRendererConsumerCount===0', !!(r.artifact && r.artifact.unauthorizedRendererConsumerCount === 0));
+  chk('A3d real-repo authorized paths include C1 adapter, three C2 services, C3 normalize-distance, three C4 services, C5 delta-metrics, and C6 comparison-export', !!(r.artifact && Array.isArray(r.artifact.authorizedConsumerPaths)
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-comparison-adapter.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-lap-authority.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-track-identity.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-distance-authority.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-normalized-distance.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-reference-selection.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-corner-segmentation.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-corner-pairing.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-delta-metrics.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-comparison-export.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-comparison-orchestrator.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/r3-0c-comparison-viewmodel.js')
+    && r.artifact.authorizedConsumerPaths.includes('renderer/js/i18n-comparisons.js')));
+  chk('A3e real-repo currentCheckpoint===C8_ACTIVATION', !!(r.artifact && r.artifact.currentCheckpoint === 'C8_ACTIVATION'));
+  chk('A3f real-repo runtimeConsumersAllowed===true', !!(r.artifact && r.artifact.runtimeConsumersAllowed === true));
+  // R3.0C C8_ACTIVATION (state-aware): the deferredStillDeferred artifact flag now reports whether the
+  // governance-current R3.0C registry CONTRACT holds — which is the active contract once
+  // featureRegistryActivationAllowed=true, or the deferred contract while it is still false. Both
+  // surface true on the same flag for downstream artifact consumers.
+  chk('A4 real-repo R3.0C registry contract holds', !!(r.artifact && r.artifact.deferredStillDeferred === true));
 })();
 
 // ── B. fixture renderer/js file requires contracts/r3.0c ──
@@ -194,5 +216,6 @@ function deferredOk() {
   chk('H3 fixture features JSON parse error → FAILS', r.status !== 0 && hasViolation(r.artifact, 'FIXTURE_FEATURES_JSON_PARSE_ERROR'));
 })();
 
+H.cleanupAll();
 console.log('r3-0c-no-consumer: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

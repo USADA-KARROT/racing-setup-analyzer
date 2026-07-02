@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0F",
+  "checkpoint": "F2_E2E_AUTOMATION",
+  "baseSha": "f143b9fcfd5bfbb65cf2c04130c9eeef9853abb9",
+  "headSha": null,
+  "previousCheckpoint": "F1_MIGRATION_ENGINE",
+  "shaSeparation": {
+    "note": "R3.0F F2 candidate branch SHA convention. reviewedCandidateSha is filled by the Codex review prompt and bound to the exact PR head SHA. manifestCommitSha is the governance anchor commit; integrationSha is the squash/merge commit on the R3.0 Integrated Delivery Train.",
+    "reviewedCandidateSha": "8bcceec7bd7c81a2a3adcee5a413e7d923749a16",
+    "reviewedCandidateNote": "Codex F2 Round 2 reviewed this exact SHA and issued FINAL VERDICT: PASS. F2 review lineage: R1 BLOCK 3 (F2-R1-01 selectReference negative paths; F2-R1-02 buildEngineerBrief authority gate; F2-R1-03 assertNoStaleCaseRef gate invocation in flow-07 + flow-08) → R2 PASS. R2 verification also confirmed via direct probe that a Proxy-wrapped D3/D4 input is rejected with HYPOTHESIS_AUTHORITY_FORGED and zero Proxy traps fire. F1 closure anchors (descriptor-preflight, BigInt JSON-safety, trap-free serialization, atomic transact, TOCTOU sourceHash) remain structurally intact at this SHA — R2 closures only touched 4 test files. R3.0B persistence + R3.0C/D/E contracts NOT modified.",
+    "manifestCommitSha": null,
+    "integrationSha": null
+  },
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0f-migration-engine.js",      "capability": "migration_engine_present" },
+    { "path": "tests/e2e/helpers/flow-harness.js",          "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-01-new-user.test.js",         "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-02-real-telemetry.test.js",   "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-03-measured.test.js",         "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-04-reference-lap.test.js",    "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-05-vre.test.js",              "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-06-setup-experiment.test.js", "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-07-driver-experiment.test.js","capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-08-export-import.test.js",    "capability": "e2e_automation_present" },
+    { "path": "tests/e2e/flow-09-electron-smoke.test.js",   "capability": "e2e_automation_present" }
+  ],
+  "newlyAuthorizedPaths": [
+    "tests/e2e/helpers/flow-harness.js",
+    "tests/e2e/flow-01-new-user.test.js",
+    "tests/e2e/flow-02-real-telemetry.test.js",
+    "tests/e2e/flow-03-measured.test.js",
+    "tests/e2e/flow-04-reference-lap.test.js",
+    "tests/e2e/flow-05-vre.test.js",
+    "tests/e2e/flow-06-setup-experiment.test.js",
+    "tests/e2e/flow-07-driver-experiment.test.js",
+    "tests/e2e/flow-08-export-import.test.js",
+    "tests/e2e/flow-09-electron-smoke.test.js"
+  ],
+  "newlyEnabledCapabilities": ["e2e_automation_present"],
+  "enabledCapabilitiesBefore": ["governance_bootstrap_present", "migration_engine_present"],
+  "enabledCapabilitiesAfter": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present"],
+  "forbiddenCapabilities": [
+    "quality_hardening_present",
+    "documentation_present",
+    "release_gate_present",
+    "release_executed"
+  ],
+  "contractEnforcements": {
+    "flowScope": "9 logic-level end-to-end flow tests that compose the production R3.0B+C+D+E+F module surfaces over MemoryBackend with deterministic stamps. NO browser DOM, NO jsdom, NO external network, NO runtime LLM. Production code is unchanged in F2 except a defensive JSON-stringify semantic alignment in r3-0f-migration-engine.js that allows undefined property values (mirroring JSON.stringify omit-on-undefined rule) so that R3.0B case-store's importBundle output — which sets `schema: undefined` — survives the F1 sanitize+serialize pipeline. The post-clone JSON-safety walker and trap-free serializer continue to reject BigInt / Date / Map / Set / typed arrays / Symbol / function / NaN / Infinity / non-plain-prototype values and never invoke prototype toJSON hooks.",
+    "deterministic": "Every flow injects a fixed stamp into createFlowHarness. The F1 engine + R3.0B stores + R3.0E stores accept the stamp and use it for all generated timestamps. Same flow inputs always produce identical outputs.",
+    "noNetworkNoLLM": "Tests load only local modules. No HTTP/WS/network IO. No runtime LLM. The VRE flow (Flow 05) explicitly asserts runtimeLLMDecisionAuthority is disabled.",
+    "consoleErrorGuard": "createFlowHarness installs a console.error shim + unhandledRejection handler; each flow asserts the post-flow consoleErrorCount === 0. Any silent failure surfaces.",
+    "forbiddenActionsGate": "createFlowHarness exposes assertForbiddenActionsDisabled which throws on autoReferenceLap / autoApplySetup / runtimeLLMDecisionAuthority / causationClaim / driverBlame. Each flow that touches the corresponding scope calls the gate.",
+    "noStaleUiContract": "createFlowHarness exposes assertNoStaleCaseRef which throws when a viewmodel-like object retains a sourceCaseId that does not match the activeCaseId. Tests that perform case-transition scenarios call this gate before asserting post-state.",
+    "scopePinReassertion": "Flow 04 (reference lap) and Flow 07 (driver experiment) cross-check governance/r3.0/train.json scopePinMirror values at runtime: sameAnalysisCaseOnly=true, sameSessionOnly=true, crossSessionForbidden=true, deltaSign='comparison-reference', explicitUserSelectionOnly=true, fastestValidEnabled=false, medianValidEnabled=false, bestSectorCompositeEnabled=false.",
+    "appendOnlyTimelineCovered": "Flow 06 appends a second event with createdAt strictly greater than the first; verifies the prior event is preserved unchanged; verifies an out-of-order createdAt is rejected by the R3.0E timeline-store.",
+    "credibilityClosedEnum": "Flow 03 asserts credibility rung is exactly one of {measured, derived, heuristic, synthetic}; never upgraded; qualifiers stay in limitations[].",
+    "exportImportContract": "Flow 08 asserts the portable bundle has NO raw telemetry array; importBundle creates an imported_summary record that can never be duplicated to local_full; F1 migration treats the imported record as at-target (no migration).",
+    "electronSmokeContract": "Flow 09 verifies electron CLI installed, --version handshake works, main.js declares contextIsolation:true + nodeIntegration:false, and preload.js exposes only contextBridge (no ipcRenderer leak, no fs/child_process/net/http requires).",
+    "stateFloors": "F2 enables e2e_automation_present. uiAllowed and featureRegistryActivationAllowed remain false. runtimeConsumersAllowed and algorithmsAllowed unchanged from F1. R3.0B case-record schema NOT modified."
+  },
+  "tests": {
+    "command": "npm test",
+    "newSuitesForThisCheckpoint": [
+      "tests/e2e/flow-01-new-user.test.js",
+      "tests/e2e/flow-02-real-telemetry.test.js",
+      "tests/e2e/flow-03-measured.test.js",
+      "tests/e2e/flow-04-reference-lap.test.js",
+      "tests/e2e/flow-05-vre.test.js",
+      "tests/e2e/flow-06-setup-experiment.test.js",
+      "tests/e2e/flow-07-driver-experiment.test.js",
+      "tests/e2e/flow-08-export-import.test.js",
+      "tests/e2e/flow-09-electron-smoke.test.js"
+    ],
+    "newSuiteAssertionsByFlow": {
+      "flow-01-new-user": 13,
+      "flow-02-real-telemetry": 17,
+      "flow-03-measured": 15,
+      "flow-04-reference-lap": 11,
+      "flow-05-vre": 8,
+      "flow-06-setup-experiment": 14,
+      "flow-07-driver-experiment": 8,
+      "flow-08-export-import": 14,
+      "flow-09-electron-smoke": 10
+    },
+    "newSuiteAssertionsTotal": 110,
+    "evidenceTier": "TIER 3 — Claude-verified on F2 branch HEAD; CI re-run on integrationSha is the authority."
+  },
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 2,
+    "reviewedCandidateSha": "8bcceec7bd7c81a2a3adcee5a413e7d923749a16",
+    "verdictEvidenceFile": "governance/r3.0f/codex-checkpoint-evidence/F2/round-2-8bcceec-PASS.raw.txt",
+    "verdictEvidenceSha256": "71b3d735f326c552c936645fc654dd9e475bd7e417c5de78f5a034288cf82b22",
+    "rounds": [
+      { "round": 1, "reviewedSha": "39a48744e33f5cec9d3e0d96bb942f06dd23431c", "verdict": "BLOCK", "findings": "3 BLOCK (F2-R1-01 selectReference negative paths; F2-R1-02 buildEngineerBrief authority gate; F2-R1-03 assertNoStaleCaseRef gate invocation)", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F2/round-1-prompt.md" },
+      { "round": 2, "reviewedSha": "8bcceec7bd7c81a2a3adcee5a413e7d923749a16", "verdict": "PASS", "findings": "0", "promptEvidence": "governance/r3.0f/codex-checkpoint-evidence/F2/round-2-prompt.md", "evidence": "governance/r3.0f/codex-checkpoint-evidence/F2/round-2-8bcceec-PASS.raw.txt" }
+    ]
+  },
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta", "engineer_brief", "experiment_loop", "case_timeline"],
+    "expectedRendererAdapter": false,
+    "note": "F2 does NOT touch the feature registry. R3.0C/D/E activations remain in their state."
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "crossPhaseGate": {
+    "r3eCheckpoint": "E5_ACTIVATION",
+    "requiredFor": "F2_E2E_AUTOMATION",
+    "satisfied": true,
+    "note": "R3.0E E5_ACTIVATION reached. F1 also merged at f143b9f. F2 may advance."
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "releaseRecord": null,
+  "note": "R3.0F F2 ships 9 logic-level E2E flow tests + a tiny defensive engine adjustment to align JSON-safety walker + serializer with JSON.stringify's omit-on-undefined-property-value rule (so R3.0B importBundle output with `schema: undefined` flows through the F1 pipeline). No new production module is added. No version bump. No tag, no release. PR ready to merge to feat/r3.0-integrated-delivery once Codex F2 PASS evidence is anchored. main remains 506012afea7b0296f2c1506cc77d4b39ffdf6ccb."
+}

@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0C",
+  "checkpoint": "C6_EXPORT",
+  "baseSha": "4d3f219ea5f7d9f260b531ca2af6f757114b1543",
+  "headSha": null,
+  "previousCheckpoint": "C5R_CP1_RETROFIT",
+
+  "shaSeparation": {
+    "note": "Per SKYLINE 2026-06-28 Continuous Delivery Master Directive, every checkpoint manifest preserves the three-way SHA separation. reviewedCandidateSha is the exact SHA Codex C6 review was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD. Substituting one for another is a tier violation.",
+    "reviewedCandidateSha": "48be2c0c9f515006113964bda4f018d20cf9fb39",
+    "reviewedCandidateNote": "The retrofit-branch HEAD where the formal Codex C6 adversarial review issued PASS (round 4). Anchored in governance/r3.0c/codex-checkpoint-evidence/C6/round-4-48be2c0-PASS.md with sha256 1ee819413f5ad1a8cfe8ab76968510febbdc52d3ca399591bff3e35b3308c962.",
+    "manifestCommitSha": null,
+    "manifestCommitNote": "Filled by a follow-up evidence-anchoring commit after integrationSha is known; mirrors the C5R convention.",
+    "integrationSha": null,
+    "integrationNote": "Filled only after the C6 branch-to-branch PR merges into feat/r3.0-integrated-delivery AND the Train target-context trusted-verification PASSes at that integration HEAD."
+  },
+
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
+    { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-track-identity.js", "capability": "track_identity_authoritative" },
+    { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-normalized-distance.js", "capability": "normalized_distance_present" },
+    { "path": "renderer/js/r3-0c-reference-selection.js", "capability": "reference_selection_present" },
+    { "path": "renderer/js/r3-0c-corner-segmentation.js", "capability": "corner_segmentation_present" },
+    { "path": "renderer/js/r3-0c-corner-pairing.js", "capability": "corner_pairing_present" },
+    { "path": "renderer/js/r3-0c-delta-metrics.js", "capability": "delta_metrics_present" },
+    { "path": "renderer/js/r3-0c-comparison-export.js", "capability": "comparison_export_present" }
+  ],
+
+  "newlyAuthorizedPath": "renderer/js/r3-0c-comparison-export.js",
+  "newlyEnabledCapability": "comparison_export_present",
+
+  "enabledCapabilitiesBefore": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present"],
+  "enabledCapabilitiesAfter": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present", "comparison_export_present"],
+  "forbiddenCapabilities": [
+    "ui_present",
+    "feature_registry_active"
+  ],
+
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3-0c-comparison-export.test.js",
+    "newSuiteAssertions": 63,
+    "evidenceTier": "TIER 3 — Claude-verified at the C6 branch HEAD; CI re-run on integrationSha is the authority for the Train target context."
+  },
+
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 4,
+    "verdictAt": "reviewedCandidateSha",
+    "reviewedCandidateSha": "48be2c0c9f515006113964bda4f018d20cf9fb39",
+    "verdictEvidenceFile": "governance/r3.0c/codex-checkpoint-evidence/C6/round-4-48be2c0-PASS.md",
+    "verdictBlockSha256": "1ee819413f5ad1a8cfe8ab76968510febbdc52d3ca399591bff3e35b3308c962",
+    "verdictHashesFile": "governance/r3.0c/codex-checkpoint-evidence/C6/verdict-hashes.txt",
+    "priorRoundEvidence": [
+      { "round": 1, "file": "governance/r3.0c/codex-checkpoint-evidence/C6/round-1-eff0d41.md", "sha": "eff0d41beb6b7262af104793544558cc15ec0f1f", "result": "BLOCK", "verdictBlockSha256": "50bdb9b2d0150ec92440c3eb1ff22f115e58cbd71271ea33bbafff270d363f07" },
+      { "round": 2, "file": "governance/r3.0c/codex-checkpoint-evidence/C6/round-2-2b6e568.md", "sha": "2b6e568d2b24b40ab68dc6b3a81a5f66c1f13e99", "result": "BLOCK", "verdictBlockSha256": "2d4f7c97d4cffc4459180b45bb4908b0bb200e49a624bc13579f2144cbf392cd" },
+      { "round": 3, "file": "governance/r3.0c/codex-checkpoint-evidence/C6/round-3-a87c7d5.md", "sha": "a87c7d580f7b290aaac4e6879a17b7665b692d81", "result": "BLOCK", "verdictBlockSha256": "65189ff8bcb1c2d9804e9b72de9d9b5757e51050b0a3f35f3edb4dbd95078706" }
+    ],
+    "codexToolchain": {
+      "cliVersion": "codex-cli 0.141.0",
+      "subAgentType": "codex:codex-rescue",
+      "subAgentId": "a22bd6ccbf8a9946d",
+      "host": "macOS Darwin 25.5.0 / Apple Silicon"
+    },
+    "evidenceTierDisclosure": "Per governance/r3.0c/codex-checkpoint-evidence/C6/README.md: TIER 1 (raw codex CLI stdout) NOT CAPTURED; TIER 2 (sub-agent relayed verdict block) and TIER 3 (Claude prompts + Claude-verified baseline values) ARE CAPTURED VERBATIM in the round-*.md files.",
+    "findingsClosed": ["F-C6-A1", "F-C6-A2", "F-C6-A3", "F-C6-A1-R2", "F-C6-A2-R2", "F-C6-A3-R2", "F-C6-A4"]
+  },
+
+  "exportContractSurface": {
+    "envelopeKeys": ["schemaIdentity", "schemaVersion", "generatedAt", "payload"],
+    "eligiblePayloadKeys": [
+      "comparisonStatus", "referenceLap", "comparisonLap", "association",
+      "cumulativeDelta", "corners", "metricAvailability",
+      "credibility", "confidence", "provenance",
+      "limitations", "blockers", "cannotConclude",
+      "alternativeExplanations", "nextValidationAction"
+    ],
+    "blockedPayloadKeys": ["comparisonStatus", "status", "reasonCodes", "limitations", "identity", "nextValidationAction"],
+    "forbiddenPayloadContents": [
+      "raw telemetry", "normalized grids", "per-sample traces", "channel arrays",
+      "full session objects", "IndexedDB keys", "filenames", "private paths",
+      "arbitrary user metadata", "reactive UI state",
+      "class instance", "Date / Map / Set / typed arrays",
+      "callback / function", "unbounded prose",
+      "the caller's complete result spread"
+    ],
+    "builderSteps": [
+      "1. validate result is shaped like a C5 service output (status + sign + identity)",
+      "2. validate association block (caseId / sessionId / track / layout / basis / direction)",
+      "3. validate non-empty generationToken",
+      "4. allowlist payload — only the directive-named fields",
+      "5. rebuild plain object from scratch — never spread the caller's result",
+      "6. apply bounded item caps + per-string + total UTF-8 byte caps (envelope contract)",
+      "7. validate the envelope (pre-serialize)",
+      "8. JSON.stringify the envelope (deterministic order)",
+      "9. JSON.parse the serialized string",
+      "10. re-validate the parsed envelope (round-trip determinism)"
+    ],
+    "staleResultGuard": "result.identity { caseId, sessionId } MUST match association.{caseId, sessionId}; mismatch fails closed with CROSS_CASE_COMPARISON_UNSUPPORTED / CROSS_SESSION_COMPARISON_UNSUPPORTED.",
+    "phaseGatePreservation": "PHASE_SCOPE_METRICS (entry/mid/exit_delta) are reported metricAvailability:false in the export while phase_boundary_contract.enabled is false (F6 governance gate carried from CP1R)."
+  },
+
+  "frozenDiff": 0,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "expectedRendererAdapter": false
+  },
+
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+
+  "note": "C6 Comparison Export. Adds ONE production capability (comparison_export_present) backed by renderer/js/r3-0c-comparison-export.js. The service is a closed-allowlist gateway: it validates input authority, rebuilds a plain payload from explicit allowlist fields (never spreads the caller's result), invokes contracts/r3.0c/comparison-export-contract.js for envelope construction + bounds, then JSON.serialize → parse → re-validate for deterministic round-trip equivalence. Stale-result guard: result.identity must match association. F6 governance gate preserved: phase metrics report metricAvailability:false until phase_boundary_contract.enabled becomes true. Blocked-result export contains only status / reasonCodes / limitations / identity / nextValidationAction — no fabricated metrics, no raw telemetry, no per-sample arrays, no exotic objects. No UI activation. No feature-registry change. C6 adversarial Codex review + Train target-context CI will fill the null SHA / verdict / artifact fields per the SHA-separation discipline before integration."
+}

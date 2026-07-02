@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0C",
+  "checkpoint": "C7_UI",
+  "baseSha": "9044a7f3c880d4d85dfaaca3d7cca9c0b124eaa9",
+  "headSha": "f0304ffc24d05d0f90abbffe368d5e4bcb1795ff",
+  "previousCheckpoint": "C6_EXPORT",
+
+  "shaSeparation": {
+    "note": "Per SKYLINE 2026-06-28 Continuous Delivery Master Directive, every checkpoint manifest preserves the three-way SHA separation. reviewedCandidateSha is the exact SHA Codex C7 review was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD. Substituting one for another is a tier violation.",
+    "reviewedCandidateSha": "f0304ffc24d05d0f90abbffe368d5e4bcb1795ff",
+    "reviewedCandidateNote": "Codex C7 adversarial review Round 7 against this exact SHA returned VERDICT: PASS on 2026-06-28T03:51:56Z. Six prior BLOCK rounds (Rounds 2/3/4/5/6 plus a proactive sister-site closure between R5 and R6) closed seven distinct issues: D1 (case-authenticity self-registration), J1 (browser wiring deferred), getter tri-state, init structured failure, R3 framing TOCTOU sanitized-snapshot, R4 C6 _allowlistFrame cascade, R5 exportComparison hostile-accessor escape, R6 viewmodel hostile-Proxy escape. Tier 1 raw stdout for all seven rounds persisted under governance/r3.0c/codex-checkpoint-evidence/C7/round-{2..7}-<sha>.md.",
+    "manifestCommitSha": null,
+    "integrationSha": null
+  },
+
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
+    { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-track-identity.js", "capability": "track_identity_authoritative" },
+    { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-normalized-distance.js", "capability": "normalized_distance_present" },
+    { "path": "renderer/js/r3-0c-reference-selection.js", "capability": "reference_selection_present" },
+    { "path": "renderer/js/r3-0c-corner-segmentation.js", "capability": "corner_segmentation_present" },
+    { "path": "renderer/js/r3-0c-corner-pairing.js", "capability": "corner_pairing_present" },
+    { "path": "renderer/js/r3-0c-delta-metrics.js", "capability": "delta_metrics_present" },
+    { "path": "renderer/js/r3-0c-comparison-export.js", "capability": "comparison_export_present" },
+    { "path": "renderer/js/r3-0c-comparison-orchestrator.js", "capability": "ui_present" },
+    { "path": "renderer/js/r3-0c-comparison-viewmodel.js", "capability": "ui_present" },
+    { "path": "renderer/js/i18n-comparisons.js", "capability": "ui_present" },
+    { "path": "renderer/js/r3-0c-contracts-bundle.js", "capability": "ui_present" }
+  ],
+
+  "newlyAuthorizedPaths": [
+    "renderer/js/r3-0c-comparison-orchestrator.js",
+    "renderer/js/r3-0c-comparison-viewmodel.js",
+    "renderer/js/i18n-comparisons.js",
+    "renderer/js/r3-0c-contracts-bundle.js"
+  ],
+  "newlyEnabledCapabilities": ["ui_present", "viewmodel_state_transition_contract", "framing_source_structured_contract"],
+
+  "enabledCapabilitiesBefore": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present", "comparison_export_present"],
+  "enabledCapabilitiesAfter": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present", "comparison_export_present", "ui_present", "viewmodel_state_transition_contract", "framing_source_structured_contract"],
+  "forbiddenCapabilities": [
+    "feature_registry_active"
+  ],
+
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3-0c-comparison-workspace.test.js",
+    "newSuiteAssertions": 111,
+    "newAdjacentSuiteForThisCheckpoint": "tests/r3-0c-contracts-bundle-equivalence.test.js",
+    "newAdjacentSuiteAssertions": 17,
+    "evidenceTier": "TIER 3 — Claude-verified on C7 branch HEAD; CI re-run on integrationSha is the authority for the Train target context. Browser runtime verification at the HTTP-served renderer/ layer additionally confirmed: 5 R3_0C_* globals registered, ALL_REASON_CODES.length=66, Comparison Workspace pane reachable with placeholder=idle on success, structured unavailable + UI_INITIALIZATION_FAILED on init failure, hostile-Proxy attacks against viewmodel mutators do not throw and never reach READY."
+  },
+
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+
+  "codexVerdict": {
+    "verdict": "PASS",
+    "round": 7,
+    "rounds": [
+      { "round": 2, "reviewedSha": "c51952aa1d7aa3a16d5e5ee14bee33e2ec94b46a", "verdict": "BLOCK", "evidence": "governance/r3.0c/codex-checkpoint-evidence/C7/round-2-c51952a.md", "blockers": ["C7-R2-A-01", "C7-R2-B-01", "C7-R2-C-01", "C7-R2-D-01"] },
+      { "round": 3, "reviewedSha": "ae039008addad384e27c66fb6bd524ab512666ff", "verdict": "BLOCK", "evidence": "governance/r3.0c/codex-checkpoint-evidence/C7/round-3-ae039008.md", "blockers": ["C7-R3-C-01"] },
+      { "round": 4, "reviewedSha": "fc6ff8f81629593d24c6af7e3274e89607c34ed7", "verdict": "BLOCK", "evidence": "governance/r3.0c/codex-checkpoint-evidence/C7/round-4-fc6ff8f8.md", "blockers": ["C7-R4-* (C6 _allowlistFrame Proxy TOCTOU)"] },
+      { "round": 5, "reviewedSha": "a1a6988e16f2b2e70d6c385c9239f395d3359d26", "verdict": "BLOCK", "evidence": "governance/r3.0c/codex-checkpoint-evidence/C7/round-5-a1a6988e.md", "blockers": ["C7-R5-01"] },
+      { "round": 6, "reviewedSha": "93506779c23fdd759178d506dbf95030daafd4cc", "verdict": "BLOCK", "evidence": "governance/r3.0c/codex-checkpoint-evidence/C7/round-6-93506779.md", "blockers": ["C7-R6-01"] },
+      { "round": 7, "reviewedSha": "f0304ffc24d05d0f90abbffe368d5e4bcb1795ff", "verdict": "PASS", "evidence": "governance/r3.0c/codex-checkpoint-evidence/C7/round-7-f0304ff.md", "blockers": [] }
+    ],
+    "finalBlockersClosed": [
+      "C7-R2-A-01 — D1 case authenticity self-registration",
+      "C7-R2-B-01 — J1 browser wiring deferred",
+      "C7-R2-C-01 — getter throw laundered as absent",
+      "C7-R2-D-01 — init failure silent",
+      "C7-R3-C-01 — framing Proxy descriptor TOCTOU",
+      "C7-R4-* — C6 _allowlistFrame cascade",
+      "C7-R5-01 — exportComparison hostile-accessor escape",
+      "C7-R6-01 — viewmodel public mutators hostile-Proxy escape"
+    ],
+    "tierDisclosure": "TIER 1 raw stdout captured for all rounds and persisted to repo under governance/r3.0c/codex-checkpoint-evidence/C7/. Codex was invoked via codex-cli 0.141.0 with -s read-only sandbox; some governance/full-suite re-runs inside Codex could not complete because the read-only sandbox denied mkdtemp / artifact writes, but every BLOCKER finding was reproducible from the descriptor / property layer; the candidate-side npm test was re-run by Claude after each fix and reported all green.",
+    "passNote": "Round 7 reported: hostile public surfaces all blocked, framing sanitized contract holds, D1 holds, J1 holds, governance 14/12, frozen=0, preset=501. No concrete residual C7-scope attack found."
+  },
+
+  "uiSurface": {
+    "paneTemplate": "renderer/index.html data-r3c-c7-pane=\"comparison-workspace\" region",
+    "stateAccessor": "app().comparisonVMState() — returns the viewmodel state or placeholder.idle default",
+    "scriptLoadOrder": [
+      "renderer/js/i18n-comparisons.js (after i18n-workspace, before i18n-ux0)",
+      "renderer/js/r3-0c-comparison-orchestrator.js (loaded by app() init when UMD globals available)",
+      "renderer/js/r3-0c-comparison-viewmodel.js (same)"
+    ],
+    "stateTransitionContract": "contracts/r3.0c/viewmodel-state-transition-contract.js",
+    "framingSourceContract": "contracts/r3.0c/framing-i18n-key-registry.js",
+    "phaseCardsBehavior": "Hidden by metricAvailability.entry_delta || mid_delta || exit_delta; viewmodel forces all three to false while phase_boundary_contract.enabled === false",
+    "exportButtonGate": "viewmodel exportGate predicate — disabled binding on the button + click-time recheck"
+  },
+
+  "scopeBoundary": {
+    "frozenFilesUntouched": true,
+    "r30bPersistenceUntouched": true,
+    "featureRegistryUnchanged": true,
+    "deferredFeatureIdsStillDeferred": ["case_comparison", "reference_lap", "corner_delta"],
+    "phaseBoundaryContractEnabled": false
+  },
+
+  "frozenDiff": 0,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "expectedRendererAdapter": false
+  },
+
+  "packageVersion": "1.4.0",
+  "createdAt": "2026-06-28T03:51:56Z",
+  "status": "candidate",
+  "governanceChanged": true,
+
+  "note": "C7 Comparison Workspace UI. Adds the ui_present production capability + flips the two CP1R-declared governance capabilities (viewmodel_state_transition_contract and framing_source_structured_contract) to enabled:true. Three new authorized renderer/js paths: r3-0c-comparison-orchestrator.js (request-token issuer + framing emitter), r3-0c-comparison-viewmodel.js (pure state machine implementing the 7 transition triggers + stale-token drop), i18n-comparisons.js (en/zh/ja closed wording table for FRAMING_I18N_KEY_REGISTRY). Two new contract modules: framing-i18n-key-registry.js + viewmodel-state-transition-contract.js. UI lives in renderer/index.html — the deferred comparisons placeholder is replaced with a real pane gated by showPane('comparisons'). Phase cards (entry/mid/exit_delta) are hidden by the viewmodel forcing metricAvailability=false while phase_boundary_contract.enabled === false. Three R3.0C feature IDs (case_comparison / reference_lap / corner_delta) REMAIN availability='deferred' — feature_registry_active is forbidden until C8. Frozen physics / R3.0B persistence schema / feature-registry: untouched."
+}

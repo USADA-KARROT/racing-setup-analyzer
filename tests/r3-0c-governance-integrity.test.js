@@ -10,7 +10,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const os = require('os');
+const H = require('./helpers/managed-temp-dir.js');
 const crypto = require('crypto');
 
 const REPO = path.resolve(__dirname, '..');
@@ -36,7 +36,7 @@ function chk(name, cond, detail) {
 }
 
 function runValidator(repoOverride) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-int-art-'));
+  const tmp = H.acquireTempDir('r3c-int-art-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp });
   if (repoOverride) env.R3_0C_INTEGRITY_REPO_OVERRIDE = repoOverride;
   const r = cp.spawnSync('node', [SCRIPT], { cwd: REPO, encoding: 'utf8', env });
@@ -80,8 +80,8 @@ function hasViolation(art, code) { return !!(art && Array.isArray(art.violations
 
 // ── C. bundleSha256 is deterministic for identical content ──
 (() => {
-  const fixA = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-int-fixA-'));
-  const fixB = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-int-fixB-'));
+  const fixA = H.acquireTempDir('r3c-int-fixA-');
+  const fixB = H.acquireTempDir('r3c-int-fixB-');
   copyRequiredInto(fixA); copyRequiredInto(fixB);
   const a = runValidator(fixA);
   const b = runValidator(fixB);
@@ -90,7 +90,7 @@ function hasViolation(art, code) { return !!(art && Array.isArray(art.violations
 
 // ── D. bundleSha256 changes when any file content changes ──
 (() => {
-  const fix = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-int-fix-'));
+  const fix = H.acquireTempDir('r3c-int-fix-');
   copyRequiredInto(fix);
   const before = runValidator(fix);
   fs.writeFileSync(path.join(fix, 'governance', 'r3.0c', 'state.json'),
@@ -101,7 +101,7 @@ function hasViolation(art, code) { return !!(art && Array.isArray(art.violations
 
 // ── E. missing required file fails closed ──
 (() => {
-  const fix = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-int-miss-'));
+  const fix = H.acquireTempDir('r3c-int-miss-');
   copyRequiredInto(fix);
   fs.unlinkSync(path.join(fix, 'governance', 'r3.0c', 'schema.json'));
   const r = runValidator(fix);
@@ -113,7 +113,7 @@ function hasViolation(art, code) { return !!(art && Array.isArray(art.violations
 
 // ── F. extra checkpoint manifests are inventoried (visibility) ──
 (() => {
-  const fix = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-int-extra-'));
+  const fix = H.acquireTempDir('r3c-int-extra-');
   copyRequiredInto(fix);
   fs.writeFileSync(path.join(fix, 'governance', 'r3.0c', 'checkpoints', 'C1.json'), JSON.stringify({ schemaVersion: 1, program: 'R3.0C', checkpoint: 'C1_PRODUCTION_ADAPTER', status: 'pending' }, null, 2));
   const r = runValidator(fix);
@@ -127,5 +127,6 @@ function hasViolation(art, code) { return !!(art && Array.isArray(art.violations
   chk('G1 real-repo exit==0 when ok==true', (r.status === 0) === !!(r.artifact && r.artifact.ok === true));
 })();
 
+H.cleanupAll();
 console.log('r3-0c-governance-integrity: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

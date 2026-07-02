@@ -1,0 +1,135 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0D",
+  "checkpoint": "D4_PRIORITY_ENGINE",
+  "baseSha": "6ab8f390b0128bbee4df77f88fa2edd46df6b677",
+  "headSha": null,
+  "previousCheckpoint": "D3_HYPOTHESIS_ENGINE",
+
+  "shaSeparation": {
+    "note": "Per SKYLINE 2026-06-28 R3.0 Final Continuous Execution Directive §7 + 2026-06-29 R3.0 Continuous Resume Directive §12, every checkpoint manifest preserves the three-way SHA separation. reviewedCandidateSha is the exact SHA Codex D4 review was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD.",
+    "reviewedCandidateSha": "c81a479b4ab93578a30368bf3ec712c78f67b867",
+    "reviewedCandidateNote": "Codex D4 R6 reviewed this exact SHA on feat/r3.0d-d4-priority-engine and issued FINAL VERDICT: PASS (2026-06-29). Round 1..6 lineage at governance/r3.0d/codex-checkpoint-evidence/D4/round-{1..6}-<sha>.raw.txt. 19 distinct adversarial findings closed across 6 rounds (D4-R1-01..06, D4-R2-01..05, D4-R3-01..03, D4-R4-01..03, D4-R5-01..02). Architectural milestones: layered authority (frozen-input → recursive descriptor audit → structuredClone defang → post-clone audit → WeakSet identity attestation via captured Reflect.apply on captured WeakSet.prototype methods → D2-invariant revalidation + closed schema + contentSignature recompute integrity + hypothesisSetId recompute → mandatory freshness post-clock → two-pass priority resolution with finalized kind/tier/priorityId → fixed priority ladder enforcement). Producer attestation model: D3 sole producer + D4 verifier/consumer + caller cannot forge (closure-private WeakSet, narrow verifier-only export). Clock invoked AT MOST ONCE post-authority. Array fallback removal verified via paired baseline/mutant harness.",
+    "manifestCommitSha": null,
+    "manifestCommitNote": "Filled by the same follow-up evidence-anchoring commit; mirrors D1/D2/D3 convention.",
+    "integrationSha": null,
+    "integrationNote": "Filled only after the D4 branch-to-branch PR merges into feat/r3.0-integrated-delivery AND the Train target-context trusted-verification PASSes."
+  },
+
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0d-evidence-graph.js", "capability": "evidence_graph_present" },
+    { "path": "renderer/js/r3-0d-hypothesis-engine.js", "capability": "hypothesis_engine_present" },
+    { "path": "renderer/js/r3-0d-priority-engine.js", "capability": "priority_engine_present" }
+  ],
+  "newlyAuthorizedPath": "renderer/js/r3-0d-priority-engine.js",
+  "newlyEnabledCapability": "priority_engine_present",
+
+  "enabledCapabilitiesBefore": ["contract_foundation_present", "evidence_graph_present", "hypothesis_engine_present"],
+  "enabledCapabilitiesAfter": ["contract_foundation_present", "evidence_graph_present", "hypothesis_engine_present", "priority_engine_present"],
+  "forbiddenCapabilities": ["engineer_brief_present", "feature_registry_active"],
+
+  "contractEnforcements": {
+    "priorityEngineScope": "renderer/js/r3-0d-priority-engine.js consumes ONLY a D3-authoritative Hypothesis Set snapshot validated via PRODUCER ATTESTATION (Codex D4 R3 D4-R3-02 closure). D3 holds a closure-private WeakSet `_authoritativeHypothesisSets` and registers only fully-validated, fully-deep-frozen snapshots inside `buildHypothesisSet`. D3 exposes ONLY the narrow verifier `verifyAuthoritativeHypothesisSet(candidate) → boolean` — never the registry, never a register function, never a sign function, never a raw secret. D4 calls the verifier as the FIRST authority check; clones / JSON round-trips / hand-forged frozen objects with matching hashes all fail because they are different object references. contentSignature + hypothesisSetId remain as INTEGRITY/determinism proofs (defense-in-depth), NOT authority. Caller cannot forge identity even by recomputing both public FNV hashes. Authority verified via a layered model: (a) frozen-input via captured Object.isFrozen; (b) top-level descriptor audit BEFORE clone — rejects accessor descriptors / Symbol keys / non-enumerable on input.hypothesisSet (Codex D4 R1 D4-R1-02 closure); (c) HI.safeStructuredClone defang; (d) post-clone HI.deepOriginalShapeAudit + closed key set check on hypothesisSet (HSET_KEYS_ALLOWED 14 keys); (e) hypothesisSetId FNV-1a 32-bit×2 recompute equality (byte-equivalent to D3 hash); (f) per-hypothesis closed-schema revalidation (Codex D4 R1 D4-R1-01/03 closure) — closed key set (HYPOTHESIS_KEYS_ALLOWED 16 keys), hypothesisId grammar pri_<16hex>, hypothesisId RECOMPUTE equality from (ruleId, supportingIds, contradictingIds) binding the evidence references, ruleId must exist in HE.RULE_REGISTRY, category === rule.category, i18nKey === rule.i18nKey, credibility ≥ rule.minConclusionCredibility, status ∈ HYPOTHESIS_STATUS_ALLOWED {supported, contradicted, inconclusive, blocked}, confidence.state ∈ CONFIDENCE_STATE_ALLOWED {not_computed, insufficient_evidence, low, moderate, high}, confidence.score ∈ [0,100] integer, supporting/contradictingEvidenceIds non-empty strings + cap 64, limitations all valid reason codes + cap 32, cross-field consistency (status=contradicted ⟹ contradictingEvidenceIds.length>0; status=supported ⟹ supportingEvidenceIds.length>0); (g) mandatory freshness reference time via opts.clock() OR opts.referenceNowMs; (h) input + opts descriptor-only snapshot rejecting Symbol/non-enumerable/accessor/function fields — opts.clock MUST be a data descriptor (Codex D4 R1 D4-R1-02 closure); (i) deep-frozen output.",
+    "fixedPriorityLadder": "Hard-coded ladder: (1) fix_data_quality (tier 1) → (2) recalibrate_channel (tier 2) → (3) controlled_repeat_lap (tier 3) → (4) driver_experiment (tier 4) → (5) setup_experiment (tier 5) → collect_additional_session/lap (tier 6) → no_action_required (tier 7). Order MUST NOT be reversed. Within same tier: confidence.score desc, then hypothesisId asc.",
+    "categoryToKindMapping": "data_quality → fix_data_quality; mapping_calibration → recalibrate_channel; driver_behaviour → controlled_repeat_lap; vehicle_response → controlled_repeat_lap; setup_model → setup_experiment (with downgrade to controlled_repeat_lap if not eligibleAsSetupExperiment).",
+    "closedKindEnum": "PRIORITY_KIND_ALLOWED matches D1 hypothesis-contract.VALIDATION_ACTION_KIND_ALLOWED {fix_data_quality, recalibrate_channel, controlled_repeat_lap, driver_experiment, setup_experiment, collect_additional_session, collect_additional_lap, no_action_required}.",
+    "blockingPrerequisites": "Each priority entry lists blockingPrerequisiteIds — IDs of all higher-priority (lower tier number) priorities whose hypothesis has supportable evidence (credibility ≥ Derived AND status not contradicted/blocked). A priority with non-empty blockingPrerequisiteIds cannot become primary. Codex D4 R1 D4-R1-04 closure: TWO-PASS computation — finalize each priority's kind / tier / priorityId FIRST (applying setup_experiment→controlled_repeat_lap downgrade), THEN compute prerequisite IDs against the FINAL priorityIds. This eliminates dangling prerequisite references that occurred when blocking IDs were computed from preliminary (pre-downgrade) kinds.",
+    "primaryEligibility": "primaryActionId points to the highest-rank priority that is eligibleAsPrimary AND has zero blocking prerequisites. eligibleAsPrimary requires: credibility ≥ Derived; status NOT contradicted/blocked; confidence.state ∈ {moderate, high}. setup_experiment additionally requires confidence.state === 'high' + zero contradictions + credibility ≥ Derived (per directive §12 'unsupported setup actions' forbidden — downgraded to controlled_repeat_lap otherwise).",
+    "rollbackRequired": "Every priority entry carries stopConditionI18nKey + rollbackConditionI18nKey. No irreversible action emitted without explicit rollback.",
+    "noAutoMode": "D4 emits descriptive priorities only. NO apply_mode field. NO auto_tuning / auto_setup / auto_calibration / auto_preset (these are D4 FORBIDDEN per directive §10/§12).",
+    "noLLM": "Deterministic. No LLM call. No runtime config.",
+    "noUI": "No DOM mutation, no Alpine binding, no index.html script src. UI is D5_ENGINEER_BRIEF_ACTIVATION.",
+    "hardenedIntrinsicsEnforced": "All ambient calls go through HI. Module-init captures: Object.isFrozen, Date.parse, Object.is. Hash byte-equivalent to D2/D3 (FNV-1a 32-bit×2). Apply D3 R1-R7 lessons proactively (27 known attack patterns avoided).",
+    "deterministicOutput": "Same input Hypothesis Set produces identical prioritySetId, identical priorityIds, identical ranks, identical limitations, identical blockingPrerequisiteIds. Clock-independent for IDs; clock-dependent only for createdAt.",
+    "caps": "PRIORITY_COUNT_CAP=128, PREREQ_ID_PER_PRIORITY_CAP=32, LIMITATIONS_PER_PRIORITY_CAP=32, SNAPSHOT_LIMITATIONS_CAP=64, SNAPSHOT_CANNOT_CONCLUDE_CAP=64, ENVELOPE_BYTE_CAP=512 KiB, INPUT_HYPOTHESES_INPUT_CAP=64 (mirror D3 HYPOTHESIS_COUNT_CAP). generationToken ≤ 128 chars; contextVersion ≤ 128 chars.",
+    "outerTryCatch": "buildPrioritySet wrapped in outer try/catch → INTERNAL_CONTRACT_VIOLATION on any uncaught throw.",
+    "errorDetailPrivacy": "Codex D4 R1 D4-R1-05 closure: fail-closed `detail` strings NEVER echo caller-supplied key names verbatim. A path-like key (e.g. `/Users/x/private.csv`) used as an input own key is reported as 'unknown input own key' — no caller content reaches the output. This applies to input wrapper own-key violations and opts own-key violations alike."
+  },
+
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3.0d-priority-engine.test.js",
+    "newSuiteAssertions": 111,
+    "additionalSuites": {
+      "r3.0d-contract-foundation": { "path": "tests/r3.0d-contract-foundation.test.js", "assertions": 160, "purpose": "D1 contract foundation (unchanged at D4)" },
+      "r3.0d-hardened-intrinsics": { "path": "tests/r3.0d-hardened-intrinsics.test.js", "assertions": 75, "purpose": "HI wrappers (unchanged at D4)" },
+      "r3.0d-evidence-graph": { "path": "tests/r3.0d-evidence-graph.test.js", "assertions": 261, "purpose": "D2 evidence graph (unchanged at D4)" },
+      "r3.0d-hypothesis-engine": { "path": "tests/r3.0d-hypothesis-engine.test.js", "assertions": 158, "purpose": "D3 hypothesis engine (unchanged at D4)" }
+    },
+    "evidenceTier": "TIER 3 — Claude-verified on D4 branch HEAD; CI re-run on integrationSha is the authority."
+  },
+
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 6,
+    "reviewedCandidateSha": "c81a479b4ab93578a30368bf3ec712c78f67b867",
+    "verdictEvidenceFile": "governance/r3.0d/codex-checkpoint-evidence/D4/round-6-c81a479.raw.txt",
+    "rounds": [
+      { "round": 1, "reviewedSha": "3a7a33e", "verdict": "BLOCK", "findings": "5 BLOCK + 1 NIT (D4-R1-01..06)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D4/round-1-3a7a33e.raw.txt" },
+      { "round": 2, "reviewedSha": "f09323d", "verdict": "BLOCK", "findings": "3 BLOCK + 2 NIT (D4-R2-01..05)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D4/round-2-f09323d.raw.txt" },
+      { "round": 3, "reviewedSha": "4ed1e35", "verdict": "BLOCK", "findings": "2 BLOCK + 1 NIT (D4-R3-01..03)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D4/round-3-4ed1e35.raw.txt" },
+      { "round": 4, "reviewedSha": "08bb063", "verdict": "BLOCK", "findings": "2 BLOCK + 1 NIT (D4-R4-01..03)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D4/round-4-08bb063.raw.txt" },
+      { "round": 5, "reviewedSha": "146ca99", "verdict": "BLOCK", "findings": "1 BLOCK + 1 NIT (D4-R5-01..02)", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D4/round-5-146ca99.raw.txt" },
+      { "round": 6, "reviewedSha": "c81a479", "verdict": "PASS", "findings": "0 BLOCK + 0 NIT", "evidence": "governance/r3.0d/codex-checkpoint-evidence/D4/round-6-c81a479.raw.txt", "summary": "Reviewed c81a479. R5-01 direct verifier returned false + zero Proxy traps in both verifier and D4 paths. R5-02 paired baseline/mutant harness: baseline rejected malformed D3 with HYPOTHESIS_INVALID; mutant accepted (proves array check is load-bearing). Order remains authority/schema → clock → freshness → computation → materialization. D3 158/0; D4 111/0. Genuine D3→D4 pipeline emitted valid PrioritySet. Stable contentSignature + hsetId. No WeakSet/register/sign/secret exports." }
+    ]
+  },
+
+  "scopeBoundary": {
+    "frozenFilesUntouched": true,
+    "r30bPersistenceUntouched": true,
+    "r30cContractsUntouched": true,
+    "r30cProductionUntouched": true,
+    "featureRegistryUnchanged": true,
+    "indexHtmlUnchanged": true,
+    "noR30dFeatureIdInRegistry": true,
+    "runtimeConsumerCount": 3,
+    "productionPathCount": 3,
+    "algorithmCount": 3,
+    "uiSurfaceCount": 0
+  },
+
+  "frozenDiff": 0,
+  "productionDiff": 1,
+  "runtimeConsumerCount": 3,
+
+  "featureRegistryState": {
+    "expectedDeferredIds": ["decision_engine", "hypothesis", "engineer_brief"],
+    "expectedRendererAdapter": false,
+    "note": "D4 does NOT register any R3.0D feature ID. Feature Registry activation is exclusively D5_ENGINEER_BRIEF_ACTIVATION."
+  },
+
+  "crossPhaseGate": {
+    "r3cCheckpoint": "C8_ACTIVATION",
+    "requiredFor": "D4_PRIORITY_ENGINE",
+    "satisfied": true,
+    "note": "R3.0C state.currentCheckpoint === 'C8_ACTIVATION' verified."
+  },
+
+  "packageVersion": "1.4.0",
+  "createdAt": "2026-06-29T07:50:00Z",
+
+  "status": "candidate",
+  "governanceChanged": true,
+
+  "changedFiles": [
+    "renderer/js/r3-0d-priority-engine.js",
+    "tests/r3.0d-priority-engine.test.js",
+    "governance/r3.0d/checkpoints/D4.json",
+    "governance/r3.0d/state.json",
+    "governance/r3.0/train.json",
+    "package.json",
+    "governance/r3.0d/codex-checkpoint-evidence/D4/round-1-3a7a33e.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D4/round-2-f09323d.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D4/round-3-4ed1e35.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D4/round-4-08bb063.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D4/round-5-146ca99.raw.txt",
+    "governance/r3.0d/codex-checkpoint-evidence/D4/round-6-c81a479.raw.txt"
+  ],
+  "changedFilesNote": "Computed from baseSha (6ab8f39, D3 merge) → D4 candidate HEAD diff. Adds: (1) renderer/js/r3-0d-priority-engine.js — production module (~600 lines, all HI-wrapped, D3 R1-R7 lessons applied proactively, layered authority + multi-set semantics consistent with D2/D3, deep-frozen output); (2) tests/r3.0d-priority-engine.test.js — 53-assertion adversarial suite (sections A-N covering functional, structural, authority, scope, ladder, blocking prereqs, primary eligibility, security, privacy, HI wrapper mutation matrix, output immutability, mandatory freshness, closed kind enum, forbidden behaviors); (3) D4.json manifest; (4) state.json + train.json transitions to D4_PRIORITY_ENGINE.",
+
+  "note": "R3.0D D4_PRIORITY_ENGINE — Priority Engine module consumes D3 Hypothesis Set and emits deep-frozen Priority Set with fixed ladder (data_quality → mapping → driver_experiment → setup_experiment). Capability priority_engine_present is enabled; uiAllowed + featureRegistryActivationAllowed remain false (D5)."
+}

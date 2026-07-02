@@ -1,12 +1,23 @@
 {
   "schemaVersion": 1,
   "program": "R3.0D",
-  "currentCheckpoint": "D0_BOOTSTRAP",
-  "authorizedProductionPaths": [],
-  "enabledCapabilities": [],
-  "runtimeConsumersAllowed": false,
-  "uiAllowed": false,
-  "featureRegistryActivationAllowed": false,
-  "algorithmsAllowed": false,
-  "note": "R3.0D Integrated Delivery Governance state. D0 BOOTSTRAP fixes every production switch OFF. authorizedProductionPaths is intentionally empty; enabledCapabilities is intentionally empty. The four *Allowed flags are intentionally false. R3.0D introduces NO Feature Registry IDs at D0 — feature IDs (decision_engine / hypothesis / engineer_brief) are reserved for D5_ACTIVATION and are deliberately absent from renderer/js/feature-registry.js. Mutating any field above the D0 baseline requires a separately-authorized Integrated Delivery Train checkpoint AND requires R3.0C state.currentCheckpoint === 'C8_ACTIVATION' per cross-phase rule."
+  "currentCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+  "authorizedProductionPaths": [
+    { "path": "renderer/js/r3-0d-evidence-graph.js", "capability": "evidence_graph_present" },
+    { "path": "renderer/js/r3-0d-hypothesis-engine.js", "capability": "hypothesis_engine_present" },
+    { "path": "renderer/js/r3-0d-priority-engine.js", "capability": "priority_engine_present" },
+    { "path": "renderer/js/r3-0d-engineer-brief.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/r3-0d-engineer-viewmodel.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/r3-0d-engineer-orchestrator.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/r3-0d-engineer-ui.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/i18n-r3-0d.js", "capability": "engineer_brief_present" },
+    { "path": "renderer/js/r3-0d-contracts-bundle.js", "capability": "contract_foundation_present" },
+    { "path": "renderer/js/feature-registry.js", "capability": "feature_registry_active" }
+  ],
+  "enabledCapabilities": ["contract_foundation_present", "evidence_graph_present", "hypothesis_engine_present", "priority_engine_present", "engineer_brief_present", "feature_registry_active"],
+  "runtimeConsumersAllowed": true,
+  "uiAllowed": true,
+  "featureRegistryActivationAllowed": true,
+  "algorithmsAllowed": true,
+  "note": "R3.0D D5_ENGINEER_BRIEF_ACTIVATION state. engineer_brief_present unlocks renderer/js/r3-0d-engineer-brief.js + r3-0d-engineer-viewmodel.js + r3-0d-engineer-orchestrator.js + r3-0d-engineer-ui.js + i18n-r3-0d.js as authorized production paths. feature_registry_active is enabled: feature-registry.js NOW carries NAV_NODE 'case:engineer_brief' + FEATURE 'engineer_brief' (case_scoped, available_conditional). uiAllowed + featureRegistryActivationAllowed transition to true — both scoped to the engineer_brief feature only. R3.0E (E1..E5) and R3.0F remain FORBIDDEN. R3.0B portable schema + R3.0C contracts/production untouched. Mutating any state field above D5 requires R3.0E E1_EXPERIMENT_CONTRACTS authorization, which itself requires D5_ENGINEER_BRIEF_ACTIVATION to be the current checkpoint AND R3.0C state.currentCheckpoint === 'C8_ACTIVATION' per cross-phase rule. The D3+D4 producer-attestation chain (closure-private WeakSet identity attestation, captured Reflect.apply on captured WeakSet.prototype methods) extends to D5 via PE.verifyAuthoritativePrioritySet + EB.verifyAuthoritativeEngineerBrief + VM.verifyAuthoritativeEngineerViewModel."
 }

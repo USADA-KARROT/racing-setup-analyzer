@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0C",
+  "checkpoint": "C4_REFERENCE_AND_CORNER",
+  "baseSha": "df19405bb94a368cf86c0234e504e4de9f2e373a",
+  "headSha": null,
+  "previousCheckpoint": "C3_NORMALIZED_DISTANCE",
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
+    { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-track-identity.js", "capability": "track_identity_authoritative" },
+    { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-normalized-distance.js", "capability": "normalized_distance_present" },
+    { "path": "renderer/js/r3-0c-reference-selection.js", "capability": "reference_selection_present" },
+    { "path": "renderer/js/r3-0c-corner-segmentation.js", "capability": "corner_segmentation_present" },
+    { "path": "renderer/js/r3-0c-corner-pairing.js", "capability": "corner_pairing_present" }
+  ],
+  "enabledCapabilitiesBefore": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present"],
+  "enabledCapabilitiesAfter": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present"],
+  "forbiddenCapabilities": [
+    "delta_metrics_present",
+    "comparison_export_present",
+    "ui_present",
+    "feature_registry_active"
+  ],
+  "changedFiles": [
+    "contracts/r3.0c/reason-codes.js",
+    "contracts/r3.0c/reference-and-corner-contract.js",
+    "contracts/r3.0c/index.js",
+    "renderer/js/r3-0c-reference-selection.js",
+    "renderer/js/r3-0c-corner-segmentation.js",
+    "renderer/js/r3-0c-corner-pairing.js",
+    "renderer/js/r3-0c-comparison-adapter.js",
+    "governance/r3.0c/state.json",
+    "governance/r3.0c/checkpoints/C4.json",
+    "governance/r3.0/train.json",
+    "tests/r3.0c-contract-foundation.test.js",
+    "tests/r3-0c-comparison-adapter.test.js",
+    "tests/r3-0c-reference-selection.test.js",
+    "tests/r3-0c-corner-segmentation.test.js",
+    "tests/r3-0c-corner-pairing.test.js",
+    "tests/r3-0c-governance.test.js",
+    "tests/r3-0c-no-consumer.test.js",
+    "package.json"
+  ],
+  "tests": null,
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": null,
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "expectedRendererAdapter": false
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "note": "C4 reference-and-corner: three new renderer/js production services (reference-selection, corner-segmentation, corner-pairing) plus a new contract module (contracts/r3.0c/reference-and-corner-contract.js, registered in index.js). Sixteen new reason codes split the reference / corner-segmentation / corner-pairing / corner-confirmation refusal semantics (35 → 51 total). Three new capabilities (reference_selection_present, corner_segmentation_present, corner_pairing_present) unlocked at C4_REFERENCE_AND_CORNER. Reference-selection refuses any non-user selection mode per the scope pin (governance/r3.0/train.schema.json :: referenceSelectionPolicy.explicitUserSelectionOnly === true) and refuses caller-forged authoritative flags lacking lapId/sourceId/selectedAt. Corner segmentation is a deterministic data-driven PROPOSAL with full-vs-reduced authority tiers, fingerprint identities (algorithmVersion + rounded normalized start/end), short/overlapping/wrap-spanning candidate fail-closed, and applyUserConfirmation that lifts ONLY proposal authority (telemetry credibility never upgraded — CORNER_CONFIRMATION_CANNOT_UPGRADE_TELEMETRY). Corner pairing requires ≥50% normalized overlap, refuses ordinal pairing and one-to-many ambiguity, surfaces partial coverage (<80%) as a limitation. Adapter gains pure-passthrough selectReference / segmentCorners / applyCornerUserConfirmation / pairCorners / referenceAndCornerForbiddenSelectionModes. State-aware validators (scripts/check-r3-0c-no-consumer.js, scripts/check-r3-0c-guard.js) generalised at C1 automatically extend allowance to the three new renderer/js paths — NO validator weakening at C4. The trusted-verification artifact bound to headSha is the PASS authority; headSha / workflowRunId / artifactId / artifactBoundSha / codexVerdict / createdAt are intentionally null in-commit."
+}

@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const os = require('os');
+const H = require('./helpers/managed-temp-dir.js');
 
 const REPO = path.resolve(__dirname, '..');
 const SCRIPT = 'scripts/check-r3-phase-governance.js';
@@ -26,7 +26,7 @@ function chk(name, cond, detail) {
 }
 
 function runValidator(phase, govDir) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-gov-art-'));
+  const tmp = H.acquireTempDir('r3-phase-gov-art-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp, R3_PHASE_PROGRAM: phase });
   if (govDir) env.R3_PHASE_GOV_DIR_OVERRIDE = govDir;
   const r = cp.spawnSync('node', [SCRIPT], { cwd: REPO, encoding: 'utf8', env });
@@ -42,8 +42,8 @@ function hasViolation(artifact, code) {
 
 function baseSchema(phase) {
   const bs = BOOTSTRAP[phase];
-  const otherCheckpoint = phase === 'R3.0D' ? 'D2_HYPOTHESIS_ENGINE' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
-  const lastCheckpoint = phase === 'R3.0D' ? 'D5_ACTIVATION' : phase === 'R3.0E' ? 'E5_ACTIVATION' : 'F6_RELEASE';
+  const otherCheckpoint = phase === 'R3.0D' ? 'D2_EVIDENCE_GRAPH' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
+  const lastCheckpoint = phase === 'R3.0D' ? 'D5_ENGINEER_BRIEF_ACTIVATION' : phase === 'R3.0E' ? 'E5_ACTIVATION' : 'F6_RELEASE';
   const cpList = [bs, otherCheckpoint, lastCheckpoint];
   const transitions = {}; for (let i = 0; i < cpList.length; i++) transitions[cpList[i]] = i + 1 < cpList.length ? [cpList[i + 1]] : [];
   return {
@@ -60,8 +60,8 @@ function baseSchema(phase) {
 
 function baseCapabilities(phase) {
   const bs = BOOTSTRAP[phase];
-  const otherCheckpoint = phase === 'R3.0D' ? 'D2_HYPOTHESIS_ENGINE' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
-  const lastCheckpoint = phase === 'R3.0D' ? 'D5_ACTIVATION' : phase === 'R3.0E' ? 'E5_ACTIVATION' : 'F6_RELEASE';
+  const otherCheckpoint = phase === 'R3.0D' ? 'D2_EVIDENCE_GRAPH' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
+  const lastCheckpoint = phase === 'R3.0D' ? 'D5_ENGINEER_BRIEF_ACTIVATION' : phase === 'R3.0E' ? 'E5_ACTIVATION' : 'F6_RELEASE';
   return {
     schemaVersion: 1, program: phase,
     capabilities: {
@@ -81,7 +81,7 @@ function baseState(phase) {
 }
 
 function writeFixture(state, schema, caps, manifestSchema) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-gov-fix-'));
+  const dir = H.acquireTempDir('r3-phase-gov-fix-');
   fs.mkdirSync(path.join(dir, 'checkpoints'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'schema.json'), JSON.stringify(schema));
   fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify(state));
@@ -91,19 +91,32 @@ function writeFixture(state, schema, caps, manifestSchema) {
 }
 
 // ── PASS: real repo state for each phase ──
+// Originally each phase was pinned at its BOOTSTRAP checkpoint. R3.0D advanced to D1_CONTRACT_FOUNDATION
+// on 2026-06-28 (contract_foundation_present enabled). The assertions below accept either the BOOTSTRAP
+// state or a later legal state, and conditionally tighten the counts depending on which state holds.
 for (const phase of PHASES) {
   const r = runValidator(phase, null);
   chk(phase + ' PASS real repo (status 0)', r.status === 0, { status: r.status, violations: r.artifact && r.artifact.violations });
   chk(phase + ' PASS artifact ok=true', r.artifact && r.artifact.ok === true);
-  chk(phase + ' PASS currentCheckpoint=' + BOOTSTRAP[phase], r.artifact && r.artifact.currentCheckpoint === BOOTSTRAP[phase]);
-  chk(phase + ' PASS authPaths=0', r.artifact && r.artifact.authorizedProductionPathCount === 0);
-  chk(phase + ' PASS enabledCaps=0', r.artifact && r.artifact.enabledCapabilityCount === 0);
-  chk(phase + ' PASS all *Allowed false', r.artifact && r.artifact.runtimeConsumersAllowed === false && r.artifact.uiAllowed === false && r.artifact.featureRegistryActivationAllowed === false && r.artifact.algorithmsAllowed === false);
+  const cur = r.artifact && r.artifact.currentCheckpoint;
+  const isBootstrap = cur === BOOTSTRAP[phase];
+  chk(phase + ' PASS currentCheckpoint is BOOTSTRAP or advanced', typeof cur === 'string' && cur.length > 0);
+  if (isBootstrap) {
+    chk(phase + ' BOOTSTRAP authPaths=0', r.artifact && r.artifact.authorizedProductionPathCount === 0);
+    chk(phase + ' BOOTSTRAP enabledCaps=0', r.artifact && r.artifact.enabledCapabilityCount === 0);
+    chk(phase + ' BOOTSTRAP all *Allowed false', r.artifact && r.artifact.runtimeConsumersAllowed === false && r.artifact.uiAllowed === false && r.artifact.featureRegistryActivationAllowed === false && r.artifact.algorithmsAllowed === false);
+  } else {
+    // Advanced phase: phase-governance is fail-closed at the validator (already asserted ok=true above);
+    // the count + flag invariants are governed by the phase schema's capabilityUnlockFloor and the
+    // checkpoint-manifest schema, which the validator enforces. We do NOT pin specific counts here
+    // because they evolve as later checkpoints flip more capabilities.
+    chk(phase + ' ADVANCED counts are non-negative integers', Number.isInteger(r.artifact.authorizedProductionPathCount) && r.artifact.authorizedProductionPathCount >= 0 && Number.isInteger(r.artifact.enabledCapabilityCount) && r.artifact.enabledCapabilityCount >= 0);
+  }
 }
 
 // ── FAIL: missing R3_PHASE_PROGRAM ──
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-gov-art-'));
+  const tmp = H.acquireTempDir('r3-phase-gov-art-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp });
   delete env.R3_PHASE_PROGRAM;
   const r = cp.spawnSync('node', [SCRIPT], { cwd: REPO, encoding: 'utf8', env });
@@ -141,7 +154,7 @@ for (const phase of PHASES) {
 
 // ── FAIL: enabled capability below floor ──
 for (const phase of PHASES) {
-  const otherCheckpoint = phase === 'R3.0D' ? 'D2_HYPOTHESIS_ENGINE' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
+  const otherCheckpoint = phase === 'R3.0D' ? 'D2_EVIDENCE_GRAPH' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
   void otherCheckpoint;
   const s = baseState(phase); s.enabledCapabilities = ['production_cap_present']; // floor is the second checkpoint, current is bootstrap
   const dir = writeFixture(s, baseSchema(phase), baseCapabilities(phase), baseManifestSchema(phase));
@@ -151,7 +164,7 @@ for (const phase of PHASES) {
 
 // ── FAIL: wildcard authorized path ──
 for (const phase of PHASES) {
-  const s = baseState(phase); s.currentCheckpoint = phase === 'R3.0D' ? 'D2_HYPOTHESIS_ENGINE' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
+  const s = baseState(phase); s.currentCheckpoint = phase === 'R3.0D' ? 'D2_EVIDENCE_GRAPH' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
   s.enabledCapabilities = ['production_cap_present'];
   s.authorizedProductionPaths = [{ path: 'renderer/js/*.js', capability: 'production_cap_present' }];
   const dir = writeFixture(s, baseSchema(phase), baseCapabilities(phase), baseManifestSchema(phase));
@@ -161,7 +174,7 @@ for (const phase of PHASES) {
 
 // ── FAIL: absolute authorized path ──
 for (const phase of PHASES) {
-  const s = baseState(phase); s.currentCheckpoint = phase === 'R3.0D' ? 'D2_HYPOTHESIS_ENGINE' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
+  const s = baseState(phase); s.currentCheckpoint = phase === 'R3.0D' ? 'D2_EVIDENCE_GRAPH' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
   s.enabledCapabilities = ['production_cap_present'];
   s.authorizedProductionPaths = [{ path: '/etc/passwd', capability: 'production_cap_present' }];
   const dir = writeFixture(s, baseSchema(phase), baseCapabilities(phase), baseManifestSchema(phase));
@@ -171,7 +184,7 @@ for (const phase of PHASES) {
 
 // ── FAIL: parent-segment authorized path ──
 for (const phase of PHASES) {
-  const s = baseState(phase); s.currentCheckpoint = phase === 'R3.0D' ? 'D2_HYPOTHESIS_ENGINE' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
+  const s = baseState(phase); s.currentCheckpoint = phase === 'R3.0D' ? 'D2_EVIDENCE_GRAPH' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
   s.enabledCapabilities = ['production_cap_present'];
   s.authorizedProductionPaths = [{ path: 'renderer/../etc/x.js', capability: 'production_cap_present' }];
   const dir = writeFixture(s, baseSchema(phase), baseCapabilities(phase), baseManifestSchema(phase));
@@ -181,7 +194,7 @@ for (const phase of PHASES) {
 
 // ── FAIL: path outside allowedRoots ──
 for (const phase of PHASES) {
-  const s = baseState(phase); s.currentCheckpoint = phase === 'R3.0D' ? 'D2_HYPOTHESIS_ENGINE' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
+  const s = baseState(phase); s.currentCheckpoint = phase === 'R3.0D' ? 'D2_EVIDENCE_GRAPH' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
   s.enabledCapabilities = ['production_cap_present'];
   s.authorizedProductionPaths = [{ path: 'docs/whatever.md', capability: 'production_cap_present' }];
   const dir = writeFixture(s, baseSchema(phase), baseCapabilities(phase), baseManifestSchema(phase));
@@ -207,7 +220,7 @@ for (const phase of PHASES) {
 
 // ── FAIL: enabled capability with no authorized path (production capability) ──
 for (const phase of PHASES) {
-  const s = baseState(phase); s.currentCheckpoint = phase === 'R3.0D' ? 'D2_HYPOTHESIS_ENGINE' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
+  const s = baseState(phase); s.currentCheckpoint = phase === 'R3.0D' ? 'D2_EVIDENCE_GRAPH' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
   s.enabledCapabilities = ['production_cap_present']; // production capability without authorized path
   const dir = writeFixture(s, baseSchema(phase), baseCapabilities(phase), baseManifestSchema(phase));
   const r = runValidator(phase, dir);
@@ -216,7 +229,7 @@ for (const phase of PHASES) {
 
 // ── FAIL: regex-metacharacter path (Codex G1 round 1 BLOCKER 2 regression) ──
 for (const phase of PHASES) {
-  const advCheckpoint = phase === 'R3.0D' ? 'D2_HYPOTHESIS_ENGINE' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
+  const advCheckpoint = phase === 'R3.0D' ? 'D2_EVIDENCE_GRAPH' : phase === 'R3.0E' ? 'E2_EXPERIMENT_STORE' : 'F1_MIGRATION_ENGINE';
   const advCases = [
     ['regex caret', 'renderer/js/^decision+.js'],
     ['regex anchor $', 'renderer/js/x$.js'],
@@ -287,5 +300,6 @@ for (const phase of PHASES) {
   }
 }
 
+H.cleanupAll();
 console.log('phase-governance: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

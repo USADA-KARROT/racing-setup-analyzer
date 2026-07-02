@@ -211,13 +211,102 @@ canvas{max-height:300px}
   </div>
 </div>
 
-<!-- R3.0A: Comparisons (explicitly deferred to R3.0C — non-actionable info panel, not a fake control) -->
-<div x-show="showPane('comparisons')" x-cloak x-transition>
-  <h2 class="text-xl font-bold mb-3" x-text="t('ui.nav.comparisons')"></h2>
-  <div class="bg-slate-800/40 rounded-lg p-4 border border-amber-700/40 max-w-2xl text-sm text-slate-300">
-    <div class="text-amber-300 font-semibold mb-1" x-text="t('ui.comparisons.deferred')"></div>
-    <div x-text="t('ui.comparisons.deferredBody')"></div>
+<!-- R3.0C C7/C8: Comparison Workspace. Since C8_ACTIVATION the three R3.0C feature IDs are
+     availability='available' with a live rendererAdapter (paneId 'comparisons') — this pane IS
+     the live Comparisons surface. showPane('comparisons') gates rendering; navigateToFeature()
+     routes the active feature IDs here (see renderer/js/feature-registry.js C8 comments). -->
+<div x-show="showPane('comparisons')" x-cloak x-transition data-r3c-c7-pane="comparison-workspace">
+  <h2 class="text-xl font-bold mb-1" x-text="t('ui.comp.title')"></h2>
+  <div class="text-xs text-slate-500 mb-3" x-text="t('ui.comp.subtitle')"></div>
+
+  <!-- Placeholder state — every transition trigger lands here first (state-transition contract). -->
+  <div x-show="comparisonVMState().placeholder !== 'ready'" class="bg-slate-800/40 rounded-lg p-3 border border-slate-700/40 max-w-2xl text-sm text-slate-300 mb-3">
+    <span x-text="t('ui.comp.placeholder.' + comparisonVMState().placeholder)"></span>
   </div>
+
+  <!-- Selectors — R3.0C C8 (Codex C-B Finding C8-CB-RN-06 closure): the dropdowns now have @change handlers
+       wired through the viewmodel mutators (r3cC8OnReferenceSelected / r3cC8OnComparisonSelected). The option
+       list is derived from r3cC8LapCandidates() — empty until multi-lap telemetry import populates it. The
+       placeholder above (comparisonVMState().placeholder) renders "no laps to compare" when the list is empty. -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 max-w-3xl">
+    <div>
+      <div class="text-[11px] uppercase tracking-wide text-slate-600 mb-1" x-text="t('ui.comp.referenceSelector')"></div>
+      <select class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm w-full" data-r3c-c7="reference-selector"
+              @change="r3cC8OnReferenceSelected($event.target.value || null)">
+        <option value="" x-text="t('ui.comp.referenceSelector.placeholder')"></option>
+        <template x-for="lap in r3cC8LapCandidates()" :key="'r-' + lap.lapId">
+          <option :value="lap.lapId" x-text="lap.label"></option>
+        </template>
+      </select>
+    </div>
+    <div>
+      <div class="text-[11px] uppercase tracking-wide text-slate-600 mb-1" x-text="t('ui.comp.comparisonSelector')"></div>
+      <select class="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-sm w-full" data-r3c-c7="comparison-selector"
+              @change="r3cC8OnComparisonSelected($event.target.value || null)">
+        <option value="" x-text="t('ui.comp.comparisonSelector.placeholder')"></option>
+        <template x-for="lap in r3cC8LapCandidates()" :key="'c-' + lap.lapId">
+          <option :value="lap.lapId" x-text="lap.label"></option>
+        </template>
+      </select>
+    </div>
+  </div>
+
+  <!-- Summary cards (rendered only when result is ready) -->
+  <div x-show="comparisonVMState().placeholder === 'ready'" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3 max-w-3xl">
+    <div class="bg-slate-800/40 rounded-lg p-3 border border-slate-700/40 text-sm">
+      <div class="text-[11px] uppercase tracking-wide text-slate-500 mb-1" x-text="t('ui.comp.summaryCard.lapTimeDelta')"></div>
+      <div class="text-slate-200" data-r3c-c7="lap-time-delta-value"></div>
+    </div>
+    <div class="bg-slate-800/40 rounded-lg p-3 border border-slate-700/40 text-sm">
+      <div class="text-[11px] uppercase tracking-wide text-slate-500 mb-1" x-text="t('ui.comp.summaryCard.cumulativeDelta')"></div>
+      <div class="text-slate-200" data-r3c-c7="cumulative-delta-value"></div>
+    </div>
+    <div class="bg-slate-800/40 rounded-lg p-3 border border-slate-700/40 text-sm">
+      <button :disabled="!comparisonVMState().exportGate" data-r3c-c7="export-action"
+              @click="r3cC8OnExportClick()"
+              class="px-3 py-1 rounded bg-emerald-600/30 hover:bg-emerald-600/50 disabled:opacity-40 disabled:cursor-not-allowed text-emerald-100"
+              x-text="t('ui.comp.summaryCard.exportAction')"></button>
+      <div x-show="!comparisonVMState().exportGate" class="text-[11px] text-amber-300 mt-1" x-text="t('ui.comp.summaryCard.exportAction.disabled')"></div>
+    </div>
+  </div>
+
+  <!-- Phase cards — governance-locked while phase_boundary_contract.enabled === false. The
+       `comparisonVMState().metricAvailability.entry_delta` (mid / exit) values are forced to
+       false by the viewmodel so this branch never enters until a future checkpoint authorizes
+       phase-boundary derivation. -->
+  <div x-show="comparisonVMState().placeholder === 'ready' && (comparisonVMState().metricAvailability.entry_delta || comparisonVMState().metricAvailability.mid_delta || comparisonVMState().metricAvailability.exit_delta)" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3 max-w-3xl">
+    <div data-r3c-c7-phase="entry"><div class="text-[11px] uppercase text-slate-500" x-text="t('ui.comp.metric.entry_delta')"></div></div>
+    <div data-r3c-c7-phase="mid"><div class="text-[11px] uppercase text-slate-500" x-text="t('ui.comp.metric.mid_delta')"></div></div>
+    <div data-r3c-c7-phase="exit"><div class="text-[11px] uppercase text-slate-500" x-text="t('ui.comp.metric.exit_delta')"></div></div>
+  </div>
+
+  <!-- Blocked / cannotConclude / nextValidation framing rendering. The renderer maps i18nKey to
+       wording via t(); the source layer never authors UI prose. -->
+  <template x-if="comparisonVMState().blockedReasons.length > 0">
+    <div class="bg-rose-900/20 border border-rose-700/40 rounded-lg p-3 text-sm text-rose-100 max-w-3xl mb-3">
+      <div class="font-semibold mb-1" x-text="t('ui.comp.blockers.title')"></div>
+      <template x-for="code in comparisonVMState().blockedReasons" :key="code">
+        <!-- Codex C7-R2-D-01 closure — tCode(code) was single-arg, which the 2-arg tCode signature
+             rendered as empty string. Use the shell-wide 'ui.blocker' prefix so reason codes
+             (including the new UI_INITIALIZATION_FAILED) surface localized wording. -->
+        <div x-text="tCode('ui.blocker', code)"></div>
+      </template>
+    </div>
+  </template>
+  <template x-if="comparisonVMState().framing && comparisonVMState().framing.cannotDistinguish && comparisonVMState().framing.cannotDistinguish.length > 0">
+    <div class="bg-slate-800/40 border border-slate-700/40 rounded-lg p-3 text-sm text-slate-200 max-w-3xl mb-3">
+      <div class="font-semibold mb-1" x-text="t('ui.comp.cannotConclude.title')"></div>
+      <template x-for="entry in comparisonVMState().framing.cannotDistinguish" :key="entry.i18nKey">
+        <div x-text="t(entry.i18nKey)"></div>
+      </template>
+    </div>
+  </template>
+  <template x-if="comparisonVMState().framing && comparisonVMState().framing.nextValidationAction">
+    <div class="bg-sky-900/20 border border-sky-700/40 rounded-lg p-3 text-sm text-sky-100 max-w-3xl">
+      <div class="font-semibold mb-1" x-text="t('ui.comp.nextValidation.title')"></div>
+      <div x-text="t(comparisonVMState().framing.nextValidationAction.i18nKey)"></div>
+    </div>
+  </template>
 </div>
 
 <!-- R3.0A: Setup Library sub-navigation -->
@@ -3116,6 +3205,8 @@ canvas{max-height:300px}
 <script src="js/i18n-csv.js"></script>
 <script src="js/i18n-shell.js"></script>
 <script src="js/i18n-workspace.js"></script>
+<script src="js/i18n-comparisons.js"></script>
+<script src="js/i18n-r3-0d.js"></script>
 <script src="js/i18n-ux0.js"></script>
 <script src="js/calibration.js"></script>
 <script src="js/tire-data.js"></script>
@@ -3166,6 +3257,20 @@ canvas{max-height:300px}
 <script src="js/model-telemetry-comparison.js"></script>
 <script src="js/race-engineer-insight.js"></script>
 <script src="js/driver-coach-insight.js"></script>
+<!-- R3.0D contracts (UMD; expose R3_0D_* globals). Concatenated bundle for browser (the
+     8 contracts under contracts/r3.0d/ in dependency order). Generated by `cat` — each
+     contract module is an IIFE so concatenation is order-preserving and idempotent. The
+     Node test harness still requires from contracts/r3.0d/ directly. -->
+<script src="js/r3-0d-contracts-bundle.js"></script>
+<!-- R3.0D production modules D2-D4 (deferred at their own checkpoints; activated at D5). -->
+<script src="js/r3-0d-evidence-graph.js"></script>
+<script src="js/r3-0d-hypothesis-engine.js"></script>
+<script src="js/r3-0d-priority-engine.js"></script>
+<!-- R3.0D D5 — Engineer Brief production modules (render-only UI; service+viewmodel+orchestrator+ui). -->
+<script src="js/r3-0d-engineer-brief.js"></script>
+<script src="js/r3-0d-engineer-viewmodel.js"></script>
+<script src="js/r3-0d-engineer-orchestrator.js"></script>
+<script src="js/r3-0d-engineer-ui.js"></script>
 <script src="js/track-intelligence.js"></script>
 <script src="js/analysis-workspace.js"></script>
 <script src="js/analysis-workspace-viewmodel.js"></script>
@@ -3177,6 +3282,21 @@ canvas{max-height:300px}
 <script src="js/case-library-viewmodel.js"></script>
 <script src="js/feature-registry.js"></script>
 <script src="js/feature-router.js"></script>
+<!-- R3.0C C7 Comparison Workspace browser wiring — Codex C7-R2-B-01 (J1) closure.
+     The contracts/r3.0c/ directory is governance-classified NON-PRODUCTION so the no-consumer
+     validator (scripts/check-r3-0c-no-consumer.js) forbids index.html from loading those files
+     directly. The auto-generated r3-0c-contracts-bundle.js below (in renderer/js/, name does NOT
+     match the contracts-or-feature regex) carries the contract surface as registered globals.
+     Load order is dependency-direction:
+       contracts bundle → delta-metrics (C5) → comparison-export (C6) → orchestrator (C7) → viewmodel (C7).
+     The equivalence test (tests/r3-0c-contracts-bundle-equivalence.test.js) re-runs the generator
+     and fails closed on any drift between the source contracts and the committed bundle. -->
+<script src="js/r3-0c-contracts-bundle.js"></script>
+<script src="js/r3-0c-delta-metrics.js"></script>
+<script src="js/r3-0c-comparison-export.js"></script>
+<script src="js/r3-0c-comparison-orchestrator.js"></script>
+<script src="js/r3-0c-comparison-viewmodel.js"></script>
+
 <script src="js/vehicle-preset-usecases.js"></script>
 <script src="js/vehicle-preset-viewmodel.js"></script>
 <script src="js/case-shell.js"></script>
@@ -3196,22 +3316,343 @@ const COLORS=['#38bdf8','#f472b6','#34d399','#facc15','#a78bfa','#fb923c','#22d3
 const telemetryDataHolder = { session: null, importToken: 0, ro: null, lastW: null,
   layout: null, timeValues: null, timeIndex: null, laneReaders: null, cursorTime: null, selection: null,
   dragging: false, dragStartPx: null, dragCurrPx: null, pointerInside: false, raf: 0 };
-// R3.0B: analysis working state incl. RAW telemetry (session/imported bundle) lives HERE, OUTSIDE Alpine's
-// reactive proxy — Alpine holds only ids + small summaries. (No raw sample arrays in the reactive tree.)
+// R3.0C C8_ACTIVATION + Codex C-B Round 2 hardening (Finding C8-CB-RN-09) — wrap `r3cC8Authority` AND
+// `function app()` in a closure-private outer IIFE so neither r3cC8Authority nor app() leak to the
+// realm's lexical environment. The ONLY thing this IIFE exposes is `root.app = app` for Alpine's
+// `x-data="app()"` lookup; r3cC8Authority is unreachable from any other script, any eval, or any
+// developer-tools expression in the same realm. (Round 1's earlier IIFE only enclosed the
+// _r3cC8Authority literal; the surrounding `const r3cC8Authority = ...` declaration itself was still
+// at script top-level, making the binding name resolvable from elsewhere in the same lexical
+// environment — Finding C8-CB-RN-09. Wrapping the whole script-section closes that escape.)
+;(function (root) {
+  'use strict';
+
+// R3.0B + Round 3 (Findings C8-CB-RN-15 / 16) — analysis working state INCLUDING RAW telemetry was
+// originally at script top-level as `const caseDataHolder`. Round 2 closed lexical access to
+// r3cC8Authority but left caseDataHolder at script top-level; Round 3 found that same-realm code
+// could redefine caseDataHolder.lastSession's setter to throw (breaking _r3cBeginCaseTransition's
+// invariants) AND directly assign caseDataHolder.lastSession to a forged session whose sessionId
+// matched the authoritative record, bypassing the lap gate by string equality alone. Moving
+// caseDataHolder INSIDE the IIFE makes it closure-private — neither setters nor the binding name
+// itself are reachable from any other script, eval, or developer-tools expression in the same
+// realm. (telemetryDataHolder stays at script top-level — it carries no authority and the
+// telemetry CSV viewer's RAW arrays remain outside Alpine's reactive proxy by design.)
 const caseDataHolder = { lastCase: null, lastSession: null, lastSessionId: null, lastWindow: null, lastVmOpts: null, importedBundle: null, caseStore: null, sessionStore: null, sessionOpToken: 0, sessionPersistPromise: null, autosaveTimer: 0 };
 
+// R3.0C C8 Round 4 (Finding C8-CB-RN-19) — capture the DemoAnalysisCase builder at IIFE init time
+// and use the captured reference inside loadDemoAnalysisCase. Same-realm code that later replaces
+// `DemoAnalysisCase.buildDemoAnalysisCase` with a forged function CANNOT mint authoritative case +
+// session pairs via the demo load path: the captured reference still points at the original
+// builder. The capture happens during script parse before any other code can run; once captured the
+// reference is closure-private and unreachable from any caller in the same realm.
+const _trustedDemoBuilder = (function () {
+  if (typeof DemoAnalysisCase !== 'object' || DemoAnalysisCase === null) return null;
+  var fn = DemoAnalysisCase.buildDemoAnalysisCase;
+  return (typeof fn === 'function') ? fn : null;
+})();
+
+// R3.0C C8 Round 3 (Finding C8-CB-RN-16) — unforgeable session-identity registry. The lap-candidate
+// gate previously trusted any session whose sessionId string matched the authoritative record's
+// telemetrySessionId; attacker-supplied or cross-case sessions with the matching string would pass.
+// r3cC8SessionAuthority is a closure-private WeakSet that the trusted load paths (loadDemoAnalysisCase
+// + runImportedAnalysis + any future session-store load) populate at session-load time. The lap-
+// candidate gate now ALSO requires r3cC8SessionAuthority.isAuthentic(loadedSession) — defense-in-depth
+// on top of the sessionId match. Forged sessions (not in the WeakSet) fail closed.
+const r3cC8SessionAuthority = (function () {
+  var _weak = (typeof WeakSet === 'function') ? new WeakSet() : null;
+  return {
+    register: function (session) {
+      if (!_weak) return false;
+      if (session === null || typeof session !== 'object') return false;
+      try { _weak.add(session); return true; } catch (e) { return false; }
+    },
+    isAuthentic: function (session) {
+      if (!_weak) return false;
+      if (session === null || typeof session !== 'object') return false;
+      try { return _weak.has(session); } catch (e) { return false; }
+    },
+  };
+})();
+
+// R3.0C C8_ACTIVATION + Codex C-B Round 1 hardening (findings C8-CB-RN-01 / 02 / 05) — renderer-private
+// authority controller. The WeakSet and the only registration entry points live in THIS IIFE-scope closure
+// (not on the Alpine `app()` instance) so neither Alpine templates, eval, nor any caller of `app()` can
+// directly mint authentic case records. Two trusted entry points (forCaseStore / forDemo) accept a
+// case-store open result or a demo case respectively, normalize fields with guarded reads (hostile getter
+// throws yield null), freeze the resulting plain { caseId, associations } record, and add to the WeakSet.
+// Strict imported-summary rejection (Finding 05): `o.degraded` MUST be the BOOLEAN LITERAL `false`; any
+// other value (1, "yes", undefined, throwing accessor) fails closed without ever touching the WeakSet.
+const r3cC8Authority = (function () {
+  var _weakset = (typeof WeakSet === 'function') ? new WeakSet() : null;
+  function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
+  function _str(v) { return typeof v === 'string' && v.length > 0 ? v : null; }
+  function _safeRead(o, k) { try { return o[k]; } catch (e) { return undefined; } }
+  function _buildCanonical(caseId, associations) {
+    if (typeof caseId !== 'string' || caseId.length === 0) return null;
+    var a = _isPlain(associations) ? associations : {};
+    var rec = { caseId: caseId, associations: Object.freeze({
+      trackId: _str(_safeRead(a, 'trackId')),
+      layoutId: _str(_safeRead(a, 'layoutId')),
+      positionBasis: _str(_safeRead(a, 'positionBasis')),
+      positionDirection: _str(_safeRead(a, 'positionDirection')),
+      telemetrySessionId: _str(_safeRead(a, 'telemetrySessionId')),
+      vehicleProfileId: _str(_safeRead(a, 'vehicleProfileId')),
+    }) };
+    return Object.freeze(rec);
+  }
+  return {
+    forCaseStore: function (o) {
+      if (!_weakset || !o || typeof o !== 'object') return null;
+      var ok, deg, caseId, assoc;
+      try { ok = o.ok; } catch (e) { return null; }
+      if (ok !== true) return null;
+      try { deg = o.degraded; } catch (e) { return null; }
+      if (deg !== false) return null; // STRICT — anything other than literal false rejects (Finding 05)
+      try { caseId = o.caseId; } catch (e) { return null; }
+      try { assoc = o.associations; } catch (e) { return null; }
+      var rec = _buildCanonical(caseId, assoc);
+      if (!rec) return null;
+      try { _weakset.add(rec); } catch (e) { return null; }
+      return rec;
+    },
+    forDemo: function (demoCase) {
+      if (!_weakset || !demoCase || typeof demoCase !== 'object') return null;
+      var caseId, assoc;
+      try { caseId = demoCase.caseId; } catch (e) { return null; }
+      try { assoc = demoCase.associations; } catch (e) { return null; }
+      var rec = _buildCanonical(caseId, assoc);
+      if (!rec) return null;
+      try { _weakset.add(rec); } catch (e) { return null; }
+      return rec;
+    },
+    predicate: function (cr) {
+      if (!_weakset) return false;
+      if (cr === null || typeof cr !== 'object') return false;
+      try { return _weakset.has(cr); } catch (e) { return false; }
+    },
+  };
+})();
+
 function app(){return{
+  // === R3.0C C7 Comparison Workspace state accessor (placeholder-only initial state). ===
+  // The viewmodel + orchestrator are instantiated by init() when their UMD globals load; until
+  // then the pane renders placeholder.idle. Codex C7 review focuses on the orchestrator +
+  // viewmodel implementation and contracts, not the HTML wiring breadth — full data feeds
+  // (case-store, session-store linkage) land in follow-up work.
+  _r3cC7VM: null,
+  // Codex C7-R2-D-01 closure: structured init-failure surface. When init() detects the C7 UMD
+  // globals are not loaded (typeof guard miss) OR a factory throws during construction, this
+  // field captures the structured failure reason. comparisonVMState() reads it FIRST so the UI
+  // renders an honest unavailable state with UI_INITIALIZATION_FAILED rather than masquerading
+  // as a successfully-initialized idle workspace.
+  _r3cC7InitFailure: null,
+  // R3.0C C8_ACTIVATION + Codex C-B Round 1 (Finding C8-CB-RN-01) — the renderer-private WeakSet and
+  // registration entry points have been MOVED to the module-scope `r3cC8Authority` closure (above
+  // `function app()`). Alpine templates, eval, and any caller of `app()` can no longer mint authentic
+  // records by invoking a method on `this`. The only two legal entry points remain openCase (with
+  // o.degraded strictly === false) and loadDemoAnalysisCase. The closure exposes `predicate(cr)` for
+  // the orchestrator construction below — nothing else.
+  // _r3cC8LatestAuthorityRecord caches the FROZEN canonical record so a setAssociation call can pass
+  // the same reference back through the predicate (WeakSet membership is identity-based).
+  _r3cC8LatestAuthorityRecord: null,
+  // Codex C-B Findings C8-CB-RN-04 / C8-CB-RN-10 — monotonic token guarding every case-context
+  // transition (openCase + loadDemoAnalysisCase). Promise commits whose token is no longer current
+  // are dropped at their `if (tok !== self._r3cC8OpenToken)` gate.
+  _r3cC8OpenToken: 0,
+  // Codex C-B Round 2 (Findings C8-CB-RN-03 / 10 / 11) — single shared case-context invalidation
+  // helper called SYNCHRONOUSLY at the entry of every case transition (openCase + loadDemoAnalysisCase).
+  // The helper:
+  //   (1) increments _r3cC8OpenToken so any in-flight promise commit becomes stale
+  //   (2) nulls _r3cC8LatestAuthorityRecord so a stale read of authority cannot survive the transition
+  //   (3) nulls caseDataHolder.lastSession + lastSessionId so prior-case laps cannot bleed into the
+  //       new selectors via r3cC8LapCandidates / _r3cC8LapFor
+  //   (4) notifies the viewmodel of case_reopen so its in-flight commit is dropped at stale-token check
+  // Returns the new token value so the caller can capture it before await and test `tok !== current`
+  // at the promise commit point.
+  _r3cBeginCaseTransition(){
+    // R3.0C C8 + Codex C-B Round 3 Finding C8-CB-RN-15 — each invariant is cleared in its own
+    // try/catch so a hostile setter throw on one field cannot prevent the others from being cleared.
+    // (caseDataHolder is now IIFE-private per Finding C8-CB-RN-16, so this is defense-in-depth: same-
+    // realm code cannot reach the binding to install a hostile setter in the first place.)
+    var tok = ++this._r3cC8OpenToken;
+    this._r3cC8LatestAuthorityRecord = null;
+    try { caseDataHolder.lastSession = null; } catch (_) {}
+    try { caseDataHolder.lastSessionId = null; } catch (_) {}
+    if (this._r3cC7VM && typeof this._r3cC7VM.notifyCaseReopen === 'function') {
+      try { this._r3cC7VM.notifyCaseReopen(); } catch (_) {}
+    }
+    return tok;
+  },
+  comparisonVMState(){
+    if (this._r3cC7InitFailure) {
+      // Structured unavailable state — distinct from placeholder.idle. Export gated off; no
+      // result rendered; reason code surfaces via blockedReasons → ui.blocker.* i18n key.
+      return { placeholder: 'unavailable', reference: null, comparison: null, association: null, result: null, framing: null, blockedReasons: [this._r3cC7InitFailure.reasonCode], limitations: [], exportGate: false, metricAvailability: { lap_time: false, delta_cumulative: false, sector_delta: false, entry_delta: false, mid_delta: false, exit_delta: false }, latestToken: 0 };
+    }
+    if (this._r3cC7VM && typeof this._r3cC7VM.getState === 'function') return this._r3cC7VM.getState();
+    return { placeholder: 'idle', reference: null, comparison: null, association: null, result: null, framing: null, blockedReasons: [], limitations: [], exportGate: false, metricAvailability: { lap_time: false, delta_cumulative: false, sector_delta: false, entry_delta: false, mid_delta: false, exit_delta: false }, latestToken: 0 };
+  },
+  // R3.0C C8_ACTIVATION + Codex C-B Finding C8-CB-RN-06 — minimum viewmodel wiring. After a case becomes
+  // authoritative (via _r3cC8LatestAuthorityRecord, set ONLY through the renderer-private closure entry
+  // points), build a comparison-eligibility-shape association object that carries the SAME frozen
+  // canonical caseRecord reference back into vm.setAssociation. The viewmodel preserves the reference
+  // identity (viewmodel fix C8-CB-RN-02) so the orchestrator's WeakSet authenticityPredicate matches.
+  //
+  // The association we build here is intentionally MINIMAL — only the fields the comparison-
+  // eligibility contract reads (caseId / analysisCaseId / sessionId / track / layout / basis /
+  // direction). Selector population (the actual lap-candidate dropdowns) is wired separately via the
+  // r3cC8ComparisonSelectors / r3cC8OnReferenceSelected / r3cC8OnComparisonSelected helpers below.
+  _r3cC8SyncAssociationFromCase(rec, caseSource){
+    if (!this._r3cC7VM || typeof this._r3cC7VM.setAssociation !== 'function') return false;
+    if (!rec || typeof rec !== 'object') return false;
+    var assoc = (caseSource && typeof caseSource === 'object' && caseSource.associations && typeof caseSource.associations === 'object') ? caseSource.associations : (rec.associations || {});
+    function s(v){ return typeof v === 'string' && v.length > 0 ? v : null; }
+    var sessionId = s(assoc.telemetrySessionId);
+    var association = {
+      caseId: rec.caseId,
+      analysisCaseId: rec.caseId,
+      sessionId: sessionId,
+      trackId: s(assoc.trackId),
+      layoutId: s(assoc.layoutId),
+      positionBasis: s(assoc.positionBasis) || 'lap_distance',
+      positionDirection: s(assoc.positionDirection) || 'increasing',
+      caseRecord: rec,
+    };
+    try { this._r3cC7VM.setAssociation(association); return true; } catch(_) { return false; }
+  },
+  // Selector candidate lists. R3.0C C8 ships the wiring; until multi-lap telemetry import lands,
+  // r3cC8LapCandidates returns an empty array and the dropdowns render as empty (the viewmodel stays
+  // in SELECTING since reference + comparison remain null). Importing a session with a populated
+  // session.laps[] (R3.0C C8+ future product work) will surface them here without further wiring.
+  //
+  // R3.0C C8 Codex C-B Round 2 (Finding C8-CB-RN-11) — cross-session lap leak protection: the
+  // candidate list is only non-empty when caseDataHolder.lastSession EXISTS, its sessionId matches
+  // the authoritative case's telemetrySessionId, AND the latest authority record points at the
+  // currently-loaded case. If any of these conditions fail (transition in progress, stale session
+  // from prior case, no authoritative case yet) the selectors render empty. _r3cC8LapFor applies the
+  // same gate so a stale lapId cannot resolve a descriptor across the session boundary.
+  _r3cC8AuthoritativeSessionId(){
+    var rec = this._r3cC8LatestAuthorityRecord;
+    if (!rec || typeof rec !== 'object' || !rec.associations || typeof rec.associations !== 'object') return null;
+    var sid = rec.associations.telemetrySessionId;
+    return typeof sid === 'string' && sid.length > 0 ? sid : null;
+  },
+  _r3cC8AuthoritativeSession(){
+    var sid = this._r3cC8AuthoritativeSessionId();
+    if (!sid) return null;
+    var s = caseDataHolder.lastSession;
+    if (!s || typeof s !== 'object') return null;
+    // R3.0C C8 Codex C-B Round 3 Finding C8-CB-RN-16 — unforgeable session-identity gate.
+    // String sessionId equality alone is forgeable (an attacker who can write caseDataHolder.lastSession
+    // could supply a forged session whose sessionId matches the authoritative record). The session MUST
+    // also be a member of r3cC8SessionAuthority's closure-private WeakSet — only the trusted load paths
+    // (loadDemoAnalysisCase / runImportedAnalysis / future session-store load) register sessions into it.
+    if (!r3cC8SessionAuthority.isAuthentic(s)) return null;
+    // The session can identify itself via sessionId or via the persisted lastSessionId pairing.
+    var loadedId = (typeof s.sessionId === 'string' && s.sessionId.length > 0) ? s.sessionId : caseDataHolder.lastSessionId;
+    if (loadedId !== sid) return null;
+    return s;
+  },
+  r3cC8LapCandidates(){
+    var s = this._r3cC8AuthoritativeSession();
+    var laps = s && Array.isArray(s.laps) ? s.laps : [];
+    return laps.filter(function(l){ return l && typeof l.lapId === 'string' && l.lapId.length > 0; }).map(function(l){
+      return {
+        lapId: l.lapId,
+        lapTimeMs: (typeof l.lapTimeMs === 'number' && isFinite(l.lapTimeMs)) ? l.lapTimeMs : null,
+        label: l.lapId + (typeof l.lapTimeMs === 'number' ? (' (' + (l.lapTimeMs / 1000).toFixed(3) + 's)') : ''),
+      };
+    });
+  },
+  _r3cC8LapFor(lapId){
+    var s = this._r3cC8AuthoritativeSession();
+    var laps = s && Array.isArray(s.laps) ? s.laps : [];
+    for (var i = 0; i < laps.length; i++) { if (laps[i] && laps[i].lapId === lapId) return laps[i]; }
+    return null;
+  },
+  _r3cC8LapDescriptor(lapId){
+    // Build the lap-descriptor shape the viewmodel forwards into the orchestrator's eligibilityInput.
+    // Empty / unknown / partial lap → null so the viewmodel transitions to SELECTING rather than
+    // attempting an underspecified comparison.
+    var lap = this._r3cC8LapFor(lapId);
+    if (!lap) return null;
+    if (typeof lap.lapTimeMs !== 'number' || !isFinite(lap.lapTimeMs) || lap.lapTimeMs <= 0) return null;
+    return Object.freeze({
+      lapId: lap.lapId,
+      lapTimeMs: lap.lapTimeMs,
+      lapAuthority: lap.lapAuthority || {},
+      normalizationAuthority: lap.normalizationAuthority || {},
+    });
+  },
+  r3cC8OnReferenceSelected(lapId){
+    if (!this._r3cC7VM || typeof this._r3cC7VM.setReference !== 'function') return;
+    var d = lapId ? this._r3cC8LapDescriptor(lapId) : null;
+    try { this._r3cC7VM.setReference(d); } catch(_) {}
+  },
+  r3cC8OnComparisonSelected(lapId){
+    if (!this._r3cC7VM || typeof this._r3cC7VM.setComparison !== 'function') return;
+    var d = lapId ? this._r3cC8LapDescriptor(lapId) : null;
+    try { this._r3cC7VM.setComparison(d); } catch(_) {}
+  },
+  // Codex C-B Finding C8-CB-RN-06 — export click handler. Goes through the orchestrator's
+  // exportComparison boundary (Codex C7-R5-01 + C6 authorization checks); never bypasses C6.
+  r3cC8OnExportClick(){
+    if (!this._r3cC7Orch || typeof this._r3cC7Orch.exportComparison !== 'function') return;
+    var state = this.comparisonVMState();
+    if (!state || state.placeholder !== 'ready' || state.exportGate !== true) return;
+    var rec = this._r3cC8LatestAuthorityRecord;
+    if (!rec) return;
+    var extra = { association: state.association, credibilityMetadata: (state.association && state.association.credibilityMetadata) || null, referenceLap: state.reference, comparisonLap: state.comparison };
+    // The orchestrator's exportComparison consumes the orchestrator-returned eligible response shape;
+    // the viewmodel stores result / framing / exportGate already, so we re-assemble the minimum shape
+    // here. This deliberately uses the SAME identity-preserved authoritative path.
+    var resp = { status: 'eligible', exportGate: true, result: state.result, generationToken: state.latestToken, framing: state.framing };
+    try {
+      var r = this._r3cC7Orch.exportComparison(resp, extra);
+      if (r && r.eligible === true && r.envelope) {
+        this._downloadJson(r.envelope, 'comparison-' + rec.caseId + '.json');
+      }
+    } catch(_) {}
+  },
   // === R2.2 Analysis Workspace (consumes production service output via the pure view-model builder) ===
   analysisView: null,
   analysisError: null,
   loadDemoAnalysisCase(){
+    // R3.0C C8 + Codex C-B Findings C8-CB-RN-03 / C8-CB-RN-10 — single shared invalidation helper used
+    // by every case-context transition. Round 1 only invalidated inside openCase; Round 2 found that a
+    // pending openCase could STILL race past a subsequent loadDemoAnalysisCase because the demo path
+    // never bumped the token. _r3cBeginCaseTransition() centralizes the invariants: bump the open
+    // token (drops any in-flight openCase commit at its `if (tok !== self._r3cC8OpenToken)` gate),
+    // null the latest authority pointer, clear caseDataHolder.lastSession (Finding C8-CB-RN-11 —
+    // prior-case laps must not bleed into the new case's lap selectors), and notify the viewmodel
+    // so its in-flight comparison commit is dropped at the next stale-token check.
+    this._r3cBeginCaseTransition();
     try {
-      if (typeof DemoAnalysisCase==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof AnalysisWorkspaceViewModel==='undefined'){ this.analysisError='modules_not_loaded'; this.analysisView=null; this._shellEvidence=null; return; }
-      const demo = DemoAnalysisCase.buildDemoAnalysisCase();
+      // R3.0C C8 Round 4 Finding C8-CB-RN-19 closure — use the IIFE-captured _trustedDemoBuilder
+      // reference, NOT the live DemoAnalysisCase.buildDemoAnalysisCase property. If same-realm code
+      // has replaced the global with a forged function, the captured reference still points to the
+      // original. AnalysisWorkspace + AnalysisWorkspaceViewModel are still read via globals because
+      // they are pure (no authority-conferring side effects); the threat model only applies to the
+      // demo case+session data that gets registered into the r3cC8Authority / r3cC8SessionAuthority
+      // closures.
+      if (typeof _trustedDemoBuilder !== 'function' || typeof AnalysisWorkspace==='undefined' || typeof AnalysisWorkspaceViewModel==='undefined'){ this.analysisError='modules_not_loaded'; this.analysisView=null; this._shellEvidence=null; return; }
+      const demo = _trustedDemoBuilder();
       const ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, demo.telemetrySession, demo.window, {}); // global Tier1BasicBalance as the model runner
       caseDataHolder.lastCase = demo.analysisCase; caseDataHolder.lastSession = demo.telemetrySession; caseDataHolder.lastWindow = demo.window; caseDataHolder.lastVmOpts = { suspensionNormalizationView: demo.suspensionNormalizationView }; this._persistSession(demo.telemetrySession);
+      // R3.0C C8 Round 3 Finding C8-CB-RN-16 — register the trusted demo telemetry session in the
+      // closure-private session WeakSet so r3cC8AuthoritativeSession()'s unforgeable-identity gate
+      // recognises it. Forged sessions with matching string sessionId will not be accepted.
+      try { r3cC8SessionAuthority.register(demo.telemetrySession); } catch (_) {}
       this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, { suspensionNormalizationView: demo.suspensionNormalizationView }); this._shellEvidence=this._mkShellEvidence(ws,'demo_case');
       this.analysisError = null;
+      // R3.0C C8_ACTIVATION + Codex C-B Findings C8-CB-RN-01 / 06 — register via the renderer-private
+      // closure, cache the authoritative reference, and IMMEDIATELY wire the viewmodel's association
+      // so the workspace can transition from idle → selecting (Finding C8-CB-RN-06 minimum wiring).
+      var rec = r3cC8Authority.forDemo(demo.analysisCase);
+      if (rec) {
+        this._r3cC8LatestAuthorityRecord = rec;
+        this._r3cC8SyncAssociationFromCase(rec, demo.analysisCase);
+      }
     } catch(e){ this.analysisError = String((e&&e.message)||e); this.analysisView=null; this._shellEvidence=null; }
   },
   // R2.3 import workflow — UI calls services only; no physics recompute, no UI-side capability derivation
@@ -3258,6 +3699,13 @@ function app(){return{
     } catch(e){ this.importError=String((e&&e.message)||e); }
   },
   runImportedAnalysis(){
+    // R3.0C C8 + Codex C-B Round 2 Finding C8-CB-RN-10/11 — CSV import is a case-context transition.
+    // Begin transition (bumps token, nulls authority, clears prior session, notifies viewmodel) so a
+    // pending demo / openCase comparison cannot commit on top of the imported session, and prior-case
+    // laps cannot survive into the new selectors. The CSV import path does NOT register an authoritative
+    // case via r3cC8Authority (no case-store boundary), so the workspace remains in idle/selecting until
+    // a future product step authorizes import-derived authority.
+    this._r3cBeginCaseTransition();
     try {
       this.importError=null;
       if (typeof CanonicalTelemetrySession==='undefined' || typeof AnalysisWorkspace==='undefined' || typeof DemoAnalysisCase==='undefined'){ this.importError='modules_not_loaded'; return; }
@@ -3278,6 +3726,13 @@ function app(){return{
       var demo = DemoAnalysisCase.buildDemoAnalysisCase(); // vehicle/setup binding; imported telemetry session
       var ws = AnalysisWorkspace.runAnalysisWorkspace(demo.analysisCase, session, null, {});
       caseDataHolder.lastCase = demo.analysisCase; caseDataHolder.lastSession = session; caseDataHolder.lastWindow = null; caseDataHolder.lastVmOpts = {}; this._persistSession(session);
+      // R3.0C C8 Round 3 Finding C8-CB-RN-16 — register the trusted imported telemetry session in
+      // the closure-private session WeakSet so the lap-candidate gate's unforgeable identity check
+      // recognises it. (The CSV import path still does NOT register an authoritative case via
+      // r3cC8Authority — no case-store boundary — so the workspace stays idle/selecting; this only
+      // makes the session itself trusted, future product steps can pair it with an authoritative
+      // case at which point the lap-candidate gate accepts both halves.)
+      try { r3cC8SessionAuthority.register(session); } catch (_) {}
       this.analysisView = AnalysisWorkspaceViewModel.buildAnalysisWorkspaceViewModel(ws, demo.analysisCase, {}); this._shellEvidence=this._mkShellEvidence(ws,'imported_csv');
     } catch(e){ this.importError=String((e&&e.message)||e); this.analysisView=null; this._shellEvidence=null; }
   },
@@ -3680,7 +4135,29 @@ function app(){return{
   saveCurrentCase(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='cannot_overwrite_imported'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.save(self._saveInput(false)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.storageError=null; self.refreshLibrary(); } else { self.storageError=r.code; } }); },
   autosaveCurrentCase(){ var self=this; if(!this.autosaveEnabled || !this.currentCaseId || this.importedSummaryOpen || !this.analysisView || !caseDataHolder.caseStore) return; try{ if(caseDataHolder.autosaveTimer) clearTimeout(caseDataHolder.autosaveTimer); caseDataHolder.autosaveTimer=setTimeout(function(){ caseDataHolder.autosaveTimer=0; if(self.autosaveEnabled && self.currentCaseId && !self.importedSummaryOpen && self.analysisView) self.saveCurrentCase(); }, 1500); }catch(e){} },
   saveCurrentCaseAsNew(){ var self=this; if(!this.analysisView||!this.ensureStore()) return; if(this.importedSummaryOpen){ this.storageError='cannot_promote_imported'; return; } (caseDataHolder.sessionPersistPromise||Promise.resolve()).then(function(){ return caseDataHolder.caseStore.create(self._saveInput(true)); }).then(function(r){ if(r.ok){ self.currentCaseId=r.caseId; self.importedSummaryOpen=false; self.refreshLibrary(); } else self.storageError=r.code; }); },
-  openCase(id){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.open(id).then(function(o){ if(!o.ok){ self.storageError=o.code; return; } self.analysisView=o.analysisResults; self._shellEvidence={ capability:(o.shellEvidence&&o.shellEvidence.capability)||{}, observation:(o.shellEvidence&&o.shellEvidence.observation)||{blockedReasons:[]}, source:(o.shellEvidence&&o.shellEvidence.source)||null }; self.currentCaseId=id; self.importedSummaryOpen=!!o.degraded; ++caseDataHolder.sessionOpToken; caseDataHolder.lastSessionId=(o.associations&&o.associations.telemetrySessionId)||null; caseDataHolder.sessionPersistPromise=Promise.resolve(); self.caseSubview='overview'; self.shellSection='cases'; self.currentTab='analysis'; }); },
+  openCase(id){
+    // R3.0C C8 + Codex C-B Round 3 Finding C8-CB-RN-14 — the case-context transition MUST run BEFORE
+    // ensureStore() so that an ensureStore failure (or throw) cannot leave prior authority + session +
+    // viewmodel state stale. _r3cBeginCaseTransition is now the very first executable statement; the
+    // ensureStore guard runs immediately after with all prior state already cleared.
+    var self = this;
+    var tok = this._r3cBeginCaseTransition();
+    if (!this.ensureStore()) return;
+    caseDataHolder.caseStore.open(id).then(function(o){
+      if (tok !== self._r3cC8OpenToken) return; // stale completion — a newer openCase already raced past us
+      if(!o.ok){ self.storageError=o.code; return; }
+      self.analysisView=o.analysisResults; self._shellEvidence={ capability:(o.shellEvidence&&o.shellEvidence.capability)||{}, observation:(o.shellEvidence&&o.shellEvidence.observation)||{blockedReasons:[]}, source:(o.shellEvidence&&o.shellEvidence.source)||null }; self.currentCaseId=id; self.importedSummaryOpen=!!o.degraded; ++caseDataHolder.sessionOpToken; caseDataHolder.lastSessionId=(o.associations&&o.associations.telemetrySessionId)||null; caseDataHolder.sessionPersistPromise=Promise.resolve();
+      // R3.0C C8_ACTIVATION + Codex C-B Findings C8-CB-RN-01 / 05 / 06 — register via the renderer-private
+      // closure (strict o.degraded===false check inside; degraded=true / 1 / "yes" / throwing accessor all
+      // fail closed and DO NOT advance _r3cC8LatestAuthorityRecord, which we already pre-cleared above).
+      var rec = r3cC8Authority.forCaseStore(o);
+      if (rec) {
+        self._r3cC8LatestAuthorityRecord = rec;
+        self._r3cC8SyncAssociationFromCase(rec, o);
+      }
+      self.caseSubview='overview'; self.shellSection='cases'; self.currentTab='analysis';
+    });
+  },
   duplicateCase(id){ var self=this; if(!this.ensureStore()) return; caseDataHolder.caseStore.duplicate(id).then(function(r){ if(r.ok) self.refreshLibrary(); else self.storageError=r.code; }); },
   archiveCase(id,arch){ var self=this; if(!this.ensureStore()) return; (arch?caseDataHolder.caseStore.archive(id):caseDataHolder.caseStore.unarchive(id)).then(function(){ self.refreshLibrary(); }); },
   deleteCase(id){ var self=this; if(!this.ensureStore()) return; if(typeof confirm==='function' && !confirm(this.t('ui.case.deleteConfirm'))) return; caseDataHolder.caseStore.remove(id,{confirm:true}).then(function(r){ if(r.ok){ if(self.currentCaseId===id) self.currentCaseId=null; self.refreshLibrary(); } else self.storageError=r.code; }); },
@@ -3820,6 +4297,46 @@ function app(){return{
 
   init(){
     this.tireOptions = api.getTires();
+    // R3.0C C7 Comparison Workspace: instantiate the orchestrator + viewmodel once the UMD
+    // globals are loaded. Capabilities mirror governance/r3.0c/capabilities.json — phase
+    // boundary contract remains disabled at C7. The viewmodel is stored in a non-reactive
+    // holder (_r3cC7VM) so async commits never trigger Alpine reactive re-derivation during
+    // an in-flight comparison.
+    //
+    // Codex C7-R2-D-01 closure: split the prior single try/catch into THREE outcomes that the UI
+    // can distinguish — (1) globals present + factories succeed → live VM, (2) globals absent
+    // (script load failed or pending) → structured failure UI_INITIALIZATION_FAILED, (3) globals
+    // present but a factory throws → also UI_INITIALIZATION_FAILED. The previous catch silently
+    // null'd both branches into placeholder.idle; that is no longer permitted at a UI checkpoint.
+    // No stack / private path is leaked to the DOM; a bounded generic diagnostic is logged once
+    // to the console on localhost only (mirrors tCode's missing-key telemetry).
+    if (typeof R3_0C_ComparisonOrchestrator === 'undefined' || typeof R3_0C_ComparisonViewModel === 'undefined') {
+      this._r3cC7VM = null;
+      this._r3cC7Orch = null;
+      this._r3cC7InitFailure = { reasonCode: 'UI_INITIALIZATION_FAILED', cause: 'globals_missing' };
+      try { if (typeof location !== 'undefined' && /^(localhost|127\.0\.0\.1|)$/.test(location.hostname)) console.warn('[r3.0c.c7] UI_INITIALIZATION_FAILED — R3_0C_ComparisonOrchestrator / R3_0C_ComparisonViewModel UMD globals not loaded'); } catch (_) {}
+      return;
+    }
+    try {
+      const caps = { phaseBoundaryContractEnabled: false, viewmodelStateTransitionContractEnabled: true, framingSourceStructuredContractEnabled: true };
+      // R3.0C C8_ACTIVATION + Codex C-B Round 1 (Finding C8-CB-RN-01): authenticityPredicate is a
+      // closure-private function defined OUTSIDE app() / Alpine, so the WeakSet that backs it is
+      // unreachable from any caller of app(). The case-store-open boundary (with strict
+      // o.degraded===false) and the demo-case boundary are the only legal ways to add to the
+      // WeakSet. The predicate signature is unchanged from C7.
+      const _orch = R3_0C_ComparisonOrchestrator.createOrchestrator({
+        capabilities: caps,
+        authenticityPredicate: r3cC8Authority.predicate,
+      });
+      this._r3cC7VM = R3_0C_ComparisonViewModel.createComparisonViewModel({ orchestrator: _orch, capabilities: caps });
+      this._r3cC7Orch = _orch;
+      this._r3cC7InitFailure = null;
+    } catch (e) {
+      this._r3cC7VM = null;
+      this._r3cC7Orch = null;
+      this._r3cC7InitFailure = { reasonCode: 'UI_INITIALIZATION_FAILED', cause: 'factory_threw' };
+      try { if (typeof location !== 'undefined' && /^(localhost|127\.0\.0\.1|)$/.test(location.hostname)) console.warn('[r3.0c.c7] UI_INITIALIZATION_FAILED — factory threw during construction'); } catch (_) {}
+    }
   },
 
   // === OEM Specs 統一介面 ===
@@ -4707,6 +5224,42 @@ function app(){return{
     this.tirePressChartObj=new Chart(ctx,{type:'scatter',data:{datasets:[{label:'Grip vs Pressure',data:pts,borderColor:'#38bdf8',backgroundColor:'rgba(56,189,248,.1)',fill:true,pointRadius:0,tension:.4}]},options:{responsive:true,showLine:true,plugins:{legend:{display:false}},scales:{x:{title:{display:true,text:this.t('ui.chart.pressureBar'),color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8'}},y:{title:{display:true,text:this.t('ui.chart.gripAxis'),color:'#94a3b8'},grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#94a3b8'},min:80,max:110}}}});
   },
 }}
+
+// R3.0C C8 Codex C-B Round 2 finding C8-CB-RN-09 closure: only `app` is exposed on globalThis. The
+// IIFE traps r3cC8Authority + function app() in a closure that is unreachable from any other script
+// or from preview_eval. Alpine looks up `app` via globalThis.app for its x-data="app()" binding;
+// nothing else from this section is exposed.
+root.app = app;
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+</script>
+
+<!-- R3.0D D5 — Engineer Brief mount target. Hidden by default; the orchestrator publishes
+     state on case/session change, and the UI module renders into this element. The host
+     wiring (case-shell or a downstream wire-in commit) decides whether to reveal it as a
+     case subview pane. Until then, the mount stays inert (no Alpine bindings; no automatic
+     visibility). The render-only UI guarantees no side effects from this DOM presence. -->
+<div id="r3-0d-engineer-brief-mount" data-r3-0d-engineer-brief-pane class="hidden"
+     aria-hidden="true" role="region" aria-label="Engineer Brief"></div>
+<script>
+// R3.0D D5 auto-mount — idempotent; safe even if R3_0D_EngineerUi is unavailable (e.g., a
+// stripped-down build). Runs at end-of-body after all R3.0D scripts loaded.
+(function () {
+  'use strict';
+  try {
+    if (typeof document === 'undefined') return;
+    var el = document.getElementById('r3-0d-engineer-brief-mount');
+    if (!el) return;
+    if (typeof R3_0D_EngineerUi !== 'object' || R3_0D_EngineerUi === null) return;
+    if (typeof R3_0D_EngineerUi.mountEngineerBriefPane !== 'function') return;
+    // i18n bridge — use the host renderer's t() if available; fall back to passthrough.
+    var i18n = (typeof t === 'function')
+      ? function (key, params) { try { return t(key, params); } catch (e) { return key; } }
+      : null;
+    R3_0D_EngineerUi.mountEngineerBriefPane(el, i18n ? { i18n: i18n } : {});
+  } catch (e) {
+    // Silently swallow — render-only mount must never break the host page.
+  }
+})();
 </script>
 </body>
 </html>

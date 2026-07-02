@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0C",
+  "checkpoint": "C3_NORMALIZED_DISTANCE",
+  "baseSha": "738f5268538e3978042ed197f21fae78ee49c3d8",
+  "headSha": null,
+  "previousCheckpoint": "C2_LAP_AUTHORITY",
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
+    { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-track-identity.js", "capability": "track_identity_authoritative" },
+    { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-normalized-distance.js", "capability": "normalized_distance_present" }
+  ],
+  "enabledCapabilitiesBefore": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative"],
+  "enabledCapabilitiesAfter": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present"],
+  "forbiddenCapabilities": [
+    "reference_selection_present",
+    "corner_segmentation_present",
+    "corner_pairing_present",
+    "delta_metrics_present",
+    "comparison_export_present",
+    "ui_present",
+    "feature_registry_active"
+  ],
+  "changedFiles": [
+    "contracts/r3.0c/reason-codes.js",
+    "contracts/r3.0c/normalized-position-contract.js",
+    "renderer/js/r3-0c-normalized-distance.js",
+    "renderer/js/r3-0c-comparison-adapter.js",
+    "governance/r3.0c/state.json",
+    "governance/r3.0c/checkpoints/C3.json",
+    "governance/r3.0/train.json",
+    "docs/r3.0c-contract-foundation.md",
+    "tests/r3.0c-contract-foundation.test.js",
+    "tests/r3-0c-comparison-adapter.test.js",
+    "tests/r3-0c-normalized-distance.test.js",
+    "tests/r3-0c-governance.test.js",
+    "tests/r3-0c-no-consumer.test.js"
+  ],
+  "tests": null,
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": null,
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "expectedRendererAdapter": false
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "note": "C3 normalize-distance: one new renderer/js production service (r3-0c-normalized-distance.js) canonicalizes a single lap's raw (distance, time) series into a [0,1] normalized axis. Sixteen NORMALIZED_DISTANCE_* reason codes are added to contracts/r3.0c/reason-codes.js (35 total — 16 mandated + 3 scope/metric extensions + 16 C3 extensions). The contract gains evaluateNormalizeDistanceRequestShape (structural first layer) and exposes ACCEPTED_DISTANCE_UNITS / ACCEPTED_DIRECTIONS / ACCEPTED_WRAP_SEMANTICS / ACCEPTED_MONOTONICITY / ACCEPTED_DUPLICATE_POSITION_POLICIES / ACCEPTED_ENDPOINT_CONVENTIONS / C3_NORMALIZE_REASON_CODES closed allowlists. The production service applies caller-supplied policy thresholds (no implicit defaults — the contract forces presence), refuses caller-forged authority status (NORMALIZED_DISTANCE_AUTHORITY_FORGED), refuses extrapolation beyond observed sample range (NORMALIZED_DISTANCE_EXTRAPOLATION_REQUIRED), permits at most one legal start/finish wrap (MULTIPLE_WRAPS otherwise), and emits only reason codes from C3_NORMALIZE_REASON_CODES. Thresholds inherit the C2 calibration matrix (coverage 0.95 / minimumSamples 200 / normalizedMaxGap 0.02 / timeGapSeconds 0.5, calibrationStatus 'fixture_derived_pending_field_validation'); every eligible result carries the limitation 'thresholds_fixture_calibrated_not_field_validated' on its evidence side-channel so downstream credibility cannot upgrade calibration beyond fixture support. Adapter normalizeDistance / normalizeAtTarget / normalizedDistanceDefaultThresholds / normalizedDistanceAcceptedUnits are pure passthroughs. No UI, no feature activation, no reference selection, no corner segmentation, no corner pairing, no delta metric, no export — those remain locked behind C4..C8. State-aware validators (scripts/check-r3-0c-no-consumer.js, scripts/check-r3-0c-guard.js) generalized at C1 automatically extend allowance to the new renderer/js path via governance/r3.0c/state.json.authorizedProductionPaths — NO validator weakening at C3. The trusted-verification artifact bound to headSha is the PASS authority; headSha / workflowRunId / artifactId / artifactBoundSha / codexVerdict / createdAt are intentionally null in-commit."
+}

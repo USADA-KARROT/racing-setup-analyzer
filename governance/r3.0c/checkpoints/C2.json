@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0C",
+  "checkpoint": "C2_LAP_AUTHORITY",
+  "baseSha": "724b918ad02dc7fd43f86bdaea39c46f511db0e6",
+  "headSha": null,
+  "previousCheckpoint": "C1_PRODUCTION_ADAPTER",
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
+    { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-track-identity.js", "capability": "track_identity_authoritative" },
+    { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" }
+  ],
+  "enabledCapabilitiesBefore": ["production_adapter_present"],
+  "enabledCapabilitiesAfter": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative"],
+  "forbiddenCapabilities": [
+    "normalized_distance_present",
+    "reference_selection_present",
+    "corner_segmentation_present",
+    "corner_pairing_present",
+    "delta_metrics_present",
+    "comparison_export_present",
+    "ui_present",
+    "feature_registry_active"
+  ],
+  "changedFiles": [
+    "contracts/r3.0c/reason-codes.js",
+    "renderer/js/r3-0c-comparison-adapter.js",
+    "renderer/js/r3-0c-lap-authority.js",
+    "renderer/js/r3-0c-track-identity.js",
+    "renderer/js/r3-0c-distance-authority.js",
+    "governance/r3.0c/state.json",
+    "governance/r3.0c/checkpoints/C2.json",
+    "governance/r3.0/train.json",
+    "tests/r3.0c-contract-foundation.test.js",
+    "tests/r3-0c-comparison-adapter.test.js",
+    "tests/r3-0c-lap-authority.test.js",
+    "tests/r3-0c-track-identity.test.js",
+    "tests/r3-0c-distance-authority.test.js",
+    "tests/r3-0c-governance.test.js",
+    "tests/r3-0c-no-consumer.test.js",
+    "package.json"
+  ],
+  "tests": null,
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": null,
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "expectedRendererAdapter": false
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "note": "C2 lap authority: three new renderer/js production services (lap-authority, track-identity, distance-authority) re-derive the comparison contract's authority claims from raw lap evidence rather than trusting caller-supplied descriptors. The contract layer is the single source of truth for reason-code emission; services only produce the descriptor shapes the contract validates. ONE new reason code is added to contracts/r3.0c/reason-codes.js as a third documented extension — METRIC_REQUIRED_CHANNEL_UNAVAILABLE — to express partial-channel gating per metric (the metric is in SUPPORTED_METRICS but the raw channels the lap evidence carries do not include the ones the metric requires). algorithmsAllowed flips true (C2 is the algorithmCheckpoint per schema.json). No UI, no feature activation, no normalization-distance algorithm, no corner segmentation, no delta metric computation, no reference-lap selection, no export — those remain locked behind C3..C8. Thresholds (coverage 0.95 / minimumSamples 200 / normalizedMaxGap 0.02 / timeGapSeconds 0.5) are the directive's candidate values, fixture-validated across the 16-fixture matrix in tests/r3-0c-lap-authority.test.js, and labelled calibrationStatus='fixture_derived_pending_field_validation'. Every eligible lap-authority result carries the limitation string 'thresholds_fixture_calibrated_not_field_validated' on its evidence side-channel so the downstream credibility layer cannot upgrade the calibration claim beyond what the fixture matrix supports. The state-aware validators (scripts/check-r3-0c-no-consumer.js, scripts/check-r3-0c-guard.js) were generalized at C1 and automatically extend the allowance to the three new renderer/js paths — NO validator weakening at C2. The trusted-verification artifact bound to headSha is the PASS authority — headSha / workflowRunId / artifactId / artifactBoundSha / codexVerdict / createdAt are intentionally null in-commit."
+}

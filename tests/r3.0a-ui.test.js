@@ -34,10 +34,12 @@ chk('index.html consumes derived mainNav (no inline whitelist)', /FeatureRegistr
 chk('main nav drives setShellSection', /@click="setShellSection\(item\.id\)"/.test(html));
 chk('sidebar highlights active section', /shellSection===item\.id/.test(html));
 
-// per-case navigation (8 views) — R3-UX0: case nav is DERIVED from the registry (one list, shared with caseSubviewIds).
-const CASE_NAV_IDS = ['overview', 'setup_model', 'telemetry', 'measured_metrics', 'model_vs_actual', 'recommendations', 'corner_coaching', 'evidence_trust'];
+// per-case navigation (11 views) — R3-UX0: case nav is DERIVED from the registry (one list,
+// shared with caseSubviewIds). R3.0D D5 added 'engineer_brief' as the 9th subview;
+// R3.0E E5 adds 'experiment_loop' (10th) and 'case_timeline' (11th).
+const CASE_NAV_IDS = ['overview', 'setup_model', 'telemetry', 'measured_metrics', 'model_vs_actual', 'recommendations', 'corner_coaching', 'evidence_trust', 'engineer_brief', 'experiment_loop', 'case_timeline'];
 const derivedCaseNav = REG.deriveCaseNav().map(function (n) { return n.id; });
-chk('case nav: 8 derived subviews', derivedCaseNav.length === 8 && CASE_NAV_IDS.every(function (id) { return derivedCaseNav.indexOf(id) !== -1; }));
+chk('case nav: 11 derived subviews', derivedCaseNav.length === 11 && CASE_NAV_IDS.every(function (id) { return derivedCaseNav.indexOf(id) !== -1; }));
 chk('caseNav === caseSubviewIds (single derived list, no divergence)', JSON.stringify(derivedCaseNav) === JSON.stringify(REG.deriveCaseSubviewIds()));
 CASE_NAV_IDS.forEach(function (id) {
   chk('case nav i18n label (en/zh/ja): ' + id, !!SHELL.en['ui.caseNav.' + id] && !!SHELL.zh['ui.caseNav.' + id] && !!SHELL.ja['ui.caseNav.' + id]);
@@ -74,12 +76,26 @@ chk('svShow method present', /svShow\(name\)\{/.test(html));
 });
 chk('Setup Analyzer (predict) is reachable as Setup & Model', /caseSubview==='setup_model'\) return id==='predict'/.test(html.replace(/\s+/g, ' ')) || /setup_model[\s\S]{0,40}predict/.test(html));
 
-// honest deferral (§5.4): Comparisons is an explicit deferred info panel, NOT a fake control.
-// Copy is now i18n'd → assert the pane references the deferral keys AND every locale keeps the honest meaning.
-chk('comparisons pane is deferred', /t\('ui\.comparisons\.deferred'\)/.test(html) && /Deferred to R3\.0C/.test(SHELL.en['ui.comparisons.deferred']));
-chk('comparisons states nothing fabricated', /t\('ui\.comparisons\.deferredBody'\)/.test(html) && /fabricated/i.test(SHELL.en['ui.comparisons.deferredBody']) && /捏造/.test(SHELL.zh['ui.comparisons.deferredBody']) && /捏造/.test(SHELL.ja['ui.comparisons.deferredBody']));
-chk('deferred marker on nav item (registry-derived)', (REG.deriveMainNav().find(function (n) { return n.id === 'comparisons'; }) || {}).deferred === 'R3.0C' && /x-text="item\.deferred"/.test(html));
-chk('R3.0C deferred features are stable deferred IDs, not fake controls', ['case_comparison', 'reference_lap', 'corner_delta'].every(function (id) { var f = REG.getFeature(id); return !!f && f.availability === 'deferred' && f.deferredReason === 'R3.0C' && (!f.allowedActions || f.allowedActions.length === 0) && !f.rendererAdapter; }));
+// R3.0C C7: the Comparisons pane is now the real Comparison Workspace pane. The deferred
+// placeholder copy remains in the i18n shell dictionary for governance-honest cross-references,
+// but the pane HTML no longer renders it — instead it renders the workspace with viewmodel
+// state. The three R3.0C feature IDs (case_comparison / reference_lap / corner_delta) remain
+// availability='deferred' until C8_ACTIVATION wires the rendererAdapter.
+chk('C7 comparison workspace pane present', /data-r3c-c7-pane="comparison-workspace"/.test(html));
+chk('C7 placeholder accessor wired', /comparisonVMState\(\)/.test(html));
+chk('C7 deferred copy still in shell dictionary', /Deferred to R3\.0C/.test(SHELL.en['ui.comparisons.deferred']));
+// R3.0C C8_ACTIVATION (state-aware): deferred nav marker + deferred feature shape hold while
+// governance/r3.0c/state.json.featureRegistryActivationAllowed=false (C0–C7). After C8 flips the
+// flag the comparisons nav loses its deferred marker and the three IDs switch to active+adapter.
+// Fail-closed reading of state.json defaults to activation=false so the deferred assertions hold.
+var _r30cActAllowed = (function () { try { var p = require('path'); var fsm = require('fs'); var st = JSON.parse(fsm.readFileSync(p.join(__dirname, '..', 'governance', 'r3.0c', 'state.json'), 'utf8')); return st && st.featureRegistryActivationAllowed === true; } catch (_) { return false; } })();
+if (_r30cActAllowed) {
+  chk('C8 activation: comparisons nav has no deferred marker', (REG.deriveMainNav().find(function (n) { return n.id === 'comparisons'; }) || {}).deferred === undefined && /x-text="item\.deferred"/.test(html));
+  chk('C8 activation: R3.0C feature IDs are available with rendererAdapter→comparisons', ['case_comparison', 'reference_lap', 'corner_delta'].every(function (id) { var f = REG.getFeature(id); return !!f && f.availability === 'available' && !!f.rendererAdapter && f.rendererAdapter.paneId === 'comparisons' && f.deferredReason === undefined; }));
+} else {
+  chk('deferred marker on nav item (registry-derived)', (REG.deriveMainNav().find(function (n) { return n.id === 'comparisons'; }) || {}).deferred === 'R3.0C' && /x-text="item\.deferred"/.test(html));
+  chk('R3.0C deferred features are stable deferred IDs, not fake controls', ['case_comparison', 'reference_lap', 'corner_delta'].every(function (id) { var f = REG.getFeature(id); return !!f && f.availability === 'deferred' && f.deferredReason === 'R3.0C' && (!f.allowedActions || f.allowedActions.length === 0) && !f.rendererAdapter; }));
+}
 
 // existing panes still gated by showPane (single visibility mechanism)
 chk('showPane drives panes', (html.match(/x-show="showPane\('/g) || []).length >= 10);

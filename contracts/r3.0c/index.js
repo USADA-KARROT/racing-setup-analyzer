@@ -18,7 +18,11 @@
   var NP = _req('./normalized-position-contract.js', typeof R3_0C_NormalizedPositionContract !== 'undefined' ? R3_0C_NormalizedPositionContract : undefined);
   var CE = _req('./comparison-eligibility-contract.js', typeof R3_0C_ComparisonEligibilityContract !== 'undefined' ? R3_0C_ComparisonEligibilityContract : undefined);
   var EX = _req('./comparison-export-contract.js', typeof R3_0C_ComparisonExportContract !== 'undefined' ? R3_0C_ComparisonExportContract : undefined);
-  if (!RC || !CR || !VL || !NP || !CE || !EX) throw new Error('contracts/r3.0c/index.js could not load the contract modules');
+  var RAC = _req('./reference-and-corner-contract.js', typeof R3_0C_ReferenceAndCornerContract !== 'undefined' ? R3_0C_ReferenceAndCornerContract : undefined);
+  var DM = _req('./delta-metrics-contract.js', typeof R3_0C_DeltaMetricsContract !== 'undefined' ? R3_0C_DeltaMetricsContract : undefined);
+  var FIR = _req('./framing-i18n-key-registry.js', typeof R3_0C_FramingI18nKeyRegistry !== 'undefined' ? R3_0C_FramingI18nKeyRegistry : undefined);
+  var VST = _req('./viewmodel-state-transition-contract.js', typeof R3_0C_ViewmodelStateTransitionContract !== 'undefined' ? R3_0C_ViewmodelStateTransitionContract : undefined);
+  if (!RC || !CR || !VL || !NP || !CE || !EX || !RAC || !DM || !FIR || !VST) throw new Error('contracts/r3.0c/index.js could not load the contract modules');
 
   var api = {
     reasonCodes: RC,
@@ -27,6 +31,10 @@
     normalizedPosition: NP,
     comparisonEligibility: CE,
     comparisonExport: EX,
+    referenceAndCorner: RAC,
+    deltaMetrics: DM,
+    framingI18nKeyRegistry: FIR,
+    viewmodelStateTransition: VST,
     // convenience top-level constants
     REASON_CODES: RC.REASON_CODES,
     ALL_REASON_CODES: RC.ALL_REASON_CODES,

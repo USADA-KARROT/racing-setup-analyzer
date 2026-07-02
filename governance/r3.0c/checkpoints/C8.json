@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0C",
+  "checkpoint": "C8_ACTIVATION",
+  "baseSha": "2acf089e8b34abcac20fde8bd8450678b57a49be",
+  "headSha": null,
+  "previousCheckpoint": "C7_UI",
+
+  "shaSeparation": {
+    "note": "Per SKYLINE 2026-06-28 Continuous Delivery Master Directive §22 the C8 manifest preserves the three-way SHA separation. reviewedCandidateSha is the exact SHA Codex C-B was issued against; manifestCommitSha is this manifest's own commit; integrationSha is the post-merge Train HEAD. Substituting one for another is a tier violation.",
+    "reviewedCandidateSha": "f9deb13e5fb1a59bc6e4beba74cc332b74702c3f",
+    "reviewedCandidateNote": "Codex C-B Round 6 returned VERDICT: PASS against this exact SHA on 2026-06-28. Six prior rounds (R1-R5) closed 21 distinct findings; the post-fix manifest commit at f9deb13 was the first round with zero new findings. Tier 1 raw stdout for every round persisted under governance/r3.0c/codex-checkpoint-evidence/C-B/round-{1..6}-*.md.",
+    "manifestCommitSha": null,
+    "manifestCommitNote": "Filled by the same follow-up evidence-anchoring commit; mirrors C5R / C6 / C7 convention.",
+    "integrationSha": null,
+    "integrationNote": "Filled only after the C8 branch-to-branch PR merges into feat/r3.0-integrated-delivery AND the Train target-context trusted-verification PASSes at that integration HEAD."
+  },
+
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
+    { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-track-identity.js", "capability": "track_identity_authoritative" },
+    { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-normalized-distance.js", "capability": "normalized_distance_present" },
+    { "path": "renderer/js/r3-0c-reference-selection.js", "capability": "reference_selection_present" },
+    { "path": "renderer/js/r3-0c-corner-segmentation.js", "capability": "corner_segmentation_present" },
+    { "path": "renderer/js/r3-0c-corner-pairing.js", "capability": "corner_pairing_present" },
+    { "path": "renderer/js/r3-0c-delta-metrics.js", "capability": "delta_metrics_present" },
+    { "path": "renderer/js/r3-0c-comparison-export.js", "capability": "comparison_export_present" },
+    { "path": "renderer/js/r3-0c-comparison-orchestrator.js", "capability": "ui_present" },
+    { "path": "renderer/js/r3-0c-comparison-viewmodel.js", "capability": "ui_present" },
+    { "path": "renderer/js/i18n-comparisons.js", "capability": "ui_present" },
+    { "path": "renderer/js/r3-0c-contracts-bundle.js", "capability": "ui_present" },
+    { "path": "renderer/js/feature-registry.js", "capability": "feature_registry_active" }
+  ],
+
+  "newlyAuthorizedPath": "renderer/js/feature-registry.js",
+  "newlyEnabledCapability": "feature_registry_active",
+
+  "enabledCapabilitiesBefore": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present", "comparison_export_present", "ui_present", "viewmodel_state_transition_contract", "framing_source_structured_contract"],
+  "enabledCapabilitiesAfter": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present", "comparison_export_present", "ui_present", "viewmodel_state_transition_contract", "framing_source_structured_contract", "feature_registry_active"],
+  "forbiddenCapabilities": [],
+
+  "activationContract": {
+    "featureRegistryActivationAllowed": true,
+    "finalActivationReached": true,
+    "activatedFeatureIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "activatedFeatureShape": {
+      "availability": "available",
+      "rendererAdapter": { "paneId": "comparisons", "focusTarget": null },
+      "deferredReason": "absent"
+    },
+    "navNodeComparisonsAvailability": "available",
+    "comparisonScope": {
+      "sameAnalysisCaseOnly": true,
+      "sameSessionOnly": true,
+      "crossSessionForbidden": true,
+      "crossCaseForbidden": true,
+      "explicitReferenceSelectionOnly": true,
+      "autoFastestForbidden": true,
+      "medianForbidden": true,
+      "bestSectorCompositeForbidden": true
+    },
+    "deltaSignFormula": "comparison_minus_reference",
+    "authorityFlow": {
+      "boundary": "renderer/index.html app().openCase + loadDemoAnalysisCase + runImportedAnalysis — all route through _r3cBeginCaseTransition() at synchronous entry",
+      "canonicalRecord": "_buildCanonical(caseId, associations) — a CLOSURE-PRIVATE function inside r3cC8Authority's IIFE, invoked internally by forCaseStore and forDemo. It is NOT a property of the returned controller. Returns Object.freeze({ caseId, associations: Object.freeze({...string-or-null normalized fields...}) }) so the orchestrator's WeakSet predicate sees a frozen plain-prototype reference whose identity it controls.",
+      "weakSet": "r3cC8Authority closure-private WeakSet (Codex C-B Round 1 Finding 01 + Round 2 Finding 09 closure: the closure AND the surrounding `const r3cC8Authority` binding both live inside an outer IIFE — no script, eval, or developer-tools expression in the same realm can resolve `r3cC8Authority` by name; only the orchestrator's authenticityPredicate, supplied at construction, reads the WeakSet)",
+      "predicate": "createOrchestrator({authenticityPredicate: r3cC8Authority.predicate}) — closure capture; the WeakSet is not exposed on orchestrator, viewmodel, app(), or globalThis",
+      "rejectImportedSummary": "r3cC8Authority.forCaseStore(o) requires o.degraded === false STRICT (Codex C-B Round 1 Finding 05 closure); any other value — 1, 'yes', undefined, throwing accessor — fails closed and the registration helper returns null without touching the WeakSet AND without advancing _r3cC8LatestAuthorityRecord",
+      "failClosedDefault": "When the WeakSet is empty or the candidate caseRecord prototype is not Object.prototype, the predicate returns false → requestComparison emits INTERNAL_CONTRACT_VIOLATION. Default-constructed orchestrator (no predicate supplied) also fails closed.",
+      "identityPreservation": "Codex C-B Round 1 Finding 02 closure — renderer/js/r3-0c-comparison-viewmodel.js setAssociation no longer _safeShallowCopy's the caseRecord; it stores the reference IFF _isPlain(crSrc) && Object.isFrozen(crSrc), else null. This preserves WeakSet identity end-to-end while still refusing hostile Proxy / non-frozen inputs.",
+      "caseTransitionInvariant": "Codex C-B Round 1 Findings 03/04 + Round 2 Findings 10/11 closure — _r3cBeginCaseTransition() is the single shared invalidation helper called SYNCHRONOUSLY at every case-context transition (openCase / loadDemoAnalysisCase / runImportedAnalysis). It (1) bumps _r3cC8OpenToken so any in-flight promise commit gates out at `if (tok !== self._r3cC8OpenToken)`, (2) nulls _r3cC8LatestAuthorityRecord, (3) clears caseDataHolder.lastSession + lastSessionId so prior-case laps cannot survive into the new selectors, (4) notifies the viewmodel of case_reopen so its in-flight comparison commit is dropped at stale-token check.",
+      "trustedDemoBuilderCapture": "Codex C-B Round 4 Finding 19 closure — `const _trustedDemoBuilder = (function () { ... })();` is declared INSIDE the outer IIFE at script-parse time. It captures DemoAnalysisCase.buildDemoAnalysisCase ONCE, before any other code can run. `app().loadDemoAnalysisCase` invokes the captured reference exclusively (typeof _trustedDemoBuilder !== 'function' shortcuts to modules_not_loaded; the live `DemoAnalysisCase.buildDemoAnalysisCase` global property is NEVER read on the demo authority path after the IIFE returns). Same-realm code that replaces the global DemoAnalysisCase.buildDemoAnalysisCase with a forged function after the IIFE returns CANNOT mint authoritative case+session pairs via the demo load path. The CSV-import path (app().runImportedAnalysis) still reads DemoAnalysisCase.buildDemoAnalysisCase live to obtain the vehicle/setup binding template, but its post-load registration calls ONLY r3cC8SessionAuthority.register(session) — there is no r3cC8Authority.forCaseStore / forDemo call from the import path, so the live-global lookup confers SESSION identity only (subject to its own unforgeable WeakSet) and CANNOT confer authoritative case identity. A future product step that wants to make import-derived cases authoritative would need to add its own IIFE-captured trusted builder + r3cC8Authority registration.",
+      "laneCandidateGate": "Codex C-B Round 2 Finding 11 closure — _r3cC8AuthoritativeSession() gates lap-candidate resolution by requiring the loaded session's id (session.sessionId or caseDataHolder.lastSessionId) to match the authoritative record's associations.telemetrySessionId. r3cC8LapCandidates / _r3cC8LapFor both read through this gate; any mismatch yields an empty list and a null descriptor."
+    },
+    "phaseBoundaryContractEnabled": false,
+    "phaseMetricStatus": "entry_delta / mid_delta / exit_delta REMAIN metricAvailability:false in viewmodel + export (phase_boundary_contract still disabled; UI displays the structurally-unavailable card)"
+  },
+
+  "stateAwareGuardMigration": {
+    "note": "Four pre-C8 hardcoded deferred-invariant guards converted to state-aware checks that read governance/r3.0c/state.json.featureRegistryActivationAllowed:",
+    "scripts/check-feature-registry.js": "deferredIntact → r30cContractIntact (active shape when flag true; deferred shape when flag false; legacy keys kept for downstream artifact consumers)",
+    "scripts/check-r3-0c-guard.js": "deferredStillDeferred + activatedShapeIntact (both must hold against the current state)",
+    "scripts/check-r3-0c-no-consumer.js": "checkFeatureRegistryStillDeferred → checkFeatureRegistryContract (state-aware branch); index.html R3.0C feature-name script ban now gated by state.uiAllowed (already true since C7)",
+    "tests/feature-registry.test.js": "C0–C7 deferred assertions kept; C8+ active assertions added behind ACTIVATION_ALLOWED branch read from state.json (fail-closed default = deferred)",
+    "tests/feature-router.test.js": "case_comparison route assertion split into deferred (C0–C7) / active (C8+) branches",
+    "failClosedReadingPolicy": "Every state-aware check reads governance/r3.0c/state.json via fs.readFileSync inside try/catch; any IO / JSON failure leaves activation=false so the deferred expectation continues to hold (a malicious state.json deletion CANNOT relax the deferred contract while it is still in force)."
+  },
+
+  "rendererWiring": {
+    "outerIifeBoundary": "renderer/index.html — `;(function(root){'use strict'; const caseDataHolder = ...; const _trustedDemoBuilder = ...; const r3cC8SessionAuthority = ...; const r3cC8Authority = ...; function app() {...}; root.app = app; })(typeof globalThis !== 'undefined' ? globalThis : this);` wraps caseDataHolder + _trustedDemoBuilder + r3cC8SessionAuthority + r3cC8Authority + function app() in one private IIFE; only `app` is exposed on globalThis. Codex C-B Round 2 Finding 09 closure — none of caseDataHolder / _trustedDemoBuilder / r3cC8SessionAuthority / r3cC8Authority are lexically resolvable by name from any other script or from eval in the same realm.",
+    "iifeCapturedReferences": [
+      "_trustedDemoBuilder (Codex C-B Round 4 Finding 19 closure) — IIFE captures DemoAnalysisCase.buildDemoAnalysisCase at parse-time; loadDemoAnalysisCase invokes EXCLUSIVELY this captured reference; the live global property is never re-read for the authority path. CSV-import (runImportedAnalysis) still uses the live global for vehicle/setup template but registers SESSION identity only (no case authority)."
+    ],
+    "appHelpers": [
+      "_r3cC8LatestAuthorityRecord (state — null until a successful authoritative register)",
+      "_r3cC8OpenToken (monotonic open-token, bumped by _r3cBeginCaseTransition)",
+      "_r3cBeginCaseTransition() — single shared invalidation helper (bumps token + nulls authority + clears caseDataHolder.lastSession+lastSessionId + notifies viewmodel of case_reopen)",
+      "_r3cC8AuthoritativeSessionId() — reads associations.telemetrySessionId from the current authoritative record",
+      "_r3cC8AuthoritativeSession() — returns caseDataHolder.lastSession ONLY when its loaded sessionId matches the authoritative record (Finding 11 gate)",
+      "_r3cC8SyncAssociationFromCase(rec, caseSource) — builds the comparison-eligibility association from the authoritative record + caller-supplied case source, passes the authoritative caseRecord reference into vm.setAssociation",
+      "r3cC8LapCandidates() — gated lap-candidate list for the reference + comparison selectors (empty when no authoritative session is loaded)",
+      "_r3cC8LapFor(lapId) — gated lap descriptor lookup",
+      "_r3cC8LapDescriptor(lapId) — builds the lap descriptor shape the viewmodel forwards into the orchestrator's eligibilityInput",
+      "r3cC8OnReferenceSelected(lapId) — selector @change handler → vm.setReference",
+      "r3cC8OnComparisonSelected(lapId) — selector @change handler → vm.setComparison",
+      "r3cC8OnExportClick() — export button @click handler → orchestrator.exportComparison → _downloadJson"
+    ],
+    "transitionCallSites": [
+      "openCase(id) → this._r3cBeginCaseTransition() at synchronous entry (Round 3 Finding 14: MUST be the first executable statement, BEFORE ensureStore()); promise commit drops stale token at `if (tok !== self._r3cC8OpenToken) return;`; on success non-degraded, r3cC8Authority.forCaseStore(o) registers + _r3cC8SyncAssociationFromCase wires association",
+      "loadDemoAnalysisCase() → this._r3cBeginCaseTransition() at synchronous entry; demo data sourced from _trustedDemoBuilder() (the IIFE-captured reference — NOT the live DemoAnalysisCase global); on success, r3cC8Authority.forDemo(demo.analysisCase) registers + _r3cC8SyncAssociationFromCase wires association; r3cC8SessionAuthority.register(demo.telemetrySession) marks the session unforgeable",
+      "runImportedAnalysis() → this._r3cBeginCaseTransition() at synchronous entry; CSV import does NOT register an authoritative case (no case-store boundary, no _trustedDemoBuilder analog), so the workspace remains idle/selecting until a future product step authorizes import-derived authority. Session identity IS registered via r3cC8SessionAuthority.register(session) — a future product step that pairs this session with an authoritative case will pass the lap-candidate gate"
+    ],
+    "noPublicRegistrationApi": "No method on the Alpine app() component exposes a way to add to the WeakSet. The closure-private r3cC8Authority is unreachable from any caller in the same realm. The orchestrator's authenticityPredicate is the only reader.",
+    "selectorWiring": "Reference + comparison <select> elements gain @change=\"r3cC8OnReferenceSelected/Comparison($event.target.value || null)\"; the option list comes from r3cC8LapCandidates() (gated by the authoritative-session check). Export <button> gains @click=\"r3cC8OnExportClick()\". The selectors render empty placeholders when no authoritative session is loaded (Codex C-B Round 2 Finding 11 — prior-session laps cannot leak through)."
+  },
+
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3-0c-activation.test.js",
+    "newSuiteAssertions": null,
+    "stateAwareSuites": ["tests/feature-registry.test.js", "tests/feature-router.test.js"],
+    "evidenceTier": "TIER 3 — Claude-verified on C8 branch HEAD; CI re-run on integrationSha is the authority for the Train target context. Browser runtime verification at the HTTP-served renderer/ layer additionally confirmed: comparisons mainNav entry is no longer deferred; navigateToFeature('case_comparison') resolves to shellSection='comparisons' / currentTab='comparisons' with deferred=false; the Comparison Workspace pane is reachable via the comparisons section; loadDemoAnalysisCase + openCase both populate _r3cC8LatestAuthorityRecord and add the canonical record to the renderer-private WeakSet."
+  },
+
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 6,
+    "verdictAt": "reviewedCandidateSha",
+    "reviewedCandidateSha": "f9deb13e5fb1a59bc6e4beba74cc332b74702c3f",
+    "verdictEvidenceFile": "governance/r3.0c/codex-checkpoint-evidence/C-B/round-6-f9deb13.md",
+    "verdictEvidenceSha256": "4c801451008fb8bd001209f8621c6b6c71b5ee1390754f55449437e4825227d0",
+    "passNote": "Round 6 verified: manifest accuracy with file:line evidence (C8.json:74,92-113 ↔ renderer/index.html:3332-3336, 3604-3638); CSV boundary (live builder at 3710, session-only registration at 3719, no forCaseStore/forDemo); authority gate (private WeakSets + strict degraded at 3345-3417, predicate injection at 4311-4315); cross-case/session isolation (transition invalidation at 3456-3468, authenticated session+ID gates at 3524-3538); race/stale-state closure (openCase invalidates before ensureStore + token check at 4122-4137); identity preservation (viewmodel.js:248-276; orchestrator.js:99-105,204-216); phase metrics (capability disabled at capabilities.json:75-79; filtering at orchestrator.js:225-240; viewmodel availability forced false at viewmodel.js:121-139); state-aware activation (state.json:20-26, feature-registry.js:74-81, check-feature-registry.js:20-53); governance lineage (Round 1-5 evidence hashes match C8.json:135-201; JSON parses); scope boundary (d317c1f → f9deb13 diff is governance/evidence only — no production or test changes); test integrity (182 activation assertions PASS; feature-registry 27/0; feature-router 20/0; full npm test reached known read-only sandbox mkdtemp EPERM — not an assertion failure).",
+    "rounds": [
+      {
+        "round": 6,
+        "reviewedSha": "f9deb13e5fb1a59bc6e4beba74cc332b74702c3f",
+        "verdict": "PASS",
+        "evidence": "governance/r3.0c/codex-checkpoint-evidence/C-B/round-6-f9deb13.md",
+        "evidenceSha256": "4c801451008fb8bd001209f8621c6b6c71b5ee1390754f55449437e4825227d0",
+        "findings": []
+      },
+      {
+        "round": 5,
+        "reviewedSha": "d317c1f646eb951f382d434943ba035c1ad1904a",
+        "verdict": "BLOCK",
+        "evidence": "governance/r3.0c/codex-checkpoint-evidence/C-B/round-5-d317c1f.md",
+        "evidenceSha256": "fc43f70b7e8b0446ed44236cef4a4012fba471cd64540a057e056efdcd14585e",
+        "findings": [
+          { "id": "C8-CB-RN-21", "title": "Manifest omits the trusted demo-builder capture mechanism", "triage": "ACCEPT", "fixCommit": "round-6", "fixSummary": "Add explicit trustedDemoBuilderCapture entry under authorityFlow + iifeCapturedReferences under rendererWiring documenting (a) _trustedDemoBuilder is captured at IIFE init, (b) loadDemoAnalysisCase invokes the captured reference exclusively, (c) the CSV-import (runImportedAnalysis) still uses the live DemoAnalysisCase global for its vehicle/setup template but registers SESSION identity only — no case authority — so a forged DemoAnalysisCase replacement cannot mint authoritative case identity via either path." }
+        ]
+      },
+      {
+        "round": 4,
+        "reviewedSha": "09345c40ad7df2d71e25a05f8e097921836ba9d5",
+        "verdict": "BLOCK",
+        "evidence": "governance/r3.0c/codex-checkpoint-evidence/C-B/round-4-09345c4.md",
+        "evidenceSha256": "072aa725adf0b36cebb60bfacf32b81fde174c08babbee04407a4253d1d1e4f0",
+        "findings": [
+          { "id": "C8-CB-RN-19", "title": "Mutable demo provider can mint both authoritative case and session identities", "triage": "ACCEPT", "fixCommit": "round-5", "fixSummary": "Capture _trustedDemoBuilder = DemoAnalysisCase.buildDemoAnalysisCase at IIFE init time; loadDemoAnalysisCase uses the captured reference, NOT the live global. Same-realm code that later replaces the global with a forged builder cannot mint authoritative case+session pairs. Browser runtime confirms: after attacker installs PWNED_CASE/evil_sess builder on the global, loadDemoAnalysisCase still registers the LEGITIMATE demo_case_001; the forged lap 'X' does NOT appear in lap candidates." },
+          { "id": "C8-CB-RN-20", "title": "Section 11 does not execute its claimed negative security cases", "triage": "ACCEPT", "fixCommit": "round-5", "fixSummary": "Section 11 rewritten: (a) call loadDemoAnalysisCase FIRST to seed authority; (b) preflight asserts authority is non-null; (c) openCase against fake id MUST null _r3cC8LatestAuthorityRecord synchronously even though ensureStore throws; (d) token bump verified even after ensureStore failure; (e) lap candidates verified to drop to zero. New Section 12 adds the demo-builder replacement attack runtime proof: install forged builder on global, call loadDemoAnalysisCase, assert authority is LEGITIMATE caseId and forged caseId/session NOT registered." }
+        ]
+      },
+      {
+        "round": 3,
+        "reviewedSha": "a768306ae59731bdbc57df88b0c615652c850150",
+        "verdict": "BLOCK",
+        "evidence": "governance/r3.0c/codex-checkpoint-evidence/C-B/round-3-a768306.md",
+        "evidenceSha256": "9bf71ec705b756960ca8ff2a7d44be54ef3ea03b04a194e07172c85803b2c6ff",
+        "findings": [
+          { "id": "C8-CB-RN-14", "title": "openCase does not invalidate at synchronous entry (ensureStore runs first)", "triage": "ACCEPT", "fixCommit": "round-4", "fixSummary": "openCase makes _r3cBeginCaseTransition() the FIRST executable statement; ensureStore() runs after. Browser runtime confirms openCase against a nonexistent caseId still bumps the open token synchronously (token 1→2)." },
+          { "id": "C8-CB-RN-15", "title": "Transition invariants not atomic under hostile session setter", "triage": "ACCEPT", "fixCommit": "round-4", "fixSummary": "_r3cBeginCaseTransition clears caseDataHolder.lastSession and lastSessionId in INDEPENDENT try/catch blocks so one hostile setter throw cannot prevent the other clear from running. Defense-in-depth on top of Finding 16's IIFE relocation of caseDataHolder." },
+          { "id": "C8-CB-RN-16", "title": "Mutable global session storage bypasses the lap authority gate", "triage": "ACCEPT", "fixCommit": "round-4", "fixSummary": "(a) caseDataHolder moved INSIDE the outer IIFE — closure-private; same-realm code cannot redefine its setters or assign a forged session. (b) New r3cC8SessionAuthority closure-private WeakSet binds loaded sessions to unforgeable identity; the trusted load paths (loadDemoAnalysisCase + runImportedAnalysis) register sessions into it. (c) _r3cC8AuthoritativeSession now requires r3cC8SessionAuthority.isAuthentic(s) in ADDITION to sessionId-string match — a forged session with the matching string but not WeakSet-registered fails closed." },
+          { "id": "C8-CB-RN-17", "title": "Runtime coverage omits navigation/stale-session attacks", "triage": "ACCEPT", "fixCommit": "round-4", "fixSummary": "Activation test Section 11 instantiates app() inside vm.createContext, calls openCase('fake') with an ensureStore-failing storage stub, and asserts _r3cC8OpenToken bumps synchronously (proving transition runs BEFORE ensureStore). Also exercises loadDemoAnalysisCase token bump + authority registration + lap-candidate visibility via the demo session that the trusted register path placed in the WeakSet." },
+          { "id": "C8-CB-RN-18", "title": "Manifest documents a nonexistent authority method (_buildCanonical)", "triage": "ACCEPT", "fixCommit": "round-4", "fixSummary": "authorityFlow.canonicalRecord wording corrected: _buildCanonical is a closure-private function inside r3cC8Authority's IIFE, invoked internally by forCaseStore and forDemo — NOT a property of the returned controller. The property-qualification 'r3cC8Authority._buildCanonical(...)' was wrong." }
+        ]
+      },
+      {
+        "round": 2,
+        "reviewedSha": "49ab0d5dbf4d42409ce433b33f7ba387fb21353c",
+        "verdict": "BLOCK",
+        "evidence": "governance/r3.0c/codex-checkpoint-evidence/C-B/round-2-49ab0d5.md",
+        "evidenceSha256": "f02fe253a6c1cdc891456cbde853bbe5fc26d403c10e27b6b4d89978aee58f7e",
+        "findings": [
+          { "id": "C8-CB-RN-09", "title": "Authority registration remains globally callable", "triage": "ACCEPT", "fixCommit": "round-3", "fixSummary": "Wrap both r3cC8Authority declaration and function app() in an outer IIFE; expose only root.app = app. Runtime test (Section 10) executes the renderer's script block in a vm context and proves r3cC8Authority + forCaseStore + forDemo are NOT resolvable by name after the IIFE returns." },
+          { "id": "C8-CB-RN-10", "title": "Demo navigation does not invalidate pending case opens", "triage": "ACCEPT", "fixCommit": "round-3", "fixSummary": "_r3cBeginCaseTransition() centralizes the invariants (bump token + null authority + clear lastSession + notifyCaseReopen). openCase + loadDemoAnalysisCase + runImportedAnalysis all call it synchronously at entry." },
+          { "id": "C8-CB-RN-11", "title": "Opened cases can consume laps retained from another session", "triage": "ACCEPT", "fixCommit": "round-3", "fixSummary": "_r3cBeginCaseTransition clears caseDataHolder.lastSession + lastSessionId. r3cC8LapCandidates / _r3cC8LapFor route through _r3cC8AuthoritativeSession() which requires the loaded session's id to match the authoritative record's associations.telemetrySessionId; mismatch yields empty list." },
+          { "id": "C8-CB-RN-12", "title": "Tests do not execute production authority boundary or navigation races", "triage": "ACCEPT", "fixCommit": "round-3", "fixSummary": "Activation test Section 10 loads index.html, extracts the script block, runs it in vm.createContext with module stubs, then asserts (a) app is on globalThis, (b) r3cC8Authority is NOT, (c) ReferenceError on r3cC8Authority / forCaseStore / forDemo lookup. Source-pattern assertions extended for IIFE wrap + _r3cBeginCaseTransition + lap-candidate gate." },
+          { "id": "C8-CB-RN-13", "title": "Checkpoint governance evidence contradicts the reviewed implementation", "triage": "ACCEPT", "fixCommit": "round-3", "fixSummary": "authorityFlow + rendererWiring blocks rewritten to match the current implementation: IIFE boundary, r3cC8Authority closure-private helper inventory, _r3cBeginCaseTransition single-helper invariant, _r3cC8AuthoritativeSession gate, strict o.degraded===false rejection wording." }
+        ]
+      },
+      {
+        "round": 1,
+        "reviewedSha": "0caa8c8ffea5400fbfbef92a85a578c77fe66d65",
+        "verdict": "BLOCK",
+        "evidence": "governance/r3.0c/codex-checkpoint-evidence/C-B/round-1-0caa8c8.md",
+        "evidenceSha256": "3efd8de2ffd2414583479883270e69a4399b09ea2f9328cb6c465eece5f3c411",
+        "findings": [
+          { "id": "C8-CB-RN-01", "title": "Renderer callers can mint arbitrary authentic case records", "triage": "ACCEPT", "fixCommit": "round-2", "fixSummary": "Move WeakSet + register helpers into IIFE-scope closure (r3cC8Authority); remove _r3cC7RegisterAuthenticCaseRecord + _r3cC7AuthenticCaseRecords from app() public API." },
+          { "id": "C8-CB-RN-02", "title": "Authentic records lose identity before reaching WeakSet predicate", "triage": "ACCEPT", "fixCommit": "round-2", "fixSummary": "Viewmodel setAssociation preserves caseRecord reference identity when input is plain + frozen; rejects non-frozen / hostile Proxy to null. Renderer-side builder always emits frozen records." },
+          { "id": "C8-CB-RN-03", "title": "Case reopen preserves stale authority/framing/result/export", "triage": "ACCEPT", "fixCommit": "round-2", "fixSummary": "openCase + loadDemoAnalysisCase null _r3cC8LatestAuthorityRecord and call vm.notifyCaseReopen() SYNCHRONOUSLY at initiation; only repopulate on successful non-degraded registration." },
+          { "id": "C8-CB-RN-04", "title": "Concurrent opens can commit older case after newer navigation", "triage": "ACCEPT", "fixCommit": "round-2", "fixSummary": "Monotonic _r3cC8OpenToken bumped at openCase entry; promise commit drops stale completions." },
+          { "id": "C8-CB-RN-05", "title": "Degraded-case rejection accepts truthy non-boolean values", "triage": "ACCEPT", "fixCommit": "round-2", "fixSummary": "r3cC8Authority.forCaseStore requires o.degraded === false strict; any other value (1, 'yes', undefined, throwing accessor) fails closed." },
+          { "id": "C8-CB-RN-06", "title": "Activated comparison route exposes a non-functional workspace", "triage": "ACCEPT WITH NARROWER FIX", "fixCommit": "round-2", "fixSummary": "Wire reference/comparison selectors @change → vm.setReference/setComparison; wire export @click → orchestrator.exportComparison + _downloadJson; auto-call setAssociation on successful case open; selectors populate from caseDataHolder.lastSession.laps when available (demo session has no laps array yet — selectors render empty placeholder; vm stays in SELECTING; full multi-lap session population is the next product deliverable but the wiring is in place)." },
+          { "id": "C8-CB-RN-07", "title": "Activation tests bypass actual renderer authority implementation", "triage": "ACCEPT", "fixCommit": "round-2", "fixSummary": "Add source-pattern assertions on renderer/index.html for the closure pattern + strict degraded + open clearing + token guard + selector handlers + export handler; add viewmodel identity-preservation tests with stub orchestrator capturing the requestComparison input." },
+          { "id": "C8-CB-RN-08", "title": "Required test-integrity exits were not achieved (Codex sandbox EPERM)", "triage": "OVERLY CONSERVATIVE", "fixCommit": null, "fixSummary": "Codex CLI ran with read-only sandbox; mkdtemp failed inside the sandbox. Claude-verified npm test EXIT=0 in writable environment (this commit AND round-2 commit); CI re-run on the integration SHA is the authoritative writable-environment evidence." }
+        ]
+      }
+    ],
+    "tierDisclosure": "Codex C-B (the final R3.0C phase gate). Tier 1 raw stdout persisted for all rounds at governance/r3.0c/codex-checkpoint-evidence/C-B/. Round 1: round-1-0caa8c8.md (sha256 3efd8de2ffd2414583479883270e69a4399b09ea2f9328cb6c465eece5f3c411). Round 2: round-2-49ab0d5.md (sha256 f02fe253a6c1cdc891456cbde853bbe5fc26d403c10e27b6b4d89978aee58f7e). Round 3: round-3-a768306.md (sha256 9bf71ec705b756960ca8ff2a7d44be54ef3ea03b04a194e07172c85803b2c6ff). Round 4: round-4-09345c4.md (sha256 072aa725adf0b36cebb60bfacf32b81fde174c08babbee04407a4253d1d1e4f0). Round 5: round-5-d317c1f.md (sha256 fc43f70b7e8b0446ed44236cef4a4012fba471cd64540a057e056efdcd14585e). Round 6: round-6-f9deb13.md (sha256 4c801451008fb8bd001209f8621c6b6c71b5ee1390754f55449437e4825227d0) — FINAL VERDICT PASS."
+  },
+
+  "scopeBoundary": {
+    "frozenFilesUntouched": true,
+    "r30bPersistenceUntouched": true,
+    "featureRegistryUnchangedExceptR3_0C_ActivationSurface": true,
+    "deferredFeatureIdsActivated": ["case_comparison", "reference_lap", "corner_delta"],
+    "phaseBoundaryContractEnabled": false,
+    "r3_0d_scope_introduced": false
+  },
+
+  "frozenDiff": 0,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedAvailableIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "expectedRendererAdapter": true,
+    "expectedRendererAdapterPaneId": "comparisons"
+  },
+
+  "packageVersion": "1.4.0",
+  "createdAt": "2026-06-28T00:00:00Z",
+  "status": "candidate",
+  "governanceChanged": true,
+  "changedFiles": [
+    "renderer/js/feature-registry.js",
+    "renderer/js/r3-0c-comparison-viewmodel.js",
+    "renderer/js/i18n-comparisons.js",
+    "renderer/index.html",
+    "scripts/check-feature-registry.js",
+    "scripts/check-r3-0c-guard.js",
+    "scripts/check-r3-0c-no-consumer.js",
+    "tests/feature-registry.test.js",
+    "tests/feature-router.test.js",
+    "tests/r3.0a-ui.test.js",
+    "tests/r3.0b-ui.test.js",
+    "tests/r3.0c-contract-foundation.test.js",
+    "tests/r3-0c-activation.test.js",
+    "tests/r3-0c-governance.test.js",
+    "tests/r3-0c-no-consumer.test.js",
+    "tests/r3-0-train.test.js",
+    "governance/r3.0c/state.json",
+    "governance/r3.0c/capabilities.json",
+    "governance/r3.0c/checkpoints/C8.json",
+    "governance/r3.0c/codex-checkpoint-evidence/C-B/round-1-0caa8c8.md",
+    "governance/r3.0c/codex-checkpoint-evidence/C-B/round-2-49ab0d5.md",
+    "governance/r3.0c/codex-checkpoint-evidence/C-B/round-3-a768306.md",
+    "governance/r3.0c/codex-checkpoint-evidence/C-B/round-4-09345c4.md",
+    "governance/r3.0c/codex-checkpoint-evidence/C-B/round-5-d317c1f.md",
+    "governance/r3.0c/codex-checkpoint-evidence/C-B/round-6-f9deb13.md",
+    "governance/r3.0/train.json",
+    ".github/workflows/ci.yml",
+    "package.json"
+  ],
+
+  "note": "C8_ACTIVATION — the final R3.0C checkpoint. Adds ONE production capability (feature_registry_active) backed by the existing renderer/js/feature-registry.js (now a newly-authorized R3.0C production path). The three R3.0C feature IDs (case_comparison / reference_lap / corner_delta) flip from availability='deferred' (no rendererAdapter) to availability='available' with rendererAdapter={paneId:'comparisons',focusTarget:null}; NAV_NODES.comparisons drops its deferredReason. The orchestrator's authenticityPredicate now has a real authority source: app().openCase + loadDemoAnalysisCase build a canonical frozen { caseId, associations } record and register it with the renderer-private WeakSet — imported_summary case-store records (o.degraded=true) are REFUSED inside the helper so an imported case cannot become an authoritative comparison case. Comparison scope (same-Analysis-Case / same-session-only / explicit reference selection / delta=comparison-reference) and phase-metric disability (phase_boundary_contract.enabled=false) are unchanged from C7. Four pre-C8 hardcoded deferred-invariant guards are converted to state-aware checks that read featureRegistryActivationAllowed (fail-closed default = deferred). C8 introduces no frozen R3.0B module change, no preset / car / physics constant change, and no R3.0D scope. C-B Codex review runs against the exact C8 candidate SHA; tier-1 raw stdout to be persisted under governance/r3.0c/codex-checkpoint-evidence/C-B/."
+}

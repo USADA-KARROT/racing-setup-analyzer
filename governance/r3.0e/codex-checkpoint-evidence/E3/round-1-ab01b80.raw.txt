@@ -1,0 +1,2925 @@
+Reading additional input from stdin...
+OpenAI Codex v0.141.0
+--------
+workdir: /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: none
+reasoning summaries: none
+session id: 019f1625-4943-7680-ac32-c2dc0bbf6f45
+--------
+user
+# Codex E3 Round 1 — initial adversarial review
+
+## Subject
+
+- Candidate SHA: **ab01b8077a802042fc5f8c9116317d8d2b7e239a**
+- PR: #29 on `feat/r3.0e-e3-outcome-classifier` → base `feat/r3.0-integrated-delivery`
+- Train HEAD (base for this checkpoint): `7642123ed384ad5a557a1a54047f81ff7b02b6c3`
+- main: `506012afea7b0296f2c1506cc77d4b39ffdf6ccb` (unchanged)
+
+## What was added
+
+### Production module (the only authorized E3 production path)
+- `renderer/js/r3-0e-outcome-classifier.js`
+  - public API: `classifyOutcome(input, opts)` + `verifyAuthoritativeOutcome(candidate)` + readonly constants (`SERVICE_VERSION`, `OUTCOME_SCHEMA_VERSION`, `ENVELOPE_BYTE_CAP`, `MIN_COMPARABILITY_FOR_VALID_COMPARISON`, `DATA_QUALITY_ISSUE_BLOCK_THRESHOLD`).
+  - producer attestation via closure-private WeakSet (`_authoritativeOutcomes`); WeakSet ops dispatched via captured `WeakSet.prototype.add/has` + captured `Reflect.apply`.
+  - module-init captures: `Object.freeze`, `Object.isFrozen`, `Object.is`, `Object.getOwnPropertyNames`, `Object.getOwnPropertyDescriptor`, `Object.getOwnPropertySymbols`, `Object.getPrototypeOf`, `Array.isArray`, `Date.parse`, `Reflect.apply`, `JSON.stringify`, `TextEncoder`, `Number.isFinite`, `Number.isInteger`.
+  - input wrapper has a CLOSED key set (`experiment`, `appliedChange`, `followUp`, `observation`, `controlVariableObservations`). Each nested sub-object also has a closed key set. Caller-supplied `class`, `outcome`, `confounders`, `comparabilityScore`, or any unknown own key → BLOCK with `UNKNOWN_OWN_KEY` via descriptor-only `_snapshotPlainShape` (does NOT fire `[[Get]]` on caller data for non-listed keys).
+  - precedence ladder: `invalid_comparison > inconclusive_due_to_confounders > inconclusive > contradicted > partially_confirmed > confirmed`.
+  - clock invoked AT MOST ONCE, in Step 9, AFTER all authority/structural gates pass; forged input → zero clock invocations.
+  - output passes through E1 `OUT.validateOutcomeShape`, deep-frozen, registered in WeakSet, envelope byte cap 128 KiB.
+  - `outcomeId` is deterministic FNV-1a hash of `(experimentId, changeId)` — NO clock leak.
+  - NO causal language, NO driver-blame, NO free-text feedback (i18n key only), NO raw telemetry, NO path leak.
+
+### Tests
+- `tests/r3.0e-outcome-classifier.test.js` (95 assertions across sections A..T) — confirmed / partially_confirmed / contradicted / inconclusive / invalid_comparison / inconclusive_due_to_confounders; cross-case; cross-session; missing applied change; stale; caller classification rejected; clone/JSON/structuredClone rejection; Proxy zero-read on extra own key; hostile clock; deterministic outcomeId; deep freeze; no causation/blame/path; mutation resistance; API export hardening.
+
+### Governance
+- `governance/r3.0e/state.json` — currentCheckpoint=E3_OUTCOME_CLASSIFIER; `outcome_classifier_present` enabled; `algorithmsAllowed=true` ONLY for the exact authorized path.
+- `governance/r3.0e/checkpoints/E3.json` — cumulative `authorizedPaths`: E2 stores + E3 classifier; previousCheckpoint=E2_EXPERIMENT_STORE.
+- `governance/r3.0/train.json` — currentPhaseCheckpoint=E3_OUTCOME_CLASSIFIER.
+- `package.json` — test manifest extended.
+
+### What was NOT changed (boundary)
+- contracts/r3.0e/* — untouched (E1).
+- renderer/js/r3-0e-stores.js — untouched (E2).
+- R3.0B persistence (case-record-schema, storage-backend, schema-migration, case-store, session-store, case-library-viewmodel) — untouched.
+- R3.0C contracts + production — untouched.
+- R3.0D contracts + production — untouched.
+- feature-registry.js, renderer/index.html, vehicle-preset-pipeline — untouched.
+
+### Test status
+- Local: `npm test` 87 test files all green. `r3.0e-outcome-classifier: 95/0`, `r3-0-train: 34/0`, governance + no-consumer + integrity green.
+- CI: trusted-verification-gate run 28414013195 SUCCESS on `ab01b80`.
+
+## Round 1 task
+
+Try to refute. Adversarial review of `renderer/js/r3-0e-outcome-classifier.js` + the test suite. Specifically look for:
+
+1. Can a hostile caller bypass `verifyAuthoritativeOutcome` (clone / Proxy / WeakSet rebind / `Reflect.apply` rebind / class confusion)?
+2. Can a hostile caller invoke `opts.clock` BEFORE the authority/structural gates pass (i.e. ANY path that fires `clock()` while input has unknown keys / wrong shapes / class-confused experiment)?
+3. Can a hostile caller smuggle a pre-classified `outcome` past the closed-key descriptor snapshot (Proxy with extra `ownKeys` / accessor / non-enumerable own key / Symbol key)?
+4. Does the precedence cascade ever leak a `confirmed` classification when comparison is invalid / control variables missing / contradictions present?
+5. Does the output ever contain caller-supplied free text (driverFeedback laundering as a "key" containing spaces / blame phrasing)?
+6. Are array element walks (`controlVariableObservations`, `sideEffects`, `contradicting/supportingEvidenceIds`, `dataQualityIssues`) safe against sparse arrays / Array subclass / `Array.prototype` poisoning / per-index accessor?
+7. Are the captured intrinsics actually used everywhere, or do any code paths fall back to ambient (`Object.freeze` / `Array.isArray` / `Date.parse`) that a post-load rebind could subvert?
+8. Does the deep-freeze walk handle cycles / Proxy children correctly?
+9. Are there any paths through the function that return a non-frozen envelope?
+10. Is `outcomeId` truly deterministic and free of clock leak (incl. edge cases where `experimentId` or `changeId` contain hash-collision-prone characters)?
+
+Up to 8 findings. Use this format:
+
+```
+Finding E3-R1-NN: <one-line>
+  evidence: file:line
+  severity: BLOCK | NIT
+  proposed closure: <change>
+```
+
+End with EXACTLY one of:
+
+```
+FINAL VERDICT: PASS
+FINAL VERDICT: BLOCK
+```
+codex
+I’ll use the GitHub review skill for this PR-style adversarial pass, then inspect the local files and candidate diff directly. Since the workspace is read-only, I’ll only review and report findings.
+exec
+/bin/bash -lc "sed -n '1,220p' /Users/SKYLINE/.codex/plugins/cache/openai-curated-remote/github/0.1.5/skills/github/SKILL.md && sed -n '1,260p' renderer/js/r3-0e-outcome-classifier.js && sed -n '1,260p' tests/r3.0e-outcome-classifier.test.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+---
+name: github
+description: Triage and orient GitHub repository, pull request, and issue work through the connected GitHub app. Use when the user asks for general GitHub help, wants PR or issue summaries, or needs repository context before choosing a more specific GitHub workflow.
+---
+
+# GitHub
+
+## Overview
+
+Use this skill as the umbrella entrypoint for general GitHub work in this plugin. It should decide whether the task stays in repo and PR triage or should be handed off to a more specific review, CI, or publish workflow.
+
+This plugin is intentionally hybrid:
+
+- Prefer the GitHub app from this plugin for repository, issue, pull request, comment, label, reaction, and PR creation workflows.
+- Use local `git` and `gh` only when the connector does not cover the job well, especially for current-branch PR discovery, branch creation, commit and push, `gh auth status`, and GitHub Actions log inspection.
+- Keep connector state and local checkout context aligned. If the request is about the current branch, resolve the local repo and branch before acting.
+
+Once the intent is clear, route to the specialist skill immediately and do not keep broad GitHub triage in scope longer than needed.
+
+## Connector-First Responsibilities
+
+Handle these directly in this skill when the request does not need a narrower specialist workflow:
+
+- repository orientation once the repo, PR, issue, or local checkout is identified
+- recent PR or issue triage
+- PR metadata summaries
+- PR patch inspection
+- PR comments, labels, and reactions
+- issue lookup and summarization
+- PR creation after a branch is already pushed
+
+Prefer the GitHub app from this plugin for those flows because it provides structured PR, issue, and review-adjacent data without depending on a local checkout. If the repository is not already identifiable from the user request or local git context, ask for the repo instead of pretending there is a repo-search flow that may not exist.
+
+## Routing Rules
+
+1. Resolve the operating context first:
+   - If the user provides a repository, PR number, issue number, or URL, use that.
+   - If the request is about "this branch" or "the current PR", resolve local git context and use `gh` only as needed to discover the branch PR.
+   - If the repository is still ambiguous after local inspection, ask for the repo identifier.
+2. Classify the request before taking action:
+   - `repo or PR triage`: summarize PRs, issues, patches, comments, labels, reactions, or repository state
+   - `review follow-up`: unresolved review threads, requested changes, or inline review feedback
+   - `CI debugging`: failing checks, Actions logs, or CI root-cause analysis
+   - `publish changes`: create or switch branches, stage changes, commit, push, and open a draft PR
+3. Route to the specialist skill as soon as the category is clear:
+   - Review comments and requested changes: `../gh-address-comments/SKILL.md`
+   - Failing GitHub Actions checks: `../gh-fix-ci/SKILL.md`
+   - Commit, push, and open PR: `../yeet/SKILL.md`
+4. Keep the hybrid model consistent after routing:
+   - connector first for PR and issue data
+   - local `git` and `gh` only for the specific gaps the connector does not cover
+
+## Default Workflow
+
+1. Resolve repository and item scope.
+2. Gather structured PR or issue context through the GitHub app from this plugin.
+3. Decide whether the task stays in connector-backed triage or needs a specialist skill.
+4. Route immediately when the work becomes review follow-up, CI debugging, or publish workflow.
+5. End with a clear summary of what was inspected, what changed, and what remains.
+
+## Output Expectations
+
+- For triage requests, return a concise summary of the repository, PR, or issue state and the next likely action.
+- For mixed requests, tell the user which specialist path you are taking and why.
+- For connector-backed write actions, restate the exact PR, issue, label, or reaction target before applying the change.
+- Never imply that GitHub Actions logs are available through the connector alone. That remains a `gh` workflow.
+
+## Examples
+
+- "Use GitHub to summarize the open PRs in this repo and tell me what needs attention."
+- "Help with this PR."
+- "Review the latest comments on PR 482 and tell me what is actionable."
+- "Debug the failing checks on this branch."
+- "Commit these changes, push them, and open a draft PR."
+/**
+ * renderer/js/r3-0e-outcome-classifier.js — R3.0E E3 · Outcome Classifier (PRODUCTION).
+ *
+ * Authoritative entry: classifyOutcome(input, opts)
+ *
+ * Hard contract (SKYLINE 2026-06-30 R3.0 Continuous Resume Directive §6):
+ *   • Inputs are authoritative-only:
+ *       - experiment            (E1-valid Experiment; status MUST be 'applied'.
+ *                                 outcome field MUST be null — E1 already enforces this
+ *                                 invariant for draft/planned/applied, so caller-provided
+ *                                 final outcomes are rejected at the contract layer.)
+ *       - appliedChange         (audit record bound to experiment.experimentId).
+ *       - followUp              (R3.0B follow-up identity + R3.0C comparison-authority
+ *                                 attestation: parentCaseId, sessionId, parentSessionId,
+ *                                 hasExplicitReference, comparabilityScore).
+ *       - observation           (observed direction/magnitude + evidence id arrays;
+ *                                 i18n-keyed driverFeedback ONLY; no free text;
+ *                                 no causal claim; no raw telemetry).
+ *       - controlVariableObservations (E1-valid Control Variables with observedValue +
+ *                                 withinRange filled per the E3 algorithm requirement).
+ *   • E3 NEVER accepts a caller-provided `class`, `confounders`, `comparabilityScore` on
+ *     the outcome side — the classifier derives all of them. The input wrapper has a
+ *     CLOSED key set; any caller-supplied outcome / class / classification field is an
+ *     UNKNOWN_OWN_KEY → BLOCK before any further read.
+ *   • Confirmed requires ALL of:
+ *       same case (sourceCaseId match)
+ *       same session
+ *       explicit reference selected
+ *       applied change audit bound to this experiment
+ *       expected observation predefined (E1 enforces expectedDirection + range)
+ *       every declared control variable observed AND withinRange === true
+ *       no major data-quality issue
+ *       no contradicting evidence ids
+ *       direction matches AND magnitude inside expectedMagnitudeRange
+ *   • invalid_comparison takes PRECEDENCE over inconclusive / confirmed when:
+ *       cross-case, cross-session, or no explicit reference, or comparabilityScore<0.5.
+ *   • inconclusive_due_to_confounders takes precedence over confirmed/contradicted when
+ *     control variables are missing or out-of-range.
+ *   • Output never contains: free-text driver feedback, blame language, causation claim,
+ *     raw telemetry samples, filesystem paths, source filenames, usernames, machine IDs,
+ *     internal database handles, stack traces, or Electron private paths.
+ *   • Clock is invoked at most ONCE, AFTER all authority/structural gates pass. Forged
+ *     or malformed input → zero clock invocations.
+ *   • All ambient intrinsic references (Object.isFrozen, Object.is, Date.parse,
+ *     Array.isArray, Reflect.apply, WeakSet ctor/add/has) are captured at module init
+ *     so a post-load rebind of the global cannot defeat verification.
+ *   • Producer attestation: every successfully-classified outcome envelope is registered
+ *     in a closure-private WeakSet. The exported verifyAuthoritativeOutcome(candidate)
+ *     checks identity (WeakSet membership) AND structural witnesses (deep-frozen +
+ *     schemaVersion + outcomeId + experimentId). The WeakSet, register function, and
+ *     captured WeakSet primitives are NEVER exposed.
+ *
+ * UMD: Node require / Electron renderer global (R3_0E_OutcomeClassifier).
+ */
+(function (root) {
+  'use strict';
+
+  // ---------- Module-init: load E1 contracts (literal-string require for no-consumer scan) ----
+  var RC_E = null, EXP = null, OUT = null, CV = null;
+  if (typeof module !== 'undefined' && module.exports) {
+    try { RC_E = require('../../contracts/r3.0e/reason-codes.js'); } catch (e) { RC_E = null; }
+    try { EXP = require('../../contracts/r3.0e/experiment-contract.js'); } catch (e) { EXP = null; }
+    try { OUT = require('../../contracts/r3.0e/outcome-contract.js'); } catch (e) { OUT = null; }
+    try { CV = require('../../contracts/r3.0e/control-variables-contract.js'); } catch (e) { CV = null; }
+  }
+  if (RC_E === null && typeof R3_0E_ReasonCodes !== 'undefined') RC_E = R3_0E_ReasonCodes;
+  if (EXP === null && typeof R3_0E_ExperimentContract !== 'undefined') EXP = R3_0E_ExperimentContract;
+  if (OUT === null && typeof R3_0E_OutcomeContract !== 'undefined') OUT = R3_0E_OutcomeContract;
+  if (CV === null && typeof R3_0E_ControlVariablesContract !== 'undefined') CV = R3_0E_ControlVariablesContract;
+  if (!RC_E || !EXP || !OUT || !CV) {
+    throw new Error('r3-0e-outcome-classifier.js: requires R3.0E E1 contracts');
+  }
+
+  var CODES = RC_E.REASON_CODES;
+
+  // ---------- Module-init: captured intrinsics ------------------------------------------------
+  var _CAPTURED_OBJECT_FREEZE = Object.freeze;
+  var _CAPTURED_OBJECT_IS_FROZEN = Object.isFrozen;
+  var _CAPTURED_OBJECT_IS = Object.is;
+  var _CAPTURED_OBJECT_GET_OWN_NAMES = Object.getOwnPropertyNames;
+  var _CAPTURED_OBJECT_GET_OWN_DESC = Object.getOwnPropertyDescriptor;
+  var _CAPTURED_OBJECT_GET_OWN_SYMS = Object.getOwnPropertySymbols;
+  var _CAPTURED_OBJECT_GET_PROTO = Object.getPrototypeOf;
+  var _CAPTURED_ARRAY_IS_ARRAY = Array.isArray;
+  var _CAPTURED_DATE_PARSE = Date.parse;
+  var _CAPTURED_REFLECT_APPLY = Reflect.apply;
+  var _CAPTURED_JSON_STRINGIFY = JSON.stringify;
+  var _CAPTURED_TEXT_ENCODER = (typeof TextEncoder !== 'undefined') ? TextEncoder : null;
+  var _CAPTURED_NUMBER_IS_FINITE = Number.isFinite;
+  var _CAPTURED_NUMBER_IS_INTEGER = Number.isInteger;
+
+  // WeakSet captures — defeat post-load WeakSet.prototype.has rebinds.
+  var _WeakSetCtor = WeakSet;
+  var _WS_ADD = WeakSet.prototype.add;
+  var _WS_HAS = WeakSet.prototype.has;
+  function _wsAdd(set, value) {
+    try { _CAPTURED_REFLECT_APPLY(_WS_ADD, set, [value]); return true; }
+    catch (e) { return false; }
+  }
+  function _wsHas(set, value) {
+    try { return _CAPTURED_REFLECT_APPLY(_WS_HAS, set, [value]) === true; }
+    catch (e) { return false; }
+  }
+
+  // Captured intrinsic helpers — all defensive wrappers.
+  function _isFrozenSafe(v) { try { return _CAPTURED_OBJECT_IS_FROZEN(v) === true; } catch (e) { return false; } }
+  function _isArraySafe(v) { try { return _CAPTURED_ARRAY_IS_ARRAY(v) === true; } catch (e) { return false; } }
+  function _exactlyEqual(a, b) { try { return _CAPTURED_OBJECT_IS(a, b) === true; } catch (e) { return false; } }
+  function _isoToMs(s) {
+    try {
+      if (typeof s !== 'string' || s.length === 0) return null;
+      var n = _CAPTURED_DATE_PARSE(s);
+      if (typeof n !== 'number' || n !== n /* NaN */) return null;
+      return n;
+    } catch (e) { return null; }
+  }
+  function _utf8Bytes(s) {
+    try {
+      if (typeof s !== 'string') return 0;
+      if (_CAPTURED_TEXT_ENCODER !== null) return new _CAPTURED_TEXT_ENCODER().encode(s).length;
+      return (typeof Buffer !== 'undefined') ? Buffer.byteLength(s, 'utf8') : s.length * 4;
+    } catch (e) { return Infinity; }
+  }
+
+  // ---------- Module-init integrity snapshot --------------------------------------------------
+  // The captures above MUST themselves still resolve as expected at call time. If the host
+  // mutates Object.isFrozen between module load and the first classifyOutcome call, the
+  // captured reference remains intact (we hold the function value), but defence-in-depth
+  // we re-verify the contract surfaces are frozen at call entry.
+  var _CONTRACTS_FROZEN_AT_LOAD = (function () {
+    try {
+      return _CAPTURED_OBJECT_IS_FROZEN(EXP) === true
+          && _CAPTURED_OBJECT_IS_FROZEN(OUT) === true
+          && _CAPTURED_OBJECT_IS_FROZEN(CV) === true
+          && _CAPTURED_OBJECT_IS_FROZEN(RC_E) === true;
+    } catch (e) { return false; }
+  })();
+
+  function _intrinsicsIntact() {
+    if (!_CONTRACTS_FROZEN_AT_LOAD) return false;
+    if (typeof EXP.validateExperimentShape !== 'function') return false;
+    if (typeof OUT.validateOutcomeShape !== 'function') return false;
+    if (typeof CV.validateControlVariableShape !== 'function') return false;
+    if (typeof RC_E.buildBlockedResult !== 'function') return false;
+    return true;
+  }
+
+  function _buildTamperBlock(detail) {
+    return _CAPTURED_OBJECT_FREEZE({
+      valid: false,
+      reasonCodes: _CAPTURED_OBJECT_FREEZE([CODES.INTERNAL_CONTRACT_VIOLATION]),
+      explanationKeys: _CAPTURED_OBJECT_FREEZE(['r3_0e.reason.internal_contract_violation']),
+      detail: typeof detail === 'string' ? detail : 'intrinsic tampering detected',
+      result: null,
+    });
+  }
+
+  // ---------- Constants -----------------------------------------------------------------------
+  var SERVICE_VERSION = 1;
+  var OUTCOME_SCHEMA_VERSION = 1;
+  var ARRAY_CAP = 32;
+  var ENVELOPE_BYTE_CAP = 128 * 1024;
+  var DEFAULT_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+  // E3 thresholds — comparison validity gates.
+  var MIN_COMPARABILITY_FOR_VALID_COMPARISON = 0.5;
+  // Data-quality threshold: a non-empty issues list reduces conclusion strength. A single
+  // minor issue still permits classification; more than this count → inconclusive.
+  var DATA_QUALITY_ISSUE_BLOCK_THRESHOLD = 4;
+
+  // Closed key sets for the E3 input wrapper and nested authoritative sub-objects.
+  var INPUT_KEYS_ALLOWED = _CAPTURED_OBJECT_FREEZE([
+    'experiment',
+    'appliedChange',
+    'followUp',
+    'observation',
+    'controlVariableObservations',
+  ]);
+  var APPLIED_CHANGE_KEYS_ALLOWED = _CAPTURED_OBJECT_FREEZE([
+    'changeId',
+    'sourceExperimentId',
+    'appliedAt',
+  ]);
+  var FOLLOWUP_KEYS_ALLOWED = _CAPTURED_OBJECT_FREEZE([
+    'followUpCaseId',
+    'parentCaseId',
+    'sessionId',
+    'parentSessionId',
+    'hasExplicitReference',
+    'comparabilityScore',
+  ]);
+  var OBSERVATION_KEYS_ALLOWED = _CAPTURED_OBJECT_FREEZE([
+    'observedDirection',
+    'observedMagnitude',
+    'driverFeedback',
+    'dataQualityIssues',
+    'sideEffects',
+    'contradictingEvidenceIds',
+    'supportingEvidenceIds',
+  ]);
+  var OPTS_KEYS_ALLOWED = _CAPTURED_OBJECT_FREEZE([
+    'clock',
+    'referenceNowMs',
+    'maxAgeMs',
+  ]);
+
+  var DIRECTION_ALLOWED = _CAPTURED_OBJECT_FREEZE(['increase', 'decrease', 'no_change']);
+  var ID_GRAMMAR_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+  var ID_FORBIDDEN_RE = /(\.\.|[\/\\]|^\.)/;
+
+  // ---------- Producer attestation (closure-private WeakSet) ----------------------------------
+  // After successful classifyOutcome → registered. The exported verifyAuthoritativeOutcome
+  // checks identity (WeakSet) + shape (deep-frozen + required fields). Clones and JSON
+  // round-trips lose identity → verifier returns false.
+  var _authoritativeOutcomes = new _WeakSetCtor();
+  function _registerAuthoritativeOutcome(envelope) {
+    _wsAdd(_authoritativeOutcomes, envelope);
+  }
+  function verifyAuthoritativeOutcome(candidate) {
+    try {
+      if (candidate === null || typeof candidate !== 'object') return false;
+      if (!_wsHas(_authoritativeOutcomes, candidate)) return false;
+      if (_CAPTURED_OBJECT_IS_FROZEN(candidate) !== true) return false;
+      if (candidate.schemaVersion !== OUTCOME_SCHEMA_VERSION) return false;
+      if (typeof candidate.outcomeId !== 'string') return false;
+      if (typeof candidate.experimentId !== 'string') return false;
+      if (typeof candidate['class'] !== 'string') return false;
+      if (!_isArraySafe(candidate.confounders)) return false;
+      if (!_isArraySafe(candidate.limitations)) return false;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // ---------- Structural helpers --------------------------------------------------------------
+  function _isOriginalPlainObject(v) {
+    try {
+      if (v === null || typeof v !== 'object' || _CAPTURED_ARRAY_IS_ARRAY(v)) return false;
+      var p = _CAPTURED_OBJECT_GET_PROTO(v);
+      return p === Object.prototype || p === null;
+    } catch (e) { return false; }
+  }
+  function _isPlainArray(v) {
+    try {
+      if (!_CAPTURED_ARRAY_IS_ARRAY(v)) return false;
+      var p = _CAPTURED_OBJECT_GET_PROTO(v);
+      return p === Array.prototype;
+    } catch (e) { return false; }
+  }
+  function _hasSymbolOwnKey(o) {
+    try {
+      var syms = _CAPTURED_OBJECT_GET_OWN_SYMS(o);
+      return _CAPTURED_ARRAY_IS_ARRAY(syms) && syms.length > 0;
+    } catch (e) { return true; }
+  }
+  function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
+  function _isFiniteNumber(v) {
+    return typeof v === 'number' && _CAPTURED_NUMBER_IS_FINITE(v) === true;
+  }
+  function _isBool(v) { return v === true || v === false; }
+  function _idGrammarOk(s) {
+/**
+ * tests/r3.0e-outcome-classifier.test.js — R3.0E E3 · Outcome Classifier adversarial tests.
+ *
+ * Coverage targets per SKYLINE 2026-06-30 R3.0 Continuous Resume Directive §6.7:
+ *   confirmed / partially_confirmed / contradicted / inconclusive / invalid_comparison /
+ *   inconclusive_due_to_confounders; cross-case + cross-session; missing applied change;
+ *   missing expected observation; uncontrolled variables; stale generation; contradiction
+ *   blocks confirmed; caller-classification rejected; forged records; clone rejection;
+ *   JSON clone rejection; structuredClone rejection; Proxy zero-read before authority;
+ *   hostile clock; duplicate evidence; deterministic IDs; deep freeze; no causation
+ *   wording; no driver blame; no raw telemetry leak; mutation tests.
+ */
+'use strict';
+var CL = require('../renderer/js/r3-0e-outcome-classifier.js');
+var EXP = require('../contracts/r3.0e/experiment-contract.js');
+var OUT = require('../contracts/r3.0e/outcome-contract.js');
+var CV = require('../contracts/r3.0e/control-variables-contract.js');
+var RC_E = require('../contracts/r3.0e/reason-codes.js');
+
+var pass = 0, fail = 0;
+function chk(msg, cond, detail) {
+  if (cond) pass += 1;
+  else { fail += 1; console.log('  FAIL ' + msg + (detail !== undefined ? '  ' + JSON.stringify(detail) : '')); }
+}
+
+var BASE_CASE = 'case_demo_a';
+var BASE_SESSION = 'session_demo_a';
+var BASE_EXP_ID = 'exp_0123456789abcdef';
+var BASE_CHANGE_ID = 'change_demo_001';
+var BASE_FOLLOWUP = 'case_demo_a_followup_1';
+var BASE_EXPERIMENT_TS = '2026-06-30T10:00:00Z';
+var BASE_APPLIED_TS = '2026-06-30T11:00:00Z';
+var BASE_CLOCK_ISO = '2026-06-30T11:30:00Z';
+
+function deepFreeze(v) {
+  if (v === null || typeof v !== 'object') return v;
+  Object.freeze(v);
+  var names = Object.getOwnPropertyNames(v);
+  for (var i = 0; i < names.length; i++) deepFreeze(v[names[i]]);
+  return v;
+}
+
+function makeExperiment(overrides) {
+  var e = {
+    schemaVersion: 1,
+    experimentId: BASE_EXP_ID,
+    sourceCaseId: BASE_CASE,
+    sourceHypothesisId: 'hyp_demo_001',
+    sourceRecommendationId: 'pri_demo_001',
+    targetMetric: 'roll_gradient_deg_per_g',
+    baselineValue: 3.5,
+    expectedDirection: 'decrease',
+    expectedMagnitudeRange: { min: 0.5, max: 1.5 },
+    setupChange: { component: 'front_arb', delta_nm_per_deg: 200 },
+    driverInstruction: null,
+    controlVariables: [
+      { name: 'tyre_temp_window', description: 'r3.0e.cv.tyre_temp_window',
+        expectedValue: 85, allowedRange: { min: 75, max: 95 }, observedValue: null, withinRange: null },
+    ],
+    validationPlan: 'r3.0e.plan.controlled_repeat_lap',
+    stopConditions: [{ i18nKey: 'r3.0e.stop.lap_time_increase', params: { threshold_s: 0.5 } }],
+    status: 'applied',
+    followUpCaseIds: [BASE_FOLLOWUP],
+    outcome: null,
+    createdAt: BASE_EXPERIMENT_TS,
+  };
+  if (overrides) for (var k in overrides) e[k] = overrides[k];
+  return deepFreeze(e);
+}
+function makeAppliedChange(overrides) {
+  var ac = {
+    changeId: BASE_CHANGE_ID,
+    sourceExperimentId: BASE_EXP_ID,
+    appliedAt: BASE_APPLIED_TS,
+  };
+  if (overrides) for (var k in overrides) ac[k] = overrides[k];
+  return ac;
+}
+function makeFollowUp(overrides) {
+  var fu = {
+    followUpCaseId: BASE_FOLLOWUP,
+    parentCaseId: BASE_CASE,
+    sessionId: BASE_SESSION,
+    parentSessionId: BASE_SESSION,
+    hasExplicitReference: true,
+    comparabilityScore: 0.9,
+  };
+  if (overrides) for (var k in overrides) fu[k] = overrides[k];
+  return fu;
+}
+function makeObservation(overrides) {
+  var o = {
+    observedDirection: 'decrease',
+    observedMagnitude: 1.0,
+    driverFeedback: 'r3.0e.driver.feedback.balance_improved',
+    dataQualityIssues: [],
+    sideEffects: [],
+    contradictingEvidenceIds: [],
+    supportingEvidenceIds: ['ev_demo_001'],
+  };
+  if (overrides) for (var k in overrides) o[k] = overrides[k];
+  return o;
+}
+function makeControlVariableObservations(overrides) {
+  var cv = [
+    { name: 'tyre_temp_window', description: 'r3.0e.cv.tyre_temp_window',
+      expectedValue: 85, allowedRange: { min: 75, max: 95 }, observedValue: 84, withinRange: true },
+  ];
+  if (overrides) return overrides;
+  return cv;
+}
+function makeInput(opts) {
+  opts = opts || {};
+  return {
+    experiment: opts.experiment || makeExperiment(opts.experimentOverrides),
+    appliedChange: opts.appliedChange || makeAppliedChange(opts.appliedChangeOverrides),
+    followUp: opts.followUp || makeFollowUp(opts.followUpOverrides),
+    observation: opts.observation || makeObservation(opts.observationOverrides),
+    controlVariableObservations: (opts.controlVariableObservations !== undefined)
+      ? opts.controlVariableObservations
+      : makeControlVariableObservations(),
+  };
+}
+function fixedClock() { return function () { return BASE_CLOCK_ISO; }; }
+
+// ------------------------------------------------------------------
+// Section A — Confirmed (golden path)
+// ------------------------------------------------------------------
+console.log('Section A — Confirmed (golden path)');
+(function () {
+  var r = CL.classifyOutcome(makeInput(), { clock: fixedClock() });
+  chk('A1: confirmed valid=true', r.valid === true, r);
+  chk('A2: confirmed class=confirmed', r.valid === true && r.outcome['class'] === 'confirmed');
+  chk('A3: confirmed has experimentId', r.valid === true && r.outcome.experimentId === BASE_EXP_ID);
+  chk('A4: confirmed has outcomeId outcome_<32hex>',
+    r.valid === true && /^outcome_[0-9a-f]{16}$/.test(r.outcome.outcomeId));
+  chk('A5: confirmed comparabilityScore preserved',
+    r.valid === true && r.outcome.comparabilityScore === 0.9);
+  chk('A6: confirmed confounders=[]',
+    r.valid === true && Array.isArray(r.outcome.confounders) && r.outcome.confounders.length === 0);
+  chk('A7: confirmed observedDirection=decrease',
+    r.valid === true && r.outcome.observedDirection === 'decrease');
+  chk('A8: confirmed observedMagnitude=1.0',
+    r.valid === true && r.outcome.observedMagnitude === 1.0);
+  chk('A9: confirmed outcome deep-frozen', r.valid === true && Object.isFrozen(r.outcome));
+  chk('A10: confirmed outcome.confounders deep-frozen',
+    r.valid === true && Object.isFrozen(r.outcome.confounders));
+  chk('A11: confirmed outcome.limitations deep-frozen',
+    r.valid === true && Object.isFrozen(r.outcome.limitations));
+  chk('A12: confirmed envelope deep-frozen', r.valid === true && Object.isFrozen(r));
+  chk('A13: confirmed passes verifyAuthoritativeOutcome',
+    r.valid === true && CL.verifyAuthoritativeOutcome(r.outcome) === true);
+  chk('A14: confirmed schemaVersion=1', r.valid === true && r.outcome.schemaVersion === 1);
+})();
+
+// ------------------------------------------------------------------
+// Section B — Partially confirmed (direction match, magnitude out of range)
+// ------------------------------------------------------------------
+console.log('Section B — Partially confirmed');
+(function () {
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { observedDirection: 'decrease', observedMagnitude: 0.3 },
+  }), { clock: fixedClock() });
+  chk('B1: partially_confirmed valid', r.valid === true, r);
+  chk('B2: partially_confirmed class', r.valid === true && r.outcome['class'] === 'partially_confirmed');
+  chk('B3: partially_confirmed observedMagnitude preserved',
+    r.valid === true && r.outcome.observedMagnitude === 0.3);
+})();
+(function () {
+  // Magnitude above max
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { observedDirection: 'decrease', observedMagnitude: 5.0 },
+  }), { clock: fixedClock() });
+  chk('B4: partially_confirmed (above max)',
+    r.valid === true && r.outcome['class'] === 'partially_confirmed');
+})();
+
+// ------------------------------------------------------------------
+// Section C — Contradicted (direction mismatch)
+// ------------------------------------------------------------------
+console.log('Section C — Contradicted');
+(function () {
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { observedDirection: 'increase', observedMagnitude: 1.0 },
+  }), { clock: fixedClock() });
+  chk('C1: contradicted valid', r.valid === true);
+  chk('C2: contradicted class', r.valid === true && r.outcome['class'] === 'contradicted');
+})();
+(function () {
+  // observed=no_change vs expected=decrease
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { observedDirection: 'no_change', observedMagnitude: 0.0 },
+  }), { clock: fixedClock() });
+  chk('C3: contradicted (no_change vs decrease)',
+    r.valid === true && r.outcome['class'] === 'contradicted');
+})();
+
+// ------------------------------------------------------------------
+// Section D — Inconclusive
+// ------------------------------------------------------------------
+console.log('Section D — Inconclusive');
+(function () {
+  // observedDirection=null
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { observedDirection: null, observedMagnitude: null },
+  }), { clock: fixedClock() });
+  chk('D1: inconclusive (null direction)',
+    r.valid === true && r.outcome['class'] === 'inconclusive');
+})();
+(function () {
+  // Many data-quality issues → blocking → inconclusive
+  var dq = ['r3.0e.dq.timebase_jitter', 'r3.0e.dq.steering_offset', 'r3.0e.dq.brake_offset',
+            'r3.0e.dq.gear_sensor_dropouts', 'r3.0e.dq.gps_dropouts'];
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { dataQualityIssues: dq, observedDirection: 'decrease', observedMagnitude: 1.0 },
+  }), { clock: fixedClock() });
+  chk('D2: inconclusive (data-quality blocking)',
+    r.valid === true && r.outcome['class'] === 'inconclusive',
+    r.valid === true ? r.outcome['class'] : r);
+  chk('D3: data-quality codes propagated to limitations',
+    r.valid === true && r.outcome.limitations.indexOf('r3.0e.dq.timebase_jitter') !== -1);
+})();
+
+// ------------------------------------------------------------------
+// Section E — invalid_comparison precedence
+// ------------------------------------------------------------------
+console.log('Section E — invalid_comparison');
+(function () {
+  // Cross-case
+  var r = CL.classifyOutcome(makeInput({
+    followUpOverrides: { parentCaseId: 'case_other', followUpCaseId: 'case_other_follow' },
+  }), { clock: fixedClock() });
+  chk('E1: cross-case → invalid_comparison',
+    r.valid === true && r.outcome['class'] === 'invalid_comparison');
+  chk('E2: cross-case → LINKAGE_PARENT_MISSING limitation',
+    r.valid === true && r.outcome.limitations.indexOf('LINKAGE_PARENT_MISSING') !== -1);
+})();
+(function () {
+  // Cross-session
+  var r = CL.classifyOutcome(makeInput({
+    followUpOverrides: { parentSessionId: 'session_other' },
+  }), { clock: fixedClock() });
+  chk('E3: cross-session → invalid_comparison',
+    r.valid === true && r.outcome['class'] === 'invalid_comparison');
+  chk('E4: cross-session → LIMITATION_CROSS_SESSION_FOLLOW_UP',
+    r.valid === true && r.outcome.limitations.indexOf('LIMITATION_CROSS_SESSION_FOLLOW_UP') !== -1);
+})();
+(function () {
+  // No explicit reference
+  var r = CL.classifyOutcome(makeInput({
+    followUpOverrides: { hasExplicitReference: false },
+  }), { clock: fixedClock() });
+  chk('E5: no explicit reference → invalid_comparison',
+    r.valid === true && r.outcome['class'] === 'invalid_comparison');
+  chk('E6: no explicit reference → OUTCOME_COMPARABILITY_INSUFFICIENT',
+    r.valid === true && r.outcome.limitations.indexOf('OUTCOME_COMPARABILITY_INSUFFICIENT') !== -1);
+})();
+(function () {
+  // Low comparability score
+  var r = CL.classifyOutcome(makeInput({
+
+codex
+I’ve got the main module open. Next I’m checking the middle and bottom of the implementation where the structural gates, array walks, precedence, and freezing/return paths live.
+exec
+/bin/bash -lc "sed -n '220,520p' renderer/js/r3-0e-outcome-classifier.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+    try {
+      if (candidate === null || typeof candidate !== 'object') return false;
+      if (!_wsHas(_authoritativeOutcomes, candidate)) return false;
+      if (_CAPTURED_OBJECT_IS_FROZEN(candidate) !== true) return false;
+      if (candidate.schemaVersion !== OUTCOME_SCHEMA_VERSION) return false;
+      if (typeof candidate.outcomeId !== 'string') return false;
+      if (typeof candidate.experimentId !== 'string') return false;
+      if (typeof candidate['class'] !== 'string') return false;
+      if (!_isArraySafe(candidate.confounders)) return false;
+      if (!_isArraySafe(candidate.limitations)) return false;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // ---------- Structural helpers --------------------------------------------------------------
+  function _isOriginalPlainObject(v) {
+    try {
+      if (v === null || typeof v !== 'object' || _CAPTURED_ARRAY_IS_ARRAY(v)) return false;
+      var p = _CAPTURED_OBJECT_GET_PROTO(v);
+      return p === Object.prototype || p === null;
+    } catch (e) { return false; }
+  }
+  function _isPlainArray(v) {
+    try {
+      if (!_CAPTURED_ARRAY_IS_ARRAY(v)) return false;
+      var p = _CAPTURED_OBJECT_GET_PROTO(v);
+      return p === Array.prototype;
+    } catch (e) { return false; }
+  }
+  function _hasSymbolOwnKey(o) {
+    try {
+      var syms = _CAPTURED_OBJECT_GET_OWN_SYMS(o);
+      return _CAPTURED_ARRAY_IS_ARRAY(syms) && syms.length > 0;
+    } catch (e) { return true; }
+  }
+  function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
+  function _isFiniteNumber(v) {
+    return typeof v === 'number' && _CAPTURED_NUMBER_IS_FINITE(v) === true;
+  }
+  function _isBool(v) { return v === true || v === false; }
+  function _idGrammarOk(s) {
+    if (!_nonEmptyStr(s)) return false;
+    if (ID_FORBIDDEN_RE.test(s)) return false;
+    if (!ID_GRAMMAR_RE.test(s)) return false;
+    return true;
+  }
+
+  // Deep freeze using captured Object.freeze + captured getOwnPropertyNames.
+  function _deepFreeze(v) {
+    if (v === null || typeof v !== 'object') return v;
+    try { _CAPTURED_OBJECT_FREEZE(v); } catch (e) { /* swallow */ }
+    var keys;
+    try { keys = _CAPTURED_OBJECT_GET_OWN_NAMES(v); } catch (e) { return v; }
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      var child;
+      try { child = v[k]; } catch (eGet) { continue; }
+      _deepFreeze(child);
+    }
+    return v;
+  }
+
+  // ---------- Input descriptor snapshot --------------------------------------------------------
+  // Mirrors D5 snapshotInputDescriptors: walks own descriptors (NOT [[Get]]) so a Proxy with
+  // hostile getters does NOT fire on first read. Symbol / non-enumerable / accessor / unknown
+  // own key → reject before any further inspection.
+  function _snapshotPlainShape(o, allowedKeys, invalidCode, opts) {
+    opts = opts || {};
+    if (!_isOriginalPlainObject(o)) {
+      return { valid: false, reasonCodes: [invalidCode, CODES.PROTOTYPE_POLLUTION_REJECTED], detail: 'not plain' };
+    }
+    if (opts.requireFrozen && _isFrozenSafe(o) !== true) {
+      return { valid: false, reasonCodes: [invalidCode], detail: 'not frozen' };
+    }
+    if (_hasSymbolOwnKey(o)) {
+      return { valid: false, reasonCodes: [invalidCode, CODES.UNKNOWN_OWN_KEY], detail: 'symbol own key' };
+    }
+    var names;
+    try { names = _CAPTURED_OBJECT_GET_OWN_NAMES(o); } catch (e) {
+      return { valid: false, reasonCodes: [invalidCode], detail: 'descriptor read failed' };
+    }
+    var snap = Object.create(null);
+    for (var i = 0; i < names.length; i++) {
+      var k = names[i];
+      // Reject unknown own key — caller cannot smuggle `class`, `outcomeId`, `confounders`,
+      // etc. into the input wrapper.
+      if (allowedKeys.indexOf(k) === -1) {
+        return { valid: false, reasonCodes: [invalidCode, CODES.UNKNOWN_OWN_KEY], detail: 'unknown own key ' + k };
+      }
+      var d;
+      try { d = _CAPTURED_OBJECT_GET_OWN_DESC(o, k); } catch (e) {
+        return { valid: false, reasonCodes: [invalidCode], detail: 'descriptor inaccessible' };
+      }
+      if (!d || d.enumerable !== true) {
+        return { valid: false, reasonCodes: [invalidCode], detail: 'non-enumerable key ' + k };
+      }
+      if (typeof d.get === 'function' || typeof d.set === 'function') {
+        return { valid: false, reasonCodes: [invalidCode], detail: 'accessor key ' + k };
+      }
+      snap[k] = d.value;
+    }
+    return { valid: true, snapshot: snap };
+  }
+
+  function _snapshotArrayShape(a, invalidCode) {
+    if (!_isPlainArray(a)) {
+      return { valid: false, reasonCodes: [invalidCode], detail: 'not array' };
+    }
+    if (_hasSymbolOwnKey(a)) {
+      return { valid: false, reasonCodes: [invalidCode, CODES.UNKNOWN_OWN_KEY], detail: 'symbol own key on array' };
+    }
+    var names;
+    try { names = _CAPTURED_OBJECT_GET_OWN_NAMES(a); } catch (e) {
+      return { valid: false, reasonCodes: [invalidCode], detail: 'array desc inaccessible' };
+    }
+    var snap = [];
+    var aLen = a.length;
+    if (typeof aLen !== 'number' || aLen < 0 || aLen > ARRAY_CAP) {
+      return { valid: false, reasonCodes: [invalidCode, CODES.ARRAY_CAP_EXCEEDED], detail: 'array len ' + aLen };
+    }
+    // Walk via captured-name descriptors so an accessor index isn't possible.
+    for (var i = 0; i < names.length; i++) {
+      var name = names[i];
+      if (name === 'length') continue;
+      var d;
+      try { d = _CAPTURED_OBJECT_GET_OWN_DESC(a, name); } catch (e) {
+        return { valid: false, reasonCodes: [invalidCode], detail: 'array elt desc fail' };
+      }
+      if (!d || d.enumerable !== true) {
+        return { valid: false, reasonCodes: [invalidCode], detail: 'non-enumerable array elt' };
+      }
+      if (typeof d.get === 'function' || typeof d.set === 'function') {
+        return { valid: false, reasonCodes: [invalidCode], detail: 'accessor array elt' };
+      }
+      snap.push(d.value);
+    }
+    return { valid: true, snapshot: snap };
+  }
+
+  function _snapshotOpts(optsIn) {
+    var snap = Object.create(null);
+    if (optsIn === undefined || optsIn === null) return { valid: true, snapshot: snap };
+    var r = _snapshotPlainShape(optsIn, OPTS_KEYS_ALLOWED, CODES.OUTCOME_INVALID);
+    if (r.valid !== true) return r;
+    // Type-check each opt.
+    if (r.snapshot.clock !== undefined && r.snapshot.clock !== null && typeof r.snapshot.clock !== 'function') {
+      return { valid: false, reasonCodes: [CODES.OUTCOME_INVALID], detail: 'opts.clock not function' };
+    }
+    if (r.snapshot.referenceNowMs !== undefined && r.snapshot.referenceNowMs !== null
+        && typeof r.snapshot.referenceNowMs !== 'number') {
+      return { valid: false, reasonCodes: [CODES.OUTCOME_INVALID], detail: 'opts.referenceNowMs not number' };
+    }
+    if (r.snapshot.maxAgeMs !== undefined && r.snapshot.maxAgeMs !== null
+        && (typeof r.snapshot.maxAgeMs !== 'number' || !_CAPTURED_NUMBER_IS_INTEGER(r.snapshot.maxAgeMs) || r.snapshot.maxAgeMs < 0)) {
+      return { valid: false, reasonCodes: [CODES.OUTCOME_INVALID], detail: 'opts.maxAgeMs invalid' };
+    }
+    return { valid: true, snapshot: r.snapshot };
+  }
+
+  // ---------- Deterministic ID generator -------------------------------------------------------
+  // outcomeId is deterministic from (experimentId, changeId). No clock leak.
+  function _hash32(s) {
+    var h = 0x811c9dc5;
+    var len = typeof s === 'string' ? s.length : 0;
+    for (var i = 0; i < len; i++) {
+      h ^= s.charCodeAt(i);
+      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+    }
+    return h.toString(16).padStart(8, '0');
+  }
+  function _fnv2(s) {
+    var slen = typeof s === 'string' ? s.length : 0;
+    return _hash32(s) + _hash32(s + '|' + slen);
+  }
+  function _outcomeId(experimentId, changeId) {
+    return 'outcome_' + _fnv2('outcome|' + experimentId + '|' + changeId);
+  }
+
+  // ---------- Main entry: classifyOutcome -----------------------------------------------------
+  /**
+   * classifyOutcome(input, opts) — produces a deep-frozen Outcome envelope.
+   *
+   * Ordered steps (clock MUST NOT fire before Step 9):
+   *   0.  intrinsic integrity (captures + contract surfaces still frozen)
+   *   1.  input wrapper descriptor snapshot (closed keys; symbol/accessor/proxy rejected)
+   *   2.  experiment frozen + E1 shape validation
+   *   3.  appliedChange snapshot + shape
+   *   4.  followUp snapshot + shape
+   *   5.  observation snapshot + shape
+   *   6.  controlVariableObservations snapshot + per-element E1 shape
+   *   7.  opts snapshot
+   *   8.  identity binding (status=applied, sourceExperimentId match, parentCaseId match)
+   *   9.  resolve freshness reference time (clock at most once)
+   *   10. freshness check on experiment.createdAt + appliedChange.appliedAt
+   *   11. comparison-validity computation (invalid_comparison precedence)
+   *   12. control-variable integrity (inconclusive_due_to_confounders precedence)
+   *   13. data-quality + direction/magnitude classification cascade
+   *   14. compose outcome
+   *   15. validate via E1 OUT.validateOutcomeShape
+   *   16. envelope byte cap
+   *   17. deep-freeze + register
+   */
+  function classifyOutcome(inputIn, optsIn) {
+    try {
+      // ---- Step 0: intrinsic integrity ----------------------------------------------------
+      if (!_intrinsicsIntact()) {
+        return _buildTamperBlock('intrinsic tampering detected at entry');
+      }
+
+      // ---- Step 1: input wrapper descriptor snapshot -------------------------------------
+      var inSnapR = _snapshotPlainShape(inputIn, INPUT_KEYS_ALLOWED, CODES.OUTCOME_INVALID, { requireFrozen: false });
+      if (inSnapR.valid !== true) {
+        return RC_E.buildBlockedResult(inSnapR.reasonCodes, { detail: inSnapR.detail });
+      }
+      var inputSnap = inSnapR.snapshot;
+
+      // ---- Step 2: experiment shape validation -------------------------------------------
+      // The Experiment must be deep-frozen (immutability) AND pass the E1 contract.
+      if (!_isFrozenSafe(inputSnap.experiment)) {
+        return RC_E.buildBlockedResult([CODES.EXPERIMENT_INVALID], { detail: 'experiment not deep-frozen' });
+      }
+      var expCheck = EXP.validateExperimentShape(inputSnap.experiment);
+      if (expCheck.valid !== true) {
+        return RC_E.buildBlockedResult(
+          expCheck.reasonCodes ? expCheck.reasonCodes.slice() : [CODES.EXPERIMENT_INVALID],
+          { detail: 'experiment shape invalid' }
+        );
+      }
+      var experiment = inputSnap.experiment;
+
+      // ---- Step 3: appliedChange snapshot + shape ----------------------------------------
+      var acSnapR = _snapshotPlainShape(inputSnap.appliedChange, APPLIED_CHANGE_KEYS_ALLOWED, CODES.OUTCOME_INVALID);
+      if (acSnapR.valid !== true) {
+        return RC_E.buildBlockedResult(acSnapR.reasonCodes, { detail: 'appliedChange: ' + acSnapR.detail });
+      }
+      var appliedChange = acSnapR.snapshot;
+      if (!_idGrammarOk(appliedChange.changeId)) {
+        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'appliedChange.changeId invalid' });
+      }
+      if (!_idGrammarOk(appliedChange.sourceExperimentId)) {
+        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'appliedChange.sourceExperimentId invalid' });
+      }
+      if (!_nonEmptyStr(appliedChange.appliedAt) || _isoToMs(appliedChange.appliedAt) === null) {
+        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'appliedChange.appliedAt invalid' });
+      }
+
+      // ---- Step 4: followUp snapshot + shape ---------------------------------------------
+      var fuSnapR = _snapshotPlainShape(inputSnap.followUp, FOLLOWUP_KEYS_ALLOWED, CODES.OUTCOME_INVALID);
+      if (fuSnapR.valid !== true) {
+        return RC_E.buildBlockedResult(fuSnapR.reasonCodes, { detail: 'followUp: ' + fuSnapR.detail });
+      }
+      var followUp = fuSnapR.snapshot;
+      if (!_idGrammarOk(followUp.followUpCaseId)) {
+        return RC_E.buildBlockedResult([CODES.LINKAGE_INVALID], { detail: 'followUp.followUpCaseId invalid' });
+      }
+      if (!_idGrammarOk(followUp.parentCaseId)) {
+        return RC_E.buildBlockedResult([CODES.LINKAGE_PARENT_MISSING], { detail: 'followUp.parentCaseId invalid' });
+      }
+      if (followUp.parentCaseId === followUp.followUpCaseId) {
+        return RC_E.buildBlockedResult([CODES.LINKAGE_INVALID], { detail: 'follow-up case is self-link' });
+      }
+      if (!_idGrammarOk(followUp.sessionId)) {
+        return RC_E.buildBlockedResult([CODES.LINKAGE_INVALID], { detail: 'followUp.sessionId invalid' });
+      }
+      if (!_idGrammarOk(followUp.parentSessionId)) {
+        return RC_E.buildBlockedResult([CODES.LINKAGE_INVALID], { detail: 'followUp.parentSessionId invalid' });
+      }
+      if (!_isBool(followUp.hasExplicitReference)) {
+        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'followUp.hasExplicitReference not bool' });
+      }
+      if (!_isFiniteNumber(followUp.comparabilityScore) || followUp.comparabilityScore < 0 || followUp.comparabilityScore > 1) {
+        return RC_E.buildBlockedResult([CODES.OUTCOME_COMPARABILITY_INSUFFICIENT], { detail: 'followUp.comparabilityScore out of [0,1]' });
+      }
+
+      // ---- Step 5: observation snapshot + shape ------------------------------------------
+      var obsSnapR = _snapshotPlainShape(inputSnap.observation, OBSERVATION_KEYS_ALLOWED, CODES.OUTCOME_INVALID);
+      if (obsSnapR.valid !== true) {
+        return RC_E.buildBlockedResult(obsSnapR.reasonCodes, { detail: 'observation: ' + obsSnapR.detail });
+      }
+      var observation = obsSnapR.snapshot;
+      // observedDirection: enum OR null
+      if (observation.observedDirection !== null && DIRECTION_ALLOWED.indexOf(observation.observedDirection) === -1) {
+        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'observation.observedDirection invalid' });
+      }
+      // observedMagnitude: finite OR null
+      if (observation.observedMagnitude !== null && !_isFiniteNumber(observation.observedMagnitude)) {
+        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'observation.observedMagnitude invalid' });
+      }
+      // driverFeedback: non-empty string i18n key OR null. The classifier propagates the key
+      // unchanged into the outcome envelope; no text generation, no free-text laundering.
+      if (observation.driverFeedback !== null && !_nonEmptyStr(observation.driverFeedback)) {
+        return RC_E.buildBlockedResult([CODES.OUTCOME_DRIVER_FEEDBACK_INVALID], { detail: 'driverFeedback invalid' });
+      }
+      // dataQualityIssues / sideEffects / contradictingEvidenceIds / supportingEvidenceIds — bounded plain arrays.
+      var dqiR = _snapshotArrayShape(observation.dataQualityIssues, CODES.OUTCOME_DATA_QUALITY_INVALID);
+      if (dqiR.valid !== true) {
+        return RC_E.buildBlockedResult(dqiR.reasonCodes, { detail: 'dataQualityIssues: ' + dqiR.detail });
+      }
+      var dataQualityIssues = dqiR.snapshot;
+      for (var qi = 0; qi < dataQualityIssues.length; qi++) {
+        if (!_nonEmptyStr(dataQualityIssues[qi])) {
+
+exec
+/bin/bash -lc "sed -n '260,620p' tests/r3.0e-outcome-classifier.test.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+exec
+/bin/bash -lc "sed -n '520,920p' renderer/js/r3-0e-outcome-classifier.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+        if (!_nonEmptyStr(dataQualityIssues[qi])) {
+          return RC_E.buildBlockedResult([CODES.OUTCOME_DATA_QUALITY_INVALID], { detail: 'dataQualityIssues[' + qi + '] not non-empty string' });
+        }
+      }
+      var seR = _snapshotArrayShape(observation.sideEffects, CODES.OUTCOME_INVALID);
+      if (seR.valid !== true) {
+        return RC_E.buildBlockedResult(seR.reasonCodes, { detail: 'sideEffects: ' + seR.detail });
+      }
+      var sideEffects = seR.snapshot;
+      // Each side-effect must be a plain { i18nKey, params } object (params may be null).
+      for (var si = 0; si < sideEffects.length; si++) {
+        var se = sideEffects[si];
+        if (!_isOriginalPlainObject(se)) {
+          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '] not plain' });
+        }
+        var seKeysR = _snapshotPlainShape(se, _CAPTURED_OBJECT_FREEZE(['i18nKey', 'params']), CODES.OUTCOME_INVALID);
+        if (seKeysR.valid !== true) {
+          return RC_E.buildBlockedResult(seKeysR.reasonCodes, { detail: 'sideEffects[' + si + ']: ' + seKeysR.detail });
+        }
+        if (!_nonEmptyStr(seKeysR.snapshot.i18nKey)) {
+          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].i18nKey not non-empty' });
+        }
+        if (seKeysR.snapshot.params !== null && seKeysR.snapshot.params !== undefined && !_isOriginalPlainObject(seKeysR.snapshot.params)) {
+          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params not plain' });
+        }
+      }
+      var contraR = _snapshotArrayShape(observation.contradictingEvidenceIds, CODES.OUTCOME_INVALID);
+      if (contraR.valid !== true) {
+        return RC_E.buildBlockedResult(contraR.reasonCodes, { detail: 'contradictingEvidenceIds: ' + contraR.detail });
+      }
+      var contradictingEvidenceIds = contraR.snapshot;
+      for (var ci = 0; ci < contradictingEvidenceIds.length; ci++) {
+        if (!_idGrammarOk(contradictingEvidenceIds[ci])) {
+          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'contradictingEvidenceIds[' + ci + '] invalid id' });
+        }
+      }
+      var supR = _snapshotArrayShape(observation.supportingEvidenceIds, CODES.OUTCOME_INVALID);
+      if (supR.valid !== true) {
+        return RC_E.buildBlockedResult(supR.reasonCodes, { detail: 'supportingEvidenceIds: ' + supR.detail });
+      }
+      var supportingEvidenceIds = supR.snapshot;
+      for (var sii = 0; sii < supportingEvidenceIds.length; sii++) {
+        if (!_idGrammarOk(supportingEvidenceIds[sii])) {
+          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'supportingEvidenceIds[' + sii + '] invalid id' });
+        }
+      }
+
+      // ---- Step 6: controlVariableObservations snapshot + per-element E1 -----------------
+      var cvObsR = _snapshotArrayShape(inputSnap.controlVariableObservations, CODES.CONTROL_VARIABLES_INVALID);
+      if (cvObsR.valid !== true) {
+        return RC_E.buildBlockedResult(cvObsR.reasonCodes, { detail: 'controlVariableObservations: ' + cvObsR.detail });
+      }
+      var controlVariableObservations = cvObsR.snapshot;
+      // E1 contract per element. The CV contract permits observedValue + withinRange filled.
+      var observedCvByName = Object.create(null);
+      for (var cvi = 0; cvi < controlVariableObservations.length; cvi++) {
+        var cvObs = controlVariableObservations[cvi];
+        var cvCheck = CV.validateControlVariableShape(cvObs);
+        if (cvCheck.valid !== true) {
+          return RC_E.buildBlockedResult(
+            cvCheck.reasonCodes ? cvCheck.reasonCodes.slice() : [CODES.CONTROL_VARIABLES_INVALID],
+            { detail: 'controlVariableObservations[' + cvi + '] shape invalid' }
+          );
+        }
+        // E3 additionally requires observedValue + withinRange to be filled (non-null) — the
+        // E1 contract permits null for shape-only validation; E3 algorithm demands the
+        // observation be present so the integrity check can run.
+        if (cvObs.observedValue === null) {
+          return RC_E.buildBlockedResult([CODES.CONTROL_VARIABLE_MISSING], { detail: 'controlVariableObservations[' + cvi + '].observedValue null' });
+        }
+        if (cvObs.withinRange === null) {
+          return RC_E.buildBlockedResult([CODES.CONTROL_VARIABLE_MISSING], { detail: 'controlVariableObservations[' + cvi + '].withinRange null' });
+        }
+        if (observedCvByName[cvObs.name] !== undefined) {
+          return RC_E.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID], { detail: 'duplicate control variable name: ' + cvObs.name });
+        }
+        observedCvByName[cvObs.name] = cvObs;
+      }
+
+      // ---- Step 7: opts snapshot ----------------------------------------------------------
+      var optsR = _snapshotOpts(optsIn);
+      if (optsR.valid !== true) {
+        return RC_E.buildBlockedResult(optsR.reasonCodes, { detail: 'opts: ' + optsR.detail });
+      }
+      var optsSnap = optsR.snapshot;
+
+      // ---- Step 8: identity binding -------------------------------------------------------
+      if (experiment.status !== 'applied') {
+        return RC_E.buildBlockedResult([CODES.EXPERIMENT_STATUS_INVALID], { detail: 'experiment.status must be applied to classify, got ' + experiment.status });
+      }
+      if (experiment.outcome !== null) {
+        // Defence-in-depth: E1 contract already enforces outcome=null for status=applied,
+        // but caller-supplied final classification is forbidden, so the classifier rejects
+        // any pre-filled outcome explicitly here too.
+        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'caller-supplied experiment.outcome forbidden at classification' });
+      }
+      if (appliedChange.sourceExperimentId !== experiment.experimentId) {
+        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'appliedChange.sourceExperimentId !== experiment.experimentId' });
+      }
+      // parentCaseId binding — followUp's parent MUST be the experiment's source case. If
+      // parentCaseId mismatches, treat as invalid_comparison (cross-case forbidden).
+      var crossCase = (followUp.parentCaseId !== experiment.sourceCaseId);
+      var crossSession = (followUp.sessionId !== followUp.parentSessionId);
+      var noExplicitReference = (followUp.hasExplicitReference !== true);
+      var lowComparability = (followUp.comparabilityScore < MIN_COMPARABILITY_FOR_VALID_COMPARISON);
+
+      // ---- Step 9: resolve freshness reference (clock AT MOST ONCE, post-authority) ------
+      var refNowMs = null;
+      var resolvedClockIso = null;
+      if (typeof optsSnap.referenceNowMs === 'number' && _CAPTURED_NUMBER_IS_INTEGER(optsSnap.referenceNowMs) && optsSnap.referenceNowMs >= 0) {
+        refNowMs = optsSnap.referenceNowMs;
+      } else if (typeof optsSnap.clock === 'function') {
+        var clockIso = null;
+        try { clockIso = optsSnap.clock(); } catch (eClock) { clockIso = null; }
+        if (typeof clockIso === 'string' && clockIso.length > 0) {
+          var clockMs = _isoToMs(clockIso);
+          if (typeof clockMs === 'number') {
+            refNowMs = clockMs;
+            resolvedClockIso = clockIso;
+          }
+        }
+      }
+      if (typeof refNowMs !== 'number' || refNowMs !== refNowMs) {
+        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'unable to resolve reference time (opts.clock missing or invalid)' });
+      }
+      var maxAgeMs = (typeof optsSnap.maxAgeMs === 'number') ? optsSnap.maxAgeMs : DEFAULT_MAX_AGE_MS;
+
+      // ---- Step 10: freshness check ------------------------------------------------------
+      var expCreatedMs = _isoToMs(experiment.createdAt);
+      var changeAppliedMs = _isoToMs(appliedChange.appliedAt);
+      if (expCreatedMs !== null && (refNowMs - expCreatedMs) > maxAgeMs) {
+        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'experiment exceeds max age' });
+      }
+      if (changeAppliedMs !== null && (refNowMs - changeAppliedMs) > maxAgeMs) {
+        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'appliedChange exceeds max age' });
+      }
+
+      // ---- Step 11: comparison-validity computation (invalid_comparison precedence) ------
+      var limitations = [];
+      var classDecision = null;
+      var confounders = [];
+
+      if (crossCase || crossSession || noExplicitReference || lowComparability) {
+        classDecision = 'invalid_comparison';
+        if (crossCase) limitations.push(CODES.LINKAGE_PARENT_MISSING);
+        if (crossSession) limitations.push(CODES.LIMITATION_CROSS_SESSION_FOLLOW_UP);
+        if (noExplicitReference) limitations.push(CODES.OUTCOME_COMPARABILITY_INSUFFICIENT);
+        if (lowComparability && limitations.indexOf(CODES.OUTCOME_COMPARABILITY_INSUFFICIENT) === -1) {
+          limitations.push(CODES.OUTCOME_COMPARABILITY_INSUFFICIENT);
+        }
+      } else {
+        // ---- Step 12: control-variable integrity (inconclusive_due_to_confounders) ------
+        // Every declared experiment.controlVariables[].name MUST appear in observations.
+        var declaredCv = experiment.controlVariables || [];
+        for (var dci = 0; dci < declaredCv.length; dci++) {
+          var declared = declaredCv[dci];
+          if (declared === null || typeof declared !== 'object') continue;
+          var declaredName = declared.name;
+          if (!_nonEmptyStr(declaredName)) continue;
+          if (observedCvByName[declaredName] === undefined) {
+            confounders.push(declaredName);
+          }
+        }
+        if (confounders.length > 0) {
+          classDecision = 'inconclusive_due_to_confounders';
+          if (limitations.indexOf(CODES.CONTROL_VARIABLE_MISSING) === -1) {
+            limitations.push(CODES.CONTROL_VARIABLE_MISSING);
+          }
+        } else {
+          // Out-of-range CVs become confounders.
+          var outOfRange = [];
+          for (var ki = 0; ki < controlVariableObservations.length; ki++) {
+            var cvo = controlVariableObservations[ki];
+            if (cvo.withinRange !== true) outOfRange.push(cvo.name);
+          }
+          if (outOfRange.length > 0) {
+            classDecision = 'inconclusive_due_to_confounders';
+            confounders = outOfRange;
+            if (limitations.indexOf(CODES.CONTROL_VARIABLE_OUT_OF_RANGE) === -1) {
+              limitations.push(CODES.CONTROL_VARIABLE_OUT_OF_RANGE);
+            }
+          } else if (controlVariableObservations.length === 0) {
+            // No control variables AT ALL — the experiment did not declare any, and none
+            // were observed. The outcome can still be classified, but we flag the
+            // limitation honestly.
+            if (limitations.indexOf(CODES.LIMITATION_NO_CONTROL_VARIABLES) === -1) {
+              limitations.push(CODES.LIMITATION_NO_CONTROL_VARIABLES);
+            }
+          }
+        }
+
+        // ---- Step 13: data quality + direction/magnitude classification cascade --------
+        if (classDecision === null) {
+          var dataQualityBlocking = dataQualityIssues.length > DATA_QUALITY_ISSUE_BLOCK_THRESHOLD;
+          var hasContradictions = contradictingEvidenceIds.length > 0;
+          var directionMatch = (observation.observedDirection === experiment.expectedDirection);
+          var magnitudeInRange = (
+            observation.observedMagnitude !== null
+              && _isFiniteNumber(observation.observedMagnitude)
+              && observation.observedMagnitude >= experiment.expectedMagnitudeRange.min
+              && observation.observedMagnitude <= experiment.expectedMagnitudeRange.max
+          );
+
+          if (dataQualityBlocking) {
+            classDecision = 'inconclusive';
+            // Carry the data-quality codes as limitations so the UI can show them honestly.
+            for (var dqi = 0; dqi < dataQualityIssues.length && limitations.length < ARRAY_CAP; dqi++) {
+              if (limitations.indexOf(dataQualityIssues[dqi]) === -1) limitations.push(dataQualityIssues[dqi]);
+            }
+          } else if (observation.observedDirection === null) {
+            classDecision = 'inconclusive';
+          } else if (hasContradictions) {
+            // Contradicting evidence blocks confirmed; treat as contradicted irrespective of
+            // direction match (the contradicting evidence is itself evidence to the contrary).
+            classDecision = 'contradicted';
+          } else if (!directionMatch) {
+            classDecision = 'contradicted';
+          } else if (magnitudeInRange) {
+            classDecision = 'confirmed';
+          } else {
+            classDecision = 'partially_confirmed';
+          }
+        }
+      }
+
+      // ---- Step 14: compose outcome ------------------------------------------------------
+      var createdAtIso = resolvedClockIso || appliedChange.appliedAt || experiment.createdAt;
+      if (!_nonEmptyStr(createdAtIso) || _isoToMs(createdAtIso) === null) {
+        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'could not resolve outcome createdAt ISO' });
+      }
+      var outcomeIdStr = _outcomeId(experiment.experimentId, appliedChange.changeId);
+      // Bound the limitations array.
+      if (limitations.length > ARRAY_CAP) limitations = limitations.slice(0, ARRAY_CAP);
+
+      var outcome = {
+        schemaVersion: OUTCOME_SCHEMA_VERSION,
+        outcomeId: outcomeIdStr,
+        experimentId: experiment.experimentId,
+        'class': classDecision,
+        observedDirection: observation.observedDirection,
+        observedMagnitude: observation.observedMagnitude,
+        comparabilityScore: followUp.comparabilityScore,
+        confounders: confounders.slice(),
+        driverFeedback: observation.driverFeedback,
+        dataQualityIssues: dataQualityIssues.slice(),
+        sideEffects: sideEffects.slice(),
+        limitations: limitations.slice(),
+        createdAt: createdAtIso,
+      };
+
+      // ---- Step 15: validate via E1 OUT.validateOutcomeShape -----------------------------
+      var outCheck = OUT.validateOutcomeShape(outcome);
+      if (outCheck.valid !== true) {
+        return RC_E.buildBlockedResult(
+          outCheck.reasonCodes ? outCheck.reasonCodes.slice() : [CODES.OUTCOME_INVALID],
+          { detail: 'composed outcome failed E1 OUT.validateOutcomeShape' }
+        );
+      }
+
+      // ---- Step 16: envelope byte cap ----------------------------------------------------
+      var envelopeBytes;
+      try { envelopeBytes = _utf8Bytes(_CAPTURED_JSON_STRINGIFY(outcome)); }
+      catch (e) { envelopeBytes = Infinity; }
+      if (envelopeBytes > ENVELOPE_BYTE_CAP) {
+        return RC_E.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'outcome envelope ' + envelopeBytes + ' bytes > ' + ENVELOPE_BYTE_CAP });
+      }
+
+      // ---- Step 17: re-check intrinsics post-classify, deep-freeze, register -------------
+      if (!_intrinsicsIntact()) {
+        return _buildTamperBlock('intrinsic tampering detected post-classify');
+      }
+      _deepFreeze(outcome);
+      _registerAuthoritativeOutcome(outcome);
+
+      return _CAPTURED_OBJECT_FREEZE({ valid: true, outcome: outcome });
+
+    } catch (eOuter) {
+      return RC_E.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'classifyOutcome threw on hostile input' });
+    }
+  }
+
+  // ---------- Public API ---------------------------------------------------------------------
+  var api = {
+    SERVICE_VERSION: SERVICE_VERSION,
+    OUTCOME_SCHEMA_VERSION: OUTCOME_SCHEMA_VERSION,
+    ENVELOPE_BYTE_CAP: ENVELOPE_BYTE_CAP,
+    MIN_COMPARABILITY_FOR_VALID_COMPARISON: MIN_COMPARABILITY_FOR_VALID_COMPARISON,
+    DATA_QUALITY_ISSUE_BLOCK_THRESHOLD: DATA_QUALITY_ISSUE_BLOCK_THRESHOLD,
+    classifyOutcome: classifyOutcome,
+    verifyAuthoritativeOutcome: verifyAuthoritativeOutcome,
+  };
+  _CAPTURED_OBJECT_FREEZE(api);
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = api;
+  } else if (root) {
+    try { Object.defineProperty(root, 'R3_0E_OutcomeClassifier', { value: api, writable: false, enumerable: false, configurable: false }); }
+    catch (e) { root.R3_0E_OutcomeClassifier = api; }
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+ succeeded in 0ms:
+  var r = CL.classifyOutcome(makeInput({
+    followUpOverrides: { comparabilityScore: 0.3 },
+  }), { clock: fixedClock() });
+  chk('E7: low comparability → invalid_comparison',
+    r.valid === true && r.outcome['class'] === 'invalid_comparison');
+})();
+(function () {
+  // Precedence: cross-case AND would-otherwise-be-confirmed → invalid_comparison wins (not confirmed)
+  var r = CL.classifyOutcome(makeInput({
+    followUpOverrides: { parentCaseId: 'case_other' },
+    observationOverrides: { observedDirection: 'decrease', observedMagnitude: 1.0 },
+  }), { clock: fixedClock() });
+  chk('E8: invalid_comparison takes precedence over confirmed',
+    r.valid === true && r.outcome['class'] === 'invalid_comparison');
+})();
+
+// ------------------------------------------------------------------
+// Section F — inconclusive_due_to_confounders precedence
+// ------------------------------------------------------------------
+console.log('Section F — inconclusive_due_to_confounders');
+(function () {
+  // Out-of-range CV
+  var cvObs = [
+    { name: 'tyre_temp_window', description: 'r3.0e.cv.tyre_temp_window',
+      expectedValue: 85, allowedRange: { min: 75, max: 95 }, observedValue: 105, withinRange: false },
+  ];
+  var r = CL.classifyOutcome(makeInput({ controlVariableObservations: cvObs }),
+    { clock: fixedClock() });
+  chk('F1: out-of-range CV → inconclusive_due_to_confounders',
+    r.valid === true && r.outcome['class'] === 'inconclusive_due_to_confounders');
+  chk('F2: confounders list includes the CV name',
+    r.valid === true && r.outcome.confounders.indexOf('tyre_temp_window') !== -1);
+})();
+(function () {
+  // Missing CV (declared but not observed)
+  var r = CL.classifyOutcome(makeInput({ controlVariableObservations: [] }),
+    { clock: fixedClock() });
+  chk('F3: missing CV → inconclusive_due_to_confounders',
+    r.valid === true && r.outcome['class'] === 'inconclusive_due_to_confounders');
+  chk('F4: missing CV limitations carries CONTROL_VARIABLE_MISSING',
+    r.valid === true && r.outcome.limitations.indexOf('CONTROL_VARIABLE_MISSING') !== -1);
+})();
+(function () {
+  // No CVs declared, none observed → flagged but classified normally
+  var exp = makeExperiment({ controlVariables: [] });
+  var r = CL.classifyOutcome(makeInput({ experiment: exp, controlVariableObservations: [] }),
+    { clock: fixedClock() });
+  chk('F5: no CVs → confirmed (with LIMITATION_NO_CONTROL_VARIABLES)',
+    r.valid === true && r.outcome['class'] === 'confirmed');
+  chk('F6: no CVs → LIMITATION_NO_CONTROL_VARIABLES carried',
+    r.valid === true && r.outcome.limitations.indexOf('LIMITATION_NO_CONTROL_VARIABLES') !== -1);
+})();
+(function () {
+  // Precedence: confounders AND would-otherwise-be-confirmed → inconclusive_due_to_confounders
+  var cvObs = [
+    { name: 'tyre_temp_window', description: 'r3.0e.cv.tyre_temp_window',
+      expectedValue: 85, allowedRange: { min: 75, max: 95 }, observedValue: 105, withinRange: false },
+  ];
+  var r = CL.classifyOutcome(makeInput({
+    controlVariableObservations: cvObs,
+    observationOverrides: { observedDirection: 'decrease', observedMagnitude: 1.0 },
+  }), { clock: fixedClock() });
+  chk('F7: confounder precedence over confirmed',
+    r.valid === true && r.outcome['class'] === 'inconclusive_due_to_confounders');
+})();
+
+// ------------------------------------------------------------------
+// Section G — Contradiction blocks confirmed
+// ------------------------------------------------------------------
+console.log('Section G — Contradicting evidence');
+(function () {
+  // direction match, magnitude in range, BUT contradicting evidence present
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: {
+      observedDirection: 'decrease', observedMagnitude: 1.0,
+      contradictingEvidenceIds: ['ev_contradict_001'],
+    },
+  }), { clock: fixedClock() });
+  chk('G1: contradictingEvidenceIds non-empty → contradicted (not confirmed)',
+    r.valid === true && r.outcome['class'] === 'contradicted');
+})();
+
+// ------------------------------------------------------------------
+// Section H — Cross-case / cross-session / missing applied change
+// ------------------------------------------------------------------
+console.log('Section H — Identity binding');
+(function () {
+  // appliedChange.sourceExperimentId mismatch
+  var ac = makeAppliedChange({ sourceExperimentId: 'exp_other_aaaaaaaaaa' });
+  var r = CL.classifyOutcome(makeInput({ appliedChange: ac }), { clock: fixedClock() });
+  chk('H1: appliedChange.sourceExperimentId mismatch → BLOCK',
+    r.valid !== true && r.reasonCodes.indexOf('OUTCOME_INVALID') !== -1);
+})();
+(function () {
+  // experiment.status !== applied
+  var exp = makeExperiment({ status: 'planned' });
+  var r = CL.classifyOutcome(makeInput({ experiment: exp }), { clock: fixedClock() });
+  chk('H2: experiment.status=planned → BLOCK EXPERIMENT_STATUS_INVALID',
+    r.valid !== true && r.reasonCodes.indexOf('EXPERIMENT_STATUS_INVALID') !== -1);
+})();
+
+// ------------------------------------------------------------------
+// Section I — Missing expected observation / stale generation
+// ------------------------------------------------------------------
+console.log('Section I — Missing expected observation / stale generation');
+(function () {
+  // expected magnitude range absent — E1 already enforces, but we feed an experiment that
+  // would fail E1.validateExperimentShape → BLOCK at classifier layer too.
+  var bad = JSON.parse(JSON.stringify(makeExperiment()));
+  delete bad.expectedMagnitudeRange;
+  Object.freeze(bad);
+  var r = CL.classifyOutcome(makeInput({ experiment: bad }), { clock: fixedClock() });
+  chk('I1: missing expectedMagnitudeRange → BLOCK',
+    r.valid !== true && (r.reasonCodes.indexOf('EXPERIMENT_INVALID') !== -1
+      || r.reasonCodes.indexOf('EXPERIMENT_EXPECTED_MAGNITUDE_RANGE_INVALID') !== -1));
+})();
+(function () {
+  // Stale generation — experiment older than maxAgeMs
+  var oldExp = makeExperiment({ createdAt: '2020-01-01T00:00:00Z' });
+  var r = CL.classifyOutcome(makeInput({ experiment: oldExp }),
+    { clock: fixedClock(), maxAgeMs: 1000 });
+  chk('I2: stale experiment → BLOCK OUTCOME_INVALID',
+    r.valid !== true);
+})();
+
+// ------------------------------------------------------------------
+// Section J — Caller-classification rejected
+// ------------------------------------------------------------------
+console.log('Section J — Caller-classification rejected');
+(function () {
+  // Caller tries to smuggle an `outcome` field on the input wrapper (UNKNOWN_OWN_KEY)
+  var i = makeInput();
+  i.outcome = { 'class': 'confirmed' };
+  var r = CL.classifyOutcome(i, { clock: fixedClock() });
+  chk('J1: caller-supplied outcome on input wrapper → BLOCK UNKNOWN_OWN_KEY',
+    r.valid !== true && r.reasonCodes.indexOf('UNKNOWN_OWN_KEY') !== -1);
+})();
+(function () {
+  // Caller tries to set experiment.outcome (status=applied → E1 already forbids; defence-in-depth)
+  // Build an experiment with outcome non-null and a status that E1 would permit (completed).
+  // We then set status back to 'applied' on the snapshot — but the E1 contract rejects that
+  // combo. So this hits the EXP validate gate.
+  var exp = makeExperiment({ status: 'completed', outcome: { synthetic: true } });
+  var r = CL.classifyOutcome(makeInput({ experiment: exp }), { clock: fixedClock() });
+  chk('J2: pre-filled outcome on experiment (status=completed) → BLOCK EXPERIMENT_STATUS_INVALID',
+    r.valid !== true && (r.reasonCodes.indexOf('EXPERIMENT_STATUS_INVALID') !== -1
+      || r.reasonCodes.indexOf('OUTCOME_INVALID') !== -1));
+})();
+(function () {
+  // Caller tries `class` field directly on input
+  var i = makeInput();
+  i['class'] = 'confirmed';
+  var r = CL.classifyOutcome(i, { clock: fixedClock() });
+  chk('J3: caller-supplied class on input → BLOCK',
+    r.valid !== true && r.reasonCodes.indexOf('UNKNOWN_OWN_KEY') !== -1);
+})();
+
+// ------------------------------------------------------------------
+// Section K — Forged records (clone / JSON / structuredClone / Proxy)
+// ------------------------------------------------------------------
+console.log('Section K — Forged records / clone rejection');
+(function () {
+  // Clone the experiment after the original passes — clone is a NEW reference, NOT registered.
+  var r = CL.classifyOutcome(makeInput(), { clock: fixedClock() });
+  chk('K0 setup: confirmed verifies', r.valid === true && CL.verifyAuthoritativeOutcome(r.outcome));
+  // JSON clone: structurally identical, different reference
+  var cloned = JSON.parse(JSON.stringify(r.outcome));
+  chk('K1: JSON-cloned outcome does NOT verify',
+    CL.verifyAuthoritativeOutcome(cloned) === false);
+  // structuredClone
+  if (typeof structuredClone === 'function') {
+    var sc = structuredClone(r.outcome);
+    chk('K2: structuredClone outcome does NOT verify',
+      CL.verifyAuthoritativeOutcome(sc) === false);
+  } else { pass += 1; }
+  // Hand-forged shape match
+  var forged = Object.freeze({
+    schemaVersion: 1,
+    outcomeId: r.outcome.outcomeId,
+    experimentId: r.outcome.experimentId,
+    'class': 'confirmed',
+    observedDirection: 'decrease', observedMagnitude: 1.0,
+    comparabilityScore: 0.9, confounders: Object.freeze([]),
+    driverFeedback: null, dataQualityIssues: Object.freeze([]),
+    sideEffects: Object.freeze([]), limitations: Object.freeze([]),
+    createdAt: '2026-06-30T11:30:00Z',
+  });
+  chk('K3: hand-forged shape-matching frozen object does NOT verify',
+    CL.verifyAuthoritativeOutcome(forged) === false);
+})();
+(function () {
+  // Experiment passed as a NON-frozen object → BLOCK (not deep-frozen)
+  var exp = makeExperiment();
+  // makeExperiment already deep-freezes; manually re-build a non-frozen variant
+  var unfrozen = JSON.parse(JSON.stringify(exp));
+  var r = CL.classifyOutcome(makeInput({ experiment: unfrozen }), { clock: fixedClock() });
+  chk('K4: unfrozen experiment → BLOCK',
+    r.valid !== true && r.reasonCodes.indexOf('EXPERIMENT_INVALID') !== -1);
+})();
+(function () {
+  // Proxy input wrapper — descriptor snapshot should reject (Object.getOwnPropertyNames
+  // does fire the ownKeys trap, but our walk uses descriptors and rejects unknown keys.
+  // A Proxy that returns "extra" own keys → BLOCK).
+  var realInput = makeInput();
+  var p = new Proxy(realInput, {
+    ownKeys: function (target) {
+      return ['experiment', 'appliedChange', 'followUp', 'observation', 'controlVariableObservations', 'class'];
+    },
+    getOwnPropertyDescriptor: function (target, key) {
+      if (key === 'class') return { configurable: true, enumerable: true, value: 'confirmed' };
+      return Object.getOwnPropertyDescriptor(target, key);
+    },
+    get: function (target, key) {
+      throw new Error('Proxy [[Get]] fired — classifier should not [[Get]] before authority');
+    },
+  });
+  var r = CL.classifyOutcome(p, { clock: fixedClock() });
+  chk('K5: Proxy with extra "class" own key → BLOCK without firing [[Get]]',
+    r.valid !== true);
+})();
+
+// ------------------------------------------------------------------
+// Section L — Hostile clock
+// ------------------------------------------------------------------
+console.log('Section L — Hostile clock');
+(function () {
+  var clockCalls = 0;
+  var hostileClock = function () { clockCalls++; throw new Error('clock exploded'); };
+  // Forged input (cross-case → fast-fail BEFORE clock)
+  var r = CL.classifyOutcome(makeInput({
+    followUpOverrides: { parentCaseId: 'case_other' },
+  }), { clock: hostileClock });
+  // The classifier currently invokes clock during Step 9 (post-authority) — for forged
+  // input it should not reach Step 9. But invalid_comparison happens AFTER clock. So we
+  // also test a STRUCTURAL reject (cross-case is structural).
+  // Actually crossCase only triggers at Step 11 (post-clock). Need a structural rejection
+  // earlier to assert clockCalls === 0. Use an unknown-own-key Proxy:
+  var i = makeInput();
+  i.unknown_field = 1;
+  clockCalls = 0;
+  var r2 = CL.classifyOutcome(i, { clock: hostileClock });
+  chk('L1: forged input (UNKNOWN_OWN_KEY) → clock not invoked',
+    r2.valid !== true && clockCalls === 0);
+  chk('L2: forged input → BLOCK', r2.valid !== true);
+})();
+(function () {
+  // Hostile clock returning a non-string → BLOCK with no partial output
+  var hostileClock = function () { return { malicious: true }; };
+  var r = CL.classifyOutcome(makeInput(), { clock: hostileClock });
+  chk('L3: hostile clock returning non-string → BLOCK',
+    r.valid !== true);
+})();
+
+// ------------------------------------------------------------------
+// Section M — Deterministic IDs / no clock leak in outcomeId
+// ------------------------------------------------------------------
+console.log('Section M — Deterministic IDs');
+(function () {
+  // Clock varies within the freshness window — outcomeId hash MUST NOT depend on clock.
+  var r1 = CL.classifyOutcome(makeInput(),
+    { clock: function () { return '2026-06-30T11:30:00Z'; } });
+  var r2 = CL.classifyOutcome(makeInput(),
+    { clock: function () { return '2026-07-15T12:00:00Z'; } });
+  chk('M1: outcomeId deterministic regardless of clock',
+    r1.valid === true && r2.valid === true
+      && r1.outcome.outcomeId === r2.outcome.outcomeId,
+    r1.valid === true && r2.valid === true ? { id1: r1.outcome.outcomeId, id2: r2.outcome.outcomeId } : { r1: r1, r2: r2 });
+})();
+(function () {
+  // Different changeId → different outcomeId
+  var r1 = CL.classifyOutcome(makeInput(), { clock: fixedClock() });
+  var r2 = CL.classifyOutcome(makeInput({
+    appliedChangeOverrides: { changeId: 'change_demo_002' },
+  }), { clock: fixedClock() });
+  chk('M2: different changeId → different outcomeId',
+    r1.valid === true && r2.valid === true && r1.outcome.outcomeId !== r2.outcome.outcomeId);
+})();
+(function () {
+  // Different experimentId → different outcomeId
+  var r1 = CL.classifyOutcome(makeInput(), { clock: fixedClock() });
+  var otherExp = makeExperiment({ experimentId: 'exp_aaaaaaaaaaaaaaaa' });
+  var otherAc = makeAppliedChange({ sourceExperimentId: 'exp_aaaaaaaaaaaaaaaa' });
+  var r2 = CL.classifyOutcome(makeInput({ experiment: otherExp, appliedChange: otherAc }),
+    { clock: fixedClock() });
+  chk('M3: different experimentId → different outcomeId',
+    r1.valid === true && r2.valid === true && r1.outcome.outcomeId !== r2.outcome.outcomeId);
+})();
+
+// ------------------------------------------------------------------
+// Section N — Deep freeze / no causation wording / no raw telemetry leak
+// ------------------------------------------------------------------
+console.log('Section N — Deep freeze / no causation / no raw telemetry');
+(function () {
+  var r = CL.classifyOutcome(makeInput(), { clock: fixedClock() });
+  chk('N1: outcome is deep-frozen', r.valid === true && Object.isFrozen(r.outcome));
+  chk('N2: outcome.confounders is frozen', r.valid === true && Object.isFrozen(r.outcome.confounders));
+  chk('N3: outcome.limitations is frozen', r.valid === true && Object.isFrozen(r.outcome.limitations));
+  chk('N4: outcome.dataQualityIssues is frozen', r.valid === true && Object.isFrozen(r.outcome.dataQualityIssues));
+  chk('N5: outcome.sideEffects is frozen', r.valid === true && Object.isFrozen(r.outcome.sideEffects));
+  // Outcome must not contain free-text driver feedback (only i18n key)
+  if (r.valid === true) {
+    var fb = r.outcome.driverFeedback;
+    chk('N6: driverFeedback is i18n key or null',
+      fb === null || (typeof fb === 'string' && fb.indexOf(' ') === -1 && fb.indexOf('.') !== -1));
+  }
+  // Outcome must not contain raw telemetry payloads, paths, etc.
+  if (r.valid === true) {
+    var s = JSON.stringify(r.outcome);
+    chk('N7: outcome contains no filesystem path',
+      s.indexOf('/Users/') === -1 && s.indexOf('\\Users\\') === -1
+      && s.indexOf('/home/') === -1 && s.indexOf('/private/') === -1);
+    chk('N8: outcome contains no causal claim wording',
+      s.toLowerCase().indexOf(' causes ') === -1
+      && s.toLowerCase().indexOf(' caused ') === -1
+      && s.toLowerCase().indexOf(' because ') === -1);
+    chk('N9: outcome contains no driver-blame wording',
+      s.toLowerCase().indexOf('driver error') === -1
+      && s.toLowerCase().indexOf("driver's fault") === -1
+      && s.toLowerCase().indexOf('blame') === -1);
+  }
+})();
+
+// ------------------------------------------------------------------
+// Section O — Mutation tests (outcome cannot be mutated post-return)
+// ------------------------------------------------------------------
+console.log('Section O — Mutation resistance');
+(function () {
+  var r = CL.classifyOutcome(makeInput(), { clock: fixedClock() });
+  if (r.valid === true) {
+    var beforeClass = r.outcome['class'];
+    try { r.outcome['class'] = 'forged'; } catch (e) { /* swallow strict-mode throw */ }
+    chk('O1: outcome.class cannot be mutated',
+      r.outcome['class'] === beforeClass);
+    try { r.outcome.confounders.push('x'); } catch (e) { /* swallow */ }
+    chk('O2: outcome.confounders cannot be mutated',
+      r.outcome.confounders.length === 0);
+    try { r.outcome.limitations.push('FORGED'); } catch (e) { /* swallow */ }
+    chk('O3: outcome.limitations cannot be mutated post-return',
+      r.outcome.limitations.indexOf('FORGED') === -1);
+  }
+})();
+
+// ------------------------------------------------------------------
+// Section P — Duplicate evidence id rejected at structural layer
+// ------------------------------------------------------------------
+console.log('Section P — Evidence ids');
+(function () {
+  // Two contradicting evidence ids that happen to be the same id — the structural layer
+  // accepts both (no dedup logic at E3 contract), but the count still drives contradicted.
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: {
+      contradictingEvidenceIds: ['ev_dup_001', 'ev_dup_001'],
+      observedDirection: 'decrease', observedMagnitude: 1.0,
+    },
+  }), { clock: fixedClock() });
+  chk('P1: duplicate contradicting evidence ids still classify as contradicted',
+    r.valid === true && r.outcome['class'] === 'contradicted');
+})();
+(function () {
+  // Hostile contradicting id (contains "..")
+  var r = CL.classifyOutcome(makeInput({
+
+exec
+/bin/bash -lc 'git diff --stat 7642123ed384ad5a557a1a54047f81ff7b02b6c3..ab01b8077a802042fc5f8c9116317d8d2b7e239a && git diff --name-only 7642123ed384ad5a557a1a54047f81ff7b02b6c3..ab01b8077a802042fc5f8c9116317d8d2b7e239a' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-9n77Qrwx' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-PgDKxiEh' (errno=Operation not permitted)
+ governance/r3.0/train.json              |   4 +-
+ governance/r3.0e/checkpoints/E3.json    | 102 ++++
+ governance/r3.0e/state.json             |  11 +-
+ package.json                            |   2 +-
+ renderer/js/r3-0e-outcome-classifier.js | 818 ++++++++++++++++++++++++++++++++
+ tests/r3.0e-outcome-classifier.test.js  | 770 ++++++++++++++++++++++++++++++
+ 6 files changed, 1699 insertions(+), 8 deletions(-)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-kKuL0aa7' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-WGOK7ZPY' (errno=Operation not permitted)
+governance/r3.0/train.json
+governance/r3.0e/checkpoints/E3.json
+governance/r3.0e/state.json
+package.json
+renderer/js/r3-0e-outcome-classifier.js
+tests/r3.0e-outcome-classifier.test.js
+
+codex
+One possible issue is already standing out: the comments say driver feedback is i18n-keyed, but the implementation only checks “non-empty string” before copying it into the outcome. I’m checking the E1 outcome contract now to see whether it closes that gap or leaves E3 responsible.
+exec
+/bin/bash -lc "nl -ba renderer/js/r3-0e-outcome-classifier.js | sed -n '250,760p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+   250	    try {
+   251	      var syms = _CAPTURED_OBJECT_GET_OWN_SYMS(o);
+   252	      return _CAPTURED_ARRAY_IS_ARRAY(syms) && syms.length > 0;
+   253	    } catch (e) { return true; }
+   254	  }
+   255	  function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
+   256	  function _isFiniteNumber(v) {
+   257	    return typeof v === 'number' && _CAPTURED_NUMBER_IS_FINITE(v) === true;
+   258	  }
+   259	  function _isBool(v) { return v === true || v === false; }
+   260	  function _idGrammarOk(s) {
+   261	    if (!_nonEmptyStr(s)) return false;
+   262	    if (ID_FORBIDDEN_RE.test(s)) return false;
+   263	    if (!ID_GRAMMAR_RE.test(s)) return false;
+   264	    return true;
+   265	  }
+   266	
+   267	  // Deep freeze using captured Object.freeze + captured getOwnPropertyNames.
+   268	  function _deepFreeze(v) {
+   269	    if (v === null || typeof v !== 'object') return v;
+   270	    try { _CAPTURED_OBJECT_FREEZE(v); } catch (e) { /* swallow */ }
+   271	    var keys;
+   272	    try { keys = _CAPTURED_OBJECT_GET_OWN_NAMES(v); } catch (e) { return v; }
+   273	    for (var i = 0; i < keys.length; i++) {
+   274	      var k = keys[i];
+   275	      var child;
+   276	      try { child = v[k]; } catch (eGet) { continue; }
+   277	      _deepFreeze(child);
+   278	    }
+   279	    return v;
+   280	  }
+   281	
+   282	  // ---------- Input descriptor snapshot --------------------------------------------------------
+   283	  // Mirrors D5 snapshotInputDescriptors: walks own descriptors (NOT [[Get]]) so a Proxy with
+   284	  // hostile getters does NOT fire on first read. Symbol / non-enumerable / accessor / unknown
+   285	  // own key → reject before any further inspection.
+   286	  function _snapshotPlainShape(o, allowedKeys, invalidCode, opts) {
+   287	    opts = opts || {};
+   288	    if (!_isOriginalPlainObject(o)) {
+   289	      return { valid: false, reasonCodes: [invalidCode, CODES.PROTOTYPE_POLLUTION_REJECTED], detail: 'not plain' };
+   290	    }
+   291	    if (opts.requireFrozen && _isFrozenSafe(o) !== true) {
+   292	      return { valid: false, reasonCodes: [invalidCode], detail: 'not frozen' };
+   293	    }
+   294	    if (_hasSymbolOwnKey(o)) {
+   295	      return { valid: false, reasonCodes: [invalidCode, CODES.UNKNOWN_OWN_KEY], detail: 'symbol own key' };
+   296	    }
+   297	    var names;
+   298	    try { names = _CAPTURED_OBJECT_GET_OWN_NAMES(o); } catch (e) {
+   299	      return { valid: false, reasonCodes: [invalidCode], detail: 'descriptor read failed' };
+   300	    }
+   301	    var snap = Object.create(null);
+   302	    for (var i = 0; i < names.length; i++) {
+   303	      var k = names[i];
+   304	      // Reject unknown own key — caller cannot smuggle `class`, `outcomeId`, `confounders`,
+   305	      // etc. into the input wrapper.
+   306	      if (allowedKeys.indexOf(k) === -1) {
+   307	        return { valid: false, reasonCodes: [invalidCode, CODES.UNKNOWN_OWN_KEY], detail: 'unknown own key ' + k };
+   308	      }
+   309	      var d;
+   310	      try { d = _CAPTURED_OBJECT_GET_OWN_DESC(o, k); } catch (e) {
+   311	        return { valid: false, reasonCodes: [invalidCode], detail: 'descriptor inaccessible' };
+   312	      }
+   313	      if (!d || d.enumerable !== true) {
+   314	        return { valid: false, reasonCodes: [invalidCode], detail: 'non-enumerable key ' + k };
+   315	      }
+   316	      if (typeof d.get === 'function' || typeof d.set === 'function') {
+   317	        return { valid: false, reasonCodes: [invalidCode], detail: 'accessor key ' + k };
+   318	      }
+   319	      snap[k] = d.value;
+   320	    }
+   321	    return { valid: true, snapshot: snap };
+   322	  }
+   323	
+   324	  function _snapshotArrayShape(a, invalidCode) {
+   325	    if (!_isPlainArray(a)) {
+   326	      return { valid: false, reasonCodes: [invalidCode], detail: 'not array' };
+   327	    }
+   328	    if (_hasSymbolOwnKey(a)) {
+   329	      return { valid: false, reasonCodes: [invalidCode, CODES.UNKNOWN_OWN_KEY], detail: 'symbol own key on array' };
+   330	    }
+   331	    var names;
+   332	    try { names = _CAPTURED_OBJECT_GET_OWN_NAMES(a); } catch (e) {
+   333	      return { valid: false, reasonCodes: [invalidCode], detail: 'array desc inaccessible' };
+   334	    }
+   335	    var snap = [];
+   336	    var aLen = a.length;
+   337	    if (typeof aLen !== 'number' || aLen < 0 || aLen > ARRAY_CAP) {
+   338	      return { valid: false, reasonCodes: [invalidCode, CODES.ARRAY_CAP_EXCEEDED], detail: 'array len ' + aLen };
+   339	    }
+   340	    // Walk via captured-name descriptors so an accessor index isn't possible.
+   341	    for (var i = 0; i < names.length; i++) {
+   342	      var name = names[i];
+   343	      if (name === 'length') continue;
+   344	      var d;
+   345	      try { d = _CAPTURED_OBJECT_GET_OWN_DESC(a, name); } catch (e) {
+   346	        return { valid: false, reasonCodes: [invalidCode], detail: 'array elt desc fail' };
+   347	      }
+   348	      if (!d || d.enumerable !== true) {
+   349	        return { valid: false, reasonCodes: [invalidCode], detail: 'non-enumerable array elt' };
+   350	      }
+   351	      if (typeof d.get === 'function' || typeof d.set === 'function') {
+   352	        return { valid: false, reasonCodes: [invalidCode], detail: 'accessor array elt' };
+   353	      }
+   354	      snap.push(d.value);
+   355	    }
+   356	    return { valid: true, snapshot: snap };
+   357	  }
+   358	
+   359	  function _snapshotOpts(optsIn) {
+   360	    var snap = Object.create(null);
+   361	    if (optsIn === undefined || optsIn === null) return { valid: true, snapshot: snap };
+   362	    var r = _snapshotPlainShape(optsIn, OPTS_KEYS_ALLOWED, CODES.OUTCOME_INVALID);
+   363	    if (r.valid !== true) return r;
+   364	    // Type-check each opt.
+   365	    if (r.snapshot.clock !== undefined && r.snapshot.clock !== null && typeof r.snapshot.clock !== 'function') {
+   366	      return { valid: false, reasonCodes: [CODES.OUTCOME_INVALID], detail: 'opts.clock not function' };
+   367	    }
+   368	    if (r.snapshot.referenceNowMs !== undefined && r.snapshot.referenceNowMs !== null
+   369	        && typeof r.snapshot.referenceNowMs !== 'number') {
+   370	      return { valid: false, reasonCodes: [CODES.OUTCOME_INVALID], detail: 'opts.referenceNowMs not number' };
+   371	    }
+   372	    if (r.snapshot.maxAgeMs !== undefined && r.snapshot.maxAgeMs !== null
+   373	        && (typeof r.snapshot.maxAgeMs !== 'number' || !_CAPTURED_NUMBER_IS_INTEGER(r.snapshot.maxAgeMs) || r.snapshot.maxAgeMs < 0)) {
+   374	      return { valid: false, reasonCodes: [CODES.OUTCOME_INVALID], detail: 'opts.maxAgeMs invalid' };
+   375	    }
+   376	    return { valid: true, snapshot: r.snapshot };
+   377	  }
+   378	
+   379	  // ---------- Deterministic ID generator -------------------------------------------------------
+   380	  // outcomeId is deterministic from (experimentId, changeId). No clock leak.
+   381	  function _hash32(s) {
+   382	    var h = 0x811c9dc5;
+   383	    var len = typeof s === 'string' ? s.length : 0;
+   384	    for (var i = 0; i < len; i++) {
+   385	      h ^= s.charCodeAt(i);
+   386	      h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+   387	    }
+   388	    return h.toString(16).padStart(8, '0');
+   389	  }
+   390	  function _fnv2(s) {
+   391	    var slen = typeof s === 'string' ? s.length : 0;
+   392	    return _hash32(s) + _hash32(s + '|' + slen);
+   393	  }
+   394	  function _outcomeId(experimentId, changeId) {
+   395	    return 'outcome_' + _fnv2('outcome|' + experimentId + '|' + changeId);
+   396	  }
+   397	
+   398	  // ---------- Main entry: classifyOutcome -----------------------------------------------------
+   399	  /**
+   400	   * classifyOutcome(input, opts) — produces a deep-frozen Outcome envelope.
+   401	   *
+   402	   * Ordered steps (clock MUST NOT fire before Step 9):
+   403	   *   0.  intrinsic integrity (captures + contract surfaces still frozen)
+   404	   *   1.  input wrapper descriptor snapshot (closed keys; symbol/accessor/proxy rejected)
+   405	   *   2.  experiment frozen + E1 shape validation
+   406	   *   3.  appliedChange snapshot + shape
+   407	   *   4.  followUp snapshot + shape
+   408	   *   5.  observation snapshot + shape
+   409	   *   6.  controlVariableObservations snapshot + per-element E1 shape
+   410	   *   7.  opts snapshot
+   411	   *   8.  identity binding (status=applied, sourceExperimentId match, parentCaseId match)
+   412	   *   9.  resolve freshness reference time (clock at most once)
+   413	   *   10. freshness check on experiment.createdAt + appliedChange.appliedAt
+   414	   *   11. comparison-validity computation (invalid_comparison precedence)
+   415	   *   12. control-variable integrity (inconclusive_due_to_confounders precedence)
+   416	   *   13. data-quality + direction/magnitude classification cascade
+   417	   *   14. compose outcome
+   418	   *   15. validate via E1 OUT.validateOutcomeShape
+   419	   *   16. envelope byte cap
+   420	   *   17. deep-freeze + register
+   421	   */
+   422	  function classifyOutcome(inputIn, optsIn) {
+   423	    try {
+   424	      // ---- Step 0: intrinsic integrity ----------------------------------------------------
+   425	      if (!_intrinsicsIntact()) {
+   426	        return _buildTamperBlock('intrinsic tampering detected at entry');
+   427	      }
+   428	
+   429	      // ---- Step 1: input wrapper descriptor snapshot -------------------------------------
+   430	      var inSnapR = _snapshotPlainShape(inputIn, INPUT_KEYS_ALLOWED, CODES.OUTCOME_INVALID, { requireFrozen: false });
+   431	      if (inSnapR.valid !== true) {
+   432	        return RC_E.buildBlockedResult(inSnapR.reasonCodes, { detail: inSnapR.detail });
+   433	      }
+   434	      var inputSnap = inSnapR.snapshot;
+   435	
+   436	      // ---- Step 2: experiment shape validation -------------------------------------------
+   437	      // The Experiment must be deep-frozen (immutability) AND pass the E1 contract.
+   438	      if (!_isFrozenSafe(inputSnap.experiment)) {
+   439	        return RC_E.buildBlockedResult([CODES.EXPERIMENT_INVALID], { detail: 'experiment not deep-frozen' });
+   440	      }
+   441	      var expCheck = EXP.validateExperimentShape(inputSnap.experiment);
+   442	      if (expCheck.valid !== true) {
+   443	        return RC_E.buildBlockedResult(
+   444	          expCheck.reasonCodes ? expCheck.reasonCodes.slice() : [CODES.EXPERIMENT_INVALID],
+   445	          { detail: 'experiment shape invalid' }
+   446	        );
+   447	      }
+   448	      var experiment = inputSnap.experiment;
+   449	
+   450	      // ---- Step 3: appliedChange snapshot + shape ----------------------------------------
+   451	      var acSnapR = _snapshotPlainShape(inputSnap.appliedChange, APPLIED_CHANGE_KEYS_ALLOWED, CODES.OUTCOME_INVALID);
+   452	      if (acSnapR.valid !== true) {
+   453	        return RC_E.buildBlockedResult(acSnapR.reasonCodes, { detail: 'appliedChange: ' + acSnapR.detail });
+   454	      }
+   455	      var appliedChange = acSnapR.snapshot;
+   456	      if (!_idGrammarOk(appliedChange.changeId)) {
+   457	        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'appliedChange.changeId invalid' });
+   458	      }
+   459	      if (!_idGrammarOk(appliedChange.sourceExperimentId)) {
+   460	        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'appliedChange.sourceExperimentId invalid' });
+   461	      }
+   462	      if (!_nonEmptyStr(appliedChange.appliedAt) || _isoToMs(appliedChange.appliedAt) === null) {
+   463	        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'appliedChange.appliedAt invalid' });
+   464	      }
+   465	
+   466	      // ---- Step 4: followUp snapshot + shape ---------------------------------------------
+   467	      var fuSnapR = _snapshotPlainShape(inputSnap.followUp, FOLLOWUP_KEYS_ALLOWED, CODES.OUTCOME_INVALID);
+   468	      if (fuSnapR.valid !== true) {
+   469	        return RC_E.buildBlockedResult(fuSnapR.reasonCodes, { detail: 'followUp: ' + fuSnapR.detail });
+   470	      }
+   471	      var followUp = fuSnapR.snapshot;
+   472	      if (!_idGrammarOk(followUp.followUpCaseId)) {
+   473	        return RC_E.buildBlockedResult([CODES.LINKAGE_INVALID], { detail: 'followUp.followUpCaseId invalid' });
+   474	      }
+   475	      if (!_idGrammarOk(followUp.parentCaseId)) {
+   476	        return RC_E.buildBlockedResult([CODES.LINKAGE_PARENT_MISSING], { detail: 'followUp.parentCaseId invalid' });
+   477	      }
+   478	      if (followUp.parentCaseId === followUp.followUpCaseId) {
+   479	        return RC_E.buildBlockedResult([CODES.LINKAGE_INVALID], { detail: 'follow-up case is self-link' });
+   480	      }
+   481	      if (!_idGrammarOk(followUp.sessionId)) {
+   482	        return RC_E.buildBlockedResult([CODES.LINKAGE_INVALID], { detail: 'followUp.sessionId invalid' });
+   483	      }
+   484	      if (!_idGrammarOk(followUp.parentSessionId)) {
+   485	        return RC_E.buildBlockedResult([CODES.LINKAGE_INVALID], { detail: 'followUp.parentSessionId invalid' });
+   486	      }
+   487	      if (!_isBool(followUp.hasExplicitReference)) {
+   488	        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'followUp.hasExplicitReference not bool' });
+   489	      }
+   490	      if (!_isFiniteNumber(followUp.comparabilityScore) || followUp.comparabilityScore < 0 || followUp.comparabilityScore > 1) {
+   491	        return RC_E.buildBlockedResult([CODES.OUTCOME_COMPARABILITY_INSUFFICIENT], { detail: 'followUp.comparabilityScore out of [0,1]' });
+   492	      }
+   493	
+   494	      // ---- Step 5: observation snapshot + shape ------------------------------------------
+   495	      var obsSnapR = _snapshotPlainShape(inputSnap.observation, OBSERVATION_KEYS_ALLOWED, CODES.OUTCOME_INVALID);
+   496	      if (obsSnapR.valid !== true) {
+   497	        return RC_E.buildBlockedResult(obsSnapR.reasonCodes, { detail: 'observation: ' + obsSnapR.detail });
+   498	      }
+   499	      var observation = obsSnapR.snapshot;
+   500	      // observedDirection: enum OR null
+   501	      if (observation.observedDirection !== null && DIRECTION_ALLOWED.indexOf(observation.observedDirection) === -1) {
+   502	        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'observation.observedDirection invalid' });
+   503	      }
+   504	      // observedMagnitude: finite OR null
+   505	      if (observation.observedMagnitude !== null && !_isFiniteNumber(observation.observedMagnitude)) {
+   506	        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'observation.observedMagnitude invalid' });
+   507	      }
+   508	      // driverFeedback: non-empty string i18n key OR null. The classifier propagates the key
+   509	      // unchanged into the outcome envelope; no text generation, no free-text laundering.
+   510	      if (observation.driverFeedback !== null && !_nonEmptyStr(observation.driverFeedback)) {
+   511	        return RC_E.buildBlockedResult([CODES.OUTCOME_DRIVER_FEEDBACK_INVALID], { detail: 'driverFeedback invalid' });
+   512	      }
+   513	      // dataQualityIssues / sideEffects / contradictingEvidenceIds / supportingEvidenceIds — bounded plain arrays.
+   514	      var dqiR = _snapshotArrayShape(observation.dataQualityIssues, CODES.OUTCOME_DATA_QUALITY_INVALID);
+   515	      if (dqiR.valid !== true) {
+   516	        return RC_E.buildBlockedResult(dqiR.reasonCodes, { detail: 'dataQualityIssues: ' + dqiR.detail });
+   517	      }
+   518	      var dataQualityIssues = dqiR.snapshot;
+   519	      for (var qi = 0; qi < dataQualityIssues.length; qi++) {
+   520	        if (!_nonEmptyStr(dataQualityIssues[qi])) {
+   521	          return RC_E.buildBlockedResult([CODES.OUTCOME_DATA_QUALITY_INVALID], { detail: 'dataQualityIssues[' + qi + '] not non-empty string' });
+   522	        }
+   523	      }
+   524	      var seR = _snapshotArrayShape(observation.sideEffects, CODES.OUTCOME_INVALID);
+   525	      if (seR.valid !== true) {
+   526	        return RC_E.buildBlockedResult(seR.reasonCodes, { detail: 'sideEffects: ' + seR.detail });
+   527	      }
+   528	      var sideEffects = seR.snapshot;
+   529	      // Each side-effect must be a plain { i18nKey, params } object (params may be null).
+   530	      for (var si = 0; si < sideEffects.length; si++) {
+   531	        var se = sideEffects[si];
+   532	        if (!_isOriginalPlainObject(se)) {
+   533	          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '] not plain' });
+   534	        }
+   535	        var seKeysR = _snapshotPlainShape(se, _CAPTURED_OBJECT_FREEZE(['i18nKey', 'params']), CODES.OUTCOME_INVALID);
+   536	        if (seKeysR.valid !== true) {
+   537	          return RC_E.buildBlockedResult(seKeysR.reasonCodes, { detail: 'sideEffects[' + si + ']: ' + seKeysR.detail });
+   538	        }
+   539	        if (!_nonEmptyStr(seKeysR.snapshot.i18nKey)) {
+   540	          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].i18nKey not non-empty' });
+   541	        }
+   542	        if (seKeysR.snapshot.params !== null && seKeysR.snapshot.params !== undefined && !_isOriginalPlainObject(seKeysR.snapshot.params)) {
+   543	          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params not plain' });
+   544	        }
+   545	      }
+   546	      var contraR = _snapshotArrayShape(observation.contradictingEvidenceIds, CODES.OUTCOME_INVALID);
+   547	      if (contraR.valid !== true) {
+   548	        return RC_E.buildBlockedResult(contraR.reasonCodes, { detail: 'contradictingEvidenceIds: ' + contraR.detail });
+   549	      }
+   550	      var contradictingEvidenceIds = contraR.snapshot;
+   551	      for (var ci = 0; ci < contradictingEvidenceIds.length; ci++) {
+   552	        if (!_idGrammarOk(contradictingEvidenceIds[ci])) {
+   553	          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'contradictingEvidenceIds[' + ci + '] invalid id' });
+   554	        }
+   555	      }
+   556	      var supR = _snapshotArrayShape(observation.supportingEvidenceIds, CODES.OUTCOME_INVALID);
+   557	      if (supR.valid !== true) {
+   558	        return RC_E.buildBlockedResult(supR.reasonCodes, { detail: 'supportingEvidenceIds: ' + supR.detail });
+   559	      }
+   560	      var supportingEvidenceIds = supR.snapshot;
+   561	      for (var sii = 0; sii < supportingEvidenceIds.length; sii++) {
+   562	        if (!_idGrammarOk(supportingEvidenceIds[sii])) {
+   563	          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'supportingEvidenceIds[' + sii + '] invalid id' });
+   564	        }
+   565	      }
+   566	
+   567	      // ---- Step 6: controlVariableObservations snapshot + per-element E1 -----------------
+   568	      var cvObsR = _snapshotArrayShape(inputSnap.controlVariableObservations, CODES.CONTROL_VARIABLES_INVALID);
+   569	      if (cvObsR.valid !== true) {
+   570	        return RC_E.buildBlockedResult(cvObsR.reasonCodes, { detail: 'controlVariableObservations: ' + cvObsR.detail });
+   571	      }
+   572	      var controlVariableObservations = cvObsR.snapshot;
+   573	      // E1 contract per element. The CV contract permits observedValue + withinRange filled.
+   574	      var observedCvByName = Object.create(null);
+   575	      for (var cvi = 0; cvi < controlVariableObservations.length; cvi++) {
+   576	        var cvObs = controlVariableObservations[cvi];
+   577	        var cvCheck = CV.validateControlVariableShape(cvObs);
+   578	        if (cvCheck.valid !== true) {
+   579	          return RC_E.buildBlockedResult(
+   580	            cvCheck.reasonCodes ? cvCheck.reasonCodes.slice() : [CODES.CONTROL_VARIABLES_INVALID],
+   581	            { detail: 'controlVariableObservations[' + cvi + '] shape invalid' }
+   582	          );
+   583	        }
+   584	        // E3 additionally requires observedValue + withinRange to be filled (non-null) — the
+   585	        // E1 contract permits null for shape-only validation; E3 algorithm demands the
+   586	        // observation be present so the integrity check can run.
+   587	        if (cvObs.observedValue === null) {
+   588	          return RC_E.buildBlockedResult([CODES.CONTROL_VARIABLE_MISSING], { detail: 'controlVariableObservations[' + cvi + '].observedValue null' });
+   589	        }
+   590	        if (cvObs.withinRange === null) {
+   591	          return RC_E.buildBlockedResult([CODES.CONTROL_VARIABLE_MISSING], { detail: 'controlVariableObservations[' + cvi + '].withinRange null' });
+   592	        }
+   593	        if (observedCvByName[cvObs.name] !== undefined) {
+   594	          return RC_E.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID], { detail: 'duplicate control variable name: ' + cvObs.name });
+   595	        }
+   596	        observedCvByName[cvObs.name] = cvObs;
+   597	      }
+   598	
+   599	      // ---- Step 7: opts snapshot ----------------------------------------------------------
+   600	      var optsR = _snapshotOpts(optsIn);
+   601	      if (optsR.valid !== true) {
+   602	        return RC_E.buildBlockedResult(optsR.reasonCodes, { detail: 'opts: ' + optsR.detail });
+   603	      }
+   604	      var optsSnap = optsR.snapshot;
+   605	
+   606	      // ---- Step 8: identity binding -------------------------------------------------------
+   607	      if (experiment.status !== 'applied') {
+   608	        return RC_E.buildBlockedResult([CODES.EXPERIMENT_STATUS_INVALID], { detail: 'experiment.status must be applied to classify, got ' + experiment.status });
+   609	      }
+   610	      if (experiment.outcome !== null) {
+   611	        // Defence-in-depth: E1 contract already enforces outcome=null for status=applied,
+   612	        // but caller-supplied final classification is forbidden, so the classifier rejects
+   613	        // any pre-filled outcome explicitly here too.
+   614	        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'caller-supplied experiment.outcome forbidden at classification' });
+   615	      }
+   616	      if (appliedChange.sourceExperimentId !== experiment.experimentId) {
+   617	        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'appliedChange.sourceExperimentId !== experiment.experimentId' });
+   618	      }
+   619	      // parentCaseId binding — followUp's parent MUST be the experiment's source case. If
+   620	      // parentCaseId mismatches, treat as invalid_comparison (cross-case forbidden).
+   621	      var crossCase = (followUp.parentCaseId !== experiment.sourceCaseId);
+   622	      var crossSession = (followUp.sessionId !== followUp.parentSessionId);
+   623	      var noExplicitReference = (followUp.hasExplicitReference !== true);
+   624	      var lowComparability = (followUp.comparabilityScore < MIN_COMPARABILITY_FOR_VALID_COMPARISON);
+   625	
+   626	      // ---- Step 9: resolve freshness reference (clock AT MOST ONCE, post-authority) ------
+   627	      var refNowMs = null;
+   628	      var resolvedClockIso = null;
+   629	      if (typeof optsSnap.referenceNowMs === 'number' && _CAPTURED_NUMBER_IS_INTEGER(optsSnap.referenceNowMs) && optsSnap.referenceNowMs >= 0) {
+   630	        refNowMs = optsSnap.referenceNowMs;
+   631	      } else if (typeof optsSnap.clock === 'function') {
+   632	        var clockIso = null;
+   633	        try { clockIso = optsSnap.clock(); } catch (eClock) { clockIso = null; }
+   634	        if (typeof clockIso === 'string' && clockIso.length > 0) {
+   635	          var clockMs = _isoToMs(clockIso);
+   636	          if (typeof clockMs === 'number') {
+   637	            refNowMs = clockMs;
+   638	            resolvedClockIso = clockIso;
+   639	          }
+   640	        }
+   641	      }
+   642	      if (typeof refNowMs !== 'number' || refNowMs !== refNowMs) {
+   643	        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'unable to resolve reference time (opts.clock missing or invalid)' });
+   644	      }
+   645	      var maxAgeMs = (typeof optsSnap.maxAgeMs === 'number') ? optsSnap.maxAgeMs : DEFAULT_MAX_AGE_MS;
+   646	
+   647	      // ---- Step 10: freshness check ------------------------------------------------------
+   648	      var expCreatedMs = _isoToMs(experiment.createdAt);
+   649	      var changeAppliedMs = _isoToMs(appliedChange.appliedAt);
+   650	      if (expCreatedMs !== null && (refNowMs - expCreatedMs) > maxAgeMs) {
+   651	        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'experiment exceeds max age' });
+   652	      }
+   653	      if (changeAppliedMs !== null && (refNowMs - changeAppliedMs) > maxAgeMs) {
+   654	        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'appliedChange exceeds max age' });
+   655	      }
+   656	
+   657	      // ---- Step 11: comparison-validity computation (invalid_comparison precedence) ------
+   658	      var limitations = [];
+   659	      var classDecision = null;
+   660	      var confounders = [];
+   661	
+   662	      if (crossCase || crossSession || noExplicitReference || lowComparability) {
+   663	        classDecision = 'invalid_comparison';
+   664	        if (crossCase) limitations.push(CODES.LINKAGE_PARENT_MISSING);
+   665	        if (crossSession) limitations.push(CODES.LIMITATION_CROSS_SESSION_FOLLOW_UP);
+   666	        if (noExplicitReference) limitations.push(CODES.OUTCOME_COMPARABILITY_INSUFFICIENT);
+   667	        if (lowComparability && limitations.indexOf(CODES.OUTCOME_COMPARABILITY_INSUFFICIENT) === -1) {
+   668	          limitations.push(CODES.OUTCOME_COMPARABILITY_INSUFFICIENT);
+   669	        }
+   670	      } else {
+   671	        // ---- Step 12: control-variable integrity (inconclusive_due_to_confounders) ------
+   672	        // Every declared experiment.controlVariables[].name MUST appear in observations.
+   673	        var declaredCv = experiment.controlVariables || [];
+   674	        for (var dci = 0; dci < declaredCv.length; dci++) {
+   675	          var declared = declaredCv[dci];
+   676	          if (declared === null || typeof declared !== 'object') continue;
+   677	          var declaredName = declared.name;
+   678	          if (!_nonEmptyStr(declaredName)) continue;
+   679	          if (observedCvByName[declaredName] === undefined) {
+   680	            confounders.push(declaredName);
+   681	          }
+   682	        }
+   683	        if (confounders.length > 0) {
+   684	          classDecision = 'inconclusive_due_to_confounders';
+   685	          if (limitations.indexOf(CODES.CONTROL_VARIABLE_MISSING) === -1) {
+   686	            limitations.push(CODES.CONTROL_VARIABLE_MISSING);
+   687	          }
+   688	        } else {
+   689	          // Out-of-range CVs become confounders.
+   690	          var outOfRange = [];
+   691	          for (var ki = 0; ki < controlVariableObservations.length; ki++) {
+   692	            var cvo = controlVariableObservations[ki];
+   693	            if (cvo.withinRange !== true) outOfRange.push(cvo.name);
+   694	          }
+   695	          if (outOfRange.length > 0) {
+   696	            classDecision = 'inconclusive_due_to_confounders';
+   697	            confounders = outOfRange;
+   698	            if (limitations.indexOf(CODES.CONTROL_VARIABLE_OUT_OF_RANGE) === -1) {
+   699	              limitations.push(CODES.CONTROL_VARIABLE_OUT_OF_RANGE);
+   700	            }
+   701	          } else if (controlVariableObservations.length === 0) {
+   702	            // No control variables AT ALL — the experiment did not declare any, and none
+   703	            // were observed. The outcome can still be classified, but we flag the
+   704	            // limitation honestly.
+   705	            if (limitations.indexOf(CODES.LIMITATION_NO_CONTROL_VARIABLES) === -1) {
+   706	              limitations.push(CODES.LIMITATION_NO_CONTROL_VARIABLES);
+   707	            }
+   708	          }
+   709	        }
+   710	
+   711	        // ---- Step 13: data quality + direction/magnitude classification cascade --------
+   712	        if (classDecision === null) {
+   713	          var dataQualityBlocking = dataQualityIssues.length > DATA_QUALITY_ISSUE_BLOCK_THRESHOLD;
+   714	          var hasContradictions = contradictingEvidenceIds.length > 0;
+   715	          var directionMatch = (observation.observedDirection === experiment.expectedDirection);
+   716	          var magnitudeInRange = (
+   717	            observation.observedMagnitude !== null
+   718	              && _isFiniteNumber(observation.observedMagnitude)
+   719	              && observation.observedMagnitude >= experiment.expectedMagnitudeRange.min
+   720	              && observation.observedMagnitude <= experiment.expectedMagnitudeRange.max
+   721	          );
+   722	
+   723	          if (dataQualityBlocking) {
+   724	            classDecision = 'inconclusive';
+   725	            // Carry the data-quality codes as limitations so the UI can show them honestly.
+   726	            for (var dqi = 0; dqi < dataQualityIssues.length && limitations.length < ARRAY_CAP; dqi++) {
+   727	              if (limitations.indexOf(dataQualityIssues[dqi]) === -1) limitations.push(dataQualityIssues[dqi]);
+   728	            }
+   729	          } else if (observation.observedDirection === null) {
+   730	            classDecision = 'inconclusive';
+   731	          } else if (hasContradictions) {
+   732	            // Contradicting evidence blocks confirmed; treat as contradicted irrespective of
+   733	            // direction match (the contradicting evidence is itself evidence to the contrary).
+   734	            classDecision = 'contradicted';
+   735	          } else if (!directionMatch) {
+   736	            classDecision = 'contradicted';
+   737	          } else if (magnitudeInRange) {
+   738	            classDecision = 'confirmed';
+   739	          } else {
+   740	            classDecision = 'partially_confirmed';
+   741	          }
+   742	        }
+   743	      }
+   744	
+   745	      // ---- Step 14: compose outcome ------------------------------------------------------
+   746	      var createdAtIso = resolvedClockIso || appliedChange.appliedAt || experiment.createdAt;
+   747	      if (!_nonEmptyStr(createdAtIso) || _isoToMs(createdAtIso) === null) {
+   748	        return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'could not resolve outcome createdAt ISO' });
+   749	      }
+   750	      var outcomeIdStr = _outcomeId(experiment.experimentId, appliedChange.changeId);
+   751	      // Bound the limitations array.
+   752	      if (limitations.length > ARRAY_CAP) limitations = limitations.slice(0, ARRAY_CAP);
+   753	
+   754	      var outcome = {
+   755	        schemaVersion: OUTCOME_SCHEMA_VERSION,
+   756	        outcomeId: outcomeIdStr,
+   757	        experimentId: experiment.experimentId,
+   758	        'class': classDecision,
+   759	        observedDirection: observation.observedDirection,
+   760	        observedMagnitude: observation.observedMagnitude,
+
+exec
+/bin/bash -lc "sed -n '1,260p' contracts/r3.0e/outcome-contract.js && sed -n '1,240p' contracts/r3.0e/control-variables-contract.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+/**
+ * contracts/r3.0e/outcome-contract.js — R3.0E E1 · Outcome shape contract (NON-PRODUCTION).
+ *
+ * Defines the structural shape of an Outcome — the classification produced at E3 by the
+ * Outcome Classifier and attached to an Experiment. Classes form a closed enum:
+ *   confirmed / partially_confirmed / contradicted / inconclusive / invalid_comparison /
+ *   inconclusive_due_to_confounders.
+ *
+ * E1 contract layer validates SHAPE only. Semantic invariants (direction match, magnitude
+ * within range, confounder detection) are enforced by the E3 algorithm.
+ *
+ * UMD: Node require / Electron renderer global (R3_0E_OutcomeContract).
+ */
+(function (root) {
+  'use strict';
+
+  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+  var RC = _req('./reason-codes.js', typeof R3_0E_ReasonCodes !== 'undefined' ? R3_0E_ReasonCodes : undefined);
+  if (!RC) throw new Error('outcome-contract.js requires reason-codes.js');
+  var CODES = RC.REASON_CODES;
+
+  var OUTCOME_KEYS = Object.freeze([
+    'schemaVersion',
+    'outcomeId',
+    'experimentId',
+    'class',                          // OUTCOME_CLASS_ALLOWED
+    'observedDirection',              // EXPECTED_DIRECTION_ALLOWED OR null
+    'observedMagnitude',              // number OR null
+    'comparabilityScore',             // 0..1
+    'confounders',                    // array of control-variable ids that drifted
+    'driverFeedback',                 // optional i18n key OR null
+    'dataQualityIssues',              // array of i18n keys (or reason codes)
+    'sideEffects',                    // array of structured side-effect descriptors
+    'limitations',                    // array of LIMITATION_* reason codes
+    'createdAt',
+  ]);
+
+  var OUTCOME_CLASS_ALLOWED = Object.freeze([
+    'confirmed',
+    'partially_confirmed',
+    'contradicted',
+    'inconclusive',
+    'invalid_comparison',
+    'inconclusive_due_to_confounders',
+  ]);
+
+  var SUPPORTED_SCHEMA_VERSION = 1;
+  var ARRAY_CAP = 32;
+
+  function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
+  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (typeof k === 'symbol') return false; if (allowed.indexOf(k) === -1) return false; } return true; }
+  function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
+
+  function validateOutcomeShape(oIn) {
+    try {
+      if (!RC.isOriginalPlainObject(oIn)) return RC.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED]);
+      if (RC.hasHiddenOwnKey(oIn)) return RC.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.UNKNOWN_OWN_KEY]);
+      if (RC.hasNonPlainNestedObject(oIn)) return RC.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED]);
+      var o = RC.toCleanCopy(oIn);
+      if (!_isPlain(o)) return RC.buildBlockedResult([CODES.OUTCOME_INVALID]);
+      if (!_hasOnlyAllowedKeys(o, OUTCOME_KEYS)) return RC.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.UNKNOWN_OWN_KEY]);
+
+      var reasons = [];
+      if (!Number.isInteger(o.schemaVersion)) reasons.push(CODES.OUTCOME_INVALID);
+      else if (o.schemaVersion > SUPPORTED_SCHEMA_VERSION) reasons.push(CODES.UNSUPPORTED_FUTURE_SCHEMA);
+      else if (o.schemaVersion < 1) reasons.push(CODES.OUTCOME_INVALID);
+
+      if (!_nonEmptyStr(o.outcomeId)) reasons.push(CODES.OUTCOME_INVALID);
+      if (!_nonEmptyStr(o.experimentId)) reasons.push(CODES.OUTCOME_INVALID);
+      if (OUTCOME_CLASS_ALLOWED.indexOf(o['class']) === -1) reasons.push(CODES.OUTCOME_CLASS_INVALID);
+      if (o.observedDirection !== null && ['increase', 'decrease', 'no_change'].indexOf(o.observedDirection) === -1) reasons.push(CODES.OUTCOME_INVALID);
+      if (o.observedMagnitude !== null && typeof o.observedMagnitude !== 'number') reasons.push(CODES.OUTCOME_INVALID);
+      if (typeof o.comparabilityScore !== 'number' || o.comparabilityScore < 0 || o.comparabilityScore > 1) reasons.push(CODES.OUTCOME_COMPARABILITY_INSUFFICIENT);
+      if (!Array.isArray(o.confounders) || o.confounders.length > ARRAY_CAP) reasons.push(CODES.OUTCOME_INVALID);
+      if (o.driverFeedback !== null && !_nonEmptyStr(o.driverFeedback)) reasons.push(CODES.OUTCOME_DRIVER_FEEDBACK_INVALID);
+      if (!Array.isArray(o.dataQualityIssues) || o.dataQualityIssues.length > ARRAY_CAP) reasons.push(CODES.OUTCOME_DATA_QUALITY_INVALID);
+      if (!Array.isArray(o.sideEffects) || o.sideEffects.length > ARRAY_CAP) reasons.push(CODES.OUTCOME_INVALID);
+      if (!Array.isArray(o.limitations) || o.limitations.length > ARRAY_CAP) reasons.push(CODES.OUTCOME_INVALID);
+      if (!_nonEmptyStr(o.createdAt)) reasons.push(CODES.OUTCOME_INVALID);
+
+      // confounders-present → class must be inconclusive_due_to_confounders OR limitations carries CONTROL_VARIABLE_MISSING.
+      if (Array.isArray(o.confounders) && o.confounders.length > 0
+          && o['class'] !== 'inconclusive_due_to_confounders'
+          && o['class'] !== 'invalid_comparison'
+          && !(Array.isArray(o.limitations) && o.limitations.indexOf('CONTROL_VARIABLE_MISSING') !== -1)) {
+        reasons.push(CODES.OUTCOME_CONFOUNDERS_PRESENT);
+      }
+
+      if (reasons.length) {
+        var seen = Object.create(null), out = [];
+        reasons.forEach(function (c) { if (!seen[c]) { seen[c] = true; out.push(c); } });
+        return RC.buildBlockedResult(out);
+      }
+      return Object.freeze({ valid: true });
+    } catch (eOuter) {
+      return RC.buildBlockedResult([CODES.OUTCOME_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION]);
+    }
+  }
+
+  var api = {
+    OUTCOME_KEYS: OUTCOME_KEYS,
+    OUTCOME_CLASS_ALLOWED: OUTCOME_CLASS_ALLOWED,
+    SUPPORTED_SCHEMA_VERSION: SUPPORTED_SCHEMA_VERSION,
+    validateOutcomeShape: validateOutcomeShape,
+  };
+  Object.freeze(api);
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (root) {
+    try { Object.defineProperty(root, 'R3_0E_OutcomeContract', { value: api, writable: false, enumerable: false, configurable: false }); }
+    catch (e) { root.R3_0E_OutcomeContract = api; }
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+/**
+ * contracts/r3.0e/control-variables-contract.js — R3.0E E1 (NON-PRODUCTION).
+ *
+ * Defines the structural shape of a single Control Variable descriptor. Control variables
+ * are things the experiment is supposed to HOLD CONSTANT (track, tyre temperature window,
+ * driver session, weather). The E3 outcome classifier checks whether each declared control
+ * variable held within its allowed range; out-of-range → confounder.
+ */
+(function (root) {
+  'use strict';
+  function _req(p, g) { var m = null; if (typeof module !== 'undefined' && module.exports) { try { m = require(p); } catch (e) { m = null; } } return m || (typeof g !== 'undefined' ? g : null); }
+  var RC = _req('./reason-codes.js', typeof R3_0E_ReasonCodes !== 'undefined' ? R3_0E_ReasonCodes : undefined);
+  if (!RC) throw new Error('control-variables-contract.js requires reason-codes.js');
+  var CODES = RC.REASON_CODES;
+
+  var CONTROL_VARIABLE_KEYS = Object.freeze([
+    'name',
+    'description',                    // i18n key
+    'expectedValue',                  // number OR string OR null
+    'allowedRange',                   // { min, max } OR null
+    'observedValue',                  // number OR string OR null (filled at E3)
+    'withinRange',                    // boolean OR null (filled at E3)
+  ]);
+
+  function _isPlain(v) { if (v == null || typeof v !== 'object' || Array.isArray(v)) return false; try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; } catch (e) { return false; } }
+  function _hasOnlyAllowedKeys(o, allowed) { var keys; try { keys = Reflect.ownKeys(o); } catch (e) { return false; } for (var i = 0; i < keys.length; i++) { var k = keys[i]; if (typeof k === 'symbol') return false; if (allowed.indexOf(k) === -1) return false; } return true; }
+  function _nonEmptyStr(v) { return typeof v === 'string' && v.length > 0; }
+
+  function validateControlVariableShape(cIn) {
+    try {
+      if (!RC.isOriginalPlainObject(cIn)) return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED]);
+      if (RC.hasHiddenOwnKey(cIn)) return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID, CODES.UNKNOWN_OWN_KEY]);
+      // Codex E1-R2-03 closure: recursive nested-descriptor audit BEFORE toCleanCopy so
+      // hostile nested allowedRange (Symbol-keyed / accessor / class instance) is rejected.
+      if (RC.hasNonPlainNestedObject(cIn)) return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID, CODES.PROTOTYPE_POLLUTION_REJECTED]);
+      var c = RC.toCleanCopy(cIn);
+      if (!_isPlain(c)) return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID]);
+      if (!_hasOnlyAllowedKeys(c, CONTROL_VARIABLE_KEYS)) return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID, CODES.UNKNOWN_OWN_KEY]);
+
+      var reasons = [];
+      if (!_nonEmptyStr(c.name)) reasons.push(CODES.CONTROL_VARIABLES_INVALID);
+      if (!_nonEmptyStr(c.description)) reasons.push(CODES.CONTROL_VARIABLES_INVALID);
+      if (c.expectedValue !== null && typeof c.expectedValue !== 'number' && typeof c.expectedValue !== 'string') reasons.push(CODES.CONTROL_VARIABLES_INVALID);
+      if (c.allowedRange !== null) {
+        if (!_isPlain(c.allowedRange)
+            || typeof c.allowedRange.min !== 'number' || !isFinite(c.allowedRange.min)
+            || typeof c.allowedRange.max !== 'number' || !isFinite(c.allowedRange.max)
+            || c.allowedRange.min > c.allowedRange.max) {
+          reasons.push(CODES.CONTROL_VARIABLE_OUT_OF_RANGE);
+        }
+      }
+      if (c.observedValue !== null && typeof c.observedValue !== 'number' && typeof c.observedValue !== 'string') reasons.push(CODES.CONTROL_VARIABLES_INVALID);
+      if (c.withinRange !== null && typeof c.withinRange !== 'boolean') reasons.push(CODES.CONTROL_VARIABLES_INVALID);
+
+      if (reasons.length) {
+        var seen = Object.create(null), out = [];
+        reasons.forEach(function (k) { if (!seen[k]) { seen[k] = true; out.push(k); } });
+        return RC.buildBlockedResult(out);
+      }
+      return Object.freeze({ valid: true });
+    } catch (e) { return RC.buildBlockedResult([CODES.CONTROL_VARIABLES_INVALID, CODES.INTERNAL_CONTRACT_VIOLATION]); }
+  }
+
+  var api = { CONTROL_VARIABLE_KEYS: CONTROL_VARIABLE_KEYS, validateControlVariableShape: validateControlVariableShape };
+  Object.freeze(api);
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (root) {
+    try { Object.defineProperty(root, 'R3_0E_ControlVariablesContract', { value: api, writable: false, enumerable: false, configurable: false }); }
+    catch (e) { root.R3_0E_ControlVariablesContract = api; }
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+exec
+/bin/bash -lc 'rg -n "driverFeedback|sideEffects|validateOutcomeShape|validateControlVariableShape|i18n" contracts/r3.0e renderer/js/r3-0e-outcome-classifier.js tests/r3.0e-outcome-classifier.test.js' in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+tests/r3.0e-outcome-classifier.test.js:61:    stopConditions: [{ i18nKey: 'r3.0e.stop.lap_time_increase', params: { threshold_s: 0.5 } }],
+tests/r3.0e-outcome-classifier.test.js:95:    driverFeedback: 'r3.0e.driver.feedback.balance_improved',
+tests/r3.0e-outcome-classifier.test.js:97:    sideEffects: [],
+tests/r3.0e-outcome-classifier.test.js:443:    driverFeedback: null, dataQualityIssues: Object.freeze([]),
+tests/r3.0e-outcome-classifier.test.js:444:    sideEffects: Object.freeze([]), limitations: Object.freeze([]),
+tests/r3.0e-outcome-classifier.test.js:558:  chk('N5: outcome.sideEffects is frozen', r.valid === true && Object.isFrozen(r.outcome.sideEffects));
+tests/r3.0e-outcome-classifier.test.js:559:  // Outcome must not contain free-text driver feedback (only i18n key)
+tests/r3.0e-outcome-classifier.test.js:561:    var fb = r.outcome.driverFeedback;
+tests/r3.0e-outcome-classifier.test.js:562:    chk('N6: driverFeedback is i18n key or null',
+tests/r3.0e-outcome-classifier.test.js:753:  // T7: hostile sideEffects element (not plain)
+tests/r3.0e-outcome-classifier.test.js:755:  fakeSe.i18nKey = 'r3.0e.side.fake';
+tests/r3.0e-outcome-classifier.test.js:758:    observationOverrides: { sideEffects: [fakeSe] },
+tests/r3.0e-outcome-classifier.test.js:762:  chk('T7: sideEffects with non-Object.prototype → BLOCK',
+renderer/js/r3-0e-outcome-classifier.js:17: *                                 i18n-keyed driverFeedback ONLY; no free text;
+renderer/js/r3-0e-outcome-classifier.js:142:    if (typeof OUT.validateOutcomeShape !== 'function') return false;
+renderer/js/r3-0e-outcome-classifier.js:143:    if (typeof CV.validateControlVariableShape !== 'function') return false;
+renderer/js/r3-0e-outcome-classifier.js:195:    'driverFeedback',
+renderer/js/r3-0e-outcome-classifier.js:197:    'sideEffects',
+renderer/js/r3-0e-outcome-classifier.js:418:   *   15. validate via E1 OUT.validateOutcomeShape
+renderer/js/r3-0e-outcome-classifier.js:508:      // driverFeedback: non-empty string i18n key OR null. The classifier propagates the key
+renderer/js/r3-0e-outcome-classifier.js:510:      if (observation.driverFeedback !== null && !_nonEmptyStr(observation.driverFeedback)) {
+renderer/js/r3-0e-outcome-classifier.js:511:        return RC_E.buildBlockedResult([CODES.OUTCOME_DRIVER_FEEDBACK_INVALID], { detail: 'driverFeedback invalid' });
+renderer/js/r3-0e-outcome-classifier.js:513:      // dataQualityIssues / sideEffects / contradictingEvidenceIds / supportingEvidenceIds — bounded plain arrays.
+renderer/js/r3-0e-outcome-classifier.js:524:      var seR = _snapshotArrayShape(observation.sideEffects, CODES.OUTCOME_INVALID);
+renderer/js/r3-0e-outcome-classifier.js:526:        return RC_E.buildBlockedResult(seR.reasonCodes, { detail: 'sideEffects: ' + seR.detail });
+renderer/js/r3-0e-outcome-classifier.js:528:      var sideEffects = seR.snapshot;
+renderer/js/r3-0e-outcome-classifier.js:529:      // Each side-effect must be a plain { i18nKey, params } object (params may be null).
+renderer/js/r3-0e-outcome-classifier.js:530:      for (var si = 0; si < sideEffects.length; si++) {
+renderer/js/r3-0e-outcome-classifier.js:531:        var se = sideEffects[si];
+renderer/js/r3-0e-outcome-classifier.js:533:          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '] not plain' });
+renderer/js/r3-0e-outcome-classifier.js:535:        var seKeysR = _snapshotPlainShape(se, _CAPTURED_OBJECT_FREEZE(['i18nKey', 'params']), CODES.OUTCOME_INVALID);
+renderer/js/r3-0e-outcome-classifier.js:537:          return RC_E.buildBlockedResult(seKeysR.reasonCodes, { detail: 'sideEffects[' + si + ']: ' + seKeysR.detail });
+renderer/js/r3-0e-outcome-classifier.js:539:        if (!_nonEmptyStr(seKeysR.snapshot.i18nKey)) {
+renderer/js/r3-0e-outcome-classifier.js:540:          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].i18nKey not non-empty' });
+renderer/js/r3-0e-outcome-classifier.js:543:          return RC_E.buildBlockedResult([CODES.OUTCOME_INVALID], { detail: 'sideEffects[' + si + '].params not plain' });
+renderer/js/r3-0e-outcome-classifier.js:577:        var cvCheck = CV.validateControlVariableShape(cvObs);
+renderer/js/r3-0e-outcome-classifier.js:763:        driverFeedback: observation.driverFeedback,
+renderer/js/r3-0e-outcome-classifier.js:765:        sideEffects: sideEffects.slice(),
+renderer/js/r3-0e-outcome-classifier.js:770:      // ---- Step 15: validate via E1 OUT.validateOutcomeShape -----------------------------
+renderer/js/r3-0e-outcome-classifier.js:771:      var outCheck = OUT.validateOutcomeShape(outcome);
+renderer/js/r3-0e-outcome-classifier.js:775:          { detail: 'composed outcome failed E1 OUT.validateOutcomeShape' }
+contracts/r3.0e/outcome-contract.js:31:    'driverFeedback',                 // optional i18n key OR null
+contracts/r3.0e/outcome-contract.js:32:    'dataQualityIssues',              // array of i18n keys (or reason codes)
+contracts/r3.0e/outcome-contract.js:33:    'sideEffects',                    // array of structured side-effect descriptors
+contracts/r3.0e/outcome-contract.js:54:  function validateOutcomeShape(oIn) {
+contracts/r3.0e/outcome-contract.js:75:      if (o.driverFeedback !== null && !_nonEmptyStr(o.driverFeedback)) reasons.push(CODES.OUTCOME_DRIVER_FEEDBACK_INVALID);
+contracts/r3.0e/outcome-contract.js:77:      if (!Array.isArray(o.sideEffects) || o.sideEffects.length > ARRAY_CAP) reasons.push(CODES.OUTCOME_INVALID);
+contracts/r3.0e/outcome-contract.js:104:    validateOutcomeShape: validateOutcomeShape,
+contracts/r3.0e/control-variables-contract.js:18:    'description',                    // i18n key
+contracts/r3.0e/control-variables-contract.js:29:  function validateControlVariableShape(cIn) {
+contracts/r3.0e/control-variables-contract.js:64:  var api = { CONTROL_VARIABLE_KEYS: CONTROL_VARIABLE_KEYS, validateControlVariableShape: validateControlVariableShape };
+contracts/r3.0e/case-timeline-contract.js:22:  var EVENT_KEYS = Object.freeze(['eventId', 'kind', 'createdAt', 'i18nKey', 'params']);
+contracts/r3.0e/case-timeline-contract.js:69:          if (!_nonEmptyStr(ev.i18nKey)) reasons.push(CODES.TIMELINE_INVALID);
+contracts/r3.0e/experiment-contract.js:35:    'driverInstruction',             // optional driver-facing instruction (i18n key)
+contracts/r3.0e/experiment-contract.js:37:    'validationPlan',                // string i18n key referencing the validation procedure
+contracts/r3.0e/experiment-contract.js:38:    'stopConditions',                // array of { i18nKey, params } guard conditions
+contracts/r3.0e/experiment-contract.js:119:      // Each entry MUST be a plain { i18nKey, params } with non-empty i18nKey; arbitrary
+contracts/r3.0e/experiment-contract.js:131:            if (['i18nKey', 'params'].indexOf(scKeys[sk]) === -1) { scKeyOk = false; break; }
+contracts/r3.0e/experiment-contract.js:134:          if (!_nonEmptyStr(sc.i18nKey)) { reasons.push(CODES.EXPERIMENT_STOP_CONDITIONS_MISSING); break; }
+
+exec
+/bin/bash -lc "sed -n '620,860p' tests/r3.0e-outcome-classifier.test.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { contradictingEvidenceIds: ['../etc/passwd'] },
+  }), { clock: fixedClock() });
+  chk('P2: hostile evidence id (../) → BLOCK',
+    r.valid !== true);
+})();
+
+// ------------------------------------------------------------------
+// Section Q — opts validation
+// ------------------------------------------------------------------
+console.log('Section Q — opts validation');
+(function () {
+  var r = CL.classifyOutcome(makeInput(), { unknown: true });
+  chk('Q1: unknown opts key → BLOCK UNKNOWN_OWN_KEY',
+    r.valid !== true && r.reasonCodes.indexOf('UNKNOWN_OWN_KEY') !== -1);
+})();
+(function () {
+  var r = CL.classifyOutcome(makeInput(), {});
+  chk('Q2: empty opts (no clock, no referenceNowMs) → BLOCK',
+    r.valid !== true);
+})();
+(function () {
+  // referenceNowMs allowed
+  var r = CL.classifyOutcome(makeInput(), { referenceNowMs: Date.parse(BASE_CLOCK_ISO) });
+  chk('Q3: referenceNowMs accepted', r.valid === true);
+})();
+
+// ------------------------------------------------------------------
+// Section R — verifyAuthoritativeOutcome boundary
+// ------------------------------------------------------------------
+console.log('Section R — verifyAuthoritativeOutcome');
+(function () {
+  chk('R1: null candidate → false', CL.verifyAuthoritativeOutcome(null) === false);
+  chk('R2: undefined → false', CL.verifyAuthoritativeOutcome(undefined) === false);
+  chk('R3: primitive → false', CL.verifyAuthoritativeOutcome('outcome_abc') === false);
+  chk('R4: empty object → false', CL.verifyAuthoritativeOutcome({}) === false);
+  chk('R5: number → false', CL.verifyAuthoritativeOutcome(42) === false);
+})();
+(function () {
+  // A Proxy that lies about WeakSet identity cannot pass — WeakSet.has via Reflect.apply
+  // resolves the underlying key by reference, not by [[Get]] traps.
+  var fakeOutcome = new Proxy({}, {
+    get: function (target, key) {
+      if (key === 'schemaVersion') return 1;
+      if (key === 'outcomeId') return 'outcome_lie';
+      if (key === 'experimentId') return 'exp_lie';
+      if (key === 'class') return 'confirmed';
+      if (key === 'confounders') return [];
+      if (key === 'limitations') return [];
+      return undefined;
+    },
+  });
+  chk('R6: Proxy-pretending-to-be-outcome → verifier returns false',
+    CL.verifyAuthoritativeOutcome(fakeOutcome) === false);
+})();
+
+// ------------------------------------------------------------------
+// Section S — API export hardening
+// ------------------------------------------------------------------
+console.log('Section S — API export');
+(function () {
+  chk('S1: API is frozen', Object.isFrozen(CL));
+  chk('S2: API exports classifyOutcome', typeof CL.classifyOutcome === 'function');
+  chk('S3: API exports verifyAuthoritativeOutcome', typeof CL.verifyAuthoritativeOutcome === 'function');
+  // Forbidden exports per directive §6.5 — no WeakSet, no register, no secret/signing
+  chk('S4: NO _registerAuthoritativeOutcome exported',
+    CL._registerAuthoritativeOutcome === undefined && CL.register === undefined);
+  chk('S5: NO WeakSet exported',
+    CL._authoritativeOutcomes === undefined && CL.weakSet === undefined);
+  chk('S6: NO secret / signing primitive exported',
+    CL.sign === undefined && CL.secret === undefined && CL._WS_ADD === undefined);
+})();
+
+// ------------------------------------------------------------------
+// Section T — Codex defensive coverage (anticipated)
+// ------------------------------------------------------------------
+console.log('Section T — Defensive');
+(function () {
+  // T1: invalid_comparison + no explicit reference + cross-case → class STILL invalid_comparison,
+  // limitations carries BOTH codes (or at least one).
+  var r = CL.classifyOutcome(makeInput({
+    followUpOverrides: { parentCaseId: 'case_other', hasExplicitReference: false },
+  }), { clock: fixedClock() });
+  chk('T1: combined invalid_comparison signals → class=invalid_comparison',
+    r.valid === true && r.outcome['class'] === 'invalid_comparison');
+})();
+(function () {
+  // T2: experiment.controlVariables[].observedValue field is null at declaration time (E1
+  // permits it). The classifier requires the OBSERVATION list to have observed values.
+  // This is documented behaviour and tested as F1/F2/F3 above. Sanity check that the
+  // observation array's elements must each be E1-valid:
+  var cvObs = [{ name: 'foo', description: 'foo desc', expectedValue: 10,
+    allowedRange: { min: 0, max: 100 }, observedValue: 50, withinRange: true }];
+  var exp = makeExperiment({ controlVariables: [{ name: 'foo', description: 'foo desc',
+    expectedValue: 10, allowedRange: { min: 0, max: 100 }, observedValue: null, withinRange: null }] });
+  var r = CL.classifyOutcome(makeInput({ experiment: exp, controlVariableObservations: cvObs }),
+    { clock: fixedClock() });
+  chk('T2: re-name (foo) CV correctly matched → confirmed',
+    r.valid === true && r.outcome['class'] === 'confirmed');
+})();
+(function () {
+  // T3: duplicate CV name in observations → BLOCK
+  var dupCv = [
+    { name: 'tyre_temp_window', description: 'r3.0e.cv.tyre_temp_window',
+      expectedValue: 85, allowedRange: { min: 75, max: 95 }, observedValue: 80, withinRange: true },
+    { name: 'tyre_temp_window', description: 'r3.0e.cv.tyre_temp_window',
+      expectedValue: 85, allowedRange: { min: 75, max: 95 }, observedValue: 85, withinRange: true },
+  ];
+  var r = CL.classifyOutcome(makeInput({ controlVariableObservations: dupCv }),
+    { clock: fixedClock() });
+  chk('T3: duplicate CV name in observations → BLOCK',
+    r.valid !== true);
+})();
+(function () {
+  // T4: hostile observation.observedDirection (string outside enum)
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { observedDirection: 'totally_made_up' },
+  }), { clock: fixedClock() });
+  chk('T4: invalid observedDirection enum → BLOCK',
+    r.valid !== true);
+})();
+(function () {
+  // T5: comparabilityScore out of [0,1]
+  var r = CL.classifyOutcome(makeInput({
+    followUpOverrides: { comparabilityScore: 1.5 },
+  }), { clock: fixedClock() });
+  chk('T5: comparabilityScore > 1 → BLOCK', r.valid !== true);
+  var r2 = CL.classifyOutcome(makeInput({
+    followUpOverrides: { comparabilityScore: -0.1 },
+  }), { clock: fixedClock() });
+  chk('T6: comparabilityScore < 0 → BLOCK', r2.valid !== true);
+})();
+(function () {
+  // T7: hostile sideEffects element (not plain)
+  var fakeSe = Object.create({});
+  fakeSe.i18nKey = 'r3.0e.side.fake';
+  fakeSe.params = null;
+  var r = CL.classifyOutcome(makeInput({
+    observationOverrides: { sideEffects: [fakeSe] },
+  }), { clock: fixedClock() });
+  // Note: Object.create({}) creates an object whose prototype is a plain object, but NOT
+  // Object.prototype/null. Our _isOriginalPlainObject rejects this.
+  chk('T7: sideEffects with non-Object.prototype → BLOCK',
+    r.valid !== true);
+})();
+
+// ------------------------------------------------------------------
+// Summary
+// ------------------------------------------------------------------
+console.log('R3.0E outcome classifier suite: ' + pass + ' passed, ' + fail + ' failed');
+if (fail > 0) process.exit(1);
+
+codex
+The array snapshot logic is descriptor-based and avoids inherited getters, but it also accepts holes and arbitrary enumerable string keys on arrays by compacting descriptor values into a new array. I’m checking whether that becomes an exploitable classification change or just a contract-hardening nit.
+exec
+/bin/bash -lc "nl -ba renderer/js/r3-0e-outcome-classifier.js | sed -n '754,835p'" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+exec
+/bin/bash -lc "sed -n '1,260p' contracts/r3.0e/reason-codes.js" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+   754	      var outcome = {
+   755	        schemaVersion: OUTCOME_SCHEMA_VERSION,
+   756	        outcomeId: outcomeIdStr,
+   757	        experimentId: experiment.experimentId,
+   758	        'class': classDecision,
+   759	        observedDirection: observation.observedDirection,
+   760	        observedMagnitude: observation.observedMagnitude,
+   761	        comparabilityScore: followUp.comparabilityScore,
+   762	        confounders: confounders.slice(),
+   763	        driverFeedback: observation.driverFeedback,
+   764	        dataQualityIssues: dataQualityIssues.slice(),
+   765	        sideEffects: sideEffects.slice(),
+   766	        limitations: limitations.slice(),
+   767	        createdAt: createdAtIso,
+   768	      };
+   769	
+   770	      // ---- Step 15: validate via E1 OUT.validateOutcomeShape -----------------------------
+   771	      var outCheck = OUT.validateOutcomeShape(outcome);
+   772	      if (outCheck.valid !== true) {
+   773	        return RC_E.buildBlockedResult(
+   774	          outCheck.reasonCodes ? outCheck.reasonCodes.slice() : [CODES.OUTCOME_INVALID],
+   775	          { detail: 'composed outcome failed E1 OUT.validateOutcomeShape' }
+   776	        );
+   777	      }
+   778	
+   779	      // ---- Step 16: envelope byte cap ----------------------------------------------------
+   780	      var envelopeBytes;
+   781	      try { envelopeBytes = _utf8Bytes(_CAPTURED_JSON_STRINGIFY(outcome)); }
+   782	      catch (e) { envelopeBytes = Infinity; }
+   783	      if (envelopeBytes > ENVELOPE_BYTE_CAP) {
+   784	        return RC_E.buildBlockedResult([CODES.BYTE_CAP_EXCEEDED], { detail: 'outcome envelope ' + envelopeBytes + ' bytes > ' + ENVELOPE_BYTE_CAP });
+   785	      }
+   786	
+   787	      // ---- Step 17: re-check intrinsics post-classify, deep-freeze, register -------------
+   788	      if (!_intrinsicsIntact()) {
+   789	        return _buildTamperBlock('intrinsic tampering detected post-classify');
+   790	      }
+   791	      _deepFreeze(outcome);
+   792	      _registerAuthoritativeOutcome(outcome);
+   793	
+   794	      return _CAPTURED_OBJECT_FREEZE({ valid: true, outcome: outcome });
+   795	
+   796	    } catch (eOuter) {
+   797	      return RC_E.buildBlockedResult([CODES.INTERNAL_CONTRACT_VIOLATION], { detail: 'classifyOutcome threw on hostile input' });
+   798	    }
+   799	  }
+   800	
+   801	  // ---------- Public API ---------------------------------------------------------------------
+   802	  var api = {
+   803	    SERVICE_VERSION: SERVICE_VERSION,
+   804	    OUTCOME_SCHEMA_VERSION: OUTCOME_SCHEMA_VERSION,
+   805	    ENVELOPE_BYTE_CAP: ENVELOPE_BYTE_CAP,
+   806	    MIN_COMPARABILITY_FOR_VALID_COMPARISON: MIN_COMPARABILITY_FOR_VALID_COMPARISON,
+   807	    DATA_QUALITY_ISSUE_BLOCK_THRESHOLD: DATA_QUALITY_ISSUE_BLOCK_THRESHOLD,
+   808	    classifyOutcome: classifyOutcome,
+   809	    verifyAuthoritativeOutcome: verifyAuthoritativeOutcome,
+   810	  };
+   811	  _CAPTURED_OBJECT_FREEZE(api);
+   812	  if (typeof module !== 'undefined' && module.exports) {
+   813	    module.exports = api;
+   814	  } else if (root) {
+   815	    try { Object.defineProperty(root, 'R3_0E_OutcomeClassifier', { value: api, writable: false, enumerable: false, configurable: false }); }
+   816	    catch (e) { root.R3_0E_OutcomeClassifier = api; }
+   817	  }
+   818	})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+ succeeded in 0ms:
+/**
+ * contracts/r3.0e/reason-codes.js — R3.0E E1 · Reason codes (NON-PRODUCTION).
+ *
+ * Closed enum + structural helpers shared by every R3.0E contract module. Mirrors the
+ * D1 reason-codes.js layering (RC.REASON_CODES, RC.ALL_REASON_CODES, RC.isReasonCode,
+ * RC.buildBlockedResult, RC.isOriginalPlainObject, RC.hasHiddenOwnKey, RC.toCleanCopy)
+ * so R3.0E contracts inherit the same hardened verification surface without re-implementing
+ * it. R3.0D codes are NOT re-exported here — each phase owns its own reason-code namespace.
+ *
+ * UMD: Node require / Electron renderer global (R3_0E_ReasonCodes).
+ */
+(function (root) {
+  'use strict';
+
+  // E1 reason codes — Experiment / Outcome / Case Timeline / Control Variables / follow-up
+  // linkage. NOT a superset of D1; R3.0E owns its own namespace. Codes prefixed by the
+  // contract they bind: EXPERIMENT_ / OUTCOME_ / CONTROL_ / TIMELINE_ / LINKAGE_.
+  var REASON_CODES = Object.freeze({
+    // ---- Structural ----
+    EXPERIMENT_INVALID: 'EXPERIMENT_INVALID',
+    OUTCOME_INVALID: 'OUTCOME_INVALID',
+    CONTROL_VARIABLES_INVALID: 'CONTROL_VARIABLES_INVALID',
+    TIMELINE_INVALID: 'TIMELINE_INVALID',
+    LINKAGE_INVALID: 'LINKAGE_INVALID',
+    UNKNOWN_OWN_KEY: 'UNKNOWN_OWN_KEY',
+    BYTE_CAP_EXCEEDED: 'BYTE_CAP_EXCEEDED',
+    ARRAY_CAP_EXCEEDED: 'ARRAY_CAP_EXCEEDED',
+    PROTOTYPE_POLLUTION_REJECTED: 'PROTOTYPE_POLLUTION_REJECTED',
+    UNSUPPORTED_FUTURE_SCHEMA: 'UNSUPPORTED_FUTURE_SCHEMA',
+    INTERNAL_CONTRACT_VIOLATION: 'INTERNAL_CONTRACT_VIOLATION',
+
+    // ---- Experiment lifecycle ----
+    EXPERIMENT_STATUS_INVALID: 'EXPERIMENT_STATUS_INVALID',
+    EXPERIMENT_BASELINE_MISSING: 'EXPERIMENT_BASELINE_MISSING',
+    EXPERIMENT_EXPECTED_DIRECTION_INVALID: 'EXPERIMENT_EXPECTED_DIRECTION_INVALID',
+    EXPERIMENT_EXPECTED_MAGNITUDE_RANGE_INVALID: 'EXPERIMENT_EXPECTED_MAGNITUDE_RANGE_INVALID',
+    EXPERIMENT_TARGET_METRIC_INVALID: 'EXPERIMENT_TARGET_METRIC_INVALID',
+    EXPERIMENT_SETUP_CHANGE_INVALID: 'EXPERIMENT_SETUP_CHANGE_INVALID',
+    EXPERIMENT_DRIVER_INSTRUCTION_INVALID: 'EXPERIMENT_DRIVER_INSTRUCTION_INVALID',
+    EXPERIMENT_VALIDATION_PLAN_MISSING: 'EXPERIMENT_VALIDATION_PLAN_MISSING',
+    EXPERIMENT_STOP_CONDITIONS_MISSING: 'EXPERIMENT_STOP_CONDITIONS_MISSING',
+
+    // ---- Outcome classification ----
+    OUTCOME_CLASS_INVALID: 'OUTCOME_CLASS_INVALID',
+    OUTCOME_COMPARABILITY_INSUFFICIENT: 'OUTCOME_COMPARABILITY_INSUFFICIENT',
+    OUTCOME_CONFOUNDERS_PRESENT: 'OUTCOME_CONFOUNDERS_PRESENT',
+    OUTCOME_DRIVER_FEEDBACK_INVALID: 'OUTCOME_DRIVER_FEEDBACK_INVALID',
+    OUTCOME_DATA_QUALITY_INVALID: 'OUTCOME_DATA_QUALITY_INVALID',
+
+    // ---- Control variables ----
+    CONTROL_VARIABLE_MISSING: 'CONTROL_VARIABLE_MISSING',
+    CONTROL_VARIABLE_OUT_OF_RANGE: 'CONTROL_VARIABLE_OUT_OF_RANGE',
+
+    // ---- Case timeline + follow-up linkage ----
+    TIMELINE_ORDERING_INVALID: 'TIMELINE_ORDERING_INVALID',
+    LINKAGE_PARENT_MISSING: 'LINKAGE_PARENT_MISSING',
+    LINKAGE_ORPHAN_FOLLOW_UP: 'LINKAGE_ORPHAN_FOLLOW_UP',
+
+    // ---- Limitations (bounded honesty) ----
+    LIMITATION_NO_CONTROL_VARIABLES: 'LIMITATION_NO_CONTROL_VARIABLES',
+    LIMITATION_CROSS_SESSION_FOLLOW_UP: 'LIMITATION_CROSS_SESSION_FOLLOW_UP',
+    LIMITATION_PARENT_CASE_ARCHIVED: 'LIMITATION_PARENT_CASE_ARCHIVED',
+  });
+
+  var ALL_REASON_CODES = Object.freeze(Object.keys(REASON_CODES));
+  var _CODE_SET = (function () { var s = Object.create(null); for (var i = 0; i < ALL_REASON_CODES.length; i++) s[ALL_REASON_CODES[i]] = true; return s; })();
+  function isReasonCode(c) { return typeof c === 'string' && _CODE_SET[c] === true; }
+
+  function buildBlockedResult(reasonCodes, opts) {
+    opts = opts || {};
+    var codes = [];
+    var seen = Object.create(null);
+    if (Array.isArray(reasonCodes)) {
+      for (var i = 0; i < reasonCodes.length; i++) {
+        var rc = reasonCodes[i];
+        if (typeof rc === 'string' && !seen[rc]) { seen[rc] = true; codes.push(rc); }
+      }
+    }
+    if (codes.length === 0) codes.push(REASON_CODES.INTERNAL_CONTRACT_VIOLATION);
+    return Object.freeze({
+      eligible: false,
+      status: 'blocked',
+      reasonCodes: Object.freeze(codes),
+      explanationKeys: Object.freeze(codes.map(function (c) { return 'r3_0e.reason.' + c.toLowerCase(); })),
+      detail: typeof opts.detail === 'string' ? opts.detail : '',
+      result: null,
+    });
+  }
+
+  // ---- Structural helpers shared by every R3.0E contract module ----
+  function isOriginalPlainObject(v) {
+    if (v === null || typeof v !== 'object' || Array.isArray(v)) return false;
+    try { var p = Object.getPrototypeOf(v); return p === Object.prototype || p === null; }
+    catch (e) { return false; }
+  }
+  function hasHiddenOwnKey(o) {
+    try {
+      var syms = Object.getOwnPropertySymbols(o);
+      if (syms && syms.length > 0) return true;
+      var names = Object.getOwnPropertyNames(o);
+      for (var i = 0; i < names.length; i++) {
+        var d = Object.getOwnPropertyDescriptor(o, names[i]);
+        if (!d || d.enumerable !== true) return true;
+        if (typeof d.get === 'function' || typeof d.set === 'function') return true;
+      }
+      return false;
+    } catch (e) { return true; }
+  }
+  function hasNonPlainNestedObject(o) {
+    // Codex E1-R1-01 closure: recursive descriptor audit. Walks every nested object/array
+    // descriptor, rejecting Symbol-keyed own keys, non-enumerable own keys, accessor
+    // (get/set) descriptors, non-plain prototypes (class instances / Proxy targets /
+    // arbitrary class), and sparse-array hole patterns.
+    //
+    // Codex E1-R2-01 closure: traversal overflow MUST fail closed (return true). Previous
+    // code returned false (clean) when the visit cap was hit, which let a hostile attacker
+    // hide a Symbol-keyed / accessor / non-plain object beyond node 4096. The walk now
+    // tracks both depth and node count; overflow on either dimension → reject. Depth is
+    // tracked per-node via parallel stack so depth>32 also triggers reject.
+    try {
+      var MAX_DEPTH = 32;
+      var MAX_NODES = 4096;
+      var stack = [{ v: o, depth: 0 }];
+      var visited = 0;
+      while (stack.length > 0) {
+        if (visited >= MAX_NODES) return true; // fail-closed on node overflow
+        var frame = stack.shift(); visited++;
+        if (frame.depth > MAX_DEPTH) return true; // fail-closed on depth overflow
+        var v = frame.v;
+        if (v === null) continue;
+        var t = typeof v;
+        if (t === 'function' || t === 'symbol' || t === 'bigint') return true;
+        if (t !== 'object') continue;
+        var isArr = Array.isArray(v);
+        if (!isArr) {
+          var p = Object.getPrototypeOf(v);
+          if (!(p === Object.prototype || p === null)) return true;
+        } else {
+          var p2 = Object.getPrototypeOf(v);
+          if (p2 !== Array.prototype) return true;
+        }
+        // Symbol-keyed own keys → reject at any nesting depth.
+        var syms;
+        try { syms = Object.getOwnPropertySymbols(v); } catch (e) { return true; }
+        if (syms && syms.length > 0) return true;
+        var names = Object.getOwnPropertyNames(v);
+        for (var j = 0; j < names.length; j++) {
+          var name = names[j];
+          // Array.length is non-enumerable own — skip it from the audit while still
+          // walking indexed entries below.
+          if (isArr && name === 'length') continue;
+          var d;
+          try { d = Object.getOwnPropertyDescriptor(v, name); } catch (eDesc) { return true; }
+          if (!d) return true;
+          if (typeof d.get === 'function' || typeof d.set === 'function') return true;
+          if (d.enumerable !== true) return true;
+          stack.push({ v: d.value, depth: frame.depth + 1 });
+        }
+      }
+      return false;
+    } catch (e) { return true; }
+  }
+  function toCleanCopy(o) {
+    try {
+      if (typeof structuredClone === 'function') return structuredClone(o);
+      return JSON.parse(JSON.stringify(o));
+    } catch (e) { return null; }
+  }
+
+  var api = {
+    REASON_CODES: REASON_CODES,
+    ALL_REASON_CODES: ALL_REASON_CODES,
+    isReasonCode: isReasonCode,
+    buildBlockedResult: buildBlockedResult,
+    isOriginalPlainObject: isOriginalPlainObject,
+    hasHiddenOwnKey: hasHiddenOwnKey,
+    hasNonPlainNestedObject: hasNonPlainNestedObject,
+    toCleanCopy: toCleanCopy,
+  };
+  Object.freeze(api);
+  if (typeof module !== 'undefined' && module.exports) module.exports = api;
+  if (root) {
+    try { Object.defineProperty(root, 'R3_0E_ReasonCodes', { value: api, writable: false, enumerable: false, configurable: false }); }
+    catch (e) { root.R3_0E_ReasonCodes = api; }
+  }
+})(typeof globalThis !== 'undefined' ? globalThis : this);
+
+codex
+The E1 outcome contract does not enforce i18n grammar either; it only requires a non-empty string. That makes the free-text laundering issue concrete in E3, because E3 copies `observation.driverFeedback` straight into the returned outcome.
+exec
+/bin/bash -lc "node -e \"const CL=require('./renderer/js/r3-0e-outcome-classifier.js');function df(v){if(v&&typeof v==='object'){Object.freeze(v);Object.getOwnPropertyNames(v).forEach(k=>df(v[k]));}return v;}const exp=df({schemaVersion:1,experimentId:'exp_0123456789abcdef',sourceCaseId:'case_demo_a',sourceHypothesisId:'hyp_demo_001',sourceRecommendationId:'pri_demo_001',targetMetric:'roll_gradient_deg_per_g',baselineValue:3.5,expectedDirection:'decrease',expectedMagnitudeRange:{min:0.5,max:1.5},setupChange:{component:'front_arb',delta_nm_per_deg:200},driverInstruction:null,controlVariables:[{name:'tyre_temp_window',description:'r3.0e.cv.tyre_temp_window',expectedValue:85,allowedRange:{min:75,max:95},observedValue:null,withinRange:null}],validationPlan:'r3.0e.plan.controlled_repeat_lap',stopConditions:[{i18nKey:'r3.0e.stop.lap_time_increase',params:{threshold_s:0.5}}],status:'applied',followUpCaseIds:['case_demo_a_followup_1'],outcome:null,createdAt:'2026-06-30T10:00:00Z'});const input={experiment:exp,appliedChange:{changeId:'change_demo_001',sourceExperimentId:'exp_0123456789abcdef',appliedAt:'2026-06-30T11:00:00Z'},followUp:{followUpCaseId:'case_demo_a_followup_1',parentCaseId:'case_demo_a',sessionId:'session_demo_a',parentSessionId:'session_demo_a',hasExplicitReference:true,comparabilityScore:0.9},observation:{observedDirection:'decrease',observedMagnitude:1,driverFeedback:'driver error because setup caused crash',dataQualityIssues:[],sideEffects:[],contradictingEvidenceIds:[],supportingEvidenceIds:['ev_demo_001']},controlVariableObservations:[{name:'tyre_temp_window',description:'r3.0e.cv.tyre_temp_window',expectedValue:85,allowedRange:{min:75,max:95},observedValue:84,withinRange:true}]};const r=CL.classifyOutcome(input,{clock:()=> '2026-06-30T11:30:00Z'});console.log(JSON.stringify({valid:r.valid, cls:r.outcome&&r.outcome.class, driverFeedback:r.outcome&&r.outcome.driverFeedback}));\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"valid":true,"cls":"confirmed","driverFeedback":"driver error because setup caused crash"}
+
+exec
+/bin/bash -lc "node -e \"const CL=require('./renderer/js/r3-0e-outcome-classifier.js');function df(v){if(v&&typeof v==='object'){Object.freeze(v);Object.getOwnPropertyNames(v).forEach(k=>df(v[k]));}return v;}function input(){const exp=df({schemaVersion:1,experimentId:'exp_0123456789abcdef',sourceCaseId:'case_demo_a',sourceHypothesisId:'hyp_demo_001',sourceRecommendationId:'pri_demo_001',targetMetric:'roll_gradient_deg_per_g',baselineValue:3.5,expectedDirection:'decrease',expectedMagnitudeRange:{min:0.5,max:1.5},setupChange:{component:'front_arb',delta_nm_per_deg:200},driverInstruction:null,controlVariables:[{name:'tyre_temp_window',description:'r3.0e.cv.tyre_temp_window',expectedValue:85,allowedRange:{min:75,max:95},observedValue:null,withinRange:null}],validationPlan:'r3.0e.plan.controlled_repeat_lap',stopConditions:[{i18nKey:'r3.0e.stop.lap_time_increase',params:{threshold_s:0.5}}],status:'applied',followUpCaseIds:['case_demo_a_followup_1'],outcome:null,createdAt:'2026-06-30T10:00:00Z'});return {experiment:exp,appliedChange:{changeId:'change_demo_001',sourceExperimentId:'exp_0123456789abcdef',appliedAt:'2026-06-30T11:00:00Z'},followUp:{followUpCaseId:'case_demo_a_followup_1',parentCaseId:'case_demo_a',sessionId:'session_demo_a',parentSessionId:'session_demo_a',hasExplicitReference:true,comparabilityScore:0.9},observation:{observedDirection:'decrease',observedMagnitude:1,driverFeedback:null,dataQualityIssues:[],sideEffects:[],contradictingEvidenceIds:[],supportingEvidenceIds:['ev_demo_001']},controlVariableObservations:[{name:'tyre_temp_window',description:'r3.0e.cv.tyre_temp_window',expectedValue:85,allowedRange:{min:75,max:95},observedValue:84,withinRange:true}]};}let a=input();a.observation.dataQualityIssues=new Array(5);let r=CL.classifyOutcome(a,{clock:()=> '2026-06-30T11:30:00Z'});let b=input();b.observation.dataQualityIssues=[];b.observation.dataQualityIssues.foo='r3.0e.dq.foo';let r2=CL.classifyOutcome(b,{clock:()=> '2026-06-30T11:30:00Z'});console.log(JSON.stringify({sparse:{valid:r.valid,cls:r.outcome&&r.outcome.class,dq:r.outcome&&r.outcome.dataQualityIssues},named:{valid:r2.valid,cls:r2.outcome&&r2.outcome.class,dq:r2.outcome&&r2.outcome.dataQualityIssues}}));\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+{"sparse":{"valid":true,"cls":"confirmed","dq":[]},"named":{"valid":true,"cls":"confirmed","dq":["r3.0e.dq.foo"]}}
+
+codex
+There is also an intrinsic-capture gap with `Object.create`: the module captures many `Object.*` functions, but not `Object.create`, and uses the ambient function during classification. I’m validating whether that can change classification semantics rather than only causing a harmless crash.
+exec
+/bin/bash -lc "node -e \"const CL=require('./renderer/js/r3-0e-outcome-classifier.js');function df(v){if(v&&typeof v==='object'){Object.freeze(v);Object.getOwnPropertyNames(v).forEach(k=>df(v[k]));}return v;}const exp=df({schemaVersion:1,experimentId:'exp_0123456789abcdef',sourceCaseId:'case_demo_a',sourceHypothesisId:'hyp_demo_001',sourceRecommendationId:'pri_demo_001',targetMetric:'roll_gradient_deg_per_g',baselineValue:3.5,expectedDirection:'decrease',expectedMagnitudeRange:{min:0.5,max:1.5},setupChange:{component:'front_arb',delta_nm_per_deg:200},driverInstruction:null,controlVariables:[{name:'tyre_temp_window',description:'r3.0e.cv.tyre_temp_window',expectedValue:85,allowedRange:{min:75,max:95},observedValue:null,withinRange:null}],validationPlan:'r3.0e.plan.controlled_repeat_lap',stopConditions:[{i18nKey:'r3.0e.stop.lap_time_increase',params:{threshold_s:0.5}}],status:'applied',followUpCaseIds:['case_demo_a_followup_1'],outcome:null,createdAt:'2026-06-30T10:00:00Z'});const input={experiment:exp,appliedChange:{changeId:'change_demo_001',sourceExperimentId:'exp_0123456789abcdef',appliedAt:'2026-06-30T11:00:00Z'},followUp:{followUpCaseId:'case_demo_a_followup_1',parentCaseId:'case_demo_a',sessionId:'session_demo_a',parentSessionId:'session_demo_a',hasExplicitReference:true,comparabilityScore:0.9},observation:{observedDirection:'decrease',observedMagnitude:1,driverFeedback:null,dataQualityIssues:[],sideEffects:[],contradictingEvidenceIds:[],supportingEvidenceIds:['ev_demo_001']},controlVariableObservations:[]};const realCreate=Object.create;console.log('before', CL.classifyOutcome(input,{clock:()=> '2026-06-30T11:30:00Z'}).outcome?.class);Object.create=function(){return {tyre_temp_window:{name:'tyre_temp_window',withinRange:true}}};const r=CL.classifyOutcome(input,{clock:()=> '2026-06-30T11:30:00Z'});Object.create=realCreate;console.log(JSON.stringify({valid:r.valid, cls:r.outcome&&r.outcome.class, confounders:r.outcome&&r.outcome.confounders, limitations:r.outcome&&r.outcome.limitations}));\"" in /Users/SKYLINE/Claude/projects/racing-setup-analyzer
+ succeeded in 0ms:
+before inconclusive_due_to_confounders
+{"valid":true,"cls":"confirmed","confounders":[],"limitations":["LIMITATION_NO_CONTROL_VARIABLES"]}
+
+codex
+Finding E3-R1-01: Post-load `Object.create` rebind can bypass missing-control-variable precedence and produce `confirmed`
+  evidence: renderer/js/r3-0e-outcome-classifier.js:574
+  severity: BLOCK
+  proposed closure: Capture `Object.create` at module init and use the captured intrinsic everywhere; for `observedCvByName`, use null-prototype storage plus captured own-descriptor membership checks instead of prototype-sensitive `obj[name] !== undefined`.
+
+Finding E3-R1-02: Caller-supplied free text/blame can be laundered through `driverFeedback`
+  evidence: renderer/js/r3-0e-outcome-classifier.js:508
+  severity: BLOCK
+  proposed closure: Enforce strict i18n-key grammar for `driverFeedback` before copying it into the outcome, and add adversarial tests with spaces, blame phrasing, causal wording, and paths.
+
+Finding E3-R1-03: Sparse arrays and non-index array own keys are accepted and compacted, changing classification inputs
+  evidence: renderer/js/r3-0e-outcome-classifier.js:331
+  severity: BLOCK
+  proposed closure: Require dense arrays by validating every index `0..length-1` has an enumerable data descriptor, reject holes, and reject any own key other than `length` or canonical array indices.
+
+FINAL VERDICT: BLOCK
+tokens used
+61,106
+Finding E3-R1-01: Post-load `Object.create` rebind can bypass missing-control-variable precedence and produce `confirmed`
+  evidence: renderer/js/r3-0e-outcome-classifier.js:574
+  severity: BLOCK
+  proposed closure: Capture `Object.create` at module init and use the captured intrinsic everywhere; for `observedCvByName`, use null-prototype storage plus captured own-descriptor membership checks instead of prototype-sensitive `obj[name] !== undefined`.
+
+Finding E3-R1-02: Caller-supplied free text/blame can be laundered through `driverFeedback`
+  evidence: renderer/js/r3-0e-outcome-classifier.js:508
+  severity: BLOCK
+  proposed closure: Enforce strict i18n-key grammar for `driverFeedback` before copying it into the outcome, and add adversarial tests with spaces, blame phrasing, causal wording, and paths.
+
+Finding E3-R1-03: Sparse arrays and non-index array own keys are accepted and compacted, changing classification inputs
+  evidence: renderer/js/r3-0e-outcome-classifier.js:331
+  severity: BLOCK
+  proposed closure: Require dense arrays by validating every index `0..length-1` has an enumerable data descriptor, reject holes, and reject any own key other than `length` or canonical array indices.
+
+FINAL VERDICT: BLOCK

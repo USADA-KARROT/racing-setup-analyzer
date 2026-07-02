@@ -2,34 +2,35 @@
   "schemaVersion": 1,
   "program": "R3.0D",
   "title": "R3.0D Virtual Race Engineer Decision Engine — schema",
-  "note": "Defines the legal universe of checkpoints, capabilities, transitions, and authorized-path rules for the R3.0D phase of the R3.0 Integrated Delivery Train. D0 establishes the schema; D1..D5 are NOT yet authorized — they describe future intent so the validator can refuse premature activation. R3.0D depends on R3.0C completing all the way to C8_ACTIVATION before any non-bootstrap D checkpoint may advance — that cross-phase rule is enforced by scripts/check-r3-0-train.js, not by this single-phase schema.",
+  "note": "Defines the legal universe of checkpoints, capabilities, transitions, and authorized-path rules for the R3.0D phase of the R3.0 Integrated Delivery Train. D0 establishes the schema; D1 contracts are merged; D2..D5 are sequenced as Evidence Graph → Hypothesis Engine → Priority Engine → Engineer Brief + UI + Activation (per SKYLINE 2026-06-28 R3.0 Final Continuous Execution Directive §2.D). Cross-phase rule: R3.0D depends on R3.0C completing all the way to C8_ACTIVATION before any non-bootstrap D checkpoint may advance — enforced by scripts/check-r3-0-train.js.",
   "checkpoints": [
     "D0_BOOTSTRAP",
     "D1_CONTRACT_FOUNDATION",
-    "D2_HYPOTHESIS_ENGINE",
-    "D3_PRIORITY_ENGINE",
-    "D4_ENGINEER_BRIEF",
-    "D5_ACTIVATION"
+    "D2_EVIDENCE_GRAPH",
+    "D3_HYPOTHESIS_ENGINE",
+    "D4_PRIORITY_ENGINE",
+    "D5_ENGINEER_BRIEF_ACTIVATION"
   ],
   "transitions": {
     "D0_BOOTSTRAP": ["D1_CONTRACT_FOUNDATION"],
-    "D1_CONTRACT_FOUNDATION": ["D2_HYPOTHESIS_ENGINE"],
-    "D2_HYPOTHESIS_ENGINE": ["D3_PRIORITY_ENGINE"],
-    "D3_PRIORITY_ENGINE": ["D4_ENGINEER_BRIEF"],
-    "D4_ENGINEER_BRIEF": ["D5_ACTIVATION"],
-    "D5_ACTIVATION": []
+    "D1_CONTRACT_FOUNDATION": ["D2_EVIDENCE_GRAPH"],
+    "D2_EVIDENCE_GRAPH": ["D3_HYPOTHESIS_ENGINE"],
+    "D3_HYPOTHESIS_ENGINE": ["D4_PRIORITY_ENGINE"],
+    "D4_PRIORITY_ENGINE": ["D5_ENGINEER_BRIEF_ACTIVATION"],
+    "D5_ENGINEER_BRIEF_ACTIVATION": []
   },
   "checkpointOrder": [
     "D0_BOOTSTRAP",
     "D1_CONTRACT_FOUNDATION",
-    "D2_HYPOTHESIS_ENGINE",
-    "D3_PRIORITY_ENGINE",
-    "D4_ENGINEER_BRIEF",
-    "D5_ACTIVATION"
+    "D2_EVIDENCE_GRAPH",
+    "D3_HYPOTHESIS_ENGINE",
+    "D4_PRIORITY_ENGINE",
+    "D5_ENGINEER_BRIEF_ACTIVATION"
   ],
   "capabilities": [
     "contract_foundation_present",
     "governance_bootstrap_present",
+    "evidence_graph_present",
     "hypothesis_engine_present",
     "priority_engine_present",
     "engineer_brief_present",
@@ -40,6 +41,7 @@
     "governance_bootstrap_present"
   ],
   "productionCapabilities": [
+    "evidence_graph_present",
     "hypothesis_engine_present",
     "priority_engine_present",
     "engineer_brief_present",
@@ -48,15 +50,16 @@
   "capabilityUnlockFloor": {
     "contract_foundation_present": "D1_CONTRACT_FOUNDATION",
     "governance_bootstrap_present": "D0_BOOTSTRAP",
-    "hypothesis_engine_present": "D2_HYPOTHESIS_ENGINE",
-    "priority_engine_present": "D3_PRIORITY_ENGINE",
-    "engineer_brief_present": "D4_ENGINEER_BRIEF",
-    "feature_registry_active": "D5_ACTIVATION"
+    "evidence_graph_present": "D2_EVIDENCE_GRAPH",
+    "hypothesis_engine_present": "D3_HYPOTHESIS_ENGINE",
+    "priority_engine_present": "D4_PRIORITY_ENGINE",
+    "engineer_brief_present": "D5_ENGINEER_BRIEF_ACTIVATION",
+    "feature_registry_active": "D5_ENGINEER_BRIEF_ACTIVATION"
   },
-  "runtimeConsumerCheckpoint": "D2_HYPOTHESIS_ENGINE",
-  "algorithmCheckpoint": "D3_PRIORITY_ENGINE",
-  "uiCheckpoint": "D4_ENGINEER_BRIEF",
-  "featureRegistryActivationCheckpoint": "D5_ACTIVATION",
+  "runtimeConsumerCheckpoint": "D2_EVIDENCE_GRAPH",
+  "algorithmCheckpoint": "D2_EVIDENCE_GRAPH",
+  "uiCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+  "featureRegistryActivationCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
   "bootstrapCheckpoint": "D0_BOOTSTRAP",
   "contractPrefix": "contracts/r3.0d",
   "authorizedPathRules": {

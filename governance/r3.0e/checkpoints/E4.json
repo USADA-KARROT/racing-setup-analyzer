@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0E",
+  "checkpoint": "E4_CASE_TIMELINE",
+  "baseSha": "0224e87ef22c32402d9cb53942ae5727a0e669d9",
+  "headSha": null,
+  "previousCheckpoint": "E3_OUTCOME_CLASSIFIER",
+  "shaSeparation": {
+    "note": "Three-way SHA separation per the established R3.0 convention.",
+    "reviewedCandidateSha": "aaa2efc6799e4292d46592846195f06d15c07fe6",
+    "reviewedCandidateNote": "Codex E4 Round 7 reviewed this exact SHA and issued FINAL VERDICT: PASS. 12 distinct adversarial findings closed across 6 review rounds: R1-01 projectTimeline params allowlist / R1-02 clock canonicalization / R1-03 correction_of value-equality / R1-04 orphan correctionOf / R1-05 strict monotonic / R2-01 Date.toISOString capture / R2-02 listForParent Proxy snapshot / R2-03 reserved hostile token blocklist / R3-01 toLowerCase capture / R3-02 RegExp.test capture / R4-01 clean-clone Proxy barrier / R5-01 padStart-free _toHex8 / R6-01 charCodeAt capture.",
+    "manifestCommitSha": null,
+    "integrationSha": null
+  },
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0e-stores.js", "capability": "experiment_store_present" },
+    { "path": "renderer/js/r3-0e-outcome-classifier.js", "capability": "outcome_classifier_present" },
+    { "path": "renderer/js/r3-0e-followup-timeline.js", "capability": "case_timeline_present" }
+  ],
+  "newlyAuthorizedPaths": [
+    "renderer/js/r3-0e-followup-timeline.js"
+  ],
+  "newlyEnabledCapabilities": ["case_timeline_present"],
+  "enabledCapabilitiesBefore": ["contract_foundation_present", "experiment_store_present", "outcome_classifier_present"],
+  "enabledCapabilitiesAfter": ["contract_foundation_present", "experiment_store_present", "outcome_classifier_present", "case_timeline_present"],
+  "forbiddenCapabilities": [
+    "feature_registry_active"
+  ],
+  "contractEnforcements": {
+    "serviceScope": "renderer/js/r3-0e-followup-timeline.js exports createFollowUpTimelineService({timelineStore, followUpLinkStore}) → service object + verifyAuthoritativeFollowUpLink + verifyAuthoritativeTimelineProjection. Service methods: createFollowUpLink / getFollowUpLink / listFollowUpLinksForParent / appendTimelineEvent / projectTimeline. NO mutation API: timeline events are append-only; corrections are NEW events with params.correction_of=<priorEventId>. NO WeakSet, register, secret, or signing primitive exported.",
+    "inputAuthority": "All input wrappers have CLOSED key sets ({parentCaseId, followUpCaseId, experimentId, parentStatus} for links; {caseId, kind, i18nKey, params, correctionOf} for events; {clock, referenceNowMs} for opts). Symbol / accessor / non-enumerable / Proxy / unknown own key → BLOCK with UNKNOWN_OWN_KEY before any [[Get]].",
+    "deterministicIds": "linkId = 'link_' + FNV-1a(parentCaseId, followUpCaseId, experimentId); eventId = 'event_' + FNV-1a(caseId, sequence, kind, i18nKey); projectionId = 'projection_' + FNV-1a(caseId, eventCount, lastEventId). NO clock leak in any id.",
+    "appendOnly": "Timeline events are append-only at BOTH layers — the service computes sequence from existing events length; the E2 store also rejects duplicate eventId + out-of-order createdAt. A clock rollback (refMs < prev event ms) is caught at the service layer with TIMELINE_ORDERING_INVALID before reaching the store.",
+    "i18nGrammar": "Event i18nKey passes the strict grammar (dotted lower_snake_case, 2..6 segments, ≤128 chars). Event params is null OR a plain object whose keys are sober identifiers and whose values are: finite number / boolean / null / strict i18n key / strict id string. Free-text / blame / causation / path / raw-telemetry-array smuggling is blocked.",
+    "correctionEvents": "A correction event is a new event whose params.correction_of references the prior event id. The original is NEVER overwritten — the projection includes BOTH events in chronological order.",
+    "clockOrdering": "Clock invoked AT MOST ONCE per call, AFTER all authority + structural gates. Forged input → ZERO clock invocations.",
+    "producerAttestation": "Every successfully-created follow-up link record AND every projected timeline is deep-frozen and registered in a closure-private WeakSet. Verifiers check identity + structural witnesses. Clones / JSON round-trips / structuredClone / Proxy lookalikes do NOT pass. WeakSet ops + Array.prototype ops dispatched via captured intrinsics + captured Reflect.apply.",
+    "rehydrationAuthority": "Reload across service instances (same backend, fresh service factory) produces a deterministic projection with identical projectionId. Each rehydrated event is re-validated via E1 contract and rebuilt into a service-owned frozen copy before being included in the projection.",
+    "crossCaseScopePolicy": "The follow-up link service PERMITS cross-case linkage (it records the relationship). The comparison-validity gate that requires same-case / same-session / explicit-reference / comparabilityScore lives in E3 outcome classifier — link existence does NOT imply comparison validity.",
+    "stateFloors": "E4 unlocks case_timeline_present (in addition to E3's outcome_classifier_present + E2's experiment_store_present). algorithmsAllowed=true for the three authorized R3.0E paths only. uiAllowed remains false (E5 only). featureRegistryActivationAllowed remains false (E5 only). R3.0B case-record schema NOT modified."
+  },
+  "tests": {
+    "command": "npm test",
+    "newSuiteForThisCheckpoint": "tests/r3.0e-followup-timeline.test.js",
+    "newSuiteAssertions": 66,
+    "evidenceTier": "TIER 3 — Claude-verified on E4 branch HEAD; CI re-run on integrationSha is the authority."
+  },
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 7,
+    "reviewedCandidateSha": "aaa2efc6799e4292d46592846195f06d15c07fe6",
+    "verdictEvidenceFile": "governance/r3.0e/codex-checkpoint-evidence/E4/round-7-aaa2efc-PASS.raw.txt",
+    "rounds": [
+      { "round": 1, "reviewedSha": "b734402", "verdict": "BLOCK", "findings": "5 BLOCK (E4-R1-01..05)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E4/round-1-b734402.raw.txt" },
+      { "round": 2, "reviewedSha": "4e1784d", "verdict": "BLOCK", "findings": "3 BLOCK (E4-R2-01..03)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E4/round-2-4e1784d.raw.txt" },
+      { "round": 3, "reviewedSha": "81918b2", "verdict": "BLOCK", "findings": "2 BLOCK (E4-R3-01..02)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E4/round-3-81918b2.raw.txt" },
+      { "round": 4, "reviewedSha": "36d7e3b", "verdict": "BLOCK", "findings": "1 BLOCK (E4-R4-01)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E4/round-4-36d7e3b.raw.txt" },
+      { "round": 5, "reviewedSha": "106278a", "verdict": "BLOCK", "findings": "1 BLOCK (E4-R5-01)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E4/round-5-106278a.raw.txt" },
+      { "round": 6, "reviewedSha": "d882207", "verdict": "BLOCK", "findings": "1 BLOCK (E4-R6-01)", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E4/round-6-d882207.raw.txt" },
+      { "round": 7, "reviewedSha": "aaa2efc", "verdict": "PASS", "findings": "0", "evidence": "governance/r3.0e/codex-checkpoint-evidence/E4/round-7-aaa2efc-PASS.raw.txt" }
+    ]
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "scopeBoundary": {
+    "frozenFilesUntouched": true,
+    "r30bPersistenceUntouched": true,
+    "r30cContractsUntouched": true,
+    "r30cProductionUntouched": true,
+    "r30dContractsUntouched": true,
+    "r30dProductionUntouched": true,
+    "r30eContractsUntouched": true,
+    "r30eStoresUntouched": true,
+    "r30eOutcomeClassifierUntouched": true,
+    "featureRegistryUnchanged": true,
+    "indexHtmlUnchanged": true,
+    "noR30eFeatureIdInRegistry": true,
+    "runtimeConsumerCount": 3,
+    "productionPathCount": 3,
+    "uiSurfaceCount": 0
+  },
+  "frozenDiff": 0,
+  "productionDiff": 1,
+  "runtimeConsumerCount": 3,
+  "featureRegistryState": {
+    "expectedRegisteredIds": [],
+    "expectedDeferredIds": ["experiment_loop", "case_timeline"],
+    "note": "E4 does NOT register any R3.0E feature ID. Feature Registry activation is exclusively E5_ACTIVATION."
+  },
+  "crossPhaseGate": {
+    "r3dCheckpoint": "D5_ENGINEER_BRIEF_ACTIVATION",
+    "requiredFor": "E4_CASE_TIMELINE",
+    "satisfied": true
+  },
+  "packageVersion": "1.4.0",
+  "createdAt": "2026-06-30T00:00:00Z",
+  "status": "candidate",
+  "governanceChanged": true,
+  "changedFiles": [
+    "renderer/js/r3-0e-followup-timeline.js",
+    "tests/r3.0e-followup-timeline.test.js",
+    "governance/r3.0e/checkpoints/E4.json",
+    "governance/r3.0e/state.json",
+    "governance/r3.0/train.json",
+    "package.json"
+  ],
+  "note": "R3.0E E4_CASE_TIMELINE — semantic follow-up + timeline service wrapping E2 stores with closure-private WeakSet producer attestation for both link records and timeline projections. Append-only timeline; corrections as new events; deterministic IDs; no UI; no Feature Registry change."
+}

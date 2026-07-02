@@ -127,7 +127,17 @@ jobs:
       - name: E — Frozen-boundary guard
         if: ${{ !cancelled() }}
         timeout-minutes: 2
-        run: node scripts/check-frozen-boundary.js
+        # R3.0C C8_ACTIVATION authorizes renderer/js/feature-registry.js to flip the three R3.0C
+        # feature IDs from deferred to active. The frozen-boundary mechanism uses FROZEN_ALLOW for
+        # exactly this milestone-authorized change. While featureRegistryActivationAllowed=false
+        # (C0–C7) the file is treated as fully frozen; once C8 flips the flag the allowlist is
+        # populated for this single file only — any OTHER frozen file touched still fails the check.
+        run: |
+          ALLOW=""
+          if node -e "const s=require('./governance/r3.0c/state.json');process.exit(s.featureRegistryActivationAllowed===true&&(s.authorizedProductionPaths||[]).some(e=>e&&e.path==='renderer/js/feature-registry.js'&&e.capability==='feature_registry_active')?0:1)"; then
+            ALLOW="renderer/js/feature-registry.js"
+          fi
+          FROZEN_ALLOW="$ALLOW" node scripts/check-frozen-boundary.js
 
       - name: F — Package version policy
         if: ${{ !cancelled() }}

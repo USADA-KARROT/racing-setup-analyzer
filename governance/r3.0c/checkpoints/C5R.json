@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0C",
+  "checkpoint": "C5R_CP1_RETROFIT",
+  "baseSha": "5f70aafa82d4539dda5229da4a288ebaca62767d",
+  "headSha": "5d2d2aa8fbea5077b19c5ea2d5022f88c39ddb33",
+  "previousCheckpoint": "C5_DELTA_METRICS",
+
+  "shaSeparation": {
+    "note": "Per SKYLINE 2026-06-28 ruling, this manifest distinguishes three orthogonal SHAs. A future reader MUST NOT conflate them. headSha mirrors integrationSha now that the PR has merged. reviewedCandidateSha remains the pre-integration SHA Codex actually reviewed and is NOT advanced by merge.",
+    "reviewedCandidateSha": "cf28bed48f19c9909406cf645bed804195caf597",
+    "reviewedCandidateNote": "The exact retrofit-branch HEAD that the formal Codex C-A gate verdict (round 4 PASS) was issued against. See governance/r3.0c/codex-ca-gate-evidence/round-4-cf28bed.md and verdict-hashes.txt. This SHA is permanently reachable from the Train branch (verified via git merge-base --is-ancestor at integration time).",
+    "manifestCommitSha": "2390df49a4bb339f0e988848f3948798208b0445",
+    "manifestCommitNote": "The git commit SHA that authored this manifest on the retrofit branch (commit title: cp1r(c5r): C5R_CP1_RETROFIT checkpoint manifest + governance state advance). Distinct from reviewedCandidateSha; substituting one for the other is a tier violation.",
+    "integrationSha": "5d2d2aa8fbea5077b19c5ea2d5022f88c39ddb33",
+    "integrationNote": "The Train-branch HEAD AFTER PR #17 (retrofit → Train) was merged into feat/r3.0-integrated-delivery via merge_commit method on 2026-06-27T23:44:43Z. This is a merge-commit SHA (two parents: previous Train HEAD 5f70aaf + retrofit HEAD 2390df4). Train target-context CI / trusted-verification PASS was bound to the retrofit HEAD 2390df4 (not this merge-commit SHA); a separate Codex re-gate against integrationSha would be required for any claim of post-merge Codex review, and a separate trusted-verification run against integrationSha would be required for any claim of post-merge CI authority. The current Train PR #16 (Train → main) carries this as its new headRefOid."
+  },
+
+  "authorizedPaths": [
+    { "path": "renderer/js/r3-0c-comparison-adapter.js", "capability": "production_adapter_present" },
+    { "path": "renderer/js/r3-0c-lap-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-track-identity.js", "capability": "track_identity_authoritative" },
+    { "path": "renderer/js/r3-0c-distance-authority.js", "capability": "lap_authority_present" },
+    { "path": "renderer/js/r3-0c-normalized-distance.js", "capability": "normalized_distance_present" },
+    { "path": "renderer/js/r3-0c-reference-selection.js", "capability": "reference_selection_present" },
+    { "path": "renderer/js/r3-0c-corner-segmentation.js", "capability": "corner_segmentation_present" },
+    { "path": "renderer/js/r3-0c-corner-pairing.js", "capability": "corner_pairing_present" },
+    { "path": "renderer/js/r3-0c-delta-metrics.js", "capability": "delta_metrics_present" }
+  ],
+  "authorizedPathsNote": "C5R is a retrofit: enabledCapabilities is unchanged from C5; authorizedPaths therefore mirrors C5's authorizedPaths set verbatim (no new production module added, no module removed). The retrofit's own touched files are listed under findingsClosureDetail per F-id; the renderer/js diff at this checkpoint is restricted to renderer/js/r3-0c-corner-segmentation.js (in-place fix, not a new authorization).",
+
+  "enabledCapabilitiesBefore": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present"],
+  "enabledCapabilitiesAfter": ["production_adapter_present", "lap_authority_present", "track_identity_authoritative", "normalized_distance_present", "reference_selection_present", "corner_segmentation_present", "corner_pairing_present", "delta_metrics_present"],
+  "newlyDeclaredCapabilitiesDisabled": ["phase_boundary_contract", "viewmodel_state_transition_contract", "framing_source_structured_contract"],
+  "forbiddenCapabilities": [
+    "comparison_export_present",
+    "ui_present",
+    "feature_registry_active"
+  ],
+
+  "tests": {
+    "command": "npm test",
+    "suites": 74,
+    "passed": 8130,
+    "failed": 0,
+    "selfTestPassed": 15,
+    "selfTestFailed": 0,
+    "presetEquivalence": { "raw": 1002, "observable": 501, "intact": true },
+    "evidenceTier": "TIER 3 — Claude-verified in non-sandboxed environment at reviewedCandidateSha cf28bed; CI re-run on integrationSha is the PASS authority for the Train target context."
+  },
+
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 4,
+    "verdictAt": "reviewedCandidateSha",
+    "reviewedCandidateSha": "cf28bed48f19c9909406cf645bed804195caf597",
+    "verdictEvidenceFile": "governance/r3.0c/codex-ca-gate-evidence/round-4-cf28bed.md",
+    "verdictBlockSha256": "c8da5c44f1fd865e31a3a8f88590b39d892e4465974b13859d084f76e27484d3",
+    "verdictHashesFile": "governance/r3.0c/codex-ca-gate-evidence/verdict-hashes.txt",
+    "priorRoundEvidence": [
+      { "round": 2, "file": "governance/r3.0c/codex-ca-gate-evidence/round-2-e3ac3d6.md", "sha": "e3ac3d627decb53151037cc8e850c73ba18bbd95", "result": "BLOCK", "verdictBlockSha256": "59ebca5ea9e55e9621e0dc0ef3c5520b8ca7943500f0fc2ee2c422a6fb55e32d" },
+      { "round": 3, "file": "governance/r3.0c/codex-ca-gate-evidence/round-3-2dab434.md", "sha": "2dab434b301664894061ad33768c1025c9f233a6", "result": "BLOCK", "verdictBlockSha256": "6fb88f50e9cbfd21d52673110ebd31e30fa52497c2036c477e24c8ea68d61af0" }
+    ],
+    "codexToolchain": {
+      "cliVersion": "codex-cli 0.141.0",
+      "subAgentType": "codex:codex-rescue",
+      "host": "macOS Darwin 25.5.0 / Apple Silicon",
+      "subAgentId": "a1b4c4be8c3aa8786"
+    },
+    "evidenceTierDisclosure": "Per governance/r3.0c/codex-ca-gate-evidence/README.md: TIER 1 (raw codex CLI stdout) NOT CAPTURED; TIER 2 (sub-agent relayed verdict block) and TIER 3 (Claude-authored prompts + Claude-verified baseline values) ARE CAPTURED VERBATIM in the round-*.md files. A future tier-1 audit requires re-execution with stdout capture.",
+    "findingsClosed": ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F9", "F10", "F11", "F12"]
+  },
+
+  "findingsClosureDetail": {
+    "F1": { "lens": "I_export", "title": "envelope unknown own-key smuggling", "fix": "EXPORT_ENVELOPE_UNKNOWN_KEY + ENVELOPE_KEYS closed set", "files": ["contracts/r3.0c/comparison-export-contract.js", "contracts/r3.0c/reason-codes.js"] },
+    "F2": { "lens": "I_export", "title": "non-finite numbers leak through payload", "fix": "_payloadBounded rejects NaN/Infinity/-Infinity with EXPORT_PAYLOAD_NON_FINITE_NUMBER", "files": ["contracts/r3.0c/comparison-export-contract.js"] },
+    "F3": { "lens": "I_export+J_privacy", "title": "unbounded strings + total envelope size", "fix": "MAX_STRING_UTF8_BYTES=4096 + MAX_ENVELOPE_UTF8_BYTES=262144 with their reason codes", "files": ["contracts/r3.0c/comparison-export-contract.js"] },
+    "F4": { "lens": "A_track_authority", "title": "case-context binding missing + bogus assoc value silently passed", "fix": "validateComparisonContextAgainstCase exposed; split gates fail-closed on invalid assoc value (round-3 close)", "files": ["contracts/r3.0c/comparison-eligibility-contract.js"] },
+    "F5": { "lens": "A_track_authority+C_position", "title": "positionBasis + positionDirection missing from identity", "fix": "ACCEPTED_POSITION_BASES + ACCEPTED_POSITION_DIRECTIONS + 4 new reason codes; both sides demanded; ref/cmp must agree", "files": ["contracts/r3.0c/comparison-eligibility-contract.js", "contracts/r3.0c/reason-codes.js"] },
+    "F6": { "lens": "G_corner+H_honesty", "title": "phase metrics derivable without service-owned boundary contract", "fix": "PHASE_SCOPE_METRICS gated by policy.phaseBoundaryAuthorisation; capability disabled; sector_delta unaffected", "files": ["contracts/r3.0c/delta-metrics-contract.js", "governance/r3.0c/capabilities.json", "governance/r3.0c/schema.json"] },
+    "F7": { "lens": "C_position", "title": "duplicate position samples — div-by-zero in resampler", "fix": "Train already enforces caller-declared duplicatePositions policy (reject/collapse/retain); HANDLED, no code change", "files": ["renderer/js/r3-0c-normalized-distance.js"] },
+    "F9": { "lens": "G_corner", "title": "corner pairing multi-overlap tie-break undefined", "fix": "Train already fail-closes with CORNER_PAIRING_AMBIGUOUS (stronger than tie-break); HANDLED, no code change", "files": ["renderer/js/r3-0c-corner-pairing.js"] },
+    "F10": { "lens": "G_corner", "title": "same-lap overlap only detected adjacent — non-adjacent overlap slips", "fix": "all-pairs O(n^2) scan (round-3 close)", "files": ["renderer/js/r3-0c-corner-segmentation.js"] },
+    "F11": { "lens": "H_honesty_state", "title": "viewmodel state-transition contract undefined", "fix": "deferred contract document declared + capability disabled; C7_UI cannot ship without enabling", "files": ["docs/r3.0c-state-transition-contract.md", "governance/r3.0c/capabilities.json"] },
+    "F12": { "lens": "H_honesty+K_R30D", "title": "framing-source contract not structurally satisfiable", "fix": "FRAMING_KEY_SHAPE declared; CANNOT_DISTINGUISH registered; fallback omits params instead of params:null (round-3 + round-4 close)", "files": ["contracts/r3.0c/comparison-eligibility-contract.js", "contracts/r3.0c/reason-codes.js", "docs/r3.0c-framing-source-contract.md"] }
+  },
+
+  "frozenDiff": 0,
+  "productionDiff": 0,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": ["case_comparison", "reference_lap", "corner_delta"],
+    "expectedRendererAdapter": false
+  },
+
+  "packageVersion": "1.4.0",
+
+  "schemaSurface": {
+    "reasonCodesTotal": 65,
+    "reasonCodesAddedThisCheckpoint": [
+      "MISSING_POSITION_BASIS", "INCOMPATIBLE_POSITION_BASIS",
+      "MISSING_POSITION_DIRECTION", "INCOMPATIBLE_POSITION_DIRECTION",
+      "EXPORT_ENVELOPE_UNKNOWN_KEY", "EXPORT_PAYLOAD_NON_FINITE_NUMBER",
+      "EXPORT_PAYLOAD_STRING_TOO_LONG", "EXPORT_PAYLOAD_ENVELOPE_TOO_LARGE",
+      "PHASE_BOUNDARY_CONTRACT_UNAUTHORISED",
+      "CANNOT_DISTINGUISH"
+    ]
+  },
+
+  "createdAt": "2026-06-27T23:44:43Z",
+  "createdAtNote": "Filled with the PR #17 merge timestamp (gh pulls/17 mergedAt) so the value is bound to a CI-verifiable moment, not to a local clock. The original draft of this manifest at commit 2390df4 carried null per checkpoint-manifest.schema convention.",
+  "status": "candidate",
+  "statusNote": "'candidate' is set on this post-merge anchoring commit because the trusted-verification artifact bound to integrationSha (5d2d2aa8) does not yet exist — pre-merge CI ran against the retrofit HEAD 2390df4, not the merge-commit SHA. A subsequent CI run on the merged Train HEAD would bind PASS authority to 5d2d2aa8; until then status remains 'candidate'. PASS lives in the artifact bound to integrationSha, not in this file.",
+  "governanceChanged": true,
+
+  "note": "C5R is a retrofit checkpoint. It does NOT advance any productionCapability beyond C5; enabledCapabilitiesBefore === enabledCapabilitiesAfter. It brings the C1-C5 surface into honesty alignment with the formal Codex C-A round-2 BLOCK adjudication (F1-F12 closure detailed above). The retrofit modifies one already-authorised production file (renderer/js/r3-0c-corner-segmentation.js — bounded O(n^2) overlap-scan extension, no algorithm replacement) and four contracts; declares three new governance-capabilities (phase_boundary_contract / viewmodel_state_transition_contract / framing_source_structured_contract — all DISABLED) that gate the deferred C7_UI surface; persists Codex C-A evidence in tiered form under governance/r3.0c/codex-ca-gate-evidence/; and explicitly separates reviewedCandidateSha / manifestCommitSha / integrationSha so future audits cannot conflate them. The trusted-verification artifact bound to the eventual Train integrationSha is the PASS authority for THAT integration; reviewedCandidateSha is the PASS authority only for the pre-merge retrofit candidate. headSha / workflowRunId / artifactId / artifactBoundSha / createdAt are intentionally null in-commit, mirroring the existing C0-C5 manifest convention. status='pending' per the same convention; PASS lives in the trusted-verification artifact, not in this file."
+}
