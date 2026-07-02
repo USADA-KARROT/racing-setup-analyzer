@@ -64,9 +64,13 @@
   "uiCheckpoint": "F3_QUALITY_HARDENING",
   "featureRegistryActivationCheckpoint": "F6_RELEASE",
   "releaseStages": {
-    "note": "Monotonic F6_RELEASE progression recorded in checkpoints/F6.json releaseStage. Forward-only: RELEASE_PREPARED (bump staged; no tag/Release) -> RELEASE_TAGGED_DRAFT (annotated tag pushed AND/OR a DRAFT GitHub Release exists; nothing published, no assets) -> RELEASE_PUBLISHED (the GitHub Release is actually published: draft=false with a non-null publishedAt). Semantic ruling (SKYLINE, 2026-07-02): the release_executed capability means PUBLISHED ONLY — a tag alone or a draft Release alone must NOT enable it. Later stages never rewrite earlier evidence; publish advances the stage and fills publishedAt without history rewrites.",
+    "note": "Monotonic F6_RELEASE progression recorded in checkpoints/F6.json releaseStage. Forward-only: RELEASE_PREPARED (bump staged; no tag/Release) -> RELEASE_TAGGED_DRAFT (annotated tag pushed AND/OR a DRAFT GitHub Release exists; nothing published, no assets) -> RELEASE_PUBLISHED (the GitHub Release is actually published: draft=false with a non-null publishedAt). Semantic ruling (SKYLINE, 2026-07-02): the release_executed capability means PUBLISHED ONLY — a tag alone or a draft Release alone must NOT enable it. Later stages never rewrite earlier evidence.",
     "order": ["RELEASE_PREPARED", "RELEASE_TAGGED_DRAFT", "RELEASE_PUBLISHED"],
-    "releaseExecutedRequiresStage": "RELEASE_PUBLISHED"
+    "releaseExecutedRequiresStage": "RELEASE_PUBLISHED",
+    "publishForwardFields": {
+      "note": "The COMPLETE, exhaustive field set a future publish mirror may change — every one is a forward-only state advance; everything else in releaseRecord (tag SHAs, release id, tagMessage, mainMergeSha, historical evidence) is immutable. The state field advances DRAFT -> PUBLISHED in lockstep with draft/published (enforced by R3F_RELEASE_STATE_FIELD_MISMATCH).",
+      "fields": ["releaseStage", "releaseRecord.githubRelease.state", "releaseRecord.githubRelease.draft", "releaseRecord.githubRelease.published", "releaseRecord.githubRelease.publishedAt", "releaseRecord.releaseExecuted", "state.json enabledCapabilities += release_executed"]
+    }
   },
   "bootstrapCheckpoint": "F0_BOOTSTRAP",
   "contractPrefix": "contracts/r3.0f",

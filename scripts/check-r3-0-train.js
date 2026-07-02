@@ -250,8 +250,10 @@ function run() {
         if ((capOn || rr.releaseExecuted === true) && (!published || m.releaseStage !== 'RELEASE_PUBLISHED')) fail('R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH', 'release_executed asserted but the GitHub Release is not published (draft/publishedAt/stage mismatch) — a tag alone or a draft Release alone never counts', { phase, capOn, recordFlag: rr.releaseExecuted === true, releaseStage: m.releaseStage, draft: gr && gr.draft, publishedAt: gr && gr.publishedAt });
         // a draft Release on record forbids release_executed in BOTH places
         if (gr && gr.draft === true && (capOn || rr.releaseExecuted === true)) fail('R3F_RELEASE_EXECUTED_ON_DRAFT', 'githubRelease.draft=true but release_executed is asserted', { phase, capOn, recordFlag: rr.releaseExecuted === true });
-        // dmgUploaded must corroborate with assets; every asset entry must be a
-        // {name: string} object — bare strings or malformed entries are rejected outright
+        // dmgUploaded must corroborate with assets; a recorded Release MUST carry an
+        // assets array (missing/non-array is itself a violation — no silent skip), and
+        // every entry must be a {name: string} object — bare strings are rejected outright
+        if (gr && !Array.isArray(gr.assets)) fail('R3F_RELEASE_ASSETS_MISSING', 'githubRelease is recorded but assets is missing or not an array — asset evidence must be explicit', { phase, assets: gr.assets === undefined ? 'missing' : gr.assets });
         const assets = gr && Array.isArray(gr.assets) ? gr.assets : null;
         const assetsWellFormed = !!(assets && assets.every(a => a && typeof a === 'object' && !Array.isArray(a) && typeof a.name === 'string' && a.name.length > 0));
         if (assets && assets.length > 0 && !assetsWellFormed) fail('R3F_RELEASE_ASSETS_MALFORMED', 'githubRelease.assets entries must be {name: string} objects (bare strings/malformed entries rejected)', { phase, assets });

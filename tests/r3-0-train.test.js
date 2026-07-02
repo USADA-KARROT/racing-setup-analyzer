@@ -412,7 +412,10 @@ function mutateF6(fn) {
   const r = mutateF6((m) => { m.releaseRecord.releaseExecuted = true; });
   chk('FAIL releaseExecuted record flag on draft Release', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_ON_DRAFT') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
 }
-// mirror-3: a genuinely published Release (draft=false, publishedAt set, stage advanced) allows release_executed
+// mirror-3: a genuinely published Release allows release_executed. The edit set below is
+// EXACTLY schema releaseStages.publishForwardFields — the exhaustive forward-only publish
+// mirror (stage, state, draft, published, publishedAt, record flag, capability); no other
+// recorded evidence (tag SHAs, release id, mainMergeSha) is touched.
 {
   const r = mutateF6((m, st) => {
     m.releaseStage = 'RELEASE_PUBLISHED';
@@ -514,6 +517,16 @@ function mutateF6(fn) {
     st.enabledCapabilities.push('release_executed');
   });
   chk('FAIL whitespace publishedAt rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH') && hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH'));
+}
+// mirror-18 (MIRROR-R2-02): assets deleted entirely -> FAIL (no silent skip)
+{
+  const r = mutateF6((m) => { delete m.releaseRecord.githubRelease.assets; });
+  chk('FAIL missing assets array', hasViolation(r.artifact, 'R3F_RELEASE_ASSETS_MISSING'));
+}
+// mirror-19 (MIRROR-R2-02): assets as a non-array -> FAIL
+{
+  const r = mutateF6((m) => { m.releaseRecord.githubRelease.assets = 'none'; });
+  chk('FAIL non-array assets', hasViolation(r.artifact, 'R3F_RELEASE_ASSETS_MISSING'));
 }
 
 H.cleanupAll();
