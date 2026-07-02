@@ -34,29 +34,56 @@ function _makeTempDir(prefix) {
   if (typeof prefix !== 'string' || prefix.length === 0) {
     throw new Error('managed-temp-dir: prefix must be a non-empty string');
   }
-  return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  // Ownership safety (Codex INFRA-01/02): the prefix must be a bare basename fragment —
+  // no path separators, no traversal. `path.join(os.tmpdir(), '../sibling-')` would
+  // otherwise create (and later recursively DELETE) a directory OUTSIDE the temp root.
+  if (prefix !== path.basename(prefix) || prefix === '.' || prefix === '..' ||
+      /[\/\\]/.test(prefix) || prefix.indexOf('\0') !== -1) {
+    throw new Error('managed-temp-dir: prefix must be a bare name fragment (no separators, no traversal): ' + JSON.stringify(prefix));
+  }
+  var created = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  // Belt-and-suspenders: the created dir must sit DIRECTLY beneath the resolved temp root.
+  var tempRoot = fs.realpathSync(os.tmpdir());
+  var parent = fs.realpathSync(path.dirname(created));
+  if (parent !== tempRoot) {
+    _cleanupBestEffort(created, 'escape-check');
+    throw new Error('managed-temp-dir: created dir escaped the temp root: ' + created);
+  }
+  return created;
 }
 
-function _cleanup(tempDir) {
+function _cleanupBestEffort(tempDir, context) {
   // recursive + force so a partially-populated dir, a read-only file, or an already-removed
-  // dir all clean up silently. This is intentionally robust — its job is "no leak ever".
+  // dir all clean up without throwing. Used by the exit-hook backstop and by finally-path
+  // cleanup where throwing would shadow the original test failure. Failures are REPORTED
+  // to stderr (Codex INFRA-03: never silent), just not thrown.
   try {
     fs.rmSync(tempDir, { recursive: true, force: true });
-  } catch (_) {
-    // Last-ditch: ignore. The dir is in $TMPDIR; the OS will eventually reap. Throwing here
-    // would shadow the original test failure (if any) and make debugging harder.
+    return true;
+  } catch (e) {
+    try {
+      process.stderr.write('managed-temp-dir: cleanup failed (' + (context || 'best-effort') + ') for ' + tempDir + ': ' + (e && e.message) + '\n');
+    } catch (_) { /* stderr unavailable during teardown — nothing further we can do */ }
+    return false;
   }
+}
+
+function _cleanupStrict(tempDir) {
+  // Explicit-release path: the caller asked for deletion NOW, so a failure must surface.
+  fs.rmSync(tempDir, { recursive: true, force: true });
 }
 
 function withTempDir(prefix, callback) {
   if (typeof callback !== 'function') {
     throw new Error('managed-temp-dir: callback must be a function');
   }
+  _installExitHooksOnce();
   var tempDir = _makeTempDir(prefix);
+  _registry.add(tempDir); // registered so a failed finally-cleanup is retried by the exit hook
   try {
     return callback(tempDir);
   } finally {
-    _cleanup(tempDir);
+    if (_cleanupBestEffort(tempDir, 'withTempDir')) _registry.delete(tempDir);
   }
 }
 
@@ -64,11 +91,13 @@ async function withTempDirAsync(prefix, callback) {
   if (typeof callback !== 'function') {
     throw new Error('managed-temp-dir: callback must be a function');
   }
+  _installExitHooksOnce();
   var tempDir = _makeTempDir(prefix);
+  _registry.add(tempDir); // registered so a failed finally-cleanup is retried by the exit hook
   try {
     return await callback(tempDir);
   } finally {
-    _cleanup(tempDir);
+    if (_cleanupBestEffort(tempDir, 'withTempDirAsync')) _registry.delete(tempDir);
   }
 }
 
@@ -85,11 +114,13 @@ var _registry = new Set();
 var _exitHooksInstalled = false;
 
 function _cleanupAllInternal() {
-  // Synchronous walk; safe inside process.on('exit'). Errors swallowed per cleanup contract.
+  // Synchronous walk; safe inside process.on('exit'). Best-effort per cleanup contract —
+  // failures are reported to stderr by _cleanupBestEffort, never thrown (throwing inside
+  // an 'exit' hook would mask the process's real exit status).
   var entries = Array.from(_registry);
   _registry.clear();
   for (var i = 0; i < entries.length; i++) {
-    _cleanup(entries[i]);
+    _cleanupBestEffort(entries[i], 'exit-hook');
   }
 }
 
@@ -123,9 +154,16 @@ function acquireTempDir(prefix) {
 }
 
 function releaseTempDir(tempDir) {
-  // Explicit early cleanup. Idempotent: a path not in the registry is silently OK.
-  if (_registry.has(tempDir)) _registry.delete(tempDir);
-  _cleanup(tempDir);
+  // Explicit early cleanup — REGISTRY-OWNED PATHS ONLY (Codex INFRA-01). A path this
+  // helper did not create must never be deleted here: an arbitrary caller-supplied
+  // directory (or an already-released one) is a silent no-op, which also keeps the
+  // double-release idempotency contract. Deletion failures on an owned path THROW
+  // (Codex INFRA-03: the caller asked for deletion now, so a failure must surface);
+  // the entry stays in the registry so the exit-hook backstop retries it.
+  if (!_registry.has(tempDir)) return false;
+  _cleanupStrict(tempDir);
+  _registry.delete(tempDir);
+  return true;
 }
 
 function cleanupAll() {

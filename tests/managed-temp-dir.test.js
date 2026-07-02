@@ -130,6 +130,32 @@ function tempBaseline() {
   try { H.releaseTempDir(acquired9); } catch (_) { noThrowOnDoubleRelease = false; }
   chk('releaseTempDir is idempotent (no throw on already-released path)', noThrowOnDoubleRelease === true);
 
+  // (11b) OWNERSHIP: releaseTempDir must NOT delete a directory the registry does not own
+  // (Codex INFRA-01 closure). An arbitrary caller-supplied path is a no-op returning false.
+  var foreignDir = fs.mkdtempSync(path.join(os.tmpdir(), 'managed-temp-probe-foreign-'));
+  var foreignResult = H.releaseTempDir(foreignDir);
+  chk('ownership: releaseTempDir returns false for a non-registry path', foreignResult === false);
+  chk('ownership: non-registry dir NOT deleted by releaseTempDir', fs.existsSync(foreignDir));
+  fs.rmSync(foreignDir, { recursive: true, force: true });
+
+  // (11c) PREFIX SAFETY: traversal / separator prefixes are rejected before any mkdtemp
+  // (Codex INFRA-02 closure).
+  ['../managed-temp-escape-', 'a/b-', 'a\\b-', '..', '.'].forEach(function (badPrefix) {
+    var rejected = false;
+    try { H.acquireTempDir(badPrefix); } catch (e) { rejected = /bare name fragment|non-empty string/.test(String(e && e.message)); }
+    chk('prefix safety: ' + JSON.stringify(badPrefix) + ' rejected', rejected === true);
+  });
+  chk('prefix safety: no escape dir created beside tmpdir', !fs.existsSync(path.join(os.tmpdir(), '..', 'managed-temp-escape-')));
+
+  // (11d) withTempDir dirs are registry-tracked during the callback (exit-hook retry safety,
+  // Codex INFRA-03 closure) and deregistered after a successful finally-cleanup.
+  var seenInRegistry = false;
+  H.withTempDir('managed-temp-probe-with-reg-', function (dir) {
+    seenInRegistry = H._registrySnapshot().indexOf(dir) !== -1;
+  });
+  chk('withTempDir: dir registry-tracked during callback', seenInRegistry === true);
+  chk('withTempDir: registry entry removed after successful cleanup', H._registrySnapshot().length === 0);
+
   // (12) Net leak: no managed-temp-probe-* entries leaked
   var after = tempBaseline();
   chk('NET LEAK probe count delta === 0', after === before, { before: before, after: after });
