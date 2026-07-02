@@ -635,6 +635,13 @@ function mutateF6(fn) {
   const r = runValidator(dir);
   chk('FAIL crafted terminal stage rejected (canonical order pin + rule invalid + executed blocked)', hasViolation(r.artifact, 'R3F_RELEASE_STAGES_ORDER_DRIFT') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
 }
+// mirror-27 (MIRROR-R6-01): a DRAFT record with published missing/null is malformed, not acceptable
+{
+  const r = mutateF6((m) => { delete m.releaseRecord.githubRelease.published; });
+  chk('FAIL DRAFT record with published missing', hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH'));
+  const r2 = mutateF6((m) => { m.releaseRecord.githubRelease.published = null; });
+  chk('FAIL DRAFT record with published=null', hasViolation(r2.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH'));
+}
 
 H.cleanupAll();
 console.log('r3-0-train: ' + pass + ' passed, ' + fail + ' failed');
