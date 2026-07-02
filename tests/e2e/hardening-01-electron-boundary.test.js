@@ -318,6 +318,27 @@ try {
     for (var ai2 = 0; ai2 < atkIds.length; ai2++) if (KEYWORDS.indexOf(atkIds[ai2]) === -1 && ALLOWED.indexOf(atkIds[ai2]) === -1) { caught = true; break; }
     chk('SELF-TEST: Buffer-decoding shape is outside the closed world', caught);
   })();
+  // H1-R6-01 closure: dynamic-invocation ban on the strip-cleaned source. The round-6
+  // attack (console['warn']['con'+'structor']('return req'+'uire')()) reaches Function
+  // via COMPUTED member access + string concatenation, which string-stripping hides
+  // from the closed-world audit. preload.js legitimately uses none of these, so ban:
+  //   (a) computed member access  x[...]  (bracket after identifier/)/]) — array
+  //       literals after ( , = return are unaffected;
+  //   (b) the + operator (string-concatenation code-building);
+  //   (c) constructor / apply / call / bind (reflective invocation);
+  //   (d) atob/Function/import tokens.
+  var preloadCleaned = preloadSrc.replace(/\/(?:[^\/\\\n]|\\.)+\/[a-z]*/g, '0'); // regex literals (strings already stripped in preloadSrc)
+  chk('preload.js has NO computed member access (bracket after identifier/)/])', !/[\w$)\]]\s*\[/.test(preloadCleaned), { hit: (preloadCleaned.match(/.{0,30}[\w$)\]]\s*\[.{0,20}/) || [])[0] });
+  chk('preload.js has NO + operator (no string-concatenation code-building)', preloadCleaned.indexOf('+') === -1);
+  chk('preload.js has NO constructor/apply/call/bind reflective-invocation token', !/\b(constructor|apply|call|bind)\b/.test(preloadCleaned));
+  chk('preload.js has NO atob/Function/import escape token', !/\b(atob|Function|import)\b/.test(preloadCleaned));
+  // Self-test: the exact round-6 dynamic-constructor body must be caught.
+  (function r6SelfTest() {
+    var atk = "return console['warn']['con' + 'structor']('return req' + 'uire')()('electron');";
+    var atkClean = atk.replace(/'(?:[^'\\]|\\.)*'/g, '""');
+    chk('SELF-TEST: dynamic-constructor body triggers computed-access OR + ban',
+      /[\w$)\]]\s*\[/.test(atkClean) || atkClean.indexOf('+') !== -1);
+  })();
   // Self-tests: every known smuggling shape MUST leave a residue.
   (function adversarialSelfTests() {
     var shapes = [
