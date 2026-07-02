@@ -4,10 +4,13 @@
  * R3-GATE0 — package + version policy check (dependency-free lane).
  *
  * package.json version must remain 2.0.0 — the F6_RELEASE pin after the single authorized
- * 1.4.0 -> 2.0.0 bump (unless VERSION_BUMP_ALLOW=<x.y.z> stages a future authorized bump). The lockfile must stay
- * untracked and must not be introduced by this PR. The CI workflow must contain no package-manager
- * install, Electron build, or lifecycle invocation — R3-GATE0 must not quietly change the project's
- * existing dependency governance. CI never publishes / tags / releases (no release step exists).
+ * 1.4.0 -> 2.0.0 bump (unless VERSION_BUMP_ALLOW=<x.y.z> stages a future authorized bump).
+ *
+ * H3 (v2.0.x public-release hardening) POLICY FLIP: a tracked package-lock.json is now REQUIRED
+ * (the reproducible-build authority) — its ABSENCE is the violation. The DEPENDENCY-FREE
+ * VERIFICATION LANE (the trusted-verification-gate workflow) must still contain no package-manager
+ * install / Electron build / lifecycle invocation; that ban is now scoped to that ONE workflow so a
+ * separate supply-chain/build lane may legitimately run `npm ci`. CI never publishes / tags / releases.
  *
  * Env: BASE_SHA / HEAD_SHA (CI supplies; fallback origin/main...HEAD), VERSION_BUMP_ALLOW (optional).
  * Output: ${ARTIFACT_DIR:-artifacts}/version-policy.json   (exit non-zero on any violation)
@@ -31,15 +34,21 @@ function run() {
   const version = pkg.version;
   const versionOk = version === EXPECTED || (!!allow && version === allow);
 
+  // H3: the lockfile is now the REQUIRED reproducible-build authority. It must be tracked and
+  // must remain tracked; a PR that removes it is the violation.
   const lockfileTracked = !!git(['ls-files', 'package-lock.json']);
   const base = process.env.BASE_SHA || 'origin/main', head = process.env.HEAD_SHA || 'HEAD';
   const changed = (git(['diff', '--name-only', base + '...' + head]) || '').split('\n').map(s => s.trim()).filter(Boolean);
-  const lockfileAddedByPR = changed.includes('package-lock.json');
+  const lockfileDeletedByPR = git(['diff', '--name-only', '--diff-filter=D', base + '...' + head]) || '';
+  const lockfileRemovedByPR = lockfileDeletedByPR.split('\n').map(s => s.trim()).includes('package-lock.json');
 
   // The CI workflow must not install packages / build Electron / run lifecycle scripts.
+  // The install-free ban applies ONLY to the dependency-free verification lane (ci.yml). The
+  // supply-chain/build lane is exempt — it exists precisely to run `npm ci` reproducibly.
+  const VERIFICATION_LANE_WORKFLOW = 'ci.yml';
   const wfDir = path.join(REPO, '.github', 'workflows');
   let wfFiles = [];
-  try { wfFiles = fs.readdirSync(wfDir).filter(f => /\.ya?ml$/.test(f)); } catch (_) { /* none */ }
+  try { wfFiles = fs.readdirSync(wfDir).filter(f => /\.ya?ml$/.test(f) && f === VERIFICATION_LANE_WORKFLOW); } catch (_) { /* none */ }
   const forbidden = [
     { re: /npm\s+ci\b/, name: 'npm ci' }, { re: /npm\s+install\b/, name: 'npm install' },
     { re: /\bnpx\b/, name: 'npx' }, { re: /\byarn\b/, name: 'yarn' }, { re: /\bpnpm\b/, name: 'pnpm' },
@@ -52,11 +61,11 @@ function run() {
     for (const x of forbidden) if (x.re.test(txt)) workflowViolations.push(f + ': ' + x.name);
   }
 
-  const ok = versionOk && !lockfileTracked && !lockfileAddedByPR && workflowViolations.length === 0;
+  const ok = versionOk && lockfileTracked && !lockfileRemovedByPR && workflowViolations.length === 0;
   return {
     check: 'version-policy',
     packageVersion: version, expected: EXPECTED, bumpAllow: allow || null, versionOk,
-    lockfileTracked, lockfileAddedByPR, workflowViolations, ok,
+    lockfileTracked, lockfileRequired: true, lockfileRemovedByPR, workflowViolations, ok,
   };
 }
 
@@ -65,5 +74,5 @@ try { result = run(); exitCode = result.ok ? 0 : 1; }
 catch (e) { result = { check: 'version-policy', fatalError: String((e && e.stack) || e), packageVersion: null, ok: false }; exitCode = 2; }
 fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
 fs.writeFileSync(path.join(ARTIFACT_DIR, 'version-policy.json'), JSON.stringify(result, null, 2));
-console.log('VERSION ' + JSON.stringify({ packageVersion: result.packageVersion, lockfileTracked: result.lockfileTracked, workflowViolations: result.workflowViolations, ok: result.ok }));
+console.log('VERSION ' + JSON.stringify({ packageVersion: result.packageVersion, lockfileTracked: result.lockfileTracked, lockfileRemovedByPR: result.lockfileRemovedByPR, workflowViolations: result.workflowViolations, ok: result.ok }));
 process.exit(exitCode);

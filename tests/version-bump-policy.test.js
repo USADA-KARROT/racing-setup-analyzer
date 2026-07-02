@@ -38,6 +38,9 @@ function runPolicy(version, env) {
     fs.mkdirSync(path.join(box, '.github', 'workflows'), { recursive: true });
     fs.copyFileSync(SCRIPT, path.join(box, 'scripts', 'check-version-policy.js'));
     fs.writeFileSync(path.join(box, 'package.json'), JSON.stringify({ name: 'fixture', version: version }) + '\n');
+    // H3: a tracked package-lock.json is now the required reproducible-build authority. Give the
+    // fixture a minimal lockfile so the VERSION logic (not the lockfile rule) is what's under test.
+    fs.writeFileSync(path.join(box, 'package-lock.json'), JSON.stringify({ name: 'fixture', version: version, lockfileVersion: 3, packages: { '': { name: 'fixture', version: version } } }) + '\n');
     fs.writeFileSync(path.join(box, '.github', 'workflows', 'ci.yml'), 'name: x\non:\n  push:\n');
     cp.execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm x', { cwd: box });
     const r = cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'check-version-policy.js')], {
@@ -103,6 +106,25 @@ function runPolicy(version, env) {
   chk('release_executed remains DISABLED at RELEASE_PREPARED', state.enabledCapabilities.indexOf('release_executed') === -1);
   const pkg = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
   chk('repo package.json carries exactly the bumped version 2.0.0', pkg.version === '2.0.0');
+})();
+
+// 7. H3 lockfile-required policy: an otherwise-valid version FAILS if the lockfile is absent,
+//    and a PR that DELETES the lockfile FAILS.
+(function () {
+  const box = H.acquireTempDir('f6-version-policy-nolock-');
+  try {
+    fs.mkdirSync(path.join(box, 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(box, '.github', 'workflows'), { recursive: true });
+    fs.copyFileSync(SCRIPT, path.join(box, 'scripts', 'check-version-policy.js'));
+    fs.writeFileSync(path.join(box, 'package.json'), JSON.stringify({ name: 'fixture', version: '2.0.0' }) + '\n');
+    fs.writeFileSync(path.join(box, '.github', 'workflows', 'ci.yml'), 'name: x\non:\n  push:\n');
+    cp.execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm x', { cwd: box });
+    const r = cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'check-version-policy.js')], {
+      cwd: box, encoding: 'utf8', env: Object.assign({}, process.env, { ARTIFACT_DIR: path.join(box, 'artifacts'), BASE_SHA: 'HEAD', HEAD_SHA: 'HEAD' }),
+    });
+    let art = null; try { art = JSON.parse(fs.readFileSync(path.join(box, 'artifacts', 'version-policy.json'), 'utf8')); } catch (_) {}
+    chk('H3: correct version but NO lockfile is REJECTED', r.status !== 0 && art && art.ok === false && art.lockfileTracked === false);
+  } finally { H.releaseTempDir(box); }
 })();
 
 console.log('version-bump-policy: ' + passed + ' passed, ' + failed + ' failed');
