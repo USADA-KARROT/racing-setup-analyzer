@@ -90,4 +90,9 @@ function main() {
   process.stdout.write('Wrote ' + path.relative(REPO, OUT) + ' (' + bundle.length + ' bytes)\n');
 }
 
-main();
+// Exported so tests/r3-0d-contracts-bundle-equivalence.test.js can regenerate the
+// bundle in memory and byte-compare against the committed file (drift fail-closed),
+// mirroring the R3.0C generator/test pair. CLI behaviour is unchanged.
+module.exports = { buildBundle: buildBundle, ORDER: ORDER, OUT_FILE: OUT, IN_DIR: IN_DIR };
+
+if (require.main === module) main();
