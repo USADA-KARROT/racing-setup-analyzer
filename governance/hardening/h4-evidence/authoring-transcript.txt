@@ -1,0 +1,76 @@
+# H4 v1.4.0 fixture authoring transcript
+date_utc=2026-07-02T07:13:53Z
+v140_worktree=/Users/SKYLINE/Claude/worktrees/v140-build
+v140_git_sha=7780d6d269103c5b94b7fe5d0a0616a05d02e03f
+v140_git_describe=v1.4.0
+v140_package_version=1.4.0
+electron_binary=/Users/SKYLINE/Claude/worktrees/v140-build/node_modules/.bin/electron
+electron_version=33.4.11
+sentinel=v140-authored-1782976433
+## running real 1.4.0 + writing sentinel via CDP
+{"ok":true,"seed":"{\"wrote\":\"v140-authored-1782976433\",\"marker\":\"present\"}","ranSeconds":4}
+## complete profile directory tree (proves absence of IndexedDB)
+.
+./Cache
+./Cache/Cache_Data
+./Code Cache
+./Code Cache/js
+./Code Cache/js/index
+./Code Cache/js/index-dir
+./Code Cache/js/index-dir/the-real-index
+./Code Cache/wasm
+./Code Cache/wasm/index
+./Code Cache/wasm/index-dir
+./Code Cache/wasm/index-dir/the-real-index
+./DawnGraphiteCache
+./DawnGraphiteCache/data_0
+./DawnGraphiteCache/data_1
+./DawnGraphiteCache/data_2
+./DawnGraphiteCache/data_3
+./DawnGraphiteCache/index
+./DawnWebGPUCache
+./DawnWebGPUCache/data_0
+./DawnWebGPUCache/data_1
+./DawnWebGPUCache/data_2
+./DawnWebGPUCache/data_3
+./DawnWebGPUCache/index
+./DevToolsActivePort
+./GPUCache
+./GPUCache/data_0
+./GPUCache/data_1
+./GPUCache/data_2
+./GPUCache/data_3
+./GPUCache/index
+./Local Storage
+./Local Storage/leveldb
+./Local Storage/leveldb/000003.log
+./Local Storage/leveldb/CURRENT
+./Local Storage/leveldb/LOCK
+./Local Storage/leveldb/LOG
+./Local Storage/leveldb/MANIFEST-000001
+./Network Persistent State
+./Preferences
+./Session Storage
+./Session Storage/000003.log
+./Session Storage/CURRENT
+./Session Storage/LOCK
+./Session Storage/LOG
+./Session Storage/MANIFEST-000001
+./Shared Dictionary
+./Shared Dictionary/cache
+./Shared Dictionary/cache/index
+./Shared Dictionary/cache/index-dir
+./Shared Dictionary/cache/index-dir/the-real-index
+./Shared Dictionary/db
+./Shared Dictionary/db-journal
+./Trust Tokens
+./Trust Tokens-journal
+./blob_storage
+./blob_storage/1afc3f17-07b6-4979-9191-0d3205029264
+indexeddb_paths=0
+## Local Storage leveldb sentinel extract (proves the 1.4.0 binary wrote it)
+h4_marker
+h4_sentinel
+v140-authored-1782976433
+## per-file sha256 manifest
+manifest_files=38

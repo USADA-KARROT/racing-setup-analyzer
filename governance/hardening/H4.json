@@ -21,25 +21,44 @@
     "reopenPhase": "9/9 PASS — case survives 2.0.0 restart, exactly one (no duplication), schema v1 unchanged, open() idempotent",
     "isolation": "real profile moved aside; 1.4.0 fixture copied in; restored afterward (macOS Electron ignores $HOME)",
     "committedEvidence": {
-      "fixtureProvenance": {
-        "path": "governance/hardening/h4-evidence/fixture-provenance.json",
-        "sha256": "2276c6ccbfb93cbc524351da0486e48d569bd83813d0f9521190ecd31c4326b0"
+      "authoringTranscript": {
+        "path": "governance/hardening/h4-evidence/authoring-transcript.txt",
+        "sha256": "fe8e66ed262b25a205ca4da87666660983e8d8da1a2698c0049432f256138ffe"
       },
-      "fixtureFileManifest": {
+      "fixtureTree": {
+        "path": "governance/hardening/h4-evidence/fixture-1.4.0-tree.txt",
+        "sha256": "c9c9940a9bd92569f99c5fc130f698fed87de9a703401c9636953c9e2598c15b"
+      },
+      "sentinelExtract": {
+        "path": "governance/hardening/h4-evidence/fixture-sentinel-extract.txt",
+        "sha256": "6d2e1aeeff62ccbf2b679219ca6dc202990621fbd8eaf0ed9829fed0746a1232"
+      },
+      "fileManifest": {
         "path": "governance/hardening/h4-evidence/fixture-1.4.0-profile.sha256",
-        "sha256": "b4be9cefb00bf18c0ff9be24fd66155519772d0791f5c4e37ac0fa35967cc9ef",
-        "note": "per-file sha256 of the exact 1.4.0-authored profile; auditably shows a Local Storage store and NO IndexedDB directory"
+        "sha256": "08839f277c7f0c729b5b493de25b3e988e15fa516eacdf65ab1704c364800fb3"
       },
       "upgradeLog": {
         "path": "governance/hardening/h4-evidence/upgrade-phase.log",
-        "sha256": "ff34fbbdf284eb79eb88d812ea878f529e41a986ec09e5bbc90906b0fff57db7"
+        "sha256": "24dbde7e5bc45dfb43348e97ffd9925c56792a97d54c997742dcd1242bb570d9"
       },
       "reopenLog": {
         "path": "governance/hardening/h4-evidence/reopen-phase.log",
         "sha256": "6e0dca8ec3aeeb85510e922948cac8308fd43b02792eca1b3d4edbc7e4ece595"
+      },
+      "fixtureProvenance": {
+        "path": "governance/hardening/h4-evidence/fixture-provenance.json",
+        "sha256": "7778765701e7ff9c153261f89a19b96e01b0ede731b023a9dd5446c67c426b6a"
       }
     },
-    "sentinelProof": "a sentinel string was written into Local Storage FROM WITHIN the real 1.4.0 renderer (CDP localStorage.setItem) before the fixture was captured; the packaged 2.0.0 binary reads back the exact same value, proving (a) the profile is genuinely 1.4.0-authored and (b) 2.0.0 preserves pre-existing Local Storage. Value recorded in fixture-provenance.json."
+    "sentinelProof": "a sentinel string was written into Local Storage FROM WITHIN the real 1.4.0 renderer (CDP localStorage.setItem) before the fixture was captured; the packaged 2.0.0 binary reads back the exact same value, proving (a) the profile is genuinely 1.4.0-authored and (b) 2.0.0 preserves pre-existing Local Storage. Value recorded in fixture-provenance.json.",
+    "reproducibleAuthoring": {
+      "script": "tests/packaged/h4-author-140-fixture.sh (committed, re-runnable)",
+      "transcript": {
+        "path": "governance/hardening/h4-evidence/authoring-transcript.txt",
+        "sha256": "fe8e66ed262b25a205ca4da87666660983e8d8da1a2698c0049432f256138ffe"
+      },
+      "proves": "v1.4.0 tag SHA 7780d6d + electron 33.4.11 + sentinel write/readback from the 1.4.0 renderer + complete tree with indexeddb_paths=0 + leveldb sentinel extract + per-file manifest"
+    }
   },
   "deterministicQualification": {
     "suite": "tests/h4-upgrade-qualification.test.js 14/14 over the SAME production modules (case-store.js + storage-backend.js + schema-migration.js)",

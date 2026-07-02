@@ -1,23 +1,39 @@
 {
   "schemaVersion": 1,
-  "note": "Auditable provenance for the H4 real-upgrade fixture. The 1.4.0 userData profile was authored by the REAL v1.4.0 application (electron . from the v1.4.0 tag worktree, electron 33.4.11) — NOT by 2.0.0. A sentinel was written into Local Storage FROM WITHIN the running 1.4.0 renderer over CDP (localStorage.setItem) to give the upgrade a non-vacuous preservation check. The fixture itself is a userData profile (caches + Local Storage leveldb, machine-specific) and is intentionally NOT committed as a binary blob; its exact contents are pinned by the per-file sha256 manifest below, which auditably shows a Local Storage store and the ABSENCE of any IndexedDB directory.",
-  "authoredBy": "real v1.4.0 binary (electron 33.4.11, v1.4.0 tag source)",
+  "note": "Auditable, REPRODUCIBLE provenance for the H4 real-upgrade fixture. The 1.4.0 userData profile was authored by the REAL v1.4.0 application via the committed script tests/packaged/h4-author-140-fixture.sh, whose full transcript is authoring-transcript.txt. That transcript independently records: the v1.4.0 tag commit SHA, the electron binary version, the sentinel WRITE+READBACK performed from within the running 1.4.0 renderer over CDP, the COMPLETE profile directory tree (proving indexeddb_paths=0 — no IndexedDB), the leveldb strings extract showing the sentinel bytes, and the per-file sha256 manifest. Anyone can re-run the script to reproduce an equivalent fixture. The profile itself (caches + leveldb, machine-specific) is intentionally not committed as a binary blob.",
+  "authoringScript": "tests/packaged/h4-author-140-fixture.sh",
+  "v140GitSha": "7780d6d269103c5b94b7fe5d0a0616a05d02e03f",
+  "v140GitTag": "v1.4.0",
+  "electronVersion": "33.4.11",
   "sentinelKey": "h4_sentinel",
-  "sentinelValue": "v140-authored-1782976023950",
+  "sentinelValue": "v140-authored-1782976433",
   "markerKey": "h4_marker",
   "markerValue": "present",
   "indexedDbPresent": false,
-  "fileManifest": "governance/hardening/h4-evidence/fixture-1.4.0-profile.sha256 (per-file sha256 of the exact 1.4.0-authored profile)",
-  "fileManifestSha256": "b4be9cefb00bf18c0ff9be24fd66155519772d0791f5c4e37ac0fa35967cc9ef",
-  "runLogs": {
-    "upgrade": {
-      "path": "governance/hardening/h4-evidence/upgrade-phase.log",
-      "result": "9/9",
-      "sha256": "ff34fbbdf284eb79eb88d812ea878f529e41a986ec09e5bbc90906b0fff57db7"
+  "evidenceFiles": {
+    "authoringTranscript": {
+      "path": "governance/hardening/h4-evidence/authoring-transcript.txt",
+      "sha256": "fe8e66ed262b25a205ca4da87666660983e8d8da1a2698c0049432f256138ffe"
     },
-    "reopen": {
+    "fixtureTree": {
+      "path": "governance/hardening/h4-evidence/fixture-1.4.0-tree.txt",
+      "sha256": "c9c9940a9bd92569f99c5fc130f698fed87de9a703401c9636953c9e2598c15b",
+      "note": "complete directory tree; grep IndexedDB = 0"
+    },
+    "sentinelExtract": {
+      "path": "governance/hardening/h4-evidence/fixture-sentinel-extract.txt",
+      "sha256": "6d2e1aeeff62ccbf2b679219ca6dc202990621fbd8eaf0ed9829fed0746a1232"
+    },
+    "fileManifest": {
+      "path": "governance/hardening/h4-evidence/fixture-1.4.0-profile.sha256",
+      "sha256": "08839f277c7f0c729b5b493de25b3e988e15fa516eacdf65ab1704c364800fb3"
+    },
+    "upgradeLog": {
+      "path": "governance/hardening/h4-evidence/upgrade-phase.log",
+      "sha256": "24dbde7e5bc45dfb43348e97ffd9925c56792a97d54c997742dcd1242bb570d9"
+    },
+    "reopenLog": {
       "path": "governance/hardening/h4-evidence/reopen-phase.log",
-      "result": "9/9",
       "sha256": "6e0dca8ec3aeeb85510e922948cac8308fd43b02792eca1b3d4edbc7e4ece595"
     }
   }
