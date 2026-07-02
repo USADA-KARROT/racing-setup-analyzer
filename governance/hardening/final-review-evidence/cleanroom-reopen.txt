@@ -1,0 +1,10 @@
+  ✓ [reopen] 2.0.0 boots on the 1.4.0-authored profile (no preload crash)
+  ✓ [reopen] renderer alive (document.title present)
+  ✓ [reopen] reports version 2.0.1
+  ✓ [reopen] upgraded case SURVIVED 2.0.0 restart
+  ✓ [reopen] exactly one case (no duplication across the upgrade)
+  ✓ [reopen] schema v1 read back unchanged
+  ✓ [reopen] open() is idempotent
+  ✓ [reopen] spawned binary still alive (target ownership)
+  ✓ [reopen] port still owned by our child (lsof)
+H4-UPGRADE(reopen): 9 passed, 0 failed
