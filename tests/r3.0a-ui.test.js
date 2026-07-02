@@ -37,9 +37,10 @@ chk('sidebar highlights active section', /shellSection===item\.id/.test(html));
 // per-case navigation (11 views) — R3-UX0: case nav is DERIVED from the registry (one list,
 // shared with caseSubviewIds). R3.0D D5 added 'engineer_brief' as the 9th subview;
 // R3.0E E5 adds 'experiment_loop' (10th) and 'case_timeline' (11th).
-const CASE_NAV_IDS = ['overview', 'setup_model', 'telemetry', 'measured_metrics', 'model_vs_actual', 'recommendations', 'corner_coaching', 'evidence_trust', 'engineer_brief', 'experiment_loop', 'case_timeline'];
+// H5: experiment_loop + case_timeline are deferred and FILTERED from public nav.
+const CASE_NAV_IDS = ['overview', 'setup_model', 'telemetry', 'measured_metrics', 'model_vs_actual', 'recommendations', 'corner_coaching', 'evidence_trust', 'engineer_brief'];
 const derivedCaseNav = REG.deriveCaseNav().map(function (n) { return n.id; });
-chk('case nav: 11 derived subviews', derivedCaseNav.length === 11 && CASE_NAV_IDS.every(function (id) { return derivedCaseNav.indexOf(id) !== -1; }));
+chk('case nav: 9 PUBLIC derived subviews (H5)', derivedCaseNav.length === 9 && CASE_NAV_IDS.every(function (id) { return derivedCaseNav.indexOf(id) !== -1; }));
 chk('caseNav === caseSubviewIds (single derived list, no divergence)', JSON.stringify(derivedCaseNav) === JSON.stringify(REG.deriveCaseSubviewIds()));
 CASE_NAV_IDS.forEach(function (id) {
   chk('case nav i18n label (en/zh/ja): ' + id, !!SHELL.en['ui.caseNav.' + id] && !!SHELL.zh['ui.caseNav.' + id] && !!SHELL.ja['ui.caseNav.' + id]);

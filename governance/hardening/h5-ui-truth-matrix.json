@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "note": "H5 UI DELIVERY TRUTH MATRIX — the authoritative statement of what the v2.0.x public build actually delivers. Classifications per the fixed product rulings (SKYLINE, 2026-07-02). Enforced by tests/h5-ui-truth.test.js (in the install-free chain) + the packaged asserter tests/packaged/h5-ui-truth.mjs.",
+  "entries": [
+    {
+      "item": "Comparisons pane",
+      "classification": "LIVE",
+      "navVisibility": "public (main nav 'comparisons' + case workflow)",
+      "runtimeLoad": "renderer/index.html loads the comparison workspace modules (contracts bundle + orchestrator + viewmodel + export + delta-metrics)",
+      "packageInclusion": "included",
+      "publicClaim": "claimed as delivered (release notes)",
+      "testCoverage": "Node suites + packaged CDP (pane node present; packaged E2E asserts reachability)",
+      "owningModule": "renderer/js/r3-0c-comparison-viewmodel.js + comparison workspace pane in index.html",
+      "rationale": "C8-activated, functional since 2.0.0 train"
+    },
+    {
+      "item": "Engineer Brief",
+      "classification": "LIVE",
+      "navVisibility": "public (case subview 'engineer_brief')",
+      "runtimeLoad": "renderer/index.html loads r3-0d-engineer-{brief,viewmodel,orchestrator,ui}.js; the D5 render-only UI auto-mounts",
+      "packageInclusion": "included",
+      "publicClaim": "claimed as delivered (advisory-only, per-case data gates apply)",
+      "testCoverage": "Node suites (engineer-ui/viewmodel/orchestrator) + packaged CDP (subview navigation reveals a rendered, non-empty pane)",
+      "owningModule": "renderer/js/r3-0d-engineer-ui.js + #r3-0d-engineer-brief-mount",
+      "rationale": "H5 ruling: LIVE was achievable with SMALL wiring only — the complete render-only UI already auto-mounted; H5 added ONLY the Alpine visibility binding tying the existing mount to the existing nav state (no new architecture, no new data flow)"
+    },
+    {
+      "item": "Experiment Loop",
+      "classification": "INTERNAL-DEFERRED",
+      "navVisibility": "NOT in public navigation (registry-filtered)",
+      "runtimeLoad": "NOT loaded by the page (no script tag)",
+      "packageInclusion": "EXCLUDED from the packaged app (build.files !renderer/js/r3-0e-*)",
+      "publicClaim": "NOT claimed; release notes state deferred",
+      "testCoverage": "Node suites only (contracts + stores + viewmodel run under tests)",
+      "owningModule": "renderer/js/r3-0e-experiment-viewmodel.js (+ r3-0e-stores/outcome-classifier/followup-timeline)",
+      "rationale": "H5 ruling: pane content requires substantial new UI development — deferred"
+    },
+    {
+      "item": "Case Timeline",
+      "classification": "INTERNAL-DEFERRED",
+      "navVisibility": "NOT in public navigation (registry-filtered)",
+      "runtimeLoad": "NOT loaded by the page",
+      "packageInclusion": "EXCLUDED from the packaged app",
+      "publicClaim": "NOT claimed; release notes state deferred",
+      "testCoverage": "Node suites only",
+      "owningModule": "renderer/js/r3-0e-followup-timeline.js",
+      "rationale": "H5 ruling: deferred"
+    },
+    {
+      "item": "R3.0C authority-pipeline modules superseded by the bundled contracts (8 files: comparison-adapter, corner-pairing, corner-segmentation, distance-authority, lap-authority, normalized-distance, reference-selection, track-identity)",
+      "classification": "INTERNAL-DEFERRED",
+      "navVisibility": "n/a (library modules, no nav)",
+      "runtimeLoad": "NOT loaded by the page (the page loads r3-0c-contracts-bundle.js — the single runtime authority)",
+      "packageInclusion": "EXCLUDED from the packaged app (no duplicate authority ships)",
+      "publicClaim": "not user-facing",
+      "testCoverage": "Node suites exercise them as the bundle's source-of-truth equivalence set (r3-0c-contracts-bundle-equivalence.test.js proves bundle == modules)",
+      "owningModule": "renderer/js/r3-0c-*.js (8 files)",
+      "rationale": "H5 ruling: REMOVED-or-excluded — package-exclude chosen because the per-module sources are the equivalence baseline the bundle is verified against in tests; deleting them would orphan the equivalence proof. NO duplicate authority ships in the packaged app."
+    },
+    {
+      "item": "i18n-r3-0e.js",
+      "classification": "INTERNAL-DEFERRED",
+      "navVisibility": "n/a",
+      "runtimeLoad": "NOT loaded by the page",
+      "packageInclusion": "EXCLUDED",
+      "publicClaim": "not user-facing",
+      "testCoverage": "Node i18n suites",
+      "owningModule": "renderer/js/i18n-r3-0e.js",
+      "rationale": "serves only the deferred R3.0E panes — excluded with them"
+    },
+    {
+      "item": "r3-0f-migration-engine.js",
+      "classification": "INTERNAL-DEFERRED",
+      "navVisibility": "n/a",
+      "runtimeLoad": "NOT loaded by the page; H4 proved the real upgrade path uses case-store per-read migration, NOT this engine (no runtime consumer)",
+      "packageInclusion": "EXCLUDED",
+      "publicClaim": "documented as tooling-layer only",
+      "testCoverage": "Node suite (r3.0f-migration-engine.test.js)",
+      "owningModule": "renderer/js/r3-0f-migration-engine.js",
+      "rationale": "H5 ruling: no runtime consumer (H4-verified) → excluded from package; source retained as governed tooling"
+    },
+    {
+      "item": "vehicle-profile-f312.js",
+      "classification": "INTERNAL-DEFERRED",
+      "navVisibility": "n/a",
+      "runtimeLoad": "NOT loaded by the page (no runtime consumer)",
+      "packageInclusion": "EXCLUDED",
+      "publicClaim": "not user-facing",
+      "testCoverage": "Node suite (vehicle-profile-f312.test.js)",
+      "owningModule": "renderer/js/vehicle-profile-f312.js",
+      "rationale": "H5 ruling: no runtime consumer → excluded; source retained for the F312 dataset tests"
+    },
+    {
+      "item": "1.4.0-era legacy case-data fixtures",
+      "classification": "NOT APPLICABLE",
+      "navVisibility": "n/a", "runtimeLoad": "n/a", "packageInclusion": "n/a",
+      "publicClaim": "n/a",
+      "testCoverage": "n/a",
+      "owningModule": "n/a",
+      "rationale": "v1.4.0 ships no persistence layer (H4-proven); such fixtures cannot exist and are not fabricated"
+    }
+  ]
+}

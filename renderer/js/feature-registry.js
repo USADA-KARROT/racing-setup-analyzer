@@ -48,8 +48,8 @@
     // either subview — pane wiring is a downstream step (disclosed in
     // docs/release-notes-2.0.0.md "Known limitations"). Activation governed by
     // governance/r3.0e/state.json (featureRegistryActivationAllowed=true at E5_UI_ACTIVATION).
-    'case:experiment_loop': { id: 'case:experiment_loop', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'experiment_loop', labelKey: 'casenav.experiment_loop', order: 9, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'experiment_loop', currentTab: 'analysis' } },
-    'case:case_timeline': { id: 'case:case_timeline', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'case_timeline', labelKey: 'casenav.case_timeline', order: 10, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'case_timeline', currentTab: 'analysis' } },
+    'case:experiment_loop': { id: 'case:experiment_loop', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'experiment_loop', labelKey: 'casenav.experiment_loop', order: 9, availability: 'deferred', deferredReason: 'h5_ui_delivery_deferred', legacyRouting: { shellSection: 'cases', caseSubview: 'experiment_loop', currentTab: 'analysis' } },
+    'case:case_timeline': { id: 'case:case_timeline', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'case_timeline', labelKey: 'casenav.case_timeline', order: 10, availability: 'deferred', deferredReason: 'h5_ui_delivery_deferred', legacyRouting: { shellSection: 'cases', caseSubview: 'case_timeline', currentTab: 'analysis' } },
   };
 
   // ── FEATURES — the 23 stable Feature IDs ──
@@ -97,8 +97,10 @@
     // display state — exercised by the Node suites). NOTE: at this milestone
     // renderer/index.html loads no R3.0E viewmodel script and renders no pane for either
     // subview (nav nodes only; see docs/release-notes-2.0.0.md "Known limitations").
-    experiment_loop: F('experiment_loop', 'case_scoped', 'case:experiment_loop', 'analysis', { availability: 'available_conditional' }),
-    case_timeline: F('case_timeline', 'case_scoped', 'case:case_timeline', 'analysis', { availability: 'available_conditional' }),
+    // H5 UI-delivery ruling: pane content is NOT wired in this release; the ids stay DEFERRED
+    // (registry truth) and their nav nodes are filtered from public navigation below.
+    experiment_loop: F('experiment_loop', 'case_scoped', 'case:experiment_loop', 'analysis', { availability: 'deferred', deferredReason: 'h5_ui_delivery_deferred' }),
+    case_timeline: F('case_timeline', 'case_scoped', 'case:case_timeline', 'analysis', { availability: 'deferred', deferredReason: 'h5_ui_delivery_deferred' }),
     // R3.0C — activated at C8_ACTIVATION (governance/r3.0c/state.json featureRegistryActivationAllowed=true).
     // Pane id 'comparisons' is served by the Comparison Workspace UI (renderer/index.html data-r3c-c7-pane).
     // Same-Analysis-Case / same-session scope is enforced by the orchestrator + viewmodel; feature-router only
@@ -115,8 +117,9 @@
   function _features() { return Object.keys(FEATURES).map(function (k) { return FEATURES[k]; }); }
 
   function deriveMainNav() { return _nodes('shell_section').map(function (n) { var o = { id: n.id, labelKey: n.labelKey }; if (n.availability === 'deferred') o.deferred = n.deferredReason; return o; }); }
-  function deriveCaseNav() { return _nodes('case_subview').map(function (n) { return { id: n.subviewId, labelKey: n.labelKey }; }); }
-  function deriveCaseSubviewIds() { return _nodes('case_subview').map(function (n) { return n.subviewId; }); }
+  // H5: deferred case subviews are NOT publicly navigable (no empty-pane nav targets).
+  function deriveCaseNav() { return _nodes('case_subview').filter(function (n) { return n.availability !== 'deferred'; }).map(function (n) { return { id: n.subviewId, labelKey: n.labelKey }; }); }
+  function deriveCaseSubviewIds() { return _nodes('case_subview').filter(function (n) { return n.availability !== 'deferred'; }).map(function (n) { return n.subviewId; }); }
   function deriveSetupLibraryAreas() {
     return _nodes('setuplib_area').map(function (area) {
       var feats = _features().filter(function (f) { return f.navNodeId === area.id && f.entryPoints && f.entryPoints.desktop === true; })

@@ -273,10 +273,20 @@ const CONDITIONS = [
       if (b.appId !== 'com.racingsetup.analyzer') problems.push('build.appId drifted: ' + b.appId);
       if (b.productName !== 'Racing Setup Analyzer') problems.push('build.productName drifted: ' + b.productName);
       if (!b.directories || typeof b.directories.output !== 'string' || b.directories.output.length === 0) problems.push('build.directories.output missing');
-      // 9c. files allowlist is exactly the three production roots.
-      const files = Array.isArray(b.files) ? b.files.slice().sort() : [];
-      const expected = ['main.js', 'preload.js', 'renderer/**/*'].sort();
-      if (JSON.stringify(files) !== JSON.stringify(expected)) problems.push('build.files must be exactly [main.js, preload.js, renderer/**/*]; got ' + JSON.stringify(b.files));
+      // 9c. files allowlist: exactly the three production roots PLUS (H5) any number of
+      //     single-file '!renderer/js/<name>.js' EXCLUSIONS (the UI-truth package excludes).
+      //     Nothing else — no extra inclusions, no directory-wide or non-renderer excludes.
+      const files = Array.isArray(b.files) ? b.files.slice() : [];
+      const baseRoots = ['main.js', 'preload.js', 'renderer/**/*'];
+      const inclusions = files.filter(f => !String(f).startsWith('!'));
+      const exclusions = files.filter(f => String(f).startsWith('!'));
+      if (JSON.stringify(inclusions.slice().sort()) !== JSON.stringify(baseRoots.slice().sort())) problems.push('build.files inclusions must be exactly [main.js, preload.js, renderer/**/*]; got ' + JSON.stringify(inclusions));
+      const badExcl = exclusions.filter(f => !/^!renderer\/js\/[A-Za-z0-9._-]+\.js$/.test(f));
+      if (badExcl.length) problems.push('build.files exclusions must each be a single-file !renderer/js/<name>.js pattern; got ' + JSON.stringify(badExcl));
+      // every excluded file must NOT be referenced by the page (no packaged 404s)
+      const htmlForExcl = fs.readFileSync(path.join(REPO, 'renderer', 'index.html'), 'utf8');
+      const leakedExcl = exclusions.map(f => f.replace('!renderer/js/', '')).filter(f => htmlForExcl.includes('js/' + f));
+      if (leakedExcl.length) problems.push('build.files excludes page-loaded scripts (packaged 404): ' + JSON.stringify(leakedExcl));
       // 9d. every asset the build config references must exist on disk (no dangling icons).
       for (const [plat, cfg] of [['mac', b.mac], ['win', b.win]]) {
         if (cfg && typeof cfg.icon === 'string') {
