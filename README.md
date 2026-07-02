@@ -1,10 +1,37 @@
 # Racing Setup Analyzer
 
-**A case-centric vehicle-dynamics workspace that predicts handling balance, sizes your spring / ARB / damper numbers, simulates a tyre stint, and — when you bring real telemetry and a verified calibration — reports honestly-gated measured metrics. Every number is labelled by how it was derived; every blocked feature says why.**
+**Browser-first Web Preview** — a case-centric vehicle-dynamics workspace that predicts handling balance, sizes your spring / ARB / damper numbers, simulates a tyre stint, and — when you bring real telemetry and a verified calibration — reports honestly-gated measured metrics. Every number is labelled by how it was derived; every blocked feature says why.
+
+### ▶ [**Open the Web Preview**](https://usada-karrot.github.io/racing-setup-analyzer/) ← recommended
+
+| | |
+|---|---|
+| 🌐 **Recommended** | [Open the hosted Web Preview](https://usada-karrot.github.io/racing-setup-analyzer/) — nothing to install, runs entirely in your browser |
+| 🖥️ **Desktop (experimental)** | [Download the experimental unsigned macOS build](https://github.com/USADA-KARROT/racing-setup-analyzer/releases/tag/v2.0.1) — see the Release notes for its Gatekeeper caveats |
+| 🔑 **Verify checksums** | `SHA256SUMS.txt` on the [v2.0.1 Release](https://github.com/USADA-KARROT/racing-setup-analyzer/releases/tag/v2.0.1) |
+| 💬 **Report feedback** | [GitHub Issues](https://github.com/USADA-KARROT/racing-setup-analyzer/issues) |
 
 `🌐 Language:` **English** ｜ [繁體中文](#繁體中文) ｜ [日本語](#日本語)
 
-Grounded in textbook vehicle dynamics (Milliken, Gillespie, OptimumG) and cross-checked against real-world engineering practice. Runs as an Electron desktop app or straight in a browser — no build step, no server, no account; the physics runs locally in plain JavaScript.
+Grounded in textbook vehicle dynamics (Milliken, Gillespie, OptimumG) and cross-checked against real-world engineering practice. Racing Setup Analyzer is at heart a plain HTML / CSS / JavaScript application — no build step, no server, no account; the physics runs locally in your browser. The Electron desktop app is an **experimental, unsigned packaging** of the same code, not the primary delivery.
+
+## Data and Privacy
+
+- All case data lives **locally in your browser** (IndexedDB / Local Storage for this site's origin). Nothing is uploaded to any server.
+- Different browsers, devices, and the desktop app each have their **own separate storage** — data does not sync automatically between them.
+- **Clearing site data for this origin deletes your local cases.** Use **Export** regularly to back up cases as JSON files, and **Import** to restore them — or to move cases between the Web Preview and the desktop app.
+
+## Current Scope
+
+- **LIVE:** Comparisons (reference-lap / corner deltas) · Engineer Brief (advisory-only)
+- **DEFERRED (not in the UI):** Experiment Loop · Case Timeline
+
+## Project Status
+
+- Web Preview stabilized — **monitoring feedback only**
+- Feature development **paused**
+- No commercial commitment
+- No desktop-packaging decision yet (Electron/DMG remains experimental; signing/notarization undecided)
 
 ## Core value
 
@@ -30,7 +57,7 @@ Grounded in textbook vehicle dynamics (Milliken, Gillespie, OptimumG) and cross-
 | R3.0E | Experiment-outcome loop (experiment / outcome / follow-up link / append-only timeline stores + contracts) | ✅ complete — services shipped; Experiment Loop / Case Timeline panes not yet wired into the page (nav nodes live) |
 | R3.0F | Migration engine, E2E flows, hardening probes, documentation, release gate | ✅ complete; Train merged to `main`; v2.0.0 release candidate staged (tag/Release pending authorization) |
 
-Version 2.0.1 (public release candidate — the v2.0.1 tag and public GitHub Release are pending explicit authorization). The Comparisons pane and the Engineer Brief are live; Experiment Loop / Case Timeline are deferred (see `docs/release-notes-2.0.1.md`). Apple Silicon (arm64) macOS 12+ only.
+Version 2.0.1 — published. **Primary delivery: the [hosted Web Preview](https://usada-karrot.github.io/racing-setup-analyzer/)** (any modern browser). The [v2.0.1 GitHub Release](https://github.com/USADA-KARROT/racing-setup-analyzer/releases/tag/v2.0.1) additionally carries an **experimental unsigned macOS desktop build** (Apple Silicon arm64, macOS 12+) — unsigned/not notarized; some macOS versions show a "damaged" Gatekeeper dialog on first launch and the right-click-Open path is not guaranteed to work, so it is not recommended for non-technical users. The Comparisons pane and the Engineer Brief are live; Experiment Loop / Case Timeline are deferred (see `docs/release-notes-2.0.1.md`).
 
 ## What it can do
 
