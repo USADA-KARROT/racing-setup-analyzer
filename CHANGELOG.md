@@ -32,8 +32,8 @@ but by design performs no bump itself); the post-merge target is `2.0.0`.
   (the Comparisons pane is live and usable today; the Engineer Brief, Experiment Loop,
   and Case Timeline nav nodes are live in navigation, but their pane content is not yet
   wired into `renderer/index.html` — the D5 mount ships hidden/inert and the page loads
-  no R3.0E viewmodel script); only R3.0F's own flag remains **false** until the release
-  gate, and R3.0F introduces no case-scoped pane of its own. `runtimeConsumersAllowed`
+  no R3.0E viewmodel script); only R3.0F's own flag remains **false** until `F6_RELEASE`,
+  and R3.0F introduces no case-scoped pane of its own. `runtimeConsumersAllowed`
   has been `true` since F1.
 - `canonicalTrustUpgraded` remains a hard literal `false`. Suspension normalization is numeric
   compatibility, not evidence.

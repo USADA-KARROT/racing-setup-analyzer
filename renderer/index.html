@@ -211,9 +211,10 @@ canvas{max-height:300px}
   </div>
 </div>
 
-<!-- R3.0C C7: Comparison Workspace (UI lives here; the three R3.0C feature IDs remain
-     availability='deferred' until C8_ACTIVATION wires the rendererAdapter). The pane is gated by
-     showPane('comparisons') so navigateToFeature() still treats the feature IDs as deferred. -->
+<!-- R3.0C C7/C8: Comparison Workspace. Since C8_ACTIVATION the three R3.0C feature IDs are
+     availability='available' with a live rendererAdapter (paneId 'comparisons') — this pane IS
+     the live Comparisons surface. showPane('comparisons') gates rendering; navigateToFeature()
+     routes the active feature IDs here (see renderer/js/feature-registry.js C8 comments). -->
 <div x-show="showPane('comparisons')" x-cloak x-transition data-r3c-c7-pane="comparison-workspace">
   <h2 class="text-xl font-bold mb-1" x-text="t('ui.comp.title')"></h2>
   <div class="text-xs text-slate-500 mb-3" x-text="t('ui.comp.subtitle')"></div>
