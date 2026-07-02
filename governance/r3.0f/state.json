@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "program": "R3.0F",
-  "currentCheckpoint": "F3_QUALITY_HARDENING",
+  "currentCheckpoint": "F4_DOCUMENTATION",
   "authorizedProductionPaths": [
     { "path": "renderer/js/r3-0f-migration-engine.js",                "capability": "migration_engine_present" },
     { "path": "tests/e2e/helpers/flow-harness.js",                    "capability": "e2e_automation_present" },
@@ -19,12 +19,18 @@
     { "path": "tests/e2e/hardening-03-no-stale-ui.test.js",           "capability": "quality_hardening_present" },
     { "path": "tests/e2e/hardening-04-large-library.test.js",         "capability": "quality_hardening_present" },
     { "path": "tests/e2e/hardening-05-xss-injection.test.js",         "capability": "quality_hardening_present" },
-    { "path": "tests/e2e/hardening-06-supply-chain.test.js",          "capability": "quality_hardening_present" }
+    { "path": "tests/e2e/hardening-06-supply-chain.test.js",          "capability": "quality_hardening_present" },
+    { "path": "docs/r3-architecture.md",                              "capability": "documentation_present" },
+    { "path": "docs/r3-user-workflow.md",                             "capability": "documentation_present" },
+    { "path": "docs/r3-data-and-privacy.md",                          "capability": "documentation_present" },
+    { "path": "docs/r3-credibility-model.md",                         "capability": "documentation_present" },
+    { "path": "docs/r3-experiment-loop.md",                           "capability": "documentation_present" },
+    { "path": "CHANGELOG.md",                                         "capability": "documentation_present" }
   ],
-  "enabledCapabilities": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present", "quality_hardening_present"],
+  "enabledCapabilities": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present", "quality_hardening_present", "documentation_present"],
   "runtimeConsumersAllowed": true,
   "uiAllowed": true,
   "featureRegistryActivationAllowed": false,
   "algorithmsAllowed": true,
-  "note": "R3.0F F3_QUALITY_HARDENING state. F3 enables quality_hardening_present by adding 6 hardening test files under tests/e2e/ (electron boundary / storage failure / no-stale-UI / large library / XSS-injection / supply-chain). Per the schema, uiAllowed flips to true at F3_QUALITY_HARDENING (uiCheckpoint floor). featureRegistryActivationAllowed remains false (F6_RELEASE floor). R3.0B persistence + R3.0C/D/E contracts NOT modified. The F3 tests are PURE SCAN + LOGIC-LEVEL probes — no production renderer module is added or modified."
+  "note": "R3.0F F4_DOCUMENTATION state. F4 enables documentation_present by shipping 6 new docs (r3-architecture / r3-user-workflow / r3-data-and-privacy / r3-credibility-model / r3-experiment-loop / CHANGELOG). NO new production renderer code; existing R3.0B persistence + R3.0C/D/E contracts NOT modified. featureRegistryActivationAllowed remains false (F6_RELEASE floor). The docs strictly enforce the credibility ladder (Physics > Model > Measured > Derived > Heuristic > Unavailable), fail-closed defaults, no 'professionally validated' claims, no 'AI replaces engineer' claims."
 }
