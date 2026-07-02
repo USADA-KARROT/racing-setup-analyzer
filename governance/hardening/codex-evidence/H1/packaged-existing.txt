@@ -1,0 +1,13 @@
+  ✓ [packaged-existing] preload loaded (no "Unable to load preload script" in logs)
+  ✓ [packaged-existing] no module-not-found preload crash in logs
+  ✓ [packaged-existing] electronAPI exists
+  ✓ [packaged-existing] electronAPI surface EXACTLY [getAppVersion, platform]
+  ✓ [packaged-existing] electronAPI.platform is a known platform string
+  ✓ [packaged-existing] getAppVersion() === 2.0.0
+  ✓ [packaged-existing] getAppVersion() never fabricates 1.0.0
+  ✓ [packaged-existing] api.getStats().version === 2.0.0 (startup-resolved)
+  ✓ [packaged-existing] getStats().version is never the fabricated 1.0.0
+  ✓ [packaged-existing] page cannot reach ipcRenderer/require/process and bridge has no generic invoke/send
+  ✓ [packaged-existing] spawned binary is still alive (CDP target ownership)
+  ✓ [packaged-existing] port still bound by OUR child PID at end-of-run (lsof)
+H1-RUNTIME(packaged-existing): 12 passed, 0 failed

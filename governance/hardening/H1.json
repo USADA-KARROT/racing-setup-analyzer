@@ -4,7 +4,7 @@
   "phase": "H1_PACKAGED_RUNTIME_INTEGRITY",
   "baseSha": "0563f119e2bdfced959b7a808cf292e0f883807f",
   "integrationBranch": "release/v2.0.0-public-hardening",
-  "headSha": null,
+  "headSha": "27894944be8e00dfec5745e662177ecbe6c8582f",
   "scope": {
     "closes": [
       "A1 preload sandbox require crash (since v1.0.0)",
@@ -57,6 +57,94 @@
     "profileIsolation": "real userData moved aside before clean phase and restored after (macOS Electron ignores $HOME); smoke profile removed",
     "packagedAsarChecks": "getAppVersion present; app:get-version present; pre-H1 require('./package.json').version crash pattern ABSENT"
   },
-  "codexVerdict": null,
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 7,
+    "reviewedCandidateSha": "27894944be8e00dfec5745e662177ecbe6c8582f",
+    "verdictEvidenceFile": "governance/hardening/codex-evidence/H1/round-7-raw.txt",
+    "verdictEvidenceSha256": "216a3823b5a3b3ae17e0a5e0e3772ee3dbd23f7b0e1c00a98cf97f816f2628d7",
+    "totalBlockRounds": 6,
+    "totalDistinctFindings": 9,
+    "rounds": [
+      {
+        "round": 1,
+        "reviewedSha": "8599f1330e9f360f41b68a654cc235e8d2ffd115",
+        "verdict": "BLOCK",
+        "findings": 2,
+        "evidence": "governance/hardening/codex-evidence/H1/round-1-raw.txt",
+        "evidenceSha256": "4aec0741e982544d38f55889efa7519a729ddea96b3f3e6db4da37b598944a13",
+        "closures": [
+          "R1-01 strict SemVer 2.0.0 (leading-zero/empty-identifier rejection)",
+          "R1-02 getAppVersion body extraction+audit"
+        ]
+      },
+      {
+        "round": 2,
+        "reviewedSha": "3fb3f1b6c8786adfc7417edd49402841029ead90",
+        "verdict": "BLOCK",
+        "findings": 1,
+        "evidence": "governance/hardening/codex-evidence/H1/round-2-raw.txt",
+        "evidenceSha256": "a19f271e0c6a2aadee8987a823fe5b60fdb0bf7e14239c0b57e7927a6fdd89a4",
+        "closures": [
+          "R2-01 alias-proof ipcRenderer token accounting + self-test"
+        ]
+      },
+      {
+        "round": 3,
+        "reviewedSha": "b15ada1ea28a4098c7ea81167263fe5fe6fc4f0e",
+        "verdict": "BLOCK",
+        "findings": 1,
+        "evidence": "governance/hardening/codex-evidence/H1/round-3-raw.txt",
+        "evidenceSha256": "2240ff215f242549d0fee3079a87442801f63251e244482a446ff5f26092f09a",
+        "closures": [
+          "R3-01 generalized authority-token accounting (require/process/contextBridge) + self-tests"
+        ]
+      },
+      {
+        "round": 4,
+        "reviewedSha": "b07f5deb5d384f8adc01c4b427b1f1927e04c8ae",
+        "verdict": "BLOCK",
+        "findings": 2,
+        "evidence": "governance/hardening/codex-evidence/H1/round-4-raw.txt",
+        "evidenceSha256": "883a6f6abee99baa1d828b4aa2b2f54a0d4cc6be23c2c0b3a46e3713a69c6803",
+        "closures": [
+          "R4-01 escape/non-ASCII identifier-obfuscation ban",
+          "R4-02 harness free-port precheck + child-death abort + liveness"
+        ]
+      },
+      {
+        "round": 5,
+        "reviewedSha": "f304f05f9ec3e16652fcd9e5be02eccb042cfba4",
+        "verdict": "BLOCK",
+        "findings": 2,
+        "evidence": "governance/hardening/codex-evidence/H1/round-5-raw.txt",
+        "evidenceSha256": "57e6e2d30af24f92f9050c8bb52221ad4c2af061fe4e6e976f98e06c55f6ab5f",
+        "closures": [
+          "R5-01 closed-world identifier allowlist (Buffer/any global fails closed)",
+          "R5-02 lsof PID-binding descendant-aware ownership proof"
+        ]
+      },
+      {
+        "round": 6,
+        "reviewedSha": "e5615b519226f7e06485bebfa88d2903010989bd",
+        "verdict": "BLOCK",
+        "findings": 1,
+        "evidence": "governance/hardening/codex-evidence/H1/round-6-raw.txt",
+        "evidenceSha256": "ec75ec52d358ebe54571e1bcdd17317c91c74f0b5ab40649c2c025e374ca6dde",
+        "closures": [
+          "R6-01 dynamic-invocation ban (computed access/concat/constructor/apply/call/bind/atob/Function/import)"
+        ]
+      },
+      {
+        "round": 7,
+        "reviewedSha": "27894944be8e00dfec5745e662177ecbe6c8582f",
+        "verdict": "PASS",
+        "findings": 0,
+        "evidence": "governance/hardening/codex-evidence/H1/round-7-raw.txt",
+        "evidenceSha256": "216a3823b5a3b3ae17e0a5e0e3772ee3dbd23f7b0e1c00a98cf97f816f2628d7"
+      }
+    ],
+    "tierDisclosure": "TIER 1 all 7 rounds: raw stdout + prompts archived under governance/hardening/codex-evidence/H1/ with sha256 anchors; packaged runtime logs (clean/existing/dev 12/12) archived alongside. All codex launches used < /dev/null."
+  },
   "note": "H1 evidence logs live in the session scratchpad during review; verdict + hashes are anchored here and raw logs archived under governance/hardening/codex-evidence/H1/ at the PASS anchor."
 }

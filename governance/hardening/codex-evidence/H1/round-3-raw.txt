@@ -1,0 +1,2009 @@
+Reading additional input from stdin...
+OpenAI Codex v0.141.0
+--------
+workdir: /Users/SKYLINE/Claude/worktrees/f6-release
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: none
+reasoning summaries: none
+session id: 019f2157-cddb-7e23-8521-d4f42988866f
+--------
+user
+You are the adversarial runtime-security auditor for the H1 "Packaged Runtime Integrity" change on this Electron app. Review commit b15ada1ea28a4098c7ea81167263fe5fe6fc4f0e on branch hardening/h1-preload-runtime (base: release/v2.0.0-public-hardening @ 0563f119e2bdfced959b7a808cf292e0f883807f). Confirm `git rev-parse HEAD` first.
+
+CONTEXT: the app's preload has been broken since v1.0.0 — `require('./package.json')` crashes in Electron's default-sandboxed preload, so window.electronAPI never existed in the packaged app, and the renderer masked it with a fabricated '1.0.0' version fallback. H1 claims to fix this with: main-process app.getVersion() as the single version authority; ONE allowlisted invoke channel 'app:get-version' (constant both sides, removeHandler-first idempotent registration); preload exposing exactly {platform, getAppVersion} via contextBridge with a fail-closed query (3s timeout + semver-shape validation -> literal 'unavailable' + console.warn, never fabricated, never a crash); renderer getStats().version reporting the resolved version or 'unavailable'. Claimed evidence: REAL-binary CDP runs 10/10 on clean profile, existing profile, and dev-mode consistency.
+
+Review `git diff 0563f119..HEAD` plus any file. Judge these 12 items:
+
+1. SANDBOX LOADABILITY: does preload.js now contain ONLY constructs a default-sandboxed Electron 33 preload can execute (require limited to 'electron'; no relative/module requires; no Node primitives)? Would it actually load?
+2. SINGLE VERSION AUTHORITY: is app.getVersion() the only version source end-to-end? Any remaining path where the renderer or preload reads package.json or a hardcoded version?
+3. FABRICATED FALLBACK: is any '1.0.0'-style fabricated version fallback left anywhere in main.js/preload.js/renderer (api.js especially)? Distinguish legitimate schema-version constants from app-version fabrication.
+4. GENERIC IPC EXPOSURE: does the exposed bridge leak ipcRenderer, a generic invoke/send, a caller-chosen channel, or any function that forwards arbitrary arguments to IPC? Try to construct a bypass from the page context.
+5. CHANNEL MINIMALITY: exactly one channel constant, identical literal on both sides, invoke-only, no ipcMain.on/once, no dynamic channel construction anywhere.
+6. FAIL-CLOSED SEMANTICS: walk the preload getAppVersion failure paths (IPC rejection, timeout, non-string reply, malformed string, missing bridge in renderer). Does every path resolve to 'unavailable' + an observable console.warn, without crashing the page and without fabricating? Any path that silently returns undefined/null or hangs forever?
+7. DOUBLE-REGISTRATION GUARD: is the removeHandler-first pattern actually idempotent, and is registration ordered before any window load can invoke?
+8. TEST EVOLUTION HONESTY: the hardening-01/flow-09 contract changes — do the new assertions genuinely enforce the new contract fail-closed, or did any old protection get silently weakened (e.g., could a second exposeInMainWorld, a spread of ipcRenderer, a computed channel, or a closure smuggling Node authority now slip through)? Attack the regexes with adversarial preload shapes.
+9. PACKAGED TEST REALITY: does tests/packaged/h1-packaged-runtime.mjs actually require a real binary boot (CDP attach, page target, live evaluate), and would it FAIL (not silently pass) if electronAPI were missing, if getAppVersion returned 1.0.0, or if the preload crashed? Check the assertions cannot vacuously pass.
+10. DEV/PACKAGED CONSISTENCY: same preload/main code path in both modes; any dev-only divergence that could mask a packaged failure?
+11. SCOPE DISCIPLINE: diff limited to main.js/preload.js/renderer api.js version path/tests/harness/governance H1.json/release-notes item-10 status; package.json version untouched; no case-storage/UI-delivery/tag/Release changes.
+12. RELEASE-NOTES HONESTY: the item-10 update must not claim a published fix (only fixed-in-hardening-line), and the remaining text must still accurately describe the 2.0.0 tag/draft snapshot.
+
+Report findings as H1-R3-NN with file:line evidence. If ALL 12 hold output exactly "VERDICT: PASS", else "VERDICT: BLOCK" with findings. Judge what exists; no out-of-scope enhancements.
+
+ROUND-2 ADDENDUM — this is round 2. Round 1 (on 8599f133) found: H1-R1-01 the semver validation accepted malformed values (01.2.3, 1.2.3-.., 1.2.3+.); H1-R1-02 the surface test only checked that a named getAppVersion exists, not its body. Both closed in 3fb3f1b6: strict SemVer 2.0.0 grammar (semver.org regex — leading zeros and empty identifiers rejected through the observable 'unavailable' path); hardening-01 now extracts the getAppVersion body via brace matching and audits it (zero params, ipcRenderer only as the exact allowlisted invoke, no require/process/arguments/spread, never returns a bare authority object) — 63 checks. Packaged evidence re-run after rebuild: clean 10/10, existing 10/10, dev-consistency 10/10. VERIFY both closures by re-attack (try adversarial semver strings and adversarial getAppVersion body shapes against the new assertions), then re-judge all 12 items on the current SHA.
+
+ROUND-3 ADDENDUM — this is round 3. Round 2 (on 3fb3f1b6) found H1-R2-01: the body audit permitted closure-alias authority smuggling (an outer wrapper forwarding to ipcRenderer.invoke, returned by getAppVersion, with one unreachable allowlisted call satisfying the count regexes). Closed in b15ada1e with a STRUCTURAL invariant in hardening-01: after removing the only two legal appearances (the fixed {contextBridge, ipcRenderer} destructure and the exact allowlisted invoke), the ipcRenderer token must appear nowhere else in preload.js (alias/spread/wrapper all leave residue); exactly one require() file-wide (the fixed electron destructure); zero rest/spread tokens file-wide; plus an embedded adversarial self-test proving the round-2 attack shape is caught (67 checks). preload.js itself was already conformant and is unchanged. VERIFY the closure by constructing new smuggling shapes against the residue invariant (aliased destructure, computed member access, string-concatenated require, template-literal channel, etc.), then re-judge all 12 items on the current SHA.
+codex
+I’ll first confirm the checked-out SHA, then inspect the full base-to-HEAD diff and run the relevant contract tests plus targeted adversarial probes.
+exec
+/bin/bash -lc 'git rev-parse HEAD && git status --short && git diff --stat 0563f119e2bdfced959b7a808cf292e0f883807f..HEAD && git diff --name-status 0563f119e2bdfced959b7a808cf292e0f883807f..HEAD' in /Users/SKYLINE/Claude/worktrees/f6-release
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-FuKY46jV' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-qxM82MJc' (errno=Operation not permitted)
+b15ada1ea28a4098c7ea81167263fe5fe6fc4f0e
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-vVIW9fET' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-aOernTWX' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-RdfzTZ0q' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-i34mygpl' (errno=Operation not permitted)
+ docs/release-notes-2.0.0.md                      |   9 +-
+ governance/hardening/H1.json                     |  62 ++++++++++++
+ main.js                                          |  18 +++-
+ preload.js                                       |  36 ++++++-
+ renderer/js/api.js                               |  23 ++++-
+ tests/e2e/flow-09-electron-smoke.test.js         |   5 +-
+ tests/e2e/hardening-01-electron-boundary.test.js |  91 ++++++++++++++++-
+ tests/packaged/h1-packaged-runtime.mjs           | 121 +++++++++++++++++++++++
+ 8 files changed, 353 insertions(+), 12 deletions(-)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-NyO7W62b' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-84Jpo8kj' (errno=Operation not permitted)
+M	docs/release-notes-2.0.0.md
+A	governance/hardening/H1.json
+M	main.js
+M	preload.js
+M	renderer/js/api.js
+M	tests/e2e/flow-09-electron-smoke.test.js
+M	tests/e2e/hardening-01-electron-boundary.test.js
+A	tests/packaged/h1-packaged-runtime.mjs
+
+exec
+/bin/bash -lc 'git diff --check 0563f119e2bdfced959b7a808cf292e0f883807f..HEAD; git diff --unified=80 0563f119e2bdfced959b7a808cf292e0f883807f..HEAD -- main.js preload.js renderer/js/api.js tests/e2e/flow-09-electron-smoke.test.js tests/e2e/hardening-01-electron-boundary.test.js tests/packaged/h1-packaged-runtime.mjs docs/release-notes-2.0.0.md governance/hardening/H1.json' in /Users/SKYLINE/Claude/worktrees/f6-release
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-2Zh4kNmt' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-iyylgUyW' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-jkBvAI8Z' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-qmCBDVmC' (errno=Operation not permitted)
+diff --git a/docs/release-notes-2.0.0.md b/docs/release-notes-2.0.0.md
+index 1752d5c..aad0a96 100644
+--- a/docs/release-notes-2.0.0.md
++++ b/docs/release-notes-2.0.0.md
+@@ -40,104 +40,111 @@ code-signed.** This is a deliberate, documented state for 2.0.0:
+ 
+ - On **macOS**, Gatekeeper will block a plain double-click on first launch. Open via
+   right-click → Open (or `System Settings → Privacy & Security → Open Anyway`). The DMG
+   carries the default Electron icon — no custom app icon ships in 2.0.0.
+ - On **Windows**, SmartScreen will warn about an unrecognized app. "More info → Run
+   anyway" is required on first launch.
+ - No auto-update channel exists. The app never contacts an update server (see
+   `docs/r3-data-and-privacy.md`, "Network egress").
+ 
+ ## Upgrade guidance (from 1.4.0)
+ 
+ - 2.0.0 preserves the frozen R3.0B portable case-record schema **v1.4.0 unchanged** —
+   existing case data in IndexedDB is read as-is; the runtime upgrade path is the
+   per-read migration in `renderer/js/case-store.js` (`migrateCaseRecord` on `open`),
+   which currently passes v1 records through unchanged and fail-closes on
+   future-version records (`CANNOT_OVERWRITE_FUTURE` guards on every write path).
+ - The R3.0F F1 migration engine (`renderer/js/r3-0f-migration-engine.js`) ships in the
+   package but is **not loaded by the renderer page** — it is exercised at the
+   Node-test/tooling layer only in 2.0.0 (see "Known limitations").
+ - Records written by a FUTURE schema version are rejected fail-closed, never coerced.
+ - There is no downgrade path: once a future version writes data, 2.0.0 will refuse it.
+ 
+ ## Backup and rollback guidance
+ 
+ - All persistent state lives in the Electron `userData` profile (IndexedDB) plus one
+   `localStorage` key (`lang`). Backing up the `userData` folder while the app is closed
+   is a complete backup; restoring it is a complete restore.
+ - The app itself provides case-level export (`Export` button → JSON bundle download)
+   as a portable, partial backup; comparison summaries export separately. Neither export
+   contains raw telemetry samples (see `docs/r3-data-and-privacy.md`).
+ - Rollback = reinstall the previous app version + restore the backed-up `userData`
+   folder. In-app data deletion is partial by design (outcome/timeline stores are
+   write-once/append-only); only deleting `userData` wipes everything.
+ 
+ ## Privacy
+ 
+ Local-first; no designed cloud sync; no active product telemetry; no account; no remote
+ identity. Data leaves the machine only through user-initiated export downloads. The app
+ cannot control OS-level backups or other local processes. Full statement:
+ `docs/r3-data-and-privacy.md`.
+ 
+ ## Known limitations (2.0.0)
+ 
+ 1. **Pane wiring is partial.** The Comparisons pane is live and usable. The Engineer
+    Brief, Experiment Loop, and Case Timeline **nav nodes** are live in navigation, but
+    their pane content is not wired into `renderer/index.html` (the D5 Engineer Brief
+    mount ships hidden/inert; the page loads no R3.0E viewmodel script). The underlying
+    services and contracts ship, run under Node-level tests, and are documented, but a
+    user cannot open those panes in 2.0.0.
+ 2. **Packaged-but-not-loaded modules.** 15 files under `renderer/js/` ship inside the
+    package but are never loaded by the page (the R3.0E module family, the R3.0C
+    authority-pipeline modules superseded by the bundled contracts, the F1 migration
+    engine, `vehicle-profile-f312.js`, `i18n-r3-0e.js`). They are inert in the packaged
+    app: nothing executes them at runtime.
+ 3. **No custom app icon.** `package.json`'s build config intentionally declares no icon;
+    platforms show the default Electron icon.
+ 4. **No license granted.** `package.json` declares `"license": "UNLICENSED"` and the
+    repository carries no LICENSE file: all rights reserved; this public repository does
+    not currently grant reuse rights. Adopting a license is a product decision deferred
+    past 2.0.0.
+ 5. **No tracked lockfile (by policy).** The repository's verification lane is
+    dependency-free and `scripts/check-version-policy.js` enforces that
+    `package-lock.json` stays untracked. A fresh `npm install` resolves
+    `electron ^33.0.0` / `electron-builder ^25.0.0` by semver range; build reproducibility
+    is bounded by those ranges, not a pinned lock. This is an accepted, documented
+    trade-off of the dependency-free governance lane.
+ 6. **Vendored renderer libraries.** Three third-party libraries ship vendored under
+    `renderer/lib/`, outside npm governance: `alpine.min.js` (Alpine.js), `chart.min.js`
+    (Chart.js 4.4.7), `tailwind.js` (Tailwind CSS browser build). They load from disk
+    only (no CDN at runtime); no integrity hashes are recorded in-repo.
+ 7. **Electron boot smoke is structural.** `tests/e2e/flow-09` validates declaration-level
+    Electron structure (main/preload/webPreferences) without launching a window; no test
+    boots the real Electron binary in CI (CI is install-free by policy).
+ 8. **IndexedDB-specific failure paths untested in Node.** Quota-exceeded mapping and
+    `tx.onabort` in `renderer/js/storage-backend.js` have no automated coverage (Node
+    tests run on MemoryBackend); storage-failure semantics are covered at the transact
+    contract level (`hardening-02`).
+ 9. **No professional validation.** The product is not a professional race-engineer
+    replacement; outputs are advisory, in physical units, with explicit credibility and
+    limitations metadata (see `docs/r3-credibility-model.md`).
+-10. **Preload `electronAPI` surface is not functional (pre-existing since v1.0.0).**
++10. **[FIXED in the v2.0.x public-release hardening line — H1; not yet in any published
++   release.]** ~~Preload `electronAPI` surface is not functional (pre-existing since
++   v1.0.0).~~ The hardening branch replaces the crashing `require('./package.json')`
++   with a main-process `app.getVersion()` authority over a single allowlisted IPC
++   channel; the renderer reports `unavailable` (never a fabricated version) if the
++   bridge fails. The paragraph below describes the state of the 2.0.0 tag/draft
++   snapshot, which predates the fix:
++   **Preload `electronAPI` surface is not functional (pre-existing since v1.0.0).**
+    `preload.js` calls `require('./package.json')`, which Electron's default-sandboxed
+    preload cannot resolve — the preload script fails to load and `window.electronAPI`
+    (`{platform, version}`) is never exposed in the packaged app. The renderer's
+    `typeof`-guard fallback masks this (the in-app version string falls back to
+    `'1.0.0'`); no other functionality depends on the preload surface. Confirmed by the
+    F6 packaged smoke; this is NOT an F6/2.0.0 regression (present since the initial
+    commit) and the fix is deferred as a production change outside the 2.0.0 release
+    scope. `docs/r3-data-and-privacy.md` describes the *intended* preload surface.
+ 
+ ## Release boundary (current state at the F6 release-candidate stage)
+ 
+ - DONE: Train PR #16 merged to `main` (merge commit `0711e74a`); the single authorized
+   version bump 1.4.0 → 2.0.0 is staged on the F6 release branch.
+ - NOT DONE (each requires separate explicit authorization): `v2.0.0` git tag, GitHub
+   Release, DMG upload/binary distribution, deployment.
+ - No code signing, no notarization (no signing identity or notary credentials exist;
+   see "Installation status" above).
+ - Parallel known follow-up, NOT part of 2.0.0: the R2.4-era credibility-rung string
+   cleanup (three pre-Train files carrying `'Measured (kinematic, confounded)'` as a
+   rung value) is in progress in a separate workstream; it must not be assumed merged.
+ - License note: `package.json` declares `UNLICENSED` (no LICENSE file exists);
+   a legacy `license: MIT` field in `CITATION.cff` contradicted this and was removed
+   at the F6 stage — adopting an actual license remains an explicit product decision.
+diff --git a/governance/hardening/H1.json b/governance/hardening/H1.json
+new file mode 100644
+index 0000000..4c0a94a
+--- /dev/null
++++ b/governance/hardening/H1.json
+@@ -0,0 +1,62 @@
++{
++  "schemaVersion": 1,
++  "program": "PUBLIC_RELEASE_HARDENING",
++  "phase": "H1_PACKAGED_RUNTIME_INTEGRITY",
++  "baseSha": "0563f119e2bdfced959b7a808cf292e0f883807f",
++  "integrationBranch": "release/v2.0.0-public-hardening",
++  "headSha": null,
++  "scope": {
++    "closes": [
++      "A1 preload sandbox require crash (since v1.0.0)",
++      "A2 electronAPI never exposed in packaged app",
++      "A3 fabricated 1.0.0 version fallback",
++      "A4 preload failure silently masked"
++    ],
++    "changedFiles": [
++      "main.js",
++      "preload.js",
++      "renderer/js/api.js",
++      "tests/e2e/hardening-01-electron-boundary.test.js",
++      "tests/e2e/flow-09-electron-smoke.test.js",
++      "tests/packaged/h1-packaged-runtime.mjs"
++    ],
++    "notChanged": [
++      "package.json (version untouched)",
++      "case storage",
++      "UI feature delivery",
++      "tag",
++      "Release"
++    ]
++  },
++  "design": {
++    "versionAuthority": "main-process app.getVersion() — the ONLY source; renderer never reads package.json",
++    "ipcChannels": [
++      "app:get-version (invoke-only, constant, removeHandler-first idempotent registration)"
++    ],
++    "electronAPISurface": "{ platform: process.platform, getAppVersion(): Promise<string|'unavailable'> }",
++    "failClosed": "IPC error / 3s timeout / malformed reply (strict SemVer 2.0.0 — leading zeros / empty identifiers rejected) -> literal 'unavailable' + console.warn; renderer default 'unavailable'; missing bridge -> console.warn; NEVER a fabricated version; NEVER a crash",
++    "webPreferences": "contextIsolation:true, nodeIntegration:false, sandbox: Electron default true (never set false — asserted by hardening-01)"
++  },
++  "evidence": {
++    "packagedClean": {
++      "result": "10/10 PASS",
++      "log": "h1-run-clean.txt",
++      "sha256": "4cad0dba0a731b987ca39f611435c4891cf5c14c0426286c27292beb56123441"
++    },
++    "packagedExisting": {
++      "result": "10/10 PASS",
++      "log": "h1-run-existing.txt",
++      "sha256": "48e9cc9479d16578102de1c8132dc988b0f7c17af98eef136c245dda9c8c3aac"
++    },
++    "devConsistency": {
++      "result": "10/10 PASS",
++      "log": "h1-run-dev.txt",
++      "sha256": "b6ed266e4dcf562c9ba40aa2d2abfdc43848513e0dc7d6093200bd0715eb3f9b"
++    },
++    "harness": "tests/packaged/h1-packaged-runtime.mjs (REAL binary over CDP; local evidence tooling — requires a build, so not in the install-free npm-test chain)",
++    "profileIsolation": "real userData moved aside before clean phase and restored after (macOS Electron ignores $HOME); smoke profile removed",
++    "packagedAsarChecks": "getAppVersion present; app:get-version present; pre-H1 require('./package.json').version crash pattern ABSENT"
++  },
++  "codexVerdict": null,
++  "note": "H1 evidence logs live in the session scratchpad during review; verdict + hashes are anchored here and raw logs archived under governance/hardening/codex-evidence/H1/ at the PASS anchor."
++}
+diff --git a/main.js b/main.js
+index 3064680..947b661 100644
+--- a/main.js
++++ b/main.js
+@@ -1,31 +1,45 @@
+-const { app, BrowserWindow } = require('electron');
++const { app, BrowserWindow, ipcMain } = require('electron');
+ const path = require('path');
+ 
++// The ONE allowlisted IPC channel. app.getVersion() is the single version authority
++// (the packaged bundle version; the renderer never reads package.json). Any new
++// channel added here is a reviewed governance change, never an incidental edit.
++const APP_VERSION_CHANNEL = 'app:get-version';
++
++function registerIpcHandlers() {
++  // removeHandler-first makes registration idempotent (double-registration guard).
++  ipcMain.removeHandler(APP_VERSION_CHANNEL);
++  ipcMain.handle(APP_VERSION_CHANNEL, () => app.getVersion());
++}
++
+ function createWindow() {
+   const win = new BrowserWindow({
+     width: 1400,
+     height: 900,
+     minWidth: 1000,
+     minHeight: 700,
+     webPreferences: {
+       preload: path.join(__dirname, 'preload.js'),
+       contextIsolation: true,
+       nodeIntegration: false,
+     },
+     titleBarStyle: 'hiddenInset',
+     backgroundColor: '#0b1120',
+     title: 'Racing Setup Analyzer',
+   });
+ 
+   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+ }
+ 
+-app.whenReady().then(createWindow);
++app.whenReady().then(() => {
++  registerIpcHandlers();
++  createWindow();
++});
+ 
+ app.on('window-all-closed', () => {
+   app.quit();
+ });
+ 
+ app.on('activate', () => {
+   if (BrowserWindow.getAllWindows().length === 0) createWindow();
+ });
+diff --git a/preload.js b/preload.js
+index 4370220..a53c49b 100644
+--- a/preload.js
++++ b/preload.js
+@@ -1,7 +1,37 @@
+-// Preload script - minimal since all computation runs in renderer
+-const { contextBridge } = require('electron');
++// Preload — the ONLY bridge between main and renderer. Runs sandboxed (Electron
++// default): no arbitrary require, no Node primitives leak. The exposed surface is
++// exactly { platform, getAppVersion } — never ipcRenderer itself, never a generic
++// send/invoke, never a caller-chosen channel.
++const { contextBridge, ipcRenderer } = require('electron');
++
++// Single allowlisted channel — MUST stay in lockstep with main.js APP_VERSION_CHANNEL.
++const APP_VERSION_CHANNEL = 'app:get-version';
++const APP_VERSION_TIMEOUT_MS = 3000;
++
++// Fail-closed version query: any failure (IPC error, timeout, malformed reply)
++// resolves to the literal 'unavailable' — never a fabricated version — and is
++// observable on the console. Callers never crash on version failure.
++function getAppVersion() {
++  return Promise.race([
++    ipcRenderer.invoke(APP_VERSION_CHANNEL),
++    new Promise((resolve, reject) => {
++      setTimeout(() => reject(new Error('APP_VERSION_TIMEOUT')), APP_VERSION_TIMEOUT_MS);
++    }),
++  ])
++    .then((v) => {
++      // Strict SemVer 2.0.0 (semver.org): no leading zeros, dot-separated non-empty
++      // pre-release/build identifiers — '01.2.3', '1.2.3-..', '1.2.3+.' all fail.
++      const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
++      if (typeof v === 'string' && SEMVER.test(v)) return v;
++      throw new Error('APP_VERSION_MALFORMED');
++    })
++    .catch((err) => {
++      console.warn('[preload] app version unavailable:', err && err.message);
++      return 'unavailable';
++    });
++}
+ 
+ contextBridge.exposeInMainWorld('electronAPI', {
+   platform: process.platform,
+-  version: require('./package.json').version,
++  getAppVersion,
+ });
+diff --git a/renderer/js/api.js b/renderer/js/api.js
+index 50c956c..7490687 100644
+--- a/renderer/js/api.js
++++ b/renderer/js/api.js
+@@ -117,84 +117,105 @@ const api = {
+       rear_pct: roundN(rearTotal / total * 100, 1),
+       left_pct: roundN(leftTotal / total * 100, 1),
+       right_pct: roundN(rightTotal / total * 100, 1),
+       cross_weight_pct: roundN(crossWeight / total * 100, 1),
+       front_total: roundN(frontTotal, 1),
+       rear_total: roundN(rearTotal, 1),
+     };
+   },
+ 
+   // === Setup Advisor ===
+ 
+   /** Analyze setup and generate tuning suggestions */
+   analyzeSetup(result, tier, params, advParams, tr) {
+     return SetupAdvisor.analyze(result, tier, params, advParams, tr);
+   },
+ 
+   // === Spring Calculator ===
+ 
+   /** Calculate spring rate from target frequency */
+   calcSpringFromFreq(targetHz, cornerMass, motionRatio, tireSpringRate) {
+     return SpringCalculator.freqToSpring(targetHz, cornerMass, motionRatio, tireSpringRate);
+   },
+ 
+   /** Calculate frequency from spring rate */
+   calcFreqFromSpring(springRate, cornerMass, motionRatio, tireSpringRate) {
+     return SpringCalculator.springToFreq(springRate, cornerMass, motionRatio, tireSpringRate);
+   },
+ 
+   /** Generate spring rate reference table */
+   calcSpringTable(cornerMass, motionRatio, tireSpringRate, rates) {
+     return SpringCalculator.springTable(cornerMass, motionRatio, tireSpringRate, rates);
+   },
+ 
+   /** Calculate ARB sizing for target roll gradient (tire roll stiffness optional) */
+   calcArbSizing(totalWeight, cgHeight, targetRollGrad, frontPct, springRollFront, springRollRear, tireRollFront, tireRollRear) {
+     return SpringCalculator.arbSizing(totalWeight, cgHeight, targetRollGrad, frontPct, springRollFront, springRollRear, tireRollFront, tireRollRear);
+   },
+ 
+   // === Tire Spring Rate Estimation ===
+ 
+   /** Estimate tire spring rate from dimensions (pressure in bar, optional) */
+   estimateTireSpring(width, aspectRatio, pressureBar) {
+     return TireSpringEstimator.estimate(width, aspectRatio, pressureBar);
+   },
+ 
+   /** Parse tire size string into structured specs */
+   parseTireSize(sizeStr) {
+     return TireSpringEstimator.parseTireSize(sizeStr);
+   },
+ 
+   /** Estimate tire spring rates from OEM size string */
+   estimateTireSpringFromString(sizeStr) {
+     return TireSpringEstimator.estimateFromString(sizeStr);
+   },
+ 
+   /** Calculate wheel upgrade impact */
+   calcWheelUpgrade(originalSpec, newRimSize, newWidth) {
+     return TireSpringEstimator.calculateWheelUpgrade(originalSpec, newRimSize, newWidth);
+   },
+ 
+   /** Get suggested rim sizes for upgrades */
+   suggestRimSizes(originalRim) {
+     return TireSpringEstimator.suggestRimSizes(originalRim);
+   },
+ 
+   // === Lihpao Lap-Time Simulator ===
+ 
+   /** 麗寶 G2 單圈/stint 模擬：吃目前的 setup，回傳最快圈/甜蜜點/逐圈表 */
+   simulateLihpao(setup) {
+     if (typeof simulateLihpao === 'undefined') return { error: 'lihpao-laptime.js not loaded' };
+     return simulateLihpao(setup);
+   },
+ 
+   // === Stats ===
+ 
+   /** Get app stats */
+   getStats() {
+     return {
+       trackday_tires: typeof TRACKDAY_TIRES !== 'undefined' ? Object.keys(TRACKDAY_TIRES).length : 0,
+       car_presets: typeof CAR_PRESETS !== 'undefined' ? Object.keys(CAR_PRESETS).length : 0,
+-      version: typeof electronAPI !== 'undefined' ? electronAPI.version : '1.0.0',
++      // Honest version reporting: the resolved app version, or the literal
++      // 'unavailable' while unresolved / when the preload bridge is absent.
++      // NEVER a fabricated fallback version.
++      version: api._appVersion,
+     };
+   },
++
++  // Resolved once at startup via the preload bridge (electronAPI.getAppVersion()
++  // -> main-process app.getVersion(), the single version authority). Stays
++  // 'unavailable' if the bridge is missing or the query fails — observable on
++  // the console, never masked by a fake version, never a crash.
++  _appVersion: 'unavailable',
+ };
++
++(function resolveAppVersion() {
++  if (typeof electronAPI !== 'undefined' && electronAPI && typeof electronAPI.getAppVersion === 'function') {
++    electronAPI.getAppVersion().then(function (v) {
++      api._appVersion = (typeof v === 'string' && v) ? v : 'unavailable';
++    }).catch(function (err) {
++      console.warn('[api] app version query failed:', err && err.message);
++    });
++  } else {
++    console.warn('[api] electronAPI bridge not present — preload did not initialize; version reporting stays "unavailable"');
++  }
++})();
+diff --git a/tests/e2e/flow-09-electron-smoke.test.js b/tests/e2e/flow-09-electron-smoke.test.js
+index fd0f34e..d7ae369 100644
+--- a/tests/e2e/flow-09-electron-smoke.test.js
++++ b/tests/e2e/flow-09-electron-smoke.test.js
+@@ -1,57 +1,60 @@
+ /**
+  * tests/e2e/flow-09-electron-smoke.test.js — R3.0F F2 · Electron startup smoke.
+  *
+  * Verifies the Electron host process can be invoked and reports a version. This is a SMOKE
+  * test only — it does NOT launch a window or render the UI (that would require GUI display
+  * which is not always available in CI). The smoke confirms:
+  *   • electron CLI is reachable (devDependency installed)
+  *   • main.js has a stable Electron-compatible entry shape (already covered by the require
+  *     in other unit tests; here we just confirm the version handshake)
+  *   • preload.js exposes only the minimal contextBridge surface (no nodeIntegration leak)
+  * Zero console error.
+  */
+ 'use strict';
+ var H = require('./helpers/flow-harness.js');
+ var t = H.makeChk();
+ var chk = t.chk;
+ var cp = require('child_process');
+ var path = require('path');
+ var fs = require('fs');
+ 
+ var h = H.createFlowHarness({ stamp: '2026-07-01T00:00:00.000Z' });
+ try {
+   // Step 1: electron is declared in package.json devDependencies (repo source). Its actual
+   // installation in node_modules may be absent in CI dependency-free lanes where `npm install`
+   // is not run; the structural contracts at steps 3-4 still validate without node_modules.
+   var pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf8'));
+   chk('electron declared in package.json devDependencies', !!(pkgJson.devDependencies && pkgJson.devDependencies.electron));
+   chk('electron devDep version range non-empty', typeof (pkgJson.devDependencies && pkgJson.devDependencies.electron) === 'string' && pkgJson.devDependencies.electron.length > 0);
+ 
+   // Step 2: validate the electron version range declared in package.json. CI dependency-free
+   // lanes don't ship node_modules/electron, so we deliberately AVOID require('electron/...') —
+   // that would be classified as a bare third-party import by the dep-audit. The declared range
+   // ('^33.0.0' or similar) is enough to confirm the build target.
+   var declaredRange = pkgJson.devDependencies && pkgJson.devDependencies.electron;
+   chk('declared electron version range is a valid semver-range string', typeof declaredRange === 'string' && /^[\^~]?\d+\.\d+\.\d+/.test(declaredRange));
+ 
+   // Step 3: main.js exists + structurally sound (contextIsolation: true, nodeIntegration: false)
+   var mainPath = path.join(__dirname, '..', '..', 'main.js');
+   var mainSrc = fs.readFileSync(mainPath, 'utf8');
+   chk('main.js contextIsolation: true', /contextIsolation\s*:\s*true/.test(mainSrc));
+   chk('main.js nodeIntegration: false', /nodeIntegration\s*:\s*false/.test(mainSrc));
+   chk('main.js loads preload.js', /preload\.js/.test(mainSrc));
+ 
+   // Step 4: preload.js exposes ONLY minimal contextBridge surface
+   var preloadPath = path.join(__dirname, '..', '..', 'preload.js');
+   var preloadSrc = fs.readFileSync(preloadPath, 'utf8');
+   chk('preload.js uses contextBridge', /contextBridge/.test(preloadSrc));
+-  chk('preload.js does NOT use ipcRenderer (no IPC channel exposed)', !/ipcRenderer/.test(preloadSrc));
++  // H1: the preload DOES use ipcRenderer.invoke on the single allowlisted constant
++  // channel (app:get-version) — the boundary contract (never exposed raw, no generic
++  // send/on, one channel only) is enforced exhaustively in hardening-01.
++  chk('preload.js uses ONLY the allowlisted invoke (no send/on/generic IPC)', /ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL/.test(preloadSrc) && !/ipcRenderer\s*\.\s*(send|sendSync|on|once)\b/.test(preloadSrc));
+   chk('preload.js does NOT use require(fs|child_process|net|http)', !/require\(['"](?:fs|child_process|net|http|https)['"]\)/.test(preloadSrc));
+ 
+   // Step 5: zero console error
+   chk('zero console.error during electron smoke', h.consoleErrorCount === 0);
+ } finally {
+   h.dispose();
+ }
+ 
+ t.report('e2e-flow-09-electron-smoke');
+diff --git a/tests/e2e/hardening-01-electron-boundary.test.js b/tests/e2e/hardening-01-electron-boundary.test.js
+index 9daa516..d2246f6 100644
+--- a/tests/e2e/hardening-01-electron-boundary.test.js
++++ b/tests/e2e/hardening-01-electron-boundary.test.js
+@@ -132,253 +132,336 @@ try {
+       i++;
+     }
+     return out;
+   }
+   var mainSrc = stripJsComments(mainRaw);
+   var preloadSrc = stripJsComments(preloadRaw);
+ 
+   // F3-R7-01 closure: enumerate ALL `webPreferences: { ... }` occurrences in main.js, not just
+   // the first one. Multiple BrowserWindow constructors must each pass the security audit.
+   function extractAllWebPrefsBodies(src) {
+     var bodies = [];
+     var startIdx = 0;
+     while (true) {
+       var sub = src.slice(startIdx);
+       var startMatch = sub.match(/webPreferences\s*:\s*\{/);
+       if (!startMatch) break;
+       var absStart = startIdx + startMatch.index + startMatch[0].length;
+       var depth = 1;
+       var i = absStart;
+       var inStr = false;
+       var strCh = '';
+       while (i < src.length && depth > 0) {
+         var ch = src.charAt(i);
+         if (inStr) {
+           if (ch === '\\' && i + 1 < src.length) { i += 2; continue; }
+           if (ch === strCh) { inStr = false; }
+         } else {
+           if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; }
+           else if (ch === '{') depth++;
+           else if (ch === '}') { depth--; if (depth === 0) { bodies.push(src.slice(absStart, i)); break; } }
+         }
+         i++;
+       }
+       startIdx = i + 1;
+       if (startIdx >= src.length) break;
+     }
+     return bodies;
+   }
+   var wpBodies = extractAllWebPrefsBodies(mainSrc);
+   chk('main.js declares at least one webPreferences block', wpBodies.length >= 1, { count: wpBodies.length });
+ 
+   for (var wpi = 0; wpi < wpBodies.length; wpi++) {
+     var wpBody = wpBodies[wpi];
+     var lbl = 'webPreferences[' + wpi + ']';
+     chk(lbl + ' uses NO computed-key syntax for security flags',
+       !/\[\s*['"`](?:contextIsolation|nodeIntegration|webSecurity|allowRunningInsecureContent|experimentalFeatures|enableRemoteModule|nodeIntegrationInWorker|nodeIntegrationInSubFrames|sandbox)['"`]\s*\]\s*:/.test(wpBody));
+ 
+     // F3-R9-01 closure: reject any spread `...` inside webPreferences. A spread can carry
+     // unsafe overrides that the static-flag audit cannot see.
+     chk(lbl + ' uses NO spread operator', !/\.\.\./.test(wpBody));
+ 
+     chk(lbl + '.contextIsolation === literal true', /(^|[\s,{])contextIsolation\s*:\s*true\s*(,|$|\s)/m.test(wpBody));
+     chk(lbl + '.nodeIntegration === literal false', /(^|[\s,{])nodeIntegration\s*:\s*false\s*(,|$|\s)/m.test(wpBody));
+ 
+     // F3-R10-01 closure: reject any unsafe redeclaration. JS uses the LAST value for duplicate
+     // keys; a contributor leaving both `contextIsolation: true` and later `contextIsolation: false`
+     // would silently flip the effective value. Reject ANY occurrence of the unsafe literal +
+     // assert exactly ONE occurrence of each required key.
+     chk(lbl + ' has NO contextIsolation: false anywhere', !/contextIsolation\s*:\s*false/.test(wpBody));
+     chk(lbl + ' has NO nodeIntegration: true anywhere', !/nodeIntegration\s*:\s*true/.test(wpBody));
+     var ciCount = (wpBody.match(/(^|[\s,{])contextIsolation\s*:/g) || []).length;
+     var niCount = (wpBody.match(/(^|[\s,{])nodeIntegration\s*:/g) || []).length;
+     chk(lbl + ' declares contextIsolation EXACTLY ONCE', ciCount === 1, { count: ciCount });
+     chk(lbl + ' declares nodeIntegration EXACTLY ONCE', niCount === 1, { count: niCount });
+ 
+     chk(lbl + '.allowRunningInsecureContent NOT set to true', !/allowRunningInsecureContent\s*:\s*true/.test(wpBody));
+     chk(lbl + '.webSecurity NOT set to false', !/webSecurity\s*:\s*false/.test(wpBody));
+     chk(lbl + '.experimentalFeatures NOT set to true', !/experimentalFeatures\s*:\s*true/.test(wpBody));
+     chk(lbl + '.enableRemoteModule NOT set to true', !/enableRemoteModule\s*:\s*true/.test(wpBody));
+     chk(lbl + '.nodeIntegrationInWorker NOT set to true', !/nodeIntegrationInWorker\s*:\s*true/.test(wpBody));
+     chk(lbl + '.nodeIntegrationInSubFrames NOT set to true', !/nodeIntegrationInSubFrames\s*:\s*true/.test(wpBody));
+     // F3-R8-01 closure: sandbox must NOT be explicitly disabled. If the key is present, it
+     // must be set to literal `true`. If absent, Electron's default (sandbox enabled when
+     // contextIsolation:true) applies.
+     chk(lbl + '.sandbox NOT set to false', !/(^|[\s,{])sandbox\s*:\s*false\s*(,|$|\s)/m.test(wpBody));
+     if (/(^|[\s,{])sandbox\s*:/.test(wpBody)) {
+       chk(lbl + '.sandbox (when set) === literal true', /(^|[\s,{])sandbox\s*:\s*true\s*(,|$|\s)/m.test(wpBody));
+     }
+   }
+ 
++  // H1: renderer version-reporting honesty — api.js must never fabricate a version.
++  var apiSrc = stripJsComments(fs.readFileSync(path.join(__dirname, '..', '..', 'renderer', 'js', 'api.js'), 'utf8'));
++  chk('api.js has NO fabricated 1.0.0 version literal', !/['"`]1\.0\.0['"`]/.test(apiSrc));
++  chk('api.js defaults version reporting to the literal unavailable', /_appVersion\s*:\s*['"`]unavailable['"`]/.test(apiSrc));
++  chk('api.js never reads a synchronous electronAPI.version field (pre-H1 shape)', !/electronAPI\s*\.\s*version\b/.test(apiSrc));
++  chk('api.js resolves the version via electronAPI.getAppVersion()', /electronAPI\s*\.\s*getAppVersion\s*\(/.test(apiSrc));
++  chk('api.js missing-bridge path is observable (console.warn)', /console\.warn\([^)]*electronAPI/.test(apiSrc));
++
++  // H1: main.js IPC surface — exactly ONE allowlisted handle() on the constant
++  // channel, removeHandler-first (idempotent double-registration guard), and no
++  // generic/dynamic channel registration anywhere.
++  var handleCalls = mainSrc.match(/ipcMain\s*\.\s*handle\s*\(/g) || [];
++  chk('main.js registers EXACTLY one ipcMain.handle', handleCalls.length === 1, { count: handleCalls.length });
++  chk('main.js handle uses the APP_VERSION_CHANNEL constant', /ipcMain\s*\.\s*handle\s*\(\s*APP_VERSION_CHANNEL\s*,/.test(mainSrc));
++  chk('main.js channel constant = app:get-version', /APP_VERSION_CHANNEL\s*=\s*['"`]app:get-version['"`]/.test(mainSrc));
++  chk('main.js removeHandler-first double-registration guard', /ipcMain\s*\.\s*removeHandler\s*\(\s*APP_VERSION_CHANNEL\s*\)/.test(mainSrc));
++  chk('main.js handler returns app.getVersion() (single version authority)', /handle\s*\(\s*APP_VERSION_CHANNEL\s*,\s*\(\s*\)\s*=>\s*app\.getVersion\(\)\s*\)/.test(mainSrc));
++  chk('main.js has NO ipcMain.on/once (no fire-and-forget channels)', !/ipcMain\s*\.\s*(on|once|addListener)\b/.test(mainSrc));
++
+   // Step 2: preload.js minimal surface — post-strip checks (no comment-decoy false positives)
+   chk('preload.js uses contextBridge', /contextBridge/.test(preloadSrc));
+-  chk('preload.js does NOT reference ipcRenderer (post-strip)', !/ipcRenderer/.test(preloadSrc));
++  // H1: the preload legitimately uses ipcRenderer.invoke on the single allowlisted
++  // constant channel. The boundary contract is now: (a) ipcRenderer itself is never
++  // placed on the exposed surface, (b) no generic send/sendSync/on/postMessage entry,
++  // (c) invoke is called ONLY with the APP_VERSION_CHANNEL constant, (d) exactly one
++  // channel constant exists and it is the allowlisted literal.
++  chk('preload.js never exposes ipcRenderer on the bridge surface', !/exposeInMainWorld[\s\S]*?ipcRenderer\s*[,}]/.test(preloadSrc));
++  chk('preload.js has NO generic ipcRenderer.send/sendSync/on/once/postMessage', !/ipcRenderer\s*\.\s*(send|sendSync|sendToHost|on|once|addListener|postMessage)\b/.test(preloadSrc));
++  var invokeCalls = preloadSrc.match(/ipcRenderer\s*\.\s*invoke\s*\(\s*([A-Za-z_$][\w$]*|['"`][^'"`]*['"`])/g) || [];
++  chk('preload.js ipcRenderer.invoke is used EXACTLY once', invokeCalls.length === 1, { invokeCalls: invokeCalls });
++  // H1-R2-01 closure: STRUCTURAL token accounting — regex-shape checks alone allow
++  // closure-alias smuggling (e.g. an outer `leak = (...args) => ipcRenderer.invoke(...args)`
++  // returned by getAppVersion while one unreachable allowlisted call satisfies the
++  // count). The invariant below is alias-proof: after removing the ONLY two legal
++  // appearances (the fixed destructure and the exact allowlisted invoke), the token
++  // `ipcRenderer` must not appear ANYWHERE else in the file — any alias assignment,
++  // re-destructure, spread, or argument-forwarding wrapper leaves a residue and fails.
++  function ipcResidue(src) {
++    return src
++      .replace(/const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/, '')
++      .replace(/ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*\)/, '');
++  }
++  chk('preload.js ipcRenderer token accounting: ZERO appearances outside the two legal sites',
++    !/ipcRenderer/.test(ipcResidue(preloadSrc)),
++    { residue: (ipcResidue(preloadSrc).match(/.{0,50}ipcRenderer.{0,50}/) || [])[0] });
++  chk('preload.js has EXACTLY one require(), the fixed electron destructure',
++    (preloadSrc.match(/require\s*\(/g) || []).length === 1 && /const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/.test(preloadSrc));
++  chk('preload.js has NO rest/spread token anywhere (post-strip)', preloadSrc.indexOf('...') === -1);
++  // Self-test: the exact round-2 attack shape MUST be caught by the residue invariant.
++  (function adversarialSelfTest() {
++    var attack = preloadSrc.replace('contextBridge.exposeInMainWorld', 'var leak = function () { return ipcRenderer; };\ncontextBridge.exposeInMainWorld');
++    chk('SELF-TEST: alias-smuggling shape is caught by the residue invariant', /ipcRenderer/.test(ipcResidue(attack)));
++  })();
++  chk('preload.js invoke uses the APP_VERSION_CHANNEL constant (no inline/caller-chosen channel)', /ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*[),]/.test(preloadSrc));
++  var channelConsts = preloadSrc.match(/APP_VERSION_CHANNEL\s*=\s*['"`]([^'"`]+)['"`]/g) || [];
++  chk('preload.js declares exactly one channel constant = app:get-version', channelConsts.length === 1 && /['"`]app:get-version['"`]/.test(channelConsts[0]), { channelConsts: channelConsts });
++  chk('preload.js does NOT require ./package.json (the pre-H1 sandbox crash)', !/require\s*\(\s*['"]\.\/package\.json['"]\s*\)/.test(preloadSrc));
++  chk('preload.js never fabricates a version literal', !/['"`]1\.0\.0['"`]/.test(preloadSrc));
+   chk('preload.js does NOT require fs (post-strip)', !/require\s*\(\s*['"]fs['"]\s*\)/.test(preloadSrc));
+   chk('preload.js does NOT require child_process (post-strip)', !/require\s*\(\s*['"]child_process['"]\s*\)/.test(preloadSrc));
+   chk('preload.js does NOT require net (post-strip)', !/require\s*\(\s*['"]net['"]\s*\)/.test(preloadSrc));
+   chk('preload.js does NOT require http (post-strip)', !/require\s*\(\s*['"]http['"]\s*\)/.test(preloadSrc));
+   chk('preload.js does NOT require https (post-strip)', !/require\s*\(\s*['"]https['"]\s*\)/.test(preloadSrc));
+   chk('preload.js does NOT require os (post-strip)', !/require\s*\(\s*['"]os['"]\s*\)/.test(preloadSrc));
+   chk('preload.js does NOT eval untrusted content (post-strip)', !/eval\s*\(|new\s+Function\s*\(/.test(preloadSrc));
+ 
+   // F3-R8-02 closure: enumerate EVERY exposeInMainWorld call. There must be EXACTLY ONE
+   // and its surface must be exactly {platform, version}.
+   // F3-R9-02 closure: also detect computed-form contextBridge['exposeInMainWorld'] calls.
+   function extractAllExposedSurfaces(src) {
+     var entries = [];
+     var startIdx = 0;
+     while (true) {
+       var sub = src.slice(startIdx);
+       // Dot form OR computed form OR alias-via-destructure (latter detected separately below).
+       var sm = sub.match(/contextBridge\s*(?:\.exposeInMainWorld|\[\s*['"`]exposeInMainWorld['"`]\s*\])\s*\(\s*(['"`])([^'"`]+)\1\s*,\s*\{/);
+       if (!sm) break;
+       var absStart = startIdx + sm.index + sm[0].length;
+       var worldName = sm[2];
+       var depth = 1;
+       var i = absStart;
+       var inStr = false;
+       var strCh = '';
+       while (i < src.length && depth > 0) {
+         var ch = src.charAt(i);
+         if (inStr) {
+           if (ch === '\\' && i + 1 < src.length) { i += 2; continue; }
+           if (ch === strCh) { inStr = false; }
+         } else {
+           if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; }
+           else if (ch === '{') depth++;
+           else if (ch === '}') { depth--; if (depth === 0) { entries.push({ name: worldName, body: src.slice(absStart, i) }); break; } }
+         }
+         i++;
+       }
+       startIdx = i + 1;
+       if (startIdx >= src.length) break;
+     }
+     return entries;
+   }
+   var exposedSurfaces = extractAllExposedSurfaces(preloadSrc);
+   chk('preload.js exposes EXACTLY ONE contextBridge surface', exposedSurfaces.length === 1, { surfaces: exposedSurfaces.map(function (e) { return e.name; }) });
+   var exposedEntry = exposedSurfaces[0] || { name: '', body: '' };
+   var exposedBody = exposedEntry.body || '';
+   chk('preload.js exposes the surface as "electronAPI"', exposedEntry.name === 'electronAPI');
+ 
+   // F3-R9-02 closure: also assert NO bare/aliased `exposeInMainWorld` reference outside the
+   // single audited call. A regression like
+   //   const e = contextBridge.exposeInMainWorld; e('backdoor', {...})
+   // would not match the extractor. We count total occurrences of the keyword and require it
+   // to appear exactly ONCE in the file.
+   var exposeOccurrences = (preloadSrc.match(/exposeInMainWorld/g) || []).length;
+   chk('preload.js references exposeInMainWorld EXACTLY ONCE (no aliasing/destructuring escape)', exposeOccurrences === 1, { count: exposeOccurrences });
+ 
+   // No spread (...) — exposes hidden properties
+   chk('preload.js exposed surface has NO spread operator', !/\.\.\./.test(exposedBody));
+   // No computed keys
+   chk('preload.js exposed surface has NO computed keys', !/\[\s*['"`][^'"`]+['"`]\s*\]\s*:/.test(exposedBody));
+   // No method shorthand (function bodies)
+   chk('preload.js exposed surface has NO method shorthand', !/\b[a-zA-Z_$][\w$]*\s*\([^)]*\)\s*\{/.test(exposedBody));
+   // No accessor properties (get foo() {})
+   chk('preload.js exposed surface has NO accessor properties', !/\b(?:get|set)\s+[a-zA-Z_$][\w$]*\s*\(/.test(exposedBody));
+ 
+   // Parse top-level key list — split on top-level commas (depth-0 commas)
+   function topLevelKeys(body) {
+     var keys = [];
+     var depth = 0;
+     var inStr = false;
+     var strCh = '';
+     var segStart = 0;
+     for (var i = 0; i <= body.length; i++) {
+       var ch = i < body.length ? body.charAt(i) : ',';
+       if (inStr) {
+         if (ch === '\\') { i++; continue; }
+         if (ch === strCh) inStr = false;
+         continue;
+       }
+       if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; continue; }
+       if (ch === '{' || ch === '[' || ch === '(') depth++;
+       else if (ch === '}' || ch === ']' || ch === ')') depth--;
+       else if (ch === ',' && depth === 0) {
+         var seg = body.slice(segStart, i).trim();
+         if (seg) {
+           var kMatch = seg.match(/^([a-zA-Z_$][\w$]*)\s*:/);
+           if (kMatch) keys.push(kMatch[1]);
+           else if (/^[a-zA-Z_$][\w$]*$/.test(seg)) keys.push(seg); // shorthand
+           else keys.push('<INVALID:' + seg.slice(0, 30) + '>');
+         }
+         segStart = i + 1;
+       }
+     }
+     return keys;
+   }
+   var exposedKeys = topLevelKeys(exposedBody).sort();
+-  chk('preload.js exposed surface has EXACTLY {platform, version}', JSON.stringify(exposedKeys) === JSON.stringify(['platform', 'version']), { keys: exposedKeys });
++  chk('preload.js exposed surface has EXACTLY {getAppVersion, platform}', JSON.stringify(exposedKeys) === JSON.stringify(['getAppVersion', 'platform']), { keys: exposedKeys });
+ 
+   // F3-R9-03 closure: each exposed value must be an INERT primitive expression — no functions,
+   // no closures, no process/global access, no dynamic require. Parse the body's key:value pairs
+   // and assert each value is on an allowlist of safe shapes.
+   function topLevelEntries(body) {
+     var entries = [];
+     var depth = 0;
+     var inStr = false;
+     var strCh = '';
+     var segStart = 0;
+     for (var i = 0; i <= body.length; i++) {
+       var ch = i < body.length ? body.charAt(i) : ',';
+       if (inStr) {
+         if (ch === '\\') { i++; continue; }
+         if (ch === strCh) inStr = false;
+         continue;
+       }
+       if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; continue; }
+       if (ch === '{' || ch === '[' || ch === '(') depth++;
+       else if (ch === '}' || ch === ']' || ch === ')') depth--;
+       else if (ch === ',' && depth === 0) {
+         var seg = body.slice(segStart, i).trim();
+         if (seg) {
+           var kvMatch = seg.match(/^([a-zA-Z_$][\w$]*)\s*:\s*([\s\S]+)$/);
+           if (kvMatch) entries.push({ key: kvMatch[1], value: kvMatch[2].trim() });
+           else if (/^[a-zA-Z_$][\w$]*$/.test(seg)) entries.push({ key: seg, value: seg }); // shorthand
+         }
+         segStart = i + 1;
+       }
+     }
+     return entries;
+   }
+   var exposedEntries = topLevelEntries(exposedBody);
+   var EXPOSED_FORBIDDEN_TOKENS = /\bprocess\b|\bglobalThis\b|\b__dirname\b|\b__filename\b|\bModule\b|\beval\b|\b(?:child_process|fs|net|http|https|os|crypto|dgram|vm|cluster|worker_threads|repl|inspector|perf_hooks|trace_events)\b/;
+   function isInertExposedValue(val) {
+     // (a) string literal
+     if (/^["'][^"']*["']$/.test(val)) return true;
+     // (b) reading process.platform IS allowed (it's a known-inert string)
+     if (/^process\.platform$/.test(val)) return true;
+-    // (c) require('./package.json').version is the only allowed require chain
+-    if (/^require\(\s*['"]\.\/package\.json['"]\s*\)\.version$/.test(val)) return true;
++    // (c) H1: the pre-H1 require('./package.json').version chain is now FORBIDDEN
++    //     (it crashed the sandboxed preload); the only allowed function reference is
++    //     the named getAppVersion defined in this file (validated separately below).
++    if (/^getAppVersion$/.test(val)) return true;
+     // (d) plain numeric / boolean / null literal
+     if (/^(?:-?\d+(?:\.\d+)?|true|false|null)$/.test(val)) return true;
+     return false;
+   }
++  // The allowed function reference must be a top-level named function declared in
++  // preload.js itself. H1-R1-02 closure: the BODY is extracted (brace matching) and
++  // audited — zero parameters (no caller-argument forwarding into IPC), ipcRenderer
++  // used ONLY as the exact allowlisted invoke, no Node authority, no arguments
++  // object, no rest/spread forwarding, and it never returns ipcRenderer itself.
++  chk('preload.js declares the named getAppVersion function it exposes',
++    /function\s+getAppVersion\s*\(\s*\)/.test(preloadSrc));
++  (function auditGetAppVersionBody() {
++    var m = preloadSrc.match(/function\s+getAppVersion\s*\(\s*\)\s*\{/);
++    chk('getAppVersion has ZERO parameters', !!m);
++    if (!m) return;
++    var i = m.index + m[0].length, depth = 1, inStr = false, strCh = '';
++    while (i < preloadSrc.length && depth > 0) {
++      var ch = preloadSrc.charAt(i);
++      if (inStr) { if (ch === '\\') { i += 2; continue; } if (ch === strCh) inStr = false; }
++      else if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; }
++      else if (ch === '{') depth++;
++      else if (ch === '}') depth--;
++      i++;
++    }
++    var body = preloadSrc.slice(m.index + m[0].length, i - 1);
++    var bodyNoInvoke = body.replace(/ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*\)/g, '');
++    chk('getAppVersion body: ipcRenderer appears ONLY as the exact allowlisted invoke', !/ipcRenderer/.test(bodyNoInvoke), { residue: (bodyNoInvoke.match(/.{0,40}ipcRenderer.{0,40}/) || [])[0] });
++    chk('getAppVersion body: no require/process/arguments/spread forwarding', !/\brequire\s*\(|\bprocess\s*[.\[]|\barguments\b|\.\.\./.test(body));
++    chk('getAppVersion body: never returns a bare authority object', !/return\s+ipcRenderer\b|return\s+process\b|return\s+require\b/.test(body));
++  })();
+   for (var ee = 0; ee < exposedEntries.length; ee++) {
+     var entry = exposedEntries[ee];
+     // Static forbidden-token check (catches process.env, child_process, etc., even via concat)
+     chk('exposed[' + entry.key + '] has NO Node-authority tokens',
+       !EXPOSED_FORBIDDEN_TOKENS.test(entry.value) || /^process\.platform$/.test(entry.value),
+       { key: entry.key, value: entry.value.slice(0, 80) });
+     // Allowlist shape check
+     chk('exposed[' + entry.key + '] is an inert primitive expression',
+       isInertExposedValue(entry.value),
+       { key: entry.key, value: entry.value.slice(0, 80) });
+   }
+ 
+   // Step 4: renderer/index.html declares CSP header
+   var cspMatch = indexSrc.match(/<meta\s+http-equiv\s*=\s*"Content-Security-Policy"\s+content\s*=\s*"([^"]+)"/i);
+   chk('renderer index.html declares CSP via meta', cspMatch !== null);
+   // We tolerate 'unsafe-inline' + 'unsafe-eval' here because the app is a localfile Electron renderer
+   // and the existing R3.0C/D/E code uses inline Alpine.js handlers. F3 hardens it by ensuring no
+   // external script source is referenced.
+   chk('CSP default-src is self only', cspMatch && /default-src\s+'self'/.test(cspMatch[1]));
+   chk('renderer does not pull external script (no <script src="http">)', !/script[^>]+src\s*=\s*["']https?:\/\//i.test(indexSrc));
+ 
+   // Step 5: zero console error
+   chk('zero console.error during electron-boundary hardening', h.consoleErrorCount === 0);
+ } finally {
+   h.dispose();
+ }
+ 
+ t.report('e2e-hardening-01-electron-boundary');
+diff --git a/tests/packaged/h1-packaged-runtime.mjs b/tests/packaged/h1-packaged-runtime.mjs
+new file mode 100644
+index 0000000..1095334
+--- /dev/null
++++ b/tests/packaged/h1-packaged-runtime.mjs
+@@ -0,0 +1,121 @@
++// H1 packaged-runtime verification harness.
++//
++// Boots a REAL Electron binary (packaged .app binary or a dev `electron .` launcher),
++// attaches over CDP (Node >= 22 built-in WebSocket), and asserts the H1 runtime
++// contract inside the live renderer:
++//
++//   1. the sandboxed preload actually loaded (no "Unable to load preload script")
++//   2. window.electronAPI exists with EXACTLY {platform, getAppVersion}
++//   3. electronAPI.getAppVersion() resolves to the expected app version
++//   4. api.getStats().version reports that same version (renderer display path)
++//   5. no fabricated '1.0.0' anywhere in the reported values
++//   6. ipcRenderer is NOT reachable from the page (bridge minimality)
++//
++// This harness is LOCAL EVIDENCE tooling: it requires a built binary, so it is not
++// part of the install-free `npm test` chain. Profile isolation is the CALLER's job
++// (macOS Electron ignores $HOME for userData — move the real profile aside first).
++//
++// Usage:
++//   node tests/packaged/h1-packaged-runtime.mjs <binaryPath> <expectedVersion> [label]
++// Exit code 0 = all checks passed; 1 = failures; 2 = fatal (boot/CDP failure).
++import { spawn } from 'node:child_process';
++
++const [bin, expectedVersion, label = 'packaged'] = process.argv.slice(2);
++if (!bin || !expectedVersion) {
++  console.error('usage: node h1-packaged-runtime.mjs <binaryPath> <expectedVersion> [label]');
++  process.exit(2);
++}
++const PORT = 9333;
++
++const child = spawn(bin, [`--remote-debugging-port=${PORT}`], {
++  env: { ...process.env, ELECTRON_ENABLE_LOGGING: '1' },
++  stdio: ['ignore', 'pipe', 'pipe'],
++});
++let logBuf = '';
++child.stdout.on('data', (d) => { logBuf += d; });
++child.stderr.on('data', (d) => { logBuf += d; });
++
++const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
++
++async function cdpPage() {
++  for (let i = 0; i < 40; i++) {
++    try {
++      const list = await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();
++      const page = list.find((t) => t.type === 'page');
++      if (page) return page;
++    } catch (_) { /* not up yet */ }
++    await sleep(500);
++  }
++  throw new Error('CDP page target never appeared');
++}
++
++let ws, msgId = 0;
++const pending = new Map();
++function send(method, params) {
++  return new Promise((resolve, reject) => {
++    const id = ++msgId;
++    pending.set(id, { resolve, reject });
++    ws.send(JSON.stringify({ id, method, params }));
++    setTimeout(() => { if (pending.has(id)) { pending.delete(id); reject(new Error('CDP timeout: ' + method)); } }, 15000);
++  });
++}
++async function evalJs(expression) {
++  const m = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
++  const r = m.result;
++  if (r.exceptionDetails) throw new Error('eval threw: ' + JSON.stringify(r.exceptionDetails.exception?.description || r.exceptionDetails.text));
++  return r.result.value;
++}
++
++const results = [];
++function chk(name, ok, extra) {
++  results.push({ name, ok: !!ok });
++  console.log((ok ? '  ✓ ' : '  ✗ ') + `[${label}] ` + name + (extra !== undefined && !ok ? ' :: ' + JSON.stringify(extra) : ''));
++}
++
++try {
++  const page = await cdpPage();
++  ws = new WebSocket(page.webSocketDebuggerUrl);
++  await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
++  ws.onmessage = (ev) => {
++    const m = JSON.parse(ev.data);
++    if (m.id && pending.has(m.id)) { pending.get(m.id).resolve(m); pending.delete(m.id); }
++  };
++  await sleep(4000); // let preload IPC + Alpine settle
++
++  // 1. preload actually loaded
++  chk('preload loaded (no "Unable to load preload script" in logs)', !/Unable to load preload script/.test(logBuf));
++  chk('no module-not-found preload crash in logs', !/module not found/.test(logBuf), logBuf.slice(-300));
++
++  // 2. bridge surface is exactly {platform, getAppVersion}
++  const surface = await evalJs('typeof electronAPI === "object" && electronAPI ? Object.keys(electronAPI).sort() : null');
++  chk('electronAPI exists', Array.isArray(surface), surface);
++  chk('electronAPI surface EXACTLY [getAppVersion, platform]', JSON.stringify(surface) === JSON.stringify(['getAppVersion', 'platform']), surface);
++  const platform = await evalJs('electronAPI.platform');
++  chk('electronAPI.platform is a known platform string', typeof platform === 'string' && ['darwin', 'win32', 'linux'].includes(platform), platform);
++
++  // 3. version authority round-trip
++  const v = await evalJs('electronAPI.getAppVersion()');
++  chk(`getAppVersion() === ${expectedVersion}`, v === expectedVersion, v);
++  chk('getAppVersion() never fabricates 1.0.0', v !== '1.0.0', v);
++
++  // 4. renderer display path (api.getStats)
++  const statsV = await evalJs('(function(){ try { return api.getStats().version; } catch (e) { return "THREW:" + e.message; } })()');
++  chk(`api.getStats().version === ${expectedVersion} (startup-resolved)`, statsV === expectedVersion, statsV);
++  chk('getStats().version is never the fabricated 1.0.0', statsV !== '1.0.0', statsV);
++
++  // 6. bridge minimality: no ipcRenderer/require/process reachable from the page
++  const leaks = await evalJs('JSON.stringify({ ipcRenderer: typeof ipcRenderer, require: typeof require, processObj: typeof process, electronAPIinvoke: typeof (electronAPI.invoke || electronAPI.send) })');
++  chk('page cannot reach ipcRenderer/require/process and bridge has no generic invoke/send',
++    leaks === JSON.stringify({ ipcRenderer: 'undefined', require: 'undefined', processObj: 'undefined', electronAPIinvoke: 'undefined' }), leaks);
++
++  const failed = results.filter((r) => !r.ok).length;
++  console.log(`H1-RUNTIME(${label}): ${results.length - failed} passed, ${failed} failed`);
++  child.kill('SIGTERM');
++  await sleep(800);
++  process.exit(failed ? 1 : 0);
++} catch (e) {
++  console.error(`H1-RUNTIME(${label}) FATAL: ` + e.message);
++  console.error('log tail: ' + logBuf.slice(-400));
++  child.kill('SIGKILL');
++  process.exit(2);
++}
+
+codex
+HEAD matches the requested commit. The changed-file set is limited to the eight declared H1 files; I’m now checking runtime ordering, renderer failure behavior, and whether the strengthened structural tests have parsing blind spots.
+exec
+/bin/bash -lc "nl -ba main.js; nl -ba preload.js; nl -ba renderer/js/api.js | sed -n '185,270p'; nl -ba tests/e2e/flow-09-electron-smoke.test.js; nl -ba tests/e2e/hardening-01-electron-boundary.test.js | sed -n '1,300p'; nl -ba tests/packaged/h1-packaged-runtime.mjs; git diff 0563f119e2bdfced959b7a808cf292e0f883807f..HEAD -- package.json; rg -n \"1\\.0\\.0|package\\.json|app:get-version|ipcMain\\.(on|once|handle)|ipcRenderer|electronAPI|app\\.getVersion|getStats\\(\\).*version\" main.js preload.js renderer tests --glob '"'!renderer/lib/**'"'" in /Users/SKYLINE/Claude/worktrees/f6-release
+ succeeded in 0ms:
+     1	const { app, BrowserWindow, ipcMain } = require('electron');
+     2	const path = require('path');
+     3	
+     4	// The ONE allowlisted IPC channel. app.getVersion() is the single version authority
+     5	// (the packaged bundle version; the renderer never reads package.json). Any new
+     6	// channel added here is a reviewed governance change, never an incidental edit.
+     7	const APP_VERSION_CHANNEL = 'app:get-version';
+     8	
+     9	function registerIpcHandlers() {
+    10	  // removeHandler-first makes registration idempotent (double-registration guard).
+    11	  ipcMain.removeHandler(APP_VERSION_CHANNEL);
+    12	  ipcMain.handle(APP_VERSION_CHANNEL, () => app.getVersion());
+    13	}
+    14	
+    15	function createWindow() {
+    16	  const win = new BrowserWindow({
+    17	    width: 1400,
+    18	    height: 900,
+    19	    minWidth: 1000,
+    20	    minHeight: 700,
+    21	    webPreferences: {
+    22	      preload: path.join(__dirname, 'preload.js'),
+    23	      contextIsolation: true,
+    24	      nodeIntegration: false,
+    25	    },
+    26	    titleBarStyle: 'hiddenInset',
+    27	    backgroundColor: '#0b1120',
+    28	    title: 'Racing Setup Analyzer',
+    29	  });
+    30	
+    31	  win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+    32	}
+    33	
+    34	app.whenReady().then(() => {
+    35	  registerIpcHandlers();
+    36	  createWindow();
+    37	});
+    38	
+    39	app.on('window-all-closed', () => {
+    40	  app.quit();
+    41	});
+    42	
+    43	app.on('activate', () => {
+    44	  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    45	});
+     1	// Preload — the ONLY bridge between main and renderer. Runs sandboxed (Electron
+     2	// default): no arbitrary require, no Node primitives leak. The exposed surface is
+     3	// exactly { platform, getAppVersion } — never ipcRenderer itself, never a generic
+     4	// send/invoke, never a caller-chosen channel.
+     5	const { contextBridge, ipcRenderer } = require('electron');
+     6	
+     7	// Single allowlisted channel — MUST stay in lockstep with main.js APP_VERSION_CHANNEL.
+     8	const APP_VERSION_CHANNEL = 'app:get-version';
+     9	const APP_VERSION_TIMEOUT_MS = 3000;
+    10	
+    11	// Fail-closed version query: any failure (IPC error, timeout, malformed reply)
+    12	// resolves to the literal 'unavailable' — never a fabricated version — and is
+    13	// observable on the console. Callers never crash on version failure.
+    14	function getAppVersion() {
+    15	  return Promise.race([
+    16	    ipcRenderer.invoke(APP_VERSION_CHANNEL),
+    17	    new Promise((resolve, reject) => {
+    18	      setTimeout(() => reject(new Error('APP_VERSION_TIMEOUT')), APP_VERSION_TIMEOUT_MS);
+    19	    }),
+    20	  ])
+    21	    .then((v) => {
+    22	      // Strict SemVer 2.0.0 (semver.org): no leading zeros, dot-separated non-empty
+    23	      // pre-release/build identifiers — '01.2.3', '1.2.3-..', '1.2.3+.' all fail.
+    24	      const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
+    25	      if (typeof v === 'string' && SEMVER.test(v)) return v;
+    26	      throw new Error('APP_VERSION_MALFORMED');
+    27	    })
+    28	    .catch((err) => {
+    29	      console.warn('[preload] app version unavailable:', err && err.message);
+    30	      return 'unavailable';
+    31	    });
+    32	}
+    33	
+    34	contextBridge.exposeInMainWorld('electronAPI', {
+    35	  platform: process.platform,
+    36	  getAppVersion,
+    37	});
+   185	  simulateLihpao(setup) {
+   186	    if (typeof simulateLihpao === 'undefined') return { error: 'lihpao-laptime.js not loaded' };
+   187	    return simulateLihpao(setup);
+   188	  },
+   189	
+   190	  // === Stats ===
+   191	
+   192	  /** Get app stats */
+   193	  getStats() {
+   194	    return {
+   195	      trackday_tires: typeof TRACKDAY_TIRES !== 'undefined' ? Object.keys(TRACKDAY_TIRES).length : 0,
+   196	      car_presets: typeof CAR_PRESETS !== 'undefined' ? Object.keys(CAR_PRESETS).length : 0,
+   197	      // Honest version reporting: the resolved app version, or the literal
+   198	      // 'unavailable' while unresolved / when the preload bridge is absent.
+   199	      // NEVER a fabricated fallback version.
+   200	      version: api._appVersion,
+   201	    };
+   202	  },
+   203	
+   204	  // Resolved once at startup via the preload bridge (electronAPI.getAppVersion()
+   205	  // -> main-process app.getVersion(), the single version authority). Stays
+   206	  // 'unavailable' if the bridge is missing or the query fails — observable on
+   207	  // the console, never masked by a fake version, never a crash.
+   208	  _appVersion: 'unavailable',
+   209	};
+   210	
+   211	(function resolveAppVersion() {
+   212	  if (typeof electronAPI !== 'undefined' && electronAPI && typeof electronAPI.getAppVersion === 'function') {
+   213	    electronAPI.getAppVersion().then(function (v) {
+   214	      api._appVersion = (typeof v === 'string' && v) ? v : 'unavailable';
+   215	    }).catch(function (err) {
+   216	      console.warn('[api] app version query failed:', err && err.message);
+   217	    });
+   218	  } else {
+   219	    console.warn('[api] electronAPI bridge not present — preload did not initialize; version reporting stays "unavailable"');
+   220	  }
+   221	})();
+     1	/**
+     2	 * tests/e2e/flow-09-electron-smoke.test.js — R3.0F F2 · Electron startup smoke.
+     3	 *
+     4	 * Verifies the Electron host process can be invoked and reports a version. This is a SMOKE
+     5	 * test only — it does NOT launch a window or render the UI (that would require GUI display
+     6	 * which is not always available in CI). The smoke confirms:
+     7	 *   • electron CLI is reachable (devDependency installed)
+     8	 *   • main.js has a stable Electron-compatible entry shape (already covered by the require
+     9	 *     in other unit tests; here we just confirm the version handshake)
+    10	 *   • preload.js exposes only the minimal contextBridge surface (no nodeIntegration leak)
+    11	 * Zero console error.
+    12	 */
+    13	'use strict';
+    14	var H = require('./helpers/flow-harness.js');
+    15	var t = H.makeChk();
+    16	var chk = t.chk;
+    17	var cp = require('child_process');
+    18	var path = require('path');
+    19	var fs = require('fs');
+    20	
+    21	var h = H.createFlowHarness({ stamp: '2026-07-01T00:00:00.000Z' });
+    22	try {
+    23	  // Step 1: electron is declared in package.json devDependencies (repo source). Its actual
+    24	  // installation in node_modules may be absent in CI dependency-free lanes where `npm install`
+    25	  // is not run; the structural contracts at steps 3-4 still validate without node_modules.
+    26	  var pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf8'));
+    27	  chk('electron declared in package.json devDependencies', !!(pkgJson.devDependencies && pkgJson.devDependencies.electron));
+    28	  chk('electron devDep version range non-empty', typeof (pkgJson.devDependencies && pkgJson.devDependencies.electron) === 'string' && pkgJson.devDependencies.electron.length > 0);
+    29	
+    30	  // Step 2: validate the electron version range declared in package.json. CI dependency-free
+    31	  // lanes don't ship node_modules/electron, so we deliberately AVOID require('electron/...') —
+    32	  // that would be classified as a bare third-party import by the dep-audit. The declared range
+    33	  // ('^33.0.0' or similar) is enough to confirm the build target.
+    34	  var declaredRange = pkgJson.devDependencies && pkgJson.devDependencies.electron;
+    35	  chk('declared electron version range is a valid semver-range string', typeof declaredRange === 'string' && /^[\^~]?\d+\.\d+\.\d+/.test(declaredRange));
+    36	
+    37	  // Step 3: main.js exists + structurally sound (contextIsolation: true, nodeIntegration: false)
+    38	  var mainPath = path.join(__dirname, '..', '..', 'main.js');
+    39	  var mainSrc = fs.readFileSync(mainPath, 'utf8');
+    40	  chk('main.js contextIsolation: true', /contextIsolation\s*:\s*true/.test(mainSrc));
+    41	  chk('main.js nodeIntegration: false', /nodeIntegration\s*:\s*false/.test(mainSrc));
+    42	  chk('main.js loads preload.js', /preload\.js/.test(mainSrc));
+    43	
+    44	  // Step 4: preload.js exposes ONLY minimal contextBridge surface
+    45	  var preloadPath = path.join(__dirname, '..', '..', 'preload.js');
+    46	  var preloadSrc = fs.readFileSync(preloadPath, 'utf8');
+    47	  chk('preload.js uses contextBridge', /contextBridge/.test(preloadSrc));
+    48	  // H1: the preload DOES use ipcRenderer.invoke on the single allowlisted constant
+    49	  // channel (app:get-version) — the boundary contract (never exposed raw, no generic
+    50	  // send/on, one channel only) is enforced exhaustively in hardening-01.
+    51	  chk('preload.js uses ONLY the allowlisted invoke (no send/on/generic IPC)', /ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL/.test(preloadSrc) && !/ipcRenderer\s*\.\s*(send|sendSync|on|once)\b/.test(preloadSrc));
+    52	  chk('preload.js does NOT use require(fs|child_process|net|http)', !/require\(['"](?:fs|child_process|net|http|https)['"]\)/.test(preloadSrc));
+    53	
+    54	  // Step 5: zero console error
+    55	  chk('zero console.error during electron smoke', h.consoleErrorCount === 0);
+    56	} finally {
+    57	  h.dispose();
+    58	}
+    59	
+    60	t.report('e2e-flow-09-electron-smoke');
+     1	/**
+     2	 * tests/e2e/hardening-01-electron-boundary.test.js — R3.0F F3 · Electron renderer boundary.
+     3	 *
+     4	 * Asserts the Electron host enforces the strictest renderer-process isolation:
+     5	 *   • contextIsolation: true (per Electron security best practices)
+     6	 *   • nodeIntegration: false (no Node API access from renderer)
+     7	 *   • preload.js exposes ONLY the minimal contextBridge surface
+     8	 *   • preload.js does NOT load fs / child_process / net / http / https / ipcRenderer
+     9	 *   • main.js does NOT enable unsafe webPreferences flags (allowRunningInsecureContent,
+    10	 *     webSecurity: false, experimentalFeatures, sandbox: false-override)
+    11	 *   • main.js Content-Security-Policy not weakened
+    12	 * Zero console error.
+    13	 */
+    14	'use strict';
+    15	var H = require('./helpers/flow-harness.js');
+    16	var t = H.makeChk();
+    17	var chk = t.chk;
+    18	var fs = require('fs');
+    19	var path = require('path');
+    20	
+    21	var h = H.createFlowHarness({ stamp: '2026-07-01T00:00:00.000Z' });
+    22	try {
+    23	  var mainPath = path.join(__dirname, '..', '..', 'main.js');
+    24	  var mainRaw = fs.readFileSync(mainPath, 'utf8');
+    25	  var preloadPath = path.join(__dirname, '..', '..', 'preload.js');
+    26	  var preloadRaw = fs.readFileSync(preloadPath, 'utf8');
+    27	  var indexPath = path.join(__dirname, '..', '..', 'renderer', 'index.html');
+    28	  var indexSrc = fs.readFileSync(indexPath, 'utf8');
+    29	
+    30	  // F3-R4-01 closure: lexical scanner now also recognizes regex literals (including character
+    31	  // classes like `/[/*]/` that contain `/` and `*`). Without regex tracking, the scanner would
+    32	  // see `/[` and enter block-comment mode, truncating the rest of the source.
+    33	  // Strategy: determine if a `/` starts a regex literal by looking back at the last meaningful
+    34	  // non-whitespace character. Regex follows operators, keywords, `(`, `[`, `{`, `,`, `;`, `:`,
+    35	  // `!`, `=`, `?`, `&`, `|`, `^`, `~`, `<`, `>`, `+`, `-`, `*`, `%`, `return`, `typeof`, etc.
+    36	  // After identifiers, `]`, `)`, numbers, or string literals, `/` is division.
+    37	  function stripJsComments(src) {
+    38	    var out = '';
+    39	    var i = 0;
+    40	    var n = src.length;
+    41	    var inStr = false;
+    42	    var strCh = '';
+    43	    var lastSig = ''; // last significant character (non-whitespace, non-comment)
+    44	    // F3-R5-01 closure: track a boolean keyword-context flag alongside lastSig.
+    45	    var lastWasRegexPrecedingKw = false;
+    46	    function couldStartRegex(prev) {
+    47	      if (lastWasRegexPrecedingKw) return true;
+    48	      if (prev === '') return true;
+    49	      if ('([{,;:!=?&|^~<>+-*%'.indexOf(prev) !== -1) return true;
+    50	      return false;
+    51	    }
+    52	    var REGEX_PRECEDING_KEYWORDS = ['return', 'throw', 'typeof', 'void', 'delete', 'case', 'yield', 'await', 'in', 'of', 'new', 'instanceof', 'do', 'else'];
+    53	    function readIdent(s, start) {
+    54	      var j = start;
+    55	      while (j < s.length && /[A-Za-z0-9_$]/.test(s.charAt(j))) j++;
+    56	      return s.slice(start, j);
+    57	    }
+    58	    while (i < n) {
+    59	      var ch = src.charAt(i);
+    60	      var nxt = i + 1 < n ? src.charAt(i + 1) : '';
+    61	      if (inStr) {
+    62	        if (ch === '\\' && i + 1 < n) { out += ch + nxt; i += 2; continue; }
+    63	        if (ch === strCh) { inStr = false; out += ch; i++; lastSig = ch; continue; }
+    64	        out += ch; i++; continue;
+    65	      }
+    66	      if (ch === '/' && nxt === '/') {
+    67	        while (i < n && src.charAt(i) !== '\n') i++;
+    68	        continue;
+    69	      }
+    70	      if (ch === '/' && nxt === '*') {
+    71	        i += 2;
+    72	        while (i < n && !(src.charAt(i) === '*' && i + 1 < n && src.charAt(i + 1) === '/')) i++;
+    73	        if (i < n) i += 2;
+    74	        continue;
+    75	      }
+    76	      // Identifier — track if it is a regex-preceding keyword
+    77	      if (/[A-Za-z_$]/.test(ch)) {
+    78	        var ident = readIdent(src, i);
+    79	        out += ident;
+    80	        i += ident.length;
+    81	        if (REGEX_PRECEDING_KEYWORDS.indexOf(ident) !== -1) {
+    82	          lastWasRegexPrecedingKw = true;
+    83	        } else {
+    84	          lastWasRegexPrecedingKw = false;
+    85	        }
+    86	        lastSig = ident.charAt(ident.length - 1);
+    87	        continue;
+    88	      }
+    89	      // F3-R6-01 closure: numbers also consume keyword context.
+    90	      if (/[0-9]/.test(ch)) {
+    91	        var numStart = i;
+    92	        while (i < n && /[0-9.eE_xboBOXn+\-]/.test(src.charAt(i))) {
+    93	          // accept digits, fractional/exp/separator/bin-oct-hex/BigInt-n; signs only inside exponent
+    94	          var nc = src.charAt(i);
+    95	          if ((nc === '+' || nc === '-') && i > numStart && !/[eE]/.test(src.charAt(i - 1))) break;
+    96	          i++;
+    97	        }
+    98	        out += src.slice(numStart, i);
+    99	        lastWasRegexPrecedingKw = false;
+   100	        lastSig = src.charAt(i - 1);
+   101	        continue;
+   102	      }
+   103	      // Regex literal
+   104	      if (ch === '/' && couldStartRegex(lastSig)) {
+   105	        out += ch;
+   106	        i++;
+   107	        var inCharClass = false;
+   108	        while (i < n) {
+   109	          var rc = src.charAt(i);
+   110	          out += rc;
+   111	          if (rc === '\\' && i + 1 < n) { out += src.charAt(i + 1); i += 2; continue; }
+   112	          if (rc === '[') { inCharClass = true; i++; continue; }
+   113	          if (rc === ']' && inCharClass) { inCharClass = false; i++; continue; }
+   114	          if (rc === '/' && !inCharClass) { i++; break; }
+   115	          if (rc === '\n') { break; }
+   116	          i++;
+   117	        }
+   118	        while (i < n && /[gimsuyd]/.test(src.charAt(i))) { out += src.charAt(i); i++; }
+   119	        lastSig = '/';
+   120	        continue;
+   121	      }
+   122	      if (ch === '"' || ch === "'" || ch === '`') {
+   123	        inStr = true; strCh = ch; out += ch; i++;
+   124	        lastWasRegexPrecedingKw = false;
+   125	        continue;
+   126	      }
+   127	      out += ch;
+   128	      if (!/\s/.test(ch)) {
+   129	        lastSig = ch;
+   130	        lastWasRegexPrecedingKw = false; // F3-R6-01: any non-whitespace operator/punct clears kw flag
+   131	      }
+   132	      i++;
+   133	    }
+   134	    return out;
+   135	  }
+   136	  var mainSrc = stripJsComments(mainRaw);
+   137	  var preloadSrc = stripJsComments(preloadRaw);
+   138	
+   139	  // F3-R7-01 closure: enumerate ALL `webPreferences: { ... }` occurrences in main.js, not just
+   140	  // the first one. Multiple BrowserWindow constructors must each pass the security audit.
+   141	  function extractAllWebPrefsBodies(src) {
+   142	    var bodies = [];
+   143	    var startIdx = 0;
+   144	    while (true) {
+   145	      var sub = src.slice(startIdx);
+   146	      var startMatch = sub.match(/webPreferences\s*:\s*\{/);
+   147	      if (!startMatch) break;
+   148	      var absStart = startIdx + startMatch.index + startMatch[0].length;
+   149	      var depth = 1;
+   150	      var i = absStart;
+   151	      var inStr = false;
+   152	      var strCh = '';
+   153	      while (i < src.length && depth > 0) {
+   154	        var ch = src.charAt(i);
+   155	        if (inStr) {
+   156	          if (ch === '\\' && i + 1 < src.length) { i += 2; continue; }
+   157	          if (ch === strCh) { inStr = false; }
+   158	        } else {
+   159	          if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; }
+   160	          else if (ch === '{') depth++;
+   161	          else if (ch === '}') { depth--; if (depth === 0) { bodies.push(src.slice(absStart, i)); break; } }
+   162	        }
+   163	        i++;
+   164	      }
+   165	      startIdx = i + 1;
+   166	      if (startIdx >= src.length) break;
+   167	    }
+   168	    return bodies;
+   169	  }
+   170	  var wpBodies = extractAllWebPrefsBodies(mainSrc);
+   171	  chk('main.js declares at least one webPreferences block', wpBodies.length >= 1, { count: wpBodies.length });
+   172	
+   173	  for (var wpi = 0; wpi < wpBodies.length; wpi++) {
+   174	    var wpBody = wpBodies[wpi];
+   175	    var lbl = 'webPreferences[' + wpi + ']';
+   176	    chk(lbl + ' uses NO computed-key syntax for security flags',
+   177	      !/\[\s*['"`](?:contextIsolation|nodeIntegration|webSecurity|allowRunningInsecureContent|experimentalFeatures|enableRemoteModule|nodeIntegrationInWorker|nodeIntegrationInSubFrames|sandbox)['"`]\s*\]\s*:/.test(wpBody));
+   178	
+   179	    // F3-R9-01 closure: reject any spread `...` inside webPreferences. A spread can carry
+   180	    // unsafe overrides that the static-flag audit cannot see.
+   181	    chk(lbl + ' uses NO spread operator', !/\.\.\./.test(wpBody));
+   182	
+   183	    chk(lbl + '.contextIsolation === literal true', /(^|[\s,{])contextIsolation\s*:\s*true\s*(,|$|\s)/m.test(wpBody));
+   184	    chk(lbl + '.nodeIntegration === literal false', /(^|[\s,{])nodeIntegration\s*:\s*false\s*(,|$|\s)/m.test(wpBody));
+   185	
+   186	    // F3-R10-01 closure: reject any unsafe redeclaration. JS uses the LAST value for duplicate
+   187	    // keys; a contributor leaving both `contextIsolation: true` and later `contextIsolation: false`
+   188	    // would silently flip the effective value. Reject ANY occurrence of the unsafe literal +
+   189	    // assert exactly ONE occurrence of each required key.
+   190	    chk(lbl + ' has NO contextIsolation: false anywhere', !/contextIsolation\s*:\s*false/.test(wpBody));
+   191	    chk(lbl + ' has NO nodeIntegration: true anywhere', !/nodeIntegration\s*:\s*true/.test(wpBody));
+   192	    var ciCount = (wpBody.match(/(^|[\s,{])contextIsolation\s*:/g) || []).length;
+   193	    var niCount = (wpBody.match(/(^|[\s,{])nodeIntegration\s*:/g) || []).length;
+   194	    chk(lbl + ' declares contextIsolation EXACTLY ONCE', ciCount === 1, { count: ciCount });
+   195	    chk(lbl + ' declares nodeIntegration EXACTLY ONCE', niCount === 1, { count: niCount });
+   196	
+   197	    chk(lbl + '.allowRunningInsecureContent NOT set to true', !/allowRunningInsecureContent\s*:\s*true/.test(wpBody));
+   198	    chk(lbl + '.webSecurity NOT set to false', !/webSecurity\s*:\s*false/.test(wpBody));
+   199	    chk(lbl + '.experimentalFeatures NOT set to true', !/experimentalFeatures\s*:\s*true/.test(wpBody));
+   200	    chk(lbl + '.enableRemoteModule NOT set to true', !/enableRemoteModule\s*:\s*true/.test(wpBody));
+   201	    chk(lbl + '.nodeIntegrationInWorker NOT set to true', !/nodeIntegrationInWorker\s*:\s*true/.test(wpBody));
+   202	    chk(lbl + '.nodeIntegrationInSubFrames NOT set to true', !/nodeIntegrationInSubFrames\s*:\s*true/.test(wpBody));
+   203	    // F3-R8-01 closure: sandbox must NOT be explicitly disabled. If the key is present, it
+   204	    // must be set to literal `true`. If absent, Electron's default (sandbox enabled when
+   205	    // contextIsolation:true) applies.
+   206	    chk(lbl + '.sandbox NOT set to false', !/(^|[\s,{])sandbox\s*:\s*false\s*(,|$|\s)/m.test(wpBody));
+   207	    if (/(^|[\s,{])sandbox\s*:/.test(wpBody)) {
+   208	      chk(lbl + '.sandbox (when set) === literal true', /(^|[\s,{])sandbox\s*:\s*true\s*(,|$|\s)/m.test(wpBody));
+   209	    }
+   210	  }
+   211	
+   212	  // H1: renderer version-reporting honesty — api.js must never fabricate a version.
+   213	  var apiSrc = stripJsComments(fs.readFileSync(path.join(__dirname, '..', '..', 'renderer', 'js', 'api.js'), 'utf8'));
+   214	  chk('api.js has NO fabricated 1.0.0 version literal', !/['"`]1\.0\.0['"`]/.test(apiSrc));
+   215	  chk('api.js defaults version reporting to the literal unavailable', /_appVersion\s*:\s*['"`]unavailable['"`]/.test(apiSrc));
+   216	  chk('api.js never reads a synchronous electronAPI.version field (pre-H1 shape)', !/electronAPI\s*\.\s*version\b/.test(apiSrc));
+   217	  chk('api.js resolves the version via electronAPI.getAppVersion()', /electronAPI\s*\.\s*getAppVersion\s*\(/.test(apiSrc));
+   218	  chk('api.js missing-bridge path is observable (console.warn)', /console\.warn\([^)]*electronAPI/.test(apiSrc));
+   219	
+   220	  // H1: main.js IPC surface — exactly ONE allowlisted handle() on the constant
+   221	  // channel, removeHandler-first (idempotent double-registration guard), and no
+   222	  // generic/dynamic channel registration anywhere.
+   223	  var handleCalls = mainSrc.match(/ipcMain\s*\.\s*handle\s*\(/g) || [];
+   224	  chk('main.js registers EXACTLY one ipcMain.handle', handleCalls.length === 1, { count: handleCalls.length });
+   225	  chk('main.js handle uses the APP_VERSION_CHANNEL constant', /ipcMain\s*\.\s*handle\s*\(\s*APP_VERSION_CHANNEL\s*,/.test(mainSrc));
+   226	  chk('main.js channel constant = app:get-version', /APP_VERSION_CHANNEL\s*=\s*['"`]app:get-version['"`]/.test(mainSrc));
+   227	  chk('main.js removeHandler-first double-registration guard', /ipcMain\s*\.\s*removeHandler\s*\(\s*APP_VERSION_CHANNEL\s*\)/.test(mainSrc));
+   228	  chk('main.js handler returns app.getVersion() (single version authority)', /handle\s*\(\s*APP_VERSION_CHANNEL\s*,\s*\(\s*\)\s*=>\s*app\.getVersion\(\)\s*\)/.test(mainSrc));
+   229	  chk('main.js has NO ipcMain.on/once (no fire-and-forget channels)', !/ipcMain\s*\.\s*(on|once|addListener)\b/.test(mainSrc));
+   230	
+   231	  // Step 2: preload.js minimal surface — post-strip checks (no comment-decoy false positives)
+   232	  chk('preload.js uses contextBridge', /contextBridge/.test(preloadSrc));
+   233	  // H1: the preload legitimately uses ipcRenderer.invoke on the single allowlisted
+   234	  // constant channel. The boundary contract is now: (a) ipcRenderer itself is never
+   235	  // placed on the exposed surface, (b) no generic send/sendSync/on/postMessage entry,
+   236	  // (c) invoke is called ONLY with the APP_VERSION_CHANNEL constant, (d) exactly one
+   237	  // channel constant exists and it is the allowlisted literal.
+   238	  chk('preload.js never exposes ipcRenderer on the bridge surface', !/exposeInMainWorld[\s\S]*?ipcRenderer\s*[,}]/.test(preloadSrc));
+   239	  chk('preload.js has NO generic ipcRenderer.send/sendSync/on/once/postMessage', !/ipcRenderer\s*\.\s*(send|sendSync|sendToHost|on|once|addListener|postMessage)\b/.test(preloadSrc));
+   240	  var invokeCalls = preloadSrc.match(/ipcRenderer\s*\.\s*invoke\s*\(\s*([A-Za-z_$][\w$]*|['"`][^'"`]*['"`])/g) || [];
+   241	  chk('preload.js ipcRenderer.invoke is used EXACTLY once', invokeCalls.length === 1, { invokeCalls: invokeCalls });
+   242	  // H1-R2-01 closure: STRUCTURAL token accounting — regex-shape checks alone allow
+   243	  // closure-alias smuggling (e.g. an outer `leak = (...args) => ipcRenderer.invoke(...args)`
+   244	  // returned by getAppVersion while one unreachable allowlisted call satisfies the
+   245	  // count). The invariant below is alias-proof: after removing the ONLY two legal
+   246	  // appearances (the fixed destructure and the exact allowlisted invoke), the token
+   247	  // `ipcRenderer` must not appear ANYWHERE else in the file — any alias assignment,
+   248	  // re-destructure, spread, or argument-forwarding wrapper leaves a residue and fails.
+   249	  function ipcResidue(src) {
+   250	    return src
+   251	      .replace(/const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/, '')
+   252	      .replace(/ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*\)/, '');
+   253	  }
+   254	  chk('preload.js ipcRenderer token accounting: ZERO appearances outside the two legal sites',
+   255	    !/ipcRenderer/.test(ipcResidue(preloadSrc)),
+   256	    { residue: (ipcResidue(preloadSrc).match(/.{0,50}ipcRenderer.{0,50}/) || [])[0] });
+   257	  chk('preload.js has EXACTLY one require(), the fixed electron destructure',
+   258	    (preloadSrc.match(/require\s*\(/g) || []).length === 1 && /const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/.test(preloadSrc));
+   259	  chk('preload.js has NO rest/spread token anywhere (post-strip)', preloadSrc.indexOf('...') === -1);
+   260	  // Self-test: the exact round-2 attack shape MUST be caught by the residue invariant.
+   261	  (function adversarialSelfTest() {
+   262	    var attack = preloadSrc.replace('contextBridge.exposeInMainWorld', 'var leak = function () { return ipcRenderer; };\ncontextBridge.exposeInMainWorld');
+   263	    chk('SELF-TEST: alias-smuggling shape is caught by the residue invariant', /ipcRenderer/.test(ipcResidue(attack)));
+   264	  })();
+   265	  chk('preload.js invoke uses the APP_VERSION_CHANNEL constant (no inline/caller-chosen channel)', /ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*[),]/.test(preloadSrc));
+   266	  var channelConsts = preloadSrc.match(/APP_VERSION_CHANNEL\s*=\s*['"`]([^'"`]+)['"`]/g) || [];
+   267	  chk('preload.js declares exactly one channel constant = app:get-version', channelConsts.length === 1 && /['"`]app:get-version['"`]/.test(channelConsts[0]), { channelConsts: channelConsts });
+   268	  chk('preload.js does NOT require ./package.json (the pre-H1 sandbox crash)', !/require\s*\(\s*['"]\.\/package\.json['"]\s*\)/.test(preloadSrc));
+   269	  chk('preload.js never fabricates a version literal', !/['"`]1\.0\.0['"`]/.test(preloadSrc));
+   270	  chk('preload.js does NOT require fs (post-strip)', !/require\s*\(\s*['"]fs['"]\s*\)/.test(preloadSrc));
+   271	  chk('preload.js does NOT require child_process (post-strip)', !/require\s*\(\s*['"]child_process['"]\s*\)/.test(preloadSrc));
+   272	  chk('preload.js does NOT require net (post-strip)', !/require\s*\(\s*['"]net['"]\s*\)/.test(preloadSrc));
+   273	  chk('preload.js does NOT require http (post-strip)', !/require\s*\(\s*['"]http['"]\s*\)/.test(preloadSrc));
+   274	  chk('preload.js does NOT require https (post-strip)', !/require\s*\(\s*['"]https['"]\s*\)/.test(preloadSrc));
+   275	  chk('preload.js does NOT require os (post-strip)', !/require\s*\(\s*['"]os['"]\s*\)/.test(preloadSrc));
+   276	  chk('preload.js does NOT eval untrusted content (post-strip)', !/eval\s*\(|new\s+Function\s*\(/.test(preloadSrc));
+   277	
+   278	  // F3-R8-02 closure: enumerate EVERY exposeInMainWorld call. There must be EXACTLY ONE
+   279	  // and its surface must be exactly {platform, version}.
+   280	  // F3-R9-02 closure: also detect computed-form contextBridge['exposeInMainWorld'] calls.
+   281	  function extractAllExposedSurfaces(src) {
+   282	    var entries = [];
+   283	    var startIdx = 0;
+   284	    while (true) {
+   285	      var sub = src.slice(startIdx);
+   286	      // Dot form OR computed form OR alias-via-destructure (latter detected separately below).
+   287	      var sm = sub.match(/contextBridge\s*(?:\.exposeInMainWorld|\[\s*['"`]exposeInMainWorld['"`]\s*\])\s*\(\s*(['"`])([^'"`]+)\1\s*,\s*\{/);
+   288	      if (!sm) break;
+   289	      var absStart = startIdx + sm.index + sm[0].length;
+   290	      var worldName = sm[2];
+   291	      var depth = 1;
+   292	      var i = absStart;
+   293	      var inStr = false;
+   294	      var strCh = '';
+   295	      while (i < src.length && depth > 0) {
+   296	        var ch = src.charAt(i);
+   297	        if (inStr) {
+   298	          if (ch === '\\' && i + 1 < src.length) { i += 2; continue; }
+   299	          if (ch === strCh) { inStr = false; }
+   300	        } else {
+     1	// H1 packaged-runtime verification harness.
+     2	//
+     3	// Boots a REAL Electron binary (packaged .app binary or a dev `electron .` launcher),
+     4	// attaches over CDP (Node >= 22 built-in WebSocket), and asserts the H1 runtime
+     5	// contract inside the live renderer:
+     6	//
+     7	//   1. the sandboxed preload actually loaded (no "Unable to load preload script")
+     8	//   2. window.electronAPI exists with EXACTLY {platform, getAppVersion}
+     9	//   3. electronAPI.getAppVersion() resolves to the expected app version
+    10	//   4. api.getStats().version reports that same version (renderer display path)
+    11	//   5. no fabricated '1.0.0' anywhere in the reported values
+    12	//   6. ipcRenderer is NOT reachable from the page (bridge minimality)
+    13	//
+    14	// This harness is LOCAL EVIDENCE tooling: it requires a built binary, so it is not
+    15	// part of the install-free `npm test` chain. Profile isolation is the CALLER's job
+    16	// (macOS Electron ignores $HOME for userData — move the real profile aside first).
+    17	//
+    18	// Usage:
+    19	//   node tests/packaged/h1-packaged-runtime.mjs <binaryPath> <expectedVersion> [label]
+    20	// Exit code 0 = all checks passed; 1 = failures; 2 = fatal (boot/CDP failure).
+    21	import { spawn } from 'node:child_process';
+    22	
+    23	const [bin, expectedVersion, label = 'packaged'] = process.argv.slice(2);
+    24	if (!bin || !expectedVersion) {
+    25	  console.error('usage: node h1-packaged-runtime.mjs <binaryPath> <expectedVersion> [label]');
+    26	  process.exit(2);
+    27	}
+    28	const PORT = 9333;
+    29	
+    30	const child = spawn(bin, [`--remote-debugging-port=${PORT}`], {
+    31	  env: { ...process.env, ELECTRON_ENABLE_LOGGING: '1' },
+    32	  stdio: ['ignore', 'pipe', 'pipe'],
+    33	});
+    34	let logBuf = '';
+    35	child.stdout.on('data', (d) => { logBuf += d; });
+    36	child.stderr.on('data', (d) => { logBuf += d; });
+    37	
+    38	const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    39	
+    40	async function cdpPage() {
+    41	  for (let i = 0; i < 40; i++) {
+    42	    try {
+    43	      const list = await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();
+    44	      const page = list.find((t) => t.type === 'page');
+    45	      if (page) return page;
+    46	    } catch (_) { /* not up yet */ }
+    47	    await sleep(500);
+    48	  }
+    49	  throw new Error('CDP page target never appeared');
+    50	}
+    51	
+    52	let ws, msgId = 0;
+    53	const pending = new Map();
+    54	function send(method, params) {
+    55	  return new Promise((resolve, reject) => {
+    56	    const id = ++msgId;
+    57	    pending.set(id, { resolve, reject });
+    58	    ws.send(JSON.stringify({ id, method, params }));
+    59	    setTimeout(() => { if (pending.has(id)) { pending.delete(id); reject(new Error('CDP timeout: ' + method)); } }, 15000);
+    60	  });
+    61	}
+    62	async function evalJs(expression) {
+    63	  const m = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+    64	  const r = m.result;
+    65	  if (r.exceptionDetails) throw new Error('eval threw: ' + JSON.stringify(r.exceptionDetails.exception?.description || r.exceptionDetails.text));
+    66	  return r.result.value;
+    67	}
+    68	
+    69	const results = [];
+    70	function chk(name, ok, extra) {
+    71	  results.push({ name, ok: !!ok });
+    72	  console.log((ok ? '  ✓ ' : '  ✗ ') + `[${label}] ` + name + (extra !== undefined && !ok ? ' :: ' + JSON.stringify(extra) : ''));
+    73	}
+    74	
+    75	try {
+    76	  const page = await cdpPage();
+    77	  ws = new WebSocket(page.webSocketDebuggerUrl);
+    78	  await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
+    79	  ws.onmessage = (ev) => {
+    80	    const m = JSON.parse(ev.data);
+    81	    if (m.id && pending.has(m.id)) { pending.get(m.id).resolve(m); pending.delete(m.id); }
+    82	  };
+    83	  await sleep(4000); // let preload IPC + Alpine settle
+    84	
+    85	  // 1. preload actually loaded
+    86	  chk('preload loaded (no "Unable to load preload script" in logs)', !/Unable to load preload script/.test(logBuf));
+    87	  chk('no module-not-found preload crash in logs', !/module not found/.test(logBuf), logBuf.slice(-300));
+    88	
+    89	  // 2. bridge surface is exactly {platform, getAppVersion}
+    90	  const surface = await evalJs('typeof electronAPI === "object" && electronAPI ? Object.keys(electronAPI).sort() : null');
+    91	  chk('electronAPI exists', Array.isArray(surface), surface);
+    92	  chk('electronAPI surface EXACTLY [getAppVersion, platform]', JSON.stringify(surface) === JSON.stringify(['getAppVersion', 'platform']), surface);
+    93	  const platform = await evalJs('electronAPI.platform');
+    94	  chk('electronAPI.platform is a known platform string', typeof platform === 'string' && ['darwin', 'win32', 'linux'].includes(platform), platform);
+    95	
+    96	  // 3. version authority round-trip
+    97	  const v = await evalJs('electronAPI.getAppVersion()');
+    98	  chk(`getAppVersion() === ${expectedVersion}`, v === expectedVersion, v);
+    99	  chk('getAppVersion() never fabricates 1.0.0', v !== '1.0.0', v);
+   100	
+   101	  // 4. renderer display path (api.getStats)
+   102	  const statsV = await evalJs('(function(){ try { return api.getStats().version; } catch (e) { return "THREW:" + e.message; } })()');
+   103	  chk(`api.getStats().version === ${expectedVersion} (startup-resolved)`, statsV === expectedVersion, statsV);
+   104	  chk('getStats().version is never the fabricated 1.0.0', statsV !== '1.0.0', statsV);
+   105	
+   106	  // 6. bridge minimality: no ipcRenderer/require/process reachable from the page
+   107	  const leaks = await evalJs('JSON.stringify({ ipcRenderer: typeof ipcRenderer, require: typeof require, processObj: typeof process, electronAPIinvoke: typeof (electronAPI.invoke || electronAPI.send) })');
+   108	  chk('page cannot reach ipcRenderer/require/process and bridge has no generic invoke/send',
+   109	    leaks === JSON.stringify({ ipcRenderer: 'undefined', require: 'undefined', processObj: 'undefined', electronAPIinvoke: 'undefined' }), leaks);
+   110	
+   111	  const failed = results.filter((r) => !r.ok).length;
+   112	  console.log(`H1-RUNTIME(${label}): ${results.length - failed} passed, ${failed} failed`);
+   113	  child.kill('SIGTERM');
+   114	  await sleep(800);
+   115	  process.exit(failed ? 1 : 0);
+   116	} catch (e) {
+   117	  console.error(`H1-RUNTIME(${label}) FATAL: ` + e.message);
+   118	  console.error('log tail: ' + logBuf.slice(-400));
+   119	  child.kill('SIGKILL');
+   120	  process.exit(2);
+   121	}
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-y52sI5JM' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-LaVOzaSv' (errno=Operation not permitted)
+main.js:4:// The ONE allowlisted IPC channel. app.getVersion() is the single version authority
+main.js:5:// (the packaged bundle version; the renderer never reads package.json). Any new
+main.js:7:const APP_VERSION_CHANNEL = 'app:get-version';
+main.js:12:  ipcMain.handle(APP_VERSION_CHANNEL, () => app.getVersion());
+preload.js:3:// exactly { platform, getAppVersion } — never ipcRenderer itself, never a generic
+preload.js:5:const { contextBridge, ipcRenderer } = require('electron');
+preload.js:8:const APP_VERSION_CHANNEL = 'app:get-version';
+preload.js:16:    ipcRenderer.invoke(APP_VERSION_CHANNEL),
+preload.js:34:contextBridge.exposeInMainWorld('electronAPI', {
+renderer/js/demo-analysis-case.js:121:      caseId: 'demo_case_001', schemaVersion: '1.0.0',
+renderer/js/demo-analysis-case.js:131:      modelSnapshot: { modelId: 'dynamics-model', modelVersion: 'v1.6.0', calibrationVersion: 'baseline', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: buildCanonicalInputSnapshot() },
+tests/telemetry-import-adapter.test.js:29:  const obj = { schemaVersion: '1.0.0', sampleRateHz: 20, time: [0, 0.05, 0.1], channels: { speed: { values: [20, 21, 22], unit: 'm/s' }, yaw_rate: { values: [0.4, 0.41, 0.42], unit: 'rad/s' } } };
+tests/telemetry-import-adapter.test.js:34:  const bad = IA.importTelemetry({ format: 'canonical_json', object: { schemaVersion: '1.0.0', time: [0, 1], channels: { speed: { values: [1], unit: 'm/s' } } } });
+tests/telemetry-import-adapter.test.js:36:  const unk = IA.importTelemetry({ format: 'canonical_json', object: { schemaVersion: '1.0.0', time: [], channels: {}, junk: 1 } });
+tests/analysis-case.test.js:34:    caseId: 'syn_case_complete', schemaVersion: '1.0.0',
+tests/analysis-case.test.js:39:    modelSnapshot: { modelId: 'dynamics-model', modelVersion: 'v1.6.0', calibrationVersion: 'baseline', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: completeSnapshot() },
+tests/analysis-case.test.js:78:  const cNoRef = F.buildSyntheticF312Case({ modelSnapshot: { modelId: 'm', modelVersion: 'v', calibrationVersion: 'b', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: noRef } });
+tests/analysis-case.test.js:82:  chk('C: ghost conversionRef → model input ineligible', completeCase({ modelSnapshot: { modelId: 'm', modelVersion: 'v', calibrationVersion: 'b', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: ghost } }).capabilityState.modelInputEligible === false);
+tests/analysis-case.test.js:113:  const input = { caseId: 'syn_case_g', schemaVersion: '1.0.0', caseMetadata: { title: 't', createdAt: '2026-06-21T00:00:00Z' }, vehicleBinding: { profileId: 'p', profileVersion: 'v1' }, setupSnapshot: SS.makeSetupSnapshot({ snapshotId: 's', vehicleProfileId: 'p', selectedOptions: [], measuredSettings: {}, unresolvedSelections: [] }), telemetryBinding: { sessionId: 'sess' }, modelSnapshot: { modelId: 'm', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: {} }, context: {} };
+tests/analysis-case.test.js:144:  chk('REG-LOW2: modelVersion required', F.buildSyntheticF312Case({ modelSnapshot: { modelId: 'm', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: {} } }).errors.indexOf('model_version_required') !== -1);
+renderer/js/analysis-case-export.js:20:  var BUNDLE_SCHEMA_VERSION = '1.0.0';
+renderer/js/api.js:204:  // Resolved once at startup via the preload bridge (electronAPI.getAppVersion()
+renderer/js/api.js:205:  // -> main-process app.getVersion(), the single version authority). Stays
+renderer/js/api.js:212:  if (typeof electronAPI !== 'undefined' && electronAPI && typeof electronAPI.getAppVersion === 'function') {
+renderer/js/api.js:213:    electronAPI.getAppVersion().then(function (v) {
+renderer/js/api.js:219:    console.warn('[api] electronAPI bridge not present — preload did not initialize; version reporting stays "unavailable"');
+renderer/js/canonical-telemetry-session.js:30:  var SCHEMA_VERSION = '1.0.0';
+renderer/js/analysis-case.js:32:  var SCHEMA_VERSION = '1.0.0';
+tests/analysis-case-adversarial.test.js:35:  chk('H1: measuredKus in case → forbidden field', hasErr(F.buildSyntheticF312Case({ modelSnapshot: { modelId: 'm', modelVersion: 'v', calibrationVersion: 'b', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: s1 } }), 'forbidden_field:measuredKus'));
+tests/analysis-case-adversarial.test.js:41:  chk('H3: modelOverlay in case → forbidden field', hasErr(F.buildSyntheticF312Case({ modelSnapshot: { modelId: 'm', modelVersion: 'v', calibrationVersion: 'b', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: s3 } }), 'forbidden_field:modelOverlay'));
+tests/analysis-case-adversarial.test.js:50:  const c6 = F.buildSyntheticF312Case({ modelSnapshot: { modelId: 'm', modelVersion: 'v', calibrationVersion: 'b', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: s6 } });
+tests/analysis-case-adversarial.test.js:54:  const c7 = F.buildSyntheticF312Case({ modelSnapshot: { modelId: 'm', modelVersion: 'v', calibrationVersion: 'b', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: s7 } });
+tests/analysis-case-adversarial.test.js:60:  chk('H8: macOS path as modelId → rejected', hasErr(F.buildSyntheticF312Case({ modelSnapshot: { modelId: '/Users/x/model', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: {} } }), 'model_id_invalid_or_private'));
+tests/analysis-case-adversarial.test.js:72:  const c12 = F.buildSyntheticF312Case({ modelSnapshot: { modelId: 'm', modelVersion: 'v', calibrationVersion: 'b', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: s12 } });
+tests/analysis-case-adversarial.test.js:82:  const cGhost = F.buildSyntheticF312Case({ modelSnapshot: { modelId: 'm', modelVersion: 'v', calibrationVersion: 'b', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: sGhost } });
+tests/analysis-case-adversarial.test.js:89:  const cDeep = F.buildSyntheticF312Case({ modelSnapshot: { modelId: 'm', modelVersion: 'v', calibrationVersion: 'b', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: sDeep } });
+tests/analysis-case-adversarial.test.js:109:  const c2 = F.buildSyntheticF312Case({ modelSnapshot: { modelId: 'm', modelVersion: 'v', calibrationVersion: 'x', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: snap } });
+tests/analysis-case-adversarial.test.js:112:  chk('CODEX-HIGH2b: canonical key with non-canonical value → rejected', hasErr(F.buildSyntheticF312Case({ modelSnapshot: { modelId: 'm', modelVersion: 'v', calibrationVersion: 'x', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: snap2 } }), 'canonical_input_massKg_not_canonical_parameter'));
+tests/analysis-case-adversarial.test.js:124:  const c1 = F.buildSyntheticF312Case({ modelSnapshot: { modelId: 'm', modelVersion: 'v', calibrationVersion: 'x', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: snap } });
+tests/analysis-case-adversarial.test.js:128:  chk('CODEX2-HIGH1b: canonical key/parameter mismatch → rejected', hasErr(F.buildSyntheticF312Case({ modelSnapshot: { modelId: 'm', modelVersion: 'v', calibrationVersion: 'x', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: snapM } }), 'canonical_input_massKg_parameter_mismatch'));
+tests/analysis-case-adversarial.test.js:139:  chk('U-canon-extra-primitive: extra primitive field in canonical param → rejected', hasErr(F.buildSyntheticF312Case({ modelSnapshot: { modelId: 'm', modelVersion: 'v', calibrationVersion: 'b', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: sp } }), 'canonical_input_massKg_unexpected_field:foo'));
+tests/analysis-execution.test.js:45:    caseId: 'syn_case_exec', schemaVersion: '1.0.0',
+tests/analysis-execution.test.js:50:    modelSnapshot: { modelId: 'dynamics-model', modelVersion: 'v1.6.0', canonicalContractVersion: '1.0.0', canonicalInputSnapshot: snapOverride || usableSnapshot() },
+tests/version-bump-policy.test.js:7: * against a sandboxed repo fixture (a temp dir with a git repo + package.json), so
+tests/version-bump-policy.test.js:31:// Sandbox: a minimal git repo so the script's git calls behave; its package.json is
+tests/version-bump-policy.test.js:40:    fs.writeFileSync(path.join(box, 'package.json'), JSON.stringify({ name: 'fixture', version: version }) + '\n');
+tests/version-bump-policy.test.js:104:  const pkg = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
+tests/version-bump-policy.test.js:105:  chk('repo package.json carries exactly the bumped version 2.0.0', pkg.version === '2.0.0');
+tests/fixtures/analysis-case-f312-synthetic.js:66:    schemaVersion: '1.0.0',
+tests/fixtures/analysis-case-f312-synthetic.js:77:      modelId: 'dynamics-model', modelVersion: 'v1.6.0', calibrationVersion: 'baseline', canonicalContractVersion: '1.0.0',
+tests/analysis-case-export.test.js:9:  case: EX.caseSummary({ kind: 'analysis_case', schemaVersion: '1.0.0', caseId: 'c1', caseMetadata: { title: 't', createdAt: '2026-06-21T00:00:00Z' }, vehicleBinding: { profileId: 'veh' }, telemetryBinding: { sessionId: 'sess' }, modelSnapshot: { modelId: 'dynamics-model', modelVersion: 'v1.6.0', canonicalContractVersion: '1.0.0' }, capabilityState: { modelInputEligible: true }, valid: true }),
+tests/analysis-case-export.test.js:48:(() => { chk('parse unknown top key rejected', EX.parseAnalysisCaseExport(JSON.stringify({ bundleSchemaVersion: '1.0.0', junk: 1 })).ok === false); })();
+tests/packaged/h1-packaged-runtime.mjs:8://   2. window.electronAPI exists with EXACTLY {platform, getAppVersion}
+tests/packaged/h1-packaged-runtime.mjs:9://   3. electronAPI.getAppVersion() resolves to the expected app version
+tests/packaged/h1-packaged-runtime.mjs:10://   4. api.getStats().version reports that same version (renderer display path)
+tests/packaged/h1-packaged-runtime.mjs:11://   5. no fabricated '1.0.0' anywhere in the reported values
+tests/packaged/h1-packaged-runtime.mjs:12://   6. ipcRenderer is NOT reachable from the page (bridge minimality)
+tests/packaged/h1-packaged-runtime.mjs:90:  const surface = await evalJs('typeof electronAPI === "object" && electronAPI ? Object.keys(electronAPI).sort() : null');
+tests/packaged/h1-packaged-runtime.mjs:91:  chk('electronAPI exists', Array.isArray(surface), surface);
+tests/packaged/h1-packaged-runtime.mjs:92:  chk('electronAPI surface EXACTLY [getAppVersion, platform]', JSON.stringify(surface) === JSON.stringify(['getAppVersion', 'platform']), surface);
+tests/packaged/h1-packaged-runtime.mjs:93:  const platform = await evalJs('electronAPI.platform');
+tests/packaged/h1-packaged-runtime.mjs:94:  chk('electronAPI.platform is a known platform string', typeof platform === 'string' && ['darwin', 'win32', 'linux'].includes(platform), platform);
+tests/packaged/h1-packaged-runtime.mjs:97:  const v = await evalJs('electronAPI.getAppVersion()');
+tests/packaged/h1-packaged-runtime.mjs:99:  chk('getAppVersion() never fabricates 1.0.0', v !== '1.0.0', v);
+tests/packaged/h1-packaged-runtime.mjs:102:  const statsV = await evalJs('(function(){ try { return api.getStats().version; } catch (e) { return "THREW:" + e.message; } })()');
+tests/packaged/h1-packaged-runtime.mjs:103:  chk(`api.getStats().version === ${expectedVersion} (startup-resolved)`, statsV === expectedVersion, statsV);
+tests/packaged/h1-packaged-runtime.mjs:104:  chk('getStats().version is never the fabricated 1.0.0', statsV !== '1.0.0', statsV);
+tests/packaged/h1-packaged-runtime.mjs:106:  // 6. bridge minimality: no ipcRenderer/require/process reachable from the page
+tests/packaged/h1-packaged-runtime.mjs:107:  const leaks = await evalJs('JSON.stringify({ ipcRenderer: typeof ipcRenderer, require: typeof require, processObj: typeof process, electronAPIinvoke: typeof (electronAPI.invoke || electronAPI.send) })');
+tests/packaged/h1-packaged-runtime.mjs:108:  chk('page cannot reach ipcRenderer/require/process and bridge has no generic invoke/send',
+tests/packaged/h1-packaged-runtime.mjs:109:    leaks === JSON.stringify({ ipcRenderer: 'undefined', require: 'undefined', processObj: 'undefined', electronAPIinvoke: 'undefined' }), leaks);
+tests/e2e/hardening-01-electron-boundary.test.js:8: *   • preload.js does NOT load fs / child_process / net / http / https / ipcRenderer
+tests/e2e/hardening-01-electron-boundary.test.js:214:  chk('api.js has NO fabricated 1.0.0 version literal', !/['"`]1\.0\.0['"`]/.test(apiSrc));
+tests/e2e/hardening-01-electron-boundary.test.js:216:  chk('api.js never reads a synchronous electronAPI.version field (pre-H1 shape)', !/electronAPI\s*\.\s*version\b/.test(apiSrc));
+tests/e2e/hardening-01-electron-boundary.test.js:217:  chk('api.js resolves the version via electronAPI.getAppVersion()', /electronAPI\s*\.\s*getAppVersion\s*\(/.test(apiSrc));
+tests/e2e/hardening-01-electron-boundary.test.js:218:  chk('api.js missing-bridge path is observable (console.warn)', /console\.warn\([^)]*electronAPI/.test(apiSrc));
+tests/e2e/hardening-01-electron-boundary.test.js:224:  chk('main.js registers EXACTLY one ipcMain.handle', handleCalls.length === 1, { count: handleCalls.length });
+tests/e2e/hardening-01-electron-boundary.test.js:226:  chk('main.js channel constant = app:get-version', /APP_VERSION_CHANNEL\s*=\s*['"`]app:get-version['"`]/.test(mainSrc));
+tests/e2e/hardening-01-electron-boundary.test.js:228:  chk('main.js handler returns app.getVersion() (single version authority)', /handle\s*\(\s*APP_VERSION_CHANNEL\s*,\s*\(\s*\)\s*=>\s*app\.getVersion\(\)\s*\)/.test(mainSrc));
+tests/e2e/hardening-01-electron-boundary.test.js:229:  chk('main.js has NO ipcMain.on/once (no fire-and-forget channels)', !/ipcMain\s*\.\s*(on|once|addListener)\b/.test(mainSrc));
+tests/e2e/hardening-01-electron-boundary.test.js:233:  // H1: the preload legitimately uses ipcRenderer.invoke on the single allowlisted
+tests/e2e/hardening-01-electron-boundary.test.js:234:  // constant channel. The boundary contract is now: (a) ipcRenderer itself is never
+tests/e2e/hardening-01-electron-boundary.test.js:238:  chk('preload.js never exposes ipcRenderer on the bridge surface', !/exposeInMainWorld[\s\S]*?ipcRenderer\s*[,}]/.test(preloadSrc));
+tests/e2e/hardening-01-electron-boundary.test.js:239:  chk('preload.js has NO generic ipcRenderer.send/sendSync/on/once/postMessage', !/ipcRenderer\s*\.\s*(send|sendSync|sendToHost|on|once|addListener|postMessage)\b/.test(preloadSrc));
+tests/e2e/hardening-01-electron-boundary.test.js:240:  var invokeCalls = preloadSrc.match(/ipcRenderer\s*\.\s*invoke\s*\(\s*([A-Za-z_$][\w$]*|['"`][^'"`]*['"`])/g) || [];
+tests/e2e/hardening-01-electron-boundary.test.js:241:  chk('preload.js ipcRenderer.invoke is used EXACTLY once', invokeCalls.length === 1, { invokeCalls: invokeCalls });
+tests/e2e/hardening-01-electron-boundary.test.js:243:  // closure-alias smuggling (e.g. an outer `leak = (...args) => ipcRenderer.invoke(...args)`
+tests/e2e/hardening-01-electron-boundary.test.js:247:  // `ipcRenderer` must not appear ANYWHERE else in the file — any alias assignment,
+tests/e2e/hardening-01-electron-boundary.test.js:251:      .replace(/const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/, '')
+tests/e2e/hardening-01-electron-boundary.test.js:252:      .replace(/ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*\)/, '');
+tests/e2e/hardening-01-electron-boundary.test.js:254:  chk('preload.js ipcRenderer token accounting: ZERO appearances outside the two legal sites',
+tests/e2e/hardening-01-electron-boundary.test.js:255:    !/ipcRenderer/.test(ipcResidue(preloadSrc)),
+tests/e2e/hardening-01-electron-boundary.test.js:256:    { residue: (ipcResidue(preloadSrc).match(/.{0,50}ipcRenderer.{0,50}/) || [])[0] });
+tests/e2e/hardening-01-electron-boundary.test.js:258:    (preloadSrc.match(/require\s*\(/g) || []).length === 1 && /const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/.test(preloadSrc));
+tests/e2e/hardening-01-electron-boundary.test.js:262:    var attack = preloadSrc.replace('contextBridge.exposeInMainWorld', 'var leak = function () { return ipcRenderer; };\ncontextBridge.exposeInMainWorld');
+tests/e2e/hardening-01-electron-boundary.test.js:263:    chk('SELF-TEST: alias-smuggling shape is caught by the residue invariant', /ipcRenderer/.test(ipcResidue(attack)));
+tests/e2e/hardening-01-electron-boundary.test.js:265:  chk('preload.js invoke uses the APP_VERSION_CHANNEL constant (no inline/caller-chosen channel)', /ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*[),]/.test(preloadSrc));
+tests/e2e/hardening-01-electron-boundary.test.js:267:  chk('preload.js declares exactly one channel constant = app:get-version', channelConsts.length === 1 && /['"`]app:get-version['"`]/.test(channelConsts[0]), { channelConsts: channelConsts });
+tests/e2e/hardening-01-electron-boundary.test.js:268:  chk('preload.js does NOT require ./package.json (the pre-H1 sandbox crash)', !/require\s*\(\s*['"]\.\/package\.json['"]\s*\)/.test(preloadSrc));
+tests/e2e/hardening-01-electron-boundary.test.js:316:  chk('preload.js exposes the surface as "electronAPI"', exposedEntry.name === 'electronAPI');
+tests/e2e/hardening-01-electron-boundary.test.js:406:    // (c) H1: the pre-H1 require('./package.json').version chain is now FORBIDDEN
+tests/e2e/hardening-01-electron-boundary.test.js:416:  // audited — zero parameters (no caller-argument forwarding into IPC), ipcRenderer
+tests/e2e/hardening-01-electron-boundary.test.js:418:  // object, no rest/spread forwarding, and it never returns ipcRenderer itself.
+tests/e2e/hardening-01-electron-boundary.test.js:435:    var bodyNoInvoke = body.replace(/ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*\)/g, '');
+tests/e2e/hardening-01-electron-boundary.test.js:436:    chk('getAppVersion body: ipcRenderer appears ONLY as the exact allowlisted invoke', !/ipcRenderer/.test(bodyNoInvoke), { residue: (bodyNoInvoke.match(/.{0,40}ipcRenderer.{0,40}/) || [])[0] });
+tests/e2e/hardening-01-electron-boundary.test.js:438:    chk('getAppVersion body: never returns a bare authority object', !/return\s+ipcRenderer\b|return\s+process\b|return\s+require\b/.test(body));
+tests/e2e/hardening-06-supply-chain.test.js:5: *   • package.json declares ONLY known runtime + dev deps (electron / electron-builder)
+tests/e2e/hardening-06-supply-chain.test.js:7: *   • No "scripts" in package.json reference untrusted external tooling
+tests/e2e/hardening-06-supply-chain.test.js:23:  // Step 1: package.json dependency footprint
+tests/e2e/hardening-06-supply-chain.test.js:24:  var pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
+tests/e2e/hardening-06-supply-chain.test.js:25:  chk('package.json has no runtime "dependencies" key (Electron-only app)', pkg.dependencies === undefined || Object.keys(pkg.dependencies || {}).length === 0);
+tests/e2e/hardening-06-supply-chain.test.js:129:    chk('package.json script "' + scriptNames[i] + '" passes anchored per-segment allowlist', allSegOk, { script: s, segments: segments });
+renderer/js/setup-snapshot.js:27:  var SCHEMA_VERSION = '1.0.0';
+tests/e2e/flow-09-electron-smoke.test.js:23:  // Step 1: electron is declared in package.json devDependencies (repo source). Its actual
+tests/e2e/flow-09-electron-smoke.test.js:26:  var pkgJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf8'));
+tests/e2e/flow-09-electron-smoke.test.js:27:  chk('electron declared in package.json devDependencies', !!(pkgJson.devDependencies && pkgJson.devDependencies.electron));
+tests/e2e/flow-09-electron-smoke.test.js:30:  // Step 2: validate the electron version range declared in package.json. CI dependency-free
+tests/e2e/flow-09-electron-smoke.test.js:48:  // H1: the preload DOES use ipcRenderer.invoke on the single allowlisted constant
+tests/e2e/flow-09-electron-smoke.test.js:49:  // channel (app:get-version) — the boundary contract (never exposed raw, no generic
+tests/e2e/flow-09-electron-smoke.test.js:51:  chk('preload.js uses ONLY the allowlisted invoke (no send/on/generic IPC)', /ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL/.test(preloadSrc) && !/ipcRenderer\s*\.\s*(send|sendSync|on|once)\b/.test(preloadSrc));
+tests/release-gate.test.js:42:  // condition 9 reads package.json through io.readJson — hand it the real one
+tests/release-gate.test.js:43:  'package.json': JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')),
+
+exec
+/bin/bash -lc 'node tests/e2e/hardening-01-electron-boundary.test.js && node tests/e2e/flow-09-electron-smoke.test.js' in /Users/SKYLINE/Claude/worktrees/f6-release
+ succeeded in 0ms:
+e2e-hardening-01-electron-boundary: 67 passed, 0 failed
+e2e-flow-09-electron-smoke: 10 passed, 0 failed
+
+codex
+The checked-in suites pass (hardening-01: 67/67; flow-09: 10/10). The runtime implementation itself is narrow and correctly ordered. I found a remaining test-contract bypass and am validating it against the exact assertions before issuing the verdict.
+exec
+/bin/bash -lc "nl -ba tests/e2e/hardening-01-electron-boundary.test.js | sed -n '205,275p'; nl -ba tests/e2e/hardening-01-electron-boundary.test.js | sed -n '400,448p'; nl -ba docs/release-notes-2.0.0.md | sed -n '100,145p'; nl -ba governance/hardening/H1.json | sed -n '1,80p'; git log --oneline --decorate 0563f119e2bdfced959b7a808cf292e0f883807f..HEAD" in /Users/SKYLINE/Claude/worktrees/f6-release
+ succeeded in 0ms:
+   205	    // contextIsolation:true) applies.
+   206	    chk(lbl + '.sandbox NOT set to false', !/(^|[\s,{])sandbox\s*:\s*false\s*(,|$|\s)/m.test(wpBody));
+   207	    if (/(^|[\s,{])sandbox\s*:/.test(wpBody)) {
+   208	      chk(lbl + '.sandbox (when set) === literal true', /(^|[\s,{])sandbox\s*:\s*true\s*(,|$|\s)/m.test(wpBody));
+   209	    }
+   210	  }
+   211	
+   212	  // H1: renderer version-reporting honesty — api.js must never fabricate a version.
+   213	  var apiSrc = stripJsComments(fs.readFileSync(path.join(__dirname, '..', '..', 'renderer', 'js', 'api.js'), 'utf8'));
+   214	  chk('api.js has NO fabricated 1.0.0 version literal', !/['"`]1\.0\.0['"`]/.test(apiSrc));
+   215	  chk('api.js defaults version reporting to the literal unavailable', /_appVersion\s*:\s*['"`]unavailable['"`]/.test(apiSrc));
+   216	  chk('api.js never reads a synchronous electronAPI.version field (pre-H1 shape)', !/electronAPI\s*\.\s*version\b/.test(apiSrc));
+   217	  chk('api.js resolves the version via electronAPI.getAppVersion()', /electronAPI\s*\.\s*getAppVersion\s*\(/.test(apiSrc));
+   218	  chk('api.js missing-bridge path is observable (console.warn)', /console\.warn\([^)]*electronAPI/.test(apiSrc));
+   219	
+   220	  // H1: main.js IPC surface — exactly ONE allowlisted handle() on the constant
+   221	  // channel, removeHandler-first (idempotent double-registration guard), and no
+   222	  // generic/dynamic channel registration anywhere.
+   223	  var handleCalls = mainSrc.match(/ipcMain\s*\.\s*handle\s*\(/g) || [];
+   224	  chk('main.js registers EXACTLY one ipcMain.handle', handleCalls.length === 1, { count: handleCalls.length });
+   225	  chk('main.js handle uses the APP_VERSION_CHANNEL constant', /ipcMain\s*\.\s*handle\s*\(\s*APP_VERSION_CHANNEL\s*,/.test(mainSrc));
+   226	  chk('main.js channel constant = app:get-version', /APP_VERSION_CHANNEL\s*=\s*['"`]app:get-version['"`]/.test(mainSrc));
+   227	  chk('main.js removeHandler-first double-registration guard', /ipcMain\s*\.\s*removeHandler\s*\(\s*APP_VERSION_CHANNEL\s*\)/.test(mainSrc));
+   228	  chk('main.js handler returns app.getVersion() (single version authority)', /handle\s*\(\s*APP_VERSION_CHANNEL\s*,\s*\(\s*\)\s*=>\s*app\.getVersion\(\)\s*\)/.test(mainSrc));
+   229	  chk('main.js has NO ipcMain.on/once (no fire-and-forget channels)', !/ipcMain\s*\.\s*(on|once|addListener)\b/.test(mainSrc));
+   230	
+   231	  // Step 2: preload.js minimal surface — post-strip checks (no comment-decoy false positives)
+   232	  chk('preload.js uses contextBridge', /contextBridge/.test(preloadSrc));
+   233	  // H1: the preload legitimately uses ipcRenderer.invoke on the single allowlisted
+   234	  // constant channel. The boundary contract is now: (a) ipcRenderer itself is never
+   235	  // placed on the exposed surface, (b) no generic send/sendSync/on/postMessage entry,
+   236	  // (c) invoke is called ONLY with the APP_VERSION_CHANNEL constant, (d) exactly one
+   237	  // channel constant exists and it is the allowlisted literal.
+   238	  chk('preload.js never exposes ipcRenderer on the bridge surface', !/exposeInMainWorld[\s\S]*?ipcRenderer\s*[,}]/.test(preloadSrc));
+   239	  chk('preload.js has NO generic ipcRenderer.send/sendSync/on/once/postMessage', !/ipcRenderer\s*\.\s*(send|sendSync|sendToHost|on|once|addListener|postMessage)\b/.test(preloadSrc));
+   240	  var invokeCalls = preloadSrc.match(/ipcRenderer\s*\.\s*invoke\s*\(\s*([A-Za-z_$][\w$]*|['"`][^'"`]*['"`])/g) || [];
+   241	  chk('preload.js ipcRenderer.invoke is used EXACTLY once', invokeCalls.length === 1, { invokeCalls: invokeCalls });
+   242	  // H1-R2-01 closure: STRUCTURAL token accounting — regex-shape checks alone allow
+   243	  // closure-alias smuggling (e.g. an outer `leak = (...args) => ipcRenderer.invoke(...args)`
+   244	  // returned by getAppVersion while one unreachable allowlisted call satisfies the
+   245	  // count). The invariant below is alias-proof: after removing the ONLY two legal
+   246	  // appearances (the fixed destructure and the exact allowlisted invoke), the token
+   247	  // `ipcRenderer` must not appear ANYWHERE else in the file — any alias assignment,
+   248	  // re-destructure, spread, or argument-forwarding wrapper leaves a residue and fails.
+   249	  function ipcResidue(src) {
+   250	    return src
+   251	      .replace(/const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/, '')
+   252	      .replace(/ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*\)/, '');
+   253	  }
+   254	  chk('preload.js ipcRenderer token accounting: ZERO appearances outside the two legal sites',
+   255	    !/ipcRenderer/.test(ipcResidue(preloadSrc)),
+   256	    { residue: (ipcResidue(preloadSrc).match(/.{0,50}ipcRenderer.{0,50}/) || [])[0] });
+   257	  chk('preload.js has EXACTLY one require(), the fixed electron destructure',
+   258	    (preloadSrc.match(/require\s*\(/g) || []).length === 1 && /const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/.test(preloadSrc));
+   259	  chk('preload.js has NO rest/spread token anywhere (post-strip)', preloadSrc.indexOf('...') === -1);
+   260	  // Self-test: the exact round-2 attack shape MUST be caught by the residue invariant.
+   261	  (function adversarialSelfTest() {
+   262	    var attack = preloadSrc.replace('contextBridge.exposeInMainWorld', 'var leak = function () { return ipcRenderer; };\ncontextBridge.exposeInMainWorld');
+   263	    chk('SELF-TEST: alias-smuggling shape is caught by the residue invariant', /ipcRenderer/.test(ipcResidue(attack)));
+   264	  })();
+   265	  chk('preload.js invoke uses the APP_VERSION_CHANNEL constant (no inline/caller-chosen channel)', /ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*[),]/.test(preloadSrc));
+   266	  var channelConsts = preloadSrc.match(/APP_VERSION_CHANNEL\s*=\s*['"`]([^'"`]+)['"`]/g) || [];
+   267	  chk('preload.js declares exactly one channel constant = app:get-version', channelConsts.length === 1 && /['"`]app:get-version['"`]/.test(channelConsts[0]), { channelConsts: channelConsts });
+   268	  chk('preload.js does NOT require ./package.json (the pre-H1 sandbox crash)', !/require\s*\(\s*['"]\.\/package\.json['"]\s*\)/.test(preloadSrc));
+   269	  chk('preload.js never fabricates a version literal', !/['"`]1\.0\.0['"`]/.test(preloadSrc));
+   270	  chk('preload.js does NOT require fs (post-strip)', !/require\s*\(\s*['"]fs['"]\s*\)/.test(preloadSrc));
+   271	  chk('preload.js does NOT require child_process (post-strip)', !/require\s*\(\s*['"]child_process['"]\s*\)/.test(preloadSrc));
+   272	  chk('preload.js does NOT require net (post-strip)', !/require\s*\(\s*['"]net['"]\s*\)/.test(preloadSrc));
+   273	  chk('preload.js does NOT require http (post-strip)', !/require\s*\(\s*['"]http['"]\s*\)/.test(preloadSrc));
+   274	  chk('preload.js does NOT require https (post-strip)', !/require\s*\(\s*['"]https['"]\s*\)/.test(preloadSrc));
+   275	  chk('preload.js does NOT require os (post-strip)', !/require\s*\(\s*['"]os['"]\s*\)/.test(preloadSrc));
+   400	  var EXPOSED_FORBIDDEN_TOKENS = /\bprocess\b|\bglobalThis\b|\b__dirname\b|\b__filename\b|\bModule\b|\beval\b|\b(?:child_process|fs|net|http|https|os|crypto|dgram|vm|cluster|worker_threads|repl|inspector|perf_hooks|trace_events)\b/;
+   401	  function isInertExposedValue(val) {
+   402	    // (a) string literal
+   403	    if (/^["'][^"']*["']$/.test(val)) return true;
+   404	    // (b) reading process.platform IS allowed (it's a known-inert string)
+   405	    if (/^process\.platform$/.test(val)) return true;
+   406	    // (c) H1: the pre-H1 require('./package.json').version chain is now FORBIDDEN
+   407	    //     (it crashed the sandboxed preload); the only allowed function reference is
+   408	    //     the named getAppVersion defined in this file (validated separately below).
+   409	    if (/^getAppVersion$/.test(val)) return true;
+   410	    // (d) plain numeric / boolean / null literal
+   411	    if (/^(?:-?\d+(?:\.\d+)?|true|false|null)$/.test(val)) return true;
+   412	    return false;
+   413	  }
+   414	  // The allowed function reference must be a top-level named function declared in
+   415	  // preload.js itself. H1-R1-02 closure: the BODY is extracted (brace matching) and
+   416	  // audited — zero parameters (no caller-argument forwarding into IPC), ipcRenderer
+   417	  // used ONLY as the exact allowlisted invoke, no Node authority, no arguments
+   418	  // object, no rest/spread forwarding, and it never returns ipcRenderer itself.
+   419	  chk('preload.js declares the named getAppVersion function it exposes',
+   420	    /function\s+getAppVersion\s*\(\s*\)/.test(preloadSrc));
+   421	  (function auditGetAppVersionBody() {
+   422	    var m = preloadSrc.match(/function\s+getAppVersion\s*\(\s*\)\s*\{/);
+   423	    chk('getAppVersion has ZERO parameters', !!m);
+   424	    if (!m) return;
+   425	    var i = m.index + m[0].length, depth = 1, inStr = false, strCh = '';
+   426	    while (i < preloadSrc.length && depth > 0) {
+   427	      var ch = preloadSrc.charAt(i);
+   428	      if (inStr) { if (ch === '\\') { i += 2; continue; } if (ch === strCh) inStr = false; }
+   429	      else if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; }
+   430	      else if (ch === '{') depth++;
+   431	      else if (ch === '}') depth--;
+   432	      i++;
+   433	    }
+   434	    var body = preloadSrc.slice(m.index + m[0].length, i - 1);
+   435	    var bodyNoInvoke = body.replace(/ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*\)/g, '');
+   436	    chk('getAppVersion body: ipcRenderer appears ONLY as the exact allowlisted invoke', !/ipcRenderer/.test(bodyNoInvoke), { residue: (bodyNoInvoke.match(/.{0,40}ipcRenderer.{0,40}/) || [])[0] });
+   437	    chk('getAppVersion body: no require/process/arguments/spread forwarding', !/\brequire\s*\(|\bprocess\s*[.\[]|\barguments\b|\.\.\./.test(body));
+   438	    chk('getAppVersion body: never returns a bare authority object', !/return\s+ipcRenderer\b|return\s+process\b|return\s+require\b/.test(body));
+   439	  })();
+   440	  for (var ee = 0; ee < exposedEntries.length; ee++) {
+   441	    var entry = exposedEntries[ee];
+   442	    // Static forbidden-token check (catches process.env, child_process, etc., even via concat)
+   443	    chk('exposed[' + entry.key + '] has NO Node-authority tokens',
+   444	      !EXPOSED_FORBIDDEN_TOKENS.test(entry.value) || /^process\.platform$/.test(entry.value),
+   445	      { key: entry.key, value: entry.value.slice(0, 80) });
+   446	    // Allowlist shape check
+   447	    chk('exposed[' + entry.key + '] is an inert primitive expression',
+   448	      isInertExposedValue(entry.value),
+   100	5. **No tracked lockfile (by policy).** The repository's verification lane is
+   101	   dependency-free and `scripts/check-version-policy.js` enforces that
+   102	   `package-lock.json` stays untracked. A fresh `npm install` resolves
+   103	   `electron ^33.0.0` / `electron-builder ^25.0.0` by semver range; build reproducibility
+   104	   is bounded by those ranges, not a pinned lock. This is an accepted, documented
+   105	   trade-off of the dependency-free governance lane.
+   106	6. **Vendored renderer libraries.** Three third-party libraries ship vendored under
+   107	   `renderer/lib/`, outside npm governance: `alpine.min.js` (Alpine.js), `chart.min.js`
+   108	   (Chart.js 4.4.7), `tailwind.js` (Tailwind CSS browser build). They load from disk
+   109	   only (no CDN at runtime); no integrity hashes are recorded in-repo.
+   110	7. **Electron boot smoke is structural.** `tests/e2e/flow-09` validates declaration-level
+   111	   Electron structure (main/preload/webPreferences) without launching a window; no test
+   112	   boots the real Electron binary in CI (CI is install-free by policy).
+   113	8. **IndexedDB-specific failure paths untested in Node.** Quota-exceeded mapping and
+   114	   `tx.onabort` in `renderer/js/storage-backend.js` have no automated coverage (Node
+   115	   tests run on MemoryBackend); storage-failure semantics are covered at the transact
+   116	   contract level (`hardening-02`).
+   117	9. **No professional validation.** The product is not a professional race-engineer
+   118	   replacement; outputs are advisory, in physical units, with explicit credibility and
+   119	   limitations metadata (see `docs/r3-credibility-model.md`).
+   120	10. **[FIXED in the v2.0.x public-release hardening line — H1; not yet in any published
+   121	   release.]** ~~Preload `electronAPI` surface is not functional (pre-existing since
+   122	   v1.0.0).~~ The hardening branch replaces the crashing `require('./package.json')`
+   123	   with a main-process `app.getVersion()` authority over a single allowlisted IPC
+   124	   channel; the renderer reports `unavailable` (never a fabricated version) if the
+   125	   bridge fails. The paragraph below describes the state of the 2.0.0 tag/draft
+   126	   snapshot, which predates the fix:
+   127	   **Preload `electronAPI` surface is not functional (pre-existing since v1.0.0).**
+   128	   `preload.js` calls `require('./package.json')`, which Electron's default-sandboxed
+   129	   preload cannot resolve — the preload script fails to load and `window.electronAPI`
+   130	   (`{platform, version}`) is never exposed in the packaged app. The renderer's
+   131	   `typeof`-guard fallback masks this (the in-app version string falls back to
+   132	   `'1.0.0'`); no other functionality depends on the preload surface. Confirmed by the
+   133	   F6 packaged smoke; this is NOT an F6/2.0.0 regression (present since the initial
+   134	   commit) and the fix is deferred as a production change outside the 2.0.0 release
+   135	   scope. `docs/r3-data-and-privacy.md` describes the *intended* preload surface.
+   136	
+   137	## Release boundary (current state at the F6 release-candidate stage)
+   138	
+   139	- DONE: Train PR #16 merged to `main` (merge commit `0711e74a`); the single authorized
+   140	  version bump 1.4.0 → 2.0.0 is staged on the F6 release branch.
+   141	- NOT DONE (each requires separate explicit authorization): `v2.0.0` git tag, GitHub
+   142	  Release, DMG upload/binary distribution, deployment.
+   143	- No code signing, no notarization (no signing identity or notary credentials exist;
+   144	  see "Installation status" above).
+   145	- Parallel known follow-up, NOT part of 2.0.0: the R2.4-era credibility-rung string
+     1	{
+     2	  "schemaVersion": 1,
+     3	  "program": "PUBLIC_RELEASE_HARDENING",
+     4	  "phase": "H1_PACKAGED_RUNTIME_INTEGRITY",
+     5	  "baseSha": "0563f119e2bdfced959b7a808cf292e0f883807f",
+     6	  "integrationBranch": "release/v2.0.0-public-hardening",
+     7	  "headSha": null,
+     8	  "scope": {
+     9	    "closes": [
+    10	      "A1 preload sandbox require crash (since v1.0.0)",
+    11	      "A2 electronAPI never exposed in packaged app",
+    12	      "A3 fabricated 1.0.0 version fallback",
+    13	      "A4 preload failure silently masked"
+    14	    ],
+    15	    "changedFiles": [
+    16	      "main.js",
+    17	      "preload.js",
+    18	      "renderer/js/api.js",
+    19	      "tests/e2e/hardening-01-electron-boundary.test.js",
+    20	      "tests/e2e/flow-09-electron-smoke.test.js",
+    21	      "tests/packaged/h1-packaged-runtime.mjs"
+    22	    ],
+    23	    "notChanged": [
+    24	      "package.json (version untouched)",
+    25	      "case storage",
+    26	      "UI feature delivery",
+    27	      "tag",
+    28	      "Release"
+    29	    ]
+    30	  },
+    31	  "design": {
+    32	    "versionAuthority": "main-process app.getVersion() — the ONLY source; renderer never reads package.json",
+    33	    "ipcChannels": [
+    34	      "app:get-version (invoke-only, constant, removeHandler-first idempotent registration)"
+    35	    ],
+    36	    "electronAPISurface": "{ platform: process.platform, getAppVersion(): Promise<string|'unavailable'> }",
+    37	    "failClosed": "IPC error / 3s timeout / malformed reply (strict SemVer 2.0.0 — leading zeros / empty identifiers rejected) -> literal 'unavailable' + console.warn; renderer default 'unavailable'; missing bridge -> console.warn; NEVER a fabricated version; NEVER a crash",
+    38	    "webPreferences": "contextIsolation:true, nodeIntegration:false, sandbox: Electron default true (never set false — asserted by hardening-01)"
+    39	  },
+    40	  "evidence": {
+    41	    "packagedClean": {
+    42	      "result": "10/10 PASS",
+    43	      "log": "h1-run-clean.txt",
+    44	      "sha256": "4cad0dba0a731b987ca39f611435c4891cf5c14c0426286c27292beb56123441"
+    45	    },
+    46	    "packagedExisting": {
+    47	      "result": "10/10 PASS",
+    48	      "log": "h1-run-existing.txt",
+    49	      "sha256": "48e9cc9479d16578102de1c8132dc988b0f7c17af98eef136c245dda9c8c3aac"
+    50	    },
+    51	    "devConsistency": {
+    52	      "result": "10/10 PASS",
+    53	      "log": "h1-run-dev.txt",
+    54	      "sha256": "b6ed266e4dcf562c9ba40aa2d2abfdc43848513e0dc7d6093200bd0715eb3f9b"
+    55	    },
+    56	    "harness": "tests/packaged/h1-packaged-runtime.mjs (REAL binary over CDP; local evidence tooling — requires a build, so not in the install-free npm-test chain)",
+    57	    "profileIsolation": "real userData moved aside before clean phase and restored after (macOS Electron ignores $HOME); smoke profile removed",
+    58	    "packagedAsarChecks": "getAppVersion present; app:get-version present; pre-H1 require('./package.json').version crash pattern ABSENT"
+    59	  },
+    60	  "codexVerdict": null,
+    61	  "note": "H1 evidence logs live in the session scratchpad during review; verdict + hashes are anchored here and raw logs archived under governance/hardening/codex-evidence/H1/ at the PASS anchor."
+    62	}
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-epeJcp2K' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-GrpOKOoD' (errno=Operation not permitted)
+b15ada1 (HEAD -> hardening/h1-preload-runtime, origin/hardening/h1-preload-runtime) hardening(h1): close Codex round-2 finding H1-R2-01 — alias-proof token accounting
+3fb3f1b hardening(h1): close Codex round-1 findings H1-R1-01/02
+8599f13 hardening(h1): packaged runtime integrity — preload/electronAPI/version authority
+
+codex
+VERDICT: BLOCK
+
+H1-R3-01 — `tests/e2e/hardening-01-electron-boundary.test.js:257-259,435-438`: closure-alias authority smuggling remains possible. For example, `const nodeRequire = require;` plus `return nodeRequire` inside `getAppVersion` passes the one-`require()` count, IPC residue, zero-spread, and body checks while exposing sandboxed preload `require` authority. The embedded self-test at line 262 covers only direct `ipcRenderer` aliasing, not aliased `require`/`process` authority.
+tokens used
+38,634
+VERDICT: BLOCK
+
+H1-R3-01 — `tests/e2e/hardening-01-electron-boundary.test.js:257-259,435-438`: closure-alias authority smuggling remains possible. For example, `const nodeRequire = require;` plus `return nodeRequire` inside `getAppVersion` passes the one-`require()` count, IPC residue, zero-spread, and body checks while exposing sandboxed preload `require` authority. The embedded self-test at line 262 covers only direct `ipcRenderer` aliasing, not aliased `require`/`process` authority.
+CODEX_EXIT=0
