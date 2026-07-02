@@ -144,7 +144,7 @@ Anything not yet wired is never presented in the app as if it already works — 
 
 ## License / contributing
 
-MIT-spirit personal/educational project — contributions and corrections welcome. Built in Taiwan, aimed at making serious chassis-engineering knowledge accessible to the next generation of FSAE students and track-day engineers.
+Personal/educational project, currently **UNLICENSED** (all rights reserved — no LICENSE file exists; adopting an actual license is an explicit product decision deferred past 2.0.0, see `docs/release-notes-2.0.0.md` "Known limitations"). Contributions and corrections are welcome. Built in Taiwan, aimed at making serious chassis-engineering knowledge accessible to the next generation of FSAE students and track-day engineers.
 
 ---
 ---
@@ -297,7 +297,7 @@ npm test
 
 ### 授權／貢獻
 
-MIT 精神的個人／教育專案——歡迎貢獻與指正。在台灣打造，志在讓嚴肅的底盤工程知識，能被下一代 FSAE 學生與賽道工程師接觸到。
+個人／教育專案，目前**未授權（UNLICENSED，保留所有權利）**——倉庫沒有 LICENSE 檔案；採用正式授權是延後到 2.0.0 之後的明確產品決策（見 `docs/release-notes-2.0.0.md` 的 Known limitations）。歡迎貢獻與指正。在台灣打造，志在讓嚴肅的底盤工程知識，能被下一代 FSAE 學生與賽道工程師接觸到。
 
 ---
 ---
@@ -450,4 +450,4 @@ npm test
 
 ### ライセンス／コントリビュート
 
-MIT スピリットの個人／教育プロジェクト——コントリビュートと修正を歓迎。台湾発、真剣なシャシーエンジニアリングの知識を次世代の FSAE 学生とサーキット走行エンジニアに届けることを目指す。
+個人／教育プロジェクト。現在は**ライセンス未付与（UNLICENSED、全権利留保）**——リポジトリに LICENSE ファイルは存在せず、正式なライセンスの採用は 2.0.0 以降に先送りされた明示的なプロダクト決定である（`docs/release-notes-2.0.0.md` の Known limitations 参照）。コントリビュートと修正を歓迎。台湾発、真剣なシャシーエンジニアリングの知識を次世代の FSAE 学生とサーキット走行エンジニアに届けることを目指す。
