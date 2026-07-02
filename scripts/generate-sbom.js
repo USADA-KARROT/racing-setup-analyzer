@@ -48,7 +48,9 @@ function buildSbom() {
     const version = entry.version || null;
     const comp = {
       type: 'library',
-      'bom-ref': `pkg:npm/${name}@${version}`,
+      // bom-ref is the lockfile install path (globally unique — nested packages with the same
+      // name/version get distinct refs); purl is the ecosystem coordinate (may repeat across nests).
+      'bom-ref': key,
       name,
       version,
       purl: `pkg:npm/${name}@${version}`,
@@ -57,7 +59,9 @@ function buildSbom() {
     const lic = licenseOf(entry);
     if (lic) comp.licenses = [{ license: { name: lic } }];
     if (typeof entry.integrity === 'string' && entry.integrity.startsWith('sha512-')) {
-      comp.hashes = [{ alg: 'SHA-512', content: entry.integrity.slice('sha512-'.length) }];
+      // npm integrity is SRI (sha512-<base64>); CycloneDX hash content must be hex.
+      const hex = Buffer.from(entry.integrity.slice('sha512-'.length), 'base64').toString('hex');
+      comp.hashes = [{ alg: 'SHA-512', content: hex }];
     }
     components.push(comp);
   }
@@ -68,9 +72,10 @@ function buildSbom() {
   for (const v of vendor.libraries || []) {
     components.push({
       type: 'library',
-      'bom-ref': `vendored:${v.name}@${v.version}`,
+      'bom-ref': `vendored:${v.shippedPath || (v.name + '@' + v.version)}`,
       name: v.name,
       version: v.version,
+      purl: v.purl || `pkg:generic/${v.name}@${v.version}`,
       scope: 'required',
       licenses: v.license ? [{ license: { name: v.license } }] : undefined,
       hashes: v.sha256 ? [{ alg: 'SHA-256', content: v.sha256 }] : undefined,
@@ -82,7 +87,7 @@ function buildSbom() {
     });
   }
 
-  components.sort((a, b) => (a.name + '@' + a.version).localeCompare(b.name + '@' + b.version));
+  components.sort((a, b) => String(a['bom-ref']).localeCompare(String(b['bom-ref'])));
 
   // Deterministic serial from the root identity (no timestamps/random — reproducible).
   const serialSeed = crypto.createHash('sha256').update(`${root.name || 'root'}@${root.version || '0'}`).digest('hex');

@@ -132,7 +132,7 @@ function run() {
   catch (_) { fail('supply-chain/build-environment.json missing'); }
   if (buildEnv) {
     if (!buildEnv.installMode || !/npm ci/.test(buildEnv.installMode)) fail('build-environment.installMode must document npm ci');
-    if (!buildEnv.platformSupport || buildEnv.platformSupport.arm64 !== true || buildEnv.platformSupport.x64 !== false) fail('build-environment.platformSupport must be arm64-only (arm64:true, x64:false)');
+    if (!buildEnv.platformSupport || buildEnv.platformSupport.arm64 !== true || buildEnv.platformSupport.x64 !== false || buildEnv.platformSupport.universal !== false) fail('build-environment.platformSupport must be arm64-only (arm64:true, x64:false, universal:false)');
   }
 
   return { check: 'supply-chain', ok: problems.length === 0, problems, npmComponentCount: lock ? Object.keys(lock.packages || {}).length - 1 : null, vendorCount: vendor ? (vendor.libraries || []).length : null };

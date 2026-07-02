@@ -25,8 +25,9 @@
     "sbom": {
       "path": "supply-chain/sbom.cdx.json",
       "format": "CycloneDX 1.5",
-      "sha256": "e1c738b5c2d2aeb54cdc64781242c7f872a5144c48880f4c68ce8fd519f1db95",
-      "components": 419
+      "sha256": "1541608f5811657d4bf85995763312cf40b15cd7b4b1ce78ef114348a53c7065",
+      "components": 419,
+      "note": "CycloneDX 1.5: npm hashes hex-encoded from SRI; bom-ref = unique lockfile path; vendored components carry pkg:generic purls"
     },
     "vendorManifest": {
       "path": "supply-chain/vendor-manifest.json",
@@ -56,7 +57,7 @@
   "checks": {
     "checkSupplyChain": "scripts/check-supply-chain.js (--selftest + real): lockfile v3 + root match, exact devDep pins vs lockfile, engines, vendor hash drift, vendor coverage, npm+vendor license allowlist (permissive-only, no copyleft), SBOM freshness, notices coverage, arm64-only build env",
     "generateSbom": "scripts/generate-sbom.js (deterministic; --check drift guard)",
-    "tests": "tests/supply-chain.test.js 12/12 (8 fail-closed sandbox cases); version-bump-policy 16/16 (added H3 lockfile-required case)",
+    "tests": "tests/supply-chain.test.js 14/14 (9 fail-closed sandbox cases: missing lockfile, range devDep, vendor hash drift, copyleft license, uncovered vendor file, stale SBOM, missing notices, wrong lockfileVersion, missing engines); version-bump-policy 18/18 (added H3 lockfile-required + real PR-deletion + missing-verification-lane cases)",
     "ci": "ci.yml F2 step (dependency-free static supply-chain) + NEW .github/workflows/supply-chain-build.yml (npm ci reproducibility + post-install supply-chain governance)"
   },
   "licenseAudit": {

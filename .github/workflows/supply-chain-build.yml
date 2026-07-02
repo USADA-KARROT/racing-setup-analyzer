@@ -3,8 +3,9 @@ name: supply-chain-build
 # H3 — reproducible-install / supply-chain lane.
 # SEPARATE from the dependency-free trusted-verification-gate: this lane DOES install (npm ci) to
 # prove the tracked package-lock.json reproduces the exact dependency tree. It never publishes,
-# tags, releases, signs, or uploads a binary. It does not run electron-builder (a full packaged
-# build is a local/manual step in the H-phase evidence, not this gate).
+# tags, releases, signs, or uploads a distributable binary. It uploads only the JSON evidence
+# artifact (same pattern as the trusted-verification-gate). It does not run electron-builder (a full
+# packaged build is a local/manual step in the H-phase evidence, not this gate).
 
 on:
   pull_request:

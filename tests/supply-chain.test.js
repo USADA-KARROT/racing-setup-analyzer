@@ -150,5 +150,29 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2) + '\n'
   } finally { H.releaseTempDir(box); }
 })();
 
+// h) wrong lockfileVersion
+(function () {
+  const box = sandbox();
+  try {
+    cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'generate-sbom.js')], { cwd: box, encoding: 'utf8' });
+    const l = JSON.parse(fs.readFileSync(path.join(box, 'package-lock.json'), 'utf8')); l.lockfileVersion = 2;
+    writeJson(path.join(box, 'package-lock.json'), l);
+    const r = runIn(box);
+    chk('FAIL wrong lockfileVersion (not 3)', r.status !== 0 && r.art && r.art.problems.some(p => /lockfileVersion must be 3/.test(p)));
+  } finally { H.releaseTempDir(box); }
+})();
+
+// i) missing engines
+(function () {
+  const box = sandbox();
+  try {
+    cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'generate-sbom.js')], { cwd: box, encoding: 'utf8' });
+    const pk = JSON.parse(fs.readFileSync(path.join(box, 'package.json'), 'utf8')); delete pk.engines;
+    writeJson(path.join(box, 'package.json'), pk);
+    const r = runIn(box);
+    chk('FAIL missing engines', r.status !== 0 && r.art && r.art.problems.some(p => /engines\.node missing/.test(p)));
+  } finally { H.releaseTempDir(box); }
+})();
+
 console.log('supply-chain: ' + passed + ' passed, ' + failed + ' failed');
 if (failed) process.exit(1);

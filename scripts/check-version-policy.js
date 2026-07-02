@@ -47,6 +47,7 @@ function run() {
   // supply-chain/build lane is exempt — it exists precisely to run `npm ci` reproducibly.
   const VERIFICATION_LANE_WORKFLOW = 'ci.yml';
   const wfDir = path.join(REPO, '.github', 'workflows');
+  const verificationLaneExists = fs.existsSync(path.join(wfDir, VERIFICATION_LANE_WORKFLOW));
   let wfFiles = [];
   try { wfFiles = fs.readdirSync(wfDir).filter(f => /\.ya?ml$/.test(f) && f === VERIFICATION_LANE_WORKFLOW); } catch (_) { /* none */ }
   const forbidden = [
@@ -61,11 +62,11 @@ function run() {
     for (const x of forbidden) if (x.re.test(txt)) workflowViolations.push(f + ': ' + x.name);
   }
 
-  const ok = versionOk && lockfileTracked && !lockfileRemovedByPR && workflowViolations.length === 0;
+  const ok = versionOk && lockfileTracked && !lockfileRemovedByPR && verificationLaneExists && workflowViolations.length === 0;
   return {
     check: 'version-policy',
     packageVersion: version, expected: EXPECTED, bumpAllow: allow || null, versionOk,
-    lockfileTracked, lockfileRequired: true, lockfileRemovedByPR, workflowViolations, ok,
+    lockfileTracked, lockfileRequired: true, lockfileRemovedByPR, verificationLaneExists, workflowViolations, ok,
   };
 }
 
