@@ -1,0 +1,2478 @@
+Reading additional input from stdin...
+OpenAI Codex v0.141.0
+--------
+workdir: /Users/SKYLINE/Claude/worktrees/f6-release
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: none
+reasoning summaries: none
+session id: 019f218c-47fd-7722-9de7-f1430f1e4f3d
+--------
+user
+You are the adversarial supply-chain auditor for the H3 "Reproducible build + supply-chain governance" change on this Electron app. Review commit e34486b207f91ab51a86ceb8f87a5463b8c8590d on branch hardening/h3-reproducible-build (base: release/v2.0.0-public-hardening @ 0de228c9248d00aad8eabb71ae4fe5bc860bb604). Confirm `git rev-parse HEAD` first.
+
+CONTEXT: this repo historically forbade a tracked lockfile (dependency-free CI lane). H3 flips that: a tracked package-lock.json is now the REQUIRED reproducible-build authority, while the dependency-free verification lane (ci.yml / trusted-verification-gate) must stay install-free. A separate supply-chain-build.yml lane runs `npm ci`. New: exact devDep pins, engines, SBOM (CycloneDX), vendor manifest (3 vendored MIT libs by sha256), THIRD_PARTY_NOTICES, and scripts/check-supply-chain.js + scripts/generate-sbom.js (must be builtin-only so the dependency-free audit stays external:0).
+
+Review `git diff 0de228c9..HEAD` plus any file. Judge these 14 items:
+
+1. LANE INTEGRITY: does the dependency-free verification lane (ci.yml) still install nothing? Confirm no npm ci/install/electron-builder/npx/yarn/pnpm token appears in ci.yml (including comments), and that scripts/check-version-policy.js's workflow-scan is correctly scoped to ONLY ci.yml (so the new lane is exempt) without accidentally exempting anything else.
+2. LOCKFILE POLICY FLIP CORRECTNESS: check-version-policy.js now REQUIRES a tracked lockfile and fails on absence AND on PR-deletion. Verify the fail-closed logic (lockfileTracked via git ls-files; lockfileRemovedByPR via --diff-filter=D) cannot be bypassed, and that the .gitignore no longer excludes package-lock.json.
+3. DEPENDENCY-FREE AUDIT PRESERVED: scripts/generate-sbom.js and scripts/check-supply-chain.js must use ONLY Node builtins + relative reads (no third-party require/import). Confirm the dependency audit (check-verification-dependencies.js) still reports external:0 with these added.
+4. EXACT PINS: package.json devDependencies are exact versions (no ^~ ranges) and equal the lockfile's recorded versions; engines.node and engines.npm declared. check-supply-chain enforces all of this fail-closed.
+5. LICENSE ALLOWLIST: the allowlist is permissive-only. Verify a compound SPDX expression is accepted ONLY if EVERY token is allowlisted (MIT AND GPL-3.0 must fail), null/empty fails, and that the real 416-package tree genuinely contains no copyleft. Try to construct a license string that slips a copyleft token past the splitter.
+6. VENDOR MANIFEST INTEGRITY: every vendored file's sha256 in the manifest matches disk; every renderer/lib/*.js on disk is covered (no unmanaged vendored file); a hash drift fails closed. Verify the recorded versions (alpine 3.14.8, chart.js 4.4.7, tailwind 3.4.17) are accurate against the actual files.
+7. SBOM CORRECTNESS + DETERMINISM: generate-sbom.js is deterministic (no timestamps/random serial), --check detects drift, and the committed sbom.cdx.json is byte-identical to a fresh regeneration. The SBOM covers BOTH npm (416) and vendored (3) components with purls/hashes/licenses. Confirm it is valid CycloneDX 1.5 shape.
+8. NPM CI REPRODUCIBILITY: the supply-chain-build.yml lane runs npm ci (fails closed on package.json/lockfile disagreement), verifies the installed electron/electron-builder versions, and re-runs the supply-chain check post-install. Actions pinned to full SHAs. It never publishes/tags/releases/signs/uploads.
+9. NOTICES COMPLETENESS: THIRD_PARTY_NOTICES.md references every vendored library and does not misrepresent the app's own UNLICENSED status as granting third-party rights.
+10. BUILD ENV / PLATFORM TRUTH: build-environment.json declares npm ci install mode and arm64-only (arm64:true, x64:false, universal:false); check-supply-chain enforces the arm64-only shape; no Intel/universal is implied anywhere.
+11. TEST RIGOR: tests/supply-chain.test.js runs the REAL scripts in sandboxed fixtures and its 8 fail-closed cases genuinely fail for the RIGHT reason (not vacuously). version-bump-policy's new H3 lockfile-required case actually exercises the absence path. Attack the sandbox for false-pass.
+12. SCOPE DISCIPLINE: no production renderer/main/preload/contracts behavioral change in the diff (only package.json pins/engines, lockfile, supply-chain/, scripts, ci, tests, governance, release-notes limitation status). Frozen R3.0B schema untouched.
+13. RELEASE GATE + GOVERNANCE INTACT: the 12-condition release gate still passes and no governance validator was weakened by the version-policy edit; condition 12 (tagPolicy delegating to version-policy) still fails closed on a foreign version.
+14. HONEST CLAIMS: release notes limitations 5/6 are marked addressed-in-hardening-line WITHOUT claiming a published release; H3.json evidence is internally consistent (hashes, counts).
+
+Report findings as H3-R1-NN with file:line evidence. If ALL 14 hold output exactly "VERDICT: PASS", else "VERDICT: BLOCK" with findings. Judge what exists; no out-of-scope enhancements.
+codex
+I’ll first confirm the checked-out commit, then inspect the full base-to-HEAD diff and run the repository’s real verification and adversarial supply-chain tests.
+exec
+/bin/bash -lc 'git rev-parse HEAD && git status --short && git diff --stat 0de228c9248d00aad8eabb71ae4fe5bc860bb604..HEAD && git diff --name-only 0de228c9248d00aad8eabb71ae4fe5bc860bb604..HEAD' in /Users/SKYLINE/Claude/worktrees/f6-release
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-4nfhvEUR' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-HdFxi1NX' (errno=Operation not permitted)
+e34486b207f91ab51a86ceb8f87a5463b8c8590d
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-lVHBU2Af' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-UTFhJ5ha' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-VFQ0AX4e' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-syXCxk2M' (errno=Operation not permitted)
+ .github/workflows/ci.yml                 |   10 +
+ .github/workflows/supply-chain-build.yml |   72 +
+ .gitignore                               |    6 +-
+ THIRD_PARTY_NOTICES.md                   |   62 +
+ docs/release-notes-2.0.0.md              |    6 +-
+ governance/hardening/H3.json             |   70 +
+ package-lock.json                        | 5292 ++++++++++++++++++
+ package.json                             |   10 +-
+ scripts/check-supply-chain.js            |  167 +
+ scripts/check-version-policy.js          |   27 +-
+ scripts/generate-sbom.js                 |  127 +
+ supply-chain/build-environment.json      |   21 +
+ supply-chain/sbom.cdx.json               | 8864 ++++++++++++++++++++++++++++++
+ supply-chain/vendor-manifest.json        |   48 +
+ tests/supply-chain.test.js               |  154 +
+ tests/version-bump-policy.test.js        |   22 +
+ 16 files changed, 14941 insertions(+), 17 deletions(-)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-hj44QQrX' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-o034I2dQ' (errno=Operation not permitted)
+.github/workflows/ci.yml
+.github/workflows/supply-chain-build.yml
+.gitignore
+THIRD_PARTY_NOTICES.md
+docs/release-notes-2.0.0.md
+governance/hardening/H3.json
+package-lock.json
+package.json
+scripts/check-supply-chain.js
+scripts/check-version-policy.js
+scripts/generate-sbom.js
+supply-chain/build-environment.json
+supply-chain/sbom.cdx.json
+supply-chain/vendor-manifest.json
+tests/supply-chain.test.js
+tests/version-bump-policy.test.js
+
+codex
+HEAD matches the requested commit. The worktree is clean; I’m now checking enforcement logic, workflow scoping, generated artifacts, and test mutation paths rather than relying on the committed evidence claims.
+exec
+/bin/bash -lc 'nl -ba .github/workflows/ci.yml; nl -ba .github/workflows/supply-chain-build.yml; nl -ba scripts/check-version-policy.js; nl -ba scripts/check-verification-dependencies.js; nl -ba scripts/check-supply-chain.js; nl -ba scripts/generate-sbom.js; nl -ba package.json; nl -ba supply-chain/vendor-manifest.json; nl -ba supply-chain/build-environment.json; nl -ba tests/supply-chain.test.js; nl -ba tests/version-bump-policy.test.js' in /Users/SKYLINE/Claude/worktrees/f6-release
+ succeeded in 0ms:
+     1	name: trusted-verification-gate
+     2	
+     3	# R3-GATE0 — the authoritative remote verification gate.
+     4	# Local stdout / npm exit codes / `gh pr merge` output are NOT trusted; the truth is this workflow's
+     5	# conclusion + the structured artifact it uploads, both bound to a concrete commit SHA.
+     6	# This workflow is read-only: it never commits, pushes, tags, releases, or mutates the repo.
+     7	
+     8	on:
+     9	  pull_request:
+    10	  push:
+    11	    branches: [main]
+    12	  workflow_dispatch:
+    13	
+    14	# Least privilege: read the checkout, nothing else. No write scopes anywhere.
+    15	permissions:
+    16	  contents: read
+    17	
+    18	concurrency:
+    19	  group: trusted-verification-${{ github.event.pull_request.number || github.ref }}
+    20	  cancel-in-progress: false
+    21	
+    22	jobs:
+    23	  verify:
+    24	    name: trusted-verification
+    25	    runs-on: ubuntu-latest
+    26	    # Job ceiling exceeds the SUM of EVERY step timeout below (checkout 5 + setup 5 + verifiers ≈33 ≈ 43),
+    27	    # so even if every step ran to its own limit the job would not be killed before evidence collection +
+    28	    # upload. A single hung step is killed at the step (a failure, NOT a cancel), and collect + upload run.
+    29	    timeout-minutes: 50
+    30	    env:
+    31	      ARTIFACT_DIR: ${{ github.workspace }}/artifacts
+    32	      TEST_TIMEOUT_MS: '180000'
+    33	    steps:
+    34	      # Pin every third-party Action to a full commit SHA (never a moving tag).
+    35	      - name: Checkout (PR HEAD commit, not the synthetic merge ref)
+    36	        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+    37	        timeout-minutes: 5
+    38	        with:
+    39	          fetch-depth: 0
+    40	          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+    41	          persist-credentials: false
+    42	
+    43	      - name: Setup Node 22 LTS
+    44	        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+    45	        timeout-minutes: 5
+    46	        with:
+    47	          node-version: '22'
+    48	
+    49	      - name: Resolve base/head identity (pass GitHub context via env, never inline)
+    50	        timeout-minutes: 2
+    51	        env:
+    52	          EVENT_NAME: ${{ github.event_name }}
+    53	          PR_BASE: ${{ github.event.pull_request.base.sha }}
+    54	          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+    55	          PUSH_BEFORE: ${{ github.event.before }}
+    56	          GH_SHA: ${{ github.sha }}
+    57	        run: |
+    58	          set -euo pipefail
+    59	          git fetch --no-tags --depth=0 origin main >/dev/null 2>&1 || git fetch --no-tags origin main >/dev/null 2>&1 || true
+    60	          if [ "$EVENT_NAME" = "pull_request" ]; then
+    61	            BASE="$PR_BASE"; HEAD="$PR_HEAD"
+    62	          elif [ "$EVENT_NAME" = "push" ]; then
+    63	            BASE="$PUSH_BEFORE"; HEAD="$GH_SHA"
+    64	          else
+    65	            BASE="$(git rev-parse origin/main 2>/dev/null || git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)"
+    66	            HEAD="$(git rev-parse HEAD)"
+    67	          fi
+    68	          case "$BASE" in ""|0000000000000000000000000000000000000000) BASE="$(git rev-parse origin/main 2>/dev/null || git rev-parse HEAD)";; esac
+    69	          echo "BASE_SHA=$BASE" >> "$GITHUB_ENV"
+    70	          echo "HEAD_SHA=$HEAD" >> "$GITHUB_ENV"
+    71	          echo "resolved event=$EVENT_NAME BASE_SHA=$BASE HEAD_SHA=$HEAD"
+    72	
+    73	      - name: Verify checked-out SHA matches the event-reported SHA
+    74	        timeout-minutes: 1
+    75	        env:
+    76	          EVENT_NAME: ${{ github.event_name }}
+    77	          GH_SHA: ${{ github.sha }}
+    78	        run: |
+    79	          set -euo pipefail
+    80	          ACTUAL="$(git rev-parse HEAD)"
+    81	          echo "checked-out=$ACTUAL  expected HEAD_SHA=$HEAD_SHA  github.sha=$GH_SHA"
+    82	          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "push" ]; then
+    83	            if [ "$ACTUAL" != "$HEAD_SHA" ]; then
+    84	              echo "::error::checked-out SHA ($ACTUAL) != expected HEAD_SHA ($HEAD_SHA)"; exit 1
+    85	            fi
+    86	          fi
+    87	
+    88	      # Dependency-free lane: this repo has never tracked a lockfile and verification needs no third-party
+    89	      # package (deps={} ; tests/scripts use only Node builtins + relative requires). The job therefore
+    90	      # installs nothing; the dependency audit below proves that contract. (Electron packaging is a
+    91	      # separate future milestone, not this gate.)
+    92	      - name: Confirm dependency-free lane (this job installs nothing)
+    93	        timeout-minutes: 1
+    94	        run: |
+    95	          set -euo pipefail
+    96	          echo "Dependency-free verification lane: only node scripts run here."
+    97	          echo "node version: $(node -v)"
+    98	          echo "npm version: $(npm -v)"
+    99	
+   100	      - name: A0 — Dependency audit (self-test, then prove no third-party packages reachable)
+   101	        if: ${{ !cancelled() }}
+   102	        timeout-minutes: 2
+   103	        run: |
+   104	          node scripts/check-verification-dependencies.js --selftest
+   105	          node scripts/check-verification-dependencies.js
+   106	
+   107	      - name: A — Full per-file test manifest
+   108	        if: ${{ !cancelled() }}
+   109	        timeout-minutes: 10
+   110	        run: node scripts/run-tests-manifest.js
+   111	
+   112	      - name: B — i18n three-language parity
+   113	        if: ${{ !cancelled() }}
+   114	        timeout-minutes: 2
+   115	        run: node scripts/check-i18n.js
+   116	
+   117	      - name: C — Feature registry / reachability
+   118	        if: ${{ !cancelled() }}
+   119	        timeout-minutes: 2
+   120	        run: node scripts/check-feature-registry.js
+   121	
+   122	      - name: D — Vehicle preset integrity
+   123	        if: ${{ !cancelled() }}
+   124	        timeout-minutes: 2
+   125	        run: node scripts/check-preset-integrity.js
+   126	
+   127	      - name: E — Frozen-boundary guard
+   128	        if: ${{ !cancelled() }}
+   129	        timeout-minutes: 2
+   130	        # R3.0C C8_ACTIVATION authorizes renderer/js/feature-registry.js to flip the three R3.0C
+   131	        # feature IDs from deferred to active. The frozen-boundary mechanism uses FROZEN_ALLOW for
+   132	        # exactly this milestone-authorized change. While featureRegistryActivationAllowed=false
+   133	        # (C0–C7) the file is treated as fully frozen; once C8 flips the flag the allowlist is
+   134	        # populated for this single file only — any OTHER frozen file touched still fails the check.
+   135	        run: |
+   136	          ALLOW=""
+   137	          if node -e "const s=require('./governance/r3.0c/state.json');process.exit(s.featureRegistryActivationAllowed===true&&(s.authorizedProductionPaths||[]).some(e=>e&&e.path==='renderer/js/feature-registry.js'&&e.capability==='feature_registry_active')?0:1)"; then
+   138	            ALLOW="renderer/js/feature-registry.js"
+   139	          fi
+   140	          FROZEN_ALLOW="$ALLOW" node scripts/check-frozen-boundary.js
+   141	
+   142	      - name: F — Package version policy
+   143	        if: ${{ !cancelled() }}
+   144	        timeout-minutes: 2
+   145	        run: node scripts/check-version-policy.js
+   146	
+   147	      - name: F2 — Supply-chain governance (lockfile/SBOM/vendor/licenses; dependency-free static)
+   148	        if: ${{ !cancelled() }}
+   149	        timeout-minutes: 2
+   150	        # Reads package-lock.json + vendored files + SBOM statically (Node builtins only); needs no
+   151	        # package manager to run, so it belongs in the dependency-free lane. The clean-install
+   152	        # reproducibility proof lives in the separate supply-chain-build workflow.
+   153	        run: |
+   154	          node scripts/check-supply-chain.js --selftest
+   155	          node scripts/check-supply-chain.js
+   156	
+   157	      - name: G — R3.0C scope guard
+   158	        if: ${{ !cancelled() }}
+   159	        timeout-minutes: 2
+   160	        run: node scripts/check-r3-0c-guard.js
+   161	
+   162	      # R3.0C C0 — Integrated Delivery Governance.
+   163	      # The three checks below are UNCONDITIONAL: they run on every PR and every push to main, never
+   164	      # short-circuited by "this PR did not touch R3.0C" — governance truth must be validated continuously.
+   165	      - name: H — R3.0C governance state
+   166	        if: ${{ !cancelled() }}
+   167	        timeout-minutes: 2
+   168	        run: node scripts/check-r3-0c-governance.js
+   169	
+   170	      - name: I — R3.0C no-runtime-consumer
+   171	        if: ${{ !cancelled() }}
+   172	        timeout-minutes: 2
+   173	        run: node scripts/check-r3-0c-no-consumer.js
+   174	
+   175	      - name: J — R3.0C governance integrity (visibility)
+   176	        if: ${{ !cancelled() }}
+   177	        timeout-minutes: 2
+   178	        run: node scripts/check-r3-0c-governance-integrity.js
+   179	
+   180	      # R3.0 G1 — Integrated Delivery Train per-phase governance (D / E / F) + train-level validator.
+   181	      # All steps below are UNCONDITIONAL: they run on every PR and every push to main, never short-circuited
+   182	      # by "this PR did not touch R3.0D/E/F" — governance truth must be validated continuously across the
+   183	      # entire R3.0 Integrated Delivery Train scope, not only when a particular phase's files change.
+   184	      - name: K — R3.0D governance state
+   185	        if: ${{ !cancelled() }}
+   186	        timeout-minutes: 2
+   187	        env:
+   188	          R3_PHASE_PROGRAM: R3.0D
+   189	        run: node scripts/check-r3-phase-governance.js
+   190	
+   191	      - name: K2 — R3.0D no-runtime-consumer
+   192	        if: ${{ !cancelled() }}
+   193	        timeout-minutes: 2
+   194	        env:
+   195	          R3_PHASE_PROGRAM: R3.0D
+   196	        run: node scripts/check-r3-phase-no-consumer.js
+   197	
+   198	      - name: K3 — R3.0D governance integrity (visibility)
+   199	        if: ${{ !cancelled() }}
+   200	        timeout-minutes: 2
+   201	        env:
+   202	          R3_PHASE_PROGRAM: R3.0D
+   203	        run: node scripts/check-r3-phase-governance-integrity.js
+   204	
+   205	      - name: L — R3.0E governance state
+   206	        if: ${{ !cancelled() }}
+   207	        timeout-minutes: 2
+   208	        env:
+   209	          R3_PHASE_PROGRAM: R3.0E
+   210	        run: node scripts/check-r3-phase-governance.js
+   211	
+   212	      - name: L2 — R3.0E no-runtime-consumer
+   213	        if: ${{ !cancelled() }}
+   214	        timeout-minutes: 2
+   215	        env:
+   216	          R3_PHASE_PROGRAM: R3.0E
+   217	        run: node scripts/check-r3-phase-no-consumer.js
+   218	
+   219	      - name: L3 — R3.0E governance integrity (visibility)
+   220	        if: ${{ !cancelled() }}
+   221	        timeout-minutes: 2
+   222	        env:
+   223	          R3_PHASE_PROGRAM: R3.0E
+   224	        run: node scripts/check-r3-phase-governance-integrity.js
+   225	
+   226	      - name: M — R3.0F governance state
+   227	        if: ${{ !cancelled() }}
+   228	        timeout-minutes: 2
+   229	        env:
+   230	          R3_PHASE_PROGRAM: R3.0F
+   231	        run: node scripts/check-r3-phase-governance.js
+   232	
+   233	      - name: M2 — R3.0F no-runtime-consumer
+   234	        if: ${{ !cancelled() }}
+   235	        timeout-minutes: 2
+   236	        env:
+   237	          R3_PHASE_PROGRAM: R3.0F
+   238	        run: node scripts/check-r3-phase-no-consumer.js
+   239	
+   240	      - name: M3 — R3.0F governance integrity (visibility)
+   241	        if: ${{ !cancelled() }}
+   242	        timeout-minutes: 2
+   243	        env:
+   244	          R3_PHASE_PROGRAM: R3.0F
+   245	        run: node scripts/check-r3-phase-governance-integrity.js
+   246	
+   247	      - name: N — R3.0 Integrated Delivery Train (cross-phase + scope pin + historical lineage)
+   248	        if: ${{ !cancelled() }}
+   249	        timeout-minutes: 3
+   250	        run: node scripts/check-r3-0-train.js
+   251	
+   252	      - name: Collect evidence + summary (final gate)
+   253	        if: ${{ !cancelled() }}
+   254	        timeout-minutes: 2
+   255	        run: node scripts/collect-evidence.js
+   256	
+   257	      - name: Upload trusted-verification-evidence
+   258	        if: ${{ !cancelled() }}
+   259	        timeout-minutes: 3
+   260	        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+   261	        with:
+   262	          name: trusted-verification-evidence
+   263	          path: artifacts/
+   264	          if-no-files-found: error
+   265	          retention-days: 90
+     1	name: supply-chain-build
+     2	
+     3	# H3 — reproducible-install / supply-chain lane.
+     4	# SEPARATE from the dependency-free trusted-verification-gate: this lane DOES install (npm ci) to
+     5	# prove the tracked package-lock.json reproduces the exact dependency tree. It never publishes,
+     6	# tags, releases, signs, or uploads a binary. It does not run electron-builder (a full packaged
+     7	# build is a local/manual step in the H-phase evidence, not this gate).
+     8	
+     9	on:
+    10	  pull_request:
+    11	  push:
+    12	    branches: [main]
+    13	  workflow_dispatch:
+    14	
+    15	permissions:
+    16	  contents: read
+    17	
+    18	concurrency:
+    19	  group: supply-chain-${{ github.event.pull_request.number || github.ref }}
+    20	  cancel-in-progress: false
+    21	
+    22	jobs:
+    23	  reproducible-install:
+    24	    name: reproducible-install
+    25	    runs-on: ubuntu-latest
+    26	    timeout-minutes: 20
+    27	    steps:
+    28	      - name: Checkout (PR HEAD commit, not the synthetic merge ref)
+    29	        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+    30	        timeout-minutes: 5
+    31	        with:
+    32	          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+    33	          persist-credentials: false
+    34	
+    35	      - name: Setup Node 22 LTS
+    36	        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+    37	        timeout-minutes: 5
+    38	        with:
+    39	          node-version: '22'
+    40	
+    41	      - name: Reproducible clean install from the lockfile (npm ci)
+    42	        timeout-minutes: 8
+    43	        # npm ci fails closed if package.json and package-lock.json disagree or if the lockfile is
+    44	        # missing — that IS the reproducibility contract. --ignore-scripts avoids running any
+    45	        # dependency lifecycle script during install.
+    46	        run: npm ci --ignore-scripts --no-audit --no-fund
+    47	
+    48	      - name: Prove the installed tree matches the pinned toolchain
+    49	        timeout-minutes: 2
+    50	        run: |
+    51	          set -euo pipefail
+    52	          node -e "const e=require('electron/package.json').version; if(e!=='33.4.11'){console.error('electron '+e+' != 33.4.11');process.exit(1)} console.log('electron '+e)"
+    53	          node -e "const b=require('electron-builder/package.json').version; if(b!=='25.1.8'){console.error('electron-builder '+b+' != 25.1.8');process.exit(1)} console.log('electron-builder '+b)"
+    54	
+    55	      - name: Supply-chain governance (post-install; SBOM freshness, vendor hashes, license allowlist)
+    56	        timeout-minutes: 3
+    57	        env:
+    58	          ARTIFACT_DIR: ${{ github.workspace }}/artifacts
+    59	        run: |
+    60	          node scripts/check-supply-chain.js --selftest
+    61	          node scripts/check-supply-chain.js
+    62	          node scripts/generate-sbom.js --check
+    63	
+    64	      - name: Upload supply-chain evidence
+    65	        if: ${{ !cancelled() }}
+    66	        timeout-minutes: 3
+    67	        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+    68	        with:
+    69	          name: supply-chain-evidence
+    70	          path: artifacts/
+    71	          if-no-files-found: warn
+    72	          retention-days: 90
+     1	#!/usr/bin/env node
+     2	'use strict';
+     3	/**
+     4	 * R3-GATE0 — package + version policy check (dependency-free lane).
+     5	 *
+     6	 * package.json version must remain 2.0.0 — the F6_RELEASE pin after the single authorized
+     7	 * 1.4.0 -> 2.0.0 bump (unless VERSION_BUMP_ALLOW=<x.y.z> stages a future authorized bump).
+     8	 *
+     9	 * H3 (v2.0.x public-release hardening) POLICY FLIP: a tracked package-lock.json is now REQUIRED
+    10	 * (the reproducible-build authority) — its ABSENCE is the violation. The DEPENDENCY-FREE
+    11	 * VERIFICATION LANE (the trusted-verification-gate workflow) must still contain no package-manager
+    12	 * install / Electron build / lifecycle invocation; that ban is now scoped to that ONE workflow so a
+    13	 * separate supply-chain/build lane may legitimately run `npm ci`. CI never publishes / tags / releases.
+    14	 *
+    15	 * Env: BASE_SHA / HEAD_SHA (CI supplies; fallback origin/main...HEAD), VERSION_BUMP_ALLOW (optional).
+    16	 * Output: ${ARTIFACT_DIR:-artifacts}/version-policy.json   (exit non-zero on any violation)
+    17	 */
+    18	const fs = require('fs');
+    19	const path = require('path');
+    20	const cp = require('child_process');
+    21	
+    22	const REPO = path.resolve(__dirname, '..');
+    23	const ARTIFACT_DIR = process.env.ARTIFACT_DIR ? path.resolve(process.env.ARTIFACT_DIR) : path.join(REPO, 'artifacts');
+    24	const EXPECTED = '2.0.0';
+    25	
+    26	function git(args) {
+    27	  const r = cp.spawnSync('git', args, { cwd: REPO, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+    28	  return r.status === 0 ? (r.stdout || '').trim() : null;
+    29	}
+    30	
+    31	function run() {
+    32	  const pkg = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
+    33	  const allow = (process.env.VERSION_BUMP_ALLOW || '').trim();
+    34	  const version = pkg.version;
+    35	  const versionOk = version === EXPECTED || (!!allow && version === allow);
+    36	
+    37	  // H3: the lockfile is now the REQUIRED reproducible-build authority. It must be tracked and
+    38	  // must remain tracked; a PR that removes it is the violation.
+    39	  const lockfileTracked = !!git(['ls-files', 'package-lock.json']);
+    40	  const base = process.env.BASE_SHA || 'origin/main', head = process.env.HEAD_SHA || 'HEAD';
+    41	  const changed = (git(['diff', '--name-only', base + '...' + head]) || '').split('\n').map(s => s.trim()).filter(Boolean);
+    42	  const lockfileDeletedByPR = git(['diff', '--name-only', '--diff-filter=D', base + '...' + head]) || '';
+    43	  const lockfileRemovedByPR = lockfileDeletedByPR.split('\n').map(s => s.trim()).includes('package-lock.json');
+    44	
+    45	  // The CI workflow must not install packages / build Electron / run lifecycle scripts.
+    46	  // The install-free ban applies ONLY to the dependency-free verification lane (ci.yml). The
+    47	  // supply-chain/build lane is exempt — it exists precisely to run `npm ci` reproducibly.
+    48	  const VERIFICATION_LANE_WORKFLOW = 'ci.yml';
+    49	  const wfDir = path.join(REPO, '.github', 'workflows');
+    50	  let wfFiles = [];
+    51	  try { wfFiles = fs.readdirSync(wfDir).filter(f => /\.ya?ml$/.test(f) && f === VERIFICATION_LANE_WORKFLOW); } catch (_) { /* none */ }
+    52	  const forbidden = [
+    53	    { re: /npm\s+ci\b/, name: 'npm ci' }, { re: /npm\s+install\b/, name: 'npm install' },
+    54	    { re: /\bnpx\b/, name: 'npx' }, { re: /\byarn\b/, name: 'yarn' }, { re: /\bpnpm\b/, name: 'pnpm' },
+    55	    { re: /electron-builder/, name: 'electron-builder' }, { re: /npm\s+run\s+build/, name: 'npm run build' },
+    56	    { re: /build:(mac|win|all)\b/, name: 'electron build script' },
+    57	  ];
+    58	  const workflowViolations = [];
+    59	  for (const f of wfFiles) {
+    60	    const txt = fs.readFileSync(path.join(wfDir, f), 'utf8');
+    61	    for (const x of forbidden) if (x.re.test(txt)) workflowViolations.push(f + ': ' + x.name);
+    62	  }
+    63	
+    64	  const ok = versionOk && lockfileTracked && !lockfileRemovedByPR && workflowViolations.length === 0;
+    65	  return {
+    66	    check: 'version-policy',
+    67	    packageVersion: version, expected: EXPECTED, bumpAllow: allow || null, versionOk,
+    68	    lockfileTracked, lockfileRequired: true, lockfileRemovedByPR, workflowViolations, ok,
+    69	  };
+    70	}
+    71	
+    72	let result, exitCode;
+    73	try { result = run(); exitCode = result.ok ? 0 : 1; }
+    74	catch (e) { result = { check: 'version-policy', fatalError: String((e && e.stack) || e), packageVersion: null, ok: false }; exitCode = 2; }
+    75	fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
+    76	fs.writeFileSync(path.join(ARTIFACT_DIR, 'version-policy.json'), JSON.stringify(result, null, 2));
+    77	console.log('VERSION ' + JSON.stringify({ packageVersion: result.packageVersion, lockfileTracked: result.lockfileTracked, lockfileRemovedByPR: result.lockfileRemovedByPR, workflowViolations: result.workflowViolations, ok: result.ok }));
+    78	process.exit(exitCode);
+     1	#!/usr/bin/env node
+     2	'use strict';
+     3	/**
+     4	 * R3-GATE0 — Dependency Audit Gate (dependency-free verification lane).
+     5	 *
+     6	 * Proves that every file CI executes — the authoritative test entry points (from package.json
+     7	 * scripts.test) plus the R3-GATE0 verification scripts, and everything reachable through
+     8	 * require()/import — needs no third-party npm package. The lane installs nothing, so a bare specifier
+     9	 * or an unresolvable dynamic load FAILS (fail-closed). The Node builtin set comes from
+    10	 * require('module').builtinModules.
+    11	 *
+    12	 * A stack-based lexer locates require/import in CODE positions only. It is comment/string/regex aware,
+    13	 * AND template-aware: template `${...}` expression bodies are tokenized inline through the same lexer
+    14	 * (so a `}` inside a comment/string/regex/nested-template inside `${...}` does not end the expression,
+    15	 * and a hidden `${require('x')}` is still seen). Two safe dynamic forms are adjudicated statically and
+    16	 * recorded (decisions, not skips):
+    17	 *   1. require/import( path.join(__dirname, ...string-literals) ) — ONLY when this file binds `path` to
+    18	 *      require('path'), `path` is never reassigned, and the call site is not inside a scope that shadows
+    19	 *      `path` (e.g. `function f(path){...}`).
+    20	 *   2. require(IDENT) where IDENT is a parameter of the function whose BODY actually encloses this call,
+    21	 *      and every call site of that function passes only literal relative './*.js' specifiers.
+    22	 * Anything else dynamic → dynamicUnresolved (FAIL). The documented allowlist is empty by design.
+    23	 * `--selftest` carries adversarial cases for every rule above.
+    24	 *
+    25	 * Output: ${ARTIFACT_DIR:-artifacts}/dependency-audit.json
+    26	 */
+    27	const fs = require('fs');
+    28	const path = require('path');
+    29	const { builtinModules } = require('module');
+    30	
+    31	const REPO = path.resolve(__dirname, '..');
+    32	const ARTIFACT_DIR = process.env.ARTIFACT_DIR ? path.resolve(process.env.ARTIFACT_DIR) : path.join(REPO, 'artifacts');
+    33	
+    34	const BUILTINS = new Set(builtinModules);
+    35	const isBuiltin = spec => { const s = spec.startsWith('node:') ? spec.slice(5) : spec; return BUILTINS.has(s) || BUILTINS.has(s.split('/')[0]); };
+    36	const isRelative = spec => spec.startsWith('./') || spec.startsWith('../') || spec === '.' || spec === '..';
+    37	const KEYWORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw', 'do', 'else', 'yield', 'await', 'case']);
+    38	const DYNAMIC_ALLOWLIST = []; // { file, line, reason } — empty by design (no general bypass)
+    39	
+    40	function entryPoints() {
+    41	  const pkg = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
+    42	  const fromTests = (pkg.scripts.test || '').split('&&')
+    43	    .map(s => s.trim()).filter(Boolean)
+    44	    .map(s => { const m = s.match(/^node\s+(\S+)/); return m ? m[1] : null; }).filter(Boolean);
+    45	  const verifScripts = fs.readdirSync(path.join(REPO, 'scripts')).filter(f => f.endsWith('.js')).map(f => 'scripts/' + f);
+    46	  return Array.from(new Set([...fromTests, ...verifScripts])).map(rel => path.resolve(REPO, rel));
+    47	}
+    48	
+    49	// Stack-based lexer. Template literal text is skipped; `${` opens an expression that is lexed inline
+    50	// through this same loop; the matching `}` (tracked by brace depth, never confused by a `}` inside a
+    51	// comment/string/regex within the expression) closes it back to template-literal mode.
+    52	function tokenize(src) {
+    53	  const T = []; let i = 0; const n = src.length;
+    54	  const last = () => (T.length ? T[T.length - 1] : null);
+    55	  const tplBraceStack = []; let braceDepth = 0; let mode = 'code';
+    56	  while (i < n) {
+    57	    if (mode === 'tpl') {
+    58	      const c = src[i];
+    59	      if (c === '\\') { i += 2; continue; }
+    60	      if (c === '`') { i++; mode = 'code'; continue; }
+    61	      if (c === '$' && src[i + 1] === '{') { T.push({ t: 'punct', v: '${', i }); i += 2; tplBraceStack.push(braceDepth); braceDepth++; mode = 'code'; continue; }
+    62	      i++; continue;
+    63	    }
+    64	    const c = src[i];
+    65	    if (c === ' ' || c === '\t' || c === '\r' || c === '\n') { i++; continue; }
+    66	    if (c === '/' && src[i + 1] === '/') { i += 2; while (i < n && src[i] !== '\n') i++; continue; }
+    67	    if (c === '/' && src[i + 1] === '*') { i += 2; while (i < n && !(src[i] === '*' && src[i + 1] === '/')) i++; i += 2; continue; }
+    68	    if (c === '"' || c === "'") { let j = i + 1, v = ''; while (j < n) { if (src[j] === '\\') { v += (src[j + 1] || ''); j += 2; continue; } if (src[j] === c) break; v += src[j]; j++; } T.push({ t: 'str', v, i }); i = j + 1; continue; }
+    69	    if (c === '`') { T.push({ t: 'tmpl', i }); i++; mode = 'tpl'; continue; }
+    70	    if (c === '/') {
+    71	      const l = last();
+    72	      const division = l && ((l.t === 'word' && !KEYWORDS.has(l.v)) || l.t === 'num' || l.t === 'str' || l.t === 'tmpl' || l.t === 'regex' || (l.t === 'punct' && (l.v === ')' || l.v === ']')));
+    73	      if (!division) { let j = i + 1, cls = false; while (j < n) { const e = src[j]; if (e === '\\') { j += 2; continue; } if (e === '[') cls = true; else if (e === ']') cls = false; else if (e === '/' && !cls) break; else if (e === '\n') break; j++; } j++; while (j < n && /[a-z]/i.test(src[j])) j++; T.push({ t: 'regex', i }); i = j; continue; }
+    74	      T.push({ t: 'punct', v: '/', i }); i++; continue;
+    75	    }
+    76	    if (c === '{') { braceDepth++; T.push({ t: 'punct', v: '{', i }); i++; continue; }
+    77	    if (c === '}') {
+    78	      if (tplBraceStack.length && braceDepth === tplBraceStack[tplBraceStack.length - 1] + 1) { tplBraceStack.pop(); braceDepth--; T.push({ t: 'punct', v: '}', i }); i++; mode = 'tpl'; continue; }
+    79	      braceDepth--; T.push({ t: 'punct', v: '}', i }); i++; continue;
+    80	    }
+    81	    if (/[A-Za-z_$]/.test(c)) { let j = i; while (j < n && /[\w$]/.test(src[j])) j++; T.push({ t: 'word', v: src.slice(i, j), i }); i = j; continue; }
+    82	    if (/[0-9]/.test(c)) { let j = i; while (j < n && /[\w.]/.test(src[j])) j++; T.push({ t: 'num', v: src.slice(i, j), i }); i = j; continue; }
+    83	    T.push({ t: 'punct', v: c, i }); i++;
+    84	  }
+    85	  return T;
+    86	}
+    87	
+    88	const OPEN = new Set(['(', '[', '{', '${']);
+    89	const CLOSE = new Set([')', ']', '}']);
+    90	
+    91	function grabParen(T, openK) { // openK = index of '(' token
+    92	  let depth = 0; const inner = []; let closeTok = null, closeK = -1;
+    93	  for (let k = openK; k < T.length; k++) {
+    94	    const x = T[k];
+    95	    if (x.t === 'punct' && OPEN.has(x.v)) { depth++; if (depth > 1) inner.push(x); continue; }
+    96	    if (x.t === 'punct' && CLOSE.has(x.v)) { depth--; if (depth === 0) { closeTok = x; closeK = k; break; } inner.push(x); continue; }
+    97	    if (depth >= 1) inner.push(x);
+    98	  }
+    99	  return { closeTok, closeK, inner };
+   100	}
+   101	
+   102	function grabBrace(T, openK) { // openK = index of '{' token; returns index of matching '}' (or -1)
+   103	  let depth = 0;
+   104	  for (let k = openK; k < T.length; k++) {
+   105	    const x = T[k];
+   106	    if (x.t === 'punct' && (x.v === '{' || x.v === '${')) depth++;
+   107	    else if (x.t === 'punct' && x.v === '}') { depth--; if (depth === 0) return k; }
+   108	  }
+   109	  return -1;
+   110	}
+   111	
+   112	function splitArgsTokens(inner) {
+   113	  const groups = []; let cur = [], depth = 0;
+   114	  for (const x of inner) {
+   115	    if (x.t === 'punct' && OPEN.has(x.v)) { depth++; cur.push(x); continue; }
+   116	    if (x.t === 'punct' && CLOSE.has(x.v)) { depth--; cur.push(x); continue; }
+   117	    if (x.t === 'punct' && x.v === ',' && depth === 0) { groups.push(cur); cur = []; continue; }
+   118	    cur.push(x);
+   119	  }
+   120	  if (cur.length) groups.push(cur);
+   121	  return groups;
+   122	}
+   123	
+   124	const lineOf = (src, idx) => src.slice(0, idx).split('\n').length;
+   125	
+   126	// Find the function whose BODY actually contains token index `idx`. Verifies idx lies between the body
+   127	// braces (not merely after a preceding `function` keyword). Returns { name, paramNames, fnStart } | null.
+   128	function findEnclosingFunction(T, idx) {
+   129	  for (let k = idx - 1; k >= 0; k--) {
+   130	    if (!(T[k].t === 'word' && T[k].v === 'function')) continue;
+   131	    let p = k + 1, name = null;
+   132	    if (T[p] && T[p].t === 'word') { name = T[p].v; p++; }
+   133	    if (!(T[p] && T[p].t === 'punct' && T[p].v === '(')) continue;
+   134	    const paren = grabParen(T, p);
+   135	    if (paren.closeK < 0) continue;
+   136	    let b = paren.closeK + 1;
+   137	    if (!(T[b] && T[b].t === 'punct' && T[b].v === '{')) continue; // function declarations have a block body right after )
+   138	    const bodyClose = grabBrace(T, b);
+   139	    if (bodyClose < 0) continue;
+   140	    if (idx > b && idx < bodyClose) {
+   141	      const paramNames = splitArgsTokens(paren.inner).map(g => (g.length === 1 && g[0].t === 'word') ? g[0].v : null).filter(Boolean);
+   142	      return { name, paramNames, fnStart: k };
+   143	    }
+   144	    // a `function` whose body does NOT contain idx is not our encloser; keep scanning outward
+   145	  }
+   146	  return null;
+   147	}
+   148	
+   149	// Is `path` shadowed (by a function parameter) at the scope of token index `idx`?
+   150	function pathShadowedAt(T, idx) {
+   151	  let cur = idx;
+   152	  for (let guard = 0; guard < 64; guard++) {
+   153	    const fn = findEnclosingFunction(T, cur);
+   154	    if (!fn) return false;
+   155	    if (fn.paramNames.includes('path')) return true;
+   156	    cur = fn.fnStart; // walk outward
+   157	    if (cur <= 0) return false;
+   158	  }
+   159	  return false;
+   160	}
+   161	
+   162	// File binds `path` to the Node builtin at top level?
+   163	function pathBoundToBuiltin(T) {
+   164	  for (let k = 0; k + 4 < T.length; k++) {
+   165	    if (T[k].t === 'word' && T[k].v === 'path' && T[k + 1].t === 'punct' && T[k + 1].v === '=' &&
+   166	        T[k + 2].t === 'word' && T[k + 2].v === 'require' && T[k + 3].t === 'punct' && T[k + 3].v === '(' &&
+   167	        T[k + 4].t === 'str' && (T[k + 4].v === 'path' || T[k + 4].v === 'node:path')) return true;
+   168	  }
+   169	  return false;
+   170	}
+   171	
+   172	// Is `path` reassigned anywhere (an assignment that is NOT the builtin-require binding)?
+   173	function pathReassigned(T) {
+   174	  for (let k = 0; k + 1 < T.length; k++) {
+   175	    if (!(T[k].t === 'word' && T[k].v === 'path')) continue;
+   176	    const nx = T[k + 1];
+   177	    if (!(nx && nx.t === 'punct' && nx.v === '=')) continue;
+   178	    if (T[k + 2] && T[k + 2].t === 'punct' && (T[k + 2].v === '=' || T[k + 2].v === '>')) continue; // ==, ===, =>
+   179	    const pv = T[k - 1] && T[k - 1].v;
+   180	    if (pv === '=' || pv === '!' || pv === '<' || pv === '>') continue; // ==, !=, <=, >=
+   181	    const isReqBind = T[k + 2] && T[k + 2].t === 'word' && T[k + 2].v === 'require' && T[k + 3] && T[k + 3].v === '(' &&
+   182	      T[k + 4] && T[k + 4].t === 'str' && (T[k + 4].v === 'path' || T[k + 4].v === 'node:path');
+   183	    const isDeclared = T[k - 1] && T[k - 1].t === 'word' && ['const', 'let', 'var'].includes(T[k - 1].v);
+   184	    if (isReqBind && isDeclared) continue; // the legitimate binding
+   185	    return true; // any other `path = ...`
+   186	  }
+   187	  return false;
+   188	}
+   189	
+   190	function extractSpecifiers(T, src) {
+   191	  const out = [];
+   192	  for (let k = 0; k < T.length; k++) {
+   193	    const t = T[k];
+   194	    if (t.t !== 'word' || (t.v !== 'require' && t.v !== 'import')) continue;
+   195	    const a = T[k + 1];
+   196	    if (a && a.t === 'punct' && a.v === '(') {
+   197	      const { closeTok, inner } = grabParen(T, k + 1);
+   198	      if (!closeTok) continue;
+   199	      const line = lineOf(src, t.i);
+   200	      if (inner.length === 1 && inner[0].t === 'str') out.push({ type: 'static', kind: t.v, spec: inner[0].v, line });
+   201	      else out.push({ type: 'dynamic', kind: t.v, raw: src.slice(a.i + 1, closeTok.i).trim(), line, tokenIndex: k });
+   202	      continue;
+   203	    }
+   204	    if (t.v === 'import') {
+   205	      if (a && a.t === 'str') { out.push({ type: 'static', kind: 'import', spec: a.v, line: lineOf(src, t.i) }); continue; }
+   206	      let j = k + 1;
+   207	      while (j < T.length && !(T[j].t === 'word' && T[j].v === 'from')) { if (T[j].t === 'punct' && T[j].v === ';') break; j++; }
+   208	      if (T[j] && T[j].t === 'word' && T[j].v === 'from' && T[j + 1] && T[j + 1].t === 'str') out.push({ type: 'static', kind: 'import', spec: T[j + 1].v, line: lineOf(src, t.i) });
+   209	    }
+   210	  }
+   211	  return out;
+   212	}
+   213	
+   214	function resolveRelative(fromFile, spec) {
+   215	  const base = path.resolve(path.dirname(fromFile), spec);
+   216	  for (const c of [base, base + '.js', base + '.json', path.join(base, 'index.js')]) { try { if (fs.statSync(c).isFile()) return c; } catch (_) { /* keep trying */ } }
+   217	  return null;
+   218	}
+   219	
+   220	function splitTopLevel(s) {
+   221	  const out = []; let depth = 0, cur = '', q = null;
+   222	  for (let i = 0; i < s.length; i++) {
+   223	    const c = s[i];
+   224	    if (q) { cur += c; if (c === '\\') { cur += (s[i + 1] || ''); i++; continue; } if (c === q) q = null; continue; }
+   225	    if (c === '"' || c === "'" || c === '`') { q = c; cur += c; continue; }
+   226	    if (c === '(' || c === '[' || c === '{') { depth++; cur += c; continue; }
+   227	    if (c === ')' || c === ']' || c === '}') { depth--; cur += c; continue; }
+   228	    if (c === ',' && depth === 0) { out.push(cur); cur = ''; continue; }
+   229	    cur += c;
+   230	  }
+   231	  if (cur.trim() !== '') out.push(cur);
+   232	  return out;
+   233	}
+   234	
+   235	function tryStaticPathJoin(raw, fromFile) {
+   236	  const m = raw.match(/^path\.(join|resolve)\(([\s\S]+)\)\s*$/);
+   237	  if (!m) return null;
+   238	  const args = splitTopLevel(m[2]).map(a => a.trim());
+   239	  if (!args.length || args[0] !== '__dirname') return null;
+   240	  const parts = [];
+   241	  for (const a of args.slice(1)) { const lit = a.match(/^(['"])([^'"]*)\1$/); if (!lit) return null; parts.push(lit[2]); }
+   242	  return path.resolve(path.dirname(fromFile), ...parts);
+   243	}
+   244	
+   245	// Token-based: every call site of fnName — is the arg at paramIdx always a literal relative specifier?
+   246	function callSiteLiteralsTok(T, fnName, paramIdx) {
+   247	  if (!fnName) return { ok: false, any: false, nonLiteral: ['(anonymous enclosing function)'] };
+   248	  let any = false, allLit = true; const lits = [], non = [];
+   249	  for (let k = 0; k < T.length; k++) {
+   250	    if (!(T[k].t === 'word' && T[k].v === fnName)) continue;
+   251	    if (k > 0 && T[k - 1].t === 'word' && T[k - 1].v === 'function') continue; // the definition, not a call
+   252	    const open = T[k + 1];
+   253	    if (!(open && open.t === 'punct' && open.v === '(')) continue;
+   254	    const { inner } = grabParen(T, k + 1);
+   255	    const g = splitArgsTokens(inner)[paramIdx] || [];
+   256	    any = true;
+   257	    if (g.length === 1 && g[0].t === 'str' && /^\.\.?\//.test(g[0].v)) lits.push(g[0].v);
+   258	    else { allLit = false; non.push(g.map(x => x.v || x.t).join(' ') || '(missing)'); }
+   259	  }
+   260	  return { ok: any && allLit, any, lits, nonLiteral: non };
+   261	}
+   262	
+   263	function run() {
+   264	  const entries = entryPoints();
+   265	  const visited = new Set();
+   266	  const queue = entries.slice();
+   267	  const builtinImports = new Set();
+   268	  let relativeImports = 0;
+   269	  const externalImports = [], dynamicUnresolved = [], unresolvedRelative = [], dynamicResolvedStatically = [];
+   270	
+   271	  const enqueueRel = (fromFile, spec, line) => {
+   272	    relativeImports++;
+   273	    const resolved = resolveRelative(fromFile, spec);
+   274	    if (!resolved) { unresolvedRelative.push({ file: path.relative(REPO, fromFile), line, spec, reason: 'relative path does not resolve to a repo file' }); return; }
+   275	    if (resolved.startsWith(REPO) && !visited.has(resolved)) queue.push(resolved);
+   276	  };
+   277	
+   278	  while (queue.length) {
+   279	    const file = queue.shift();
+   280	    if (visited.has(file)) continue;
+   281	    visited.add(file);
+   282	    let src;
+   283	    try { src = fs.readFileSync(file, 'utf8'); } catch (_) { unresolvedRelative.push({ file: path.relative(REPO, file), reason: 'unreadable' }); continue; }
+   284	    const rel = path.relative(REPO, file);
+   285	    const T = tokenize(src);
+   286	    const pathBound = pathBoundToBuiltin(T) && !pathReassigned(T);
+   287	    for (const s of extractSpecifiers(T, src)) {
+   288	      if (s.type === 'static') {
+   289	        if (isBuiltin(s.spec)) { builtinImports.add(s.spec.replace(/^node:/, '')); continue; }
+   290	        if (isRelative(s.spec)) { enqueueRel(file, s.spec, s.line); continue; }
+   291	        externalImports.push({ file: rel, line: s.line, kind: s.kind, spec: s.spec, reason: 'bare third-party specifier; lane installs nothing' });
+   292	        continue;
+   293	      }
+   294	      if (DYNAMIC_ALLOWLIST.find(a => a.file === rel && a.line === s.line)) { dynamicResolvedStatically.push({ file: rel, line: s.line, via: 'allowlist' }); continue; }
+   295	      const sp = (pathBound && !pathShadowedAt(T, s.tokenIndex)) ? tryStaticPathJoin(s.raw, file) : null;
+   296	      if (sp) {
+   297	        const target = (sp.endsWith('.js') ? [sp] : [sp, sp + '.js', path.join(sp, 'index.js')]).find(c => { try { return fs.statSync(c).isFile(); } catch (_) { return false; } });
+   298	        if (target && target.startsWith(REPO)) { if (!visited.has(target)) queue.push(target); dynamicResolvedStatically.push({ file: rel, line: s.line, via: 'static-path-join', target: path.relative(REPO, target) }); continue; }
+   299	      }
+   300	      const idm = s.raw.match(/^([A-Za-z_$][\w$]*)$/);
+   301	      if (idm) {
+   302	        const fn = findEnclosingFunction(T, s.tokenIndex);
+   303	        const pidx = fn ? fn.paramNames.indexOf(idm[1]) : -1;
+   304	        if (fn && pidx >= 0) {
+   305	          const cs = callSiteLiteralsTok(T, fn.name, pidx);
+   306	          if (cs.ok) { cs.lits.forEach(p => enqueueRel(file, p, s.line)); dynamicResolvedStatically.push({ file: rel, line: s.line, via: 'forwarded-literal-args', fn: fn.name, resolvedSpecs: Array.from(new Set(cs.lits)) }); continue; }
+   307	          dynamicUnresolved.push({ file: rel, line: s.line, kind: s.kind, raw: s.raw, reason: 'enclosing fn ' + (fn.name || '(anon)') + ' has non-literal call-site arg(s): ' + cs.nonLiteral.join(' | ') });
+   308	          continue;
+   309	        }
+   310	      }
+   311	      dynamicUnresolved.push({ file: rel, line: s.line, kind: s.kind, raw: s.raw, reason: 'non-literal module specifier cannot be statically adjudicated' });
+   312	    }
+   313	  }
+   314	
+   315	  const ok = externalImports.length === 0 && dynamicUnresolved.length === 0 && unresolvedRelative.length === 0;
+   316	  return {
+   317	    check: 'dependency-audit', mode: 'dependency-free',
+   318	    entryPoints: entries.length, filesTraversed: visited.size,
+   319	    builtinImports: Array.from(builtinImports).sort(), relativeImports,
+   320	    externalImports, dynamicUnresolved, unresolvedRelative, dynamicResolvedStatically,
+   321	    dynamicAllowlist: DYNAMIC_ALLOWLIST, overall: ok ? 'PASS' : 'FAIL', ok,
+   322	  };
+   323	}
+   324	
+   325	// Adversarial self-test: proves the lexer/adjudicator detects hidden third-party imports and is not
+   326	// fooled by comments/strings/regex/template-boundary tricks, shadowed/reassigned `path`, or a global
+   327	// require(IDENT) that is not actually inside the forwarding function. Run via `--selftest`.
+   328	function selftest() {
+   329	  const cases = []; const check = (name, cond) => cases.push({ name, ok: !!cond });
+   330	  const sp = s => extractSpecifiers(tokenize(s), s);
+   331	  check('template ${require(lodash)} is SEEN', sp("const a = `${require('lodash')}`;").some(s => s.spec === 'lodash'));
+   332	  check('template ${import(evil)} is SEEN', sp("const b = `${import('evil-pkg')}`;").some(s => s.spec === 'evil-pkg'));
+   333	  check('nested template ${`${require(deep)}`} is SEEN', sp("const c = `${`${require('deep-pkg')}`}`;").some(s => s.spec === 'deep-pkg'));
+   334	  check('template ${/* } */ require(evil2)} is SEEN (comment-brace not end)', sp("const d = `${/* } */ require('evil2')}`;").some(s => s.spec === 'evil2'));
+   335	  check("template ${ s=>s+'}' ; require(evil3)} is SEEN (string-brace not end)", sp("const e = `${ ((s)=>s+'}')('x') + require('evil3') }`;").some(s => s.spec === 'evil3'));
+   336	  check('comment require is IGNORED', !sp("// require('ghost')\nconst f=1;").some(s => s.spec === 'ghost'));
+   337	  check('block-comment require is IGNORED', !sp("/* require('ghost2') */\nconst g=1;").some(s => s.spec === 'ghost2'));
+   338	  check('string require is IGNORED', !sp("const s=\"require('ghost3')\";").some(s => s.spec === 'ghost3'));
+   339	  check('regex require is IGNORED', !sp("const re=/require\\('ghost4'\\)/;").some(s => s.spec === 'ghost4'));
+   340	  check('relative require is SEEN', sp("const h=require('./rel.js');").some(s => s.type === 'static' && s.spec === './rel.js'));
+   341	  check('builtin require is SEEN', sp("const fsx=require('fs');").some(s => s.spec === 'fs'));
+   342	  check('path=require(path) bound', pathBoundToBuiltin(tokenize("const path = require('path');")));
+   343	  check('shadowed path object NOT bound', !pathBoundToBuiltin(tokenize("const path = { join: function () { return 'evil'; } };")));
+   344	  check('path reassignment detected', pathReassigned(tokenize("const path = require('path'); path = require('evil');")));
+   345	  check('no reassignment for plain binding', !pathReassigned(tokenize("const path = require('path'); const y = path.join('a','b');")));
+   346	  // shadowed-at-call-site: path.join inside function f(path) must be detected as shadowed
+   347	  {
+   348	    const src = "const path = require('path');\nfunction f(path) { return require(path.join(__dirname, 'x.js')); }";
+   349	    const T = tokenize(src); const dyn = extractSpecifiers(T, src).find(x => x.type === 'dynamic');
+   350	    check('path shadowed at call site detected', !!dyn && pathShadowedAt(T, dyn.tokenIndex));
+   351	    check('path NOT shadowed at top-level call', (() => { const s2 = "const path = require('path');\nconst m = require(path.join(__dirname, 'x.js'));"; const T2 = tokenize(s2); const d2 = extractSpecifiers(T2, s2).find(x => x.type === 'dynamic'); return d2 && !pathShadowedAt(T2, d2.tokenIndex); })());
+   352	  }
+   353	  // global require(IDENT) after a forwarding function must NOT be falsely enclosed
+   354	  {
+   355	    const src = "function _req(p){ return require(p); }\n_req('./a.js');\nconst m = require(globalP);";
+   356	    const T = tokenize(src); const dyns = extractSpecifiers(T, src).filter(x => x.type === 'dynamic');
+   357	    const top = dyns.find(x => x.raw === 'globalP');
+   358	    check('global require(IDENT) not falsely enclosed', !!top && findEnclosingFunction(T, top.tokenIndex) === null);
+   359	    const inside = dyns.find(x => x.raw === 'p');
+   360	    check('inside-fn require(p) is correctly enclosed', !!inside && !!findEnclosingFunction(T, inside.tokenIndex));
+   361	  }
+   362	  const failed = cases.filter(c => !c.ok);
+   363	  console.log('DEP-AUDIT-SELFTEST ' + (cases.length - failed.length) + '/' + cases.length + ' passed' + (failed.length ? ' — FAILED: ' + failed.map(c => c.name).join('; ') : ''));
+   364	  process.exit(failed.length ? 1 : 0);
+   365	}
+   366	if (process.argv.includes('--selftest')) selftest();
+   367	
+   368	let result, exitCode;
+   369	try { result = run(); exitCode = result.ok ? 0 : 1; }
+   370	catch (e) { result = { check: 'dependency-audit', mode: 'dependency-free', fatalError: String((e && e.stack) || e), overall: 'FAIL', ok: false, externalImports: [], dynamicUnresolved: [] }; exitCode = 2; }
+   371	fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
+   372	fs.writeFileSync(path.join(ARTIFACT_DIR, 'dependency-audit.json'), JSON.stringify(result, null, 2));
+   373	console.log('DEP-AUDIT ' + JSON.stringify({ entryPoints: result.entryPoints, filesTraversed: result.filesTraversed, external: (result.externalImports || []).length, dynamicUnresolved: (result.dynamicUnresolved || []).length, resolvedStatically: (result.dynamicResolvedStatically || []).length, ok: result.ok }));
+   374	process.exit(exitCode);
+     1	#!/usr/bin/env node
+     2	'use strict';
+     3	/**
+     4	 * H3 — supply-chain governance check (dependency-free).
+     5	 *
+     6	 * Fail-closed validation of the reproducible-build + supply-chain contract:
+     7	 *
+     8	 *   1. package-lock.json exists, is lockfileVersion 3, and its root name/version match package.json.
+     9	 *   2. devDependencies are pinned to EXACT versions (no ^ ~ ranges) and match the lockfile.
+    10	 *   3. engines.node / engines.npm are declared.
+    11	 *   4. Vendor manifest: every listed library file exists on disk and its sha256 matches (drift = fail);
+    12	 *      every renderer/lib/*.js file on disk is COVERED by the manifest (no unmanaged vendored file).
+    13	 *   5. License allowlist: every npm component's license (from the lockfile) is on the permissive
+    14	 *      allowlist; every vendored library license is on the allowlist. Any copyleft/unknown = fail.
+    15	 *   6. SBOM freshness: supply-chain/sbom.cdx.json is byte-identical to a fresh regeneration.
+    16	 *   7. THIRD_PARTY_NOTICES.md exists and references every vendored library by name.
+    17	 *   8. build-environment.json declares the pinned toolchain + arm64-only platform support.
+    18	 *
+    19	 * `--selftest` exercises the hash-drift, range-version, uncovered-vendor-file, and copyleft-license
+    20	 * rejection paths against in-memory fixtures. Uses only Node builtins (fs, path, crypto).
+    21	 *
+    22	 * Output: ${ARTIFACT_DIR:-artifacts}/supply-chain.json
+    23	 */
+    24	const fs = require('fs');
+    25	const path = require('path');
+    26	const crypto = require('crypto');
+    27	const cp = require('child_process');
+    28	
+    29	const REPO = path.resolve(__dirname, '..');
+    30	const ARTIFACT_DIR = process.env.ARTIFACT_DIR ? path.resolve(process.env.ARTIFACT_DIR) : path.join(REPO, 'artifacts');
+    31	
+    32	// Permissive licenses acceptable for redistribution in an UNLICENSED (all-rights-reserved) app.
+    33	// NOTE: this list is intentionally permissive-only — no GPL/LGPL/AGPL/MPL/EPL/CDDL copyleft.
+    34	const LICENSE_ALLOWLIST = new Set([
+    35	  'MIT', 'ISC', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', '0BSD', 'BlueOak-1.0.0',
+    36	  'CC0-1.0', 'CC-BY-4.0', 'Unlicense', 'WTFPL', 'Python-2.0', 'BSD',
+    37	]);
+    38	// SPDX expression splitter: accept a compound expr iff EVERY named license token is allowlisted.
+    39	function licenseAllowed(expr) {
+    40	  if (!expr) return false;
+    41	  const tokens = String(expr).replace(/[()]/g, ' ').split(/\s+(?:OR|AND)\s+/i).map(t => t.trim()).filter(Boolean);
+    42	  if (!tokens.length) return false;
+    43	  return tokens.every(t => LICENSE_ALLOWLIST.has(t));
+    44	}
+    45	function licenseOf(entry) {
+    46	  if (typeof entry.license === 'string') return entry.license;
+    47	  if (Array.isArray(entry.licenses) && entry.licenses[0]) return entry.licenses[0].type || null;
+    48	  return null;
+    49	}
+    50	function sha256File(p) { return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
+    51	function readJson(p) { return JSON.parse(fs.readFileSync(p, 'utf8')); }
+    52	
+    53	function run() {
+    54	  const problems = [];
+    55	  const fail = (msg) => problems.push(msg);
+    56	
+    57	  const pkg = readJson(path.join(REPO, 'package.json'));
+    58	
+    59	  // 1. lockfile
+    60	  let lock = null;
+    61	  try { lock = readJson(path.join(REPO, 'package-lock.json')); }
+    62	  catch (_) { fail('package-lock.json missing or unreadable (required reproducible-build authority)'); }
+    63	  if (lock) {
+    64	    if (lock.lockfileVersion !== 3) fail('package-lock.json lockfileVersion must be 3; got ' + lock.lockfileVersion);
+    65	    const root = (lock.packages && lock.packages['']) || {};
+    66	    if (root.name !== pkg.name) fail('lockfile root name ' + root.name + ' != package.json name ' + pkg.name);
+    67	    if (root.version !== pkg.version) fail('lockfile root version ' + root.version + ' != package.json version ' + pkg.version);
+    68	  }
+    69	
+    70	  // 2. exact devDependency pins + lockfile agreement
+    71	  const dev = pkg.devDependencies || {};
+    72	  for (const [name, range] of Object.entries(dev)) {
+    73	    if (/[\^~><*]|\s-\s|x/i.test(range)) fail('devDependency ' + name + ' is not an exact version: ' + range);
+    74	    if (lock) {
+    75	      const locked = lock.packages && lock.packages['node_modules/' + name];
+    76	      if (!locked) fail('devDependency ' + name + ' not present in lockfile');
+    77	      else if (locked.version !== range) fail('devDependency ' + name + ' pin ' + range + ' != lockfile ' + locked.version);
+    78	    }
+    79	  }
+    80	
+    81	  // 3. engines
+    82	  if (!pkg.engines || !pkg.engines.node) fail('package.json engines.node missing');
+    83	  if (!pkg.engines || !pkg.engines.npm) fail('package.json engines.npm missing');
+    84	
+    85	  // 4. vendor manifest hashes + coverage
+    86	  let vendor = null;
+    87	  try { vendor = readJson(path.join(REPO, 'supply-chain', 'vendor-manifest.json')); }
+    88	  catch (_) { fail('supply-chain/vendor-manifest.json missing'); }
+    89	  const libDir = path.join(REPO, 'renderer', 'lib');
+    90	  const onDiskLibs = fs.existsSync(libDir) ? fs.readdirSync(libDir).filter(f => /\.js$/.test(f)) : [];
+    91	  const covered = new Set();
+    92	  if (vendor) {
+    93	    for (const lib of vendor.libraries || []) {
+    94	      const abs = path.join(REPO, lib.shippedPath);
+    95	      if (!fs.existsSync(abs)) { fail('vendored file missing: ' + lib.shippedPath); continue; }
+    96	      const actual = sha256File(abs);
+    97	      if (actual !== lib.sha256) fail('vendor hash DRIFT for ' + lib.shippedPath + ': manifest ' + lib.sha256 + ' actual ' + actual);
+    98	      if (!licenseAllowed(lib.license)) fail('vendored ' + lib.name + ' license not on allowlist: ' + lib.license);
+    99	      covered.add(path.basename(lib.shippedPath));
+   100	    }
+   101	  }
+   102	  for (const f of onDiskLibs) if (!covered.has(f)) fail('renderer/lib/' + f + ' is not covered by the vendor manifest (unmanaged vendored file)');
+   103	
+   104	  // 5. npm license allowlist
+   105	  if (lock) {
+   106	    const offenders = [];
+   107	    for (const [key, entry] of Object.entries(lock.packages || {})) {
+   108	      if (key === '') continue;
+   109	      const lic = licenseOf(entry);
+   110	      if (!licenseAllowed(lic)) offenders.push(key.replace(/^node_modules\//, '') + '@' + (entry.version || '?') + ' => ' + (lic || 'UNKNOWN'));
+   111	    }
+   112	    if (offenders.length) fail('non-allowlisted npm license(s): ' + offenders.slice(0, 10).join('; ') + (offenders.length > 10 ? ' (+' + (offenders.length - 10) + ' more)' : ''));
+   113	  }
+   114	
+   115	  // 6. SBOM freshness (regenerate in --check mode)
+   116	  const sbomCheck = cp.spawnSync(process.execPath, [path.join(REPO, 'scripts', 'generate-sbom.js'), '--check'], { cwd: REPO, encoding: 'utf8' });
+   117	  if (sbomCheck.status !== 0) fail('SBOM freshness check failed: ' + (sbomCheck.stderr || sbomCheck.stdout || '').trim());
+   118	
+   119	  // 7. THIRD_PARTY_NOTICES references every vendored lib
+   120	  let notices = '';
+   121	  try { notices = fs.readFileSync(path.join(REPO, 'THIRD_PARTY_NOTICES.md'), 'utf8'); }
+   122	  catch (_) { fail('THIRD_PARTY_NOTICES.md missing'); }
+   123	  if (notices && vendor) {
+   124	    for (const lib of vendor.libraries || []) {
+   125	      if (notices.indexOf(lib.displayName) === -1 && notices.indexOf(lib.name) === -1) fail('THIRD_PARTY_NOTICES.md does not mention vendored library ' + lib.displayName);
+   126	    }
+   127	  }
+   128	
+   129	  // 8. build-environment manifest
+   130	  let buildEnv = null;
+   131	  try { buildEnv = readJson(path.join(REPO, 'supply-chain', 'build-environment.json')); }
+   132	  catch (_) { fail('supply-chain/build-environment.json missing'); }
+   133	  if (buildEnv) {
+   134	    if (!buildEnv.installMode || !/npm ci/.test(buildEnv.installMode)) fail('build-environment.installMode must document npm ci');
+   135	    if (!buildEnv.platformSupport || buildEnv.platformSupport.arm64 !== true || buildEnv.platformSupport.x64 !== false) fail('build-environment.platformSupport must be arm64-only (arm64:true, x64:false)');
+   136	  }
+   137	
+   138	  return { check: 'supply-chain', ok: problems.length === 0, problems, npmComponentCount: lock ? Object.keys(lock.packages || {}).length - 1 : null, vendorCount: vendor ? (vendor.libraries || []).length : null };
+   139	}
+   140	
+   141	// ---- self-test ----
+   142	function selftest() {
+   143	  let ok = true;
+   144	  const t = (name, cond) => { if (!cond) { ok = false; console.error('  SELFTEST FAIL: ' + name); } };
+   145	  t('MIT allowed', licenseAllowed('MIT'));
+   146	  t('ISC allowed', licenseAllowed('ISC'));
+   147	  t('MIT OR Apache-2.0 allowed', licenseAllowed('(MIT OR Apache-2.0)'));
+   148	  t('GPL-3.0 rejected', !licenseAllowed('GPL-3.0'));
+   149	  t('MIT AND GPL-3.0 rejected (any copyleft token fails)', !licenseAllowed('MIT AND GPL-3.0'));
+   150	  t('null license rejected', !licenseAllowed(null));
+   151	  t('empty license rejected', !licenseAllowed(''));
+   152	  console.log(ok ? 'supply-chain selftest: PASS' : 'supply-chain selftest: FAIL');
+   153	  return ok;
+   154	}
+   155	
+   156	if (process.argv.includes('--selftest')) {
+   157	  process.exit(selftest() ? 0 : 1);
+   158	}
+   159	
+   160	let result, exitCode;
+   161	try { result = run(); exitCode = result.ok ? 0 : 1; }
+   162	catch (e) { result = { check: 'supply-chain', ok: false, fatalError: String((e && e.stack) || e) }; exitCode = 2; }
+   163	fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
+   164	fs.writeFileSync(path.join(ARTIFACT_DIR, 'supply-chain.json'), JSON.stringify(result, null, 2));
+   165	console.log('SUPPLY-CHAIN ' + JSON.stringify({ ok: result.ok, problems: result.problems ? result.problems.length : 'fatal' }));
+   166	if (result.problems && result.problems.length) for (const p of result.problems) console.log('  - ' + p);
+   167	process.exit(exitCode);
+     1	#!/usr/bin/env node
+     2	'use strict';
+     3	/**
+     4	 * H3 — SBOM generator (CycloneDX 1.5 JSON), dependency-free.
+     5	 *
+     6	 * Reads package-lock.json (the tracked reproducible-build authority) and emits a deterministic
+     7	 * CycloneDX Software Bill of Materials at supply-chain/sbom.cdx.json. Every npm component gets a
+     8	 * purl, version, and (when the lockfile records it) a license expression and integrity hash.
+     9	 * Vendored (non-npm) renderer libraries are read from supply-chain/vendor-manifest.json and added
+    10	 * as components with their sha256 hashes so the SBOM covers the WHOLE shipped surface, not just npm.
+    11	 *
+    12	 * Deterministic: components are sorted by (name, version); no timestamps, no random serials (a fixed
+    13	 * serial derived from the root name+version). `--check` mode regenerates in-memory and fails if the
+    14	 * on-disk SBOM differs (drift guard) instead of writing.
+    15	 *
+    16	 * Uses only Node builtins (fs, path, crypto) + relative reads — no third-party package, so it passes
+    17	 * the dependency-free audit gate.
+    18	 */
+    19	const fs = require('fs');
+    20	const path = require('path');
+    21	const crypto = require('crypto');
+    22	
+    23	const REPO = path.resolve(__dirname, '..');
+    24	const LOCK = path.join(REPO, 'package-lock.json');
+    25	const VENDOR = path.join(REPO, 'supply-chain', 'vendor-manifest.json');
+    26	const OUT = path.join(REPO, 'supply-chain', 'sbom.cdx.json');
+    27	
+    28	function readJson(p) { return JSON.parse(fs.readFileSync(p, 'utf8')); }
+    29	
+    30	function licenseOf(entry) {
+    31	  if (typeof entry.license === 'string') return entry.license;
+    32	  if (Array.isArray(entry.licenses) && entry.licenses[0]) return entry.licenses[0].type || null;
+    33	  return null;
+    34	}
+    35	
+    36	function buildSbom() {
+    37	  const lock = readJson(LOCK);
+    38	  const pkgs = lock.packages || {};
+    39	  const root = pkgs[''] || {};
+    40	  const components = [];
+    41	
+    42	  for (const [key, entry] of Object.entries(pkgs)) {
+    43	    if (key === '') continue; // root is metadata.component, not a component
+    44	    // node_modules/<name> or node_modules/<a>/node_modules/<b> — take the last path segment pair
+    45	    const m = key.match(/node_modules\/((?:@[^/]+\/)?[^/]+)$/);
+    46	    if (!m) continue;
+    47	    const name = m[1];
+    48	    const version = entry.version || null;
+    49	    const comp = {
+    50	      type: 'library',
+    51	      'bom-ref': `pkg:npm/${name}@${version}`,
+    52	      name,
+    53	      version,
+    54	      purl: `pkg:npm/${name}@${version}`,
+    55	      scope: entry.dev ? 'optional' : 'required', // devDependencies are build-time only
+    56	    };
+    57	    const lic = licenseOf(entry);
+    58	    if (lic) comp.licenses = [{ license: { name: lic } }];
+    59	    if (typeof entry.integrity === 'string' && entry.integrity.startsWith('sha512-')) {
+    60	      comp.hashes = [{ alg: 'SHA-512', content: entry.integrity.slice('sha512-'.length) }];
+    61	    }
+    62	    components.push(comp);
+    63	  }
+    64	
+    65	  // Vendored (non-npm) libraries — covered by their own hashes.
+    66	  let vendor = { libraries: [] };
+    67	  try { vendor = readJson(VENDOR); } catch (_) { /* generated after this on first run */ }
+    68	  for (const v of vendor.libraries || []) {
+    69	    components.push({
+    70	      type: 'library',
+    71	      'bom-ref': `vendored:${v.name}@${v.version}`,
+    72	      name: v.name,
+    73	      version: v.version,
+    74	      scope: 'required',
+    75	      licenses: v.license ? [{ license: { name: v.license } }] : undefined,
+    76	      hashes: v.sha256 ? [{ alg: 'SHA-256', content: v.sha256 }] : undefined,
+    77	      properties: [
+    78	        { name: 'vendored', value: 'true' },
+    79	        { name: 'source', value: v.source || '' },
+    80	        { name: 'shippedPath', value: v.shippedPath || '' },
+    81	      ],
+    82	    });
+    83	  }
+    84	
+    85	  components.sort((a, b) => (a.name + '@' + a.version).localeCompare(b.name + '@' + b.version));
+    86	
+    87	  // Deterministic serial from the root identity (no timestamps/random — reproducible).
+    88	  const serialSeed = crypto.createHash('sha256').update(`${root.name || 'root'}@${root.version || '0'}`).digest('hex');
+    89	  return {
+    90	    bomFormat: 'CycloneDX',
+    91	    specVersion: '1.5',
+    92	    serialNumber: `urn:uuid:${serialSeed.slice(0, 8)}-${serialSeed.slice(8, 12)}-${serialSeed.slice(12, 16)}-${serialSeed.slice(16, 20)}-${serialSeed.slice(20, 32)}`,
+    93	    version: 1,
+    94	    metadata: {
+    95	      component: {
+    96	        type: 'application',
+    97	        'bom-ref': `pkg:npm/${root.name}@${root.version}`,
+    98	        name: root.name || 'racing-setup-analyzer',
+    99	        version: root.version || null,
+   100	      },
+   101	      properties: [
+   102	        { name: 'reproducibleFrom', value: 'package-lock.json (lockfileVersion ' + (lock.lockfileVersion || '?') + ')' },
+   103	        { name: 'generator', value: 'scripts/generate-sbom.js (dependency-free)' },
+   104	      ],
+   105	    },
+   106	    components,
+   107	  };
+   108	}
+   109	
+   110	const check = process.argv.includes('--check');
+   111	const sbom = buildSbom();
+   112	const serialized = JSON.stringify(sbom, null, 2) + '\n';
+   113	
+   114	if (check) {
+   115	  let onDisk = null;
+   116	  try { onDisk = fs.readFileSync(OUT, 'utf8'); } catch (_) { /* missing */ }
+   117	  if (onDisk !== serialized) {
+   118	    console.error('SBOM DRIFT: supply-chain/sbom.cdx.json is stale — run `node scripts/generate-sbom.js`');
+   119	    process.exit(1);
+   120	  }
+   121	  console.log('SBOM up to date (' + sbom.components.length + ' components)');
+   122	  process.exit(0);
+   123	}
+   124	
+   125	fs.mkdirSync(path.dirname(OUT), { recursive: true });
+   126	fs.writeFileSync(OUT, serialized);
+   127	console.log('SBOM written: ' + path.relative(REPO, OUT) + ' (' + sbom.components.length + ' components)');
+     1	{
+     2	  "name": "racing-setup-analyzer",
+     3	  "version": "2.0.0",
+     4	  "description": "Vehicle-dynamics setup & lap-time analyzer (handling balance, springs/ARB/dampers, tyre-stint simulation)",
+     5	  "license": "UNLICENSED",
+     6	  "author": "USADA-KARROT",
+     7	  "repository": {
+     8	    "type": "git",
+     9	    "url": "https://github.com/USADA-KARROT/racing-setup-analyzer.git"
+    10	  },
+    11	  "main": "main.js",
+    12	  "scripts": {
+    13	    "start": "electron .",
+    14	    "test": "node tests/verify-dynamics.js && node tests/telemetry-core.test.js && node tests/telemetry-view.test.js && node tests/telemetry-plot.test.js && node tests/telemetry-interact.test.js && node tests/telemetry-yaw.test.js && node tests/canonical-parameters.test.js && node tests/parameter-conversions.test.js && node tests/vehicle-profile-f312.test.js && node tests/setup-snapshot.test.js && node tests/analysis-case.test.js && node tests/analysis-case-adversarial.test.js && node tests/suspension-input-normalizer.test.js && node tests/suspension-input-equivalence.test.js && node tests/suspension-input-adversarial.test.js && node tests/canonical-model-input.test.js && node tests/analysis-execution.test.js && node tests/telemetry-observation.test.js && node tests/model-telemetry-comparison.test.js && node tests/race-engineer-insight.test.js && node tests/driver-coach-insight.test.js && node tests/analysis-workspace.test.js && node tests/analysis-workspace-viewmodel.test.js && node tests/analysis-workspace-integration.test.js && node tests/analysis-workspace-ui.test.js && node tests/telemetry-import-adapter.test.js && node tests/channel-mapping.test.js && node tests/calibration-registry.test.js && node tests/analysis-window.test.js && node tests/canonical-telemetry-session.test.js && node tests/analysis-case-export.test.js && node tests/r2.3-real-telemetry-integration.test.js && node tests/r2.3-import-ui.test.js && node tests/measured-metrics.test.js && node tests/r2.4-measured-metrics-integration.test.js && node tests/r2.4-ui.test.js && node tests/setup-ab.test.js && node tests/quantitative-setup-recommendation.test.js && node tests/r2.5-setup-ab-quantitative-integration.test.js && node tests/r2.5-ui.test.js && node tests/track-intelligence.test.js && node tests/r2.6-track-intelligence-integration.test.js && node tests/r2.6-ui.test.js && node tests/case-shell.test.js && node tests/r3.0a-ui.test.js && node tests/storage-backend.test.js && node tests/schema-migration.test.js && node tests/case-record-schema.test.js && node tests/case-store.test.js && node tests/session-store.test.js && node tests/case-library-viewmodel.test.js && node tests/r3.0b-ui.test.js && node tests/r3.0b-persistence-integration.test.js && node tests/feature-registry.test.js && node tests/feature-router.test.js && node tests/vehicle-preset-pipeline.test.js && node tests/i18n-parity.test.js && node tests/r3.0c-contract-foundation.test.js && node tests/r3-0c-comparison-adapter.test.js && node tests/r3-0c-lap-authority.test.js && node tests/r3-0c-track-identity.test.js && node tests/r3-0c-distance-authority.test.js && node tests/r3-0c-normalized-distance.test.js && node tests/r3-0c-reference-selection.test.js && node tests/r3-0c-corner-segmentation.test.js && node tests/r3-0c-corner-pairing.test.js && node tests/r3-0c-delta-metrics.test.js && node tests/r3-0c-comparison-export.test.js && node tests/r3-0c-comparison-workspace.test.js && node tests/r3-0c-contracts-bundle-equivalence.test.js && node tests/r3-0c-activation.test.js && node tests/r3.0d-contract-foundation.test.js && node tests/r3.0d-hardened-intrinsics.test.js && node tests/r3.0d-evidence-graph.test.js && node tests/r3.0d-hypothesis-engine.test.js && node tests/r3.0d-priority-engine.test.js && node tests/r3.0d-engineer-brief.test.js && node tests/r3.0d-engineer-viewmodel.test.js && node tests/r3-0d-contracts-bundle-equivalence.test.js && node tests/r3.0e-contract-foundation.test.js && node tests/r3.0e-stores.test.js && node tests/r3.0e-outcome-classifier.test.js && node tests/r3.0e-followup-timeline.test.js && node tests/r3.0e-experiment-viewmodel.test.js && node tests/r3.0f-migration-engine.test.js && node tests/e2e/flow-01-new-user.test.js && node tests/e2e/flow-02-real-telemetry.test.js && node tests/e2e/flow-03-measured.test.js && node tests/e2e/flow-04-reference-lap.test.js && node tests/e2e/flow-05-vre.test.js && node tests/e2e/flow-06-setup-experiment.test.js && node tests/e2e/flow-07-driver-experiment.test.js && node tests/e2e/flow-08-export-import.test.js && node tests/e2e/flow-09-electron-smoke.test.js && node tests/e2e/hardening-01-electron-boundary.test.js && node tests/e2e/hardening-02-storage-failure.test.js && node tests/e2e/hardening-03-no-stale-ui.test.js && node tests/e2e/hardening-04-large-library.test.js && node tests/e2e/hardening-05-xss-injection.test.js && node tests/e2e/hardening-06-supply-chain.test.js && node tests/managed-temp-dir.test.js && node tests/release-gate.test.js && node tests/version-bump-policy.test.js && node tests/supply-chain.test.js && node tests/r3-0c-governance.test.js && node tests/r3-0c-no-consumer.test.js && node tests/r3-0c-governance-integrity.test.js && node tests/r3-0-phase-governance.test.js && node tests/r3-0-phase-no-consumer.test.js && node tests/r3-0-phase-governance-integrity.test.js && node tests/r3-0-train.test.js && node tools/validate-against-telemetry.js --selftest",
+    15	    "build:mac": "electron-builder --mac",
+    16	    "build:win": "electron-builder --win",
+    17	    "build:all": "electron-builder --mac --win"
+    18	  },
+    19	  "build": {
+    20	    "appId": "com.racingsetup.analyzer",
+    21	    "productName": "Racing Setup Analyzer",
+    22	    "directories": {
+    23	      "output": "build"
+    24	    },
+    25	    "files": [
+    26	      "main.js",
+    27	      "preload.js",
+    28	      "renderer/**/*"
+    29	    ],
+    30	    "mac": {
+    31	      "target": "dmg",
+    32	      "category": "public.app-category.utilities"
+    33	    },
+    34	    "win": {
+    35	      "target": [
+    36	        {
+    37	          "target": "nsis",
+    38	          "arch": [
+    39	            "x64"
+    40	          ]
+    41	        },
+    42	        {
+    43	          "target": "portable",
+    44	          "arch": [
+    45	            "x64"
+    46	          ]
+    47	        }
+    48	      ]
+    49	    },
+    50	    "nsis": {
+    51	      "oneClick": true,
+    52	      "allowToChangeInstallationDirectory": false
+    53	    }
+    54	  },
+    55	  "devDependencies": {
+    56	    "electron": "33.4.11",
+    57	    "electron-builder": "25.1.8"
+    58	  },
+    59	  "engines": {
+    60	    "node": ">=22.0.0",
+    61	    "npm": ">=10.0.0"
+    62	  }
+    63	}
+     1	{
+     2	  "schemaVersion": 1,
+     3	  "note": "H3 vendor governance. These three third-party libraries ship VENDORED under renderer/lib/ (outside npm), loaded from disk only — no CDN at runtime (see docs/r3-data-and-privacy.md 'Network egress'). Each is pinned by sha256; scripts/check-supply-chain.js fails closed if a file's hash drifts from this manifest. All three are permissive-licensed (MIT). Update policy: bump only via a reviewed PR that updates version + sha256 here in lockstep and re-runs the vulnerability audit.",
+     4	  "libraries": [
+     5	    {
+     6	      "name": "alpinejs",
+     7	      "displayName": "Alpine.js",
+     8	      "version": "3.14.8",
+     9	      "shippedPath": "renderer/lib/alpine.min.js",
+    10	      "bytes": 44758,
+    11	      "sha256": "b600e363d99d95444db54acbfb2deffec9ae792aa99a09229bcda078e5b55643",
+    12	      "license": "MIT",
+    13	      "source": "https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js",
+    14	      "upstream": "https://github.com/alpinejs/alpine",
+    15	      "versionEvidence": "embedded `version:\"3.14.8\"` string in the minified source",
+    16	      "updatePolicy": "reviewed PR only; bump version+sha256 in lockstep; re-run vulnerability audit",
+    17	      "vulnerabilityAudit": "npm advisory DB lookup for alpinejs@3.14.8 (no known advisories as of the H3 build); re-checked on each version bump"
+    18	    },
+    19	    {
+    20	      "name": "chart.js",
+    21	      "displayName": "Chart.js",
+    22	      "version": "4.4.7",
+    23	      "shippedPath": "renderer/lib/chart.min.js",
+    24	      "bytes": 205889,
+    25	      "sha256": "206b6e8bb00fc7bba2c7ee80ca41db3e9e05ba7be0aa35abeba9cfd5357f5d0e",
+    26	      "license": "MIT",
+    27	      "source": "https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js",
+    28	      "upstream": "https://github.com/chartjs/Chart.js",
+    29	      "versionEvidence": "embedded `Chart.js v4.4.7` banner in the minified source",
+    30	      "updatePolicy": "reviewed PR only; bump version+sha256 in lockstep; re-run vulnerability audit",
+    31	      "vulnerabilityAudit": "npm advisory DB lookup for chart.js@4.4.7 (no known advisories as of the H3 build); re-checked on each version bump"
+    32	    },
+    33	    {
+    34	      "name": "tailwindcss-browser",
+    35	      "displayName": "Tailwind CSS (Play CDN browser build)",
+    36	      "version": "3.4.17",
+    37	      "shippedPath": "renderer/lib/tailwind.js",
+    38	      "bytes": 407279,
+    39	      "sha256": "176e894661aa9cdc9a5cba6c720044cbbf7b8bd80d1c9a142a7c24b1b6c50d15",
+    40	      "license": "MIT",
+    41	      "source": "https://cdn.tailwindcss.com (standalone Play CDN browser build)",
+    42	      "upstream": "https://github.com/tailwindlabs/tailwindcss",
+    43	      "versionEvidence": "the Play-CDN bundle prints a `Tailwind CSS v3.0` banner but embeds tailwindcss 3.4.17; recorded as 3.4.17. NOTE: this is the browser/Play build (JIT-in-browser), an accepted trade-off vs a compiled stylesheet — documented in release notes.",
+    44	      "updatePolicy": "reviewed PR only; bump version+sha256 in lockstep; re-run vulnerability audit",
+    45	      "vulnerabilityAudit": "npm advisory DB lookup for tailwindcss@3.4.17 (no known advisories as of the H3 build); re-checked on each version bump"
+    46	    }
+    47	  ]
+    48	}
+     1	{
+     2	  "schemaVersion": 1,
+     3	  "note": "H3 reproducible-build environment record. The macOS DMG evidence in the H-phase governance was produced under the environment below. `npm ci` against the tracked package-lock.json reproduces the exact dependency tree regardless of host; the toolchain versions here pin the build host itself. Distribution target is Apple Silicon (arm64) only for the v2.0.x public release.",
+     4	  "toolchain": {
+     5	    "node": ">=22.0.0 (engines pin); build host recorded at H3: v25.5.0",
+     6	    "npm": ">=10.0.0 (engines pin); build host recorded at H3: 11.8.0",
+     7	    "electron": "33.4.11 (exact pin in devDependencies + package-lock.json)",
+     8	    "electronBuilder": "25.1.8 (exact pin in devDependencies + package-lock.json)",
+     9	    "os": "macOS 26.5.1 arm64"
+    10	  },
+    11	  "installMode": "npm ci (clean install from package-lock.json; lockfileVersion 3)",
+    12	  "buildCommand": "npm ci && npm run build:mac",
+    13	  "distributionTargets": ["mac-arm64 (dmg)"],
+    14	  "platformSupport": {
+    15	    "arm64": true,
+    16	    "x64": false,
+    17	    "universal": false,
+    18	    "note": "The v2.0.x public release ships Apple Silicon (arm64) only. Intel/universal are NOT built and must not be implied."
+    19	  },
+    20	  "reproducibilityBounds": "Deterministic to the pinned lockfile + exact electron/electron-builder versions. Electron downloads a prebuilt runtime keyed to its exact version. Not bit-for-bit reproducible across differing OS/codesign identities (signing is applied in H6), but the input closure is fully pinned."
+    21	}
+     1	'use strict';
+     2	/**
+     3	 * tests/supply-chain.test.js — H3 reproducible-build + supply-chain governance.
+     4	 *
+     5	 * Exercises the REAL scripts/check-supply-chain.js and scripts/generate-sbom.js in child processes:
+     6	 *   - the real repo PASSES (lockfile present, pins exact, vendor hashes match, licenses allowlisted,
+     7	 *     SBOM fresh, notices present);
+     8	 *   - fail-closed cases run the real script against a sandboxed repo fixture with one mutation each
+     9	 *     (missing lockfile, range devDep, vendor hash drift, copyleft license, uncovered vendor file,
+    10	 *     stale SBOM, missing notices).
+    11	 */
+    12	const fs = require('fs');
+    13	const path = require('path');
+    14	const cp = require('child_process');
+    15	const H = require('./helpers/managed-temp-dir.js');
+    16	
+    17	let passed = 0, failed = 0;
+    18	function chk(name, cond, extra) {
+    19	  if (cond) { passed++; console.log('  ✓ ' + name); }
+    20	  else { failed++; console.log('  ✗ ' + name + (extra !== undefined ? ' :: ' + JSON.stringify(extra) : '')); }
+    21	}
+    22	
+    23	const REPO = path.resolve(__dirname, '..');
+    24	
+    25	// 1. selftest passes
+    26	(function () {
+    27	  const r = cp.spawnSync(process.execPath, [path.join(REPO, 'scripts', 'check-supply-chain.js'), '--selftest'], { encoding: 'utf8' });
+    28	  chk('check-supply-chain --selftest passes', r.status === 0, r.stdout);
+    29	})();
+    30	
+    31	// 2. real repo passes
+    32	(function () {
+    33	  const box = H.acquireTempDir('h3-sc-real-');
+    34	  try {
+    35	    const r = cp.spawnSync(process.execPath, [path.join(REPO, 'scripts', 'check-supply-chain.js')], {
+    36	      cwd: REPO, encoding: 'utf8', env: Object.assign({}, process.env, { ARTIFACT_DIR: box }),
+    37	    });
+    38	    const art = JSON.parse(fs.readFileSync(path.join(box, 'supply-chain.json'), 'utf8'));
+    39	    chk('real repo supply-chain check PASSES', r.status === 0 && art.ok === true, art.problems);
+    40	    chk('real SBOM covers npm + vendored components', art.npmComponentCount > 400 && art.vendorCount === 3, { npm: art.npmComponentCount, vendor: art.vendorCount });
+    41	  } finally { H.releaseTempDir(box); }
+    42	})();
+    43	
+    44	// 3. real SBOM is fresh (generate --check passes)
+    45	(function () {
+    46	  const r = cp.spawnSync(process.execPath, [path.join(REPO, 'scripts', 'generate-sbom.js'), '--check'], { cwd: REPO, encoding: 'utf8' });
+    47	  chk('committed SBOM is up to date (generate-sbom --check)', r.status === 0, (r.stderr || r.stdout).trim());
+    48	})();
+    49	
+    50	// ---- fail-closed sandbox: copy the supply-chain-relevant files into a fixture repo and mutate one ----
+    51	function sandbox() {
+    52	  const box = H.acquireTempDir('h3-sc-box-');
+    53	  fs.mkdirSync(path.join(box, 'scripts'), { recursive: true });
+    54	  fs.mkdirSync(path.join(box, 'supply-chain'), { recursive: true });
+    55	  fs.mkdirSync(path.join(box, 'renderer', 'lib'), { recursive: true });
+    56	  for (const s of ['check-supply-chain.js', 'generate-sbom.js']) fs.copyFileSync(path.join(REPO, 'scripts', s), path.join(box, 'scripts', s));
+    57	  fs.copyFileSync(path.join(REPO, 'package.json'), path.join(box, 'package.json'));
+    58	  fs.copyFileSync(path.join(REPO, 'package-lock.json'), path.join(box, 'package-lock.json'));
+    59	  fs.copyFileSync(path.join(REPO, 'supply-chain', 'vendor-manifest.json'), path.join(box, 'supply-chain', 'vendor-manifest.json'));
+    60	  fs.copyFileSync(path.join(REPO, 'supply-chain', 'build-environment.json'), path.join(box, 'supply-chain', 'build-environment.json'));
+    61	  fs.copyFileSync(path.join(REPO, 'supply-chain', 'sbom.cdx.json'), path.join(box, 'supply-chain', 'sbom.cdx.json'));
+    62	  fs.copyFileSync(path.join(REPO, 'THIRD_PARTY_NOTICES.md'), path.join(box, 'THIRD_PARTY_NOTICES.md'));
+    63	  for (const f of fs.readdirSync(path.join(REPO, 'renderer', 'lib'))) fs.copyFileSync(path.join(REPO, 'renderer', 'lib', f), path.join(box, 'renderer', 'lib', f));
+    64	  return box;
+    65	}
+    66	function runIn(box) {
+    67	  const r = cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'check-supply-chain.js')], {
+    68	    cwd: box, encoding: 'utf8', env: Object.assign({}, process.env, { ARTIFACT_DIR: box }),
+    69	  });
+    70	  let art = null; try { art = JSON.parse(fs.readFileSync(path.join(box, 'supply-chain.json'), 'utf8')); } catch (_) {}
+    71	  return { status: r.status, art };
+    72	}
+    73	function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2) + '\n'); }
+    74	
+    75	// baseline: the pristine sandbox must PASS (proves mutations are what break it)
+    76	(function () {
+    77	  const box = sandbox();
+    78	  try {
+    79	    // sandbox SBOM was generated in-repo; regenerate inside the box so serial/paths match
+    80	    cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'generate-sbom.js')], { cwd: box, encoding: 'utf8' });
+    81	    const r = runIn(box);
+    82	    chk('pristine sandbox PASSES', r.status === 0 && r.art && r.art.ok === true, r.art && r.art.problems);
+    83	  } finally { H.releaseTempDir(box); }
+    84	})();
+    85	
+    86	// a) missing lockfile
+    87	(function () {
+    88	  const box = sandbox();
+    89	  try { fs.unlinkSync(path.join(box, 'package-lock.json')); const r = runIn(box);
+    90	    chk('FAIL missing lockfile', r.status !== 0 && r.art && r.art.problems.some(p => /package-lock\.json missing/.test(p)));
+    91	  } finally { H.releaseTempDir(box); }
+    92	})();
+    93	
+    94	// b) range devDependency
+    95	(function () {
+    96	  const box = sandbox();
+    97	  try { const p = JSON.parse(fs.readFileSync(path.join(box, 'package.json'), 'utf8')); p.devDependencies.electron = '^33.0.0'; writeJson(path.join(box, 'package.json'), p);
+    98	    const r = runIn(box);
+    99	    chk('FAIL range devDependency (^)', r.status !== 0 && r.art && r.art.problems.some(p => /not an exact version/.test(p)));
+   100	  } finally { H.releaseTempDir(box); }
+   101	})();
+   102	
+   103	// c) vendor hash drift
+   104	(function () {
+   105	  const box = sandbox();
+   106	  try { fs.appendFileSync(path.join(box, 'renderer', 'lib', 'alpine.min.js'), '\n/* tamper */');
+   107	    const r = runIn(box);
+   108	    chk('FAIL vendor hash drift', r.status !== 0 && r.art && r.art.problems.some(p => /hash DRIFT/.test(p)));
+   109	  } finally { H.releaseTempDir(box); }
+   110	})();
+   111	
+   112	// d) copyleft license injected into the lockfile
+   113	(function () {
+   114	  const box = sandbox();
+   115	  try { const l = JSON.parse(fs.readFileSync(path.join(box, 'package-lock.json'), 'utf8'));
+   116	    l.packages['node_modules/__evil'] = { version: '1.0.0', license: 'GPL-3.0' }; writeJson(path.join(box, 'package-lock.json'), l);
+   117	    const r = runIn(box);
+   118	    chk('FAIL copyleft (GPL-3.0) npm license', r.status !== 0 && r.art && r.art.problems.some(p => /non-allowlisted npm license/.test(p)));
+   119	  } finally { H.releaseTempDir(box); }
+   120	})();
+   121	
+   122	// e) uncovered vendored file
+   123	(function () {
+   124	  const box = sandbox();
+   125	  try { fs.writeFileSync(path.join(box, 'renderer', 'lib', 'rogue.js'), '// unmanaged');
+   126	    const r = runIn(box);
+   127	    chk('FAIL uncovered vendored file', r.status !== 0 && r.art && r.art.problems.some(p => /not covered by the vendor manifest/.test(p)));
+   128	  } finally { H.releaseTempDir(box); }
+   129	})();
+   130	
+   131	// f) stale SBOM
+   132	(function () {
+   133	  const box = sandbox();
+   134	  try {
+   135	    cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'generate-sbom.js')], { cwd: box, encoding: 'utf8' });
+   136	    const s = JSON.parse(fs.readFileSync(path.join(box, 'supply-chain', 'sbom.cdx.json'), 'utf8')); s.components.push({ type: 'library', name: 'ghost', version: '9.9.9' });
+   137	    writeJson(path.join(box, 'supply-chain', 'sbom.cdx.json'), s);
+   138	    const r = runIn(box);
+   139	    chk('FAIL stale SBOM', r.status !== 0 && r.art && r.art.problems.some(p => /SBOM freshness/.test(p)));
+   140	  } finally { H.releaseTempDir(box); }
+   141	})();
+   142	
+   143	// g) missing THIRD_PARTY_NOTICES
+   144	(function () {
+   145	  const box = sandbox();
+   146	  try { cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'generate-sbom.js')], { cwd: box, encoding: 'utf8' });
+   147	    fs.unlinkSync(path.join(box, 'THIRD_PARTY_NOTICES.md'));
+   148	    const r = runIn(box);
+   149	    chk('FAIL missing THIRD_PARTY_NOTICES', r.status !== 0 && r.art && r.art.problems.some(p => /THIRD_PARTY_NOTICES/.test(p)));
+   150	  } finally { H.releaseTempDir(box); }
+   151	})();
+   152	
+   153	console.log('supply-chain: ' + passed + ' passed, ' + failed + ' failed');
+   154	if (failed) process.exit(1);
+     1	'use strict';
+     2	/**
+     3	 * tests/version-bump-policy.test.js — R3.0F F6 · version-bump fail-closed contract.
+     4	 *
+     5	 * Guards the single authorized 1.4.0 -> 2.0.0 bump semantics of
+     6	 * scripts/check-version-policy.js by exercising the REAL script in a child process
+     7	 * against a sandboxed repo fixture (a temp dir with a git repo + package.json), so
+     8	 * every case runs the actual policy logic — no reimplementation.
+     9	 *
+    10	 * Covered (per the F6 release-preparation contract):
+    11	 *   - the post-bump pin: version 2.0.0 passes with NO env
+    12	 *   - fail-closed without allow: any OTHER version fails when VERSION_BUMP_ALLOW unset
+    13	 *   - exact-allow-only: allow=3.0.0 accepts exactly 3.0.0, still rejects 2.0.1
+    14	 *   - no rollback: 1.4.0 (the pre-bump value) now FAILS without an explicit allow
+    15	 *   - version scripts create no tag and never enable release_executed
+    16	 */
+    17	const fs = require('fs');
+    18	const path = require('path');
+    19	const cp = require('child_process');
+    20	const H = require('./helpers/managed-temp-dir.js');
+    21	
+    22	let passed = 0, failed = 0;
+    23	function chk(name, cond, extra) {
+    24	  if (cond) { passed++; console.log('  ✓ ' + name); }
+    25	  else { failed++; console.log('  ✗ ' + name + (extra !== undefined ? ' :: ' + JSON.stringify(extra) : '')); }
+    26	}
+    27	
+    28	const REPO = path.resolve(__dirname, '..');
+    29	const SCRIPT = path.join(REPO, 'scripts', 'check-version-policy.js');
+    30	
+    31	// Sandbox: a minimal git repo so the script's git calls behave; its package.json is
+    32	// the variable under test. The script resolves REPO relative to its own location, so
+    33	// we copy the script into the sandbox's scripts/ dir to point it at the fixture.
+    34	function runPolicy(version, env) {
+    35	  const box = H.acquireTempDir('f6-version-policy-');
+    36	  try {
+    37	    fs.mkdirSync(path.join(box, 'scripts'), { recursive: true });
+    38	    fs.mkdirSync(path.join(box, '.github', 'workflows'), { recursive: true });
+    39	    fs.copyFileSync(SCRIPT, path.join(box, 'scripts', 'check-version-policy.js'));
+    40	    fs.writeFileSync(path.join(box, 'package.json'), JSON.stringify({ name: 'fixture', version: version }) + '\n');
+    41	    // H3: a tracked package-lock.json is now the required reproducible-build authority. Give the
+    42	    // fixture a minimal lockfile so the VERSION logic (not the lockfile rule) is what's under test.
+    43	    fs.writeFileSync(path.join(box, 'package-lock.json'), JSON.stringify({ name: 'fixture', version: version, lockfileVersion: 3, packages: { '': { name: 'fixture', version: version } } }) + '\n');
+    44	    fs.writeFileSync(path.join(box, '.github', 'workflows', 'ci.yml'), 'name: x\non:\n  push:\n');
+    45	    cp.execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm x', { cwd: box });
+    46	    const r = cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'check-version-policy.js')], {
+    47	      cwd: box, encoding: 'utf8', timeout: 30000,
+    48	      env: Object.assign({}, process.env, { ARTIFACT_DIR: path.join(box, 'artifacts'), BASE_SHA: 'HEAD', HEAD_SHA: 'HEAD' }, env || {}),
+    49	    });
+    50	    let artifact = null;
+    51	    try { artifact = JSON.parse(fs.readFileSync(path.join(box, 'artifacts', 'version-policy.json'), 'utf8')); } catch (_) { }
+    52	    return { status: r.status, artifact: artifact };
+    53	  } finally {
+    54	    H.releaseTempDir(box);
+    55	  }
+    56	}
+    57	
+    58	// 1. The post-bump pin: 2.0.0 passes with no allow env.
+    59	(function () {
+    60	  const r = runPolicy('2.0.0', { VERSION_BUMP_ALLOW: '' });
+    61	  chk('pin: version 2.0.0 passes with NO VERSION_BUMP_ALLOW', r.status === 0 && r.artifact && r.artifact.ok === true, r.artifact);
+    62	})();
+    63	
+    64	// 2. Fail-closed without allow: a foreign version fails.
+    65	(function () {
+    66	  const r = runPolicy('2.0.1', { VERSION_BUMP_ALLOW: '' });
+    67	  chk('fail-closed: 2.0.1 REJECTED without allow', r.status !== 0 && r.artifact && r.artifact.ok === false);
+    68	  const r2 = runPolicy('2.1.0', { VERSION_BUMP_ALLOW: '' });
+    69	  chk('fail-closed: 2.1.0 REJECTED without allow', r2.status !== 0);
+    70	  const r3 = runPolicy('2.0.0-rc.1', { VERSION_BUMP_ALLOW: '' });
+    71	  chk('fail-closed: 2.0.0-rc.1 REJECTED without allow', r3.status !== 0);
+    72	})();
+    73	
+    74	// 3. No rollback: the PRE-bump value 1.4.0 now fails without an explicit allow.
+    75	(function () {
+    76	  const r = runPolicy('1.4.0', { VERSION_BUMP_ALLOW: '' });
+    77	  chk('no-rollback: 1.4.0 REJECTED after the F6 pin moved to 2.0.0', r.status !== 0 && r.artifact && r.artifact.ok === false);
+    78	})();
+    79	
+    80	// 4. Exact-allow-only: an allow admits exactly that version and nothing else.
+    81	(function () {
+    82	  const r = runPolicy('3.0.0', { VERSION_BUMP_ALLOW: '3.0.0' });
+    83	  chk('allow: future authorized bump 3.0.0 passes ONLY with exact allow', r.status === 0);
+    84	  const r2 = runPolicy('2.0.1', { VERSION_BUMP_ALLOW: '3.0.0' });
+    85	  chk('allow: 2.0.1 still REJECTED when allow=3.0.0 (exact match only)', r2.status !== 0);
+    86	  const r3 = runPolicy('3.0.1', { VERSION_BUMP_ALLOW: '3.0.0' });
+    87	  chk('allow: 3.0.1 REJECTED when allow=3.0.0 (no prefix/range semantics)', r3.status !== 0);
+    88	})();
+    89	
+    90	// 5. No re-bump / double-bump semantics: allow does not stack — with allow set to the
+    91	//    current pin the pin itself still passes, but an unrelated jump does not.
+    92	(function () {
+    93	  const r = runPolicy('4.0.0', { VERSION_BUMP_ALLOW: '2.0.0' });
+    94	  chk('no-double-bump: 4.0.0 REJECTED even with allow set to the current pin', r.status !== 0);
+    95	})();
+    96	
+    97	// 6. Version tooling creates no tag and never enables release_executed.
+    98	(function () {
+    99	  const src = fs.readFileSync(SCRIPT, 'utf8');
+   100	  chk('version script never creates/pushes a tag', !/git\s+(tag|push)/.test(src));
+   101	  chk('version script never touches release_executed', src.indexOf('release_executed') === -1);
+   102	  const gate = fs.readFileSync(path.join(REPO, 'scripts', 'check-release-gate.js'), 'utf8');
+   103	  chk('release gate never creates/pushes a tag', !/git\s+(tag|push)/.test(gate));
+   104	  chk('release gate never writes governance state', gate.indexOf("writeFileSync(path.join(ARTIFACT_DIR") !== -1 && !/writeFileSync\([^)]*governance/.test(gate));
+   105	  const state = JSON.parse(fs.readFileSync(path.join(REPO, 'governance', 'r3.0f', 'state.json'), 'utf8'));
+   106	  chk('release_executed remains DISABLED at RELEASE_PREPARED', state.enabledCapabilities.indexOf('release_executed') === -1);
+   107	  const pkg = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
+   108	  chk('repo package.json carries exactly the bumped version 2.0.0', pkg.version === '2.0.0');
+   109	})();
+   110	
+   111	// 7. H3 lockfile-required policy: an otherwise-valid version FAILS if the lockfile is absent,
+   112	//    and a PR that DELETES the lockfile FAILS.
+   113	(function () {
+   114	  const box = H.acquireTempDir('f6-version-policy-nolock-');
+   115	  try {
+   116	    fs.mkdirSync(path.join(box, 'scripts'), { recursive: true });
+   117	    fs.mkdirSync(path.join(box, '.github', 'workflows'), { recursive: true });
+   118	    fs.copyFileSync(SCRIPT, path.join(box, 'scripts', 'check-version-policy.js'));
+   119	    fs.writeFileSync(path.join(box, 'package.json'), JSON.stringify({ name: 'fixture', version: '2.0.0' }) + '\n');
+   120	    fs.writeFileSync(path.join(box, '.github', 'workflows', 'ci.yml'), 'name: x\non:\n  push:\n');
+   121	    cp.execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm x', { cwd: box });
+   122	    const r = cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'check-version-policy.js')], {
+   123	      cwd: box, encoding: 'utf8', env: Object.assign({}, process.env, { ARTIFACT_DIR: path.join(box, 'artifacts'), BASE_SHA: 'HEAD', HEAD_SHA: 'HEAD' }),
+   124	    });
+   125	    let art = null; try { art = JSON.parse(fs.readFileSync(path.join(box, 'artifacts', 'version-policy.json'), 'utf8')); } catch (_) {}
+   126	    chk('H3: correct version but NO lockfile is REJECTED', r.status !== 0 && art && art.ok === false && art.lockfileTracked === false);
+   127	  } finally { H.releaseTempDir(box); }
+   128	})();
+   129	
+   130	console.log('version-bump-policy: ' + passed + ' passed, ' + failed + ' failed');
+   131	if (failed) process.exit(1);
+
+exec
+/bin/bash -lc "sed -n '31,190p' scripts/check-supply-chain.js | nl -ba -v31; sed -n '1,180p' scripts/generate-sbom.js | nl -ba; sed -n '31,130p' scripts/check-version-policy.js | nl -ba -v31; cat package.json; cat .gitignore; cat supply-chain/vendor-manifest.json; cat THIRD_PARTY_NOTICES.md; cat governance/hardening/H3.json; git diff --check 0de228c9..HEAD; rg -n -i 'npm[[:space:]]+(ci|install)|electron-builder|\\bnpx\\b|\\byarn\\b|\\bpnpm\\b' .github/workflows/ci.yml || true; rg -n 'require\\(|import[ (]' scripts/check-supply-chain.js scripts/generate-sbom.js" in /Users/SKYLINE/Claude/worktrees/f6-release
+ succeeded in 0ms:
+    31	
+    32	// Permissive licenses acceptable for redistribution in an UNLICENSED (all-rights-reserved) app.
+    33	// NOTE: this list is intentionally permissive-only — no GPL/LGPL/AGPL/MPL/EPL/CDDL copyleft.
+    34	const LICENSE_ALLOWLIST = new Set([
+    35	  'MIT', 'ISC', 'Apache-2.0', 'BSD-2-Clause', 'BSD-3-Clause', '0BSD', 'BlueOak-1.0.0',
+    36	  'CC0-1.0', 'CC-BY-4.0', 'Unlicense', 'WTFPL', 'Python-2.0', 'BSD',
+    37	]);
+    38	// SPDX expression splitter: accept a compound expr iff EVERY named license token is allowlisted.
+    39	function licenseAllowed(expr) {
+    40	  if (!expr) return false;
+    41	  const tokens = String(expr).replace(/[()]/g, ' ').split(/\s+(?:OR|AND)\s+/i).map(t => t.trim()).filter(Boolean);
+    42	  if (!tokens.length) return false;
+    43	  return tokens.every(t => LICENSE_ALLOWLIST.has(t));
+    44	}
+    45	function licenseOf(entry) {
+    46	  if (typeof entry.license === 'string') return entry.license;
+    47	  if (Array.isArray(entry.licenses) && entry.licenses[0]) return entry.licenses[0].type || null;
+    48	  return null;
+    49	}
+    50	function sha256File(p) { return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'); }
+    51	function readJson(p) { return JSON.parse(fs.readFileSync(p, 'utf8')); }
+    52	
+    53	function run() {
+    54	  const problems = [];
+    55	  const fail = (msg) => problems.push(msg);
+    56	
+    57	  const pkg = readJson(path.join(REPO, 'package.json'));
+    58	
+    59	  // 1. lockfile
+    60	  let lock = null;
+    61	  try { lock = readJson(path.join(REPO, 'package-lock.json')); }
+    62	  catch (_) { fail('package-lock.json missing or unreadable (required reproducible-build authority)'); }
+    63	  if (lock) {
+    64	    if (lock.lockfileVersion !== 3) fail('package-lock.json lockfileVersion must be 3; got ' + lock.lockfileVersion);
+    65	    const root = (lock.packages && lock.packages['']) || {};
+    66	    if (root.name !== pkg.name) fail('lockfile root name ' + root.name + ' != package.json name ' + pkg.name);
+    67	    if (root.version !== pkg.version) fail('lockfile root version ' + root.version + ' != package.json version ' + pkg.version);
+    68	  }
+    69	
+    70	  // 2. exact devDependency pins + lockfile agreement
+    71	  const dev = pkg.devDependencies || {};
+    72	  for (const [name, range] of Object.entries(dev)) {
+    73	    if (/[\^~><*]|\s-\s|x/i.test(range)) fail('devDependency ' + name + ' is not an exact version: ' + range);
+    74	    if (lock) {
+    75	      const locked = lock.packages && lock.packages['node_modules/' + name];
+    76	      if (!locked) fail('devDependency ' + name + ' not present in lockfile');
+    77	      else if (locked.version !== range) fail('devDependency ' + name + ' pin ' + range + ' != lockfile ' + locked.version);
+    78	    }
+    79	  }
+    80	
+    81	  // 3. engines
+    82	  if (!pkg.engines || !pkg.engines.node) fail('package.json engines.node missing');
+    83	  if (!pkg.engines || !pkg.engines.npm) fail('package.json engines.npm missing');
+    84	
+    85	  // 4. vendor manifest hashes + coverage
+    86	  let vendor = null;
+    87	  try { vendor = readJson(path.join(REPO, 'supply-chain', 'vendor-manifest.json')); }
+    88	  catch (_) { fail('supply-chain/vendor-manifest.json missing'); }
+    89	  const libDir = path.join(REPO, 'renderer', 'lib');
+    90	  const onDiskLibs = fs.existsSync(libDir) ? fs.readdirSync(libDir).filter(f => /\.js$/.test(f)) : [];
+    91	  const covered = new Set();
+    92	  if (vendor) {
+    93	    for (const lib of vendor.libraries || []) {
+    94	      const abs = path.join(REPO, lib.shippedPath);
+    95	      if (!fs.existsSync(abs)) { fail('vendored file missing: ' + lib.shippedPath); continue; }
+    96	      const actual = sha256File(abs);
+    97	      if (actual !== lib.sha256) fail('vendor hash DRIFT for ' + lib.shippedPath + ': manifest ' + lib.sha256 + ' actual ' + actual);
+    98	      if (!licenseAllowed(lib.license)) fail('vendored ' + lib.name + ' license not on allowlist: ' + lib.license);
+    99	      covered.add(path.basename(lib.shippedPath));
+   100	    }
+   101	  }
+   102	  for (const f of onDiskLibs) if (!covered.has(f)) fail('renderer/lib/' + f + ' is not covered by the vendor manifest (unmanaged vendored file)');
+   103	
+   104	  // 5. npm license allowlist
+   105	  if (lock) {
+   106	    const offenders = [];
+   107	    for (const [key, entry] of Object.entries(lock.packages || {})) {
+   108	      if (key === '') continue;
+   109	      const lic = licenseOf(entry);
+   110	      if (!licenseAllowed(lic)) offenders.push(key.replace(/^node_modules\//, '') + '@' + (entry.version || '?') + ' => ' + (lic || 'UNKNOWN'));
+   111	    }
+   112	    if (offenders.length) fail('non-allowlisted npm license(s): ' + offenders.slice(0, 10).join('; ') + (offenders.length > 10 ? ' (+' + (offenders.length - 10) + ' more)' : ''));
+   113	  }
+   114	
+   115	  // 6. SBOM freshness (regenerate in --check mode)
+   116	  const sbomCheck = cp.spawnSync(process.execPath, [path.join(REPO, 'scripts', 'generate-sbom.js'), '--check'], { cwd: REPO, encoding: 'utf8' });
+   117	  if (sbomCheck.status !== 0) fail('SBOM freshness check failed: ' + (sbomCheck.stderr || sbomCheck.stdout || '').trim());
+   118	
+   119	  // 7. THIRD_PARTY_NOTICES references every vendored lib
+   120	  let notices = '';
+   121	  try { notices = fs.readFileSync(path.join(REPO, 'THIRD_PARTY_NOTICES.md'), 'utf8'); }
+   122	  catch (_) { fail('THIRD_PARTY_NOTICES.md missing'); }
+   123	  if (notices && vendor) {
+   124	    for (const lib of vendor.libraries || []) {
+   125	      if (notices.indexOf(lib.displayName) === -1 && notices.indexOf(lib.name) === -1) fail('THIRD_PARTY_NOTICES.md does not mention vendored library ' + lib.displayName);
+   126	    }
+   127	  }
+   128	
+   129	  // 8. build-environment manifest
+   130	  let buildEnv = null;
+   131	  try { buildEnv = readJson(path.join(REPO, 'supply-chain', 'build-environment.json')); }
+   132	  catch (_) { fail('supply-chain/build-environment.json missing'); }
+   133	  if (buildEnv) {
+   134	    if (!buildEnv.installMode || !/npm ci/.test(buildEnv.installMode)) fail('build-environment.installMode must document npm ci');
+   135	    if (!buildEnv.platformSupport || buildEnv.platformSupport.arm64 !== true || buildEnv.platformSupport.x64 !== false) fail('build-environment.platformSupport must be arm64-only (arm64:true, x64:false)');
+   136	  }
+   137	
+   138	  return { check: 'supply-chain', ok: problems.length === 0, problems, npmComponentCount: lock ? Object.keys(lock.packages || {}).length - 1 : null, vendorCount: vendor ? (vendor.libraries || []).length : null };
+   139	}
+   140	
+   141	// ---- self-test ----
+   142	function selftest() {
+   143	  let ok = true;
+   144	  const t = (name, cond) => { if (!cond) { ok = false; console.error('  SELFTEST FAIL: ' + name); } };
+   145	  t('MIT allowed', licenseAllowed('MIT'));
+   146	  t('ISC allowed', licenseAllowed('ISC'));
+   147	  t('MIT OR Apache-2.0 allowed', licenseAllowed('(MIT OR Apache-2.0)'));
+   148	  t('GPL-3.0 rejected', !licenseAllowed('GPL-3.0'));
+   149	  t('MIT AND GPL-3.0 rejected (any copyleft token fails)', !licenseAllowed('MIT AND GPL-3.0'));
+   150	  t('null license rejected', !licenseAllowed(null));
+   151	  t('empty license rejected', !licenseAllowed(''));
+   152	  console.log(ok ? 'supply-chain selftest: PASS' : 'supply-chain selftest: FAIL');
+   153	  return ok;
+   154	}
+   155	
+   156	if (process.argv.includes('--selftest')) {
+   157	  process.exit(selftest() ? 0 : 1);
+   158	}
+   159	
+   160	let result, exitCode;
+   161	try { result = run(); exitCode = result.ok ? 0 : 1; }
+   162	catch (e) { result = { check: 'supply-chain', ok: false, fatalError: String((e && e.stack) || e) }; exitCode = 2; }
+   163	fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
+   164	fs.writeFileSync(path.join(ARTIFACT_DIR, 'supply-chain.json'), JSON.stringify(result, null, 2));
+   165	console.log('SUPPLY-CHAIN ' + JSON.stringify({ ok: result.ok, problems: result.problems ? result.problems.length : 'fatal' }));
+   166	if (result.problems && result.problems.length) for (const p of result.problems) console.log('  - ' + p);
+   167	process.exit(exitCode);
+     1	#!/usr/bin/env node
+     2	'use strict';
+     3	/**
+     4	 * H3 — SBOM generator (CycloneDX 1.5 JSON), dependency-free.
+     5	 *
+     6	 * Reads package-lock.json (the tracked reproducible-build authority) and emits a deterministic
+     7	 * CycloneDX Software Bill of Materials at supply-chain/sbom.cdx.json. Every npm component gets a
+     8	 * purl, version, and (when the lockfile records it) a license expression and integrity hash.
+     9	 * Vendored (non-npm) renderer libraries are read from supply-chain/vendor-manifest.json and added
+    10	 * as components with their sha256 hashes so the SBOM covers the WHOLE shipped surface, not just npm.
+    11	 *
+    12	 * Deterministic: components are sorted by (name, version); no timestamps, no random serials (a fixed
+    13	 * serial derived from the root name+version). `--check` mode regenerates in-memory and fails if the
+    14	 * on-disk SBOM differs (drift guard) instead of writing.
+    15	 *
+    16	 * Uses only Node builtins (fs, path, crypto) + relative reads — no third-party package, so it passes
+    17	 * the dependency-free audit gate.
+    18	 */
+    19	const fs = require('fs');
+    20	const path = require('path');
+    21	const crypto = require('crypto');
+    22	
+    23	const REPO = path.resolve(__dirname, '..');
+    24	const LOCK = path.join(REPO, 'package-lock.json');
+    25	const VENDOR = path.join(REPO, 'supply-chain', 'vendor-manifest.json');
+    26	const OUT = path.join(REPO, 'supply-chain', 'sbom.cdx.json');
+    27	
+    28	function readJson(p) { return JSON.parse(fs.readFileSync(p, 'utf8')); }
+    29	
+    30	function licenseOf(entry) {
+    31	  if (typeof entry.license === 'string') return entry.license;
+    32	  if (Array.isArray(entry.licenses) && entry.licenses[0]) return entry.licenses[0].type || null;
+    33	  return null;
+    34	}
+    35	
+    36	function buildSbom() {
+    37	  const lock = readJson(LOCK);
+    38	  const pkgs = lock.packages || {};
+    39	  const root = pkgs[''] || {};
+    40	  const components = [];
+    41	
+    42	  for (const [key, entry] of Object.entries(pkgs)) {
+    43	    if (key === '') continue; // root is metadata.component, not a component
+    44	    // node_modules/<name> or node_modules/<a>/node_modules/<b> — take the last path segment pair
+    45	    const m = key.match(/node_modules\/((?:@[^/]+\/)?[^/]+)$/);
+    46	    if (!m) continue;
+    47	    const name = m[1];
+    48	    const version = entry.version || null;
+    49	    const comp = {
+    50	      type: 'library',
+    51	      'bom-ref': `pkg:npm/${name}@${version}`,
+    52	      name,
+    53	      version,
+    54	      purl: `pkg:npm/${name}@${version}`,
+    55	      scope: entry.dev ? 'optional' : 'required', // devDependencies are build-time only
+    56	    };
+    57	    const lic = licenseOf(entry);
+    58	    if (lic) comp.licenses = [{ license: { name: lic } }];
+    59	    if (typeof entry.integrity === 'string' && entry.integrity.startsWith('sha512-')) {
+    60	      comp.hashes = [{ alg: 'SHA-512', content: entry.integrity.slice('sha512-'.length) }];
+    61	    }
+    62	    components.push(comp);
+    63	  }
+    64	
+    65	  // Vendored (non-npm) libraries — covered by their own hashes.
+    66	  let vendor = { libraries: [] };
+    67	  try { vendor = readJson(VENDOR); } catch (_) { /* generated after this on first run */ }
+    68	  for (const v of vendor.libraries || []) {
+    69	    components.push({
+    70	      type: 'library',
+    71	      'bom-ref': `vendored:${v.name}@${v.version}`,
+    72	      name: v.name,
+    73	      version: v.version,
+    74	      scope: 'required',
+    75	      licenses: v.license ? [{ license: { name: v.license } }] : undefined,
+    76	      hashes: v.sha256 ? [{ alg: 'SHA-256', content: v.sha256 }] : undefined,
+    77	      properties: [
+    78	        { name: 'vendored', value: 'true' },
+    79	        { name: 'source', value: v.source || '' },
+    80	        { name: 'shippedPath', value: v.shippedPath || '' },
+    81	      ],
+    82	    });
+    83	  }
+    84	
+    85	  components.sort((a, b) => (a.name + '@' + a.version).localeCompare(b.name + '@' + b.version));
+    86	
+    87	  // Deterministic serial from the root identity (no timestamps/random — reproducible).
+    88	  const serialSeed = crypto.createHash('sha256').update(`${root.name || 'root'}@${root.version || '0'}`).digest('hex');
+    89	  return {
+    90	    bomFormat: 'CycloneDX',
+    91	    specVersion: '1.5',
+    92	    serialNumber: `urn:uuid:${serialSeed.slice(0, 8)}-${serialSeed.slice(8, 12)}-${serialSeed.slice(12, 16)}-${serialSeed.slice(16, 20)}-${serialSeed.slice(20, 32)}`,
+    93	    version: 1,
+    94	    metadata: {
+    95	      component: {
+    96	        type: 'application',
+    97	        'bom-ref': `pkg:npm/${root.name}@${root.version}`,
+    98	        name: root.name || 'racing-setup-analyzer',
+    99	        version: root.version || null,
+   100	      },
+   101	      properties: [
+   102	        { name: 'reproducibleFrom', value: 'package-lock.json (lockfileVersion ' + (lock.lockfileVersion || '?') + ')' },
+   103	        { name: 'generator', value: 'scripts/generate-sbom.js (dependency-free)' },
+   104	      ],
+   105	    },
+   106	    components,
+   107	  };
+   108	}
+   109	
+   110	const check = process.argv.includes('--check');
+   111	const sbom = buildSbom();
+   112	const serialized = JSON.stringify(sbom, null, 2) + '\n';
+   113	
+   114	if (check) {
+   115	  let onDisk = null;
+   116	  try { onDisk = fs.readFileSync(OUT, 'utf8'); } catch (_) { /* missing */ }
+   117	  if (onDisk !== serialized) {
+   118	    console.error('SBOM DRIFT: supply-chain/sbom.cdx.json is stale — run `node scripts/generate-sbom.js`');
+   119	    process.exit(1);
+   120	  }
+   121	  console.log('SBOM up to date (' + sbom.components.length + ' components)');
+   122	  process.exit(0);
+   123	}
+   124	
+   125	fs.mkdirSync(path.dirname(OUT), { recursive: true });
+   126	fs.writeFileSync(OUT, serialized);
+   127	console.log('SBOM written: ' + path.relative(REPO, OUT) + ' (' + sbom.components.length + ' components)');
+    31	function run() {
+    32	  const pkg = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
+    33	  const allow = (process.env.VERSION_BUMP_ALLOW || '').trim();
+    34	  const version = pkg.version;
+    35	  const versionOk = version === EXPECTED || (!!allow && version === allow);
+    36	
+    37	  // H3: the lockfile is now the REQUIRED reproducible-build authority. It must be tracked and
+    38	  // must remain tracked; a PR that removes it is the violation.
+    39	  const lockfileTracked = !!git(['ls-files', 'package-lock.json']);
+    40	  const base = process.env.BASE_SHA || 'origin/main', head = process.env.HEAD_SHA || 'HEAD';
+    41	  const changed = (git(['diff', '--name-only', base + '...' + head]) || '').split('\n').map(s => s.trim()).filter(Boolean);
+    42	  const lockfileDeletedByPR = git(['diff', '--name-only', '--diff-filter=D', base + '...' + head]) || '';
+    43	  const lockfileRemovedByPR = lockfileDeletedByPR.split('\n').map(s => s.trim()).includes('package-lock.json');
+    44	
+    45	  // The CI workflow must not install packages / build Electron / run lifecycle scripts.
+    46	  // The install-free ban applies ONLY to the dependency-free verification lane (ci.yml). The
+    47	  // supply-chain/build lane is exempt — it exists precisely to run `npm ci` reproducibly.
+    48	  const VERIFICATION_LANE_WORKFLOW = 'ci.yml';
+    49	  const wfDir = path.join(REPO, '.github', 'workflows');
+    50	  let wfFiles = [];
+    51	  try { wfFiles = fs.readdirSync(wfDir).filter(f => /\.ya?ml$/.test(f) && f === VERIFICATION_LANE_WORKFLOW); } catch (_) { /* none */ }
+    52	  const forbidden = [
+    53	    { re: /npm\s+ci\b/, name: 'npm ci' }, { re: /npm\s+install\b/, name: 'npm install' },
+    54	    { re: /\bnpx\b/, name: 'npx' }, { re: /\byarn\b/, name: 'yarn' }, { re: /\bpnpm\b/, name: 'pnpm' },
+    55	    { re: /electron-builder/, name: 'electron-builder' }, { re: /npm\s+run\s+build/, name: 'npm run build' },
+    56	    { re: /build:(mac|win|all)\b/, name: 'electron build script' },
+    57	  ];
+    58	  const workflowViolations = [];
+    59	  for (const f of wfFiles) {
+    60	    const txt = fs.readFileSync(path.join(wfDir, f), 'utf8');
+    61	    for (const x of forbidden) if (x.re.test(txt)) workflowViolations.push(f + ': ' + x.name);
+    62	  }
+    63	
+    64	  const ok = versionOk && lockfileTracked && !lockfileRemovedByPR && workflowViolations.length === 0;
+    65	  return {
+    66	    check: 'version-policy',
+    67	    packageVersion: version, expected: EXPECTED, bumpAllow: allow || null, versionOk,
+    68	    lockfileTracked, lockfileRequired: true, lockfileRemovedByPR, workflowViolations, ok,
+    69	  };
+    70	}
+    71	
+    72	let result, exitCode;
+    73	try { result = run(); exitCode = result.ok ? 0 : 1; }
+    74	catch (e) { result = { check: 'version-policy', fatalError: String((e && e.stack) || e), packageVersion: null, ok: false }; exitCode = 2; }
+    75	fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
+    76	fs.writeFileSync(path.join(ARTIFACT_DIR, 'version-policy.json'), JSON.stringify(result, null, 2));
+    77	console.log('VERSION ' + JSON.stringify({ packageVersion: result.packageVersion, lockfileTracked: result.lockfileTracked, lockfileRemovedByPR: result.lockfileRemovedByPR, workflowViolations: result.workflowViolations, ok: result.ok }));
+    78	process.exit(exitCode);
+{
+  "name": "racing-setup-analyzer",
+  "version": "2.0.0",
+  "description": "Vehicle-dynamics setup & lap-time analyzer (handling balance, springs/ARB/dampers, tyre-stint simulation)",
+  "license": "UNLICENSED",
+  "author": "USADA-KARROT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/USADA-KARROT/racing-setup-analyzer.git"
+  },
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node tests/verify-dynamics.js && node tests/telemetry-core.test.js && node tests/telemetry-view.test.js && node tests/telemetry-plot.test.js && node tests/telemetry-interact.test.js && node tests/telemetry-yaw.test.js && node tests/canonical-parameters.test.js && node tests/parameter-conversions.test.js && node tests/vehicle-profile-f312.test.js && node tests/setup-snapshot.test.js && node tests/analysis-case.test.js && node tests/analysis-case-adversarial.test.js && node tests/suspension-input-normalizer.test.js && node tests/suspension-input-equivalence.test.js && node tests/suspension-input-adversarial.test.js && node tests/canonical-model-input.test.js && node tests/analysis-execution.test.js && node tests/telemetry-observation.test.js && node tests/model-telemetry-comparison.test.js && node tests/race-engineer-insight.test.js && node tests/driver-coach-insight.test.js && node tests/analysis-workspace.test.js && node tests/analysis-workspace-viewmodel.test.js && node tests/analysis-workspace-integration.test.js && node tests/analysis-workspace-ui.test.js && node tests/telemetry-import-adapter.test.js && node tests/channel-mapping.test.js && node tests/calibration-registry.test.js && node tests/analysis-window.test.js && node tests/canonical-telemetry-session.test.js && node tests/analysis-case-export.test.js && node tests/r2.3-real-telemetry-integration.test.js && node tests/r2.3-import-ui.test.js && node tests/measured-metrics.test.js && node tests/r2.4-measured-metrics-integration.test.js && node tests/r2.4-ui.test.js && node tests/setup-ab.test.js && node tests/quantitative-setup-recommendation.test.js && node tests/r2.5-setup-ab-quantitative-integration.test.js && node tests/r2.5-ui.test.js && node tests/track-intelligence.test.js && node tests/r2.6-track-intelligence-integration.test.js && node tests/r2.6-ui.test.js && node tests/case-shell.test.js && node tests/r3.0a-ui.test.js && node tests/storage-backend.test.js && node tests/schema-migration.test.js && node tests/case-record-schema.test.js && node tests/case-store.test.js && node tests/session-store.test.js && node tests/case-library-viewmodel.test.js && node tests/r3.0b-ui.test.js && node tests/r3.0b-persistence-integration.test.js && node tests/feature-registry.test.js && node tests/feature-router.test.js && node tests/vehicle-preset-pipeline.test.js && node tests/i18n-parity.test.js && node tests/r3.0c-contract-foundation.test.js && node tests/r3-0c-comparison-adapter.test.js && node tests/r3-0c-lap-authority.test.js && node tests/r3-0c-track-identity.test.js && node tests/r3-0c-distance-authority.test.js && node tests/r3-0c-normalized-distance.test.js && node tests/r3-0c-reference-selection.test.js && node tests/r3-0c-corner-segmentation.test.js && node tests/r3-0c-corner-pairing.test.js && node tests/r3-0c-delta-metrics.test.js && node tests/r3-0c-comparison-export.test.js && node tests/r3-0c-comparison-workspace.test.js && node tests/r3-0c-contracts-bundle-equivalence.test.js && node tests/r3-0c-activation.test.js && node tests/r3.0d-contract-foundation.test.js && node tests/r3.0d-hardened-intrinsics.test.js && node tests/r3.0d-evidence-graph.test.js && node tests/r3.0d-hypothesis-engine.test.js && node tests/r3.0d-priority-engine.test.js && node tests/r3.0d-engineer-brief.test.js && node tests/r3.0d-engineer-viewmodel.test.js && node tests/r3-0d-contracts-bundle-equivalence.test.js && node tests/r3.0e-contract-foundation.test.js && node tests/r3.0e-stores.test.js && node tests/r3.0e-outcome-classifier.test.js && node tests/r3.0e-followup-timeline.test.js && node tests/r3.0e-experiment-viewmodel.test.js && node tests/r3.0f-migration-engine.test.js && node tests/e2e/flow-01-new-user.test.js && node tests/e2e/flow-02-real-telemetry.test.js && node tests/e2e/flow-03-measured.test.js && node tests/e2e/flow-04-reference-lap.test.js && node tests/e2e/flow-05-vre.test.js && node tests/e2e/flow-06-setup-experiment.test.js && node tests/e2e/flow-07-driver-experiment.test.js && node tests/e2e/flow-08-export-import.test.js && node tests/e2e/flow-09-electron-smoke.test.js && node tests/e2e/hardening-01-electron-boundary.test.js && node tests/e2e/hardening-02-storage-failure.test.js && node tests/e2e/hardening-03-no-stale-ui.test.js && node tests/e2e/hardening-04-large-library.test.js && node tests/e2e/hardening-05-xss-injection.test.js && node tests/e2e/hardening-06-supply-chain.test.js && node tests/managed-temp-dir.test.js && node tests/release-gate.test.js && node tests/version-bump-policy.test.js && node tests/supply-chain.test.js && node tests/r3-0c-governance.test.js && node tests/r3-0c-no-consumer.test.js && node tests/r3-0c-governance-integrity.test.js && node tests/r3-0-phase-governance.test.js && node tests/r3-0-phase-no-consumer.test.js && node tests/r3-0-phase-governance-integrity.test.js && node tests/r3-0-train.test.js && node tools/validate-against-telemetry.js --selftest",
+    "build:mac": "electron-builder --mac",
+    "build:win": "electron-builder --win",
+    "build:all": "electron-builder --mac --win"
+  },
+  "build": {
+    "appId": "com.racingsetup.analyzer",
+    "productName": "Racing Setup Analyzer",
+    "directories": {
+      "output": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*"
+    ],
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.utilities"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "allowToChangeInstallationDirectory": false
+    }
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "25.1.8"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  }
+}
+.DS_Store
+**/.DS_Store
+node_modules/
+build/
+
+# Clean-room (Phase 3 red line #5): proprietary telemetry / vendor binary data NEVER enters the repo.
+# Real .bmsbin and vendor formats are only ever read locally; tests use synthetic fixtures only.
+*.bmsbin
+*.pds
+*.cvp
+*.pvp
+*.mch
+*.tir
+*.fnl
+
+# Local-only work artifact (translation cache)
+.i18n-cache/
+
+# Local editor / agent config — never publish
+.claude/
+
+# Backup / temp / patch artifacts — never publish
+*.bak
+*.backup
+*.orig
+*.rej
+*~
+
+# Prevent accidental commit of private telemetry exports (real CSV stays local; tests use
+# inline synthetic fixtures). If a synthetic fixture ever needs committing, whitelist it
+# explicitly, e.g.:  !tests/fixtures/*.csv
+*.csv
+
+# H3 (v2.0.x public-release hardening): the lockfile is now TRACKED as the reproducible-
+# build authority. `npm ci` installs from it; scripts/check-supply-chain.js enforces it.
+# (Superseded the earlier dependency-free-lane policy that excluded it.)
+
+# R3-GATE0 verification evidence is produced by CI and uploaded as an artifact; never commit it.
+artifacts/
+{
+  "schemaVersion": 1,
+  "note": "H3 vendor governance. These three third-party libraries ship VENDORED under renderer/lib/ (outside npm), loaded from disk only — no CDN at runtime (see docs/r3-data-and-privacy.md 'Network egress'). Each is pinned by sha256; scripts/check-supply-chain.js fails closed if a file's hash drifts from this manifest. All three are permissive-licensed (MIT). Update policy: bump only via a reviewed PR that updates version + sha256 here in lockstep and re-runs the vulnerability audit.",
+  "libraries": [
+    {
+      "name": "alpinejs",
+      "displayName": "Alpine.js",
+      "version": "3.14.8",
+      "shippedPath": "renderer/lib/alpine.min.js",
+      "bytes": 44758,
+      "sha256": "b600e363d99d95444db54acbfb2deffec9ae792aa99a09229bcda078e5b55643",
+      "license": "MIT",
+      "source": "https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js",
+      "upstream": "https://github.com/alpinejs/alpine",
+      "versionEvidence": "embedded `version:\"3.14.8\"` string in the minified source",
+      "updatePolicy": "reviewed PR only; bump version+sha256 in lockstep; re-run vulnerability audit",
+      "vulnerabilityAudit": "npm advisory DB lookup for alpinejs@3.14.8 (no known advisories as of the H3 build); re-checked on each version bump"
+    },
+    {
+      "name": "chart.js",
+      "displayName": "Chart.js",
+      "version": "4.4.7",
+      "shippedPath": "renderer/lib/chart.min.js",
+      "bytes": 205889,
+      "sha256": "206b6e8bb00fc7bba2c7ee80ca41db3e9e05ba7be0aa35abeba9cfd5357f5d0e",
+      "license": "MIT",
+      "source": "https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js",
+      "upstream": "https://github.com/chartjs/Chart.js",
+      "versionEvidence": "embedded `Chart.js v4.4.7` banner in the minified source",
+      "updatePolicy": "reviewed PR only; bump version+sha256 in lockstep; re-run vulnerability audit",
+      "vulnerabilityAudit": "npm advisory DB lookup for chart.js@4.4.7 (no known advisories as of the H3 build); re-checked on each version bump"
+    },
+    {
+      "name": "tailwindcss-browser",
+      "displayName": "Tailwind CSS (Play CDN browser build)",
+      "version": "3.4.17",
+      "shippedPath": "renderer/lib/tailwind.js",
+      "bytes": 407279,
+      "sha256": "176e894661aa9cdc9a5cba6c720044cbbf7b8bd80d1c9a142a7c24b1b6c50d15",
+      "license": "MIT",
+      "source": "https://cdn.tailwindcss.com (standalone Play CDN browser build)",
+      "upstream": "https://github.com/tailwindlabs/tailwindcss",
+      "versionEvidence": "the Play-CDN bundle prints a `Tailwind CSS v3.0` banner but embeds tailwindcss 3.4.17; recorded as 3.4.17. NOTE: this is the browser/Play build (JIT-in-browser), an accepted trade-off vs a compiled stylesheet — documented in release notes.",
+      "updatePolicy": "reviewed PR only; bump version+sha256 in lockstep; re-run vulnerability audit",
+      "vulnerabilityAudit": "npm advisory DB lookup for tailwindcss@3.4.17 (no known advisories as of the H3 build); re-checked on each version bump"
+    }
+  ]
+}
+# Third-Party Notices
+
+Racing Setup Analyzer bundles third-party software. This file records the components and their
+licenses. The application itself is **UNLICENSED (all rights reserved)** — see the README; that
+status governs *this project's* code, NOT the third-party components below, each of which is
+distributed under its own permissive license.
+
+## Vendored runtime libraries (renderer/lib/, non-npm)
+
+These ship inside the packaged app and load from disk only (no CDN at runtime). Pinned by sha256 in
+`supply-chain/vendor-manifest.json`.
+
+### Alpine.js 3.14.8
+
+- License: **MIT**
+- Source: https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js
+- Upstream: https://github.com/alpinejs/alpine
+- Shipped: `renderer/lib/alpine.min.js` (sha256 `b600e363d99d95444db54acbfb2deffec9ae792aa99a09229bcda078e5b55643`)
+
+### Chart.js 4.4.7
+
+- License: **MIT**
+- Source: https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js
+- Upstream: https://github.com/chartjs/Chart.js
+- Shipped: `renderer/lib/chart.min.js` (sha256 `206b6e8bb00fc7bba2c7ee80ca41db3e9e05ba7be0aa35abeba9cfd5357f5d0e`)
+
+### Tailwind CSS (Play CDN browser build) 3.4.17
+
+- License: **MIT**
+- Source: https://cdn.tailwindcss.com (standalone Play CDN browser build)
+- Upstream: https://github.com/tailwindlabs/tailwindcss
+- Shipped: `renderer/lib/tailwind.js` (sha256 `176e894661aa9cdc9a5cba6c720044cbbf7b8bd80d1c9a142a7c24b1b6c50d15`)
+
+## npm build-toolchain dependencies (devDependencies, build-time only)
+
+The `electron` and `electron-builder` toolchains and their transitive dependencies are used only to
+BUILD the packaged app; they are not shipped inside the application bundle. The full pinned tree is in
+`package-lock.json` and enumerated in the CycloneDX SBOM at `supply-chain/sbom.cdx.json`
+(416 components). All are permissive-licensed:
+
+| License | Component count |
+|---|---|
+| MIT | 309 |
+| ISC | 73 |
+| Apache-2.0 | 10 |
+| BlueOak-1.0.0 | 8 |
+| BSD-2-Clause | 6 |
+| BSD-3-Clause | 5 |
+| Python-2.0 | 1 |
+| WTFPL OR ISC | 1 |
+| WTFPL | 1 |
+| (MIT OR CC0-1.0) | 1 |
+| (WTFPL OR MIT) | 1 |
+
+No copyleft (GPL/LGPL/AGPL/MPL/EPL/CDDL) licenses are present; `scripts/check-supply-chain.js`
+fails closed if any non-allowlisted license appears.
+
+## Electron / Chromium / Node.js
+
+The packaged app embeds the Electron runtime (Chromium + Node.js), distributed by the Electron project
+under the MIT license, which itself bundles Chromium (BSD-style) and Node.js (MIT). Full upstream
+notices ship with the Electron distribution inside the app bundle.
+{
+  "schemaVersion": 1,
+  "program": "PUBLIC_RELEASE_HARDENING",
+  "phase": "H3_REPRODUCIBLE_BUILD",
+  "baseSha": "0de228c9248d00aad8eabb71ae4fe5bc860bb604",
+  "integrationBranch": "release/v2.0.0-public-hardening",
+  "headSha": null,
+  "policyFlip": {
+    "from": "dependency-free lane forbade a tracked package-lock.json (scripts/check-version-policy.js + .gitignore)",
+    "to": "a tracked package-lock.json is REQUIRED as the reproducible-build authority; its ABSENCE or PR-deletion is the violation",
+    "rationale": "a public, code-signed binary release must have reproducible dependency resolution and an auditable supply chain",
+    "verificationLanePreserved": "the dependency-free trusted-verification-gate (ci.yml) still installs nothing; the install-free ban is now scoped to that ONE workflow so the separate supply-chain-build lane may run a clean install"
+  },
+  "closes": [
+    "E1 no lockfile / build reproducibility",
+    "F vendored libraries ungoverned",
+    "H3 third-party notices / license audit"
+  ],
+  "artifacts": {
+    "lockfile": {
+      "path": "package-lock.json",
+      "lockfileVersion": 3,
+      "sha256": "29eec8d22bfe9995024aa000cbc715efb5c5063ec5f0347c733e4c0e403748ae"
+    },
+    "sbom": {
+      "path": "supply-chain/sbom.cdx.json",
+      "format": "CycloneDX 1.5",
+      "sha256": "e1c738b5c2d2aeb54cdc64781242c7f872a5144c48880f4c68ce8fd519f1db95",
+      "components": 419
+    },
+    "vendorManifest": {
+      "path": "supply-chain/vendor-manifest.json",
+      "sha256": "1cb003ebf9b476162eac57591820dfc0acfa81c955d191f77b6c803781fededb",
+      "libraries": [
+        "alpinejs 3.14.8",
+        "chart.js 4.4.7",
+        "tailwindcss-browser 3.4.17"
+      ]
+    },
+    "buildEnvironment": {
+      "path": "supply-chain/build-environment.json",
+      "sha256": "77a9fc147adb15560346b702175505e38f801a0fe37d4a1c5c399d59ed3d9961"
+    },
+    "thirdPartyNotices": {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "sha256": "d40aeae90b755d303254ff204447078bbf8029eac0462ff4d09d4548ba8f143a"
+    }
+  },
+  "pins": {
+    "electron": "33.4.11",
+    "electronBuilder": "25.1.8",
+    "enginesNode": ">=22.0.0",
+    "enginesNpm": ">=10.0.0",
+    "npmCi": "reproduces 416 npm packages; verified locally + in supply-chain-build lane"
+  },
+  "checks": {
+    "checkSupplyChain": "scripts/check-supply-chain.js (--selftest + real): lockfile v3 + root match, exact devDep pins vs lockfile, engines, vendor hash drift, vendor coverage, npm+vendor license allowlist (permissive-only, no copyleft), SBOM freshness, notices coverage, arm64-only build env",
+    "generateSbom": "scripts/generate-sbom.js (deterministic; --check drift guard)",
+    "tests": "tests/supply-chain.test.js 12/12 (8 fail-closed sandbox cases); version-bump-policy 16/16 (added H3 lockfile-required case)",
+    "ci": "ci.yml F2 step (dependency-free static supply-chain) + NEW .github/workflows/supply-chain-build.yml (npm ci reproducibility + post-install supply-chain governance)"
+  },
+  "licenseAudit": {
+    "npmComponents": 416,
+    "distribution": "permissive-only (MIT/ISC/Apache-2.0/BSD/BlueOak/…); zero copyleft (no GPL/LGPL/AGPL/MPL/EPL/CDDL); fail-closed on any non-allowlisted license",
+    "vendored": "3x MIT"
+  },
+  "vulnerabilityAuditProcedure": "npm advisory DB lookup per vendored library on each version bump (recorded in vendor-manifest.json.vulnerabilityAudit); npm dependency tree audited via the permissive-license allowlist + pinned lockfile",
+  "codexVerdict": null,
+  "note": "H3 keeps the dependency-free verification lane intact and adds a reproducible-install + supply-chain-governance lane. No production runtime code changed. Vendored libraries retained (manifest route), not converted to npm imports."
+}
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-nA3wpalO' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-c1hYbV4M' (errno=Operation not permitted)
+scripts/check-supply-chain.js:24:const fs = require('fs');
+scripts/check-supply-chain.js:25:const path = require('path');
+scripts/check-supply-chain.js:26:const crypto = require('crypto');
+scripts/check-supply-chain.js:27:const cp = require('child_process');
+scripts/generate-sbom.js:19:const fs = require('fs');
+scripts/generate-sbom.js:20:const path = require('path');
+scripts/generate-sbom.js:21:const crypto = require('crypto');
+
+codex
+Two material issues are emerging: the SBOM encodes npm SRI base64 as CycloneDX hash content (the schema expects hexadecimal), and the supposedly non-uploading lane invokes an artifact upload action. I’m validating whether additional fail-open paths exist in lockfile deletion detection, platform enforcement, and SBOM identity uniqueness.
+exec
+/bin/bash -lc "node scripts/check-verification-dependencies.js; node scripts/check-supply-chain.js --selftest; node scripts/check-supply-chain.js; node scripts/generate-sbom.js --check; node tests/supply-chain.test.js; node tests/version-bump-policy.test.js; node - <<'NODE'
+const s=require('./supply-chain/sbom.cdx.json');
+const refs=s.components.map(x=>x['bom-ref']);
+const dup=[...new Set(refs.filter((x,i)=>refs.indexOf(x)"'!==i))];
+const badHashes=s.components.flatMap(c=>(c.hashes||[]).filter(h=>!/''^[0-9a-fA-F]+$/.test(h.content)).map(h=>[c['"'bom-ref'],h.alg,h.content.slice(0,20)]));
+const scoped=s.components.filter(c=>c.purl&&c.name.startsWith('@')).slice(0,5).map(c=>c.purl);
+const noPurl=s.components.filter(c=>"'!c.purl).length;
+console.log(JSON.stringify({components:s.components.length,duplicateBomRefs:dup.length,duplicateExamples:dup.slice(0,10),nonHexHashes:badHashes.length,badHashExamples:badHashes.slice(0,3),scopedPurls:scoped,noPurl},null,2));
+NODE
+shasum -a 256 package-lock.json supply-chain/sbom.cdx.json supply-chain/vendor-manifest.json supply-chain/build-environment.json THIRD_PARTY_NOTICES.md renderer/lib/*.js
+node scripts/check-release-gate.js' in /Users/SKYLINE/Claude/worktrees/f6-release
+ exited 2 in 9575ms:
+supply-chain selftest: PASS
+node:fs:2397
+    return binding.writeFileUtf8(
+                   ^
+
+Error: EPERM: operation not permitted, open '/Users/SKYLINE/Claude/worktrees/f6-release/artifacts/supply-chain.json'
+    at Object.writeFileSync (node:fs:2397:20)
+    at Object.<anonymous> (/Users/SKYLINE/Claude/worktrees/f6-release/scripts/check-supply-chain.js:164:4)
+    at Module._compile (node:internal/modules/cjs/loader:1803:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1934:10)
+    at Module.load (node:internal/modules/cjs/loader:1524:32)
+    at Module._load (node:internal/modules/cjs/loader:1326:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  errno: -1,
+  code: 'EPERM',
+  syscall: 'open',
+  path: '/Users/SKYLINE/Claude/worktrees/f6-release/artifacts/supply-chain.json'
+}
+
+Node.js v25.5.0
+SBOM up to date (419 components)
+  ✓ check-supply-chain --selftest passes
+node:fs:3022
+  return binding.mkdtemp(prefix, options.encoding);
+                 ^
+
+Error: EPERM: operation not permitted, mkdtemp '/private/var/folders/bw/dy9my1ls5sz2fnpxk_yrc0k80000gn/T/h3-sc-real-XXXXXX'
+    at Object.mkdtempSync (node:fs:3022:18)
+    at _makeTempDir (/Users/SKYLINE/Claude/worktrees/f6-release/tests/helpers/managed-temp-dir.js:51:20)
+    at Object.acquireTempDir (/Users/SKYLINE/Claude/worktrees/f6-release/tests/helpers/managed-temp-dir.js:157:17)
+    at /Users/SKYLINE/Claude/worktrees/f6-release/tests/supply-chain.test.js:33:17
+    at Object.<anonymous> (/Users/SKYLINE/Claude/worktrees/f6-release/tests/supply-chain.test.js:42:3)
+    at Module._compile (node:internal/modules/cjs/loader:1803:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1934:10)
+    at Module.load (node:internal/modules/cjs/loader:1524:32)
+    at Module._load (node:internal/modules/cjs/loader:1326:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14) {
+  errno: -1,
+  code: 'EPERM',
+  syscall: 'mkdtemp',
+  path: '/private/var/folders/bw/dy9my1ls5sz2fnpxk_yrc0k80000gn/T/h3-sc-real-XXXXXX'
+}
+
+Node.js v25.5.0
+node:fs:3022
+  return binding.mkdtemp(prefix, options.encoding);
+                 ^
+
+Error: EPERM: operation not permitted, mkdtemp '/private/var/folders/bw/dy9my1ls5sz2fnpxk_yrc0k80000gn/T/f6-version-policy-XXXXXX'
+    at Object.mkdtempSync (node:fs:3022:18)
+    at _makeTempDir (/Users/SKYLINE/Claude/worktrees/f6-release/tests/helpers/managed-temp-dir.js:51:20)
+    at Object.acquireTempDir (/Users/SKYLINE/Claude/worktrees/f6-release/tests/helpers/managed-temp-dir.js:157:17)
+    at runPolicy (/Users/SKYLINE/Claude/worktrees/f6-release/tests/version-bump-policy.test.js:35:17)
+    at /Users/SKYLINE/Claude/worktrees/f6-release/tests/version-bump-policy.test.js:60:13
+    at Object.<anonymous> (/Users/SKYLINE/Claude/worktrees/f6-release/tests/version-bump-policy.test.js:62:3)
+    at Module._compile (node:internal/modules/cjs/loader:1803:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1934:10)
+    at Module.load (node:internal/modules/cjs/loader:1524:32)
+    at Module._load (node:internal/modules/cjs/loader:1326:12) {
+  errno: -1,
+  code: 'EPERM',
+  syscall: 'mkdtemp',
+  path: '/private/var/folders/bw/dy9my1ls5sz2fnpxk_yrc0k80000gn/T/f6-version-policy-XXXXXX'
+}
+
+Node.js v25.5.0
+/bin/bash: cannot create temp file for here document: Operation not permitted
+29eec8d22bfe9995024aa000cbc715efb5c5063ec5f0347c733e4c0e403748ae  package-lock.json
+e1c738b5c2d2aeb54cdc64781242c7f872a5144c48880f4c68ce8fd519f1db95  supply-chain/sbom.cdx.json
+1cb003ebf9b476162eac57591820dfc0acfa81c955d191f77b6c803781fededb  supply-chain/vendor-manifest.json
+77a9fc147adb15560346b702175505e38f801a0fe37d4a1c5c399d59ed3d9961  supply-chain/build-environment.json
+d40aeae90b755d303254ff204447078bbf8029eac0462ff4d09d4548ba8f143a  THIRD_PARTY_NOTICES.md
+b600e363d99d95444db54acbfb2deffec9ae792aa99a09229bcda078e5b55643  renderer/lib/alpine.min.js
+206b6e8bb00fc7bba2c7ee80ca41db3e9e05ba7be0aa35abeba9cfd5357f5d0e  renderer/lib/chart.min.js
+176e894661aa9cdc9a5cba6c720044cbbf7b8bd80d1c9a142a7c24b1b6c50d15  renderer/lib/tailwind.js
+RELEASE-GATE FATAL Error: EPERM: operation not permitted, open '/Users/SKYLINE/Claude/worktrees/f6-release/artifacts/release-gate.json'
+    at Object.writeFileSync (node:fs:2397:20)
+    at Object.<anonymous> (/Users/SKYLINE/Claude/worktrees/f6-release/scripts/check-release-gate.js:401:8)
+    at Module._compile (node:internal/modules/cjs/loader:1803:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1934:10)
+    at Module.load (node:internal/modules/cjs/loader:1524:32)
+    at Module._load (node:internal/modules/cjs/loader:1326:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47
+
+exec
+/bin/bash -lc "node -e \"const s=require('./supply-chain/sbom.cdx.json'),r=s.components.map(x=>x['bom-ref']),d=[...new Set(r.filter((x,i)=>r.indexOf(x)"'!==i))],b=s.components.flatMap(c=>(c.hashes||[]).filter(h=>!/''^[0-9a-fA-F]+$/.test(h.content)).map(h=>[c['"'bom-ref'],h.alg,h.content.slice(0,20)])),p=s.components.filter(c=>c.purl&&c.name.startsWith('@')).slice(0,5).map(c=>c.purl); console.log(JSON.stringify({components:s.components.length,duplicates:d.length,duplicateExamples:d.slice(0,10),nonHexHashes:b.length,badHashExamples:b.slice(0,3),scopedPurls:p,noPurl:s.components.filter(c=>"'!c.purl).length},null,2))"; node -e "const l=require('"'./package-lock.json');let n=0,b=[];for(const[k,e]of Object.entries(l.packages)){if("'!k)continue;n++;const x=e.license??(e.licenses&&e.licenses[0]&&e.licenses[0].type);if(!x)b.push([k,e.version])}console.log({n,missing:b.length,examples:b.slice(0,5)})"; git diff --name-only 0de228c9..HEAD -- main.js preload.js renderer contracts governance/r3.0b; rg -n '"'limitations|addressed|published|Intel|universal|x64' docs/release-notes-2.0.0.md governance/hardening/H3.json package.json supply-chain .github/workflows/supply-chain-build.yml; rg -n 'tagPolicy|conditions|version-policy|foreign|2\\.0\\.1' scripts/check-release-gate.js tests/release-gate.test.js" in /Users/SKYLINE/Claude/worktrees/f6-release
+ succeeded in 0ms:
+{
+  "components": 419,
+  "duplicates": 17,
+  "duplicateExamples": [
+    "pkg:npm/agent-base@6.0.2",
+    "pkg:npm/balanced-match@1.0.2",
+    "pkg:npm/brace-expansion@1.1.15",
+    "pkg:npm/brace-expansion@2.1.1",
+    "pkg:npm/fs-extra@10.1.0",
+    "pkg:npm/fs-extra@9.1.0",
+    "pkg:npm/jsonfile@6.2.1",
+    "pkg:npm/lru-cache@7.18.3",
+    "pkg:npm/minimatch@3.1.5",
+    "pkg:npm/minimatch@5.1.9"
+  ],
+  "nonHexHashes": 416,
+  "badHashExamples": [
+    [
+      "pkg:npm/@develar/schema-utils@2.6.5",
+      "SHA-512",
+      "0cp4PsWQ/9avqTVMCtZ+"
+    ],
+    [
+      "pkg:npm/@electron/asar@3.4.1",
+      "SHA-512",
+      "i4/rNPRS84t0vSRa2Hor"
+    ],
+    [
+      "pkg:npm/@electron/get@2.0.3",
+      "SHA-512",
+      "Qkzpg2s9GnVV2I2BjRks"
+    ]
+  ],
+  "scopedPurls": [
+    "pkg:npm/@develar/schema-utils@2.6.5",
+    "pkg:npm/@electron/asar@3.4.1",
+    "pkg:npm/@electron/get@2.0.3",
+    "pkg:npm/@electron/notarize@2.5.0",
+    "pkg:npm/@electron/osx-sign@1.3.1"
+  ],
+  "noPurl": 3
+}
+{ n: 416, missing: 0, examples: [] }
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-OEE08ev8' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-bieM3h28' (errno=Operation not permitted)
+package.json:39:            "x64"
+package.json:45:            "x64"
+docs/release-notes-2.0.0.md:9:> been published.
+docs/release-notes-2.0.0.md:58:  Node-test/tooling layer only in 2.0.0 (see "Known limitations").
+docs/release-notes-2.0.0.md:81:## Known limitations (2.0.0)
+docs/release-notes-2.0.0.md:121:   limitations metadata (see `docs/r3-credibility-model.md`).
+docs/release-notes-2.0.0.md:122:10. **[FIXED in the v2.0.x public-release hardening line — H1; not yet in any published
+supply-chain/build-environment.json:16:    "x64": false,
+supply-chain/build-environment.json:17:    "universal": false,
+supply-chain/build-environment.json:18:    "note": "The v2.0.x public release ships Apple Silicon (arm64) only. Intel/universal are NOT built and must not be implied."
+supply-chain/sbom.cdx.json:153:      "bom-ref": "pkg:npm/@electron/universal@2.0.1",
+supply-chain/sbom.cdx.json:154:      "name": "@electron/universal",
+supply-chain/sbom.cdx.json:156:      "purl": "pkg:npm/@electron/universal@2.0.1",
+supply-chain/sbom.cdx.json:8193:      "bom-ref": "pkg:npm/universalify@0.1.2",
+supply-chain/sbom.cdx.json:8194:      "name": "universalify",
+supply-chain/sbom.cdx.json:8196:      "purl": "pkg:npm/universalify@0.1.2",
+supply-chain/sbom.cdx.json:8214:      "bom-ref": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8215:      "name": "universalify",
+supply-chain/sbom.cdx.json:8217:      "purl": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8235:      "bom-ref": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8236:      "name": "universalify",
+supply-chain/sbom.cdx.json:8238:      "purl": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8256:      "bom-ref": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8257:      "name": "universalify",
+supply-chain/sbom.cdx.json:8259:      "purl": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8277:      "bom-ref": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8278:      "name": "universalify",
+supply-chain/sbom.cdx.json:8280:      "purl": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8298:      "bom-ref": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8299:      "name": "universalify",
+supply-chain/sbom.cdx.json:8301:      "purl": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8319:      "bom-ref": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8320:      "name": "universalify",
+supply-chain/sbom.cdx.json:8322:      "purl": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8340:      "bom-ref": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8341:      "name": "universalify",
+supply-chain/sbom.cdx.json:8343:      "purl": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8361:      "bom-ref": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8362:      "name": "universalify",
+supply-chain/sbom.cdx.json:8364:      "purl": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8382:      "bom-ref": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8383:      "name": "universalify",
+supply-chain/sbom.cdx.json:8385:      "purl": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8403:      "bom-ref": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8404:      "name": "universalify",
+supply-chain/sbom.cdx.json:8406:      "purl": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8424:      "bom-ref": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8425:      "name": "universalify",
+supply-chain/sbom.cdx.json:8427:      "purl": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8445:      "bom-ref": "pkg:npm/universalify@2.0.1",
+supply-chain/sbom.cdx.json:8446:      "name": "universalify",
+supply-chain/sbom.cdx.json:8448:      "purl": "pkg:npm/universalify@2.0.1",
+tests/release-gate.test.js:5: * (conditions 1/2 alone would re-run the full multi-minute suite): the gate's io
+tests/release-gate.test.js:8: * the filesystem-only conditions (9/10/11) run against the actual repo.
+tests/release-gate.test.js:24:chk('gate declares exactly 12 conditions', G.CONDITIONS.length === 12, G.CONDITIONS.length);
+tests/release-gate.test.js:27:const EXPECTED_KEYS = ['preflight', 'tests', 'e2e', 'frozen', 'preset501', 'i18n', 'reachability', 'noOrphans', 'electronBuild', 'releaseNotes', 'changelog', 'tagPolicy'];
+tests/release-gate.test.js:58:  // F5-R2-01: corroborated artifacts for the exit-code-only delegated conditions
+tests/release-gate.test.js:64:  'version-policy.json': { ok: true },
+tests/release-gate.test.js:136:// 12 tagPolicy: artifact must corroborate (F5-R2-01)
+tests/release-gate.test.js:138:  chk('tagPolicy: green child + green artifact -> PASS', cond(12).run(ioAllGreen(GREEN_ARTIFACTS)).ok === true);
+tests/release-gate.test.js:140:  chk('tagPolicy: green child + artifact ok:false -> FAIL (F5-R2-01)', cond(12).run(ioBad).ok === false);
+tests/release-gate.test.js:173:// 9/10/11: filesystem conditions against the REAL repo (happy path must hold at HEAD)
+tests/release-gate.test.js:193:// 12 tagPolicy delegates
+tests/release-gate.test.js:195:  chk('tagPolicy: red child -> FAIL', cond(12).run({ delegate: () => ({ ok: false, detail: {} }), readJson: () => ({}) }).ok === false);
+tests/release-gate.test.js:203:    delegate: (script) => ({ ok: String(script).indexOf('check-version-policy') === -1, detail: {} }),
+tests/release-gate.test.js:207:  chk('runGate: single red condition -> ok false, names the failed key', r2.ok === false && r2.failedKeys.indexOf('tagPolicy') !== -1, r2.failedKeys);
+tests/release-gate.test.js:208:  chk('runGate: NO short-circuit — all 12 conditions still reported', r2.conditions.length === 12);
+tests/release-gate.test.js:212:  // crashing io exactly the 10 io-dependent conditions fail closed (1-9, 12).
+tests/release-gate.test.js:213:  chk('runGate: crashing io -> all 10 io-dependent conditions FAIL closed, gate ok=false',
+scripts/check-release-gate.js:13: *   - Delegating: conditions 1,2,4,5,6,7,8,12 spawn the existing single-purpose
+scripts/check-release-gate.js:19: *     (CI is install-free by policy — scripts/check-version-policy.js forbids
+scripts/check-release-gate.js:23: *   - ALL 12 conditions always run (no short-circuit) so one gate run reports the
+scripts/check-release-gate.js:25: *   - Exit codes: 0 = all 12 PASS · 1 = one or more conditions FAILED · 2 = the
+scripts/check-release-gate.js:100:// ── the 12 conditions ───────────────────────────────────────────────────────────
+scripts/check-release-gate.js:357:    key: 'tagPolicy',
+scripts/check-release-gate.js:358:    name: 'Tag policy — version pinned at the authorized value (check-version-policy EXPECTED), lockfile untracked, workflows install-free',
+scripts/check-release-gate.js:360:      const r = _corroborate(io, io.delegate('scripts/check-version-policy.js'), 'version-policy.json');
+scripts/check-release-gate.js:386:    conditions: results,
+
+codex
+H3-R1-01 — `ci.yml` can be deleted without detection: workflow discovery accepts an empty result, so the install-free lane check passes with no `ci.yml`. [check-version-policy.js](/Users/SKYLINE/Claude/worktrees/f6-release/scripts/check-version-policy.js:51)
+
+H3-R1-02 — SBOM is not valid CycloneDX 1.5: all 416 npm SHA-512 hash values are emitted as base64 SRI payloads, while CycloneDX hash content requires hexadecimal. [generate-sbom.js](/Users/SKYLINE/Claude/worktrees/f6-release/scripts/generate-sbom.js:60)
+
+H3-R1-03 — SBOM identity is ambiguous: 17 duplicate `bom-ref` values exist because nested packages with identical name/version use the same reference. [generate-sbom.js](/Users/SKYLINE/Claude/worktrees/f6-release/scripts/generate-sbom.js:51)
+
+H3-R1-04 — The three vendored SBOM components have no purl, contrary to the required npm-and-vendor purl coverage. [generate-sbom.js](/Users/SKYLINE/Claude/worktrees/f6-release/scripts/generate-sbom.js:69)
+
+H3-R1-05 — The supply-chain workflow performs an upload despite the required “never … uploads” constraint. [supply-chain-build.yml](/Users/SKYLINE/Claude/worktrees/f6-release/.github/workflows/supply-chain-build.yml:64)
+
+H3-R1-06 — Arm64-only enforcement does not validate `platformSupport.universal === false`; `true` or an absent field passes. [check-supply-chain.js](/Users/SKYLINE/Claude/worktrees/f6-release/scripts/check-supply-chain.js:135)
+
+H3-R1-07 — Test rigor/evidence is overstated: only seven fail-closed supply-chain mutations exist (`a`–`g`), not eight. [supply-chain.test.js](/Users/SKYLINE/Claude/worktrees/f6-release/tests/supply-chain.test.js:86) [H3.json](/Users/SKYLINE/Claude/worktrees/f6-release/governance/hardening/H3.json:58)
+
+H3-R1-08 — The version-policy test claims to exercise PR deletion, but only tests a repository where the lockfile never existed; `lockfileRemovedByPR` is not exercised. [version-bump-policy.test.js](/Users/SKYLINE/Claude/worktrees/f6-release/tests/version-bump-policy.test.js:111)
+
+VERDICT: BLOCK
+tokens used
+85,727
+H3-R1-01 — `ci.yml` can be deleted without detection: workflow discovery accepts an empty result, so the install-free lane check passes with no `ci.yml`. [check-version-policy.js](/Users/SKYLINE/Claude/worktrees/f6-release/scripts/check-version-policy.js:51)
+
+H3-R1-02 — SBOM is not valid CycloneDX 1.5: all 416 npm SHA-512 hash values are emitted as base64 SRI payloads, while CycloneDX hash content requires hexadecimal. [generate-sbom.js](/Users/SKYLINE/Claude/worktrees/f6-release/scripts/generate-sbom.js:60)
+
+H3-R1-03 — SBOM identity is ambiguous: 17 duplicate `bom-ref` values exist because nested packages with identical name/version use the same reference. [generate-sbom.js](/Users/SKYLINE/Claude/worktrees/f6-release/scripts/generate-sbom.js:51)
+
+H3-R1-04 — The three vendored SBOM components have no purl, contrary to the required npm-and-vendor purl coverage. [generate-sbom.js](/Users/SKYLINE/Claude/worktrees/f6-release/scripts/generate-sbom.js:69)
+
+H3-R1-05 — The supply-chain workflow performs an upload despite the required “never … uploads” constraint. [supply-chain-build.yml](/Users/SKYLINE/Claude/worktrees/f6-release/.github/workflows/supply-chain-build.yml:64)
+
+H3-R1-06 — Arm64-only enforcement does not validate `platformSupport.universal === false`; `true` or an absent field passes. [check-supply-chain.js](/Users/SKYLINE/Claude/worktrees/f6-release/scripts/check-supply-chain.js:135)
+
+H3-R1-07 — Test rigor/evidence is overstated: only seven fail-closed supply-chain mutations exist (`a`–`g`), not eight. [supply-chain.test.js](/Users/SKYLINE/Claude/worktrees/f6-release/tests/supply-chain.test.js:86) [H3.json](/Users/SKYLINE/Claude/worktrees/f6-release/governance/hardening/H3.json:58)
+
+H3-R1-08 — The version-policy test claims to exercise PR deletion, but only tests a repository where the lockfile never existed; `lockfileRemovedByPR` is not exercised. [version-bump-policy.test.js](/Users/SKYLINE/Claude/worktrees/f6-release/tests/version-bump-policy.test.js:111)
+
+VERDICT: BLOCK
+CODEX_EXIT=0

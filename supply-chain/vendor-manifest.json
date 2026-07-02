@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "note": "H3 vendor governance. These three third-party libraries ship VENDORED under renderer/lib/ (outside npm), loaded from disk only — no CDN at runtime (see docs/r3-data-and-privacy.md 'Network egress'). Each is pinned by sha256; scripts/check-supply-chain.js fails closed if a file's hash drifts from this manifest. All three are permissive-licensed (MIT). Update policy: bump only via a reviewed PR that updates version + sha256 here in lockstep and re-runs the vulnerability audit.",
+  "libraries": [
+    {
+      "name": "alpinejs",
+      "displayName": "Alpine.js",
+      "version": "3.14.8",
+      "shippedPath": "renderer/lib/alpine.min.js",
+      "bytes": 44758,
+      "sha256": "b600e363d99d95444db54acbfb2deffec9ae792aa99a09229bcda078e5b55643",
+      "license": "MIT",
+      "source": "https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js",
+      "upstream": "https://github.com/alpinejs/alpine",
+      "versionEvidence": "embedded `version:\"3.14.8\"` string in the minified source",
+      "updatePolicy": "reviewed PR only; bump version+sha256 in lockstep; re-run vulnerability audit",
+      "vulnerabilityAudit": "npm advisory DB lookup for alpinejs@3.14.8 (no known advisories as of the H3 build); re-checked on each version bump"
+    },
+    {
+      "name": "chart.js",
+      "displayName": "Chart.js",
+      "version": "4.4.7",
+      "shippedPath": "renderer/lib/chart.min.js",
+      "bytes": 205889,
+      "sha256": "206b6e8bb00fc7bba2c7ee80ca41db3e9e05ba7be0aa35abeba9cfd5357f5d0e",
+      "license": "MIT",
+      "source": "https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js",
+      "upstream": "https://github.com/chartjs/Chart.js",
+      "versionEvidence": "embedded `Chart.js v4.4.7` banner in the minified source",
+      "updatePolicy": "reviewed PR only; bump version+sha256 in lockstep; re-run vulnerability audit",
+      "vulnerabilityAudit": "npm advisory DB lookup for chart.js@4.4.7 (no known advisories as of the H3 build); re-checked on each version bump"
+    },
+    {
+      "name": "tailwindcss-browser",
+      "displayName": "Tailwind CSS (Play CDN browser build)",
+      "version": "3.4.17",
+      "shippedPath": "renderer/lib/tailwind.js",
+      "bytes": 407279,
+      "sha256": "176e894661aa9cdc9a5cba6c720044cbbf7b8bd80d1c9a142a7c24b1b6c50d15",
+      "license": "MIT",
+      "source": "https://cdn.tailwindcss.com (standalone Play CDN browser build)",
+      "upstream": "https://github.com/tailwindlabs/tailwindcss",
+      "versionEvidence": "the Play-CDN bundle prints a `Tailwind CSS v3.0` banner but embeds tailwindcss 3.4.17; recorded as 3.4.17. NOTE: this is the browser/Play build (JIT-in-browser), an accepted trade-off vs a compiled stylesheet — documented in release notes.",
+      "updatePolicy": "reviewed PR only; bump version+sha256 in lockstep; re-run vulnerability audit",
+      "vulnerabilityAudit": "npm advisory DB lookup for tailwindcss@3.4.17 (no known advisories as of the H3 build); re-checked on each version bump"
+    }
+  ]
+}

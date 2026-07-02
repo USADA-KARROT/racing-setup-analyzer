@@ -97,13 +97,15 @@ cannot control OS-level backups or other local processes. Full statement:
    repository carries no LICENSE file: all rights reserved; this public repository does
    not currently grant reuse rights. Adopting a license is a product decision deferred
    past 2.0.0.
-5. **No tracked lockfile (by policy).** The repository's verification lane is
+5. **[ADDRESSED in the v2.0.x public-release hardening line — H3.]** ~~No tracked lockfile (by policy).~~ The hardening branch tracks `package-lock.json` (reproducible `npm ci`), pins electron/electron-builder exactly, and adds a CycloneDX SBOM + license audit. The paragraph below describes the 2.0.0 tag/draft snapshot, which predates H3:
+   **No tracked lockfile (by policy).** The repository's verification lane is
    dependency-free and `scripts/check-version-policy.js` enforces that
    `package-lock.json` stays untracked. A fresh `npm install` resolves
    `electron ^33.0.0` / `electron-builder ^25.0.0` by semver range; build reproducibility
    is bounded by those ranges, not a pinned lock. This is an accepted, documented
    trade-off of the dependency-free governance lane.
-6. **Vendored renderer libraries.** Three third-party libraries ship vendored under
+6. **[ADDRESSED in the v2.0.x public-release hardening line — H3.]** ~~Vendored renderer libraries~~ are now governed by `supply-chain/vendor-manifest.json` (name/version/source/license/sha256/update-policy/vuln-audit) and covered by the SBOM + `THIRD_PARTY_NOTICES.md`. The paragraph below describes the 2.0.0 tag/draft snapshot, which predates H3:
+   **Vendored renderer libraries.** Three third-party libraries ship vendored under
    `renderer/lib/`, outside npm governance: `alpine.min.js` (Alpine.js), `chart.min.js`
    (Chart.js 4.4.7), `tailwind.js` (Tailwind CSS browser build). They load from disk
    only (no CDN at runtime); no integrity hashes are recorded in-repo.

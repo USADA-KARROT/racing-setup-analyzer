@@ -144,6 +144,16 @@ jobs:
         timeout-minutes: 2
         run: node scripts/check-version-policy.js
 
+      - name: F2 — Supply-chain governance (lockfile/SBOM/vendor/licenses; dependency-free static)
+        if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        # Reads package-lock.json + vendored files + SBOM statically (Node builtins only); needs no
+        # package manager to run, so it belongs in the dependency-free lane. The clean-install
+        # reproducibility proof lives in the separate supply-chain-build workflow.
+        run: |
+          node scripts/check-supply-chain.js --selftest
+          node scripts/check-supply-chain.js
+
       - name: G — R3.0C scope guard
         if: ${{ !cancelled() }}
         timeout-minutes: 2

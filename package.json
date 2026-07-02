@@ -11,10 +11,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "node tests/verify-dynamics.js && node tests/telemetry-core.test.js && node tests/telemetry-view.test.js && node tests/telemetry-plot.test.js && node tests/telemetry-interact.test.js && node tests/telemetry-yaw.test.js && node tests/canonical-parameters.test.js && node tests/parameter-conversions.test.js && node tests/vehicle-profile-f312.test.js && node tests/setup-snapshot.test.js && node tests/analysis-case.test.js && node tests/analysis-case-adversarial.test.js && node tests/suspension-input-normalizer.test.js && node tests/suspension-input-equivalence.test.js && node tests/suspension-input-adversarial.test.js && node tests/canonical-model-input.test.js && node tests/analysis-execution.test.js && node tests/telemetry-observation.test.js && node tests/model-telemetry-comparison.test.js && node tests/race-engineer-insight.test.js && node tests/driver-coach-insight.test.js && node tests/analysis-workspace.test.js && node tests/analysis-workspace-viewmodel.test.js && node tests/analysis-workspace-integration.test.js && node tests/analysis-workspace-ui.test.js && node tests/telemetry-import-adapter.test.js && node tests/channel-mapping.test.js && node tests/calibration-registry.test.js && node tests/analysis-window.test.js && node tests/canonical-telemetry-session.test.js && node tests/analysis-case-export.test.js && node tests/r2.3-real-telemetry-integration.test.js && node tests/r2.3-import-ui.test.js && node tests/measured-metrics.test.js && node tests/r2.4-measured-metrics-integration.test.js && node tests/r2.4-ui.test.js && node tests/setup-ab.test.js && node tests/quantitative-setup-recommendation.test.js && node tests/r2.5-setup-ab-quantitative-integration.test.js && node tests/r2.5-ui.test.js && node tests/track-intelligence.test.js && node tests/r2.6-track-intelligence-integration.test.js && node tests/r2.6-ui.test.js && node tests/case-shell.test.js && node tests/r3.0a-ui.test.js && node tests/storage-backend.test.js && node tests/schema-migration.test.js && node tests/case-record-schema.test.js && node tests/case-store.test.js && node tests/session-store.test.js && node tests/case-library-viewmodel.test.js && node tests/r3.0b-ui.test.js && node tests/r3.0b-persistence-integration.test.js && node tests/feature-registry.test.js && node tests/feature-router.test.js && node tests/vehicle-preset-pipeline.test.js && node tests/i18n-parity.test.js && node tests/r3.0c-contract-foundation.test.js && node tests/r3-0c-comparison-adapter.test.js && node tests/r3-0c-lap-authority.test.js && node tests/r3-0c-track-identity.test.js && node tests/r3-0c-distance-authority.test.js && node tests/r3-0c-normalized-distance.test.js && node tests/r3-0c-reference-selection.test.js && node tests/r3-0c-corner-segmentation.test.js && node tests/r3-0c-corner-pairing.test.js && node tests/r3-0c-delta-metrics.test.js && node tests/r3-0c-comparison-export.test.js && node tests/r3-0c-comparison-workspace.test.js && node tests/r3-0c-contracts-bundle-equivalence.test.js && node tests/r3-0c-activation.test.js && node tests/r3.0d-contract-foundation.test.js && node tests/r3.0d-hardened-intrinsics.test.js && node tests/r3.0d-evidence-graph.test.js && node tests/r3.0d-hypothesis-engine.test.js && node tests/r3.0d-priority-engine.test.js && node tests/r3.0d-engineer-brief.test.js && node tests/r3.0d-engineer-viewmodel.test.js && node tests/r3-0d-contracts-bundle-equivalence.test.js && node tests/r3.0e-contract-foundation.test.js && node tests/r3.0e-stores.test.js && node tests/r3.0e-outcome-classifier.test.js && node tests/r3.0e-followup-timeline.test.js && node tests/r3.0e-experiment-viewmodel.test.js && node tests/r3.0f-migration-engine.test.js && node tests/e2e/flow-01-new-user.test.js && node tests/e2e/flow-02-real-telemetry.test.js && node tests/e2e/flow-03-measured.test.js && node tests/e2e/flow-04-reference-lap.test.js && node tests/e2e/flow-05-vre.test.js && node tests/e2e/flow-06-setup-experiment.test.js && node tests/e2e/flow-07-driver-experiment.test.js && node tests/e2e/flow-08-export-import.test.js && node tests/e2e/flow-09-electron-smoke.test.js && node tests/e2e/hardening-01-electron-boundary.test.js && node tests/e2e/hardening-02-storage-failure.test.js && node tests/e2e/hardening-03-no-stale-ui.test.js && node tests/e2e/hardening-04-large-library.test.js && node tests/e2e/hardening-05-xss-injection.test.js && node tests/e2e/hardening-06-supply-chain.test.js && node tests/managed-temp-dir.test.js && node tests/release-gate.test.js && node tests/version-bump-policy.test.js && node tests/r3-0c-governance.test.js && node tests/r3-0c-no-consumer.test.js && node tests/r3-0c-governance-integrity.test.js && node tests/r3-0-phase-governance.test.js && node tests/r3-0-phase-no-consumer.test.js && node tests/r3-0-phase-governance-integrity.test.js && node tests/r3-0-train.test.js && node tools/validate-against-telemetry.js --selftest",
-    "build:mac": "electron-builder --mac",
-    "build:win": "electron-builder --win",
-    "build:all": "electron-builder --mac --win"
+    "test": "node tests/verify-dynamics.js && node tests/telemetry-core.test.js && node tests/telemetry-view.test.js && node tests/telemetry-plot.test.js && node tests/telemetry-interact.test.js && node tests/telemetry-yaw.test.js && node tests/canonical-parameters.test.js && node tests/parameter-conversions.test.js && node tests/vehicle-profile-f312.test.js && node tests/setup-snapshot.test.js && node tests/analysis-case.test.js && node tests/analysis-case-adversarial.test.js && node tests/suspension-input-normalizer.test.js && node tests/suspension-input-equivalence.test.js && node tests/suspension-input-adversarial.test.js && node tests/canonical-model-input.test.js && node tests/analysis-execution.test.js && node tests/telemetry-observation.test.js && node tests/model-telemetry-comparison.test.js && node tests/race-engineer-insight.test.js && node tests/driver-coach-insight.test.js && node tests/analysis-workspace.test.js && node tests/analysis-workspace-viewmodel.test.js && node tests/analysis-workspace-integration.test.js && node tests/analysis-workspace-ui.test.js && node tests/telemetry-import-adapter.test.js && node tests/channel-mapping.test.js && node tests/calibration-registry.test.js && node tests/analysis-window.test.js && node tests/canonical-telemetry-session.test.js && node tests/analysis-case-export.test.js && node tests/r2.3-real-telemetry-integration.test.js && node tests/r2.3-import-ui.test.js && node tests/measured-metrics.test.js && node tests/r2.4-measured-metrics-integration.test.js && node tests/r2.4-ui.test.js && node tests/setup-ab.test.js && node tests/quantitative-setup-recommendation.test.js && node tests/r2.5-setup-ab-quantitative-integration.test.js && node tests/r2.5-ui.test.js && node tests/track-intelligence.test.js && node tests/r2.6-track-intelligence-integration.test.js && node tests/r2.6-ui.test.js && node tests/case-shell.test.js && node tests/r3.0a-ui.test.js && node tests/storage-backend.test.js && node tests/schema-migration.test.js && node tests/case-record-schema.test.js && node tests/case-store.test.js && node tests/session-store.test.js && node tests/case-library-viewmodel.test.js && node tests/r3.0b-ui.test.js && node tests/r3.0b-persistence-integration.test.js && node tests/feature-registry.test.js && node tests/feature-router.test.js && node tests/vehicle-preset-pipeline.test.js && node tests/i18n-parity.test.js && node tests/r3.0c-contract-foundation.test.js && node tests/r3-0c-comparison-adapter.test.js && node tests/r3-0c-lap-authority.test.js && node tests/r3-0c-track-identity.test.js && node tests/r3-0c-distance-authority.test.js && node tests/r3-0c-normalized-distance.test.js && node tests/r3-0c-reference-selection.test.js && node tests/r3-0c-corner-segmentation.test.js && node tests/r3-0c-corner-pairing.test.js && node tests/r3-0c-delta-metrics.test.js && node tests/r3-0c-comparison-export.test.js && node tests/r3-0c-comparison-workspace.test.js && node tests/r3-0c-contracts-bundle-equivalence.test.js && node tests/r3-0c-activation.test.js && node tests/r3.0d-contract-foundation.test.js && node tests/r3.0d-hardened-intrinsics.test.js && node tests/r3.0d-evidence-graph.test.js && node tests/r3.0d-hypothesis-engine.test.js && node tests/r3.0d-priority-engine.test.js && node tests/r3.0d-engineer-brief.test.js && node tests/r3.0d-engineer-viewmodel.test.js && node tests/r3-0d-contracts-bundle-equivalence.test.js && node tests/r3.0e-contract-foundation.test.js && node tests/r3.0e-stores.test.js && node tests/r3.0e-outcome-classifier.test.js && node tests/r3.0e-followup-timeline.test.js && node tests/r3.0e-experiment-viewmodel.test.js && node tests/r3.0f-migration-engine.test.js && node tests/e2e/flow-01-new-user.test.js && node tests/e2e/flow-02-real-telemetry.test.js && node tests/e2e/flow-03-measured.test.js && node tests/e2e/flow-04-reference-lap.test.js && node tests/e2e/flow-05-vre.test.js && node tests/e2e/flow-06-setup-experiment.test.js && node tests/e2e/flow-07-driver-experiment.test.js && node tests/e2e/flow-08-export-import.test.js && node tests/e2e/flow-09-electron-smoke.test.js && node tests/e2e/hardening-01-electron-boundary.test.js && node tests/e2e/hardening-02-storage-failure.test.js && node tests/e2e/hardening-03-no-stale-ui.test.js && node tests/e2e/hardening-04-large-library.test.js && node tests/e2e/hardening-05-xss-injection.test.js && node tests/e2e/hardening-06-supply-chain.test.js && node tests/managed-temp-dir.test.js && node tests/release-gate.test.js && node tests/version-bump-policy.test.js && node tests/supply-chain.test.js && node tests/r3-0c-governance.test.js && node tests/r3-0c-no-consumer.test.js && node tests/r3-0c-governance-integrity.test.js && node tests/r3-0-phase-governance.test.js && node tests/r3-0-phase-no-consumer.test.js && node tests/r3-0-phase-governance-integrity.test.js && node tests/r3-0-train.test.js && node tools/validate-against-telemetry.js --selftest",
+    "build:mac": "electron-builder --mac --arm64"
   },
   "build": {
     "appId": "com.racingsetup.analyzer",
@@ -28,32 +26,23 @@
       "renderer/**/*"
     ],
     "mac": {
-      "target": "dmg",
-      "category": "public.app-category.utilities"
-    },
-    "win": {
       "target": [
         {
-          "target": "nsis",
+          "target": "dmg",
           "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
+            "arm64"
           ]
         }
-      ]
-    },
-    "nsis": {
-      "oneClick": true,
-      "allowToChangeInstallationDirectory": false
+      ],
+      "category": "public.app-category.utilities"
     }
   },
   "devDependencies": {
-    "electron": "^33.0.0",
-    "electron-builder": "^25.0.0"
+    "electron": "33.4.11",
+    "electron-builder": "25.1.8"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
   }
 }

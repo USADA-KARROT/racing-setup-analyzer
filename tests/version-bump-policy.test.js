@@ -38,6 +38,9 @@ function runPolicy(version, env) {
     fs.mkdirSync(path.join(box, '.github', 'workflows'), { recursive: true });
     fs.copyFileSync(SCRIPT, path.join(box, 'scripts', 'check-version-policy.js'));
     fs.writeFileSync(path.join(box, 'package.json'), JSON.stringify({ name: 'fixture', version: version }) + '\n');
+    // H3: a tracked package-lock.json is now the required reproducible-build authority. Give the
+    // fixture a minimal lockfile so the VERSION logic (not the lockfile rule) is what's under test.
+    fs.writeFileSync(path.join(box, 'package-lock.json'), JSON.stringify({ name: 'fixture', version: version, lockfileVersion: 3, packages: { '': { name: 'fixture', version: version } } }) + '\n');
     fs.writeFileSync(path.join(box, '.github', 'workflows', 'ci.yml'), 'name: x\non:\n  push:\n');
     cp.execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm x', { cwd: box });
     const r = cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'check-version-policy.js')], {
@@ -103,6 +106,69 @@ function runPolicy(version, env) {
   chk('release_executed remains DISABLED at RELEASE_PREPARED', state.enabledCapabilities.indexOf('release_executed') === -1);
   const pkg = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
   chk('repo package.json carries exactly the bumped version 2.0.0', pkg.version === '2.0.0');
+})();
+
+// 7. H3 lockfile-required policy: an otherwise-valid version FAILS if the lockfile is absent,
+//    and a PR that DELETES the lockfile FAILS.
+(function () {
+  const box = H.acquireTempDir('f6-version-policy-nolock-');
+  try {
+    fs.mkdirSync(path.join(box, 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(box, '.github', 'workflows'), { recursive: true });
+    fs.copyFileSync(SCRIPT, path.join(box, 'scripts', 'check-version-policy.js'));
+    fs.writeFileSync(path.join(box, 'package.json'), JSON.stringify({ name: 'fixture', version: '2.0.0' }) + '\n');
+    fs.writeFileSync(path.join(box, '.github', 'workflows', 'ci.yml'), 'name: x\non:\n  push:\n');
+    cp.execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm x', { cwd: box });
+    const r = cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'check-version-policy.js')], {
+      cwd: box, encoding: 'utf8', env: Object.assign({}, process.env, { ARTIFACT_DIR: path.join(box, 'artifacts'), BASE_SHA: 'HEAD', HEAD_SHA: 'HEAD' }),
+    });
+    let art = null; try { art = JSON.parse(fs.readFileSync(path.join(box, 'artifacts', 'version-policy.json'), 'utf8')); } catch (_) {}
+    chk('H3: correct version but NO lockfile is REJECTED', r.status !== 0 && art && art.ok === false && art.lockfileTracked === false);
+  } finally { H.releaseTempDir(box); }
+})();
+
+// 8. H3 lockfile PR-DELETION: a PR that removes a previously-tracked lockfile is REJECTED even though
+//    HEAD still shows it as tracked at BASE. This exercises lockfileRemovedByPR (--diff-filter=D).
+(function () {
+  const box = H.acquireTempDir('f6-version-policy-del-');
+  try {
+    fs.mkdirSync(path.join(box, 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(box, '.github', 'workflows'), { recursive: true });
+    fs.copyFileSync(SCRIPT, path.join(box, 'scripts', 'check-version-policy.js'));
+    fs.writeFileSync(path.join(box, 'package.json'), JSON.stringify({ name: 'fixture', version: '2.0.0' }) + '\n');
+    fs.writeFileSync(path.join(box, 'package-lock.json'), JSON.stringify({ name: 'fixture', version: '2.0.0', lockfileVersion: 3, packages: { '': { name: 'fixture', version: '2.0.0' } } }) + '\n');
+    fs.writeFileSync(path.join(box, '.github', 'workflows', 'ci.yml'), 'name: x\non:\n  push:\n');
+    // BASE commit HAS the lockfile
+    cp.execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm base', { cwd: box });
+    const baseSha = cp.execSync('git rev-parse HEAD', { cwd: box, encoding: 'utf8' }).trim();
+    // HEAD commit REMOVES it
+    cp.execSync('git rm -q package-lock.json && git -c user.email=t@t -c user.name=t commit -qm remove-lock', { cwd: box });
+    const headSha = cp.execSync('git rev-parse HEAD', { cwd: box, encoding: 'utf8' }).trim();
+    const r = cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'check-version-policy.js')], {
+      cwd: box, encoding: 'utf8', env: Object.assign({}, process.env, { ARTIFACT_DIR: path.join(box, 'artifacts'), BASE_SHA: baseSha, HEAD_SHA: headSha }),
+    });
+    let art = null; try { art = JSON.parse(fs.readFileSync(path.join(box, 'artifacts', 'version-policy.json'), 'utf8')); } catch (_) {}
+    chk('H3: a PR that DELETES the lockfile is REJECTED (lockfileRemovedByPR)', r.status !== 0 && art && art.ok === false && art.lockfileRemovedByPR === true);
+  } finally { H.releaseTempDir(box); }
+})();
+
+// 9. H3 verification-lane existence: deleting ci.yml (the dependency-free lane) is REJECTED.
+(function () {
+  const box = H.acquireTempDir('f6-version-policy-nolane-');
+  try {
+    fs.mkdirSync(path.join(box, 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(box, '.github', 'workflows'), { recursive: true });
+    fs.copyFileSync(SCRIPT, path.join(box, 'scripts', 'check-version-policy.js'));
+    fs.writeFileSync(path.join(box, 'package.json'), JSON.stringify({ name: 'fixture', version: '2.0.0' }) + '\n');
+    fs.writeFileSync(path.join(box, 'package-lock.json'), JSON.stringify({ name: 'fixture', version: '2.0.0', lockfileVersion: 3, packages: { '': {} } }) + '\n');
+    // NO ci.yml — the verification lane is missing
+    cp.execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm x', { cwd: box });
+    const r = cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'check-version-policy.js')], {
+      cwd: box, encoding: 'utf8', env: Object.assign({}, process.env, { ARTIFACT_DIR: path.join(box, 'artifacts'), BASE_SHA: 'HEAD', HEAD_SHA: 'HEAD' }),
+    });
+    let art = null; try { art = JSON.parse(fs.readFileSync(path.join(box, 'artifacts', 'version-policy.json'), 'utf8')); } catch (_) {}
+    chk('H3: missing ci.yml verification lane is REJECTED', r.status !== 0 && art && art.ok === false && art.verificationLaneExists === false);
+  } finally { H.releaseTempDir(box); }
 })();
 
 console.log('version-bump-policy: ' + passed + ' passed, ' + failed + ' failed');

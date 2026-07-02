@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "note": "H3 reproducible-build environment record. The macOS DMG evidence in the H-phase governance was produced under the environment below. `npm ci` against the tracked package-lock.json reproduces the exact dependency tree regardless of host; the toolchain versions here pin the build host itself. Distribution target is Apple Silicon (arm64) only for the v2.0.x public release.",
+  "toolchain": {
+    "node": ">=22.0.0 (engines pin); build host recorded at H3: v25.5.0",
+    "npm": ">=10.0.0 (engines pin); build host recorded at H3: 11.8.0",
+    "electron": "33.4.11 (exact pin in devDependencies + package-lock.json)",
+    "electronBuilder": "25.1.8 (exact pin in devDependencies + package-lock.json)",
+    "os": "macOS 26.5.1 arm64"
+  },
+  "installMode": "npm ci (clean install from package-lock.json; lockfileVersion 3)",
+  "buildCommand": "npm ci && npm run build:mac (resolves to `electron-builder --mac --arm64`)",
+  "distributionTargets": ["mac-arm64 (dmg)"],
+  "platformSupport": {
+    "arm64": true,
+    "x64": false,
+    "universal": false,
+    "note": "The v2.0.x public release ships Apple Silicon (arm64) only. Intel/universal are NOT built and must not be implied."
+  },
+  "reproducibilityBounds": "Deterministic to the pinned lockfile + exact electron/electron-builder versions. Electron downloads a prebuilt runtime keyed to its exact version. Not bit-for-bit reproducible across differing OS/codesign identities (signing is applied in H6), but the input closure is fully pinned."
+}
