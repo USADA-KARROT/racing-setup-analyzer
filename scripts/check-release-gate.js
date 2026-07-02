@@ -355,7 +355,7 @@ const CONDITIONS = [
   {
     id: 12,
     key: 'tagPolicy',
-    name: 'Tag policy — version pinned at the authorized value (check-version-policy EXPECTED), lockfile untracked, workflows install-free',
+    name: 'Tag policy — version pinned at the authorized value (check-version-policy EXPECTED), lockfile TRACKED (H3 reproducible-build authority), verification lane install-free',
     run(io) {
       const r = _corroborate(io, io.delegate('scripts/check-version-policy.js'), 'version-policy.json');
       return { ok: r.ok, detail: r.detail };

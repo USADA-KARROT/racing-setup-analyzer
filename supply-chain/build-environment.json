@@ -9,7 +9,7 @@
     "os": "macOS 26.5.1 arm64"
   },
   "installMode": "npm ci (clean install from package-lock.json; lockfileVersion 3)",
-  "buildCommand": "npm ci && npm run build:mac",
+  "buildCommand": "npm ci && npm run build:mac (resolves to `electron-builder --mac --arm64`)",
   "distributionTargets": ["mac-arm64 (dmg)"],
   "platformSupport": {
     "arm64": true,

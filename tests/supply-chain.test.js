@@ -174,5 +174,31 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2) + '\n'
   } finally { H.releaseTempDir(box); }
 })();
 
+// j) build config declares a Windows target (violates arm64-macOS-only)
+(function () {
+  const box = sandbox();
+  try {
+    cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'generate-sbom.js')], { cwd: box, encoding: 'utf8' });
+    const pk = JSON.parse(fs.readFileSync(path.join(box, 'package.json'), 'utf8'));
+    pk.build = pk.build || {}; pk.build.win = { target: 'nsis' };
+    writeJson(path.join(box, 'package.json'), pk);
+    const r = runIn(box);
+    chk('FAIL build.win present (arm64 macOS-only)', r.status !== 0 && r.art && r.art.problems.some(p => /build\.win must be absent/.test(p)));
+  } finally { H.releaseTempDir(box); }
+})();
+
+// k) build:mac not targeting arm64
+(function () {
+  const box = sandbox();
+  try {
+    cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'generate-sbom.js')], { cwd: box, encoding: 'utf8' });
+    const pk = JSON.parse(fs.readFileSync(path.join(box, 'package.json'), 'utf8'));
+    pk.scripts['build:mac'] = 'electron-builder --mac'; delete pk.build.mac.target;
+    writeJson(path.join(box, 'package.json'), pk);
+    const r = runIn(box);
+    chk('FAIL build:mac not arm64-explicit', r.status !== 0 && r.art && r.art.problems.some(p => /must explicitly target arm64/.test(p)));
+  } finally { H.releaseTempDir(box); }
+})();
+
 console.log('supply-chain: ' + passed + ' passed, ' + failed + ' failed');
 if (failed) process.exit(1);

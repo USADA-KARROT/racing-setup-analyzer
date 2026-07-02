@@ -135,6 +135,23 @@ function run() {
     if (!buildEnv.platformSupport || buildEnv.platformSupport.arm64 !== true || buildEnv.platformSupport.x64 !== false || buildEnv.platformSupport.universal !== false) fail('build-environment.platformSupport must be arm64-only (arm64:true, x64:false, universal:false)');
   }
 
+  // 9. build config must MATCH the arm64-only claim: the mac build script targets --arm64 (or
+  //    build.mac.arch pins arm64), and NO Windows/Intel/universal build target is declared.
+  const scripts = pkg.scripts || {};
+  const buildScripts = Object.keys(scripts).filter(k => k.startsWith('build'));
+  const macScriptArm64 = typeof scripts['build:mac'] === 'string' && /--arm64/.test(scripts['build:mac']);
+  // arch may be pinned inside a build.mac.target object ({target, arch:["arm64"]}).
+  const macTargets = pkg.build && pkg.build.mac && Array.isArray(pkg.build.mac.target) ? pkg.build.mac.target : null;
+  const macConfigArm64 = !!(macTargets && macTargets.length && macTargets.every(t => t && Array.isArray(t.arch) && t.arch.length === 1 && t.arch[0] === 'arm64'));
+  const macConfigForeignArch = !!(macTargets && macTargets.some(t => t && Array.isArray(t.arch) && t.arch.some(a => a !== 'arm64')));
+  if (!(macScriptArm64 || macConfigArm64)) fail('build:mac must explicitly target arm64 (script --arm64 or build.mac.target[].arch=["arm64"])');
+  if (macConfigForeignArch) fail('build.mac target arch must be arm64-only');
+  for (const bs of buildScripts) {
+    const v = scripts[bs] || '';
+    if (/--win|--x64|--ia32|--universal/.test(v)) fail('build script ' + bs + ' declares a non-arm64/non-mac target: ' + v);
+  }
+  if (pkg.build && pkg.build.win) fail('package.json build.win must be absent (arm64 macOS-only public release)');
+
   return { check: 'supply-chain', ok: problems.length === 0, problems, npmComponentCount: lock ? Object.keys(lock.packages || {}).length - 1 : null, vendorCount: vendor ? (vendor.libraries || []).length : null };
 }
 

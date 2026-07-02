@@ -52,12 +52,13 @@
     "electronBuilder": "25.1.8",
     "enginesNode": ">=22.0.0",
     "enginesNpm": ">=10.0.0",
-    "npmCi": "reproduces 416 npm packages; verified locally + in supply-chain-build lane"
+    "npmCi": "reproduces 416 npm packages; verified locally + in supply-chain-build lane",
+    "buildTarget": "electron-builder --mac --arm64; build.mac.target=[{dmg,arch:[arm64]}]; Windows targets removed (arm64 macOS-only)"
   },
   "checks": {
     "checkSupplyChain": "scripts/check-supply-chain.js (--selftest + real): lockfile v3 + root match, exact devDep pins vs lockfile, engines, vendor hash drift, vendor coverage, npm+vendor license allowlist (permissive-only, no copyleft), SBOM freshness, notices coverage, arm64-only build env",
     "generateSbom": "scripts/generate-sbom.js (deterministic; --check drift guard)",
-    "tests": "tests/supply-chain.test.js 14/14 (9 fail-closed sandbox cases: missing lockfile, range devDep, vendor hash drift, copyleft license, uncovered vendor file, stale SBOM, missing notices, wrong lockfileVersion, missing engines); version-bump-policy 18/18 (added H3 lockfile-required + real PR-deletion + missing-verification-lane cases)",
+    "tests": "tests/supply-chain.test.js 16/16 (11 fail-closed sandbox cases: missing lockfile, range devDep, vendor hash drift, copyleft license, uncovered vendor file, stale SBOM, missing notices, wrong lockfileVersion, missing engines); version-bump-policy 18/18 (added H3 lockfile-required + real PR-deletion + missing-verification-lane cases) (added arm64 build-config cases)",
     "ci": "ci.yml F2 step (dependency-free static supply-chain) + NEW .github/workflows/supply-chain-build.yml (npm ci reproducibility + post-install supply-chain governance)"
   },
   "licenseAudit": {
