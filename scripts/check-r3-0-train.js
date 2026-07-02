@@ -246,8 +246,8 @@ function run() {
         // publishForwardFields member) and must corroborate draft/published exactly
         if (gr && gr.state == null) fail('R3F_RELEASE_STATE_FIELD_MISSING', 'githubRelease is recorded but has no state field — the DRAFT/PUBLISHED state advance is mandatory evidence and may not be omitted', { phase });
         const stateFieldOk = !!(gr && (
-          (gr.state === 'DRAFT' && gr.draft === true && gr.published === false) ||
-          (gr.state === 'PUBLISHED' && gr.draft === false && gr.published === true)));
+          (gr.state === 'DRAFT' && gr.draft === true && gr.published === false && gr.publishedAt === null) ||
+          (gr.state === 'PUBLISHED' && gr.draft === false && gr.published === true && isIsoTs(gr.publishedAt))));
         if (gr && gr.state != null && !stateFieldOk) fail('R3F_RELEASE_STATE_FIELD_MISMATCH', 'githubRelease.state contradicts draft/published flags (state=' + gr.state + ', draft=' + gr.draft + ', published=' + gr.published + ')', { phase, state: gr.state, draft: gr.draft, published: gr.published });
         const published = !!(gr && gr.draft === false && gr.published === true && isIsoTs(gr.publishedAt) && stateFieldOk);
         // fail-closed on the stage machinery itself: the schema list, the checkpoint stage,

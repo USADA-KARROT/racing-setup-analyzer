@@ -642,6 +642,13 @@ function mutateF6(fn) {
   const r2 = mutateF6((m) => { m.releaseRecord.githubRelease.published = null; });
   chk('FAIL DRAFT record with published=null', hasViolation(r2.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH'));
 }
+// mirror-28 (MIRROR-R7-01): a DRAFT record carrying publishedAt evidence is contradictory
+{
+  const r = mutateF6((m) => { m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z'; });
+  chk('FAIL DRAFT record with an ISO publishedAt', hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH'));
+  const r2 = mutateF6((m) => { m.releaseRecord.githubRelease.publishedAt = ''; });
+  chk('FAIL DRAFT record with empty-string publishedAt', hasViolation(r2.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH'));
+}
 
 H.cleanupAll();
 console.log('r3-0-train: ' + pass + ' passed, ' + fail + ' failed');
