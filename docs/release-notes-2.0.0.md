@@ -80,13 +80,26 @@ cannot control OS-level backups or other local processes. Full statement:
 
 ## Known limitations (2.0.0)
 
-1. **Pane wiring is partial.** The Comparisons pane is live and usable. The Engineer
+1. **[UPDATED in the v2.0.x public-release hardening line — H5.]** Pane delivery truth:
+   the **Comparisons pane is LIVE** and the **Engineer Brief is LIVE** (the hardening line
+   wired the existing render-only D5 UI to case-subview navigation — packaged E2E verifies
+   reveal/render/hide). **Experiment Loop and Case Timeline are DEFERRED**: filtered from
+   public navigation, not loaded by the page, and their modules are excluded from the
+   packaged app; their services/contracts remain source-governed under Node tests. The
+   paragraph below describes the 2.0.0 tag/draft snapshot, which predates H5:
+   **Pane wiring is partial.** The Comparisons pane is live and usable. The Engineer
    Brief, Experiment Loop, and Case Timeline **nav nodes** are live in navigation, but
    their pane content is not wired into `renderer/index.html` (the D5 Engineer Brief
    mount ships hidden/inert; the page loads no R3.0E viewmodel script). The underlying
    services and contracts ship, run under Node-level tests, and are documented, but a
    user cannot open those panes in 2.0.0.
-2. **Packaged-but-not-loaded modules.** 15 files under `renderer/js/` ship inside the
+2. **[RESOLVED in the v2.0.x public-release hardening line — H5.]** The 15 inert modules
+   below are now EXCLUDED from the packaged app (`build.files` exclusions; asar-listing
+   verified) — nothing packaged-but-never-loaded ships anymore. Sources remain in the
+   repository as the test/equivalence baseline, per the UI truth matrix
+   (`governance/hardening/h5-ui-truth-matrix.json`). The paragraph below describes the
+   2.0.0 tag/draft snapshot:
+   **Packaged-but-not-loaded modules.** 15 files under `renderer/js/` ship inside the
    package but are never loaded by the page (the R3.0E module family, the R3.0C
    authority-pipeline modules superseded by the bundled contracts, the F1 migration
    engine, `vehicle-profile-f312.js`, `i18n-r3-0e.js`). They are inert in the packaged
