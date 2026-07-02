@@ -39,21 +39,21 @@
   },
   "evidence": {
     "packagedClean": {
-      "result": "11/11 PASS",
+      "result": "12/12 PASS",
       "log": "h1-run-clean.txt",
-      "sha256": "c6cdffc332dce190e30ba3ce94c98704abc838de78a9400fc385f34febefc545"
+      "sha256": "7172d9ca2d8b447906b654a1178c490879292b90e315efefbf03a1f696de33b8"
     },
     "packagedExisting": {
-      "result": "11/11 PASS",
+      "result": "12/12 PASS",
       "log": "h1-run-existing.txt",
-      "sha256": "8308699ec0aecd87410b4cd80bc5578fb03487157bea8270b88b399b4350c511"
+      "sha256": "95649ffe24f67dfe14470d2174edae2ebe29dd80a463befa33960bf801f643cb"
     },
     "devConsistency": {
-      "result": "11/11 PASS",
+      "result": "12/12 PASS",
       "log": "h1-run-dev.txt",
-      "sha256": "5365c18e08e432efabbf03d4dbb54acd4afa42dce605ab5bcedff0acdeb85411"
+      "sha256": "ba87f365c719b9418f8c85fa8e9afcd28b4f63fd0c624ab84dbf4133a556fec2"
     },
-    "harness": "tests/packaged/h1-packaged-runtime.mjs (REAL binary over CDP; local evidence tooling — requires a build, so not in the install-free npm-test chain); target-ownership guards: free-port precheck, child-death abort, end-of-run liveness assertion; per-run pid-derived port",
+    "harness": "tests/packaged/h1-packaged-runtime.mjs (REAL binary over CDP; local evidence tooling — requires a build, so not in the install-free npm-test chain); target-ownership guards: free-port precheck, child-death abort, lsof PID-binding descendant-aware ownership proof (post-discovery + end-of-run), liveness assertion; per-run pid-derived port",
     "profileIsolation": "real userData moved aside before clean phase and restored after (macOS Electron ignores $HOME); smoke profile removed",
     "packagedAsarChecks": "getAppVersion present; app:get-version present; pre-H1 require('./package.json').version crash pattern ABSENT"
   },

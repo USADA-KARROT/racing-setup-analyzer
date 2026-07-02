@@ -286,6 +286,38 @@ try {
   chk('preload.js has NO \\u / \\x escape sequences anywhere (raw)', !/\\u|\\x/i.test(preloadRaw));
   chk('preload.js is pure ASCII (no homoglyph identifiers)', !/[^\x00-\x7F]/.test(preloadRaw));
   chk('preload.js has NO globalThis/window/eval/Function escape token', !/\b(globalThis|window|eval|Function)\b/.test(preloadSrc));
+  // H1-R5-01 closure: CLOSED-WORLD identifier allowlist. Blacklisting authority
+  // tokens can never enumerate every sandbox global (Buffer, atob, TextDecoder,
+  // fetch, ...). Instead: strip string literals, extract EVERY identifier, and
+  // require the whole set to be inside the explicit allowlist of what preload.js
+  // legitimately uses. Any new global -- Buffer included -- fails closed.
+  (function closedWorldIdentifierAudit() {
+    var KEYWORDS = ['const','let','var','function','return','if','else','new','typeof','throw','true','false','null','undefined'];
+    var ALLOWED = [
+      // module surface
+      'contextBridge','ipcRenderer','require','process','electron',
+      // our declarations
+      'APP_VERSION_CHANNEL','APP_VERSION_TIMEOUT_MS','getAppVersion','SEMVER',
+      // members/locals actually used
+      'exposeInMainWorld','platform','invoke','race','then','catch','test','warn','message',
+      'Promise','setTimeout','Error','console','resolve','reject','v','err',
+    ];
+    var noStrings = preloadSrc
+      .replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g, '""')
+      .replace(/\/(?:[^\/\\\n]|\\.)+\/[a-z]*/g, '0'); // regex literals (preload has no division)
+    var ids = noStrings.match(/\b[A-Za-z_$][\w$]*\b/g) || [];
+    var outside = [];
+    for (var ii = 0; ii < ids.length; ii++) {
+      if (KEYWORDS.indexOf(ids[ii]) === -1 && ALLOWED.indexOf(ids[ii]) === -1 && outside.indexOf(ids[ii]) === -1) outside.push(ids[ii]);
+    }
+    chk('preload.js identifier set is CLOSED-WORLD (no identifier outside the allowlist)', outside.length === 0, { outside: outside });
+    // Self-test: the round-5 Buffer-decoding attack shape must be caught.
+    var attack = noStrings + ' var fake = Buffer.from(x).toString();';
+    var atkIds = attack.match(/\b[A-Za-z_$][\w$]*\b/g) || [];
+    var caught = false;
+    for (var ai2 = 0; ai2 < atkIds.length; ai2++) if (KEYWORDS.indexOf(atkIds[ai2]) === -1 && ALLOWED.indexOf(atkIds[ai2]) === -1) { caught = true; break; }
+    chk('SELF-TEST: Buffer-decoding shape is outside the closed world', caught);
+  })();
   // Self-tests: every known smuggling shape MUST leave a residue.
   (function adversarialSelfTests() {
     var shapes = [

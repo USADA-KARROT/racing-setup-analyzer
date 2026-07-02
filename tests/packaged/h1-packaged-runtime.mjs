@@ -18,7 +18,7 @@
 // Usage:
 //   node tests/packaged/h1-packaged-runtime.mjs <binaryPath> <expectedVersion> [label]
 // Exit code 0 = all checks passed; 1 = failures; 2 = fatal (boot/CDP failure).
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 
 const [bin, expectedVersion, label = 'packaged'] = process.argv.slice(2);
 if (!bin || !expectedVersion) {
@@ -86,8 +86,41 @@ function chk(name, ok, extra) {
   console.log((ok ? '  ✓ ' : '  ✗ ') + `[${label}] ` + name + (extra !== undefined && !ok ? ' :: ' + JSON.stringify(extra) : ''));
 }
 
+// TARGET-OWNERSHIP GUARD (2.5/3): OS-level binding proof. lsof reports the PID
+// that actually LISTENS on the port; it must be OUR child (closes the
+// check-to-bind race: even if a foreign process grabbed the port after the
+// precheck, its PID would not match and we refuse to attach).
+// A binding PID is OURS iff it is the spawned child or one of its descendants
+// (launcher wrappers like node_modules/.bin/electron re-spawn the real binary).
+// A foreign process can never be a descendant of our child.
+function isOurs(pid) {
+  let cur = pid;
+  for (let hop = 0; hop < 10; hop++) {
+    if (cur === child.pid) return true;
+    let ppid;
+    try { ppid = Number(execSync(`ps -o ppid= -p ${cur}`, { encoding: 'utf8', timeout: 3000 }).trim()); }
+    catch (_) { return false; }
+    if (!ppid || ppid <= 1) return false;
+    cur = ppid;
+  }
+  return false;
+}
+function assertPortOwnedByChild(stage) {
+  let pids = [];
+  try {
+    pids = execSync(`lsof -t -iTCP:${PORT} -sTCP:LISTEN`, { encoding: 'utf8', timeout: 5000 })
+      .trim().split('\n').filter(Boolean).map(Number);
+  } catch (e) {
+    throw new Error(`lsof ownership check failed at ${stage}: ` + e.message);
+  }
+  if (!(pids.length >= 1 && pids.every(isOurs))) {
+    throw new Error(`CDP port ${PORT} is bound by PID(s) ${JSON.stringify(pids)} at ${stage}, none/not-all descendants of our child ${child.pid} -- foreign target, refusing`);
+  }
+}
+
 try {
   const page = await cdpPage();
+  assertPortOwnedByChild('post-CDP-discovery');
   ws = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
   ws.onmessage = (ev) => {
@@ -123,8 +156,12 @@ try {
     leaks === JSON.stringify({ ipcRenderer: 'undefined', require: 'undefined', processObj: 'undefined', electronAPIinvoke: 'undefined' }), leaks);
 
   // TARGET-OWNERSHIP GUARD (3/3): the child we spawned must STILL be alive at the
-  // end of the assertions — if it died mid-run, the page we evaluated was foreign.
+  // end of the assertions — if it died mid-run, the page we evaluated was foreign —
+  // and the port must STILL be bound by our child's PID (re-checked via lsof).
   chk('spawned binary is still alive (CDP target ownership)', childExit === null, childExit);
+  let endOwnership = true;
+  try { assertPortOwnedByChild('end-of-run'); } catch (e) { endOwnership = false; }
+  chk('port still bound by OUR child PID at end-of-run (lsof)', endOwnership);
 
   const failed = results.filter((r) => !r.ok).length;
   console.log(`H1-RUNTIME(${label}): ${results.length - failed} passed, ${failed} failed`);
