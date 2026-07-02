@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0F",
+  "checkpoint": "F6_RELEASE",
+  "releaseStage": "RELEASE_PREPARED",
+  "baseSha": "0711e74a5583b65c1d7426aa9e61f143fe23a773",
+  "headSha": null,
+  "previousCheckpoint": "F5_RELEASE_GATE",
+  "shaSeparation": "baseSha = the R3.0 Train merge commit on main (PR #16). headSha is stamped at the F6 release-candidate SHA that Codex reviews.",
+  "authorizedPaths": [
+    {
+      "path": "renderer/js/r3-0f-migration-engine.js",
+      "capability": "migration_engine_present"
+    },
+    {
+      "path": "tests/e2e/helpers/flow-harness.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-01-new-user.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-02-real-telemetry.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-03-measured.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-04-reference-lap.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-05-vre.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-06-setup-experiment.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-07-driver-experiment.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-08-export-import.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-09-electron-smoke.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/hardening-01-electron-boundary.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-02-storage-failure.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-03-no-stale-ui.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-04-large-library.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-05-xss-injection.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-06-supply-chain.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "docs/r3-architecture.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-user-workflow.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-data-and-privacy.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-credibility-model.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-experiment-loop.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "capability": "documentation_present"
+    },
+    "docs/release-notes-2.0.0.md",
+    "package.json"
+  ],
+  "newlyAuthorizedPaths": [
+    "package.json"
+  ],
+  "newlyEnabledCapabilities": [],
+  "enabledCapabilitiesBefore": [
+    "governance_bootstrap_present",
+    "migration_engine_present",
+    "e2e_automation_present",
+    "quality_hardening_present",
+    "documentation_present",
+    "release_gate_present"
+  ],
+  "enabledCapabilitiesAfter": [
+    "governance_bootstrap_present",
+    "migration_engine_present",
+    "e2e_automation_present",
+    "quality_hardening_present",
+    "documentation_present",
+    "release_gate_present"
+  ],
+  "forbiddenCapabilities": [],
+  "contractEnforcements": {
+    "versionBump": "Exactly one package.json version change: 1.4.0 -> 2.0.0, on the release branch only. scripts/check-version-policy.js EXPECTED moves to 2.0.0 (the post-bump pin); the VERSION_BUMP_ALLOW escape hatch remains for any future authorized bump. No dependency bump, no lockfile generated, no tag created by any script.",
+    "releaseExecutedBoundary": "release_executed remains DISABLED at RELEASE_PREPARED. It may only become true on a post-release governance update AFTER: F6 PR merged + new main CI PASS + v2.0.0 annotated tag pushed + GitHub Release decision executed — each under separate explicit user authorization.",
+    "tagPolicy": "Annotated tag v2.0.0, pointing at the post-F6-merge main SHA (never the release-branch or PR-head SHA), created only AFTER merge + new main CI PASS + explicit authorization. No lightweight tag, no tag move, no force push.",
+    "documentsFinalized": "docs/release-notes-2.0.0.md: DRAFT -> RELEASE CANDIDATE (publication-pending language; no 'released/available/download' claims). CHANGELOG: [Unreleased] 2.0.0-candidate section finalized to [2.0.0] Release Candidate. README tri-lingual version lines -> 2.0.0 release candidate. CITATION.cff version synced; its legacy 'license: MIT' field removed (contradicted package.json UNLICENSED; adopting a license remains an explicit product decision).",
+    "gateHookSync": "check-release-gate.js conditions 10/11/12 hooks updated in lockstep with the finalized documents (RELEASE CANDIDATE status accepted, finalized CHANGELOG heading accepted, tag-policy name references the authoritative EXPECTED pin) — all still fail-closed on missing declarations.",
+    "parallelWorkExclusion": "The R2.4-era credibility-rung cleanup (task_dc6ebc74) is a separate in-progress workstream with no branch/PR/CI at F6 time. It is NOT included, NOT cherry-picked, and NOT assumed merged; disclosed in the release notes.",
+    "noProductionCodeChange": "Zero renderer/contracts behavioral change. The only frozen-manifest file changed since origin/main remains renderer/js/feature-registry.js (C8-authorized, comment-only at final review). The frozen R3.0B case-record schema is NOT modified."
+  },
+  "tests": {
+    "command": "npm test",
+    "newSuitesForThisCheckpoint": [
+      "tests/version-bump-policy.test.js"
+    ],
+    "newSuiteAssertionsTotal": 15,
+    "evidenceTier": "TIER 3 — Claude-verified on the F6 branch; CI re-run on the candidate SHA is the authority.",
+    "note": "version-bump-policy regression tests: fail-closed without allow, exact-allow-only, no re-bump, no rollback, no tag creation by version scripts, release_executed not auto-enabled."
+  },
+  "buildEvidence": null,
+  "smokeEvidence": null,
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": null,
+  "packageVersion": "2.0.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "crossPhaseGate": {
+    "r3eCheckpoint": "E5_ACTIVATION",
+    "requiredFor": "F6_RELEASE",
+    "satisfied": true,
+    "note": "F1..F5 complete and merged; Train merged to main at 0711e74a with post-merge CI PASS (run 28560701177) and clean-worktree local verification (110 files / 10,790 assertions / gate 12/12 / evidence hashes matched)."
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "releaseRecord": {
+    "tag": null,
+    "tagTarget": null,
+    "githubRelease": null,
+    "dmgUploaded": null,
+    "note": "Intentionally empty at RELEASE_PREPARED: no tag, no GitHub Release, no DMG distribution exists. Populated only by the post-release governance update after separate explicit authorizations."
+  },
+  "note": "R3.0F F6_RELEASE checkpoint at the RELEASE_PREPARED stage: version bump staged, documents finalized to release-candidate status, release_executed still disabled, tag/Release/deployment absent. main remains at the Train merge commit 0711e74a until the F6 PR is merged under AUTHORIZATION A.",
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": [
+      "case_comparison",
+      "reference_lap",
+      "corner_delta",
+      "engineer_brief",
+      "experiment_loop",
+      "case_timeline"
+    ],
+    "expectedRendererAdapter": false,
+    "note": "F4 does NOT touch the feature registry. R3.0C/D/E activations remain in their state."
+  }
+}

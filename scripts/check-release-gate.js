@@ -324,7 +324,9 @@ const CONDITIONS = [
       if (!fs.existsSync(p)) return { ok: false, detail: { error: 'docs/release-notes-2.0.0.md does not exist' } };
       const text = fs.readFileSync(p, 'utf8');
       const required = [
-        ['draft status', /Status:\s*DRAFT/i],
+        // F6 stage: notes graduate from DRAFT to RELEASE CANDIDATE — still fail-closed
+        // on a missing/unknown status declaration.
+        ['draft/release-candidate status', /Status:\s*(DRAFT|RELEASE CANDIDATE)/i],
         ['unsigned/unnotarized disclosure', /not code-signed and not notarized/i],
         ['upgrade guidance', /^## Upgrade guidance/m],
         ['backup/rollback guidance', /^## Backup and rollback guidance/m],
@@ -345,15 +347,15 @@ const CONDITIONS = [
       const text = fs.readFileSync(p, 'utf8');
       const problems = [];
       if (!/^# Changelog/m.test(text)) problems.push('missing top-level "# Changelog" heading');
-      if (!/^## \[Unreleased\] — 2\.0\.0 candidate/m.test(text)) problems.push('missing "## [Unreleased] — 2.0.0 candidate" section');
-      if (!/pinned at 1\.4\.0/i.test(text)) problems.push('missing the pinned-at-1.4.0 statement');
+      if (!/^## \[(Unreleased\] — 2\.0\.0 candidate|2\.0\.0\] — Release Candidate)/m.test(text)) problems.push('missing the 2.0.0 candidate/Release-Candidate section heading');
+      if (!/pinned at .?1\.4\.0/i.test(text)) problems.push('missing the pinned-at-1.4.0 history statement');
       return { ok: problems.length === 0, detail: { problems: problems } };
     },
   },
   {
     id: 12,
     key: 'tagPolicy',
-    name: 'Tag policy — version pinned at 1.4.0, lockfile untracked, workflows install-free',
+    name: 'Tag policy — version pinned at the authorized value (check-version-policy EXPECTED), lockfile untracked, workflows install-free',
     run(io) {
       const r = _corroborate(io, io.delegate('scripts/check-version-policy.js'), 'version-policy.json');
       return { ok: r.ok, detail: r.detail };

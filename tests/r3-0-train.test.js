@@ -68,7 +68,9 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
   const r = runValidator(null);
   chk('PASS real repo rc=0', r.status === 0, { violations: r.artifact && r.artifact.violations });
   chk('PASS artifact ok=true', r.artifact && r.artifact.ok === true);
-  chk('PASS trainStatus=IN_PROGRESS', r.artifact && r.artifact.trainStatus === 'IN_PROGRESS');
+  // F6: the Train PR (#16) is merged to main (0711e74a) — MERGED is the correct terminal
+  // status per train.schema.json trainStatusValues; IN_PROGRESS would now be stale.
+  chk('PASS trainStatus=MERGED', r.artifact && r.artifact.trainStatus === 'MERGED');
   chk('PASS currentPhase is a valid R3.0 phase', r.artifact && ['R3.0C', 'R3.0D', 'R3.0E', 'R3.0F'].indexOf(r.artifact.currentPhase) !== -1);
   chk('PASS targetVersion=2.0.0', r.artifact && r.artifact.targetVersion === '2.0.0');
   chk('PASS targetTag=v2.0.0', r.artifact && r.artifact.targetTag === 'v2.0.0');

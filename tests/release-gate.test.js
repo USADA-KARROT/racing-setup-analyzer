@@ -185,7 +185,7 @@ const GREEN_ARTIFACTS = {
 // 10: a draft missing a required section fails (probe against a temp copy via regex logic)
 (function () {
   const text = fs.readFileSync(path.join(__dirname, '..', 'docs', 'release-notes-2.0.0.md'), 'utf8');
-  chk('releaseNotes: draft declares DRAFT status', /Status:\s*DRAFT/i.test(text));
+  chk('releaseNotes: declares DRAFT or RELEASE CANDIDATE status', /Status:\s*(DRAFT|RELEASE CANDIDATE)/i.test(text));
   chk('releaseNotes: draft discloses unsigned+unnotarized', /not code-signed and not notarized/i.test(text));
   chk('releaseNotes: draft has release-boundary section', /^## Release boundary/m.test(text));
 })();

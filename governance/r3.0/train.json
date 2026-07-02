@@ -8,7 +8,7 @@
     "R3.0F"
   ],
   "currentPhase": "R3.0F",
-  "currentPhaseCheckpoint": "F5_RELEASE_GATE",
+  "currentPhaseCheckpoint": "F6_RELEASE",
   "phaseStates": {
     "R3.0C": {
       "governanceDir": "governance/r3.0c",
@@ -33,13 +33,13 @@
     },
     "R3.0F": {
       "governanceDir": "governance/r3.0f",
-      "currentCheckpoint": "F5_RELEASE_GATE",
+      "currentCheckpoint": "F6_RELEASE",
       "finalActivationCheckpoint": "F6_RELEASE",
       "started": true,
-      "finalActivationReached": false
+      "finalActivationReached": true
     }
   },
-  "trainStatus": "IN_PROGRESS",
+  "trainStatus": "MERGED",
   "trainStartSha": "1103336e0a87156eeda013a1162c5271b46f3253",
   "targetVersion": "2.0.0",
   "targetTag": "v2.0.0",
@@ -63,5 +63,5 @@
       "extendR3bCaseRecordSchema": false
     }
   },
-  "note": "R3.0 Integrated Delivery Train state. IN_PROGRESS means SKYLINE has authorized the feature train; feat/r3.0-integrated-delivery has been opened from main at the G1 head SHA. No production code is added by this commit and no capability is enabled — opening the branch is the only state change. Per-phase currentCheckpoint advances under separately-authorized Train checkpoints (C1..C8, D1..D5, E1..E5, F1..F5). Final merge happens once at R3.0F F6_RELEASE; v2.0.0 tag + GitHub Release are created post-merge after the new main trusted-verification PASS. trainStatus then becomes MERGED."
+  "note": "R3.0 Integrated Delivery Train state. MERGED: the Train PR (#16) merged to main at commit 0711e74a5583b65c1d7426aa9e61f143fe23a773 with post-merge trusted-verification PASS (run 28560701177). R3.0F is at F6_RELEASE in the RELEASE_PREPARED stage: the single 1.4.0 -> 2.0.0 version bump is staged on the F6 release branch. The v2.0.0 tag and the GitHub Release are created only AFTER the F6 PR merge + new main CI PASS, each under separate explicit authorization; release_executed remains disabled until then."
 }

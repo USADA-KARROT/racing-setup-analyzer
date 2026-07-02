@@ -1,11 +1,12 @@
-# Release Notes — 2.0.0 (DRAFT)
+# Release Notes — 2.0.0 (Release Candidate)
 
-> **Status: DRAFT.** This document is the release-notes draft required by the R3.0F
-> F5_RELEASE_GATE checkpoint (condition 10 of the 12-condition release gate,
-> `governance/r3.0f/capabilities.json` → `release_gate_present`). The release itself —
-> the single `package.json` version bump 1.4.0 → 2.0.0, the Train merge to `main`, the
-> `v2.0.0` tag, and the GitHub Release — happens only at **F6_RELEASE**, after explicit
-> user authorization. Nothing in this document implies any of those steps has occurred.
+> **Status: RELEASE CANDIDATE — prepared for v2.0.0; publication pending explicit
+> authorization.** The R3.0 Integrated Delivery Train has been merged to `main`
+> (merge commit `0711e74a`) and the single authorized `package.json` version bump
+> 1.4.0 → 2.0.0 is staged on the F6 release branch. The `v2.0.0` tag, the GitHub
+> Release, and any binary distribution have **NOT** been created — each requires its
+> own explicit user authorization. Nothing in this document implies the release has
+> been published.
 
 ## What 2.0.0 is
 
@@ -117,9 +118,18 @@ cannot control OS-level backups or other local processes. Full statement:
    replacement; outputs are advisory, in physical units, with explicit credibility and
    limitations metadata (see `docs/r3-credibility-model.md`).
 
-## Release boundary (what F5 explicitly does NOT do)
+## Release boundary (current state at the F6 release-candidate stage)
 
-- No `package.json` version change (stays 1.4.0 until F6).
-- No merge of the Train PR to `main`.
-- No git tag, no GitHub Release, no deployment.
-- No code signing, no notarization.
+- DONE: Train PR #16 merged to `main` (merge commit `0711e74a`); the single authorized
+  version bump 1.4.0 → 2.0.0 is staged on the F6 release branch.
+- NOT DONE (each requires separate explicit authorization): `v2.0.0` git tag, GitHub
+  Release, DMG upload/binary distribution, deployment.
+- No code signing, no notarization (no signing identity or notary credentials exist;
+  see "Installation status" above).
+- Parallel known follow-up, NOT part of 2.0.0: the R2.4-era credibility-rung string
+  cleanup (three pre-Train files carrying `'Measured (kinematic, confounded)'` as a
+  rung value) is in progress in a separate workstream — see "Known limitations" item 5;
+  it must not be assumed merged.
+- License note: `package.json` declares `UNLICENSED` (no LICENSE file exists);
+  a legacy `license: MIT` field in `CITATION.cff` contradicted this and was removed
+  at the F6 stage — adopting an actual license remains an explicit product decision.

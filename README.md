@@ -28,9 +28,9 @@ Grounded in textbook vehicle dynamics (Milliken, Gillespie, OptimumG) and cross-
 | R3.0C | Reference lap & corner-delta intelligence (same-case, same-session, cross-lap comparison; explicit user-selected reference only) | ✅ complete — Comparisons pane live |
 | R3.0D | Race-engineer decision engine (evidence graph → hypothesis → priority → advisory Engineer Brief; no runtime LLM, no causation, no driver blame) | ✅ complete — services shipped; Brief pane not yet wired into the page (nav node live, mount inert) |
 | R3.0E | Experiment-outcome loop (experiment / outcome / follow-up link / append-only timeline stores + contracts) | ✅ complete — services shipped; Experiment Loop / Case Timeline panes not yet wired into the page (nav nodes live) |
-| R3.0F | Migration engine, E2E flows, hardening probes, documentation, release gate | ✅ complete through F5_RELEASE_GATE (F6 release pending) |
+| R3.0F | Migration engine, E2E flows, hardening probes, documentation, release gate | ✅ complete; Train merged to `main`; v2.0.0 release candidate staged (tag/Release pending authorization) |
 
-Version 1.4.0 (2.0.0 staged for the R3.0 Train release at F6). The Comparisons pane is live and usable; the Engineer Brief / Experiment Loop / Case Timeline panes are the documented remaining wire-in work (see `docs/release-notes-2.0.0.md`, "Known limitations").
+Version 2.0.0 (release candidate — the v2.0.0 tag and GitHub Release are pending explicit authorization). The Comparisons pane is live and usable; the Engineer Brief / Experiment Loop / Case Timeline panes are the documented remaining wire-in work (see `docs/release-notes-2.0.0.md`, "Known limitations").
 
 ## What it can do
 
@@ -130,7 +130,7 @@ npm test
 - **R3.0C** — reference lap & corner-delta intelligence: a normalized track-position axis, per-corner + entry/mid/exit deltas, with a hard comparability gate. *Shipped; the Comparisons pane is live in the app.*
 - **R3.0D** — a deterministic, evidence-backed virtual race-engineer decision engine (primary issue + alternatives + a verifiable next experiment; never a free-text LLM conclusion). *Services shipped; the Brief pane is not yet wired into the page (nav node live, mount inert).*
 - **R3.0E** — a recommendation experiment & outcome loop (expected vs observed; local evidence history only). *Services and stores shipped; the Experiment Loop / Case Timeline panes are not yet wired into the page (nav nodes live).*
-- **R3.0F** — product hardening, schema migration, documentation and the release gate. *Complete through F5_RELEASE_GATE; the F6 release (version bump to 2.0.0, Train merge, tag) is pending explicit authorization.*
+- **R3.0F** — product hardening, schema migration, documentation and the release gate. *Complete; the Train is merged to `main` and the 2.0.0 version bump is staged; the v2.0.0 tag and GitHub Release remain pending explicit authorization.*
 
 Anything not yet wired is never presented in the app as if it already works — unwired panes stay behind inert mounts or nav-only nodes (see `docs/release-notes-2.0.0.md`, "Known limitations").
 
@@ -181,9 +181,9 @@ MIT-spirit personal/educational project — contributions and corrections welcom
 | R3.0C | 參考圈與逐彎差異情報（同案例、同 session、跨圈比較；參考圈僅限使用者明確選取） | ✅ 完成 — Comparisons 面板已上線 |
 | R3.0D | 賽車工程師決策引擎（證據圖 → 假設 → 優先序 → 諮詢性 Engineer Brief；無執行期 LLM、不下因果結論、不歸咎車手） | ✅ 完成 — 服務已出貨；Brief 面板尚未接進頁面（導覽節點已上線、掛載點為隱藏待接線） |
 | R3.0E | 實驗-結果迴圈（實驗／結果／後續連結／僅追加時間軸的儲存層與契約） | ✅ 完成 — 服務已出貨；Experiment Loop / Case Timeline 面板尚未接進頁面（導覽節點已上線） |
-| R3.0F | 遷移引擎、E2E 流程、硬化探針、文件、發佈閘門 | ✅ 完成至 F5_RELEASE_GATE（F6 發佈待授權） |
+| R3.0F | 遷移引擎、E2E 流程、硬化探針、文件、發佈閘門 | ✅ 完成；Train 已合併進 `main`；v2.0.0 release candidate 已就緒（tag/Release 待授權） |
 
-版本 1.4.0（2.0.0 已排定於 R3.0 Train 的 F6 發佈）。Comparisons 面板已上線可用；Engineer Brief / Experiment Loop / Case Timeline 面板為已記載的待接線工作（見 `docs/release-notes-2.0.0.md` 的 Known limitations）。
+版本 2.0.0（release candidate —— v2.0.0 tag 與 GitHub Release 待明確授權後發佈）。Comparisons 面板已上線可用；Engineer Brief / Experiment Loop / Case Timeline 面板為已記載的待接線工作（見 `docs/release-notes-2.0.0.md` 的 Known limitations）。
 
 ### 它能做什麼
 
@@ -283,7 +283,7 @@ npm test
 - **R3.0C** — 參考圈與逐彎差異情報：正規化賽道位置軸、逐彎＋入彎／彎中／出彎差異，含嚴格的可比較性閘門。*已出貨；Comparisons 面板已在 app 內上線。*
 - **R3.0D** — 確定性、以證據為本的虛擬賽車工程師決策引擎（主要問題＋替代解釋＋可驗證的下一步實驗；絕非自由文字 LLM 結論）。*服務已出貨；Brief 面板尚未接進頁面（導覽節點已上線、掛載點為隱藏待接線）。*
 - **R3.0E** — 建議實驗與結果迴圈（預期 vs 觀測；僅累積本機證據歷史）。*服務與儲存層已出貨；Experiment Loop / Case Timeline 面板尚未接進頁面（導覽節點已上線）。*
-- **R3.0F** — 產品硬化、schema 遷移、文件與發佈閘門。*已完成至 F5_RELEASE_GATE；F6 發佈（版本升 2.0.0、Train 合併、tag）待明確授權。*
+- **R3.0F** — 產品硬化、schema 遷移、文件與發佈閘門。*已完成；Train 已合併進 `main`、2.0.0 版本升級已就緒；v2.0.0 tag 與 GitHub Release 仍待明確授權。*
 
 尚未接線的功能絕不會在 app 內被呈現成已可運作——未接線面板一律停留在隱藏掛載點或僅導覽節點（見 `docs/release-notes-2.0.0.md` 的 Known limitations）。
 
@@ -334,9 +334,9 @@ MIT 精神的個人／教育專案——歡迎貢獻與指正。在台灣打造�
 | R3.0C | リファレンスラップとコーナーデルタ解析（同一ケース・同一 session 内のラップ間比較；リファレンスはユーザー明示選択のみ） | ✅ 完了 — Comparisons パネル稼働中 |
 | R3.0D | レースエンジニア意思決定エンジン（エビデンスグラフ → 仮説 → 優先度 → 助言型 Engineer Brief；実行時 LLM なし・因果断定なし・ドライバー非難なし） | ✅ 完了 — サービス出荷済み；Brief パネルは未配線（ナビノードは稼働、マウントは不活性） |
 | R3.0E | 実験-結果ループ（実験／結果／フォローアップリンク／追記専用タイムラインのストアと契約） | ✅ 完了 — サービス出荷済み；Experiment Loop / Case Timeline パネルは未配線（ナビノードは稼働） |
-| R3.0F | マイグレーションエンジン、E2E フロー、ハードニングプローブ、ドキュメント、リリースゲート | ✅ F5_RELEASE_GATE まで完了（F6 リリースは承認待ち） |
+| R3.0F | マイグレーションエンジン、E2E フロー、ハードニングプローブ、ドキュメント、リリースゲート | ✅ 完了；Train は `main` にマージ済み；v2.0.0 release candidate 準備完了（タグ/Release は承認待ち） |
 
-バージョン 1.4.0（2.0.0 は R3.0 Train の F6 リリースで予定）。Comparisons パネルは稼働中；Engineer Brief / Experiment Loop / Case Timeline パネルは文書化済みの残配線作業（`docs/release-notes-2.0.0.md` の Known limitations 参照）。
+バージョン 2.0.0（release candidate —— v2.0.0 タグと GitHub Release は明示承認待ち）。Comparisons パネルは稼働中；Engineer Brief / Experiment Loop / Case Timeline パネルは文書化済みの残配線作業（`docs/release-notes-2.0.0.md` の Known limitations 参照）。
 
 ### できること
 
@@ -436,7 +436,7 @@ npm test
 - **R3.0C** — リファレンスラップとコーナーデルタ解析：正規化コース位置軸、コーナーごと＋進入／旋回中／立ち上がりのデルタ、厳格な比較可能性ゲート付き。*出荷済み；Comparisons パネルはアプリ内で稼働中。*
 - **R3.0D** — 決定的で証拠に基づく仮想レースエンジニア意思決定エンジン（主要課題＋代替説明＋検証可能な次の実験；自由文の LLM 結論ではない）。*サービス出荷済み；Brief パネルは未配線（ナビノードは稼働、マウントは不活性）。*
 - **R3.0E** — 推奨の実験・結果ループ（期待 vs 観測；ローカル証拠履歴のみ）。*サービスとストアは出荷済み；Experiment Loop / Case Timeline パネルは未配線（ナビノードは稼働）。*
-- **R3.0F** — プロダクトのハードニング、スキーマ移行、ドキュメント、リリースゲート。*F5_RELEASE_GATE まで完了；F6 リリース（2.0.0 へのバンプ、Train マージ、タグ）は明示承認待ち。*
+- **R3.0F** — プロダクトのハードニング、スキーマ移行、ドキュメント、リリースゲート。*完了；Train は `main` にマージ済みで 2.0.0 バンプは準備完了；v2.0.0 タグと GitHub Release は明示承認待ち。*
 
 未配線の機能がアプリ内で動作済みのように提示されることはない——未配線パネルは不活性マウントまたはナビ専用ノードに留まる（`docs/release-notes-2.0.0.md` の Known limitations 参照）。
 
