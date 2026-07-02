@@ -15,12 +15,15 @@ never approximated.
 
 ---
 
-## [Unreleased] — 2.0.0 candidate
+## [2.0.0] — Release Candidate (publication pending explicit authorization)
 
-The R3.0 Integrated Delivery Train (A through F) ships as a single release candidate.
-`package.json` remains pinned at `1.4.0` until the separately-authorized `F6_RELEASE`
-checkpoint performs the single bump (the F5 release gate has PASSED — 12/12 conditions —
-but by design performs no bump itself); the post-merge target is `2.0.0`.
+The R3.0 Integrated Delivery Train (A through F) ships as a single release. The Train
+PR (#16) is **merged to `main`** (merge commit `0711e74a`) and the single authorized
+`F6_RELEASE` version bump 1.4.0 → 2.0.0 is staged on the F6 release branch (the F5
+release gate PASSED 12/12 before the merge; `package.json` had remained pinned at
+`1.4.0` until this bump). The `v2.0.0` tag and the GitHub Release have **not** been
+created — each requires its own explicit authorization; nothing in this section implies
+the release has been published.
 
 ### Frozen invariants carried into the 2.0.0 candidate
 
@@ -40,8 +43,11 @@ but by design performs no bump itself); the post-merge target is `2.0.0`.
 - Electron host `webPreferences` explicitly sets exactly three keys — `preload`,
   `contextIsolation: true`, `nodeIntegration: false`; no safety-relevant key (`sandbox`,
   `webSecurity`, etc.) is ever explicitly weakened, so Electron's own defaults apply to
-  everything else. The preload bridge exposes exactly `{ platform, version }` on
-  `window.electronAPI` — nothing else.
+  everything else. The preload bridge is DESIGNED to expose exactly `{ platform,
+  version }` on `window.electronAPI` — nothing else; in the packaged app the preload
+  currently fails to load (a pre-existing v1.0.0 defect — the sandboxed preload cannot
+  `require('./package.json')`), so even this surface is not exposed at runtime. See
+  release notes Known limitations item 10.
 - **Comparison is same-case + same-session only.** Cross-case comparison and cross-session
   comparison within a single case are both **permanently forbidden** at every layer
   (authority, view model, export, decision engine, experiment loop).

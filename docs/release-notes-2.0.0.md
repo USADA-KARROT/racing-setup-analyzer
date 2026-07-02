@@ -1,17 +1,18 @@
-# Release Notes — 2.0.0 (DRAFT)
+# Release Notes — 2.0.0 (Release Candidate)
 
-> **Status: DRAFT.** This document is the release-notes draft required by the R3.0F
-> F5_RELEASE_GATE checkpoint (condition 10 of the 12-condition release gate,
-> `governance/r3.0f/capabilities.json` → `release_gate_present`). The release itself —
-> the single `package.json` version bump 1.4.0 → 2.0.0, the Train merge to `main`, the
-> `v2.0.0` tag, and the GitHub Release — happens only at **F6_RELEASE**, after explicit
-> user authorization. Nothing in this document implies any of those steps has occurred.
+> **Status: RELEASE CANDIDATE — prepared for v2.0.0; publication pending explicit
+> authorization.** The R3.0 Integrated Delivery Train has been merged to `main`
+> (merge commit `0711e74a`) and the single authorized `package.json` version bump
+> 1.4.0 → 2.0.0 is staged on the F6 release branch. The `v2.0.0` tag, the GitHub
+> Release, and any binary distribution have **NOT** been created — each requires its
+> own explicit user authorization. Nothing in this document implies the release has
+> been published.
 
 ## What 2.0.0 is
 
 2.0.0 is the R3.0 Integrated Delivery Train: everything from R3.0A through R3.0F merged
 as one release on top of the 1.4.0 baseline. The authoritative per-milestone record is
-[CHANGELOG.md](../CHANGELOG.md) (its `[Unreleased] — 2.0.0 candidate` section is the
+[CHANGELOG.md](../CHANGELOG.md) (its `[2.0.0] — Release Candidate` section is the
 canonical summary and is intentionally not duplicated here).
 
 Highlights, briefly:
@@ -116,10 +117,27 @@ cannot control OS-level backups or other local processes. Full statement:
 9. **No professional validation.** The product is not a professional race-engineer
    replacement; outputs are advisory, in physical units, with explicit credibility and
    limitations metadata (see `docs/r3-credibility-model.md`).
+10. **Preload `electronAPI` surface is not functional (pre-existing since v1.0.0).**
+   `preload.js` calls `require('./package.json')`, which Electron's default-sandboxed
+   preload cannot resolve — the preload script fails to load and `window.electronAPI`
+   (`{platform, version}`) is never exposed in the packaged app. The renderer's
+   `typeof`-guard fallback masks this (the in-app version string falls back to
+   `'1.0.0'`); no other functionality depends on the preload surface. Confirmed by the
+   F6 packaged smoke; this is NOT an F6/2.0.0 regression (present since the initial
+   commit) and the fix is deferred as a production change outside the 2.0.0 release
+   scope. `docs/r3-data-and-privacy.md` describes the *intended* preload surface.
 
-## Release boundary (what F5 explicitly does NOT do)
+## Release boundary (current state at the F6 release-candidate stage)
 
-- No `package.json` version change (stays 1.4.0 until F6).
-- No merge of the Train PR to `main`.
-- No git tag, no GitHub Release, no deployment.
-- No code signing, no notarization.
+- DONE: Train PR #16 merged to `main` (merge commit `0711e74a`); the single authorized
+  version bump 1.4.0 → 2.0.0 is staged on the F6 release branch.
+- NOT DONE (each requires separate explicit authorization): `v2.0.0` git tag, GitHub
+  Release, DMG upload/binary distribution, deployment.
+- No code signing, no notarization (no signing identity or notary credentials exist;
+  see "Installation status" above).
+- Parallel known follow-up, NOT part of 2.0.0: the R2.4-era credibility-rung string
+  cleanup (three pre-Train files carrying `'Measured (kinematic, confounded)'` as a
+  rung value) is in progress in a separate workstream; it must not be assumed merged.
+- License note: `package.json` declares `UNLICENSED` (no LICENSE file exists);
+  a legacy `license: MIT` field in `CITATION.cff` contradicted this and was removed
+  at the F6 stage — adopting an actual license remains an explicit product decision.

@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 1,
+  "program": "R3.0F",
+  "checkpoint": "F6_RELEASE",
+  "releaseStage": "RELEASE_PREPARED",
+  "baseSha": "0711e74a5583b65c1d7426aa9e61f143fe23a773",
+  "headSha": "2bec6752a765541d03dc9f5967242e1e780aa116",
+  "previousCheckpoint": "F5_RELEASE_GATE",
+  "shaSeparation": "baseSha = the R3.0 Train merge commit on main (PR #16). headSha is stamped at the F6 release-candidate SHA that Codex reviews.",
+  "authorizedPaths": [
+    {
+      "path": "renderer/js/r3-0f-migration-engine.js",
+      "capability": "migration_engine_present"
+    },
+    {
+      "path": "tests/e2e/helpers/flow-harness.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-01-new-user.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-02-real-telemetry.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-03-measured.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-04-reference-lap.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-05-vre.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-06-setup-experiment.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-07-driver-experiment.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-08-export-import.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-09-electron-smoke.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/hardening-01-electron-boundary.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-02-storage-failure.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-03-no-stale-ui.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-04-large-library.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-05-xss-injection.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-06-supply-chain.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "docs/r3-architecture.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-user-workflow.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-data-and-privacy.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-credibility-model.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-experiment-loop.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "capability": "documentation_present"
+    },
+    "docs/release-notes-2.0.0.md",
+    "package.json"
+  ],
+  "newlyAuthorizedPaths": [
+    "package.json"
+  ],
+  "newlyEnabledCapabilities": [],
+  "enabledCapabilitiesBefore": [
+    "governance_bootstrap_present",
+    "migration_engine_present",
+    "e2e_automation_present",
+    "quality_hardening_present",
+    "documentation_present",
+    "release_gate_present"
+  ],
+  "enabledCapabilitiesAfter": [
+    "governance_bootstrap_present",
+    "migration_engine_present",
+    "e2e_automation_present",
+    "quality_hardening_present",
+    "documentation_present",
+    "release_gate_present"
+  ],
+  "forbiddenCapabilities": [],
+  "contractEnforcements": {
+    "versionBump": "package.json changes are exactly TWO, both authorized: (1) the single version bump 1.4.0 -> 2.0.0; (2) the test-script wiring of the new regression suite tests/version-bump-policy.test.js into the serial npm-test chain (required by the F6 regression-test mandate; tests/ is an authorized area). No dependency change, no lockfile generated, no build-config change, no tag created by any script. scripts/check-version-policy.js EXPECTED moves to 2.0.0 (the post-bump pin); the VERSION_BUMP_ALLOW escape hatch remains for any future authorized bump.",
+    "releaseExecutedBoundary": "release_executed remains DISABLED at RELEASE_PREPARED. It may only become true on a post-release governance update AFTER: F6 PR merged + new main CI PASS + v2.0.0 annotated tag pushed + GitHub Release decision executed — each under separate explicit user authorization.",
+    "tagPolicy": "Annotated tag v2.0.0, pointing at the post-F6-merge main SHA (never the release-branch or PR-head SHA), created only AFTER merge + new main CI PASS + explicit authorization. No lightweight tag, no tag move, no force push.",
+    "documentsFinalized": "docs/release-notes-2.0.0.md: DRAFT -> RELEASE CANDIDATE (publication-pending language; no 'released/available/download' claims). CHANGELOG: [Unreleased] 2.0.0-candidate section finalized to [2.0.0] Release Candidate. README tri-lingual version lines -> 2.0.0 release candidate. CITATION.cff version synced; its legacy 'license: MIT' field removed (contradicted package.json UNLICENSED; adopting a license remains an explicit product decision).",
+    "gateHookSync": "check-release-gate.js conditions 10/11/12 LOCKED to the finalized document forms (condition 10 accepts only 'Status: RELEASE CANDIDATE' — a DRAFT reversion fails; condition 11 accepts only the finalized '[2.0.0] — Release Candidate' heading; condition 12's name references the authoritative EXPECTED pin). The gate is branch-local (not in the install-free CI), so locking to F6-finalized forms is safe and fail-closed.",
+    "parallelWorkExclusion": "The R2.4-era credibility-rung cleanup (task_dc6ebc74) is a separate in-progress workstream with no branch/PR/CI at F6 time. It is NOT included, NOT cherry-picked, and NOT assumed merged; disclosed in the release notes.",
+    "noProductionCodeChange": "Zero renderer/contracts behavioral change. The only frozen-manifest file changed since origin/main remains renderer/js/feature-registry.js (C8-authorized, comment-only at final review). The frozen R3.0B case-record schema is NOT modified."
+  },
+  "tests": {
+    "command": "npm test",
+    "newSuitesForThisCheckpoint": [
+      "tests/version-bump-policy.test.js"
+    ],
+    "newSuiteAssertionsTotal": 15,
+    "evidenceTier": "TIER 3 — Claude-verified on the F6 branch; CI re-run on the candidate SHA is the authority.",
+    "note": "version-bump-policy regression tests: fail-closed without allow, exact-allow-only, no re-bump, no rollback, no tag creation by version scripts, release_executed not auto-enabled."
+  },
+  "buildEvidence": {
+    "artifact": "build/Racing Setup Analyzer-2.0.0-arm64.dmg (untracked; local evidence only, no DMG is distributed at RELEASE_PREPARED)",
+    "dmgBytes": 99418469,
+    "dmgSha256": "1c824db85926b5b79845fb514a1b27a52964d8d2cdc002355bdbb12641e2189e",
+    "environment": {
+      "node": "v25.5.0",
+      "npm": "11.8.0",
+      "os": "macOS 26.5.1 arm64",
+      "electronBuilder": "25.1.8",
+      "cleanInstall": "fresh npm install in the isolated F6 worktree (no lockfile, semver-resolved per documented policy)"
+    },
+    "warnings": [
+      "default Electron icon (no custom icon declared — disclosed)",
+      "skipped macOS code signing (0 identities — disclosed; no notarization)"
+    ],
+    "packageAudit": {
+      "asarPackageVersion": "2.0.0",
+      "secretScan": "PASS — no keys/tokens/credentials/private paths in the asar contents",
+      "contents": "app.asar carries main.js/preload.js/renderer/** + package.json only; 15 packaged-but-not-loaded renderer modules disclosed in release notes"
+    }
+  },
+  "smokeEvidence": {
+    "method": "REAL packaged binary launched with --remote-debugging-port; renderer-level assertions over CDP (Node built-in WebSocket); production CaseStore over real IndexedDB",
+    "isolationNote": "macOS Electron ignores a $HOME override for userData (always ~/Library/Application Support/racing-setup-analyzer). Isolation was achieved EXTERNALLY: the real profile was moved aside before the clean phase and restored afterward; smoke-created data was fully removed (verified).",
+    "bootSmoke": "PASS — page target, packaged index.html, document.title, shell nav, Comparisons pane node, D5 Engineer Brief mount present AND still hidden/inert, zero missing dynamic i18n codes",
+    "cleanInstallSmoke": "PASS 10/10 — on a freshly created profile, production CaseStore.create over real IndexedDB persisted a schema-v1 record (SEEDED case reopened with matching metadata)",
+    "upgradeSmoke": "PARTIAL (disclosed) — relaunch on the same profile: seeded case SURVIVED restart, exactly one record (no duplication), schemaVersion 1 read back unchanged via the per-read migration path. PARTIAL because the fixture was seeded by the 2.0.0 binary itself (same frozen schema v1), not by a real 1.4.0-binary-produced userData; future-schema fail-closed behavior is covered by Node-level suites (case-store CANNOT_OVERWRITE_FUTURE + migration tests), not by this smoke.",
+    "findings": [
+      "PRE-EXISTING DEFECT (since the v1.0.0 initial commit, NOT an F6 regression): Electron's default-sandboxed preload cannot require('./package.json'); the preload script fails to load ('Unable to load preload script' + 'module not found: ./package.json'), so window.electronAPI is NEVER exposed in the packaged app; the renderer's typeof-guard fallback masks it (version string falls back to '1.0.0'). Confirmed in all smoke runs; disclosed in release notes Known limitations; fix deferred (production change outside the F6 authorized scope).",
+      "One STORAGE_UNAVAILABLE incident during smoke development was environmental (LevelDB profile lock from an earlier debug instance / world-writable temp profile attempt), not an app defect: reproduced clean on a fresh profile with 10/10 + 11/11 passes."
+    ]
+  },
+  "workflowRunId": null,
+  "artifactId": null,
+  "artifactBoundSha": null,
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 3,
+    "reviewedCandidateSha": "2bec6752a765541d03dc9f5967242e1e780aa116",
+    "verdictEvidenceFile": "governance/r3.0f/codex-checkpoint-evidence/F6/round-3-2bec675-PASS.raw.txt",
+    "verdictEvidenceSha256": "15aadb043d308f056091d9294f80c0b76701cc4045af67ea01cce7f51a2020b7",
+    "totalBlockRounds": 2,
+    "totalDistinctFindings": 4,
+    "rounds": [
+      {
+        "round": 1,
+        "reviewedSha": "24decc20c012fbfbfbad580a74410ba1f561b458",
+        "verdict": "BLOCK",
+        "findings": 3,
+        "closures": [
+          "F6-R1-01 package.json change-count claims corrected (version bump + authorized test-script wiring)",
+          "F6-R1-02 release-gate conditions 10/11 locked to finalized-only document forms (test synced)",
+          "F6-R1-03 stale release-notes references fixed (finalized CHANGELOG heading; wrong item-5 pointer removed)"
+        ],
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6/round-1-24decc2-BLOCK.raw.txt",
+        "evidenceSha256": "0966945358df545ac38b0dd0e4f6c400a896de2125cb0dc5a1614054063b1301"
+      },
+      {
+        "round": 2,
+        "reviewedSha": "37fcdb871e58d06b62f2afdc7b7131fef7856590",
+        "verdict": "BLOCK",
+        "findings": 1,
+        "closures": [
+          "F6-R2-01 README License/contributing sections (en/zh-TW/ja) said 'MIT-spirit' contradicting UNLICENSED — all three languages corrected to UNLICENSED/all-rights-reserved with the license decision explicitly deferred"
+        ],
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6/round-2-37fcdb8-BLOCK.raw.txt",
+        "evidenceSha256": "664af4c07a27b8c82b4af118323434508d42b4fd7346e54e423c0a4b88a0a805"
+      },
+      {
+        "round": 3,
+        "reviewedSha": "2bec6752a765541d03dc9f5967242e1e780aa116",
+        "verdict": "PASS",
+        "findings": 0,
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6/round-3-2bec675-PASS.raw.txt",
+        "evidenceSha256": "15aadb043d308f056091d9294f80c0b76701cc4045af67ea01cce7f51a2020b7"
+      }
+    ],
+    "tierDisclosure": "TIER 1 for all 3 rounds (raw stdout archived + sha256-anchored; prompts archived alongside). One round-3 launch attempt stalled pre-review (codex waited on a never-EOF stdin; zero review output; process killed, snapshot archived as round-3-STALLED-ATTEMPT-not-counted.raw.txt) — NOT counted as a round per the external-blocker rule; the counted round 3 ran with stdin explicitly closed."
+  },
+  "packageVersion": "2.0.0",
+  "createdAt": null,
+  "status": "pending",
+  "governanceChanged": true,
+  "crossPhaseGate": {
+    "r3eCheckpoint": "E5_ACTIVATION",
+    "requiredFor": "F6_RELEASE",
+    "satisfied": true,
+    "note": "F1..F5 complete and merged; Train merged to main at 0711e74a with post-merge CI PASS (run 28560701177) and clean-worktree local verification (110 files / 10,790 assertions / gate 12/12 / evidence hashes matched)."
+  },
+  "r3bCaseRecordSchemaUntouched": true,
+  "releaseRecord": {
+    "tag": null,
+    "tagTarget": null,
+    "githubRelease": null,
+    "dmgUploaded": null,
+    "note": "Intentionally empty at RELEASE_PREPARED: no tag, no GitHub Release, no DMG distribution exists. Populated only by the post-release governance update after separate explicit authorizations."
+  },
+  "note": "R3.0F F6_RELEASE checkpoint at the RELEASE_PREPARED stage: version bump staged, documents finalized to release-candidate status, release_executed still disabled, tag/Release/deployment absent. main remains at the Train merge commit 0711e74a until the F6 PR is merged under AUTHORIZATION A.",
+  "frozenDiff": null,
+  "productionDiff": null,
+  "runtimeConsumerCount": null,
+  "featureRegistryState": {
+    "expectedDeferredIds": [],
+    "expectedRendererAdapter": false,
+    "note": "F6 does NOT touch the feature registry. Actual registry state carried into 2.0.0: case_comparison/reference_lap/corner_delta activated at C8_ACTIVATION (Comparisons pane live); engineer_brief/experiment_loop/case_timeline are nav-live with 'available_conditional' data-gates but their pane content is not wired into renderer/index.html (nav nodes only — disclosed in release notes Known limitations item 1)."
+  }
+}

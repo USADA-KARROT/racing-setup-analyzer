@@ -137,7 +137,12 @@ R30C_IDS.forEach(function (id) {
   ['R3.0F'].forEach(function (p) {
     const s = train.phaseStates && train.phaseStates[p];
     chk('train.phaseStates.' + p + '.started is boolean', s && (s.started === true || s.started === false));
-    chk('train.phaseStates.' + p + '.finalActivationReached=false', s && s.finalActivationReached === false);
+    // Pre-F6 this had to be false (no premature final activation before C8). At F6_RELEASE
+    // the flag legitimately flips true — but ONLY together with currentCheckpoint=F6_RELEASE,
+    // so the anti-skip property this assertion has always protected stays intact.
+    chk('train.phaseStates.' + p + '.finalActivationReached consistent with its checkpoint',
+      s && (s.finalActivationReached === false
+        || (s.finalActivationReached === true && s.currentCheckpoint === 'F6_RELEASE')));
   });
   // R3.0E is started; after E5_ACTIVATION the finalActivationReached flag may be
   // either false (in-progress) or true (R3.0E phase complete). Both are valid Train

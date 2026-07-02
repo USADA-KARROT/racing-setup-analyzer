@@ -3,7 +3,8 @@
 /**
  * R3-GATE0 — package + version policy check (dependency-free lane).
  *
- * package.json version must remain 1.4.0 (unless VERSION_BUMP_ALLOW=<x.y.z>). The lockfile must stay
+ * package.json version must remain 2.0.0 — the F6_RELEASE pin after the single authorized
+ * 1.4.0 -> 2.0.0 bump (unless VERSION_BUMP_ALLOW=<x.y.z> stages a future authorized bump). The lockfile must stay
  * untracked and must not be introduced by this PR. The CI workflow must contain no package-manager
  * install, Electron build, or lifecycle invocation — R3-GATE0 must not quietly change the project's
  * existing dependency governance. CI never publishes / tags / releases (no release step exists).
@@ -17,7 +18,7 @@ const cp = require('child_process');
 
 const REPO = path.resolve(__dirname, '..');
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR ? path.resolve(process.env.ARTIFACT_DIR) : path.join(REPO, 'artifacts');
-const EXPECTED = '1.4.0';
+const EXPECTED = '2.0.0';
 
 function git(args) {
   const r = cp.spawnSync('git', args, { cwd: REPO, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });

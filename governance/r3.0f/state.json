@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "program": "R3.0F",
-  "currentCheckpoint": "F5_RELEASE_GATE",
+  "currentCheckpoint": "F6_RELEASE",
   "authorizedProductionPaths": [
     {
       "path": "renderer/js/r3-0f-migration-engine.js",
@@ -98,6 +98,10 @@
     {
       "path": "docs/release-notes-2.0.0.md",
       "capability": "release_gate_present"
+    },
+    {
+      "path": "package.json",
+      "capability": "release_gate_present"
     }
   ],
   "enabledCapabilities": [
@@ -110,7 +114,7 @@
   ],
   "runtimeConsumersAllowed": true,
   "uiAllowed": true,
-  "featureRegistryActivationAllowed": false,
+  "featureRegistryActivationAllowed": true,
   "algorithmsAllowed": true,
-  "note": "R3.0F F5_RELEASE_GATE state. F5 enables release_gate_present by shipping the 12-condition fail-closed release gate (scripts/check-release-gate.js: preflight, tests, E2E, frozen 0, preset 501, i18n parity, reachability, no orphans, Electron build readiness, release notes drafted, CHANGELOG, tag policy) plus the docs/release-notes-2.0.0.md draft. The gate has PASSED 12/12. Release boundary: the single 1.4.0 -> 2.0.0 version bump, the Train merge to main, tag v2.0.0 and the GitHub Release all belong to the separately-authorized F6_RELEASE checkpoint; release_executed remains disabled and featureRegistryActivationAllowed remains false until then. The frozen R3.0B case-record schema is NOT modified by any F checkpoint."
+  "note": "R3.0F F6_RELEASE state — RELEASE_PREPARED posture. The Train PR (#16) is merged to main (merge commit 0711e74a) and the single authorized package.json version bump 1.4.0 -> 2.0.0 is staged on the F6 release branch (package.json is authorized under release_gate_present for exactly this bump). featureRegistryActivationAllowed flips true at its F6_RELEASE floor; R3.0F introduces no case-scoped pane of its own, so this has no UI effect. release_executed remains DISABLED: it may only become true on the post-release state mirror AFTER the v2.0.0 tag and the GitHub Release are created under separate explicit authorization and the new main CI passes. The frozen R3.0B case-record schema is NOT modified."
 }
