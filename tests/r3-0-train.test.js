@@ -389,6 +389,267 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
   chk('FAIL invalid trainStatus', hasViolation(r.artifact, 'TRAIN_STATUS_INVALID'));
 }
 
+// ── 24. F6 release-mirror consistency (semantic ruling: release_executed = PUBLISHED only) ──
+// Fixture helpers: mutate the F6 checkpoint / R3.0F state copies and expect the exact violation.
+function f6Path(dir) { return path.join(dir, 'governance', 'r3.0f', 'checkpoints', 'F6.json'); }
+function f6State(dir) { return path.join(dir, 'governance', 'r3.0f', 'state.json'); }
+function mutateF6(fn) {
+  const dir = buildFixture();
+  const m = readJson(f6Path(dir));
+  const st = readJson(f6State(dir));
+  fn(m, st);
+  writeJson(f6Path(dir), m); writeJson(f6State(dir), st);
+  return runValidator(dir);
+}
+
+// mirror-1: tag recorded, no published Release, capability flipped on -> FAIL
+{
+  const r = mutateF6((m, st) => { st.enabledCapabilities.push('release_executed'); });
+  chk('FAIL release_executed capability with tag+draft only', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
+// mirror-2: record flag releaseExecuted=true while Release is still a draft -> FAIL (both codes)
+{
+  const r = mutateF6((m) => { m.releaseRecord.releaseExecuted = true; });
+  chk('FAIL releaseExecuted record flag on draft Release', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_ON_DRAFT') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
+// mirror-3: a genuinely published Release allows release_executed. The edit set below is
+// EXACTLY schema releaseStages.publishForwardFields — the exhaustive forward-only publish
+// mirror (stage, state, draft, published, publishedAt, record flag, capability); no other
+// recorded evidence (tag SHAs, release id, mainMergeSha) is touched.
+{
+  const r = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+  });
+  chk('PASS-path: published Release permits release_executed (no mirror violations)', !hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH') && !hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_ON_DRAFT') && !hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH') && !hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH'));
+}
+// mirror-4: dmgUploaded=true with empty assets -> FAIL
+{
+  const r = mutateF6((m) => { m.releaseRecord.dmgUploaded = true; });
+  chk('FAIL dmgUploaded=true with no .dmg asset', hasViolation(r.artifact, 'R3F_DMG_FLAG_WITHOUT_ASSET'));
+}
+// mirror-5: dmgUploaded=true with only a non-dmg asset -> still FAIL
+{
+  const r = mutateF6((m) => { m.releaseRecord.dmgUploaded = true; m.releaseRecord.githubRelease.assets = [{ name: 'notes.txt' }]; });
+  chk('FAIL dmgUploaded=true with non-dmg asset only', hasViolation(r.artifact, 'R3F_DMG_FLAG_WITHOUT_ASSET'));
+}
+// mirror-6: empty assets but dmgUploaded not exactly false -> FAIL
+{
+  const r = mutateF6((m) => { delete m.releaseRecord.dmgUploaded; });
+  chk('FAIL empty assets require dmgUploaded===false', hasViolation(r.artifact, 'R3F_DMG_FLAG_NOT_FALSE_ON_EMPTY_ASSETS'));
+}
+// mirror-7: tag target differs from the recorded main merge SHA -> FAIL
+{
+  const r = mutateF6((m) => { m.releaseRecord.tagTarget = '1661f1c16d584c96aec2fc1704f6dd730a86d480'; });
+  chk('FAIL tagTarget != mainMergeSha', hasViolation(r.artifact, 'R3F_TAG_TARGET_MISMATCH'));
+}
+// mirror-8: wrong tag name -> FAIL
+{
+  const r = mutateF6((m) => { m.releaseRecord.tag = 'v2.0.1'; });
+  chk('FAIL releaseRecord.tag != v2.0.0', hasViolation(r.artifact, 'R3F_RELEASE_TAG_WRONG'));
+}
+// mirror-9: Release tag_name diverging from the recorded tag -> FAIL
+{
+  const r = mutateF6((m) => { m.releaseRecord.githubRelease.tagName = 'v1.9.9'; });
+  chk('FAIL githubRelease.tagName != releaseRecord.tag', hasViolation(r.artifact, 'R3F_RELEASE_TAG_NAME_MISMATCH'));
+}
+// mirror-10: stage rolled back to RELEASE_PREPARED while tag evidence exists -> FAIL (no history rewrite)
+{
+  const r = mutateF6((m) => { m.releaseStage = 'RELEASE_PREPARED'; });
+  chk('FAIL stage may not lag recorded tag/Release evidence', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH'));
+}
+// mirror-11: lightweight tag (or missing tag object) -> FAIL
+{
+  const r = mutateF6((m) => { m.releaseRecord.tagType = 'lightweight'; m.releaseRecord.tagObjectSha = m.releaseRecord.tagTarget; });
+  chk('FAIL non-annotated tag record', hasViolation(r.artifact, 'R3F_TAG_NOT_ANNOTATED'));
+}
+// mirror-12: unknown releaseStage -> FAIL
+{
+  const r = mutateF6((m) => { m.releaseStage = 'RELEASE_SHIPPED'; });
+  chk('FAIL unknown releaseStage', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_UNKNOWN'));
+}
+// mirror-13 (MIRROR-R1-01): published flags but state field still DRAFT -> FAIL
+{
+  const r = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+    // state left as 'DRAFT' — contradictory record must be rejected
+  });
+  chk('FAIL state=DRAFT contradicting published flags', hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
+// mirror-14 (MIRROR-R1-02): releaseStage deleted -> FAIL
+{
+  const r = mutateF6((m) => { delete m.releaseStage; });
+  chk('FAIL missing releaseStage', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_MISSING'));
+}
+// mirror-15 (MIRROR-R1-02): schema releaseStages unreadable -> FAIL
+{
+  const dir = buildFixture();
+  const sch = readJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'));
+  delete sch.releaseStages;
+  writeJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'), sch);
+  const r = runValidator(dir);
+  chk('FAIL schema releaseStages missing', hasViolation(r.artifact, 'R3F_RELEASE_STAGES_SCHEMA_MISSING'));
+}
+// mirror-16 (MIRROR-R1-03): bare-string asset entries are malformed AND never satisfy dmgUploaded
+{
+  const r = mutateF6((m) => { m.releaseRecord.dmgUploaded = true; m.releaseRecord.githubRelease.assets = ['app.dmg']; });
+  chk('FAIL string asset entry rejected as malformed', hasViolation(r.artifact, 'R3F_RELEASE_ASSETS_MALFORMED') && hasViolation(r.artifact, 'R3F_DMG_FLAG_WITHOUT_ASSET'));
+}
+// mirror-17 (MIRROR-R1-04): whitespace/invalid publishedAt never counts as published
+{
+  const r = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '   ';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+  });
+  chk('FAIL whitespace publishedAt rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH') && hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH'));
+}
+// mirror-18 (MIRROR-R2-02): assets deleted entirely -> FAIL (no silent skip)
+{
+  const r = mutateF6((m) => { delete m.releaseRecord.githubRelease.assets; });
+  chk('FAIL missing assets array', hasViolation(r.artifact, 'R3F_RELEASE_ASSETS_MISSING'));
+}
+// mirror-19 (MIRROR-R2-02): assets as a non-array -> FAIL
+{
+  const r = mutateF6((m) => { m.releaseRecord.githubRelease.assets = 'none'; });
+  chk('FAIL non-array assets', hasViolation(r.artifact, 'R3F_RELEASE_ASSETS_MISSING'));
+}
+// mirror-20 (MIRROR-R3-01): deleting state cannot bypass the mandatory state advance
+{
+  const r = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    delete m.releaseRecord.githubRelease.state;
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+  });
+  chk('FAIL missing state field blocks release_executed', hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISSING') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
+// mirror-21 (MIRROR-R3-02): impossible calendar date in publishedAt never counts as published
+{
+  const r = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-02-30T05:00:00Z';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+  });
+  chk('FAIL impossible publishedAt date (2026-02-30) rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
+// mirror-22 (MIRROR-R4-01): absurd timezone offset in publishedAt never counts as published
+{
+  const r = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00+99:99';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+  });
+  chk('FAIL invalid timezone offset (+99:99) rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
+// mirror-23 (MIRROR-R4-02): stage stuck at TAGGED_DRAFT while the Release is published -> FAIL
+{
+  const r = mutateF6((m) => {
+    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
+    // releaseStage left at RELEASE_TAGGED_DRAFT — stage may not lag published evidence
+  });
+  chk('FAIL stage lags published evidence', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH'));
+}
+// mirror-24 (MIRROR-R4-03): weakening/removing releaseExecutedRequiresStage is itself a violation
+{
+  const dir = buildFixture();
+  const sch = readJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'));
+  sch.releaseStages.releaseExecutedRequiresStage = 'RELEASE_TAGGED_DRAFT';
+  writeJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'), sch);
+  const r = runValidator(dir);
+  chk('FAIL weakened releaseExecutedRequiresStage', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID'));
+  const dir2 = buildFixture();
+  const sch2 = readJson(path.join(dir2, 'governance', 'r3.0f', 'schema.json'));
+  delete sch2.releaseStages.releaseExecutedRequiresStage;
+  writeJson(path.join(dir2, 'governance', 'r3.0f', 'schema.json'), sch2);
+  const r2 = runValidator(dir2);
+  chk('FAIL missing releaseExecutedRequiresStage', hasViolation(r2.artifact, 'R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID'));
+}
+// mirror-25 (MIRROR-R5-01): +14:59 offset is beyond the +/-14:00 hard cap
+{
+  const r = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00+14:59';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+  });
+  chk('FAIL offset beyond +/-14:00 cap rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+  const r2 = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00+14:00';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+  });
+  chk('PASS-path: exactly +14:00 offset is legal publish evidence', !hasViolation(r2.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
+// mirror-26 (MIRROR-R5-02): a crafted schema with a fake terminal stage cannot enable release_executed
+{
+  const dir = buildFixture();
+  const sch = readJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'));
+  sch.releaseStages.order = ['RELEASE_PREPARED', 'RELEASE_TAGGED_DRAFT', 'RELEASE_YOLO'];
+  sch.releaseStages.releaseExecutedRequiresStage = 'RELEASE_YOLO';
+  writeJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'), sch);
+  const m = readJson(f6Path(dir)); const st = readJson(f6State(dir));
+  m.releaseStage = 'RELEASE_YOLO';
+  m.releaseRecord.githubRelease.state = 'PUBLISHED';
+  m.releaseRecord.githubRelease.draft = false;
+  m.releaseRecord.githubRelease.published = true;
+  m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
+  m.releaseRecord.releaseExecuted = true;
+  st.enabledCapabilities.push('release_executed');
+  writeJson(f6Path(dir), m); writeJson(f6State(dir), st);
+  const r = runValidator(dir);
+  chk('FAIL crafted terminal stage rejected (canonical order pin + rule invalid + executed blocked)', hasViolation(r.artifact, 'R3F_RELEASE_STAGES_ORDER_DRIFT') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
+// mirror-27 (MIRROR-R6-01): a DRAFT record with published missing/null is malformed, not acceptable
+{
+  const r = mutateF6((m) => { delete m.releaseRecord.githubRelease.published; });
+  chk('FAIL DRAFT record with published missing', hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH'));
+  const r2 = mutateF6((m) => { m.releaseRecord.githubRelease.published = null; });
+  chk('FAIL DRAFT record with published=null', hasViolation(r2.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH'));
+}
+// mirror-28 (MIRROR-R7-01): a DRAFT record carrying publishedAt evidence is contradictory
+{
+  const r = mutateF6((m) => { m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z'; });
+  chk('FAIL DRAFT record with an ISO publishedAt', hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH'));
+  const r2 = mutateF6((m) => { m.releaseRecord.githubRelease.publishedAt = ''; });
+  chk('FAIL DRAFT record with empty-string publishedAt', hasViolation(r2.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH'));
+}
+
 H.cleanupAll();
 console.log('r3-0-train: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

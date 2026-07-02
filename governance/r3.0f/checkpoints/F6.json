@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "program": "R3.0F",
   "checkpoint": "F6_RELEASE",
-  "releaseStage": "RELEASE_PREPARED",
+  "releaseStage": "RELEASE_TAGGED_DRAFT",
   "baseSha": "0711e74a5583b65c1d7426aa9e61f143fe23a773",
   "headSha": "2bec6752a765541d03dc9f5967242e1e780aa116",
   "previousCheckpoint": "F5_RELEASE_GATE",
@@ -233,13 +233,29 @@
   },
   "r3bCaseRecordSchemaUntouched": true,
   "releaseRecord": {
-    "tag": null,
-    "tagTarget": null,
-    "githubRelease": null,
-    "dmgUploaded": null,
-    "note": "Intentionally empty at RELEASE_PREPARED: no tag, no GitHub Release, no DMG distribution exists. Populated only by the post-release governance update after separate explicit authorizations."
+    "tag": "v2.0.0",
+    "tagType": "annotated",
+    "tagObjectSha": "668c002161d4e1e28109b5d55df303f4bd75ef79",
+    "tagTarget": "74bdc5c6589644d12816bcbb14f6f2918cce73de",
+    "mainMergeSha": "74bdc5c6589644d12816bcbb14f6f2918cce73de",
+    "tagMessage": "Racing Setup Analyzer v2.0.0",
+    "githubRelease": {
+      "id": 347825133,
+      "state": "DRAFT",
+      "draft": true,
+      "published": false,
+      "publishedAt": null,
+      "prerelease": false,
+      "tagName": "v2.0.0",
+      "assets": [],
+      "urlNote": "Draft-only URL (GitHub renders drafts under an untagged-… path visible only to repo collaborators); intentionally NOT recorded as a public release URL because none exists."
+    },
+    "dmgUploaded": false,
+    "deploymentExecuted": false,
+    "releaseExecuted": false,
+    "note": "RELEASE_TAGGED_DRAFT mirror (2026-07-02, AUTHORIZATION B + C2): annotated tag v2.0.0 (object 668c0021) pushed, peeled commit exactly the PR #42 merge commit 74bdc5c6 (verified via ls-remote peel + local rev-parse + GitHub API tag object). Draft GitHub Release id 347825133 created with zero assets; NOT published. Per the semantic ruling, release_executed stays false until an actual publish under separate explicit authorization; the future publish mirror changes exactly the seven forward-only fields declared in schema.json releaseStages.publishForwardFields (stage, githubRelease.state/draft/published/publishedAt, record releaseExecuted, capability) — every recorded evidence field (tag SHAs, release id, mainMergeSha) stays immutable; no history rewrite."
   },
-  "note": "R3.0F F6_RELEASE checkpoint at the RELEASE_PREPARED stage: version bump staged, documents finalized to release-candidate status, release_executed still disabled, tag/Release/deployment absent. main remains at the Train merge commit 0711e74a until the F6 PR is merged under AUTHORIZATION A.",
+  "note": "R3.0F F6_RELEASE checkpoint at the RELEASE_TAGGED_DRAFT stage: PR #42 merged to main (74bdc5c6), annotated tag v2.0.0 pushed (peeled = the merge commit), DRAFT GitHub Release 347825133 created with no assets. NOTHING is published or distributed: no public Release, no DMG upload, no deployment, no signing. release_executed remains disabled per the published-only semantic ruling recorded in capabilities.json and schema.json releaseStages.",
   "frozenDiff": null,
   "productionDiff": null,
   "runtimeConsumerCount": null,
@@ -247,5 +263,112 @@
     "expectedDeferredIds": [],
     "expectedRendererAdapter": false,
     "note": "F6 does NOT touch the feature registry. Actual registry state carried into 2.0.0: case_comparison/reference_lap/corner_delta activated at C8_ACTIVATION (Comparisons pane live); engineer_brief/experiment_loop/case_timeline are nav-live with 'available_conditional' data-gates but their pane content is not wired into renderer/index.html (nav nodes only — disclosed in release notes Known limitations item 1)."
+  },
+  "releaseMirrorCodexVerdict": {
+    "scope": "Codex adversarial review of the RELEASE_TAGGED_DRAFT governance mirror (PR #43): draft-vs-published honesty, release_executed publish-only semantics, assets/dmg corroboration, tag object vs peeled target, canonical stage pin, monotonic publish path.",
+    "verdict": "PASS",
+    "verdictRound": 8,
+    "reviewedCandidateSha": "5c04d83a3e6040ad82e8cbb3103ab1b2b924a1fd",
+    "verdictEvidenceFile": "governance/r3.0f/codex-checkpoint-evidence/F6-mirror/round-8-raw.txt",
+    "verdictEvidenceSha256": "4b94469839cb1e549f535a15c2fb0fa597f608d09afcbd1b4a73bcf70d88c9c9",
+    "totalBlockRounds": 7,
+    "totalDistinctFindings": 16,
+    "rounds": [
+      {
+        "round": 1,
+        "reviewedSha": "dbf2e28d9160e83ad24c2a74bfc70e16a0c95d91",
+        "verdict": "BLOCK",
+        "findings": 4,
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6-mirror/round-1-raw.txt",
+        "evidenceSha256": "c6494645cc247b1dc9d9928d044e1d3604e7192b7788aabd9fe7339a24692ef8",
+        "closures": [
+          "MIRROR-R1-01 state-field contradiction unvalidated (mirror-3 left state=DRAFT on publish)",
+          "MIRROR-R1-02 missing stage / unreadable stages silently skipped",
+          "MIRROR-R1-03 bare-string assets satisfied dmg corroboration",
+          "MIRROR-R1-04 any nonempty string counted as publishedAt"
+        ]
+      },
+      {
+        "round": 2,
+        "reviewedSha": "10d0aa6a7302bf9e21d3424bf25711e1f8a28901",
+        "verdict": "BLOCK",
+        "findings": 2,
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6-mirror/round-2-raw.txt",
+        "evidenceSha256": "8303636f71bc4114c729147c9c37788e5aa6b6c02172fa46823fcc600a936c8d",
+        "closures": [
+          "MIRROR-R2-01 publish-forward field set under-declared vs implementation",
+          "MIRROR-R2-02 missing/non-array assets silently skipped"
+        ]
+      },
+      {
+        "round": 3,
+        "reviewedSha": "cacee2e4ff92388ac7ec87ae841fab73f9836f3b",
+        "verdict": "BLOCK",
+        "findings": 2,
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6-mirror/round-3-raw.txt",
+        "evidenceSha256": "3972284c7b6d33a567a19fea000e3959de4bb3ab44d8a7e65b2b9eab17b00ebe",
+        "closures": [
+          "MIRROR-R3-01 deleting state bypassed the mandatory state advance",
+          "MIRROR-R3-02 Date.parse rollover dates accepted as publishedAt"
+        ]
+      },
+      {
+        "round": 4,
+        "reviewedSha": "785701cb03c11c9d4ee884f20e6283976d110028",
+        "verdict": "BLOCK",
+        "findings": 4,
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6-mirror/round-4-raw.txt",
+        "evidenceSha256": "dc8ad7ce386591be9974aceb4b9706f8958a9379d03d8be74e1acaa9e4421aa8",
+        "closures": [
+          "MIRROR-R4-01 absurd timezone offsets accepted",
+          "MIRROR-R4-02 TAGGED_DRAFT accepted published evidence (stage lag)",
+          "MIRROR-R4-03 releaseExecutedRequiresStage never read (hardcode)",
+          "MIRROR-R4-04 F6 note contradicted publishForwardFields"
+        ]
+      },
+      {
+        "round": 5,
+        "reviewedSha": "d750bf2bb706e0b1a62b7b22a8d686fb4a888bcc",
+        "verdict": "BLOCK",
+        "findings": 2,
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6-mirror/round-5-raw.txt",
+        "evidenceSha256": "aed24871abd83a4313304273287d79fa261483927de5ac28bd8624cd7a107f95",
+        "closures": [
+          "MIRROR-R5-01 offsets +14:01..+14:59 beyond the cap",
+          "MIRROR-R5-02 crafted schema terminal stage could enable release_executed (canonical order unpinned)"
+        ]
+      },
+      {
+        "round": 6,
+        "reviewedSha": "6df6e84536f20bba4bc672f2cedc085c5e295bdf",
+        "verdict": "BLOCK",
+        "findings": 1,
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6-mirror/round-6-raw.txt",
+        "evidenceSha256": "38067ec5cd74917f0489a3f4a629a9e1c4eb5f36e8b78e6b466fa76315abe2d0",
+        "closures": [
+          "MIRROR-R6-01 DRAFT accepted published missing/null (needed === false)"
+        ]
+      },
+      {
+        "round": 7,
+        "reviewedSha": "77a0d14362ad69808d6abaf217ceba955b2ca789",
+        "verdict": "BLOCK",
+        "findings": 1,
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6-mirror/round-7-raw.txt",
+        "evidenceSha256": "7ab0093ccda9471d36904fc418f629803e5519867bd338a8249716dd77d1216b",
+        "closures": [
+          "MIRROR-R7-01 DRAFT did not require publishedAt === null (contradictory evidence passed)"
+        ]
+      },
+      {
+        "round": 8,
+        "reviewedSha": "5c04d83a3e6040ad82e8cbb3103ab1b2b924a1fd",
+        "verdict": "PASS",
+        "findings": 0,
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6-mirror/round-8-raw.txt",
+        "evidenceSha256": "4b94469839cb1e549f535a15c2fb0fa597f608d09afcbd1b4a73bcf70d88c9c9"
+      }
+    ],
+    "tierDisclosure": "TIER 1 for all 8 rounds: raw stdout archived under codex-checkpoint-evidence/F6-mirror/ with sha256 anchors; prompts archived alongside. All codex launches used explicit stdin closure (< /dev/null) after the earlier stall lesson."
   }
 }
