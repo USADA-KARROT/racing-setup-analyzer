@@ -4,7 +4,7 @@
   "checkpoint": "F6_RELEASE",
   "releaseStage": "RELEASE_PREPARED",
   "baseSha": "0711e74a5583b65c1d7426aa9e61f143fe23a773",
-  "headSha": null,
+  "headSha": "2bec6752a765541d03dc9f5967242e1e780aa116",
   "previousCheckpoint": "F5_RELEASE_GATE",
   "shaSeparation": "baseSha = the R3.0 Train merge commit on main (PR #16). headSha is stamped at the F6 release-candidate SHA that Codex reviews.",
   "authorizedPaths": [
@@ -177,7 +177,50 @@
   "workflowRunId": null,
   "artifactId": null,
   "artifactBoundSha": null,
-  "codexVerdict": null,
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 3,
+    "reviewedCandidateSha": "2bec6752a765541d03dc9f5967242e1e780aa116",
+    "verdictEvidenceFile": "governance/r3.0f/codex-checkpoint-evidence/F6/round-3-2bec675-PASS.raw.txt",
+    "verdictEvidenceSha256": "15aadb043d308f056091d9294f80c0b76701cc4045af67ea01cce7f51a2020b7",
+    "totalBlockRounds": 2,
+    "totalDistinctFindings": 4,
+    "rounds": [
+      {
+        "round": 1,
+        "reviewedSha": "24decc20c012fbfbfbad580a74410ba1f561b458",
+        "verdict": "BLOCK",
+        "findings": 3,
+        "closures": [
+          "F6-R1-01 package.json change-count claims corrected (version bump + authorized test-script wiring)",
+          "F6-R1-02 release-gate conditions 10/11 locked to finalized-only document forms (test synced)",
+          "F6-R1-03 stale release-notes references fixed (finalized CHANGELOG heading; wrong item-5 pointer removed)"
+        ],
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6/round-1-24decc2-BLOCK.raw.txt",
+        "evidenceSha256": "0966945358df545ac38b0dd0e4f6c400a896de2125cb0dc5a1614054063b1301"
+      },
+      {
+        "round": 2,
+        "reviewedSha": "37fcdb871e58d06b62f2afdc7b7131fef7856590",
+        "verdict": "BLOCK",
+        "findings": 1,
+        "closures": [
+          "F6-R2-01 README License/contributing sections (en/zh-TW/ja) said 'MIT-spirit' contradicting UNLICENSED — all three languages corrected to UNLICENSED/all-rights-reserved with the license decision explicitly deferred"
+        ],
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6/round-2-37fcdb8-BLOCK.raw.txt",
+        "evidenceSha256": "664af4c07a27b8c82b4af118323434508d42b4fd7346e54e423c0a4b88a0a805"
+      },
+      {
+        "round": 3,
+        "reviewedSha": "2bec6752a765541d03dc9f5967242e1e780aa116",
+        "verdict": "PASS",
+        "findings": 0,
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6/round-3-2bec675-PASS.raw.txt",
+        "evidenceSha256": "15aadb043d308f056091d9294f80c0b76701cc4045af67ea01cce7f51a2020b7"
+      }
+    ],
+    "tierDisclosure": "TIER 1 for all 3 rounds (raw stdout archived + sha256-anchored; prompts archived alongside). One round-3 launch attempt stalled pre-review (codex waited on a never-EOF stdin; zero review output; process killed, snapshot archived as round-3-STALLED-ATTEMPT-not-counted.raw.txt) — NOT counted as a round per the external-blocker rule; the counted round 3 ran with stdin explicitly closed."
+  },
   "packageVersion": "2.0.0",
   "createdAt": null,
   "status": "pending",
