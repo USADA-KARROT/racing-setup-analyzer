@@ -1,6 +1,6 @@
 {
   "name": "racing-setup-analyzer",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Vehicle-dynamics setup & lap-time analyzer (handling balance, springs/ARB/dampers, tyre-stint simulation)",
   "license": "UNLICENSED",
   "author": "USADA-KARROT",

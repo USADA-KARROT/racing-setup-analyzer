@@ -3,7 +3,7 @@
 /**
  * R3-GATE0 — package + version policy check (dependency-free lane).
  *
- * package.json version must remain 2.0.0 — the F6_RELEASE pin after the single authorized
+ * package.json version must remain 2.0.1 — the F6_RELEASE pin after the single authorized
  * 1.4.0 -> 2.0.0 bump (unless VERSION_BUMP_ALLOW=<x.y.z> stages a future authorized bump).
  *
  * H3 (v2.0.x public-release hardening) POLICY FLIP: a tracked package-lock.json is now REQUIRED
@@ -21,7 +21,7 @@ const cp = require('child_process');
 
 const REPO = path.resolve(__dirname, '..');
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR ? path.resolve(process.env.ARTIFACT_DIR) : path.join(REPO, 'artifacts');
-const EXPECTED = '2.0.0';
+const EXPECTED = '2.0.1';
 
 function git(args) {
   const r = cp.spawnSync('git', args, { cwd: REPO, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });

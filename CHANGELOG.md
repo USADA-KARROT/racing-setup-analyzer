@@ -15,6 +15,17 @@ never approximated.
 
 ---
 
+## [2.0.1] — Public Release Candidate (publication pending explicit authorization)
+
+2.0.0 plus the public-release hardening line (H1–H6): packaged preload/electronAPI fix
+with a single-channel version authority; tracked lockfile + SBOM + vendor manifest +
+third-party notices (reproducible npm ci, permissive-only licenses); REAL v1.4.0-profile
+upgrade qualification (fresh-IndexedDB semantics, sentinel-proven Local Storage
+preservation); original app icon + full macOS identity (arm64-only, macOS 12+);
+UI delivery truth (Engineer Brief LIVE, Experiment Loop/Case Timeline deferred, 15 inert
+modules unpackaged); hardened-runtime signing readiness with honest BLOCKED semantics.
+Full details: `docs/release-notes-2.0.1.md` + `governance/hardening/`.
+
 ## [2.0.0] — Release Candidate (publication pending explicit authorization)
 
 The R3.0 Integrated Delivery Train (A through F) ships as a single release. The Train

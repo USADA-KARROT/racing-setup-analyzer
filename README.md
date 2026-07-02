@@ -30,7 +30,7 @@ Grounded in textbook vehicle dynamics (Milliken, Gillespie, OptimumG) and cross-
 | R3.0E | Experiment-outcome loop (experiment / outcome / follow-up link / append-only timeline stores + contracts) | ✅ complete — services shipped; Experiment Loop / Case Timeline panes not yet wired into the page (nav nodes live) |
 | R3.0F | Migration engine, E2E flows, hardening probes, documentation, release gate | ✅ complete; Train merged to `main`; v2.0.0 release candidate staged (tag/Release pending authorization) |
 
-Version 2.0.0 (release candidate — the v2.0.0 tag and GitHub Release are pending explicit authorization). The Comparisons pane is live and usable; the Engineer Brief / Experiment Loop / Case Timeline panes are the documented remaining wire-in work (see `docs/release-notes-2.0.0.md`, "Known limitations").
+Version 2.0.1 (public release candidate — the v2.0.1 tag and public GitHub Release are pending explicit authorization). The Comparisons pane and the Engineer Brief are live; Experiment Loop / Case Timeline are deferred (see `docs/release-notes-2.0.1.md`). Apple Silicon (arm64) macOS 12+ only.
 
 ## What it can do
 
@@ -183,7 +183,7 @@ Personal/educational project, currently **UNLICENSED** (all rights reserved — 
 | R3.0E | 實驗-結果迴圈（實驗／結果／後續連結／僅追加時間軸的儲存層與契約） | ✅ 完成 — 服務已出貨；Experiment Loop / Case Timeline 面板尚未接進頁面（導覽節點已上線） |
 | R3.0F | 遷移引擎、E2E 流程、硬化探針、文件、發佈閘門 | ✅ 完成；Train 已合併進 `main`；v2.0.0 release candidate 已就緒（tag/Release 待授權） |
 
-版本 2.0.0（release candidate —— v2.0.0 tag 與 GitHub Release 待明確授權後發佈）。Comparisons 面板已上線可用；Engineer Brief / Experiment Loop / Case Timeline 面板為已記載的待接線工作（見 `docs/release-notes-2.0.0.md` 的 Known limitations）。
+版本 2.0.1（public release candidate —— v2.0.1 tag 與公開 GitHub Release 待明確授權後發佈）。Comparisons 面板與 Engineer Brief 已上線；Experiment Loop / Case Timeline 延後交付（見 `docs/release-notes-2.0.1.md`）。僅支援 Apple Silicon (arm64) macOS 12+。
 
 ### 它能做什麼
 
@@ -336,7 +336,7 @@ npm test
 | R3.0E | 実験-結果ループ（実験／結果／フォローアップリンク／追記専用タイムラインのストアと契約） | ✅ 完了 — サービス出荷済み；Experiment Loop / Case Timeline パネルは未配線（ナビノードは稼働） |
 | R3.0F | マイグレーションエンジン、E2E フロー、ハードニングプローブ、ドキュメント、リリースゲート | ✅ 完了；Train は `main` にマージ済み；v2.0.0 release candidate 準備完了（タグ/Release は承認待ち） |
 
-バージョン 2.0.0（release candidate —— v2.0.0 タグと GitHub Release は明示承認待ち）。Comparisons パネルは稼働中；Engineer Brief / Experiment Loop / Case Timeline パネルは文書化済みの残配線作業（`docs/release-notes-2.0.0.md` の Known limitations 参照）。
+バージョン 2.0.1（public release candidate —— v2.0.1 タグと公開 GitHub Release は明示承認待ち）。Comparisons パネルと Engineer Brief は稼働中；Experiment Loop / Case Timeline は延期（`docs/release-notes-2.0.1.md` 参照）。Apple Silicon (arm64) macOS 12+ のみ対応。
 
 ### できること
 

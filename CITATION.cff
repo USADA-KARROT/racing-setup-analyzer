@@ -12,7 +12,7 @@ abstract: >-
 type: software
 authors:
   - alias: SKYLINE
-version: "2.0.0"
+version: "2.0.1"
 repository-code: "https://github.com/USADA-KARROT/racing-setup-analyzer"
 url: "https://github.com/USADA-KARROT/racing-setup-analyzer"
 keywords:
