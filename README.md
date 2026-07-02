@@ -25,10 +25,12 @@ Grounded in textbook vehicle dynamics (Milliken, Gillespie, OptimumG) and cross-
 | R2.6 | Track intelligence + per-corner driver steering-behaviour coaching (Heuristic, low-confidence) | ✅ complete |
 | R3.0A | Case-centric app shell (nav / Case Context / Trust panel) + documentation consolidation | ✅ complete |
 | R3.0B | Local-first Case Library & persistence (save / reopen / duplicate / archive / export-import) | ✅ complete |
-| R3.0C | Reference lap & corner-delta intelligence (cross-lap / cross-session comparison) | 🚧 planned / in design — **not yet available** |
-| R3.0D–F | Race-engineer decision engine · experiment-outcome loop · hardening & release | ⏳ planned |
+| R3.0C | Reference lap & corner-delta intelligence (same-case, same-session, cross-lap comparison; explicit user-selected reference only) | ✅ complete — Comparisons pane live |
+| R3.0D | Race-engineer decision engine (evidence graph → hypothesis → priority → advisory Engineer Brief; no runtime LLM, no causation, no driver blame) | ✅ complete — services shipped; Brief pane not yet wired into the page (nav node live, mount inert) |
+| R3.0E | Experiment-outcome loop (experiment / outcome / follow-up link / append-only timeline stores + contracts) | ✅ complete — services shipped; Experiment Loop / Case Timeline panes not yet wired into the page (nav nodes live) |
+| R3.0F | Migration engine, E2E flows, hardening probes, documentation, release gate | ✅ complete through F5_RELEASE_GATE (F6 release pending) |
 
-Version 1.4.0. The Comparisons section in the app is shown as an explicit, non-actionable **deferred** panel — never a fake control.
+Version 1.4.0 (2.0.0 staged for the R3.0 Train release at F6). The Comparisons pane is live and usable; the Engineer Brief / Experiment Loop / Case Timeline panes are the documented remaining wire-in work (see `docs/release-notes-2.0.0.md`, "Known limitations").
 
 ## What it can do
 
@@ -176,10 +178,12 @@ MIT-spirit personal/educational project — contributions and corrections welcom
 | R2.6 | 賽道情報 + 逐彎駕駛轉向行為教練（啟發式、低信心） | ✅ 完成 |
 | R3.0A | 案例為核心的 app 外殼（導覽／Case Context／可信度面板）+ 文件整併 | ✅ 完成 |
 | R3.0B | 本機優先案例庫與持久化（儲存／重開／副本／封存／匯出匯入） | ✅ 完成 |
-| R3.0C | 參考圈與逐彎差異情報（跨圈／跨 session 比較） | 🚧 規劃／設計中 — **尚未提供** |
-| R3.0D–F | 賽車工程師決策引擎 · 實驗-結果迴圈 · 硬化與發佈 | ⏳ 規劃中 |
+| R3.0C | 參考圈與逐彎差異情報（同案例、同 session、跨圈比較；參考圈僅限使用者明確選取） | ✅ 完成 — Comparisons 面板已上線 |
+| R3.0D | 賽車工程師決策引擎（證據圖 → 假設 → 優先序 → 諮詢性 Engineer Brief；無執行期 LLM、不下因果結論、不歸咎車手） | ✅ 完成 — 服務已出貨；Brief 面板尚未接進頁面（導覽節點已上線、掛載點為隱藏待接線） |
+| R3.0E | 實驗-結果迴圈（實驗／結果／後續連結／僅追加時間軸的儲存層與契約） | ✅ 完成 — 服務已出貨；Experiment Loop / Case Timeline 面板尚未接進頁面（導覽節點已上線） |
+| R3.0F | 遷移引擎、E2E 流程、硬化探針、文件、發佈閘門 | ✅ 完成至 F5_RELEASE_GATE（F6 發佈待授權） |
 
-版本 1.4.0。app 內的「Comparisons」以明確、不可操作的**延後（deferred）**面板呈現——絕不是假的控制項。
+版本 1.4.0（2.0.0 已排定於 R3.0 Train 的 F6 發佈）。Comparisons 面板已上線可用；Engineer Brief / Experiment Loop / Case Timeline 面板為已記載的待接線工作（見 `docs/release-notes-2.0.0.md` 的 Known limitations）。
 
 ### 它能做什麼
 
@@ -327,10 +331,12 @@ MIT 精神的個人／教育專案——歡迎貢獻與指正。在台灣打造�
 | R2.6 | トラックインテリジェンス + コーナーごとのドライバー操舵挙動コーチング（ヒューリスティック、低確信度） | ✅ 完了 |
 | R3.0A | ケース中核のアプリシェル（ナビ／Case Context／信頼性パネル）+ ドキュメント統合 | ✅ 完了 |
 | R3.0B | ローカルファーストのケースライブラリと永続化（保存／再オープン／複製／アーカイブ／入出力） | ✅ 完了 |
-| R3.0C | リファレンスラップとコーナーデルタ解析（ラップ間／session 間比較） | 🚧 計画／設計中 — **未提供** |
-| R3.0D–F | レースエンジニア意思決定エンジン · 実験-結果ループ · ハードニングとリリース | ⏳ 計画中 |
+| R3.0C | リファレンスラップとコーナーデルタ解析（同一ケース・同一 session 内のラップ間比較；リファレンスはユーザー明示選択のみ） | ✅ 完了 — Comparisons パネル稼働中 |
+| R3.0D | レースエンジニア意思決定エンジン（エビデンスグラフ → 仮説 → 優先度 → 助言型 Engineer Brief；実行時 LLM なし・因果断定なし・ドライバー非難なし） | ✅ 完了 — サービス出荷済み；Brief パネルは未配線（ナビノードは稼働、マウントは不活性） |
+| R3.0E | 実験-結果ループ（実験／結果／フォローアップリンク／追記専用タイムラインのストアと契約） | ✅ 完了 — サービス出荷済み；Experiment Loop / Case Timeline パネルは未配線（ナビノードは稼働） |
+| R3.0F | マイグレーションエンジン、E2E フロー、ハードニングプローブ、ドキュメント、リリースゲート | ✅ F5_RELEASE_GATE まで完了（F6 リリースは承認待ち） |
 
-バージョン 1.4.0。アプリ内の「Comparisons」は、明示的で操作不可の**保留（deferred）**パネルとして表示される——偽のコントロールではない。
+バージョン 1.4.0（2.0.0 は R3.0 Train の F6 リリースで予定）。Comparisons パネルは稼働中；Engineer Brief / Experiment Loop / Case Timeline パネルは文書化済みの残配線作業（`docs/release-notes-2.0.0.md` の Known limitations 参照）。
 
 ### できること
 

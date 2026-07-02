@@ -1,33 +1,113 @@
 {
   "schemaVersion": 1,
   "program": "R3.0F",
-  "currentCheckpoint": "F4_DOCUMENTATION",
+  "currentCheckpoint": "F5_RELEASE_GATE",
   "authorizedProductionPaths": [
-    { "path": "renderer/js/r3-0f-migration-engine.js",                "capability": "migration_engine_present" },
-    { "path": "tests/e2e/helpers/flow-harness.js",                    "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-01-new-user.test.js",                   "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-02-real-telemetry.test.js",             "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-03-measured.test.js",                   "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-04-reference-lap.test.js",              "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-05-vre.test.js",                        "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-06-setup-experiment.test.js",           "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-07-driver-experiment.test.js",          "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-08-export-import.test.js",              "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/flow-09-electron-smoke.test.js",             "capability": "e2e_automation_present" },
-    { "path": "tests/e2e/hardening-01-electron-boundary.test.js",     "capability": "quality_hardening_present" },
-    { "path": "tests/e2e/hardening-02-storage-failure.test.js",       "capability": "quality_hardening_present" },
-    { "path": "tests/e2e/hardening-03-no-stale-ui.test.js",           "capability": "quality_hardening_present" },
-    { "path": "tests/e2e/hardening-04-large-library.test.js",         "capability": "quality_hardening_present" },
-    { "path": "tests/e2e/hardening-05-xss-injection.test.js",         "capability": "quality_hardening_present" },
-    { "path": "tests/e2e/hardening-06-supply-chain.test.js",          "capability": "quality_hardening_present" },
-    { "path": "docs/r3-architecture.md",                              "capability": "documentation_present" },
-    { "path": "docs/r3-user-workflow.md",                             "capability": "documentation_present" },
-    { "path": "docs/r3-data-and-privacy.md",                          "capability": "documentation_present" },
-    { "path": "docs/r3-credibility-model.md",                         "capability": "documentation_present" },
-    { "path": "docs/r3-experiment-loop.md",                           "capability": "documentation_present" },
-    { "path": "CHANGELOG.md",                                         "capability": "documentation_present" }
+    {
+      "path": "renderer/js/r3-0f-migration-engine.js",
+      "capability": "migration_engine_present"
+    },
+    {
+      "path": "tests/e2e/helpers/flow-harness.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-01-new-user.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-02-real-telemetry.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-03-measured.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-04-reference-lap.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-05-vre.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-06-setup-experiment.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-07-driver-experiment.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-08-export-import.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/flow-09-electron-smoke.test.js",
+      "capability": "e2e_automation_present"
+    },
+    {
+      "path": "tests/e2e/hardening-01-electron-boundary.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-02-storage-failure.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-03-no-stale-ui.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-04-large-library.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-05-xss-injection.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "tests/e2e/hardening-06-supply-chain.test.js",
+      "capability": "quality_hardening_present"
+    },
+    {
+      "path": "docs/r3-architecture.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-user-workflow.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-data-and-privacy.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-credibility-model.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/r3-experiment-loop.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "capability": "documentation_present"
+    },
+    {
+      "path": "docs/release-notes-2.0.0.md",
+      "capability": "release_gate_present"
+    }
   ],
-  "enabledCapabilities": ["governance_bootstrap_present", "migration_engine_present", "e2e_automation_present", "quality_hardening_present", "documentation_present"],
+  "enabledCapabilities": [
+    "governance_bootstrap_present",
+    "migration_engine_present",
+    "e2e_automation_present",
+    "quality_hardening_present",
+    "documentation_present",
+    "release_gate_present"
+  ],
   "runtimeConsumersAllowed": true,
   "uiAllowed": true,
   "featureRegistryActivationAllowed": false,
