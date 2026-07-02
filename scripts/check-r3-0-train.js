@@ -236,7 +236,7 @@ function run() {
         // publishedAt must be a real ISO-8601 UTC/offset timestamp whose calendar fields
         // survive round-trip (rejects Date.parse rollover like 2026-02-30) — junk never counts
         const isIsoTs = s => {
-          const t = typeof s === 'string' && s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})$/);
+          const t = typeof s === 'string' && s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-](?:0\d|1[0-4]):[0-5]\d)$/);
           if (!t) return false;
           const y = +t[1], mo = +t[2], da = +t[3], h = +t[4], mi = +t[5], se = +t[6];
           const d = new Date(Date.UTC(y, mo - 1, da, h, mi, se));
@@ -250,12 +250,17 @@ function run() {
           (gr.state === 'PUBLISHED' && gr.draft === false && gr.published === true)));
         if (gr && gr.state != null && !stateFieldOk) fail('R3F_RELEASE_STATE_FIELD_MISMATCH', 'githubRelease.state contradicts draft/published flags (state=' + gr.state + ', draft=' + gr.draft + ', published=' + gr.published + ')', { phase, state: gr.state, draft: gr.draft, published: gr.published });
         const published = !!(gr && gr.draft === false && gr.published === true && isIsoTs(gr.publishedAt) && stateFieldOk);
-        // fail-closed on the stage machinery itself: the schema list and the checkpoint stage are mandatory
+        // fail-closed on the stage machinery itself: the schema list, the checkpoint stage,
+        // AND the releaseExecutedRequiresStage rule are mandatory; the rule must be the FINAL
+        // stage of the declared order (a weakened schema is itself a violation)
         if (!stages.length) fail('R3F_RELEASE_STAGES_SCHEMA_MISSING', 'F6_RELEASE requires schema.json releaseStages.order (missing/unreadable — cannot validate the stage fail-closed)', { phase });
+        const reqStage = phaseSchema.releaseStages ? phaseSchema.releaseStages.releaseExecutedRequiresStage : undefined;
+        const reqStageValid = stages.length > 0 && typeof reqStage === 'string' && stages.indexOf(reqStage) === stages.length - 1;
+        if (stages.length && !reqStageValid) fail('R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID', 'schema releaseStages.releaseExecutedRequiresStage must exist and be the FINAL stage of the order; got ' + reqStage, { phase, releaseExecutedRequiresStage: reqStage });
         if (typeof m.releaseStage !== 'string' || !m.releaseStage) fail('R3F_RELEASE_STAGE_MISSING', 'F6_RELEASE checkpoint must declare releaseStage', { phase });
         else if (stages.length && !stages.includes(m.releaseStage)) fail('R3F_RELEASE_STAGE_UNKNOWN', 'F6_RELEASE releaseStage ' + m.releaseStage + ' is not in schema releaseStages.order', { phase, releaseStage: m.releaseStage });
         // release_executed (capability OR record flag) requires an actually-published Release
-        if ((capOn || rr.releaseExecuted === true) && (!published || m.releaseStage !== 'RELEASE_PUBLISHED')) fail('R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH', 'release_executed asserted but the GitHub Release is not published (draft/publishedAt/stage mismatch) — a tag alone or a draft Release alone never counts', { phase, capOn, recordFlag: rr.releaseExecuted === true, releaseStage: m.releaseStage, draft: gr && gr.draft, publishedAt: gr && gr.publishedAt });
+        if ((capOn || rr.releaseExecuted === true) && (!published || !reqStageValid || m.releaseStage !== reqStage)) fail('R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH', 'release_executed asserted but the GitHub Release is not published (draft/publishedAt/stage mismatch) — a tag alone or a draft Release alone never counts', { phase, capOn, recordFlag: rr.releaseExecuted === true, releaseStage: m.releaseStage, draft: gr && gr.draft, publishedAt: gr && gr.publishedAt });
         // a draft Release on record forbids release_executed in BOTH places
         if (gr && gr.draft === true && (capOn || rr.releaseExecuted === true)) fail('R3F_RELEASE_EXECUTED_ON_DRAFT', 'githubRelease.draft=true but release_executed is asserted', { phase, capOn, recordFlag: rr.releaseExecuted === true });
         // dmgUploaded must corroborate with assets; a recorded Release MUST carry an
@@ -279,6 +284,7 @@ function run() {
         if (m.releaseStage === 'RELEASE_TAGGED_DRAFT' && rr.tag == null && !gr) fail('R3F_RELEASE_STAGE_EVIDENCE_MISMATCH', 'releaseStage RELEASE_TAGGED_DRAFT but neither a tag nor a githubRelease is recorded', { phase });
         if (m.releaseStage === 'RELEASE_PREPARED' && (rr.tag != null || gr)) fail('R3F_RELEASE_STAGE_EVIDENCE_MISMATCH', 'releaseStage RELEASE_PREPARED but tag/Release evidence already recorded (stage may not lag evidence)', { phase });
         if (m.releaseStage === 'RELEASE_PUBLISHED' && !published) fail('R3F_RELEASE_STAGE_EVIDENCE_MISMATCH', 'releaseStage RELEASE_PUBLISHED but githubRelease is not published', { phase });
+        if (m.releaseStage === 'RELEASE_TAGGED_DRAFT' && published) fail('R3F_RELEASE_STAGE_EVIDENCE_MISMATCH', 'releaseStage RELEASE_TAGGED_DRAFT but the githubRelease is already published (stage may not lag evidence)', { phase });
       }
     }
   }

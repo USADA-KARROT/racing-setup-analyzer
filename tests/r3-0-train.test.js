@@ -554,6 +554,45 @@ function mutateF6(fn) {
   });
   chk('FAIL impossible publishedAt date (2026-02-30) rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
 }
+// mirror-22 (MIRROR-R4-01): absurd timezone offset in publishedAt never counts as published
+{
+  const r = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00+99:99';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+  });
+  chk('FAIL invalid timezone offset (+99:99) rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
+// mirror-23 (MIRROR-R4-02): stage stuck at TAGGED_DRAFT while the Release is published -> FAIL
+{
+  const r = mutateF6((m) => {
+    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
+    // releaseStage left at RELEASE_TAGGED_DRAFT — stage may not lag published evidence
+  });
+  chk('FAIL stage lags published evidence', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH'));
+}
+// mirror-24 (MIRROR-R4-03): weakening/removing releaseExecutedRequiresStage is itself a violation
+{
+  const dir = buildFixture();
+  const sch = readJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'));
+  sch.releaseStages.releaseExecutedRequiresStage = 'RELEASE_TAGGED_DRAFT';
+  writeJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'), sch);
+  const r = runValidator(dir);
+  chk('FAIL weakened releaseExecutedRequiresStage', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID'));
+  const dir2 = buildFixture();
+  const sch2 = readJson(path.join(dir2, 'governance', 'r3.0f', 'schema.json'));
+  delete sch2.releaseStages.releaseExecutedRequiresStage;
+  writeJson(path.join(dir2, 'governance', 'r3.0f', 'schema.json'), sch2);
+  const r2 = runValidator(dir2);
+  chk('FAIL missing releaseExecutedRequiresStage', hasViolation(r2.artifact, 'R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID'));
+}
 
 H.cleanupAll();
 console.log('r3-0-train: ' + pass + ' passed, ' + fail + ' failed');
