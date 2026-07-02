@@ -389,10 +389,31 @@ try {
     return false;
   }
   // The allowed function reference must be a top-level named function declared in
-  // preload.js itself whose body never touches Node authority beyond the single
-  // allowlisted invoke (the generic-send and forbidden-token checks above pin that).
+  // preload.js itself. H1-R1-02 closure: the BODY is extracted (brace matching) and
+  // audited — zero parameters (no caller-argument forwarding into IPC), ipcRenderer
+  // used ONLY as the exact allowlisted invoke, no Node authority, no arguments
+  // object, no rest/spread forwarding, and it never returns ipcRenderer itself.
   chk('preload.js declares the named getAppVersion function it exposes',
-    /function\s+getAppVersion\s*\(/.test(preloadSrc));
+    /function\s+getAppVersion\s*\(\s*\)/.test(preloadSrc));
+  (function auditGetAppVersionBody() {
+    var m = preloadSrc.match(/function\s+getAppVersion\s*\(\s*\)\s*\{/);
+    chk('getAppVersion has ZERO parameters', !!m);
+    if (!m) return;
+    var i = m.index + m[0].length, depth = 1, inStr = false, strCh = '';
+    while (i < preloadSrc.length && depth > 0) {
+      var ch = preloadSrc.charAt(i);
+      if (inStr) { if (ch === '\\') { i += 2; continue; } if (ch === strCh) inStr = false; }
+      else if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; }
+      else if (ch === '{') depth++;
+      else if (ch === '}') depth--;
+      i++;
+    }
+    var body = preloadSrc.slice(m.index + m[0].length, i - 1);
+    var bodyNoInvoke = body.replace(/ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*\)/g, '');
+    chk('getAppVersion body: ipcRenderer appears ONLY as the exact allowlisted invoke', !/ipcRenderer/.test(bodyNoInvoke), { residue: (bodyNoInvoke.match(/.{0,40}ipcRenderer.{0,40}/) || [])[0] });
+    chk('getAppVersion body: no require/process/arguments/spread forwarding', !/\brequire\s*\(|\bprocess\s*[.\[]|\barguments\b|\.\.\./.test(body));
+    chk('getAppVersion body: never returns a bare authority object', !/return\s+ipcRenderer\b|return\s+process\b|return\s+require\b/.test(body));
+  })();
   for (var ee = 0; ee < exposedEntries.length; ee++) {
     var entry = exposedEntries[ee];
     // Static forbidden-token check (catches process.env, child_process, etc., even via concat)

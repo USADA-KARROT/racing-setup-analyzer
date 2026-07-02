@@ -19,7 +19,10 @@ function getAppVersion() {
     }),
   ])
     .then((v) => {
-      if (typeof v === 'string' && /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(v)) return v;
+      // Strict SemVer 2.0.0 (semver.org): no leading zeros, dot-separated non-empty
+      // pre-release/build identifiers — '01.2.3', '1.2.3-..', '1.2.3+.' all fail.
+      const SEMVER = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$/;
+      if (typeof v === 'string' && SEMVER.test(v)) return v;
       throw new Error('APP_VERSION_MALFORMED');
     })
     .catch((err) => {

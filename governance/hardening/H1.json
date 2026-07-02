@@ -34,7 +34,7 @@
       "app:get-version (invoke-only, constant, removeHandler-first idempotent registration)"
     ],
     "electronAPISurface": "{ platform: process.platform, getAppVersion(): Promise<string|'unavailable'> }",
-    "failClosed": "IPC error / 3s timeout / malformed (non-semver) reply -> literal 'unavailable' + console.warn; renderer default 'unavailable'; missing bridge -> console.warn; NEVER a fabricated version; NEVER a crash",
+    "failClosed": "IPC error / 3s timeout / malformed reply (strict SemVer 2.0.0 — leading zeros / empty identifiers rejected) -> literal 'unavailable' + console.warn; renderer default 'unavailable'; missing bridge -> console.warn; NEVER a fabricated version; NEVER a crash",
     "webPreferences": "contextIsolation:true, nodeIntegration:false, sandbox: Electron default true (never set false — asserted by hardening-01)"
   },
   "evidence": {
