@@ -54,19 +54,32 @@ const GREEN_ARTIFACTS = {
   'preset-integrity.json': { presetCount: 501 },
   'i18n-result.json': { i18nMissing: 0 },
   // mirrors the REAL artifact schema: productionFeatureOrphans is a COUNT, ids in `orphans`
-  'feature-registry-result.json': { productionFeatureOrphans: 0, orphans: [] },
+  'feature-registry-result.json': { productionFeatureOrphans: 0, orphans: [], ok: true },
+  // F5-R2-01: corroborated artifacts for the exit-code-only delegated conditions
+  'dependency-audit.json': { ok: true },
+  'r3-0c-no-consumer.json': { ok: true },
+  'r3-0d-no-consumer.json': { ok: true },
+  'r3-0e-no-consumer.json': { ok: true },
+  'r3-0f-no-consumer.json': { ok: true },
+  'version-policy.json': { ok: true },
 };
 
 // ── per-condition fail-closed judgement ─────────────────────────────────────────
 
-// 1 preflight: selftest failure blocks before the audit even runs
+// 1 preflight: selftest failure blocks before the audit even runs; the audit's
+// artifact must corroborate (F5-R2-01)
 (function () {
   let calls = 0;
   const io = { delegate: () => { calls++; return { ok: false, detail: {} }; }, readJson: () => ({}) };
   const r = cond(1).run(io);
   chk('preflight: selftest failure -> FAIL without running the audit', r.ok === false && calls === 1);
-  const io2 = { delegate: () => ({ ok: true, detail: {} }), readJson: () => ({}) };
-  chk('preflight: both stages green -> PASS', cond(1).run(io2).ok === true);
+  const io2 = { delegate: () => ({ ok: true, detail: {} }), readJson: ioAllGreen(GREEN_ARTIFACTS).readJson };
+  chk('preflight: both stages green + green artifact -> PASS', cond(1).run(io2).ok === true);
+  // F5-R2-01 closure: exit 0 alone must NOT pass — the artifact must exist with ok===true
+  const ioNoArtifact = { delegate: () => ({ ok: true, detail: {} }), readJson: () => { throw new Error('missing'); } };
+  chk('preflight: green child + MISSING artifact -> FAIL (F5-R2-01)', cond(1).run(ioNoArtifact).ok === false);
+  const ioBadArtifact = { delegate: () => ({ ok: true, detail: {} }), readJson: () => ({ ok: false }) };
+  chk('preflight: green child + artifact ok:false -> FAIL (F5-R2-01)', cond(1).run(ioBadArtifact).ok === false);
 })();
 
 // 2 tests: child exit 0 alone is NOT enough — the manifest must corroborate
@@ -111,10 +124,26 @@ const GREEN_ARTIFACTS = {
   chk('i18n: 3 missing -> FAIL', cond(6).run(ioAllGreen(Object.assign({}, GREEN_ARTIFACTS, { 'i18n-result.json': { i18nMissing: 3 } }))).ok === false);
 })();
 
-// 7 reachability delegates; a red child fails the condition
+// 7 reachability delegates; a red child fails; artifact must corroborate (F5-R2-01)
 (function () {
   const io = { delegate: () => ({ ok: false, detail: { exitCode: 1 } }), readJson: () => ({}) };
   chk('reachability: red child -> FAIL', cond(7).run(io).ok === false);
+  chk('reachability: green child + green artifact -> PASS', cond(7).run(ioAllGreen(GREEN_ARTIFACTS)).ok === true);
+  const ioBad = { delegate: () => ({ ok: true, detail: {} }), readJson: () => ({ ok: false }) };
+  chk('reachability: green child + artifact ok:false -> FAIL (F5-R2-01)', cond(7).run(ioBad).ok === false);
+})();
+
+// 12 tagPolicy: artifact must corroborate (F5-R2-01)
+(function () {
+  chk('tagPolicy: green child + green artifact -> PASS', cond(12).run(ioAllGreen(GREEN_ARTIFACTS)).ok === true);
+  const ioBad = { delegate: () => ({ ok: true, detail: {} }), readJson: () => ({ ok: false }) };
+  chk('tagPolicy: green child + artifact ok:false -> FAIL (F5-R2-01)', cond(12).run(ioBad).ok === false);
+})();
+
+// 8 consumer checks: a green consumer child whose artifact says ok:false must FAIL (F5-R2-01)
+(function () {
+  const arts = Object.assign({}, GREEN_ARTIFACTS, { 'r3-0e-no-consumer.json': { ok: false } });
+  chk('noOrphans: green children + one consumer artifact ok:false -> FAIL (F5-R2-01)', cond(8).run(ioAllGreen(arts)).ok === false);
 })();
 
 // 8 noOrphans: the registry validator child, ALL four consumer checks, and the

@@ -79,6 +79,24 @@ function _delegate(scriptRelPath, extraArgs, extraEnv) {
   };
 }
 
+// Codex F5-R2-01: a delegated child's exit code alone is not enough — the artifact
+// the child just (re)wrote must also be readable and carry ok === true. Missing,
+// unreadable, or schema-invalid artifacts FAIL the condition even on exit 0.
+function _corroborate(io, childResult, artifactName) {
+  if (!childResult.ok) return { ok: false, detail: childResult.detail };
+  let art = null;
+  try { art = io.readJson(path.join(ARTIFACT_DIR, artifactName)); } catch (_) { }
+  const artOk = !!art && art.ok === true;
+  return {
+    ok: artOk,
+    detail: Object.assign({}, childResult.detail, {
+      artifact: artifactName,
+      artifactOk: art ? art.ok === true : null,
+      artifactReadable: !!art,
+    }),
+  };
+}
+
 // ── the 12 conditions ───────────────────────────────────────────────────────────
 
 const CONDITIONS = [
@@ -89,7 +107,7 @@ const CONDITIONS = [
     run(io) {
       const self = io.delegate('scripts/check-verification-dependencies.js', ['--selftest']);
       if (!self.ok) return { ok: false, detail: { phase: 'selftest', inner: self.detail } };
-      const main = io.delegate('scripts/check-verification-dependencies.js');
+      const main = _corroborate(io, io.delegate('scripts/check-verification-dependencies.js'), 'dependency-audit.json');
       return { ok: main.ok, detail: { phase: 'audit', inner: main.detail } };
     },
   },
@@ -194,7 +212,7 @@ const CONDITIONS = [
     key: 'reachability',
     name: 'Reachability — feature-registry contract (state-aware)',
     run(io) {
-      const r = io.delegate('scripts/check-feature-registry.js');
+      const r = _corroborate(io, io.delegate('scripts/check-feature-registry.js'), 'feature-registry-result.json');
       return { ok: r.ok, detail: r.detail };
     },
   },
@@ -216,10 +234,10 @@ const CONDITIONS = [
       // the offending ids live in the sibling `orphans` array. Fail closed when the
       // child failed, the artifact is unreadable, or the count is absent/non-zero.
       const orphanCount = reg && typeof reg.productionFeatureOrphans === 'number' ? reg.productionFeatureOrphans : null;
-      const c = io.delegate('scripts/check-r3-0c-no-consumer.js');
-      const d = io.delegate('scripts/check-r3-phase-no-consumer.js', [], { R3_PHASE_PROGRAM: 'R3.0D' });
-      const e = io.delegate('scripts/check-r3-phase-no-consumer.js', [], { R3_PHASE_PROGRAM: 'R3.0E' });
-      const f = io.delegate('scripts/check-r3-phase-no-consumer.js', [], { R3_PHASE_PROGRAM: 'R3.0F' });
+      const c = _corroborate(io, io.delegate('scripts/check-r3-0c-no-consumer.js'), 'r3-0c-no-consumer.json');
+      const d = _corroborate(io, io.delegate('scripts/check-r3-phase-no-consumer.js', [], { R3_PHASE_PROGRAM: 'R3.0D' }), 'r3-0d-no-consumer.json');
+      const e = _corroborate(io, io.delegate('scripts/check-r3-phase-no-consumer.js', [], { R3_PHASE_PROGRAM: 'R3.0E' }), 'r3-0e-no-consumer.json');
+      const f = _corroborate(io, io.delegate('scripts/check-r3-phase-no-consumer.js', [], { R3_PHASE_PROGRAM: 'R3.0F' }), 'r3-0f-no-consumer.json');
       const ok = regRun.ok && orphanCount === 0 && c.ok && d.ok && e.ok && f.ok;
       return {
         ok: ok,
@@ -337,7 +355,7 @@ const CONDITIONS = [
     key: 'tagPolicy',
     name: 'Tag policy — version pinned at 1.4.0, lockfile untracked, workflows install-free',
     run(io) {
-      const r = io.delegate('scripts/check-version-policy.js');
+      const r = _corroborate(io, io.delegate('scripts/check-version-policy.js'), 'version-policy.json');
       return { ok: r.ok, detail: r.detail };
     },
   },
