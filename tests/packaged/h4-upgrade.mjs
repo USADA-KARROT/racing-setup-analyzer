@@ -50,8 +50,10 @@ try {
   chk('reports version 2.0.0', ver === '2.0.0', ver);
 
   if (phase === 'upgrade') {
-    // The 1.4.0 profile had Local Storage but NO IndexedDB. 2.0.0 must initialize IndexedDB fresh
-    // and persist a schema-v1 case, WITHOUT corrupting the pre-existing Local Storage.
+    // The 1.4.0 profile had a Local Storage sentinel authored BY THE REAL 1.4.0 BINARY (h4_sentinel)
+    // but NO IndexedDB. 2.0.0 must initialize IndexedDB fresh + persist a schema-v1 case WITHOUT
+    // destroying the pre-existing 1.4.0 Local Storage. The expected sentinel is passed via env.
+    const expectedSentinel = process.env.H4_SENTINEL || '';
     const seed = await ev(`(async function(){
       const be = StorageBackend.IndexedDBBackend();
       const store = CaseStore.createCaseStore(be);
@@ -59,11 +61,13 @@ try {
       if (!created.ok) return { ok:false, code: created.code, error: created.error };
       const back = await store.open(created.caseId);
       const raw = await be.get('cases', created.caseId);
-      return { ok: back.ok === true, caseId: created.caseId, title: back.ok ? back.metadata.title : null, schemaVersion: raw ? raw.schemaVersion : null, lang: (function(){ try { return localStorage.getItem('lang'); } catch(e){ return 'ERR:'+e.message; } })() };
+      return { ok: back.ok === true, caseId: created.caseId, title: back.ok ? back.metadata.title : null, schemaVersion: raw ? raw.schemaVersion : null, sentinel: (function(){ try { return localStorage.getItem('h4_sentinel'); } catch(e){ return 'ERR:'+e.message; } })(), marker: (function(){ try { return localStorage.getItem('h4_marker'); } catch(e){ return 'ERR:'+e.message; } })() };
     })()`);
     chk('IndexedDB initialized + case persisted over the 1.4.0 profile', seed && seed.ok === true, seed);
     chk('created case is schema v1', seed && seed.schemaVersion === 1, seed);
-    chk('pre-existing Local Storage still readable (not corrupted by upgrade)', seed && typeof seed.lang !== 'undefined' && !(String(seed.lang).startsWith('ERR:')), seed && seed.lang);
+    // NON-VACUOUS: the exact sentinel string the 1.4.0 binary wrote must be read back intact.
+    chk('1.4.0-authored Local Storage sentinel SURVIVED the upgrade (exact value)', !!expectedSentinel && seed && seed.sentinel === expectedSentinel, { got: seed && seed.sentinel, expected: expectedSentinel });
+    chk('1.4.0-authored h4_marker also survived', seed && seed.marker === 'present', seed && seed.marker);
     console.log('SEEDED=' + (seed && seed.caseId));
   }
 

@@ -17,19 +17,29 @@
     "v140Binary": "REAL v1.4.0 app (electron . from the v1.4.0 tag worktree, electron 33.4.11) authored the fixture profile",
     "fixtureProfile": "38 files, ~1.7M, IndexedDB ABSENT (authentic 1.4.0 state)",
     "v200Binary": "packaged v2.0.0 arm64 .app (this candidate)",
-    "upgradePhase": "8/8 PASS — 2.0.0 boots on the 1.4.0 profile, initializes IndexedDB fresh, persists a schema-v1 case, pre-existing Local Storage still readable (not corrupted)",
+    "upgradePhase": "9/9 PASS — 2.0.0 boots on the 1.4.0 profile, initializes IndexedDB fresh, persists a schema-v1 case, AND the exact Local Storage sentinel authored by the real 1.4.0 binary (h4_sentinel) is read back intact (non-vacuous preservation proof)",
     "reopenPhase": "9/9 PASS — case survives 2.0.0 restart, exactly one (no duplication), schema v1 unchanged, open() idempotent",
     "isolation": "real profile moved aside; 1.4.0 fixture copied in; restored afterward (macOS Electron ignores $HOME)",
-    "logs": {
-      "upgrade": {
-        "result": "8/8",
-        "sha256": "68ed7c6adb2ab8e38499bd3d649c49e7b813842bc2ecaf235a0b4ed076dcc73e"
+    "committedEvidence": {
+      "fixtureProvenance": {
+        "path": "governance/hardening/h4-evidence/fixture-provenance.json",
+        "sha256": "2276c6ccbfb93cbc524351da0486e48d569bd83813d0f9521190ecd31c4326b0"
       },
-      "reopen": {
-        "result": "9/9",
+      "fixtureFileManifest": {
+        "path": "governance/hardening/h4-evidence/fixture-1.4.0-profile.sha256",
+        "sha256": "b4be9cefb00bf18c0ff9be24fd66155519772d0791f5c4e37ac0fa35967cc9ef",
+        "note": "per-file sha256 of the exact 1.4.0-authored profile; auditably shows a Local Storage store and NO IndexedDB directory"
+      },
+      "upgradeLog": {
+        "path": "governance/hardening/h4-evidence/upgrade-phase.log",
+        "sha256": "ff34fbbdf284eb79eb88d812ea878f529e41a986ec09e5bbc90906b0fff57db7"
+      },
+      "reopenLog": {
+        "path": "governance/hardening/h4-evidence/reopen-phase.log",
         "sha256": "6e0dca8ec3aeeb85510e922948cac8308fd43b02792eca1b3d4edbc7e4ece595"
       }
-    }
+    },
+    "sentinelProof": "a sentinel string was written into Local Storage FROM WITHIN the real 1.4.0 renderer (CDP localStorage.setItem) before the fixture was captured; the packaged 2.0.0 binary reads back the exact same value, proving (a) the profile is genuinely 1.4.0-authored and (b) 2.0.0 preserves pre-existing Local Storage. Value recorded in fixture-provenance.json."
   },
   "deterministicQualification": {
     "suite": "tests/h4-upgrade-qualification.test.js 14/14 over the SAME production modules (case-store.js + storage-backend.js + schema-migration.js)",

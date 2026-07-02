@@ -1,0 +1,11 @@
+  ✓ [upgrade] 2.0.0 boots on the 1.4.0-authored profile (no preload crash)
+  ✓ [upgrade] renderer alive (document.title present)
+  ✓ [upgrade] reports version 2.0.0
+  ✓ [upgrade] IndexedDB initialized + case persisted over the 1.4.0 profile
+  ✓ [upgrade] created case is schema v1
+  ✓ [upgrade] 1.4.0-authored Local Storage sentinel SURVIVED the upgrade (exact value)
+  ✓ [upgrade] 1.4.0-authored h4_marker also survived
+SEEDED=case_mr35x6m6_252rzi
+  ✓ [upgrade] spawned binary still alive (target ownership)
+  ✓ [upgrade] port still owned by our child (lsof)
+H4-UPGRADE(upgrade): 9 passed, 0 failed
