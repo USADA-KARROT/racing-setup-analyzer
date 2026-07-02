@@ -49,7 +49,11 @@ function _makeTempDir(prefix) {
     _cleanupBestEffort(created, 'escape-check');
     throw new Error('managed-temp-dir: created dir escaped the temp root: ' + created);
   }
-  return created;
+  // Return (and therefore register) the CANONICAL path (Codex INFRA-R2-01): if os.tmpdir()
+  // is a symlink that gets retargeted after acquisition, cleanup against the unresolved
+  // path could delete a same-named directory under the NEW target. Anchoring to the
+  // realpath at creation time pins every later cleanup to the directory actually created.
+  return path.join(tempRoot, path.basename(created));
 }
 
 function _cleanupBestEffort(tempDir, context) {
