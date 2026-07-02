@@ -50,7 +50,7 @@ const GREEN_ARTIFACTS = {
     results: Array.from({ length: 15 }, (_, i) => ({ file: 'tests/e2e/x-' + i + '.test.js', exitCode: 0, timedOut: false, assertionsFailed: 0 }))
       .concat([{ file: 'tests/other.test.js', exitCode: 0, timedOut: false, assertionsFailed: 0 }]),
   },
-  'frozen-boundary-result.json': { frozenDiffCount: 0 },
+  'frozen-boundary-result.json': { frozenDiffCount: 0, violations: [] },
   'preset-integrity.json': { presetCount: 501 },
   'i18n-result.json': { i18nMissing: 0 },
   // mirrors the REAL artifact schema: productionFeatureOrphans is a COUNT, ids in `orphans`
@@ -117,7 +117,8 @@ const GREEN_ARTIFACTS = {
 // 4/5/6: artifact must corroborate the child exit code
 (function () {
   chk('frozen: green child + frozenDiffCount 0 -> PASS', cond(4).run(ioAllGreen(GREEN_ARTIFACTS)).ok === true);
-  chk('frozen: frozenDiffCount 1 -> FAIL', cond(4).run(ioAllGreen(Object.assign({}, GREEN_ARTIFACTS, { 'frozen-boundary-result.json': { frozenDiffCount: 1 } }))).ok === false);
+  chk('frozen: violation outside the allowlist -> FAIL', cond(4).run(ioAllGreen(Object.assign({}, GREEN_ARTIFACTS, { 'frozen-boundary-result.json': { frozenDiffCount: 1, violations: ['renderer/js/case-store.js'] } }))).ok === false);
+  chk('frozen: artifact missing violations array -> FAIL (fail-closed shape)', cond(4).run(ioAllGreen(Object.assign({}, GREEN_ARTIFACTS, { 'frozen-boundary-result.json': { frozenDiffCount: 0 } }))).ok === false);
   chk('preset501: 501 -> PASS', cond(5).run(ioAllGreen(GREEN_ARTIFACTS)).ok === true);
   chk('preset501: 500 -> FAIL even with child exit 0', cond(5).run(ioAllGreen(Object.assign({}, GREEN_ARTIFACTS, { 'preset-integrity.json': { presetCount: 500 } }))).ok === false);
   chk('i18n: 0 missing -> PASS', cond(6).run(ioAllGreen(GREEN_ARTIFACTS)).ok === true);
