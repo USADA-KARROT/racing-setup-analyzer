@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "program": "PUBLIC_RELEASE_HARDENING",
+  "record": "V2_0_1_UNSIGNED_PREVIEW_PUBLISH",
+  "release_executed": true,
+  "releaseStage": "UNSIGNED_PREVIEW_PUBLISHED",
+  "stageNote": "This is the hardening-program stage for the v2.0.1 line. The R3.0F governance (F6.json) stays at RELEASE_TAGGED_DRAFT — its releaseRecord is schema-pinned to the v2.0.0 tag/draft (id 347825133), which was NEVER published; flipping r3.0f release_executed would violate its committed published-only semantic ruling. This record is the truthful publish mirror for v2.0.1.",
+  "finalSourceBranch": "release/v2.0.0-public-hardening",
+  "finalSourceSha": "bc1bd1fffa07c32cf0df8b3c416525e76be6b1fd",
+  "tag": {
+    "name": "v2.0.1",
+    "type": "annotated",
+    "object": "a61118dd28835da74fac7630244c4180bad07047",
+    "peeledTarget": "bc1bd1fffa07c32cf0df8b3c416525e76be6b1fd",
+    "message": "Racing Setup Analyzer v2.0.1 — Unsigned macOS Preview"
+  },
+  "v200TagUnchanged": {
+    "object": "668c002161d4e1e28109b5d55df303f4bd75ef79",
+    "peeled": "74bdc5c6589644d12816bcbb14f6f2918cce73de",
+    "verifiedAfterPublish": true
+  },
+  "githubRelease": {
+    "id": 347930406,
+    "url": "https://github.com/USADA-KARROT/racing-setup-analyzer/releases/tag/v2.0.1",
+    "publishedAt": "2026-07-02T09:05:50Z",
+    "prerelease": true,
+    "makeLatest": false,
+    "draft": false,
+    "assets": [
+      {
+        "name": "Racing.Setup.Analyzer-2.0.1-arm64.dmg",
+        "bytes": 99144978,
+        "sha256": "99e33fbefb7eaf87bb6b86c1dce54c3301d5acd5b14ac5818dd9718b262cc75d",
+        "note": "GitHub normalizes spaces to dots; SHA256SUMS lists both filename forms"
+      },
+      {
+        "name": "SHA256SUMS.txt",
+        "bytes": 479
+      },
+      {
+        "name": "racing-setup-analyzer-2.0.1-sbom.cdx.json",
+        "bytes": 232972,
+        "sha256": "f780085cf3d061eb793037b84eea7c1419922e9c0df0a459a80bb09c1a032b0e"
+      },
+      {
+        "name": "THIRD_PARTY_NOTICES.md",
+        "bytes": 2555,
+        "sha256": "d2294b24ff9d59560a502e8d6beaa792a8c8b9c24150893131022e8bb692daa4"
+      },
+      {
+        "name": "LICENSE",
+        "bytes": 1069,
+        "sha256": "6f49deb7f914a07f1ea73c24882c7f78748754ac84e60c04920f19dcced264d0"
+      }
+    ],
+    "downloadVerification": "DMG re-downloaded post-publish via authenticated API AND anonymously — sha256 byte-identical to the local manifest"
+  },
+  "publishIncident": {
+    "what": "the publish PATCH (draft=false) initially dropped the tag association (release went 'untagged'); anonymous downloads 404'd",
+    "fix": "PATCH tag_name=v2.0.1 re-attached; tag itself never moved; anonymous download then byte-verified",
+    "tagIntegrity": "v2.0.1 annotated tag object/peeled target unchanged throughout"
+  },
+  "license": "MIT (Copyright (c) 2026 USADA-KARROT); third-party licenses preserved; THIRD_PARTY_NOTICES authoritative",
+  "signingTruth": {
+    "signing": "UNSIGNED",
+    "developerId": "DEFERRED_TO_COMMERCIAL_RELEASE",
+    "notarization": "NOT_PERFORMED",
+    "stapling": "NOT_PERFORMED",
+    "gatekeeper": "WARNING_EXPECTED_AND_DOCUMENTED"
+  },
+  "reviews": {
+    "fable5FinalReview": "PASS (clean-room, governance/hardening/fable5-final-review.json)",
+    "codex": "DEFERRED_OPTIONAL_POST_RELEASE_AUDIT"
+  },
+  "boundaries": {
+    "mainUntouched": "0563f119e2bdfced959b7a808cf292e0f883807f",
+    "v200DraftRelease": "347825133 remains an unpublished historical draft",
+    "deployments": 0
+  }
+}
