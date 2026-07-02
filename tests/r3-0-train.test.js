@@ -389,6 +389,87 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
   chk('FAIL invalid trainStatus', hasViolation(r.artifact, 'TRAIN_STATUS_INVALID'));
 }
 
+// ── 24. F6 release-mirror consistency (semantic ruling: release_executed = PUBLISHED only) ──
+// Fixture helpers: mutate the F6 checkpoint / R3.0F state copies and expect the exact violation.
+function f6Path(dir) { return path.join(dir, 'governance', 'r3.0f', 'checkpoints', 'F6.json'); }
+function f6State(dir) { return path.join(dir, 'governance', 'r3.0f', 'state.json'); }
+function mutateF6(fn) {
+  const dir = buildFixture();
+  const m = readJson(f6Path(dir));
+  const st = readJson(f6State(dir));
+  fn(m, st);
+  writeJson(f6Path(dir), m); writeJson(f6State(dir), st);
+  return runValidator(dir);
+}
+
+// mirror-1: tag recorded, no published Release, capability flipped on -> FAIL
+{
+  const r = mutateF6((m, st) => { st.enabledCapabilities.push('release_executed'); });
+  chk('FAIL release_executed capability with tag+draft only', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
+// mirror-2: record flag releaseExecuted=true while Release is still a draft -> FAIL (both codes)
+{
+  const r = mutateF6((m) => { m.releaseRecord.releaseExecuted = true; });
+  chk('FAIL releaseExecuted record flag on draft Release', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_ON_DRAFT') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
+// mirror-3: a genuinely published Release (draft=false, publishedAt set, stage advanced) allows release_executed
+{
+  const r = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+  });
+  chk('PASS-path: published Release permits release_executed (no mirror violations)', !hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH') && !hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_ON_DRAFT') && !hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH'));
+}
+// mirror-4: dmgUploaded=true with empty assets -> FAIL
+{
+  const r = mutateF6((m) => { m.releaseRecord.dmgUploaded = true; });
+  chk('FAIL dmgUploaded=true with no .dmg asset', hasViolation(r.artifact, 'R3F_DMG_FLAG_WITHOUT_ASSET'));
+}
+// mirror-5: dmgUploaded=true with only a non-dmg asset -> still FAIL
+{
+  const r = mutateF6((m) => { m.releaseRecord.dmgUploaded = true; m.releaseRecord.githubRelease.assets = [{ name: 'notes.txt' }]; });
+  chk('FAIL dmgUploaded=true with non-dmg asset only', hasViolation(r.artifact, 'R3F_DMG_FLAG_WITHOUT_ASSET'));
+}
+// mirror-6: empty assets but dmgUploaded not exactly false -> FAIL
+{
+  const r = mutateF6((m) => { delete m.releaseRecord.dmgUploaded; });
+  chk('FAIL empty assets require dmgUploaded===false', hasViolation(r.artifact, 'R3F_DMG_FLAG_NOT_FALSE_ON_EMPTY_ASSETS'));
+}
+// mirror-7: tag target differs from the recorded main merge SHA -> FAIL
+{
+  const r = mutateF6((m) => { m.releaseRecord.tagTarget = '1661f1c16d584c96aec2fc1704f6dd730a86d480'; });
+  chk('FAIL tagTarget != mainMergeSha', hasViolation(r.artifact, 'R3F_TAG_TARGET_MISMATCH'));
+}
+// mirror-8: wrong tag name -> FAIL
+{
+  const r = mutateF6((m) => { m.releaseRecord.tag = 'v2.0.1'; });
+  chk('FAIL releaseRecord.tag != v2.0.0', hasViolation(r.artifact, 'R3F_RELEASE_TAG_WRONG'));
+}
+// mirror-9: Release tag_name diverging from the recorded tag -> FAIL
+{
+  const r = mutateF6((m) => { m.releaseRecord.githubRelease.tagName = 'v1.9.9'; });
+  chk('FAIL githubRelease.tagName != releaseRecord.tag', hasViolation(r.artifact, 'R3F_RELEASE_TAG_NAME_MISMATCH'));
+}
+// mirror-10: stage rolled back to RELEASE_PREPARED while tag evidence exists -> FAIL (no history rewrite)
+{
+  const r = mutateF6((m) => { m.releaseStage = 'RELEASE_PREPARED'; });
+  chk('FAIL stage may not lag recorded tag/Release evidence', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH'));
+}
+// mirror-11: lightweight tag (or missing tag object) -> FAIL
+{
+  const r = mutateF6((m) => { m.releaseRecord.tagType = 'lightweight'; m.releaseRecord.tagObjectSha = m.releaseRecord.tagTarget; });
+  chk('FAIL non-annotated tag record', hasViolation(r.artifact, 'R3F_TAG_NOT_ANNOTATED'));
+}
+// mirror-12: unknown releaseStage -> FAIL
+{
+  const r = mutateF6((m) => { m.releaseStage = 'RELEASE_SHIPPED'; });
+  chk('FAIL unknown releaseStage', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_UNKNOWN'));
+}
+
 H.cleanupAll();
 console.log('r3-0-train: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

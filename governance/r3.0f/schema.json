@@ -63,6 +63,11 @@
   "algorithmCheckpoint": "F1_MIGRATION_ENGINE",
   "uiCheckpoint": "F3_QUALITY_HARDENING",
   "featureRegistryActivationCheckpoint": "F6_RELEASE",
+  "releaseStages": {
+    "note": "Monotonic F6_RELEASE progression recorded in checkpoints/F6.json releaseStage. Forward-only: RELEASE_PREPARED (bump staged; no tag/Release) -> RELEASE_TAGGED_DRAFT (annotated tag pushed AND/OR a DRAFT GitHub Release exists; nothing published, no assets) -> RELEASE_PUBLISHED (the GitHub Release is actually published: draft=false with a non-null publishedAt). Semantic ruling (SKYLINE, 2026-07-02): the release_executed capability means PUBLISHED ONLY — a tag alone or a draft Release alone must NOT enable it. Later stages never rewrite earlier evidence; publish advances the stage and fills publishedAt without history rewrites.",
+    "order": ["RELEASE_PREPARED", "RELEASE_TAGGED_DRAFT", "RELEASE_PUBLISHED"],
+    "releaseExecutedRequiresStage": "RELEASE_PUBLISHED"
+  },
   "bootstrapCheckpoint": "F0_BOOTSTRAP",
   "contractPrefix": "contracts/r3.0f",
   "authorizedPathRules": {

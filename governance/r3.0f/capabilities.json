@@ -37,7 +37,7 @@
     "release_executed": {
       "kind": "activation",
       "unlockFloor": "F6_RELEASE",
-      "description": "Final activation: package.json version 1.4.0 → 2.0.0 (single bump); the R3.0 Integrated Delivery Train Draft PR is merged; tag v2.0.0 and the corresponding GitHub Release are created AFTER merge + the new main CI PASS. release_executed=true on the post-merge state.json mirror records that this final activation completed; in the train branch itself this capability remains disabled until F6 checkpoint is staged."
+      "description": "Final activation. SEMANTIC RULING (SKYLINE, 2026-07-02): release_executed=true means ONLY that the v2.0.0 GitHub Release has actually been PUBLISHED (draft=false, publishedAt non-null). Creating the annotated tag does NOT enable it; creating a DRAFT Release does NOT enable it. Preconditions remain: single 1.4.0->2.0.0 bump merged to main via the F6 PR + new main CI PASS + tag v2.0.0 pointing at the post-merge main SHA. The enabling change itself lands only on a post-publish governance mirror under separate explicit authorization."
     }
   }
 }
