@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "program": "PUBLIC_RELEASE_HARDENING",
+  "phase": "H2_PRODUCT_IDENTITY",
+  "baseSha": "9e9079f5f9fa0b390d7c7c7c0d167103d0d1b171",
+  "integrationBranch": "release/v2.0.0-public-hardening",
+  "headSha": null,
+  "closes": [
+    "B1 default Electron icon",
+    "B3 copyright",
+    "B4 minimumSystemVersion",
+    "B7 DMG volume/layout"
+  ],
+  "icon": {
+    "style": "A — abstract geometric monogram (R + katakana-レ leg-hook + 賽-hint negative-space window + vermilion apex dot + checkered block)",
+    "provenance": "ORIGINAL, programmatically drawn by the committed build-resources/generate-icon.py (PIL geometry; no third-party assets/fonts/downloads); manifest build-resources/icon-manifest.json pins all 13 assets by sha256",
+    "master": {
+      "path": "build-resources/icon-master-1024.png",
+      "sha256": "190d54a82ef1146a6ba8717a279dd7bef95817f43bd74db25083808c9fa0b800"
+    },
+    "icns": {
+      "path": "build-resources/icon.icns",
+      "sha256": "62590db9c88cd3ec8c1eb05a0a86101ab021bfcf2e303d093a6a87bad33e6e8b"
+    },
+    "legibility": "16px luminance spread 253; contrast ~7.1:1; ~12% safe margin (macOS squircle)"
+  },
+  "identity": {
+    "appId": "com.racingsetup.analyzer (UNCHANGED — upgrade identity)",
+    "productName": "Racing Setup Analyzer (UNCHANGED — userData path identity)",
+    "packageName": "racing-setup-analyzer (UNCHANGED — userData dir)",
+    "copyright": "Copyright (c) 2026 USADA-KARROT. All rights reserved.",
+    "minimumSystemVersion": "12.0.0",
+    "platform": "Apple Silicon arm64 ONLY (no Intel, no universal, no Windows)",
+    "dmg": "volume 'Racing Setup Analyzer <version>', app + /Applications symlink layout, custom volume icon"
+  },
+  "verification": {
+    "verifier": "scripts/verify-app-identity.sh (committed, re-runnable) — APP-IDENTITY: PASS (plist identity, bundle-icon sha256 == committed asset, arm64-only Mach-O, DMG mount/volume/shortcut)",
+    "inChainTest": "tests/h2-product-identity.test.js 10/10 (manifest hashes, provenance, build wiring, identity-unchanged guards)",
+    "runtime": "packaged clean-profile 12/12 + existing-profile 12/12 with the new identity (h1 runtime harness)",
+    "plist": {
+      "CFBundleName": "Racing Setup Analyzer",
+      "CFBundleIdentifier": "com.racingsetup.analyzer",
+      "CFBundleShortVersionString": "2.0.0",
+      "CFBundleVersion": "2.0.0",
+      "CFBundleIconFile": "icon.icns",
+      "LSMinimumSystemVersion": "12.0.0"
+    }
+  },
+  "reviewStatus": {
+    "implementation": "PASS",
+    "internalVerification": "PASS",
+    "codexStageReview": "WAIVED_BY_SINGLE_FINAL_REVIEW_GATE",
+    "finalCrossPhaseReview": "PENDING"
+  },
+  "codexVerdict": null,
+  "note": "INTERNAL VERIFICATION PASS - FINAL CROSS-PHASE REVIEW PENDING. Per the SINGLE FINAL REVIEW GATE directive, this phase merges on internal verification + CI; the one final cross-phase Codex review covers it before any RC is marked ready."
+}
