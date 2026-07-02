@@ -36,15 +36,18 @@
     'case:recommendations': { id: 'case:recommendations', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'recommendations', labelKey: 'casenav.recommendations', order: 5, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'recommendations', currentTab: 'analysis' } },
     'case:corner_coaching': { id: 'case:corner_coaching', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'corner_coaching', labelKey: 'casenav.corner_coaching', order: 6, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'corner_coaching', currentTab: 'analysis' } },
     'case:evidence_trust': { id: 'case:evidence_trust', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'evidence_trust', labelKey: 'casenav.evidence_trust', order: 7, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'evidence_trust', currentTab: 'analysis' } },
-    // R3.0D D5 — Engineer Brief subview. Mounts the render-only Engineer Brief pane wired via
-    // R3_0D_EngineerOrchestrator (case/session-scoped; cleared on case/session/mapping/calibration
-    // /telemetry change). Activation governed by governance/r3.0d/state.json
-    // (featureRegistryActivationAllowed=true at D5_ENGINEER_BRIEF_ACTIVATION).
+    // R3.0D D5 — Engineer Brief subview. NAV NODE ONLY at this milestone: the D5 mount in
+    // renderer/index.html ships hidden/inert and no UI event calls the orchestrator's
+    // prepareEngineerInsight — pane content is a downstream wire-in step (disclosed in
+    // docs/release-notes-2.0.0.md "Known limitations"). Activation governed by
+    // governance/r3.0d/state.json (featureRegistryActivationAllowed=true at
+    // D5_ENGINEER_BRIEF_ACTIVATION).
     'case:engineer_brief': { id: 'case:engineer_brief', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'engineer_brief', labelKey: 'casenav.engineer_brief', order: 8, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'engineer_brief', currentTab: 'analysis' } },
-    // R3.0E E5 — Experiment Loop + Case Timeline subviews. Mount the render-only viewmodel
-    // pane wired via R3_0E_ExperimentViewmodel (case/session-scoped; cleared on case/session/
-    // applied-change change). Activation governed by governance/r3.0e/state.json
-    // (featureRegistryActivationAllowed=true at E5_UI_ACTIVATION).
+    // R3.0E E5 — Experiment Loop + Case Timeline subviews. NAV NODES ONLY at this milestone:
+    // renderer/index.html loads no R3.0E viewmodel script and renders no pane content for
+    // either subview — pane wiring is a downstream step (disclosed in
+    // docs/release-notes-2.0.0.md "Known limitations"). Activation governed by
+    // governance/r3.0e/state.json (featureRegistryActivationAllowed=true at E5_UI_ACTIVATION).
     'case:experiment_loop': { id: 'case:experiment_loop', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'experiment_loop', labelKey: 'casenav.experiment_loop', order: 9, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'experiment_loop', currentTab: 'analysis' } },
     'case:case_timeline': { id: 'case:case_timeline', kind: 'case_subview', parentNodeId: 'cases', subviewId: 'case_timeline', labelKey: 'casenav.case_timeline', order: 10, availability: 'available', legacyRouting: { shellSection: 'cases', caseSubview: 'case_timeline', currentTab: 'analysis' } },
   };
@@ -82,16 +85,18 @@
     recommendations: F('recommendations', 'case_scoped', 'case:recommendations', 'analysis', { availability: 'available_conditional' }),
     corner_coaching: F('corner_coaching', 'case_scoped', 'case:corner_coaching', 'analysis', { availability: 'available_conditional' }),
     evidence_trust: F('evidence_trust', 'case_scoped', 'case:evidence_trust', 'analysis'),
-    // R3.0D D5 — Engineer Brief feature. case_scoped; available_conditional because the
-    // pane only populates when the case carries an authoritative D3/D4/D5 chain (no
-    // hypothesis set → 'unavailable' / 'inconclusive' display state, NOT a missing feature).
+    // R3.0D D5 — Engineer Brief feature. case_scoped; available_conditional describes the
+    // per-case DATA gate the D5 viewmodel enforces (no authoritative D3/D4/D5 chain →
+    // 'unavailable' / 'inconclusive' display state). NOTE: at this milestone no shipped
+    // pane renders it — the index.html mount is hidden/inert (nav node only; see
+    // docs/release-notes-2.0.0.md "Known limitations").
     engineer_brief: F('engineer_brief', 'case_scoped', 'case:engineer_brief', 'analysis', { availability: 'available_conditional' }),
     // R3.0E E5 — Experiment Loop + Case Timeline features. case_scoped;
-    // available_conditional because the panes only populate when the case carries an
-    // authoritative E3 outcome (Experiment Loop) AND an authoritative E4 projection
-    // (Case Timeline). When either is missing, the viewmodel returns 'unavailable'
-    // display state. NOT a missing feature — the registry entry stays mounted with
-    // its deferred-rationale i18n key (handled by the host wiring layer).
+    // available_conditional describes the per-case DATA gate the R3.0E experiment
+    // viewmodel enforces (no authoritative E3 outcome / E4 projection → 'unavailable'
+    // display state — exercised by the Node suites). NOTE: at this milestone
+    // renderer/index.html loads no R3.0E viewmodel script and renders no pane for either
+    // subview (nav nodes only; see docs/release-notes-2.0.0.md "Known limitations").
     experiment_loop: F('experiment_loop', 'case_scoped', 'case:experiment_loop', 'analysis', { availability: 'available_conditional' }),
     case_timeline: F('case_timeline', 'case_scoped', 'case:case_timeline', 'analysis', { availability: 'available_conditional' }),
     // R3.0C — activated at C8_ACTIVATION (governance/r3.0c/state.json featureRegistryActivationAllowed=true).

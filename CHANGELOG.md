@@ -18,8 +18,9 @@ never approximated.
 ## [Unreleased] — 2.0.0 candidate
 
 The R3.0 Integrated Delivery Train (A through F) ships as a single release candidate.
-`package.json` remains pinned at `1.4.0` until the release gate flips; the post-merge target
-is `2.0.0`.
+`package.json` remains pinned at `1.4.0` until the separately-authorized `F6_RELEASE`
+checkpoint performs the single bump (the F5 release gate has PASSED — 12/12 conditions —
+but by design performs no bump itself); the post-merge target is `2.0.0`.
 
 ### Frozen invariants carried into the 2.0.0 candidate
 
@@ -208,13 +209,17 @@ the single timeline of record.
 
 ### Release readiness
 
-Version bump to `2.0.0` is deferred until the release gate flips. Until then,
-`package.json` stays at `1.4.0` and the activation gate stays closed.
+The F5 release gate (`scripts/check-release-gate.js`, 12 fail-closed conditions) has
+**PASSED**. The version bump to `2.0.0` is deferred to the separately-authorized
+`F6_RELEASE` checkpoint; until then `package.json` stays at `1.4.0` and R3.0F's own
+activation flag stays closed.
 
-### Release gate (pending)
+### F6_RELEASE (pending explicit authorization)
 
-When the release gate flips `featureRegistryActivationAllowed = true`, the version pins to
-`2.0.0`. No tag, no GitHub release, no `main` merge is performed by the train itself.
+Only `F6_RELEASE` may flip R3.0F's `featureRegistryActivationAllowed = true` and pin the
+version to `2.0.0`. No tag, no GitHub release, no `main` merge is performed by the train
+itself — those happen post-merge, after the new `main` CI passes, under the same explicit
+authorization.
 
 ---
 
