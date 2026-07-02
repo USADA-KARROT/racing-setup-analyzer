@@ -233,13 +233,21 @@ function run() {
         const phaseStateNow = readJsonSafe(path.join(BASE, trainSchema.phaseGovernanceDirs[phase], 'state.json')) || {};
         const capOn = Array.isArray(phaseStateNow.enabledCapabilities) && phaseStateNow.enabledCapabilities.includes('release_executed');
         const isSha = s => typeof s === 'string' && /^[0-9a-f]{40}$/.test(s);
-        // publishedAt must be a real ISO-8601 UTC/offset timestamp — whitespace or junk never counts
-        const isIsoTs = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(s) && !isNaN(Date.parse(s));
-        // the redundant state field (if present) must corroborate, not contradict, draft/published
-        const stateFieldOk = !gr || gr.state == null
-          ? true
-          : (gr.state === 'DRAFT' && gr.draft === true && gr.published !== true) ||
-            (gr.state === 'PUBLISHED' && gr.draft === false && gr.published === true);
+        // publishedAt must be a real ISO-8601 UTC/offset timestamp whose calendar fields
+        // survive round-trip (rejects Date.parse rollover like 2026-02-30) — junk never counts
+        const isIsoTs = s => {
+          const t = typeof s === 'string' && s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})$/);
+          if (!t) return false;
+          const y = +t[1], mo = +t[2], da = +t[3], h = +t[4], mi = +t[5], se = +t[6];
+          const d = new Date(Date.UTC(y, mo - 1, da, h, mi, se));
+          return d.getUTCFullYear() === y && d.getUTCMonth() === mo - 1 && d.getUTCDate() === da && d.getUTCHours() === h && d.getUTCMinutes() === mi && d.getUTCSeconds() === se;
+        };
+        // the state field is MANDATORY on a recorded Release (it is a declared
+        // publishForwardFields member) and must corroborate draft/published exactly
+        if (gr && gr.state == null) fail('R3F_RELEASE_STATE_FIELD_MISSING', 'githubRelease is recorded but has no state field — the DRAFT/PUBLISHED state advance is mandatory evidence and may not be omitted', { phase });
+        const stateFieldOk = !!(gr && (
+          (gr.state === 'DRAFT' && gr.draft === true && gr.published !== true) ||
+          (gr.state === 'PUBLISHED' && gr.draft === false && gr.published === true)));
         if (gr && gr.state != null && !stateFieldOk) fail('R3F_RELEASE_STATE_FIELD_MISMATCH', 'githubRelease.state contradicts draft/published flags (state=' + gr.state + ', draft=' + gr.draft + ', published=' + gr.published + ')', { phase, state: gr.state, draft: gr.draft, published: gr.published });
         const published = !!(gr && gr.draft === false && gr.published === true && isIsoTs(gr.publishedAt) && stateFieldOk);
         // fail-closed on the stage machinery itself: the schema list and the checkpoint stage are mandatory

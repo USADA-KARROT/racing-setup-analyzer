@@ -528,6 +528,32 @@ function mutateF6(fn) {
   const r = mutateF6((m) => { m.releaseRecord.githubRelease.assets = 'none'; });
   chk('FAIL non-array assets', hasViolation(r.artifact, 'R3F_RELEASE_ASSETS_MISSING'));
 }
+// mirror-20 (MIRROR-R3-01): deleting state cannot bypass the mandatory state advance
+{
+  const r = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    delete m.releaseRecord.githubRelease.state;
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+  });
+  chk('FAIL missing state field blocks release_executed', hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISSING') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
+// mirror-21 (MIRROR-R3-02): impossible calendar date in publishedAt never counts as published
+{
+  const r = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-02-30T05:00:00Z';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+  });
+  chk('FAIL impossible publishedAt date (2026-02-30) rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
 
 H.cleanupAll();
 console.log('r3-0-train: ' + pass + ' passed, ' + fail + ' failed');
