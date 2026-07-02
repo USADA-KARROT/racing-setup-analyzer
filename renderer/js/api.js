@@ -194,7 +194,28 @@ const api = {
     return {
       trackday_tires: typeof TRACKDAY_TIRES !== 'undefined' ? Object.keys(TRACKDAY_TIRES).length : 0,
       car_presets: typeof CAR_PRESETS !== 'undefined' ? Object.keys(CAR_PRESETS).length : 0,
-      version: typeof electronAPI !== 'undefined' ? electronAPI.version : '1.0.0',
+      // Honest version reporting: the resolved app version, or the literal
+      // 'unavailable' while unresolved / when the preload bridge is absent.
+      // NEVER a fabricated fallback version.
+      version: api._appVersion,
     };
   },
+
+  // Resolved once at startup via the preload bridge (electronAPI.getAppVersion()
+  // -> main-process app.getVersion(), the single version authority). Stays
+  // 'unavailable' if the bridge is missing or the query fails — observable on
+  // the console, never masked by a fake version, never a crash.
+  _appVersion: 'unavailable',
 };
+
+(function resolveAppVersion() {
+  if (typeof electronAPI !== 'undefined' && electronAPI && typeof electronAPI.getAppVersion === 'function') {
+    electronAPI.getAppVersion().then(function (v) {
+      api._appVersion = (typeof v === 'string' && v) ? v : 'unavailable';
+    }).catch(function (err) {
+      console.warn('[api] app version query failed:', err && err.message);
+    });
+  } else {
+    console.warn('[api] electronAPI bridge not present — preload did not initialize; version reporting stays "unavailable"');
+  }
+})();

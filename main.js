@@ -1,5 +1,16 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
+
+// The ONE allowlisted IPC channel. app.getVersion() is the single version authority
+// (the packaged bundle version; the renderer never reads package.json). Any new
+// channel added here is a reviewed governance change, never an incidental edit.
+const APP_VERSION_CHANNEL = 'app:get-version';
+
+function registerIpcHandlers() {
+  // removeHandler-first makes registration idempotent (double-registration guard).
+  ipcMain.removeHandler(APP_VERSION_CHANNEL);
+  ipcMain.handle(APP_VERSION_CHANNEL, () => app.getVersion());
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -20,7 +31,10 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  registerIpcHandlers();
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   app.quit();

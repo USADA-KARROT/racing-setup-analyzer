@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "program": "PUBLIC_RELEASE_HARDENING",
+  "phase": "H1_PACKAGED_RUNTIME_INTEGRITY",
+  "baseSha": "0563f119e2bdfced959b7a808cf292e0f883807f",
+  "integrationBranch": "release/v2.0.0-public-hardening",
+  "headSha": null,
+  "scope": {
+    "closes": [
+      "A1 preload sandbox require crash (since v1.0.0)",
+      "A2 electronAPI never exposed in packaged app",
+      "A3 fabricated 1.0.0 version fallback",
+      "A4 preload failure silently masked"
+    ],
+    "changedFiles": [
+      "main.js",
+      "preload.js",
+      "renderer/js/api.js",
+      "tests/e2e/hardening-01-electron-boundary.test.js",
+      "tests/e2e/flow-09-electron-smoke.test.js",
+      "tests/packaged/h1-packaged-runtime.mjs"
+    ],
+    "notChanged": [
+      "package.json (version untouched)",
+      "case storage",
+      "UI feature delivery",
+      "tag",
+      "Release"
+    ]
+  },
+  "design": {
+    "versionAuthority": "main-process app.getVersion() — the ONLY source; renderer never reads package.json",
+    "ipcChannels": [
+      "app:get-version (invoke-only, constant, removeHandler-first idempotent registration)"
+    ],
+    "electronAPISurface": "{ platform: process.platform, getAppVersion(): Promise<string|'unavailable'> }",
+    "failClosed": "IPC error / 3s timeout / malformed (non-semver) reply -> literal 'unavailable' + console.warn; renderer default 'unavailable'; missing bridge -> console.warn; NEVER a fabricated version; NEVER a crash",
+    "webPreferences": "contextIsolation:true, nodeIntegration:false, sandbox: Electron default true (never set false — asserted by hardening-01)"
+  },
+  "evidence": {
+    "packagedClean": {
+      "result": "10/10 PASS",
+      "log": "h1-run-clean.txt",
+      "sha256": "4cad0dba0a731b987ca39f611435c4891cf5c14c0426286c27292beb56123441"
+    },
+    "packagedExisting": {
+      "result": "10/10 PASS",
+      "log": "h1-run-existing.txt",
+      "sha256": "48e9cc9479d16578102de1c8132dc988b0f7c17af98eef136c245dda9c8c3aac"
+    },
+    "devConsistency": {
+      "result": "10/10 PASS",
+      "log": "h1-run-dev.txt",
+      "sha256": "b6ed266e4dcf562c9ba40aa2d2abfdc43848513e0dc7d6093200bd0715eb3f9b"
+    },
+    "harness": "tests/packaged/h1-packaged-runtime.mjs (REAL binary over CDP; local evidence tooling — requires a build, so not in the install-free npm-test chain)",
+    "profileIsolation": "real userData moved aside before clean phase and restored after (macOS Electron ignores $HOME); smoke profile removed",
+    "packagedAsarChecks": "getAppVersion present; app:get-version present; pre-H1 require('./package.json').version crash pattern ABSENT"
+  },
+  "codexVerdict": null,
+  "note": "H1 evidence logs live in the session scratchpad during review; verdict + hashes are anchored here and raw logs archived under governance/hardening/codex-evidence/H1/ at the PASS anchor."
+}

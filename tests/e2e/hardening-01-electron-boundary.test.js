@@ -209,9 +209,41 @@ try {
     }
   }
 
+  // H1: renderer version-reporting honesty — api.js must never fabricate a version.
+  var apiSrc = stripJsComments(fs.readFileSync(path.join(__dirname, '..', '..', 'renderer', 'js', 'api.js'), 'utf8'));
+  chk('api.js has NO fabricated 1.0.0 version literal', !/['"`]1\.0\.0['"`]/.test(apiSrc));
+  chk('api.js defaults version reporting to the literal unavailable', /_appVersion\s*:\s*['"`]unavailable['"`]/.test(apiSrc));
+  chk('api.js never reads a synchronous electronAPI.version field (pre-H1 shape)', !/electronAPI\s*\.\s*version\b/.test(apiSrc));
+  chk('api.js resolves the version via electronAPI.getAppVersion()', /electronAPI\s*\.\s*getAppVersion\s*\(/.test(apiSrc));
+  chk('api.js missing-bridge path is observable (console.warn)', /console\.warn\([^)]*electronAPI/.test(apiSrc));
+
+  // H1: main.js IPC surface — exactly ONE allowlisted handle() on the constant
+  // channel, removeHandler-first (idempotent double-registration guard), and no
+  // generic/dynamic channel registration anywhere.
+  var handleCalls = mainSrc.match(/ipcMain\s*\.\s*handle\s*\(/g) || [];
+  chk('main.js registers EXACTLY one ipcMain.handle', handleCalls.length === 1, { count: handleCalls.length });
+  chk('main.js handle uses the APP_VERSION_CHANNEL constant', /ipcMain\s*\.\s*handle\s*\(\s*APP_VERSION_CHANNEL\s*,/.test(mainSrc));
+  chk('main.js channel constant = app:get-version', /APP_VERSION_CHANNEL\s*=\s*['"`]app:get-version['"`]/.test(mainSrc));
+  chk('main.js removeHandler-first double-registration guard', /ipcMain\s*\.\s*removeHandler\s*\(\s*APP_VERSION_CHANNEL\s*\)/.test(mainSrc));
+  chk('main.js handler returns app.getVersion() (single version authority)', /handle\s*\(\s*APP_VERSION_CHANNEL\s*,\s*\(\s*\)\s*=>\s*app\.getVersion\(\)\s*\)/.test(mainSrc));
+  chk('main.js has NO ipcMain.on/once (no fire-and-forget channels)', !/ipcMain\s*\.\s*(on|once|addListener)\b/.test(mainSrc));
+
   // Step 2: preload.js minimal surface — post-strip checks (no comment-decoy false positives)
   chk('preload.js uses contextBridge', /contextBridge/.test(preloadSrc));
-  chk('preload.js does NOT reference ipcRenderer (post-strip)', !/ipcRenderer/.test(preloadSrc));
+  // H1: the preload legitimately uses ipcRenderer.invoke on the single allowlisted
+  // constant channel. The boundary contract is now: (a) ipcRenderer itself is never
+  // placed on the exposed surface, (b) no generic send/sendSync/on/postMessage entry,
+  // (c) invoke is called ONLY with the APP_VERSION_CHANNEL constant, (d) exactly one
+  // channel constant exists and it is the allowlisted literal.
+  chk('preload.js never exposes ipcRenderer on the bridge surface', !/exposeInMainWorld[\s\S]*?ipcRenderer\s*[,}]/.test(preloadSrc));
+  chk('preload.js has NO generic ipcRenderer.send/sendSync/on/once/postMessage', !/ipcRenderer\s*\.\s*(send|sendSync|sendToHost|on|once|addListener|postMessage)\b/.test(preloadSrc));
+  var invokeCalls = preloadSrc.match(/ipcRenderer\s*\.\s*invoke\s*\(\s*([A-Za-z_$][\w$]*|['"`][^'"`]*['"`])/g) || [];
+  chk('preload.js ipcRenderer.invoke is used EXACTLY once', invokeCalls.length === 1, { invokeCalls: invokeCalls });
+  chk('preload.js invoke uses the APP_VERSION_CHANNEL constant (no inline/caller-chosen channel)', /ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*[),]/.test(preloadSrc));
+  var channelConsts = preloadSrc.match(/APP_VERSION_CHANNEL\s*=\s*['"`]([^'"`]+)['"`]/g) || [];
+  chk('preload.js declares exactly one channel constant = app:get-version', channelConsts.length === 1 && /['"`]app:get-version['"`]/.test(channelConsts[0]), { channelConsts: channelConsts });
+  chk('preload.js does NOT require ./package.json (the pre-H1 sandbox crash)', !/require\s*\(\s*['"]\.\/package\.json['"]\s*\)/.test(preloadSrc));
+  chk('preload.js never fabricates a version literal', !/['"`]1\.0\.0['"`]/.test(preloadSrc));
   chk('preload.js does NOT require fs (post-strip)', !/require\s*\(\s*['"]fs['"]\s*\)/.test(preloadSrc));
   chk('preload.js does NOT require child_process (post-strip)', !/require\s*\(\s*['"]child_process['"]\s*\)/.test(preloadSrc));
   chk('preload.js does NOT require net (post-strip)', !/require\s*\(\s*['"]net['"]\s*\)/.test(preloadSrc));
@@ -308,7 +340,7 @@ try {
     return keys;
   }
   var exposedKeys = topLevelKeys(exposedBody).sort();
-  chk('preload.js exposed surface has EXACTLY {platform, version}', JSON.stringify(exposedKeys) === JSON.stringify(['platform', 'version']), { keys: exposedKeys });
+  chk('preload.js exposed surface has EXACTLY {getAppVersion, platform}', JSON.stringify(exposedKeys) === JSON.stringify(['getAppVersion', 'platform']), { keys: exposedKeys });
 
   // F3-R9-03 closure: each exposed value must be an INERT primitive expression — no functions,
   // no closures, no process/global access, no dynamic require. Parse the body's key:value pairs
@@ -348,12 +380,19 @@ try {
     if (/^["'][^"']*["']$/.test(val)) return true;
     // (b) reading process.platform IS allowed (it's a known-inert string)
     if (/^process\.platform$/.test(val)) return true;
-    // (c) require('./package.json').version is the only allowed require chain
-    if (/^require\(\s*['"]\.\/package\.json['"]\s*\)\.version$/.test(val)) return true;
+    // (c) H1: the pre-H1 require('./package.json').version chain is now FORBIDDEN
+    //     (it crashed the sandboxed preload); the only allowed function reference is
+    //     the named getAppVersion defined in this file (validated separately below).
+    if (/^getAppVersion$/.test(val)) return true;
     // (d) plain numeric / boolean / null literal
     if (/^(?:-?\d+(?:\.\d+)?|true|false|null)$/.test(val)) return true;
     return false;
   }
+  // The allowed function reference must be a top-level named function declared in
+  // preload.js itself whose body never touches Node authority beyond the single
+  // allowlisted invoke (the generic-send and forbidden-token checks above pin that).
+  chk('preload.js declares the named getAppVersion function it exposes',
+    /function\s+getAppVersion\s*\(/.test(preloadSrc));
   for (var ee = 0; ee < exposedEntries.length; ee++) {
     var entry = exposedEntries[ee];
     // Static forbidden-token check (catches process.env, child_process, etc., even via concat)

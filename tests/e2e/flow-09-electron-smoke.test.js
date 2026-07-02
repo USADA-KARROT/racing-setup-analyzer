@@ -45,7 +45,10 @@ try {
   var preloadPath = path.join(__dirname, '..', '..', 'preload.js');
   var preloadSrc = fs.readFileSync(preloadPath, 'utf8');
   chk('preload.js uses contextBridge', /contextBridge/.test(preloadSrc));
-  chk('preload.js does NOT use ipcRenderer (no IPC channel exposed)', !/ipcRenderer/.test(preloadSrc));
+  // H1: the preload DOES use ipcRenderer.invoke on the single allowlisted constant
+  // channel (app:get-version) — the boundary contract (never exposed raw, no generic
+  // send/on, one channel only) is enforced exhaustively in hardening-01.
+  chk('preload.js uses ONLY the allowlisted invoke (no send/on/generic IPC)', /ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL/.test(preloadSrc) && !/ipcRenderer\s*\.\s*(send|sendSync|on|once)\b/.test(preloadSrc));
   chk('preload.js does NOT use require(fs|child_process|net|http)', !/require\(['"](?:fs|child_process|net|http|https)['"]\)/.test(preloadSrc));
 
   // Step 5: zero console error
