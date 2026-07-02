@@ -9,8 +9,9 @@
  * Statistical fit is NECESSARY BUT NOT SUFFICIENT: positive-gain, ≥MIN_BINS over ≥MIN_SPEED_RANGE per
  * direction, across-bin consistency (robust CV), a weak R² gate, per-direction AGREEMENT (left vs right,
  * never folded by |abs|), and a plausible physical band must ALL hold — else available:false + a reason.
- * Even when produced, the metric is `Measured (kinematic, confounded)` and always carries confounder
- * limitations. Pure; deterministic; never throws (non-finite → block).
+ * Even when produced, the credibility rung is the bare enum value `Measured`; the kinematic/confounded
+ * qualifier lives in limitations[] (standing `kinematic_confounded` + the per-confounder codes) and in the
+ * display labels only — never embedded in the rung string. Pure; deterministic; never throws (non-finite → block).
  *
  * UMD: Node require / Electron renderer global (MeasuredMetrics).
  */
@@ -95,8 +96,8 @@
         cvPos: pos.cv, cvNeg: neg.cv, r2Pos: pos.r2, r2Neg: neg.r2, kPos: pos.kDegG, kNeg: neg.kDegG, agreementDeltaDegG: delta,
       },
       blockedReasons: [],
-      credibility: 'Measured (kinematic, confounded)',
-      limitations: CONFOUNDERS.slice(),
+      credibility: 'Measured',
+      limitations: ['kinematic_confounded'].concat(CONFOUNDERS),
     };
   }
 

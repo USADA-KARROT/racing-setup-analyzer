@@ -54,7 +54,8 @@ const session = (cals, sessId) => CTS.buildCanonicalSession(imported, mapping, c
   chk('measured K_us ≈ 2', Math.abs(mc.measuredKUsDegG - 2) < 0.25, mc.measuredKUsDegG);
   chk('predicted K_us surfaced', typeof mc.predictedKUsDegG === 'number');
   chk('agreement = measured_more_understeer (2 vs ~0.51)', mc.agreementClass === 'measured_more_understeer', [mc.measuredKUsDegG, mc.predictedKUsDegG, mc.agreementClass]);
-  chk('credibility confounded', mc.credibility === 'Measured (kinematic, confounded)');
+  chk('credibility is the bare Measured rung', mc.credibility === 'Measured');
+  chk('kinematic/confounded qualifier carried in limitations', Array.isArray(mc.limitations) && mc.limitations.indexOf('kinematic_confounded') !== -1);
   chk('provenance carried (synthetic)', mc.dataProvenance === 'synthetic');
 })();
 
@@ -101,7 +102,8 @@ let directionalWithoutCal;
   const wsCal = WS.runAnalysisWorkspace(demoCase, session(steeringCals()), null, { modelRunner: runner });
   const vCal = VM.buildAnalysisWorkspaceViewModel(wsCal, demoCase, {});
   chk('viewmodel: measuredMetrics available', vCal.measuredMetrics.available === true && Math.abs(vCal.measuredMetrics.measuredKUs.value - 2) < 0.25, vCal.measuredMetrics);
-  chk('viewmodel: measured credibility tag', vCal.measuredMetrics.measuredKUs.credibility === 'Measured (kinematic, confounded)');
+  chk('viewmodel: measured credibility tag', vCal.measuredMetrics.measuredKUs.credibility === 'Measured');
+  chk('viewmodel: qualifier carried in limitations', vCal.measuredMetrics.limitations.indexOf('kinematic_confounded') !== -1);
   chk('viewmodel: capability rows include the two R2.4 flags', vCal.capabilitySummary.some(r => r.key === 'calibratedMagnitudeEligible') && vCal.capabilitySummary.some(r => r.key === 'measuredKUsEligible'));
   const wsNo = WS.runAnalysisWorkspace(demoCase, session([]), null, { modelRunner: runner });
   const vNo = VM.buildAnalysisWorkspaceViewModel(wsNo, demoCase, {});

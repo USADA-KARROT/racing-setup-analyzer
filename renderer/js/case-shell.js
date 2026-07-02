@@ -103,7 +103,7 @@
     var blocked = (av && av.evidenceDrawer && av.evidenceDrawer.allBlockedReasons) || [];
     return {
       capability: (av && av.capabilitySummary) || [],
-      credibility: cap && cap.measuredKUsEligible ? 'Measured (kinematic, confounded)' : (cap && cap.modelRan ? 'Model' : 'Unavailable'),
+      credibility: cap && cap.measuredKUsEligible ? 'Measured' : (cap && cap.modelRan ? 'Model' : 'Unavailable'),
       confidence: (av && av.modelVsActual && av.modelVsActual.confidence) || null,
       blockedReasons: blocked,
       limitations: limitations,

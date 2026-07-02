@@ -117,7 +117,7 @@
       available: mag.available === true,
       eligible: mag.eligible === true,
       calibratedMagnitudeAvailable: !!calMag,
-      measuredKUs: mag.available === true ? m(mag.measuredKUsDegG, mag.credibility || 'Measured (kinematic, confounded)', 'deg/g') : _na('Unavailable'),
+      measuredKUs: mag.available === true ? m(mag.measuredKUsDegG, mag.credibility || 'Measured', 'deg/g') : _na('Unavailable'),
       predictedKUs: m(mag.predictedKUsDegG, 'Model', 'deg/g'),
       residualDegG: (mag.residualDegG != null) ? mag.residualDegG : null,
       agreementClass: mag.agreementClass || null,
@@ -126,7 +126,7 @@
       limitations: mag.limitations || [],
       reason: mag.reason || null,
       blockedReasons: mag.blockedReasons || [],
-      credibility: mag.available === true ? (mag.credibility || 'Measured (kinematic, confounded)') : 'Unavailable',
+      credibility: mag.available === true ? (mag.credibility || 'Measured') : 'Unavailable',
     };
   }
 

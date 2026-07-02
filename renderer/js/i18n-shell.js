@@ -119,6 +119,7 @@ const SHELL_I18N = {
     'ui.blocker.MODEL_RESULT_NOT_AVAILABLE': 'Model result not available',
     // — high-frequency limitation codes —
     'ui.limitation.magnitude_from_user_supplied_steering_ratio': 'Magnitude depends on the user-supplied steering ratio',
+    'ui.limitation.kinematic_confounded': 'Kinematic method — confounded',
     'ui.limitation.fixed_steering_ratio_assumption': 'Assumes a fixed steering ratio',
     'ui.limitation.assumes_fixed_steering_ratio_within_session': 'Assumes a fixed steering ratio within the session',
     'ui.limitation.directional_tendency_only_not_a_measured_magnitude': 'Directional tendency only — not a measured magnitude',
@@ -133,7 +134,7 @@ const SHELL_I18N = {
     'ui.limitation.raw_steering_directional_trend_not_calibrated_magnitude': 'Raw-steering directional trend — not a calibrated magnitude',
     'ui.limitation.raw_steering_input_observation_only': 'Raw-steering observation only', 'ui.limitation.raw_steering_only': 'Raw steering only',
     'ui.limitation.data_provenance_unverified': 'Data provenance: unverified', 'ui.limitation.data_provenance_real': 'Data provenance: real', 'ui.limitation.data_provenance_synthetic': 'Data provenance: synthetic',
-    'ui.confounder.tyre_load_sensitivity': 'Tyre load sensitivity', 'ui.confounder.aero_not_separated': 'Aerodynamic effects not separated', 'ui.confounder.transient_vs_steady_state': 'Transient vs steady-state', 'ui.confounder.single_session': 'Single session only', 'ui.confounder.fixed_steering_ratio_assumption': 'Fixed steering-ratio assumption', 'ui.confounder.aero_balance_vs_speed': 'Aero balance varies with speed', 'ui.confounder.mixed_or_speed_dependent': 'Mixed or speed-dependent',
+    'ui.confounder.kinematic_confounded': 'Kinematic method — confounded', 'ui.confounder.tyre_load_sensitivity': 'Tyre load sensitivity', 'ui.confounder.aero_not_separated': 'Aerodynamic effects not separated', 'ui.confounder.transient_vs_steady_state': 'Transient vs steady-state', 'ui.confounder.single_session': 'Single session only', 'ui.confounder.fixed_steering_ratio_assumption': 'Fixed steering-ratio assumption', 'ui.confounder.aero_balance_vs_speed': 'Aero balance varies with speed', 'ui.confounder.mixed_or_speed_dependent': 'Mixed or speed-dependent',
     'ui.cannot.throttle_or_brake_technique_no_pedal_channel': 'Throttle/brake technique — no pedal channel', 'ui.cannot.attribution_to_a_specific_corner_or_apex_no_track_position': 'Attribution to a specific corner/apex — no track position', 'ui.cannot.per_corner_attribution_no_track_position': 'Per-corner attribution — no track position', 'ui.cannot.lap_to_lap_or_single_corner_consistency_no_lap_segmentation': 'Lap-to-lap / single-corner consistency — no lap segmentation', 'ui.cannot.lap_to_lap_or_per_corner_consistency_no_lap_segmentation': 'Lap-to-lap / per-corner consistency — no lap segmentation', 'ui.cannot.steering_behaviour_no_steering_channel': 'Steering behaviour — no steering channel', 'ui.cannot.corner_segmentation_no_speed_channel': 'Corner segmentation — no speed channel', 'ui.cannot.corner_detection_no_lateral_accel_channel': 'Corner detection — no lateral-acceleration channel',
   },
   zh: {
@@ -218,6 +219,7 @@ const SHELL_I18N = {
     'ui.blocker.NO_COMPARISON': '無可用比較', 'ui.blocker.NO_ANALYSIS_CASE': '尚無分析案例',
     'ui.blocker.MODEL_RESULT_NOT_AVAILABLE': '無法取得模型結果',
     'ui.limitation.magnitude_from_user_supplied_steering_ratio': '量值取決於使用者提供的轉向比',
+    'ui.limitation.kinematic_confounded': '運動學法——受干擾因素影響',
     'ui.limitation.fixed_steering_ratio_assumption': '假設轉向比固定',
     'ui.limitation.assumes_fixed_steering_ratio_within_session': '假設同一場次內轉向比固定',
     'ui.limitation.directional_tendency_only_not_a_measured_magnitude': '僅為方向性趨勢——非量測量值',
@@ -232,7 +234,7 @@ const SHELL_I18N = {
     'ui.limitation.raw_steering_directional_trend_not_calibrated_magnitude': '原始轉向的方向趨勢——非校正後量值',
     'ui.limitation.raw_steering_input_observation_only': '僅原始轉向觀察', 'ui.limitation.raw_steering_only': '僅原始轉向',
     'ui.limitation.data_provenance_unverified': '資料來源：未驗證', 'ui.limitation.data_provenance_real': '資料來源：真實', 'ui.limitation.data_provenance_synthetic': '資料來源：合成',
-    'ui.confounder.tyre_load_sensitivity': '輪胎負載敏感度', 'ui.confounder.aero_not_separated': '未分離空力影響', 'ui.confounder.transient_vs_steady_state': '瞬態 vs 穩態', 'ui.confounder.single_session': '僅單一場次', 'ui.confounder.fixed_steering_ratio_assumption': '假設轉向比固定', 'ui.confounder.aero_balance_vs_speed': '空力平衡隨速度變化', 'ui.confounder.mixed_or_speed_dependent': '混合或隨速度變化',
+    'ui.confounder.kinematic_confounded': '運動學法——受干擾因素影響', 'ui.confounder.tyre_load_sensitivity': '輪胎負載敏感度', 'ui.confounder.aero_not_separated': '未分離空力影響', 'ui.confounder.transient_vs_steady_state': '瞬態 vs 穩態', 'ui.confounder.single_session': '僅單一場次', 'ui.confounder.fixed_steering_ratio_assumption': '假設轉向比固定', 'ui.confounder.aero_balance_vs_speed': '空力平衡隨速度變化', 'ui.confounder.mixed_or_speed_dependent': '混合或隨速度變化',
     'ui.cannot.throttle_or_brake_technique_no_pedal_channel': '無踏板通道——無法判定油門／煞車技術', 'ui.cannot.attribution_to_a_specific_corner_or_apex_no_track_position': '無賽道位置——無法歸因到特定彎角／apex', 'ui.cannot.per_corner_attribution_no_track_position': '無賽道位置——無法逐彎歸因', 'ui.cannot.lap_to_lap_or_single_corner_consistency_no_lap_segmentation': '無圈次分段——無法判定逐圈／單彎一致性', 'ui.cannot.lap_to_lap_or_per_corner_consistency_no_lap_segmentation': '無圈次分段——無法判定逐圈／逐彎一致性', 'ui.cannot.steering_behaviour_no_steering_channel': '無轉向通道——無法觀察轉向行為', 'ui.cannot.corner_segmentation_no_speed_channel': '無車速通道——無法分段彎角', 'ui.cannot.corner_detection_no_lateral_accel_channel': '無橫向加速度——無法偵測彎角',
   },
   ja: {
@@ -317,6 +319,7 @@ const SHELL_I18N = {
     'ui.blocker.NO_COMPARISON': '利用可能な比較がありません', 'ui.blocker.NO_ANALYSIS_CASE': '解析ケースがありません',
     'ui.blocker.MODEL_RESULT_NOT_AVAILABLE': 'モデル結果を取得できません',
     'ui.limitation.magnitude_from_user_supplied_steering_ratio': '大きさはユーザー指定のステアリング比に依存',
+    'ui.limitation.kinematic_confounded': '運動学的手法——交絡あり',
     'ui.limitation.fixed_steering_ratio_assumption': 'ステアリング比固定を前提',
     'ui.limitation.assumes_fixed_steering_ratio_within_session': 'セッション内でステアリング比固定と仮定',
     'ui.limitation.directional_tendency_only_not_a_measured_magnitude': '方向性の傾向のみ——計測された大きさではない',
@@ -331,7 +334,7 @@ const SHELL_I18N = {
     'ui.limitation.raw_steering_directional_trend_not_calibrated_magnitude': '生ステアリングの方向トレンド——校正された大きさではない',
     'ui.limitation.raw_steering_input_observation_only': '生ステアリングの観察のみ', 'ui.limitation.raw_steering_only': '生ステアリングのみ',
     'ui.limitation.data_provenance_unverified': 'データ由来：未検証', 'ui.limitation.data_provenance_real': 'データ由来：実', 'ui.limitation.data_provenance_synthetic': 'データ由来：合成',
-    'ui.confounder.tyre_load_sensitivity': 'タイヤ荷重感度', 'ui.confounder.aero_not_separated': '空力影響は未分離', 'ui.confounder.transient_vs_steady_state': '過渡 vs 定常', 'ui.confounder.single_session': '単一セッションのみ', 'ui.confounder.fixed_steering_ratio_assumption': 'ステアリング比固定の前提', 'ui.confounder.aero_balance_vs_speed': '空力バランスの速度依存', 'ui.confounder.mixed_or_speed_dependent': '混在または速度依存',
+    'ui.confounder.kinematic_confounded': '運動学的手法——交絡あり', 'ui.confounder.tyre_load_sensitivity': 'タイヤ荷重感度', 'ui.confounder.aero_not_separated': '空力影響は未分離', 'ui.confounder.transient_vs_steady_state': '過渡 vs 定常', 'ui.confounder.single_session': '単一セッションのみ', 'ui.confounder.fixed_steering_ratio_assumption': 'ステアリング比固定の前提', 'ui.confounder.aero_balance_vs_speed': '空力バランスの速度依存', 'ui.confounder.mixed_or_speed_dependent': '混在または速度依存',
     'ui.cannot.throttle_or_brake_technique_no_pedal_channel': 'スロットル／ブレーキ技術——ペダルチャンネルなし', 'ui.cannot.attribution_to_a_specific_corner_or_apex_no_track_position': '特定コーナー／エイペックスへの帰属——コース位置なし', 'ui.cannot.per_corner_attribution_no_track_position': 'コーナー別の帰属——コース位置なし', 'ui.cannot.lap_to_lap_or_single_corner_consistency_no_lap_segmentation': 'ラップ間／単一コーナーの一貫性——ラップ分割なし', 'ui.cannot.lap_to_lap_or_per_corner_consistency_no_lap_segmentation': 'ラップ間／コーナー別の一貫性——ラップ分割なし', 'ui.cannot.steering_behaviour_no_steering_channel': '操舵挙動——ステアリングチャンネルなし', 'ui.cannot.corner_segmentation_no_speed_channel': 'コーナー分割——車速チャンネルなし', 'ui.cannot.corner_detection_no_lateral_accel_channel': 'コーナー検出——横加速度チャンネルなし',
   },
 };
