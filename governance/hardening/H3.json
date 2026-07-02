@@ -4,7 +4,7 @@
   "phase": "H3_REPRODUCIBLE_BUILD",
   "baseSha": "0de228c9248d00aad8eabb71ae4fe5bc860bb604",
   "integrationBranch": "release/v2.0.0-public-hardening",
-  "headSha": null,
+  "headSha": "36dec765fb1baa79cfcfde14dc9ea9ceda1edba6",
   "policyFlip": {
     "from": "dependency-free lane forbade a tracked package-lock.json (scripts/check-version-policy.js + .gitignore)",
     "to": "a tracked package-lock.json is REQUIRED as the reproducible-build authority; its ABSENCE or PR-deletion is the violation",
@@ -67,6 +67,49 @@
     "vendored": "3x MIT"
   },
   "vulnerabilityAuditProcedure": "npm advisory DB lookup per vendored library on each version bump (recorded in vendor-manifest.json.vulnerabilityAudit); npm dependency tree audited via the permissive-license allowlist + pinned lockfile",
-  "codexVerdict": null,
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 4,
+    "reviewedCandidateSha": "36dec765fb1baa79cfcfde14dc9ea9ceda1edba6",
+    "verdictEvidenceFile": "governance/hardening/codex-evidence/H3/round-4-raw.txt",
+    "verdictEvidenceSha256": "00bde97999db0379e6d048cabd7a743e406c315022abeaf5624d675f0576605c",
+    "totalBlockRounds": 3,
+    "totalDistinctFindings": 12,
+    "rounds": [
+      {
+        "round": 1,
+        "reviewedSha": "e34486b207f91ab51a86ceb8f87a5463b8c8590d",
+        "verdict": "BLOCK",
+        "findings": 8,
+        "evidence": "governance/hardening/codex-evidence/H3/round-1-raw.txt",
+        "evidenceSha256": "c525aa4610f28de661c9aa5d7c44a50c04aba35f9f229bf540f4adde96f7666c"
+      },
+      {
+        "round": 2,
+        "reviewedSha": "e68119c0b26b8be681d5894795a3a3d34eb02e72",
+        "verdict": "BLOCK",
+        "findings": 2,
+        "evidence": "governance/hardening/codex-evidence/H3/round-2-raw.txt",
+        "evidenceSha256": "2e7bda7f19d829c91404e1316579c069b4bbd8573c86cc4c091b5e461778084a"
+      },
+      {
+        "round": 3,
+        "reviewedSha": "700ab8398b68c881d04ce3eee77f6926a72975b8",
+        "verdict": "BLOCK",
+        "findings": 2,
+        "evidence": "governance/hardening/codex-evidence/H3/round-3-raw.txt",
+        "evidenceSha256": "d93cfaee5aea461fbb9cfdf499ecab56f35ffd70a9826a3d4a39f564f0eb2164"
+      },
+      {
+        "round": 4,
+        "reviewedSha": "36dec765fb1baa79cfcfde14dc9ea9ceda1edba6",
+        "verdict": "PASS",
+        "findings": 0,
+        "evidence": "governance/hardening/codex-evidence/H3/round-4-raw.txt",
+        "evidenceSha256": "00bde97999db0379e6d048cabd7a743e406c315022abeaf5624d675f0576605c"
+      }
+    ],
+    "tierDisclosure": "TIER 1 all 4 rounds: raw stdout + prompts archived under governance/hardening/codex-evidence/H3/ with sha256 anchors. All codex launches used < /dev/null."
+  },
   "note": "H3 keeps the dependency-free verification lane intact and adds a reproducible-install + supply-chain-governance lane. No production runtime code changed. Vendored libraries retained (manifest route), not converted to npm imports."
 }
