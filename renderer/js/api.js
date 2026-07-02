@@ -201,21 +201,24 @@ const api = {
     };
   },
 
-  // Resolved once at startup via the preload bridge (electronAPI.getAppVersion()
-  // -> main-process app.getVersion(), the single version authority). Stays
-  // 'unavailable' if the bridge is missing or the query fails — observable on
-  // the console, never masked by a fake version, never a crash.
+  // Resolved once at startup via RuntimeApi — the single host abstraction
+  // (renderer code never reads window.electronAPI directly). Electron:
+  // RuntimeApi delegates to the preload bridge (-> main-process
+  // app.getVersion(), the version authority). Web: RuntimeApi reads the static
+  // build metadata. Stays 'unavailable' if the host adapter is missing or the
+  // query fails — observable on the console, never masked by a fake version,
+  // never a crash.
   _appVersion: 'unavailable',
 };
 
 (function resolveAppVersion() {
-  if (typeof electronAPI !== 'undefined' && electronAPI && typeof electronAPI.getAppVersion === 'function') {
-    electronAPI.getAppVersion().then(function (v) {
+  if (typeof RuntimeApi !== 'undefined' && RuntimeApi && typeof RuntimeApi.getAppVersion === 'function') {
+    RuntimeApi.getAppVersion().then(function (v) {
       api._appVersion = (typeof v === 'string' && v) ? v : 'unavailable';
     }).catch(function (err) {
       console.warn('[api] app version query failed:', err && err.message);
     });
   } else {
-    console.warn('[api] electronAPI bridge not present — preload did not initialize; version reporting stays "unavailable"');
+    console.warn('[api] RuntimeApi host adapter not present — version reporting stays "unavailable"');
   }
 })();

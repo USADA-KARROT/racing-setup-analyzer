@@ -210,12 +210,21 @@ try {
   }
 
   // H1: renderer version-reporting honesty — api.js must never fabricate a version.
+  // Since the browser-first delivery, api.js consumes the RuntimeApi host adapter
+  // (renderer/js/runtime-api.js) instead of window.electronAPI directly; the
+  // adapter's Electron branch is the ONLY renderer consumer of the preload bridge.
   var apiSrc = stripJsComments(fs.readFileSync(path.join(__dirname, '..', '..', 'renderer', 'js', 'api.js'), 'utf8'));
   chk('api.js has NO fabricated 1.0.0 version literal', !/['"`]1\.0\.0['"`]/.test(apiSrc));
   chk('api.js defaults version reporting to the literal unavailable', /_appVersion\s*:\s*['"`]unavailable['"`]/.test(apiSrc));
   chk('api.js never reads a synchronous electronAPI.version field (pre-H1 shape)', !/electronAPI\s*\.\s*version\b/.test(apiSrc));
-  chk('api.js resolves the version via electronAPI.getAppVersion()', /electronAPI\s*\.\s*getAppVersion\s*\(/.test(apiSrc));
-  chk('api.js missing-bridge path is observable (console.warn)', /console\.warn\([^)]*electronAPI/.test(apiSrc));
+  chk('api.js never reads window.electronAPI directly (host access only via RuntimeApi)', !/\belectronAPI\b/.test(apiSrc));
+  chk('api.js resolves the version via RuntimeApi.getAppVersion()', /RuntimeApi\s*\.\s*getAppVersion\s*\(/.test(apiSrc));
+  chk('api.js missing-adapter path is observable (console.warn)', /console\.warn\([^)]*RuntimeApi/.test(apiSrc));
+  var adapterSrc = stripJsComments(fs.readFileSync(path.join(__dirname, '..', '..', 'renderer', 'js', 'runtime-api.js'), 'utf8'));
+  chk('runtime-api.js electron branch delegates to the preload bridge getAppVersion', /\belectronAPI\b/.test(adapterSrc) && /getAppVersion\s*\(\s*\)/.test(adapterSrc));
+  chk('runtime-api.js has NO fabricated 1.0.0 version literal', !/['"`]1\.0\.0['"`]/.test(adapterSrc));
+  chk('runtime-api.js web branch fails closed to unavailable', /['"`]unavailable['"`]/.test(adapterSrc));
+  chk('runtime-api.js enforces strict SemVer on web metadata', /SEMVER/.test(adapterSrc));
 
   // H1: main.js IPC surface — exactly ONE allowlisted handle() on the constant
   // channel, removeHandler-first (idempotent double-registration guard), and no
