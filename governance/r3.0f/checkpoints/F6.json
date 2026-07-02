@@ -142,8 +142,38 @@
     "evidenceTier": "TIER 3 — Claude-verified on the F6 branch; CI re-run on the candidate SHA is the authority.",
     "note": "version-bump-policy regression tests: fail-closed without allow, exact-allow-only, no re-bump, no rollback, no tag creation by version scripts, release_executed not auto-enabled."
   },
-  "buildEvidence": null,
-  "smokeEvidence": null,
+  "buildEvidence": {
+    "artifact": "build/Racing Setup Analyzer-2.0.0-arm64.dmg (untracked; local evidence only, no DMG is distributed at RELEASE_PREPARED)",
+    "dmgBytes": 99418469,
+    "dmgSha256": "1c824db85926b5b79845fb514a1b27a52964d8d2cdc002355bdbb12641e2189e",
+    "environment": {
+      "node": "v25.5.0",
+      "npm": "11.8.0",
+      "os": "macOS 26.5.1 arm64",
+      "electronBuilder": "25.1.8",
+      "cleanInstall": "fresh npm install in the isolated F6 worktree (no lockfile, semver-resolved per documented policy)"
+    },
+    "warnings": [
+      "default Electron icon (no custom icon declared — disclosed)",
+      "skipped macOS code signing (0 identities — disclosed; no notarization)"
+    ],
+    "packageAudit": {
+      "asarPackageVersion": "2.0.0",
+      "secretScan": "PASS — no keys/tokens/credentials/private paths in the asar contents",
+      "contents": "app.asar carries main.js/preload.js/renderer/** + package.json only; 15 packaged-but-not-loaded renderer modules disclosed in release notes"
+    }
+  },
+  "smokeEvidence": {
+    "method": "REAL packaged binary launched with --remote-debugging-port; renderer-level assertions over CDP (Node built-in WebSocket); production CaseStore over real IndexedDB",
+    "isolationNote": "macOS Electron ignores a $HOME override for userData (always ~/Library/Application Support/racing-setup-analyzer). Isolation was achieved EXTERNALLY: the real profile was moved aside before the clean phase and restored afterward; smoke-created data was fully removed (verified).",
+    "bootSmoke": "PASS — page target, packaged index.html, document.title, shell nav, Comparisons pane node, D5 Engineer Brief mount present AND still hidden/inert, zero missing dynamic i18n codes",
+    "cleanInstallSmoke": "PASS 10/10 — on a freshly created profile, production CaseStore.create over real IndexedDB persisted a schema-v1 record (SEEDED case reopened with matching metadata)",
+    "upgradeSmoke": "PARTIAL (disclosed) — relaunch on the same profile: seeded case SURVIVED restart, exactly one record (no duplication), schemaVersion 1 read back unchanged via the per-read migration path. PARTIAL because the fixture was seeded by the 2.0.0 binary itself (same frozen schema v1), not by a real 1.4.0-binary-produced userData; future-schema fail-closed behavior is covered by Node-level suites (case-store CANNOT_OVERWRITE_FUTURE + migration tests), not by this smoke.",
+    "findings": [
+      "PRE-EXISTING DEFECT (since the v1.0.0 initial commit, NOT an F6 regression): Electron's default-sandboxed preload cannot require('./package.json'); the preload script fails to load ('Unable to load preload script' + 'module not found: ./package.json'), so window.electronAPI is NEVER exposed in the packaged app; the renderer's typeof-guard fallback masks it (version string falls back to '1.0.0'). Confirmed in all smoke runs; disclosed in release notes Known limitations; fix deferred (production change outside the F6 authorized scope).",
+      "One STORAGE_UNAVAILABLE incident during smoke development was environmental (LevelDB profile lock from an earlier debug instance / world-writable temp profile attempt), not an app defect: reproduced clean on a fresh profile with 10/10 + 11/11 passes."
+    ]
+  },
   "workflowRunId": null,
   "artifactId": null,
   "artifactBoundSha": null,
@@ -171,15 +201,8 @@
   "productionDiff": null,
   "runtimeConsumerCount": null,
   "featureRegistryState": {
-    "expectedDeferredIds": [
-      "case_comparison",
-      "reference_lap",
-      "corner_delta",
-      "engineer_brief",
-      "experiment_loop",
-      "case_timeline"
-    ],
+    "expectedDeferredIds": [],
     "expectedRendererAdapter": false,
-    "note": "F4 does NOT touch the feature registry. R3.0C/D/E activations remain in their state."
+    "note": "F6 does NOT touch the feature registry. Actual registry state carried into 2.0.0: case_comparison/reference_lap/corner_delta activated at C8_ACTIVATION (Comparisons pane live); engineer_brief/experiment_loop/case_timeline are nav-live with 'available_conditional' data-gates but their pane content is not wired into renderer/index.html (nav nodes only — disclosed in release notes Known limitations item 1)."
   }
 }

@@ -117,6 +117,15 @@ cannot control OS-level backups or other local processes. Full statement:
 9. **No professional validation.** The product is not a professional race-engineer
    replacement; outputs are advisory, in physical units, with explicit credibility and
    limitations metadata (see `docs/r3-credibility-model.md`).
+10. **Preload `electronAPI` surface is not functional (pre-existing since v1.0.0).**
+   `preload.js` calls `require('./package.json')`, which Electron's default-sandboxed
+   preload cannot resolve — the preload script fails to load and `window.electronAPI`
+   (`{platform, version}`) is never exposed in the packaged app. The renderer's
+   `typeof`-guard fallback masks this (the in-app version string falls back to
+   `'1.0.0'`); no other functionality depends on the preload surface. Confirmed by the
+   F6 packaged smoke; this is NOT an F6/2.0.0 regression (present since the initial
+   commit) and the fix is deferred as a production change outside the 2.0.0 release
+   scope. `docs/r3-data-and-privacy.md` describes the *intended* preload surface.
 
 ## Release boundary (current state at the F6 release-candidate stage)
 
