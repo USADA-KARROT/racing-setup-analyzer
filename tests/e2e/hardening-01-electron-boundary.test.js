@@ -279,6 +279,12 @@ try {
       { residue: (residue.match(new RegExp('.{0,50}\\b' + spec.token + '\\b.{0,50}')) || [])[0] });
   }
   chk('preload.js has NO rest/spread token anywhere (post-strip)', preloadSrc.indexOf('...') === -1);
+  // H1-R4-01 closure: identifier-obfuscation ban. JS identifiers admit unicode
+  // escapes (requ\u0069re) which evade bare-token regexes. preload.js is OUR file
+  // and legitimately needs neither escape sequences nor non-ASCII characters, so
+  // both are banned outright on the RAW source (pre-strip — comments included).
+  chk('preload.js has NO \\u / \\x escape sequences anywhere (raw)', !/\\u|\\x/i.test(preloadRaw));
+  chk('preload.js is pure ASCII (no homoglyph identifiers)', !/[^\x00-\x7F]/.test(preloadRaw));
   chk('preload.js has NO globalThis/window/eval/Function escape token', !/\b(globalThis|window|eval|Function)\b/.test(preloadSrc));
   // Self-tests: every known smuggling shape MUST leave a residue.
   (function adversarialSelfTests() {
@@ -288,6 +294,9 @@ try {
       ['bare process alias', 'const p = process;', 'process'],
       ['contextBridge alias', 'const cb = contextBridge;', 'contextBridge'],
     ];
+    // Round-4 attack shape: unicode-escaped identifier must be caught by the escape ban.
+    chk('SELF-TEST: unicode-escaped identifier (requ\\u0069re) is caught by the escape ban',
+      /\\u|\\x/i.test('const nodeRequire = requ\\u0069re;'));
     for (var si = 0; si < shapes.length; si++) {
       var injected = preloadSrc.replace('contextBridge.exposeInMainWorld', shapes[si][1] + '\ncontextBridge.exposeInMainWorld');
       var spec2 = null;
