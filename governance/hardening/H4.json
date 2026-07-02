@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "program": "PUBLIC_RELEASE_HARDENING",
+  "phase": "H4_REAL_UPGRADE_QUALIFICATION",
+  "baseSha": "493375b86ee76f934616f266d563045b2b58fc2c",
+  "integrationBranch": "release/v2.0.0-public-hardening",
+  "headSha": null,
+  "closes": [
+    "D5 upgrade smoke PARTIAL -> PASS (now backed by a REAL v1.4.0-binary-authored profile)"
+  ],
+  "keyFinding": {
+    "v140HasNoPersistenceLayer": true,
+    "evidence": "the v1.4.0 tag ships 4 renderer/js files and ZERO IndexedDB/localStorage case persistence; a real 1.4.0 run authored a profile with Local Storage + caches but NO IndexedDB directory (verified)",
+    "upgradeSemantics": "a real 1.4.0->2.0.0 transition is therefore NOT a case-data migration; it is a FRESH IndexedDB initialization by 2.0.0 over a genuine 1.4.0-authored userData profile, preserving the pre-existing Local Storage. The v1.4.0-era corrupted/partial-legacy-case fixtures are NOT APPLICABLE (1.4.0 cannot author case data) and are honestly recorded as such, not fabricated."
+  },
+  "realBinaryEvidence": {
+    "v140Binary": "REAL v1.4.0 app (electron . from the v1.4.0 tag worktree, electron 33.4.11) authored the fixture profile",
+    "fixtureProfile": "38 files, ~1.7M, IndexedDB ABSENT (authentic 1.4.0 state)",
+    "v200Binary": "packaged v2.0.0 arm64 .app (this candidate)",
+    "upgradePhase": "8/8 PASS — 2.0.0 boots on the 1.4.0 profile, initializes IndexedDB fresh, persists a schema-v1 case, pre-existing Local Storage still readable (not corrupted)",
+    "reopenPhase": "9/9 PASS — case survives 2.0.0 restart, exactly one (no duplication), schema v1 unchanged, open() idempotent",
+    "isolation": "real profile moved aside; 1.4.0 fixture copied in; restored afterward (macOS Electron ignores $HOME)",
+    "logs": {
+      "upgrade": {
+        "result": "8/8",
+        "sha256": "68ed7c6adb2ab8e38499bd3d649c49e7b813842bc2ecaf235a0b4ed076dcc73e"
+      },
+      "reopen": {
+        "result": "9/9",
+        "sha256": "6e0dca8ec3aeeb85510e922948cac8308fd43b02792eca1b3d4edbc7e4ece595"
+      }
+    }
+  },
+  "deterministicQualification": {
+    "suite": "tests/h4-upgrade-qualification.test.js 14/14 over the SAME production modules (case-store.js + storage-backend.js + schema-migration.js)",
+    "scenarios": [
+      "future-schema fail-closed (migration refuses + open rejected)",
+      "downgrade refusal (CANNOT_OVERWRITE_FUTURE)",
+      "idempotent re-open",
+      "no duplication",
+      "malformed record fail-closed (no crash)",
+      "interrupted-init resilience (CASE_NOT_FOUND, list survives)",
+      "recovery after corruption"
+    ]
+  },
+  "codexVerdict": null,
+  "note": "upgrade smoke is now PASS (real 1.4.0 binary authored the fixture). No production runtime code changed. Harness: tests/packaged/h4-upgrade.mjs (real binary, CDP, target-ownership guards) — local evidence tooling, not in the install-free npm-test chain; the deterministic qualification IS in the chain."
+}
