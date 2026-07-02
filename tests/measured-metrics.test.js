@@ -12,8 +12,9 @@ const SPEEDS = [14, 18, 22, 26, 30]; // range 16 m/s > MIN_SPEED_RANGE
   const r = MM.deriveMeasuredUndersteerGradient({ calibratedYawGainBins: makeBins(2, 2, SPEEDS), wheelbaseM: L });
   chk('clean K=2 available', r.available === true, r.blockedReasons);
   chk('clean K=2 recovered ≈ 2', Math.abs(r.kUsDegG - 2) < 0.15, r.kUsDegG);
-  chk('credibility confounded', r.credibility === 'Measured (kinematic, confounded)');
-  chk('carries confounder limitations', r.limitations.length >= 4 && r.limitations.indexOf('fixed_steering_ratio_assumption') !== -1);
+  chk('credibility is the bare Measured rung', r.credibility === 'Measured');
+  chk('kinematic/confounded qualifier lives in limitations', r.limitations.indexOf('kinematic_confounded') !== -1);
+  chk('carries confounder limitations', r.limitations.length >= 5 && r.limitations.indexOf('fixed_steering_ratio_assumption') !== -1);
   chk('fitQuality both directions', r.fitQuality.nBinsPos >= 3 && r.fitQuality.nBinsNeg >= 3);
 })();
 
