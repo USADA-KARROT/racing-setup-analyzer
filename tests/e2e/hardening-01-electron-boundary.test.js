@@ -246,21 +246,55 @@ try {
   // appearances (the fixed destructure and the exact allowlisted invoke), the token
   // `ipcRenderer` must not appear ANYWHERE else in the file — any alias assignment,
   // re-destructure, spread, or argument-forwarding wrapper leaves a residue and fails.
-  function ipcResidue(src) {
-    return src
-      .replace(/const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/, '')
-      .replace(/ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*\)/, '');
+  // H1-R3-01 closure: generalize to EVERY authority token. Each token has an explicit
+  // list of legal appearance patterns; after removing those, the BARE token must not
+  // appear anywhere (word-boundary match) — so alias assignment (`const r = require`),
+  // argument passing, returning, computed access, all leave a residue and fail.
+  var AUTHORITY_TOKENS = [
+    { token: 'ipcRenderer', legal: [
+      /const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/,
+      /ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*\)/,
+    ] },
+    { token: 'require', legal: [
+      /const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/,
+    ] },
+    { token: 'process', legal: [
+      /platform\s*:\s*process\.platform/,
+    ] },
+    { token: 'contextBridge', legal: [
+      /const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/,
+      /contextBridge\s*\.\s*exposeInMainWorld\s*\(/,
+    ] },
+  ];
+  function authorityResidue(src, spec) {
+    var out = src;
+    for (var li = 0; li < spec.legal.length; li++) out = out.replace(spec.legal[li], '');
+    return out;
   }
-  chk('preload.js ipcRenderer token accounting: ZERO appearances outside the two legal sites',
-    !/ipcRenderer/.test(ipcResidue(preloadSrc)),
-    { residue: (ipcResidue(preloadSrc).match(/.{0,50}ipcRenderer.{0,50}/) || [])[0] });
-  chk('preload.js has EXACTLY one require(), the fixed electron destructure',
-    (preloadSrc.match(/require\s*\(/g) || []).length === 1 && /const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/.test(preloadSrc));
+  for (var ai = 0; ai < AUTHORITY_TOKENS.length; ai++) {
+    var spec = AUTHORITY_TOKENS[ai];
+    var residue = authorityResidue(preloadSrc, spec);
+    chk('preload.js authority-token accounting: ' + spec.token + ' appears ONLY at its legal sites',
+      !(new RegExp('\\b' + spec.token + '\\b')).test(residue),
+      { residue: (residue.match(new RegExp('.{0,50}\\b' + spec.token + '\\b.{0,50}')) || [])[0] });
+  }
   chk('preload.js has NO rest/spread token anywhere (post-strip)', preloadSrc.indexOf('...') === -1);
-  // Self-test: the exact round-2 attack shape MUST be caught by the residue invariant.
-  (function adversarialSelfTest() {
-    var attack = preloadSrc.replace('contextBridge.exposeInMainWorld', 'var leak = function () { return ipcRenderer; };\ncontextBridge.exposeInMainWorld');
-    chk('SELF-TEST: alias-smuggling shape is caught by the residue invariant', /ipcRenderer/.test(ipcResidue(attack)));
+  chk('preload.js has NO globalThis/window/eval/Function escape token', !/\b(globalThis|window|eval|Function)\b/.test(preloadSrc));
+  // Self-tests: every known smuggling shape MUST leave a residue.
+  (function adversarialSelfTests() {
+    var shapes = [
+      ['direct ipcRenderer alias', 'var leak = function () { return ipcRenderer; };', 'ipcRenderer'],
+      ['bare require alias (round-3 attack)', 'const nodeRequire = require;', 'require'],
+      ['bare process alias', 'const p = process;', 'process'],
+      ['contextBridge alias', 'const cb = contextBridge;', 'contextBridge'],
+    ];
+    for (var si = 0; si < shapes.length; si++) {
+      var injected = preloadSrc.replace('contextBridge.exposeInMainWorld', shapes[si][1] + '\ncontextBridge.exposeInMainWorld');
+      var spec2 = null;
+      for (var sj = 0; sj < AUTHORITY_TOKENS.length; sj++) if (AUTHORITY_TOKENS[sj].token === shapes[si][2]) spec2 = AUTHORITY_TOKENS[sj];
+      chk('SELF-TEST: ' + shapes[si][0] + ' leaves a residue',
+        (new RegExp('\\b' + shapes[si][2] + '\\b')).test(authorityResidue(injected, spec2)));
+    }
   })();
   chk('preload.js invoke uses the APP_VERSION_CHANNEL constant (no inline/caller-chosen channel)', /ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*[),]/.test(preloadSrc));
   var channelConsts = preloadSrc.match(/APP_VERSION_CHANNEL\s*=\s*['"`]([^'"`]+)['"`]/g) || [];
