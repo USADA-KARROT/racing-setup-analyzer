@@ -1,0 +1,1062 @@
+
+> racing-setup-analyzer@2.0.1 test
+> node tests/verify-dynamics.js && node tests/telemetry-core.test.js && node tests/telemetry-view.test.js && node tests/telemetry-plot.test.js && node tests/telemetry-interact.test.js && node tests/telemetry-yaw.test.js && node tests/canonical-parameters.test.js && node tests/parameter-conversions.test.js && node tests/vehicle-profile-f312.test.js && node tests/setup-snapshot.test.js && node tests/analysis-case.test.js && node tests/analysis-case-adversarial.test.js && node tests/suspension-input-normalizer.test.js && node tests/suspension-input-equivalence.test.js && node tests/suspension-input-adversarial.test.js && node tests/canonical-model-input.test.js && node tests/analysis-execution.test.js && node tests/telemetry-observation.test.js && node tests/model-telemetry-comparison.test.js && node tests/race-engineer-insight.test.js && node tests/driver-coach-insight.test.js && node tests/analysis-workspace.test.js && node tests/analysis-workspace-viewmodel.test.js && node tests/analysis-workspace-integration.test.js && node tests/analysis-workspace-ui.test.js && node tests/telemetry-import-adapter.test.js && node tests/channel-mapping.test.js && node tests/calibration-registry.test.js && node tests/analysis-window.test.js && node tests/canonical-telemetry-session.test.js && node tests/analysis-case-export.test.js && node tests/r2.3-real-telemetry-integration.test.js && node tests/r2.3-import-ui.test.js && node tests/measured-metrics.test.js && node tests/r2.4-measured-metrics-integration.test.js && node tests/r2.4-ui.test.js && node tests/setup-ab.test.js && node tests/quantitative-setup-recommendation.test.js && node tests/r2.5-setup-ab-quantitative-integration.test.js && node tests/r2.5-ui.test.js && node tests/track-intelligence.test.js && node tests/r2.6-track-intelligence-integration.test.js && node tests/r2.6-ui.test.js && node tests/case-shell.test.js && node tests/r3.0a-ui.test.js && node tests/storage-backend.test.js && node tests/schema-migration.test.js && node tests/case-record-schema.test.js && node tests/case-store.test.js && node tests/session-store.test.js && node tests/case-library-viewmodel.test.js && node tests/r3.0b-ui.test.js && node tests/r3.0b-persistence-integration.test.js && node tests/feature-registry.test.js && node tests/feature-router.test.js && node tests/vehicle-preset-pipeline.test.js && node tests/i18n-parity.test.js && node tests/r3.0c-contract-foundation.test.js && node tests/r3-0c-comparison-adapter.test.js && node tests/r3-0c-lap-authority.test.js && node tests/r3-0c-track-identity.test.js && node tests/r3-0c-distance-authority.test.js && node tests/r3-0c-normalized-distance.test.js && node tests/r3-0c-reference-selection.test.js && node tests/r3-0c-corner-segmentation.test.js && node tests/r3-0c-corner-pairing.test.js && node tests/r3-0c-delta-metrics.test.js && node tests/r3-0c-comparison-export.test.js && node tests/r3-0c-comparison-workspace.test.js && node tests/r3-0c-contracts-bundle-equivalence.test.js && node tests/r3-0c-activation.test.js && node tests/r3.0d-contract-foundation.test.js && node tests/r3.0d-hardened-intrinsics.test.js && node tests/r3.0d-evidence-graph.test.js && node tests/r3.0d-hypothesis-engine.test.js && node tests/r3.0d-priority-engine.test.js && node tests/r3.0d-engineer-brief.test.js && node tests/r3.0d-engineer-viewmodel.test.js && node tests/r3-0d-contracts-bundle-equivalence.test.js && node tests/r3.0e-contract-foundation.test.js && node tests/r3.0e-stores.test.js && node tests/r3.0e-outcome-classifier.test.js && node tests/r3.0e-followup-timeline.test.js && node tests/r3.0e-experiment-viewmodel.test.js && node tests/r3.0f-migration-engine.test.js && node tests/e2e/flow-01-new-user.test.js && node tests/e2e/flow-02-real-telemetry.test.js && node tests/e2e/flow-03-measured.test.js && node tests/e2e/flow-04-reference-lap.test.js && node tests/e2e/flow-05-vre.test.js && node tests/e2e/flow-06-setup-experiment.test.js && node tests/e2e/flow-07-driver-experiment.test.js && node tests/e2e/flow-08-export-import.test.js && node tests/e2e/flow-09-electron-smoke.test.js && node tests/e2e/hardening-01-electron-boundary.test.js && node tests/e2e/hardening-02-storage-failure.test.js && node tests/e2e/hardening-03-no-stale-ui.test.js && node tests/e2e/hardening-04-large-library.test.js && node tests/e2e/hardening-05-xss-injection.test.js && node tests/e2e/hardening-06-supply-chain.test.js && node tests/managed-temp-dir.test.js && node tests/release-gate.test.js && node tests/version-bump-policy.test.js && node tests/supply-chain.test.js && node tests/h4-upgrade-qualification.test.js && node tests/h2-product-identity.test.js && node tests/h5-ui-truth.test.js && node tests/h6-signing-readiness.test.js && node tests/r3-0c-governance.test.js && node tests/r3-0c-no-consumer.test.js && node tests/r3-0c-governance-integrity.test.js && node tests/r3-0-phase-governance.test.js && node tests/r3-0-phase-no-consumer.test.js && node tests/r3-0-phase-governance-integrity.test.js && node tests/r3-0-train.test.js && node tools/validate-against-telemetry.js --selftest
+
+
+[1] 軸側傾剛性 K = k_w·t²/2 (Milliken / Suspension Secrets)
+  ✓ 前彈簧側傾剛性 = k·t²/2
+  ✓ 輪胎串聯後總剛性 < 懸吊剛性
+
+[2] Roll gradient 量級 (OptimumG: 街車 ~3-6°/g, 高下壓力賽車 0.2-0.7°/g)
+  ✓ GT3 roll gradient 在 1.5-5 °/g 合理區間
+  ✓ 軟彈簧 → roll gradient 更大
+
+[3] ARB sizing 單位一致性 (Nm/deg)
+  ✓ total_roll_needed ≈ m·g·h/target
+  ✓ front_arb_needed 在現實範圍 (< 3000 Nm/deg)
+  ✓ current_roll_gradient 在現實範圍 (< 15 °/g)
+
+[4] 線性自行車模型 (Gillespie ch.6)
+  ✓ 滑移角@1g 在 2-10° 物理範圍
+  ✓ K_us = W_f/C_f − W_r/C_r
+  ✓ 臨界速度 = √(g·L/|K_us|)
+  ✓ K_us<0 時無特徵速度
+  ✓ 超過臨界速度時 yaw gain = null
+  ✓ 50/50 車 K_us ≈ 0
+
+[5] 阻尼比 (OptimumG Tech Tip 2: 賽車 ζ ≈ 0.65-0.7)
+  ✓ heave 阻尼比在 0.2-1.2 現實範圍
+  ✓ 側傾阻尼比在 0.1-1.5 現實範圍
+  ✓ 參考速度加倍 → ζ 減半
+
+[6] 空力方向 (front-biased downforce → 高速轉向過度)
+  ✓ 前偏空力 → aero_us_shift < 0 (轉向過度)
+  ✓ 後偏空力 → aero_us_shift > 0 (轉向不足)
+
+[7] Toe 慣例 (+ = toe-in)
+  ✓ 前 toe-in → 更轉向不足
+  ✓ 後 toe-in → 更轉向不足(穩定)
+
+[8] Cross weight (FL+RR 分析對角，作者刻意設計)
+  ✓ cross = (FL+RR)/total
+
+[9] Flat ride 規則 (Olley: 後/前 ≈ 1.10-1.20)
+  ✓ 後/前比值過低觸發建議
+  ✓ 目標比值 = 1.10 (後高於前)
+  ✓ 建議調整「後」彈簧
+
+[10] 輪胎垂直彈簧率估算 (實測校準)
+  ✓ 255/40 估算 ≈ 250 N/mm (±10%)
+  ✓ 205/55 ≈ 220 N/mm 基準
+  ✓ 胎壓越高剛性越高
+  ✓ 295/30 在 250-320 N/mm 合理範圍
+
+[11] Pacejka 模型
+  ✓ C_α 峰值在 Fz = a4
+  ✓ -3° camber 降低 C_α < 3%
+  ✓ 峰值 μ 在 0.8-1.3
+
+[12] Load sensitivity 形狀
+  ✓ Fz=Fz0 時 = 1.0 (峰值)
+  ✓ Fz>Fz0 時下降
+
+[13] 縱向荷重轉移 ΔW = W·a·h/L (Gillespie)
+  ✓ 1g 煞車轉移量
+
+[14] 全車種資料庫掃描（Tier 1 輸出健全性）
+  ✓ 501 台車全部輸出在物理合理範圍
+
+[15] Pacejka 荷重敏感度膝點隨車重校準 (a4 scaling)
+  ✓ GT3 臨界速度不再低得離譜 (>90 km/h 或無)
+  ✓ 62/38 前重車 → K_us > 0 (轉向不足)
+  ✓ 有角落重量時軸荷重以磅秤值為準
+
+[16] 阻尼參考速度防呆 (0/''/負值 → 退回 0.3)
+  ✓ damper_ref_speed=0 → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed="" → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed=-1 → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed=null → ζ 有限且等於 0.3 預設
+  ✓ damper_ref_speed=undefined → ζ 有限且等於 0.3 預設
+
+[17] arbSizing 輪胎柔度補償（軸級閉合）
+  ✓ series(spring+ARB, tire) 總和 = 所需總剛性
+  ✓ 無輪胎參數時維持舊行為
+
+[18] 統一機械平衡 (Tier1 understeer_gradient, deg/g) — 配重 + LLTD
+  ✓ 車頭重(62%F) → 轉向不足 (US>0)
+  ✓ 50/50 → 近中性 (|US|<0.3)
+  ✓ 車尾重(40%F) → 轉向過度 (US<0)
+  ✓ 配重單調: 62%F 比 50%F 更US, 40%F 更OS
+  ✓ US 在 deg/g 合理範圍 (|US|<8)
+  ✓ 前 ARB 硬 → 轉向不足方向
+  ✓ 後 ARB 硬 → 轉向過度方向
+  ✓ 前硬 vs 後硬 方向相反且對稱
+
+[19] 預設車庫傾向分佈合理性 (回歸「全部轉向過度」bug)
+  ✓ OS 不超過 50% (修正前幾乎全 OS)
+  ✓ 三種傾向都有合理數量(各>10%)
+  ✓ FF 前驅車 轉向不足 > 轉向過度 (物理正確)
+
+[20] 麗寶單圈模擬器 — GG 點質量 lap sim
+  ✓ 賽道段落總長 ≈ 3500m (±200)
+  ✓ 改裝 GR Yaris 圈速 ≈ 110.9s (1:50, ±6s)
+  ✓ 極速合理 (180-260 km/h)
+  ✓ 抓地↑ → 圈速更快
+  ✓ 動力↑ → 圈速更快
+  ✓ 質量↑ → 圈速更慢
+
+[21] 麗寶 stint 演化 — 胎壓甜蜜點 / 最快圈 / 退化
+  ✓ 產生 12 圈逐圈資料
+  ✓ 最快單圈時間字串格式 m:ss.mmm
+  ✓ 甜蜜點在 stint 早段 (第1-5圈)
+  ✓ 最快圈 ≈ 峰值抓地圈 (±1)
+  ✓ 第1圈(冷胎)比最快圈慢
+  ✓ 熱胎壓 > 冷胎壓 (升溫建壓)
+  ✓ 建議冷胎壓 < 熱胎甜蜜點
+  ✓ 峰值後抓地退化
+
+[22] 胎種抓地排序 — 光頭胎應比街胎快 (回歸「光頭胎變慢」bug)
+  ✓ 光頭軟胎 比 街胎(PS4S) 快
+  ✓ 光頭軟胎 比 半熱熔(A052) 快
+  ✓ 半熱熔 比 街胎 快
+  ✓ 光頭胎在熱賽道達工作窗口 (峰值抓地>85%)
+  ✓ tir: FNOMIN parsed
+  ✓ tir: vertical stiffness → N/mm
+  ✓ tir: dims (width) parsed
+  ✓ tir: lateral coeff PCY1 parsed
+  ✓ tir: comment stripped from value
+  ✓ tir: ISO sign (α>0 → Fy<0)
+  ✓ tir: Fy rises toward peak (|Fy(2°)|<|Fy(6°)|)
+  ✓ tir: peak μ ≈ PDY1 (1.3–1.7)
+  ✓ tir: optimal slip angle 3–12°
+  ✓ tir: cornering stiffness > 0
+  ✓ tir: load sensitivity (μ falls as Fz rises)
+  ✓ tir: fyCurve generated (0–15°, |Fy| rises from ~0 toward peak)
+  ✓ tir: imported tire feeds handling model (K_us shifts)
+  ✓ tir: default prediction unaffected without tireModel
+  ✓ tir: peak μ feeds lap-sim base_mu (override)
+  ✓ tir: lap sim unaffected without tirePeakMu
+  ✓ kin: roll-center height in 0–150mm
+  ✓ kin: ride height (dz=0) returns static camber
+  ✓ kin: camber gain negative (more neg camber in bump)
+  ✓ kin: camber gain magnitude sane (<0.1°/mm)
+  ✓ kin: camber curve smooth/monotonic (no branch-jump spike)
+  ✓ kin: roll center migrates with travel
+  ✓ ref: front-heavy car is more understeer (Milliken K_us)
+  ✓ ref: stiffer front ARB → more understeer
+  ✓ ref: stiffer rear ARB → less understeer (toward oversteer)
+  ✓ ref: street sports-car roll gradient in 2–6°/g
+  ✓ ref: ride frequency matches f=(1/2π)√(k_eff/m)
+  ✓ ref: stiffer springs raise ride frequency
+  ✓ trans: response is stable
+  ✓ trans: yaw response time 0.05–0.6s
+  ✓ trans: yaw-mode damping 0.3–1.2
+  ✓ trans: yaw natural frequency 0.4–3Hz
+  ✓ trans: steady yaw gain matches Gillespie V/(L+Kus·V²/g) (<5%)
+  ✓ trans: invalid input returns null
+  ✓ bms: header identifies DarabImporter
+  ✓ bms: catalog finds all 3 channels
+  ✓ bms: channel name/source/description parsed
+  ✓ bms: detects validation channels (accy/yaw/steer)
+
+[bmsid] D1-0B Bosch channel dictionary + identity card
+  ✓ bmsid: card built from synthetic Darab catalog
+  ✓ bmsid: format detected = Bosch WinDarab / DarabImporter
+  ✓ bmsid: file identity carries name + size
+  ✓ bmsid: source summary lists MS5.8 + C60
+  ✓ bmsid: speed → vehicle_speed (high)
+  ✓ bmsid: steer → steering_angle (high)
+  ✓ bmsid: accy → lateral_acceleration (high)
+  ✓ bmsid: accx → longitudinal_acceleration (high)
+  ✓ bmsid: yaw → yaw_rate (high)
+  ✓ bmsid: nmot → engine_rpm (high)
+  ✓ bmsid: pbrake_f → brake_pressure_front (high)
+  ✓ bmsid: pbrake_r → brake_pressure_rear (high)
+  ✓ bmsid: vwheel_* → wheel_speed_FL/FR/RL/RR (high)
+  ✓ bmsid: unmapped channel → unknown (no fail)
+  ✓ bmsid: ugs NOT treated as gear value
+  ✓ bmsid: ags_*_engine_speed NOT treated as engine_rpm (name-gated)
+  ✓ bmsid: R_H_Front → ride_height, low-confidence inferred
+  ✓ bmsid: Road_FL → road_suspension, low-confidence inferred
+  ✓ bmsid: coverage marks vehicle_speed/yaw_rate found
+  ✓ bmsid: coverage marks ride_height uncertain (low only)
+  ✓ bmsid: forbidden caps all false (timeSeries/physicalValues/scaling/units/modelVsActual/kus/handlingAnalysis/setupFromRaw)
+  ✓ bmsid: limitations pin presence-only / nothing decoded
+  ✓ bmsid: null input → fail-closed (format null, caps false, 0 channels)
+
+[cal] Calibration 層：常數值鎖定 (calibration.js)
+  ✓ cal: CAL.US_NEUTRAL_BAND === 0.5
+  ✓ cal: CALIBRATION.US_NEUTRAL_BAND.value 對齊 CAL.US_NEUTRAL_BAND
+  ✓ cal: CAL.US_NORM_SCALE === 4
+  ✓ cal: CALIBRATION.US_NORM_SCALE.value 對齊 CAL.US_NORM_SCALE
+  ✓ cal: CAL.CORNERING_STIFFNESS_AY_REF_G === 1
+  ✓ cal: CALIBRATION.CORNERING_STIFFNESS_AY_REF_G.value 對齊 CAL.CORNERING_STIFFNESS_AY_REF_G
+  ✓ cal: CAL.TIRE_GRIP_TO_US_GRADIENT_GAIN === 14
+  ✓ cal: CALIBRATION.TIRE_GRIP_TO_US_GRADIENT_GAIN.value 對齊 CAL.TIRE_GRIP_TO_US_GRADIENT_GAIN
+  ✓ cal: CAL.WEIGHT_SHIFT_TO_US_GRADIENT === 0.2
+  ✓ cal: CALIBRATION.WEIGHT_SHIFT_TO_US_GRADIENT.value 對齊 CAL.WEIGHT_SHIFT_TO_US_GRADIENT
+  ✓ cal: CAL.TIRE_WIDTH_GRIP_REF_MM === 245
+  ✓ cal: CALIBRATION.TIRE_WIDTH_GRIP_REF_MM.value 對齊 CAL.TIRE_WIDTH_GRIP_REF_MM
+  ✓ cal: CAL.TIRE_WIDTH_GRIP_EXPONENT === 0.5
+  ✓ cal: CALIBRATION.TIRE_WIDTH_GRIP_EXPONENT.value 對齊 CAL.TIRE_WIDTH_GRIP_EXPONENT
+  ✓ cal: CAL.PRESSURE_GRIP_LOSS_PER_BAR === 0.2
+  ✓ cal: CALIBRATION.PRESSURE_GRIP_LOSS_PER_BAR.value 對齊 CAL.PRESSURE_GRIP_LOSS_PER_BAR
+  ✓ cal: CAL.LIHPAO_RADIUS_SCALE === 1.1
+  ✓ cal: CALIBRATION.LIHPAO_RADIUS_SCALE.value 對齊 CAL.LIHPAO_RADIUS_SCALE
+  ✓ cal: CAL.TIRE_TEMP_TRACK_COEFF === 0.6
+  ✓ cal: CALIBRATION.TIRE_TEMP_TRACK_COEFF.value 對齊 CAL.TIRE_TEMP_TRACK_COEFF
+  ✓ cal: CAL.TIRE_TEMP_EQUIL_TAU_LAPS === 1.6
+  ✓ cal: CALIBRATION.TIRE_TEMP_EQUIL_TAU_LAPS.value 對齊 CAL.TIRE_TEMP_EQUIL_TAU_LAPS
+  ✓ cal: CAL.LAP_BALANCE_PENALTY_PER_DEGG === 0.012
+  ✓ cal: CALIBRATION.LAP_BALANCE_PENALTY_PER_DEGG.value 對齊 CAL.LAP_BALANCE_PENALTY_PER_DEGG
+  ✓ cal: CAL.LAP_BALANCE_PENALTY_CAP === 0.04
+  ✓ cal: CALIBRATION.LAP_BALANCE_PENALTY_CAP.value 對齊 CAL.LAP_BALANCE_PENALTY_CAP
+  ✓ cal: CAL.DRIVETRAIN_TRACTION_FRAC_2WD === 0.62
+  ✓ cal: CALIBRATION.DRIVETRAIN_TRACTION_FRAC_2WD.value 對齊 CAL.DRIVETRAIN_TRACTION_FRAC_2WD
+  ✓ cal: CALIBRATION 鍵集合 == 測試預期
+  ✓ cal: 每個常數 metadata 完整且 value 落在 validRange 內
+
+[sens] corneringStiffnessScale 鉤子
+  ✓ sens: corneringStiffnessScale 預設(=1) 不改變 understeer_gradient
+  ✓ sens: cornering stiffness ×0.8 → Kus ≈ Kus0/0.8
+
+[tmeta] 輪胎模型 metadata
+  ✓ tmeta: generic → sourceType/overallStatus generic
+  ✓ tmeta: generic → Cα = model/generic_pacejka
+  ✓ tmeta: generic → pressure/temp/width grip are heuristic
+  ✓ tmeta: generic → no fallback flags (nothing better was expected)
+  ✓ tmeta: imported → sourceType imported_tir, status valid
+  ✓ tmeta: imported → Cα & peak μ upgraded to model/imported_tir
+  ✓ tmeta: imported → pressure/temp/width/tireUsShift STILL heuristic + fallback
+  ✓ tmeta: imported → coverage lateral true; Fx/Mz/combined false
+  ✓ tmeta: imported → emits "grip still heuristic" honesty diagnostic
+  ✓ tmeta: partial .tir → overallStatus imported_partial
+  ✓ tmeta: partial .tir → camber + lateral-only warnings
+  ✓ tmeta: partial .tir → missing pressure-model diagnostic
+  ✓ tmeta: parseTIR → imported_tir descriptor
+  ✓ tmeta: descriptor is pure — no prediction drift
+
+[tval] .tir validation diagnostics
+  ✓ tval: valid → no error severity
+  ✓ tval: valid → lateral-only is a warning (not an error)
+  ✓ tval: valid → grip-still-heuristic is a warning
+  ✓ tval: valid → vertical stiffness reported as info
+  ✓ tval: valid → load-sensitivity reported as info
+  ✓ tval: valid → pressure-unused note is info (file has PPY)
+  ✓ tval: lateral-only flags combined slip + Mz + Fx
+  ✓ tval: null → error TIR_PARSE_FAILED only
+  ✓ tval: missing PCY1 → error TIR_MISSING_LATERAL (returns early)
+  ✓ tval: missing PDY1 → error TIR_NO_PEAK
+  ✓ tval: partial → no error severity
+  ✓ tval: partial → no-camber warning + no-pressure/no-vertical info
+  ✓ tval: degenerate (Fy0≡0) → error TIR_NO_EFFECTIVE_LATERAL_FORCE
+  ✓ tval: degenerate → importedTirMetadata overallStatus imported_error (never imported_valid)
+  ✓ tval: valid (non-degenerate) → NO effective-lateral-force error
+  ✓ tval: importedTirMetadata(no PDY1) → overallStatus imported_error
+  ✓ tval: buildTireModelMetadata diagnostics come from validateTirModel
+
+[telemetry] .bmsbin catalog metadata + diagnostics
+  ✓ telemetry: canonical mapping returns matched raw name
+  ✓ telemetry: maps wheel-speed / damper / ride-height
+  ✓ telemetry: valid catalog → status catalog_only
+  ✓ telemetry: capabilities — catalog true, all decoding false
+  ✓ telemetry: required channels carry raw names
+  ✓ telemetry: catalog-only emits time-series-not-decoded warning
+  ✓ telemetry: full core → validation-detected + ready-for-3B info
+  ✓ telemetry: missing yaw/steer/speed → warnings; lateral present → no lateral warning
+  ✓ telemetry: partial still catalog_only (no time-series)
+  ✓ telemetry: non-Darab → error TELEM_NOT_DARAB + decode_error
+  ✓ telemetry: zero channels → error TELEM_NO_CHANNELS
+  ✓ telemetry: consumes parseBms shape (header/channelCount/channels)
+
+[probe] .bmsbin binary sample-block probe
+  ✓ probe: empty file → error BMS_PROBE_EMPTY_FILE
+  ✓ probe: non-Darab header → error BMS_PROBE_INVALID_HEADER
+  ✓ probe: catalog-only → catalog found + no-sample-region warning + no regions
+  ✓ probe: catalog + numeric region → candidate binary region found
+  ✓ probe: numeric region → int16le encoding flagged plausible
+  ✓ probe: monotonic counter → timebase clue candidate
+  ✓ probe: random region → probe_only + scaling-not-decoded warning
+  ✓ probe: report schema stable (probe_only, arrays, unknowns)
+  ✓ probe: always honest — probe-only + time-series-not-confirmed diagnostics
+  ✓ probe→metadata: status probe_available + sampleProbe true, decoding still false
+  ✓ probe→metadata: probe summary attached (regionCount + diagnostics)
+  ✓ probe→metadata: no probe → stays catalog_only, sampleProbe false
+
+[raw] .bmsbin raw time-series candidate extraction
+  ✓ raw: no probe report → error
+  ✓ raw: no candidate region → error + no series
+  ✓ raw: numeric region → raw series candidate found
+  ✓ raw: int16le stats correct (min/max/mean of 0..999)
+  ✓ raw: series carries raw-only notes (no scaling / no mapping)
+  ✓ raw: timebase clue → candidate only (not a confirmed timestamp)
+  ✓ raw: interleaved data → interleaved layout hypothesis (≥2 channels)
+  ✓ raw: channel mapping stays not_mapped
+  ✓ raw: physicalScaling + handlingCorrelation + timeSeries stay false
+  ✓ raw: rawTimeSeriesCandidates true + status raw_candidates_only
+  ✓ raw: end-to-end probe→extract yields candidates
+  ✓ raw→metadata: status raw_candidates_only + rawTimeSeriesCandidates true; physical/handling false
+  ✓ raw→metadata: rawExtraction summary attached (seriesCount + channelMapping not_mapped)
+
+[link] .bmsbin channel-linking hypotheses
+  ✓ link: no raw extraction → error
+  ✓ link: no catalog → warning
+  ✓ link: count match → count-match info + low-confidence order hypothesis
+  ✓ link: no explicit mapping → channel identity not confirmed
+  ✓ link: explicit mapping → high-confidence identity (synthetic case only)
+  ✓ link: explicit scale → scaling hypothesis (metadata_candidate)
+  ✓ link: no scale → manual_required + physicalScaling false
+  ✓ link: canonicalPreview available only with explicit identity+scale
+  ✓ link: decode-grade capabilities stay false even with explicit mapping
+  ✓ link: timebase hypothesis formed (candidate only, sample-count match)
+  ✓ link→metadata: status linking_hypotheses_only + linking/scaling caps true; decode-grade false
+  ✓ link→metadata: linking summary attached (identity not confirmed, no canonical preview)
+
+[tool] local validation reporter — fixture-safe / sanitized output
+  ✓ tool: REPORT_FIELDS whitelist names no raw-content field
+  ✓ tool: summarizeFile emits only whitelisted REPORT_FIELDS
+  ✓ tool: summary values are scalars only (no raw arrays/objects)
+  ✓ tool: summary reflects pipeline run + claims no decode
+  ✓ tool: aggregate emits counts/ranges/histograms only (no raw arrays)
+  ✓ tool: serialized summary+aggregate names no raw-content field
+  ✓ tool: summary carries sanitized confirmation decision (catalog confirmed, structure not, no decode)
+  ✓ tool: aggregate reports confirmation counts + corpus booleans (sanitized)
+  ✓ tool: summary carries sanitized extraction eligibility (not eligible, 0 eligible, no measured values)
+  ✓ tool: summary carries sanitized measured extraction (real file blocked, 0 corners, realDataUsed false, no tendency)
+  ✓ tool: summary carries sanitized canonical-adapter eligibility (real file blocked, never ready, realDataUsed false)
+  ✓ tool: summary carries sanitized private-corpus boundary (not available on single file, realDataUsed false)
+
+[confirm] .bmsbin hypothesis→confirmed criteria
+  ✓ confirm: catalog-only → catalog confirmed, structure not, status not_confirmed
+  ✓ confirm: unstable candidate regions → sample structure not confirmed
+  ✓ confirm: stable regions + matching raw count → sample structure can be confirmed
+  ✓ confirm: explicit mapping → channel identity can be confirmed (synthetic)
+  ✓ confirm: no explicit mapping → channel identity stays false
+  ✓ confirm: monotonic counter + sample-count match → timebase can be confirmed
+  ✓ confirm: no scale table → physical scaling stays false
+  ✓ confirm: explicit scale → scaling criteria confirmed (synthetic), physicalScaling cap still false
+  ✓ confirm: real-data-like (85 ch / 2 raw, no corpus) → catalog only, status not_confirmed
+  ✓ confirm: explicit mapping but NO corpus → identity/scaling/canonical stay false (structure gates them)
+  ✓ confirm: decode-grade capabilities stay false even when structure is confirmed
+  ✓ confirm: report schema (scores + blockers + nextEvidenceNeeded + canonical blocked)
+  ✓ confirm→metadata: confirmation summary surfaced + confirmationCriteria cap true; decode-grade false
+  ✓ confirm→metadata: no confirmation → confirmationCriteria false, confirmation null
+
+[struct] .bmsbin sample-structure discovery
+  ✓ struct: catalog-only (no raw) → hypotheses-only + not converged + warning
+  ✓ struct: 85-entry in-range offset table → candidate matches catalog (targets plausible)
+  ✓ struct: offset table with out-of-file targets → not confirmed (targetsPlausible false)
+  ✓ struct: 85 length-prefixed blocks → per_channel_blocks hypothesis matching catalog
+  ✓ struct: interleaved 85-lane data → interleaved_channels hypothesis
+  ✓ struct: random region → compressed_or_sparse hypothesis
+  ✓ struct→confirm: per-channel feed but NO corpus → structure NOT confirmed, decode caps false
+  ✓ struct→confirm: per-channel feed + corpus → structure can confirm; decode-grade caps still false
+  ✓ struct: decode-grade caps false + sampleStructureDiscovery true + never converged (all fixtures)
+  ✓ struct: report never names a canonical channel / decoded series
+  ✓ struct→metadata: structure summary surfaced + sampleStructureDiscovery cap true; decode caps false
+  ✓ struct→metadata: no structure → sampleStructureDiscovery false, structure null
+  ✓ struct(R1): misaligned per-channel blocks (junk prefix) still found via full start search
+  ✓ struct(R2): sequential index run → channel_index_table, not a matches offset_table
+  ✓ struct(R3): single contiguous smooth series → NOT mislabelled interleaved_channels
+  ✓ struct(R4): random region yields no targetsPlausible offset_table candidate
+
+[raw-stream] .bmsbin raw stream confirmation criteria
+  ✓ rawstream: catalog-only → not confirmed, no confirmable stream
+  ✓ rawstream: single-file per-channel blocks → confirmable, aggregate not confirmed (corpus required)
+  ✓ rawstream: corpus + consistent per-channel blocks → confirmed_structure + raw_stream_structure_confirmed
+  ✓ rawstream: matching count but inconsistent block length → candidate_only, not confirmed
+  ✓ rawstream: corpus + interleaved layout → confirmed_structure
+  ✓ rawstream: single contiguous smooth series → no interleaved stream, not confirmed
+  ✓ rawstream: offset table → rejected as raw stream (boundary evidence), not confirmed
+  ✓ rawstream: decode-grade capabilities stay false (timeSeries/physicalScaling/handlingCorrelation)
+  ✓ rawstream: always warns identity + physical values unavailable; never names a channel/value
+  ✓ rawstream→confirm: feed WITHOUT corpus → raw streams not confirmed; decode caps false
+  ✓ rawstream→confirm: feed + corpus (fileCount≥2) → raw streams can confirm; decode caps still false
+  ✓ rawstream: real-data-like (no corpus, no clean structure) → not confirmed
+  ✓ rawstream→metadata: summary surfaced + rawStreamConfirmation cap true; decode caps false
+  ✓ rawstream→metadata: no raw stream confirmation → cap false, summary null
+  ✓ rawstream(R1): equal-prefix / variable-tail blocks → NOT confirmed_structure (whole-run length check)
+
+[channel-identity] .bmsbin channel identity confirmation criteria
+  ✓ identity(A): shape-only → hypothesis_only, not confirmed
+  ✓ identity(B): label-only → labeled_unverified, not confirmed
+  ✓ identity(C): independent mapping but raw stream not confirmed → confirmable_identity, not confirmed
+  ✓ identity(D): corpus + confirmed raw stream + independent mapping → confirmed_identity (synthetic); decode caps false
+  ✓ identity(R1): unknowns[] is consistent with the decision on both paths
+  ✓ identity(E): no corpus (single file) → never confirmed_identity
+  ✓ identity(E2): mapping depends on scaling → candidate at most, not confirmed
+  ✓ identity(F): physical/canonical/handling/setup/units caps pinned false (even confirmed_identity)
+  ✓ identity(G): real path (no evidence) → not_confirmed, 0 candidates
+  ✓ identity(G): real path never names a channel (no speed/brake/throttle/steering/accy from catalog)
+  ✓ identity→confirm: feed WITHOUT corpus → channel identity not confirmed; decode caps false
+  ✓ identity→confirm: feed + corpus → channel identity can confirm; decode caps still false
+  ✓ identity→metadata: surfaced + channelIdentityConfirmed false; physical/canonical/handling/setup caps false
+  ✓ identity→metadata: no identity → cap false, summary null
+
+[timebase] .bmsbin timebase confirmation criteria
+  ✓ timebase(A): no evidence → not_confirmed, confirmed false
+  ✓ timebase(B): sample-count only → sample_count_candidate, confirmed false
+  ✓ timebase(C): monotonic counter only → monotonic_candidate, confirmed false
+  ✓ timebase(D): delta stable, no corpus → delta_candidate, confirmed false
+  ✓ timebase(E): manual sample-rate only → fallback hint, not confirmed; units/scaling/timeSeries false
+  ✓ timebase(F): raw stream not confirmed → confirmable_timebase at most, not confirmed
+  ✓ timebase(G): corpus + confirmed raw stream + full structural → confirmed_timebase (synthetic); caps false
+  ✓ timebase(H): gaps/dropouts → not confirmed_timebase + gaps-detected diagnostic
+  ✓ timebase(H2): NaN gap/dropout count → fails closed (not confirmed), never coerced to 0
+  ✓ timebase(I): single file (no corpus) → never confirmed; no inferred Hz/rate value emitted
+  ✓ timebase(red-line): physical/units/canonical/timeSeries/handling/setup caps pinned false (all paths)
+  ✓ timebase→confirm: feed WITHOUT corpus → timebase not confirmed; decode caps false
+  ✓ timebase→confirm: feed + corpus → timebase can confirm; decode caps still false
+  ✓ timebase→metadata: summary surfaced + timebaseConfirmed false; physical/units/canonical/handling caps false
+  ✓ timebase→metadata: no timebase → cap false, summary null
+
+[physical-scaling] .bmsbin physical scaling confirmation criteria
+  ✓ scaling(A): no evidence → not_confirmed; physical/units caps false
+  ✓ scaling(B): raw stream not confirmed → not confirmed; physicalScaling false
+  ✓ scaling(C): channel identity not confirmed → identity_missing, not confirmed
+  ✓ scaling(D): timebase missing (time-indexed) → timebase_missing, not confirmed
+  ✓ scaling(E): manual scale only → scale_hint_only (fallback); not confirmed; units false
+  ✓ scaling(F): unit label only → unit_hint_only, not confirmed
+  ✓ scaling(G): plausible range only → candidate at most, not confirmed (range is supporting only)
+  ✓ scaling(H): transform proposed but not verified/stable → transform_candidate, not confirmed
+  ✓ scaling(I): all prereqs + independent scale + unit + verified transform → confirmed_scaling (synthetic); usable caps still false
+  ✓ scaling(J): synthetic confirmed → canonicalValueEligibility true but canonicalValues NOT available; no overlay
+  ✓ scaling(R1): identity status string cannot override a false aggregate decision → not confirmed
+  ✓ scaling(K): real single-file (no corpus) → never confirmed; physical/units/canonical caps false
+  ✓ scaling(L): real path + manual scale → fallback hint only; physicalScaling/units false
+  ✓ scaling(M): handling/setup/overlay/timeSeries/canonical caps pinned false (all paths)
+  ✓ scaling→confirm: feed WITHOUT corpus → physical scaling not confirmed; decode caps false
+  ✓ scaling→confirm: feed + corpus → physical scaling can confirm; decode-grade caps still false
+  ✓ scaling→metadata: summary surfaced + physicalScaling/units/canonical caps false; overlay false
+  ✓ scaling→metadata: no scaling → cap false, summary null
+
+[telemetry-readiness] .bmsbin telemetry readiness gate
+  ✓ readiness(A): no evidence → not_ready; readiness/handlingAnalysis caps false
+  ✓ readiness(B): canonical/scaling missing → insufficient_prerequisites, not ready
+  ✓ readiness(C): required channels missing → missing_required_channels, not ready
+  ✓ readiness(E): timebase missing → insufficient_prerequisites, not ready
+  ✓ readiness(F-I): sample-rate / sync / dropout / noise blocked → quality_blocked, not ready
+  ✓ readiness(H2): unknown dropout/noise quality → fail-closed, not ready
+  ✓ readiness(R1): units-only prereq → insufficient_prerequisites (ladder symmetric), still not ready
+  ✓ readiness(J): some required channels confirmed → partial_readiness, not ready
+  ✓ readiness(K): prereqs + channels met, quality not fully confirmed → confirmable_readiness, not ready
+  ✓ readiness(L): real single-file → not_ready; handlingAnalysis/overlay caps false
+  ✓ readiness(M): all prereqs + channels + quality pass → ready_for_analysis (synthetic); analysis caps false
+  ✓ readiness(N): handlingAnalysis/overlay/Kus/handling/setup caps pinned false (all paths)
+  ✓ readiness→confirm: feed WITHOUT corpus → telemetryReadyForAnalysis false; decode caps false
+  ✓ readiness→confirm: feed + full prereqs + corpus → telemetryReadyForAnalysis true; decode caps still false
+  ✓ readiness→metadata: summary surfaced + telemetryReady false; handlingAnalysis/overlay/Kus/setup caps false
+  ✓ readiness→metadata: no readiness → cap false, summary null
+
+[extract-eligibility] .bmsbin measured handling-response extraction eligibility gate
+  ✓ extract(A): real not-ready readiness → not_eligible; extraction/measuredHandlingResponse/handling caps false
+  ✓ extract(B): ready but no canonical measured series → canonical_series_unavailable, not eligible
+  ✓ extract(C): ready + canonical series but required channels absent → required_channels_unavailable
+  ✓ extract(C2): ready + canonical series + some required channels → partial_eligibility
+  ✓ extract(D): channels present but too few corner events → segmentation_prerequisites_unmet
+  ✓ extract(E): segmentation ok but windows not separable → window_prerequisites_unmet
+  ✓ extract(F): all prerequisites satisfied (synthetic) → eligible_for_extraction; extraction/analysis caps false
+  ✓ extract(F2): full evidence but no corpus → corpus_unavailable (not eligible, candidate=1, next-evidence + diag)
+  ✓ extract(G): measuredHandlingResponse/handling/overlay/Kus/modelVsActual caps pinned false (all paths)
+  ✓ extract(H): input contract names required channels (abstract) + segmentation prerequisites
+  ✓ extract(H2): output contract is measured-only proxy — not full Kus / model-vs-actual / setup
+  ✓ extract→confirm: feed WITHOUT corpus → measuredExtractionEligible false; decode caps false
+  ✓ extract→confirm: feed + full prereqs + corpus → measuredExtractionEligible true; decode caps still false
+  ✓ extract→metadata: summary surfaced + extractionEligible false; measuredHandlingResponse/handling/overlay caps false
+  ✓ extract→metadata: no extraction → cap false, summary null
+
+[measured-extraction] .bmsbin synthetic measured-extraction harness
+  ✓ measext(A): no eligibility → not_available; harness/analysis caps false; realDataUsed false
+  ✓ measext(A2): not eligible → blocked_by_eligibility; no segments/tendency; caps false
+  ✓ measext(B): eligible but not syntheticOnly (real path) → blocked_real_path; empty segments; null tendency; realDataUsed false
+  ✓ measext(C): syntheticOnly but no series → insufficient_synthetic_series; null tendency; caps false
+  ✓ measext(D): synthetic series → segmented; cornerCount>0; syntheticOnly true; realDataUsed false
+  ✓ measext(D2): full synthetic series → extracted_synthetic
+  ✓ measext(E): entry/mid/exit window counts > 0
+  ✓ measext(F): steady-state windows > 0; confidence present
+  ✓ measext(G): unstable mid → steady-state blocked (0 steady windows; not extracted_synthetic); caps false
+  ✓ measext(H): tendency proxy marked syntheticOnly/notKus/notSetupAdvice/notModelVsActual; count>0
+  ✓ measext(H2): synthetic ratio → understeer_like / oversteer_like proxy (synthetic proxy only)
+  ✓ measext(I): extracted_synthetic → measuredExtractionSynthetic true; all analysis/real caps false
+  ✓ measext(J): real/blocked path → empty segments, null tendency, syntheticOnly false
+  ✓ measext→confirm: feed WITHOUT corpus/prereqs → measuredExtractionSynthetic false; decode caps false
+  ✓ measext→confirm: feed + full prereqs + corpus → measuredExtractionSynthetic true; decode caps still false
+  ✓ measext→metadata: summary surfaced + measuredExtractionSynthetic false; harness/real/handling/overlay caps false
+  ✓ measext→metadata: no measuredExtraction → cap false, summary null
+  ✓ measext(M): prior phases real path unchanged (eligibility not_eligible, readiness not_ready)
+  ✓ measext(N): empty requiredChannels + empty series → insufficient_synthetic_series (no crash)
+  ✓ measext(O): NaN-interleaved mid speed → steady-state fail-closed (0 steady; not extracted); caps false
+  ✓ measext(P): out-of-range/negative segmentHints rejected; segments stay within bounds; realDataUsed false
+  ✓ measext(Q): extracted confidence is medium|low only
+
+[canonical-adapter] .bmsbin real canonical-series adapter boundary / eligibility gate
+  ✓ cadapter(A): no inputs → not_available; canEnter false; caps false; realDataUsed false
+  ✓ cadapter(B): real path → raw_stream_missing; not eligible; canonicalTelemetry/timeSeries/measuredExtraction false; realDataUsed false
+  ✓ cadapter(C): missing raw stream → raw_stream_missing
+  ✓ cadapter(D): missing identity → identity_missing
+  ✓ cadapter(E): missing timebase → timebase_missing
+  ✓ cadapter(F): missing scaling → scaling_missing
+  ✓ cadapter(G): missing units → units_missing
+  ✓ cadapter(H): missing cross-file corpus → corpus_missing
+  ✓ cadapter(I): all prereqs but not syntheticOnly → adapter_contract_candidate; not eligible; canonicalTelemetry false; realDataUsed false
+  ✓ cadapter(J): all prereqs + corpus + syntheticOnly → synthetic_adapter_ready; eligible true; realDataUsed false; analysis caps false
+  ✓ cadapter(K): NaN/invalid evidence → fail-closed (not synthetic_adapter_ready); caps false
+  ✓ cadapter(L): one-way feed — adapter does not mutate readiness / extraction-eligibility
+  ✓ cadapter→metadata: summary surfaced + canonicalAdapterEligible false; canonicalTelemetry/timeSeries/modelVsActual false
+  ✓ cadapter→metadata: no canonicalAdapter → cap false, summary null
+  ✓ cadapter(N): null/garbage opts → fail-closed (no throw; not synthetic_adapter_ready)
+  ✓ cadapter(O): non-numeric corpus.fileCount → not synthetic_adapter_ready; numeric still works
+
+[private-corpus] .bmsbin private real-corpus boundary / evidence-ingestion policy
+  ✓ pcorpus(A): no inputs → not_available; canUse false; caps false; realDataUsed false
+  ✓ pcorpus(B): manifest but policy disabled → private_corpus_disabled
+  ✓ pcorpus(C): policy on, no manifest → manifest_missing
+  ✓ pcorpus(D): manifest without sanitizedOnly → manifest_invalid
+  ✓ pcorpus(E): rawFilesCommitted → unsafe_manifest
+  ✓ pcorpus(F): rawBytesExposed → unsafe_manifest
+  ✓ pcorpus(G): decodedSequencesExposed → unsafe_manifest
+  ✓ pcorpus(H): fileNamesExposed → unsafe_manifest
+  ✓ pcorpus(I): offsetsExposed → unsafe_manifest
+  ✓ pcorpus(J): fingerprintsExposed → unsafe_manifest
+  ✓ pcorpus(K): fileCount<2 → insufficient_file_count
+  ✓ pcorpus(L): no sanitizedEvidence → sanitized_evidence_missing
+  ✓ pcorpus(M): partial evidence → sanitized_evidence_candidate; no confirmation; caps false
+  ✓ pcorpus(N): safe manifest + complete evidence + policy → private_corpus_boundary_ready; evidence available; ALL confirm/canonical/analysis caps false; realDataUsed false
+  ✓ pcorpus(O): hash / path / fileName / channelNames → manifest_invalid
+  ✓ pcorpus(P): NaN / non-numeric fileCount → fail-closed (not boundary_ready)
+  ✓ pcorpus(Q): one-way — does not mutate manifest / sanitized-evidence inputs
+  ✓ pcorpus→metadata: summary surfaced + privateCorpusEvidenceAvailable false; canonicalTelemetry/timeSeries/modelVsActual false
+  ✓ pcorpus→metadata: no privateCorpus → cap false, summary null
+  ✓ pcorpus(S): truthy non-boolean exposure flag (1 / "true" / {}) → unsafe_manifest
+  ✓ pcorpus(T): path / hash / file-ext in formatFamily / sourceType → manifest_invalid; plain token still ready
+
+[sanitized-evidence-adapter] .bmsbin sanitized-evidence adapter dry-run shape
+  ✓ sadapter(A): no inputs → not_available; canProvide false; caps false; realDataUsed false
+  ✓ sadapter(B): 3G-2 boundary not ready → boundary_not_ready
+  ✓ sadapter(C): boundary ready, no evidence → evidence_missing
+  ✓ sadapter(D): evidence without sanitizedOnly → evidence_invalid
+  ✓ sadapter(E): rawBytesExposed → unsafe_evidence
+  ✓ sadapter(F): decodedSequencesExposed → unsafe_evidence
+  ✓ sadapter(G): fileNamesExposed → unsafe_evidence
+  ✓ sadapter(H): pathsExposed → unsafe_evidence
+  ✓ sadapter(I): offsetsExposed → unsafe_evidence
+  ✓ sadapter(J): fingerprintsExposed → unsafe_evidence
+  ✓ sadapter(K): sampleValuesExposed → unsafe_evidence
+  ✓ sadapter(L): channelNamesExposed → unsafe_evidence
+  ✓ sadapter(M): timingExposed → unsafe_evidence
+  ✓ sadapter(N): hashesExposed → unsafe_evidence
+  ✓ sadapter(O): no scope present → insufficient_scope
+  ✓ sadapter(P): only one scope → partial_adapter_shape; no confirmation; caps false
+  ✓ sadapter(Q): core scopes present, not all → adapter_shape_candidate; no confirmation; caps false
+  ✓ sadapter(R): all scopes + safe + boundary ready → dry_run_ready; shape available; ALL confirm/canonical/analysis caps false; realDataUsed false
+  ✓ sadapter(S): hash / fileName / channelNames key OR leaky/unknown scope → evidence_invalid
+  ✓ sadapter(T): malformed evidence → fail-closed (not dry_run_ready)
+  ✓ sadapter(T2): only-status / only-feed forged boundary → boundary_not_ready (dual check)
+  ✓ sadapter(U): one-way — does not mutate boundary / sanitized-evidence inputs
+  ✓ sadapter→metadata: summary surfaced + adapterEvidenceShapeAvailable false; canonicalTelemetry/timeSeries/modelVsActual false
+  ✓ sadapter→metadata: no sanitizedEvidenceAdapter → cap false, summary null
+  ✓ sadapter(W): canonical gate shape present on every path
+  ✓ sadapter(X): all diagnostic + UI panel keys resolve in EN/繁中/JA (3 each)
+  ✓ sadapter(Y): reporter sanitized — boundary_not_ready, shape-available 0, realDataUsed false, scalar histogram
+  ✓ sadapter(Z): one-way downstream — 3G-2 boundary result unchanged after adapter runs
+
+[invariants] Phase 3 trust-chain red-line invariants
+  ✓ invariant(A): real path fail-closed (readiness not_ready / eligibility not_eligible / measext blocked / hub not_confirmed)
+  ✓ invariant(B): no gated capability true on real path (all layers + every merged-metadata red-line cap === false)
+  ✓ invariant(C): hub pins timeSeries/physicalScaling/handlingCorrelation false
+  ✓ invariant(D): bad/empty input fail-closed (no throw, no gated cap)
+  ✓ invariant(E): reporter summary key set === REPORT_FIELDS; all scalar
+  ✓ invariant(F): reporter error-fallback key set === REPORT_FIELDS (drift guard)
+  ✓ invariant(G): synthetic extracted_synthetic opens only measuredExtractionSynthetic/Harness; realDataUsed false
+  ✓ invariant(H): dual-gate — only-status/only-cap → blocked_by_eligibility; eligible+series w/o syntheticOnly → blocked_real_path
+  ✓ invariant(I): canonical gate shape on 3E-0..3G-0B (status/aggregateDecision/confirmationFeed/capabilities/diagnostics/unknowns)
+  ✓ invariant(J): no proprietary telemetry / vendor binary (.bmsbin/.tir/.pds/...) in repo tree (clean-room #5)
+
+========= 結果: 479 passed, 0 failed =========
+=== telemetry-core synthetic tests ===
+telemetry-core: 67 passed, 0 failed
+=== telemetry-view synthetic tests ===
+telemetry-view: 105 passed, 0 failed
+=== telemetry-plot geometry tests ===
+telemetry-plot: 48 passed, 0 failed
+=== telemetry-interact geometry tests ===
+telemetry-interact: 52 passed, 0 failed
+=== telemetry-yaw synthetic tests ===
+telemetry-yaw: 84 passed, 0 failed
+=== canonical-parameters schema tests ===
+canonical-parameters: 39 passed, 0 failed
+=== parameter-conversions proof tests ===
+parameter-conversions: 38 passed, 0 failed
+=== vehicle-profile-f312 fixture tests ===
+vehicle-profile-f312: 30 passed, 0 failed
+=== setup-snapshot tests ===
+setup-snapshot: 35 passed, 0 failed
+=== analysis-case tests ===
+analysis-case: 43 passed, 0 failed
+=== analysis-case adversarial tests ===
+analysis-case-adversarial: 78 passed, 0 failed
+suspension-input-normalizer: 96 passed, 0 failed
+suspension-input-equivalence: 5020 passed, 0 failed  (raw=1002, observable=501)
+suspension-input-adversarial: 54 passed, 0 failed
+canonical-model-input: 33 passed, 0 failed
+analysis-execution: 29 passed, 0 failed
+telemetry-observation: 33 passed, 0 failed
+model-telemetry-comparison: 24 passed, 0 failed
+race-engineer-insight: 26 passed, 0 failed
+driver-coach-insight: 22 passed, 0 failed
+analysis-workspace: 19 passed, 0 failed
+analysis-workspace-viewmodel: 20 passed, 0 failed
+analysis-workspace-integration: 47 passed, 0 failed
+analysis-workspace-ui: 39 passed, 0 failed
+telemetry-import-adapter: 16 passed, 0 failed
+channel-mapping: 8 passed, 0 failed
+calibration-registry: 26 passed, 0 failed
+analysis-window: 7 passed, 0 failed
+canonical-telemetry-session: 9 passed, 0 failed
+analysis-case-export: 45 passed, 0 failed
+r2.3-real-telemetry-integration: 17 passed, 0 failed
+r2.3-import-ui: 16 passed, 0 failed
+measured-metrics: 16 passed, 0 failed
+r2.4-measured-metrics-integration: 26 passed, 0 failed
+r2.4-ui: 23 passed, 0 failed
+setup-ab: 20 passed, 0 failed
+quantitative-setup-recommendation: 32 passed, 0 failed
+r2.5-setup-ab-quantitative-integration: 25 passed, 0 failed
+r2.5-ui: 36 passed, 0 failed
+track-intelligence: 30 passed, 0 failed
+r2.6-track-intelligence-integration: 22 passed, 0 failed
+r2.6-ui: 15 passed, 0 failed
+case-shell: 24 passed, 0 failed
+r3.0a-ui: 67 passed, 0 failed
+storage-backend: 15 passed, 0 failed
+schema-migration: 9 passed, 0 failed
+case-record-schema: 63 passed, 0 failed
+case-store: 36 passed, 0 failed
+session-store: 12 passed, 0 failed
+case-library-viewmodel: 16 passed, 0 failed
+r3.0b-ui: 55 passed, 0 failed
+r3.0b-persistence-integration: 16 passed, 0 failed
+feature-registry: 31 passed, 0 failed
+feature-router: 20 passed, 0 failed
+[api] electronAPI bridge not present — preload did not initialize; version reporting stays "unavailable"
+vehicle-preset-pipeline: 27 passed, 0 failed
+i18n-parity: 105 passed, 0 failed
+r3.0c-contract-foundation: 391 passed, 0 failed
+r3-0c-comparison-adapter: 118 passed, 0 failed
+r3-0c-lap-authority: 99 passed, 0 failed
+r3-0c-track-identity: 67 passed, 0 failed
+r3-0c-distance-authority: 67 passed, 0 failed
+r3-0c-normalized-distance: 77 passed, 0 failed
+r3-0c-reference-selection: 30 passed, 0 failed
+r3-0c-corner-segmentation: 41 passed, 0 failed
+r3-0c-corner-pairing: 33 passed, 0 failed
+r3-0c-delta-metrics: 59 passed, 0 failed
+r3-0c-comparison-export: 106 passed, 0 failed
+r3-0c-comparison-workspace: 111 passed, 0 failed
+r3-0c-contracts-bundle-equivalence: 17 passed, 0 failed
+r3-0c-activation: 180 passed, 0 failed
+r3.0d-contract-foundation: 156 passed, 0 failed
+R3.0D hardened-intrinsics direct-test suite: 75 pass, 0 fail
+R3.0D D2 evidence-graph suite: 261 pass, 0 fail
+Section A — functional happy paths
+Section B — structural
+Section C — authority verification
+Section D — scope (case/session/schema)
+Section E — confidence model
+Section F — limitations & cannot_conclude
+Section G — validation actions + alternative explanations
+Section H — security
+Section H2 — Codex D3 R1 closures
+Section H3 — Codex D3 R2 closures
+Section H4 — Codex D3 R3 closures
+Section H5 — Codex D3 R4 closures
+Section H6 — Codex D3 R6 closures (hash-valid fixtures)
+Section I — privacy
+Section J — HI wrapper mutation resilience
+Section K — output immutability
+R3.0D D3 hypothesis-engine adversarial suite: 158 passed, 0 failed
+Section A — functional happy paths
+Section B — structural
+Section C — authority
+Section D — scope
+Section E — priority ladder
+Section F — blocking prerequisites
+Section G — primary eligibility
+Section H — security
+Section I — privacy
+Section J — HI wrapper mutation resilience
+Section K — output immutability
+Section L — mandatory freshness reference
+Section M — closed kind enum
+Section N — forbidden behaviors
+Section O — Codex D4 R1 closures
+Section P — Codex D4 R2 closures
+Section Q — Codex D4 R3 closures
+Section R — Codex D4 R4 closures
+Section S — Codex D4 R5 closures
+Section T — D4→D5 producer-attestation regression
+R3.0D D4 priority-engine adversarial suite: 132 passed, 0 failed
+Section A — functional happy paths
+Section B — structural
+Section C — authority gates
+Section D — cross-binding
+Section E — identity binding
+Section F — mandatory freshness
+Section G — brief composition
+Section H — cannot conclude preservation
+Section I — contradictions preservation
+Section J — limitations preservation
+Section K — privacy
+Section L — security
+Section M — determinism
+Section N — D5 producer attestation
+Section O — activation gate
+Section P — HI ambient ban audit
+Section Q — closed key sets
+Section R — forbidden output behaviors
+Section S — Formal Codex D Phase Gate closures
+R3.0D D5 engineer-brief adversarial suite: 88 passed, 0 failed
+Section A — ViewModel functional re-projection
+Section B — ViewModel authority gate
+Section C — Display state derivation
+Section D — ViewModel producer attestation
+Section E — Privacy
+Section F — HI ambient ban audit
+Section G — Orchestrator pipeline
+Section H — Generation token & stale-async drop
+Section I — invalidate covers all reasons
+Section J — subscribe/unsubscribe
+Section K — sanitized errors
+Section L — authoritative envelope leak protection
+Section M — Codex D5 R1 closures
+Section N — Codex D5 R2 closures
+Section O — Codex D5 R3 closures
+R3.0D D5 viewmodel + orchestrator adversarial suite: 109 passed, 0 failed
+  ✓ A1 bundle file exists
+  ✓ A2 index.html loads the bundle
+  ✓ A3 bundle script tag precedes the first D2 consumer
+  ✓ B1 regenerated length matches committed
+  ✓ B2 regenerated content matches committed byte-for-byte
+  ✓ B3 regenerated sha256 matches committed sha256
+  ✓ C1 ORDER covers every contracts/r3.0d/*.js exactly once
+  ✓ C2 ORDER starts with hardened-intrinsics.js
+  ✓ C3 ORDER ends with index.js
+  ✓ D1 bundle contains no require(p) dynamic call
+r3-0d-contracts-bundle-equivalence: 10 passed, 0 failed
+Section A — reason codes
+Section B — Experiment
+Section C — Outcome
+Section D — Control Variables
+Section E — Case Timeline
+Section F — Follow-up Link
+Section G — aggregate index
+Section H — scope: case-record-schema.js carries refs only (no R3.0E extension)
+Section I — Codex E1 R1 closures
+Section J — Codex E1 R2 closures
+R3.0E E1 contract-foundation suite: 50 passed, 0 failed
+Section A — Experiment store CRUD
+Section B — Outcome store
+Section C — Timeline store (append-only)
+Section D — Follow-up link store
+Section E — Future-schema + corruption
+Section F — Store metadata
+Section G — scope: R3.0B case-record schema NOT modified by E2
+Section H — Codex E2 R1 closures
+Section I — Codex E2 R2 closures
+R3.0E E2 stores suite: 38 passed, 0 failed
+Section A — Confirmed (golden path)
+Section B — Partially confirmed
+Section C — Contradicted
+Section D — Inconclusive
+Section E — invalid_comparison
+Section F — inconclusive_due_to_confounders
+Section G — Contradicting evidence
+Section H — Identity binding
+Section I — Missing expected observation / stale generation
+Section J — Caller-classification rejected
+Section K — Forged records / clone rejection
+Section L — Hostile clock
+Section M — Deterministic IDs
+Section N — Deep freeze / no causation / no raw telemetry
+Section O — Mutation resistance
+Section P — Evidence ids
+Section Q — opts validation
+Section R — verifyAuthoritativeOutcome
+Section S — API export
+Section T — Defensive
+Section U — Codex E3 R1 closures
+Section V — Codex E3 R2 closures
+Section X — Codex E3 R4 closure (pre-load defineProperty poisoning)
+Section BB — Formal E Gate R1-01 closure (padStart tamper resistance)
+Section AA — Codex E3 R7 closure (TextEncoder.prototype.encode byte-cap undercount)
+Section Z — Codex E3 R6 closure (toJSON-driven post-validation mutation)
+Section Y — Codex E3 R5 closures
+Section W — Codex E3 R3 closures
+R3.0E outcome classifier suite: 158 passed, 0 failed
+Section A — createFollowUpLink golden path
+Section B — createFollowUpLink rejections
+Section C — Cross-case follow-up linkage
+Section D — listFollowUpLinksForParent
+Section E — Append timeline event
+Section F — Timeline append rejections
+Section G — Duplicate event rejection
+Section H — Clock rollback
+Section I — Correction event
+Section J — Projection authority
+Section K — Forged input rejection
+Section L — Reload / replay
+Section M — Privacy + content sanitization
+Section N — API hardening
+Section O — Verifier boundary
+Section P — Cross-case timeline scope
+Section Q — Codex E4 R1 closures
+Section R — Codex E4 R2 closures
+Section S — Codex E4 R3 closures (child-process isolation)
+Section T — Codex E4 R4 closure (Proxy listForParent rejection)
+Section U — Codex E4 R5 closure (padStart tamper resistance)
+Section V — Codex E4 R6 closure (charCodeAt tamper resistance)
+R3.0E follow-up + timeline suite: 97 passed, 0 failed
+Section A — empty / error / stale factories
+Section B — derive golden path
+Section C — derive missing inputs
+Section D — non-authoritative input rejection
+Section E — feature-registry registration
+Section F — API hardening
+Section G — Verifier boundary
+Section H — Codex E5 R1 closures
+R3.0E experiment viewmodel suite: 60 passed, 0 failed
+r3.0f-migration-engine: 250 passed, 0 failed
+e2e-flow-01-new-user: 13 passed, 0 failed
+e2e-flow-02-real-telemetry: 17 passed, 0 failed
+e2e-flow-03-measured: 15 passed, 0 failed
+e2e-flow-04-reference-lap: 24 passed, 0 failed
+e2e-flow-05-vre: 12 passed, 0 failed
+e2e-flow-06-setup-experiment: 14 passed, 0 failed
+e2e-flow-07-driver-experiment: 10 passed, 0 failed
+e2e-flow-08-export-import: 16 passed, 0 failed
+e2e-flow-09-electron-smoke: 10 passed, 0 failed
+e2e-hardening-01-electron-boundary: 83 passed, 0 failed
+e2e-hardening-02-storage-failure: 19 passed, 0 failed
+e2e-hardening-03-no-stale-ui: 30 passed, 0 failed
+e2e-hardening-04-large-library: 21 passed, 0 failed
+e2e-hardening-05-xss-injection: 7 passed, 0 failed
+e2e-hardening-06-supply-chain: 13 passed, 0 failed
+  ✓ sync happy: temp dir exists during callback
+  ✓ sync happy: callback return value passes through
+  ✓ sync happy: temp dir REMOVED after callback
+  ✓ sync throw: original error propagates
+  ✓ sync throw: temp dir REMOVED despite throw
+  ✓ async happy: temp dir exists during callback
+  ✓ async happy: callback return value passes through
+  ✓ async happy: temp dir REMOVED after callback resolves
+  ✓ async reject: original rejection propagates
+  ✓ async reject: temp dir REMOVED despite rejection
+  ✓ early return: rv5 === "early"
+  ✓ early return: temp dir REMOVED after early-return
+  ✓ inside callback can rm early without later throw
+  ✓ double-clean: temp dir gone
+  ✓ empty prefix rejected with non-empty string error
+  ✓ null callback rejected with must-be-a-function error
+  ✓ acquire: dir exists right after acquireTempDir
+  ✓ acquire: dir tracked in registry
+  ✓ release: dir removed after releaseTempDir
+  ✓ release: dir no longer tracked in registry
+  ✓ acquire (sweep test): both dirs exist before cleanupAll
+  ✓ cleanupAll: both un-released dirs removed
+  ✓ cleanupAll: registry empty after sweep
+  ✓ releaseTempDir is idempotent (no throw on already-released path)
+  ✓ ownership: releaseTempDir returns false for a non-registry path
+  ✓ ownership: non-registry dir NOT deleted by releaseTempDir
+  ✓ prefix safety: "../managed-temp-escape-" rejected
+  ✓ prefix safety: "a/b-" rejected
+  ✓ prefix safety: "a\\b-" rejected
+  ✓ prefix safety: ".." rejected
+  ✓ prefix safety: "." rejected
+  ✓ prefix safety: no escape dir created beside tmpdir
+  ✓ withTempDir: dir registry-tracked during callback
+  ✓ withTempDir: registry entry removed after successful cleanup
+  ✓ NET LEAK probe count delta === 0
+  ✓ uncaught-exception child: did not time out (no infinite loop)
+  ✓ uncaught-exception child: finished quickly (<5s, not hung)
+  ✓ uncaught-exception child: exited non-zero (failure not masked as success)
+  ✓ uncaught-exception child: created its temp dir before crashing
+  ✓ uncaught-exception child: temp dir REMOVED by exit-hook despite uncaught throw
+managed-temp-dir: 40 passed, 0 failed
+  ✓ gate declares exactly 12 conditions
+  ✓ condition ids are 1..12 in order
+  ✓ condition keys are unique
+  ✓ condition keys match the 12-condition governance definition
+  ✓ preflight: selftest failure -> FAIL without running the audit
+  ✓ preflight: both stages green + green artifact -> PASS
+  ✓ preflight: green child + MISSING artifact -> FAIL (F5-R2-01)
+  ✓ preflight: green child + artifact ok:false -> FAIL (F5-R2-01)
+  ✓ tests: green child + green manifest -> PASS
+  ✓ tests: assertionsFailed>0 -> FAIL even with child exit 0
+  ✓ tests: discoveryGhost non-empty -> FAIL
+  ✓ tests: missing manifest artifact -> FAIL (fail-closed)
+  ✓ e2e: 15 green e2e rows -> PASS
+  ✓ e2e: one failed e2e file -> FAIL
+  ✓ e2e: fewer than 15 e2e files -> FAIL (floor guard)
+  ✓ e2e: unreadable manifest -> FAIL (fail-closed)
+  ✓ e2e: row with missing assertionsFailed -> FAIL (strict === 0, F5-R1-01)
+  ✓ e2e: row with null assertionsFailed -> FAIL (strict === 0, F5-R1-01)
+  ✓ frozen: green child + frozenDiffCount 0 -> PASS
+  ✓ frozen: violation outside the allowlist -> FAIL
+  ✓ frozen: artifact missing violations array -> FAIL (fail-closed shape)
+  ✓ preset501: 501 -> PASS
+  ✓ preset501: 500 -> FAIL even with child exit 0
+  ✓ i18n: 0 missing -> PASS
+  ✓ i18n: 3 missing -> FAIL
+  ✓ reachability: red child -> FAIL
+  ✓ reachability: green child + green artifact -> PASS
+  ✓ reachability: green child + artifact ok:false -> FAIL (F5-R2-01)
+  ✓ tagPolicy: green child + green artifact -> PASS
+  ✓ tagPolicy: green child + artifact ok:false -> FAIL (F5-R2-01)
+  ✓ noOrphans: green children + one consumer artifact ok:false -> FAIL (F5-R2-01)
+  ✓ noOrphans: all green -> PASS
+  ✓ noOrphans: one orphan -> FAIL
+  ✓ noOrphans: one red consumer check (of 4) -> FAIL
+  ✓ noOrphans: missing registry artifact -> FAIL (fail-closed)
+  ✓ noOrphans: red registry child + stale green artifact -> FAIL (F5-R1-02)
+  ✓ electronBuild: real repo passes declaration-level readiness
+  ✓ electronBuild: found the full script-tag inventory (>=90)
+  ✓ releaseNotes: real draft passes required-section scan
+  ✓ changelog: real CHANGELOG passes hook scan
+  ✓ releaseNotes: declares the finalized RELEASE CANDIDATE status (DRAFT reversion would fail)
+  ✓ releaseNotes: discloses unsigned+unnotarized
+  ✓ releaseNotes: has release-boundary section
+  ✓ tagPolicy: red child -> FAIL
+  ✓ runGate: all-green stub -> ok true, 12/12
+  ✓ runGate: single red condition -> ok false, names the failed key
+  ✓ runGate: NO short-circuit — all 12 conditions still reported
+  ✓ runGate: crashing io -> all 10 io-dependent conditions FAIL closed, gate ok=false
+release-gate: 48 passed, 0 failed
+  ✓ pin: version 2.0.1 passes with NO VERSION_BUMP_ALLOW
+  ✓ fail-closed: 2.0.2 REJECTED without allow
+  ✓ fail-closed: 2.1.0 REJECTED without allow
+  ✓ fail-closed: 2.0.0-rc.1 REJECTED without allow
+  ✓ no-rollback: 1.4.0 REJECTED after the pin moved to 2.0.1
+  ✓ no-rollback: 2.0.0 REJECTED after the pin moved to 2.0.1
+  ✓ allow: future authorized bump 3.0.0 passes ONLY with exact allow
+  ✓ allow: 2.0.2 still REJECTED when allow=3.0.0 (exact match only)
+  ✓ allow: 3.0.1 REJECTED when allow=3.0.0 (no prefix/range semantics)
+  ✓ no-double-bump: 4.0.0 REJECTED even with allow set to the current pin
+  ✓ version script never creates/pushes a tag
+  ✓ version script never touches release_executed
+  ✓ release gate never creates/pushes a tag
+  ✓ release gate never writes governance state
+  ✓ release_executed remains DISABLED at RELEASE_PREPARED
+  ✓ repo package.json carries exactly the bumped version 2.0.1
+  ✓ H3: correct version but NO lockfile is REJECTED
+  ✓ H3: a PR that DELETES the lockfile is REJECTED (lockfileRemovedByPR)
+  ✓ H3: missing ci.yml verification lane is REJECTED
+version-bump-policy: 19 passed, 0 failed
+  ✓ check-supply-chain --selftest passes
+  ✓ real repo supply-chain check PASSES
+  ✓ real SBOM covers npm + vendored components
+  ✓ committed SBOM is up to date (generate-sbom --check)
+  ✓ pristine sandbox PASSES
+  ✓ FAIL missing lockfile
+  ✓ FAIL range devDependency (^)
+  ✓ FAIL vendor hash drift
+  ✓ FAIL copyleft (GPL-3.0) npm license
+  ✓ FAIL uncovered vendored file
+  ✓ FAIL stale SBOM
+  ✓ FAIL missing THIRD_PARTY_NOTICES
+  ✓ FAIL wrong lockfileVersion (not 3)
+  ✓ FAIL missing engines
+  ✓ FAIL build.win present (arm64 macOS-only)
+  ✓ FAIL build:mac not arm64-explicit
+  ✓ FAIL forbidden --x64 flag in build script
+supply-chain: 17 passed, 0 failed
+  ✓ create ok (fresh IndexedDB init path)
+  ✓ created record is schema v1
+  ✓ open round-trips
+  ✓ re-open is idempotent (identical metadata)
+  ✓ no duplication (list length 1 after two opens)
+  ✓ future-version record: migration refuses (not ok)
+  ✓ future-version record: store.open fail-closes (rejected, not silently coerced)
+  ✓ downgrade attempt is refused (CANNOT_OVERWRITE_FUTURE)
+  ✓ malformed record: open does not throw (fail-closed, not a crash)
+  ✓ malformed record: open reports not-ok
+  ✓ interrupted init: open does not throw
+  ✓ interrupted init: missing payload reported as CASE_NOT_FOUND
+  ✓ interrupted init: list still enumerable (index survives)
+  ✓ recovery: a fresh create succeeds after a corrupt entry exists
+h4-upgrade-qualification: 14 passed, 0 failed
+  ✓ icon manifest declares original design provenance
+  ✓ ALL 13 icon assets exist and match the manifest sha256
+  ✓ build.mac.icon wired to the committed icns
+  ✓ build.copyright set
+  ✓ build.mac.minimumSystemVersion declared
+  ✓ dmg has Applications shortcut layout
+  ✓ appId UNCHANGED (upgrade identity)
+  ✓ productName UNCHANGED (userData identity)
+  ✓ package name UNCHANGED (userData dir identity)
+  ✓ mac target still arm64-only dmg
+h2-product-identity: 10 passed, 0 failed
+  ✓ truth matrix present with entries
+  ✓ ALL 15 inert modules: not page-loaded + build-excluded + source retained
+  ✓ page loads a plausible script count
+  ✓ NO page-loaded script is package-excluded (would 404 in the packaged app)
+  ✓ every page-loaded script exists on disk
+  ✓ experiment_loop + case_timeline deferred in registry
+  ✓ deferred subviews NOT in public case nav
+  ✓ deferred nodes still registered (governance truth, not deleted)
+  ✓ brief mount has the LIVE visibility binding
+  ✓ engineer_brief is publicly navigable
+  ✓ brief modules are page-loaded
+  ✓ no ghost nav target (every public subview id appears in the page)
+  ✓ no shipped module requires an excluded module
+h5-ui-truth: 13 passed, 0 failed
+  ✓ entitlements.mac.plist exists
+  ✓ entitlements.mac.plist contains EXACTLY the two required entitlements
+  ✓ entitlements.mac.plist contains NO forbidden entitlement (comment-stripped)
+  ✓ entitlements.mac.inherit.plist exists
+  ✓ entitlements.mac.inherit.plist contains EXACTLY the two required entitlements
+  ✓ entitlements.mac.inherit.plist contains NO forbidden entitlement (comment-stripped)
+  ✓ mac.hardenedRuntime = true
+  ✓ mac.entitlements wired
+  ✓ mac.entitlementsInherit wired
+  ✓ mac.notarize explicitly false (env-gated by the runbook, never silently on)
+  ✓ verify-signing.sh exists + executable
+  ✓ verifier reports DEVELOPER_ID_APPLICATION_MISSING as BLOCKED
+  ✓ verifier reports NOTARY_CREDENTIAL_MISSING as BLOCKED
+  ✓ verifier reports NOTARIZATION_TICKET_MISSING as BLOCKED
+  ✓ verifier treats ad-hoc as BLOCKED (never a release PASS)
+  ✓ verifier checks deep+strict codesign
+  ✓ verifier checks hardened runtime flag
+  ✓ verifier checks spctl Gatekeeper
+  ✓ verifier checks stapler validate
+  ✓ verifier enumerates nested executables
+  ✓ verifier rejects forbidden entitlements as FAIL
+  ✓ verifier never reads/prints secrets
+  ✓ runbook exists with credential-boundary steps
+  ✓ runbook forbids secrets in repo/log/chat
+  ✓ runbook documents CI secret NAMES only
+h6-signing-readiness: 25 passed, 0 failed
+r3-0c-governance: 46 passed, 0 failed
+r3-0c-no-consumer: 26 passed, 0 failed
+r3-0c-governance-integrity: 14 passed, 0 failed
+phase-governance: 94 passed, 0 failed
+phase-no-consumer: 45 passed, 0 failed
+phase-governance-integrity: 20 passed, 0 failed
+r3-0-train: 66 passed, 0 failed
+=== SELF-TEST ===
+  ✓ full-config: K_us grade=confirmed
+  ✓ full-config: K_us ≈ 1.5 (got 1.500)
+  ✓ full-config: measured_Kus_available = true
+  ✓ no-config: K_us grade=provisional
+  ✓ no-config: measured_Kus_available = false (fail-closed)
+  ✓ no-config: lists ASSUMED definitions
+  ✓ unknown accy unit → blocked
+  ✓ left/right asymmetry detected
+  ✓ timebase reset → status blocked
+  ✓ timebase blocked → K_us blocked
+  ✓ roll grade=provisional (never auto-confirmed)
+  ✓ roll: measured_roll_gradient_available = false
+  ✓ roll: raw L-R diff slope present
+  ✓ roll: body-roll only when explicitly enabled
+  ✓ app model loads
+
+self-test: 15 passed, 0 failed
