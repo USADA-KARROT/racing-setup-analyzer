@@ -209,9 +209,160 @@ try {
     }
   }
 
+  // H1: renderer version-reporting honesty — api.js must never fabricate a version.
+  var apiSrc = stripJsComments(fs.readFileSync(path.join(__dirname, '..', '..', 'renderer', 'js', 'api.js'), 'utf8'));
+  chk('api.js has NO fabricated 1.0.0 version literal', !/['"`]1\.0\.0['"`]/.test(apiSrc));
+  chk('api.js defaults version reporting to the literal unavailable', /_appVersion\s*:\s*['"`]unavailable['"`]/.test(apiSrc));
+  chk('api.js never reads a synchronous electronAPI.version field (pre-H1 shape)', !/electronAPI\s*\.\s*version\b/.test(apiSrc));
+  chk('api.js resolves the version via electronAPI.getAppVersion()', /electronAPI\s*\.\s*getAppVersion\s*\(/.test(apiSrc));
+  chk('api.js missing-bridge path is observable (console.warn)', /console\.warn\([^)]*electronAPI/.test(apiSrc));
+
+  // H1: main.js IPC surface — exactly ONE allowlisted handle() on the constant
+  // channel, removeHandler-first (idempotent double-registration guard), and no
+  // generic/dynamic channel registration anywhere.
+  var handleCalls = mainSrc.match(/ipcMain\s*\.\s*handle\s*\(/g) || [];
+  chk('main.js registers EXACTLY one ipcMain.handle', handleCalls.length === 1, { count: handleCalls.length });
+  chk('main.js handle uses the APP_VERSION_CHANNEL constant', /ipcMain\s*\.\s*handle\s*\(\s*APP_VERSION_CHANNEL\s*,/.test(mainSrc));
+  chk('main.js channel constant = app:get-version', /APP_VERSION_CHANNEL\s*=\s*['"`]app:get-version['"`]/.test(mainSrc));
+  chk('main.js removeHandler-first double-registration guard', /ipcMain\s*\.\s*removeHandler\s*\(\s*APP_VERSION_CHANNEL\s*\)/.test(mainSrc));
+  chk('main.js handler returns app.getVersion() (single version authority)', /handle\s*\(\s*APP_VERSION_CHANNEL\s*,\s*\(\s*\)\s*=>\s*app\.getVersion\(\)\s*\)/.test(mainSrc));
+  chk('main.js has NO ipcMain.on/once (no fire-and-forget channels)', !/ipcMain\s*\.\s*(on|once|addListener)\b/.test(mainSrc));
+
   // Step 2: preload.js minimal surface — post-strip checks (no comment-decoy false positives)
   chk('preload.js uses contextBridge', /contextBridge/.test(preloadSrc));
-  chk('preload.js does NOT reference ipcRenderer (post-strip)', !/ipcRenderer/.test(preloadSrc));
+  // H1: the preload legitimately uses ipcRenderer.invoke on the single allowlisted
+  // constant channel. The boundary contract is now: (a) ipcRenderer itself is never
+  // placed on the exposed surface, (b) no generic send/sendSync/on/postMessage entry,
+  // (c) invoke is called ONLY with the APP_VERSION_CHANNEL constant, (d) exactly one
+  // channel constant exists and it is the allowlisted literal.
+  chk('preload.js never exposes ipcRenderer on the bridge surface', !/exposeInMainWorld[\s\S]*?ipcRenderer\s*[,}]/.test(preloadSrc));
+  chk('preload.js has NO generic ipcRenderer.send/sendSync/on/once/postMessage', !/ipcRenderer\s*\.\s*(send|sendSync|sendToHost|on|once|addListener|postMessage)\b/.test(preloadSrc));
+  var invokeCalls = preloadSrc.match(/ipcRenderer\s*\.\s*invoke\s*\(\s*([A-Za-z_$][\w$]*|['"`][^'"`]*['"`])/g) || [];
+  chk('preload.js ipcRenderer.invoke is used EXACTLY once', invokeCalls.length === 1, { invokeCalls: invokeCalls });
+  // H1-R2-01 closure: STRUCTURAL token accounting — regex-shape checks alone allow
+  // closure-alias smuggling (e.g. an outer `leak = (...args) => ipcRenderer.invoke(...args)`
+  // returned by getAppVersion while one unreachable allowlisted call satisfies the
+  // count). The invariant below is alias-proof: after removing the ONLY two legal
+  // appearances (the fixed destructure and the exact allowlisted invoke), the token
+  // `ipcRenderer` must not appear ANYWHERE else in the file — any alias assignment,
+  // re-destructure, spread, or argument-forwarding wrapper leaves a residue and fails.
+  // H1-R3-01 closure: generalize to EVERY authority token. Each token has an explicit
+  // list of legal appearance patterns; after removing those, the BARE token must not
+  // appear anywhere (word-boundary match) — so alias assignment (`const r = require`),
+  // argument passing, returning, computed access, all leave a residue and fail.
+  var AUTHORITY_TOKENS = [
+    { token: 'ipcRenderer', legal: [
+      /const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/,
+      /ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*\)/,
+    ] },
+    { token: 'require', legal: [
+      /const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/,
+    ] },
+    { token: 'process', legal: [
+      /platform\s*:\s*process\.platform/,
+    ] },
+    { token: 'contextBridge', legal: [
+      /const\s*\{\s*contextBridge\s*,\s*ipcRenderer\s*\}\s*=\s*require\(\s*['"]electron['"]\s*\)/,
+      /contextBridge\s*\.\s*exposeInMainWorld\s*\(/,
+    ] },
+  ];
+  function authorityResidue(src, spec) {
+    var out = src;
+    for (var li = 0; li < spec.legal.length; li++) out = out.replace(spec.legal[li], '');
+    return out;
+  }
+  for (var ai = 0; ai < AUTHORITY_TOKENS.length; ai++) {
+    var spec = AUTHORITY_TOKENS[ai];
+    var residue = authorityResidue(preloadSrc, spec);
+    chk('preload.js authority-token accounting: ' + spec.token + ' appears ONLY at its legal sites',
+      !(new RegExp('\\b' + spec.token + '\\b')).test(residue),
+      { residue: (residue.match(new RegExp('.{0,50}\\b' + spec.token + '\\b.{0,50}')) || [])[0] });
+  }
+  chk('preload.js has NO rest/spread token anywhere (post-strip)', preloadSrc.indexOf('...') === -1);
+  // H1-R4-01 closure: identifier-obfuscation ban. JS identifiers admit unicode
+  // escapes (requ\u0069re) which evade bare-token regexes. preload.js is OUR file
+  // and legitimately needs neither escape sequences nor non-ASCII characters, so
+  // both are banned outright on the RAW source (pre-strip — comments included).
+  chk('preload.js has NO \\u / \\x escape sequences anywhere (raw)', !/\\u|\\x/i.test(preloadRaw));
+  chk('preload.js is pure ASCII (no homoglyph identifiers)', !/[^\x00-\x7F]/.test(preloadRaw));
+  chk('preload.js has NO globalThis/window/eval/Function escape token', !/\b(globalThis|window|eval|Function)\b/.test(preloadSrc));
+  // H1-R5-01 closure: CLOSED-WORLD identifier allowlist. Blacklisting authority
+  // tokens can never enumerate every sandbox global (Buffer, atob, TextDecoder,
+  // fetch, ...). Instead: strip string literals, extract EVERY identifier, and
+  // require the whole set to be inside the explicit allowlist of what preload.js
+  // legitimately uses. Any new global -- Buffer included -- fails closed.
+  (function closedWorldIdentifierAudit() {
+    var KEYWORDS = ['const','let','var','function','return','if','else','new','typeof','throw','true','false','null','undefined'];
+    var ALLOWED = [
+      // module surface
+      'contextBridge','ipcRenderer','require','process','electron',
+      // our declarations
+      'APP_VERSION_CHANNEL','APP_VERSION_TIMEOUT_MS','getAppVersion','SEMVER',
+      // members/locals actually used
+      'exposeInMainWorld','platform','invoke','race','then','catch','test','warn','message',
+      'Promise','setTimeout','Error','console','resolve','reject','v','err',
+    ];
+    var noStrings = preloadSrc
+      .replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g, '""')
+      .replace(/\/(?:[^\/\\\n]|\\.)+\/[a-z]*/g, '0'); // regex literals (preload has no division)
+    var ids = noStrings.match(/\b[A-Za-z_$][\w$]*\b/g) || [];
+    var outside = [];
+    for (var ii = 0; ii < ids.length; ii++) {
+      if (KEYWORDS.indexOf(ids[ii]) === -1 && ALLOWED.indexOf(ids[ii]) === -1 && outside.indexOf(ids[ii]) === -1) outside.push(ids[ii]);
+    }
+    chk('preload.js identifier set is CLOSED-WORLD (no identifier outside the allowlist)', outside.length === 0, { outside: outside });
+    // Self-test: the round-5 Buffer-decoding attack shape must be caught.
+    var attack = noStrings + ' var fake = Buffer.from(x).toString();';
+    var atkIds = attack.match(/\b[A-Za-z_$][\w$]*\b/g) || [];
+    var caught = false;
+    for (var ai2 = 0; ai2 < atkIds.length; ai2++) if (KEYWORDS.indexOf(atkIds[ai2]) === -1 && ALLOWED.indexOf(atkIds[ai2]) === -1) { caught = true; break; }
+    chk('SELF-TEST: Buffer-decoding shape is outside the closed world', caught);
+  })();
+  // H1-R6-01 closure: dynamic-invocation ban on the strip-cleaned source. The round-6
+  // attack (console['warn']['con'+'structor']('return req'+'uire')()) reaches Function
+  // via COMPUTED member access + string concatenation, which string-stripping hides
+  // from the closed-world audit. preload.js legitimately uses none of these, so ban:
+  //   (a) computed member access  x[...]  (bracket after identifier/)/]) — array
+  //       literals after ( , = return are unaffected;
+  //   (b) the + operator (string-concatenation code-building);
+  //   (c) constructor / apply / call / bind (reflective invocation);
+  //   (d) atob/Function/import tokens.
+  var preloadCleaned = preloadSrc.replace(/\/(?:[^\/\\\n]|\\.)+\/[a-z]*/g, '0'); // regex literals (strings already stripped in preloadSrc)
+  chk('preload.js has NO computed member access (bracket after identifier/)/])', !/[\w$)\]]\s*\[/.test(preloadCleaned), { hit: (preloadCleaned.match(/.{0,30}[\w$)\]]\s*\[.{0,20}/) || [])[0] });
+  chk('preload.js has NO + operator (no string-concatenation code-building)', preloadCleaned.indexOf('+') === -1);
+  chk('preload.js has NO constructor/apply/call/bind reflective-invocation token', !/\b(constructor|apply|call|bind)\b/.test(preloadCleaned));
+  chk('preload.js has NO atob/Function/import escape token', !/\b(atob|Function|import)\b/.test(preloadCleaned));
+  // Self-test: the exact round-6 dynamic-constructor body must be caught.
+  (function r6SelfTest() {
+    var atk = "return console['warn']['con' + 'structor']('return req' + 'uire')()('electron');";
+    var atkClean = atk.replace(/'(?:[^'\\]|\\.)*'/g, '""');
+    chk('SELF-TEST: dynamic-constructor body triggers computed-access OR + ban',
+      /[\w$)\]]\s*\[/.test(atkClean) || atkClean.indexOf('+') !== -1);
+  })();
+  // Self-tests: every known smuggling shape MUST leave a residue.
+  (function adversarialSelfTests() {
+    var shapes = [
+      ['direct ipcRenderer alias', 'var leak = function () { return ipcRenderer; };', 'ipcRenderer'],
+      ['bare require alias (round-3 attack)', 'const nodeRequire = require;', 'require'],
+      ['bare process alias', 'const p = process;', 'process'],
+      ['contextBridge alias', 'const cb = contextBridge;', 'contextBridge'],
+    ];
+    // Round-4 attack shape: unicode-escaped identifier must be caught by the escape ban.
+    chk('SELF-TEST: unicode-escaped identifier (requ\\u0069re) is caught by the escape ban',
+      /\\u|\\x/i.test('const nodeRequire = requ\\u0069re;'));
+    for (var si = 0; si < shapes.length; si++) {
+      var injected = preloadSrc.replace('contextBridge.exposeInMainWorld', shapes[si][1] + '\ncontextBridge.exposeInMainWorld');
+      var spec2 = null;
+      for (var sj = 0; sj < AUTHORITY_TOKENS.length; sj++) if (AUTHORITY_TOKENS[sj].token === shapes[si][2]) spec2 = AUTHORITY_TOKENS[sj];
+      chk('SELF-TEST: ' + shapes[si][0] + ' leaves a residue',
+        (new RegExp('\\b' + shapes[si][2] + '\\b')).test(authorityResidue(injected, spec2)));
+    }
+  })();
+  chk('preload.js invoke uses the APP_VERSION_CHANNEL constant (no inline/caller-chosen channel)', /ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*[),]/.test(preloadSrc));
+  var channelConsts = preloadSrc.match(/APP_VERSION_CHANNEL\s*=\s*['"`]([^'"`]+)['"`]/g) || [];
+  chk('preload.js declares exactly one channel constant = app:get-version', channelConsts.length === 1 && /['"`]app:get-version['"`]/.test(channelConsts[0]), { channelConsts: channelConsts });
+  chk('preload.js does NOT require ./package.json (the pre-H1 sandbox crash)', !/require\s*\(\s*['"]\.\/package\.json['"]\s*\)/.test(preloadSrc));
+  chk('preload.js never fabricates a version literal', !/['"`]1\.0\.0['"`]/.test(preloadSrc));
   chk('preload.js does NOT require fs (post-strip)', !/require\s*\(\s*['"]fs['"]\s*\)/.test(preloadSrc));
   chk('preload.js does NOT require child_process (post-strip)', !/require\s*\(\s*['"]child_process['"]\s*\)/.test(preloadSrc));
   chk('preload.js does NOT require net (post-strip)', !/require\s*\(\s*['"]net['"]\s*\)/.test(preloadSrc));
@@ -308,7 +459,7 @@ try {
     return keys;
   }
   var exposedKeys = topLevelKeys(exposedBody).sort();
-  chk('preload.js exposed surface has EXACTLY {platform, version}', JSON.stringify(exposedKeys) === JSON.stringify(['platform', 'version']), { keys: exposedKeys });
+  chk('preload.js exposed surface has EXACTLY {getAppVersion, platform}', JSON.stringify(exposedKeys) === JSON.stringify(['getAppVersion', 'platform']), { keys: exposedKeys });
 
   // F3-R9-03 closure: each exposed value must be an INERT primitive expression — no functions,
   // no closures, no process/global access, no dynamic require. Parse the body's key:value pairs
@@ -348,12 +499,40 @@ try {
     if (/^["'][^"']*["']$/.test(val)) return true;
     // (b) reading process.platform IS allowed (it's a known-inert string)
     if (/^process\.platform$/.test(val)) return true;
-    // (c) require('./package.json').version is the only allowed require chain
-    if (/^require\(\s*['"]\.\/package\.json['"]\s*\)\.version$/.test(val)) return true;
+    // (c) H1: the pre-H1 require('./package.json').version chain is now FORBIDDEN
+    //     (it crashed the sandboxed preload); the only allowed function reference is
+    //     the named getAppVersion defined in this file (validated separately below).
+    if (/^getAppVersion$/.test(val)) return true;
     // (d) plain numeric / boolean / null literal
     if (/^(?:-?\d+(?:\.\d+)?|true|false|null)$/.test(val)) return true;
     return false;
   }
+  // The allowed function reference must be a top-level named function declared in
+  // preload.js itself. H1-R1-02 closure: the BODY is extracted (brace matching) and
+  // audited — zero parameters (no caller-argument forwarding into IPC), ipcRenderer
+  // used ONLY as the exact allowlisted invoke, no Node authority, no arguments
+  // object, no rest/spread forwarding, and it never returns ipcRenderer itself.
+  chk('preload.js declares the named getAppVersion function it exposes',
+    /function\s+getAppVersion\s*\(\s*\)/.test(preloadSrc));
+  (function auditGetAppVersionBody() {
+    var m = preloadSrc.match(/function\s+getAppVersion\s*\(\s*\)\s*\{/);
+    chk('getAppVersion has ZERO parameters', !!m);
+    if (!m) return;
+    var i = m.index + m[0].length, depth = 1, inStr = false, strCh = '';
+    while (i < preloadSrc.length && depth > 0) {
+      var ch = preloadSrc.charAt(i);
+      if (inStr) { if (ch === '\\') { i += 2; continue; } if (ch === strCh) inStr = false; }
+      else if (ch === '"' || ch === "'" || ch === '`') { inStr = true; strCh = ch; }
+      else if (ch === '{') depth++;
+      else if (ch === '}') depth--;
+      i++;
+    }
+    var body = preloadSrc.slice(m.index + m[0].length, i - 1);
+    var bodyNoInvoke = body.replace(/ipcRenderer\s*\.\s*invoke\s*\(\s*APP_VERSION_CHANNEL\s*\)/g, '');
+    chk('getAppVersion body: ipcRenderer appears ONLY as the exact allowlisted invoke', !/ipcRenderer/.test(bodyNoInvoke), { residue: (bodyNoInvoke.match(/.{0,40}ipcRenderer.{0,40}/) || [])[0] });
+    chk('getAppVersion body: no require/process/arguments/spread forwarding', !/\brequire\s*\(|\bprocess\s*[.\[]|\barguments\b|\.\.\./.test(body));
+    chk('getAppVersion body: never returns a bare authority object', !/return\s+ipcRenderer\b|return\s+process\b|return\s+require\b/.test(body));
+  })();
   for (var ee = 0; ee < exposedEntries.length; ee++) {
     var entry = exposedEntries[ee];
     // Static forbidden-token check (catches process.env, child_process, etc., even via concat)

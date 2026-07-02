@@ -117,7 +117,14 @@ cannot control OS-level backups or other local processes. Full statement:
 9. **No professional validation.** The product is not a professional race-engineer
    replacement; outputs are advisory, in physical units, with explicit credibility and
    limitations metadata (see `docs/r3-credibility-model.md`).
-10. **Preload `electronAPI` surface is not functional (pre-existing since v1.0.0).**
+10. **[FIXED in the v2.0.x public-release hardening line — H1; not yet in any published
+   release.]** ~~Preload `electronAPI` surface is not functional (pre-existing since
+   v1.0.0).~~ The hardening branch replaces the crashing `require('./package.json')`
+   with a main-process `app.getVersion()` authority over a single allowlisted IPC
+   channel; the renderer reports `unavailable` (never a fabricated version) if the
+   bridge fails. The paragraph below describes the state of the 2.0.0 tag/draft
+   snapshot, which predates the fix:
+   **Preload `electronAPI` surface is not functional (pre-existing since v1.0.0).**
    `preload.js` calls `require('./package.json')`, which Electron's default-sandboxed
    preload cannot resolve — the preload script fails to load and `window.electronAPI`
    (`{platform, version}`) is never exposed in the packaged app. The renderer's
