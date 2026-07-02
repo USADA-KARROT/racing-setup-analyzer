@@ -229,21 +229,34 @@ function run() {
       if (phase === 'R3.0F' && m.checkpoint === 'F6_RELEASE') {
         const rr = m.releaseRecord || {};
         const gr = rr.githubRelease || null;
-        const stages = (phaseSchema.releaseStages && phaseSchema.releaseStages.order) || [];
+        const stages = (phaseSchema.releaseStages && Array.isArray(phaseSchema.releaseStages.order)) ? phaseSchema.releaseStages.order : [];
         const phaseStateNow = readJsonSafe(path.join(BASE, trainSchema.phaseGovernanceDirs[phase], 'state.json')) || {};
         const capOn = Array.isArray(phaseStateNow.enabledCapabilities) && phaseStateNow.enabledCapabilities.includes('release_executed');
         const isSha = s => typeof s === 'string' && /^[0-9a-f]{40}$/.test(s);
-        const published = !!(gr && gr.draft === false && gr.published === true && typeof gr.publishedAt === 'string' && gr.publishedAt.length > 0);
-        // stage must come from the schema's monotonic order
-        if (m.releaseStage && stages.length && !stages.includes(m.releaseStage)) fail('R3F_RELEASE_STAGE_UNKNOWN', 'F6_RELEASE releaseStage ' + m.releaseStage + ' is not in schema releaseStages.order', { phase, releaseStage: m.releaseStage });
+        // publishedAt must be a real ISO-8601 UTC/offset timestamp — whitespace or junk never counts
+        const isIsoTs = s => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(s) && !isNaN(Date.parse(s));
+        // the redundant state field (if present) must corroborate, not contradict, draft/published
+        const stateFieldOk = !gr || gr.state == null
+          ? true
+          : (gr.state === 'DRAFT' && gr.draft === true && gr.published !== true) ||
+            (gr.state === 'PUBLISHED' && gr.draft === false && gr.published === true);
+        if (gr && gr.state != null && !stateFieldOk) fail('R3F_RELEASE_STATE_FIELD_MISMATCH', 'githubRelease.state contradicts draft/published flags (state=' + gr.state + ', draft=' + gr.draft + ', published=' + gr.published + ')', { phase, state: gr.state, draft: gr.draft, published: gr.published });
+        const published = !!(gr && gr.draft === false && gr.published === true && isIsoTs(gr.publishedAt) && stateFieldOk);
+        // fail-closed on the stage machinery itself: the schema list and the checkpoint stage are mandatory
+        if (!stages.length) fail('R3F_RELEASE_STAGES_SCHEMA_MISSING', 'F6_RELEASE requires schema.json releaseStages.order (missing/unreadable — cannot validate the stage fail-closed)', { phase });
+        if (typeof m.releaseStage !== 'string' || !m.releaseStage) fail('R3F_RELEASE_STAGE_MISSING', 'F6_RELEASE checkpoint must declare releaseStage', { phase });
+        else if (stages.length && !stages.includes(m.releaseStage)) fail('R3F_RELEASE_STAGE_UNKNOWN', 'F6_RELEASE releaseStage ' + m.releaseStage + ' is not in schema releaseStages.order', { phase, releaseStage: m.releaseStage });
         // release_executed (capability OR record flag) requires an actually-published Release
         if ((capOn || rr.releaseExecuted === true) && (!published || m.releaseStage !== 'RELEASE_PUBLISHED')) fail('R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH', 'release_executed asserted but the GitHub Release is not published (draft/publishedAt/stage mismatch) — a tag alone or a draft Release alone never counts', { phase, capOn, recordFlag: rr.releaseExecuted === true, releaseStage: m.releaseStage, draft: gr && gr.draft, publishedAt: gr && gr.publishedAt });
         // a draft Release on record forbids release_executed in BOTH places
         if (gr && gr.draft === true && (capOn || rr.releaseExecuted === true)) fail('R3F_RELEASE_EXECUTED_ON_DRAFT', 'githubRelease.draft=true but release_executed is asserted', { phase, capOn, recordFlag: rr.releaseExecuted === true });
-        // dmgUploaded must corroborate with assets
+        // dmgUploaded must corroborate with assets; every asset entry must be a
+        // {name: string} object — bare strings or malformed entries are rejected outright
         const assets = gr && Array.isArray(gr.assets) ? gr.assets : null;
-        const hasDmgAsset = !!(assets && assets.some(a => typeof (a && (a.name || a)) === 'string' && /\.dmg$/i.test(a.name || a)));
-        if (rr.dmgUploaded === true && !hasDmgAsset) fail('R3F_DMG_FLAG_WITHOUT_ASSET', 'releaseRecord.dmgUploaded=true but githubRelease.assets contains no .dmg', { phase, assets: assets || 'missing' });
+        const assetsWellFormed = !!(assets && assets.every(a => a && typeof a === 'object' && !Array.isArray(a) && typeof a.name === 'string' && a.name.length > 0));
+        if (assets && assets.length > 0 && !assetsWellFormed) fail('R3F_RELEASE_ASSETS_MALFORMED', 'githubRelease.assets entries must be {name: string} objects (bare strings/malformed entries rejected)', { phase, assets });
+        const hasDmgAsset = !!(assets && assetsWellFormed && assets.some(a => /\.dmg$/i.test(a.name)));
+        if (rr.dmgUploaded === true && !hasDmgAsset) fail('R3F_DMG_FLAG_WITHOUT_ASSET', 'releaseRecord.dmgUploaded=true but githubRelease.assets contains no well-formed .dmg entry', { phase, assets: assets || 'missing' });
         if (gr && assets && assets.length === 0 && rr.dmgUploaded !== false) fail('R3F_DMG_FLAG_NOT_FALSE_ON_EMPTY_ASSETS', 'githubRelease.assets is empty but releaseRecord.dmgUploaded is not exactly false', { phase, dmgUploaded: rr.dmgUploaded });
         // once a tag is recorded: it must be v2.0.0, annotated-with-object, and point exactly at the recorded main merge SHA
         if (rr.tag != null) {

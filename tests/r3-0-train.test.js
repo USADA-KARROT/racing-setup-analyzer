@@ -416,13 +416,14 @@ function mutateF6(fn) {
 {
   const r = mutateF6((m, st) => {
     m.releaseStage = 'RELEASE_PUBLISHED';
+    m.releaseRecord.githubRelease.state = 'PUBLISHED';
     m.releaseRecord.githubRelease.draft = false;
     m.releaseRecord.githubRelease.published = true;
     m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
     m.releaseRecord.releaseExecuted = true;
     st.enabledCapabilities.push('release_executed');
   });
-  chk('PASS-path: published Release permits release_executed (no mirror violations)', !hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH') && !hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_ON_DRAFT') && !hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH'));
+  chk('PASS-path: published Release permits release_executed (no mirror violations)', !hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH') && !hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_ON_DRAFT') && !hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH') && !hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH'));
 }
 // mirror-4: dmgUploaded=true with empty assets -> FAIL
 {
@@ -468,6 +469,51 @@ function mutateF6(fn) {
 {
   const r = mutateF6((m) => { m.releaseStage = 'RELEASE_SHIPPED'; });
   chk('FAIL unknown releaseStage', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_UNKNOWN'));
+}
+// mirror-13 (MIRROR-R1-01): published flags but state field still DRAFT -> FAIL
+{
+  const r = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+    // state left as 'DRAFT' — contradictory record must be rejected
+  });
+  chk('FAIL state=DRAFT contradicting published flags', hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+}
+// mirror-14 (MIRROR-R1-02): releaseStage deleted -> FAIL
+{
+  const r = mutateF6((m) => { delete m.releaseStage; });
+  chk('FAIL missing releaseStage', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_MISSING'));
+}
+// mirror-15 (MIRROR-R1-02): schema releaseStages unreadable -> FAIL
+{
+  const dir = buildFixture();
+  const sch = readJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'));
+  delete sch.releaseStages;
+  writeJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'), sch);
+  const r = runValidator(dir);
+  chk('FAIL schema releaseStages missing', hasViolation(r.artifact, 'R3F_RELEASE_STAGES_SCHEMA_MISSING'));
+}
+// mirror-16 (MIRROR-R1-03): bare-string asset entries are malformed AND never satisfy dmgUploaded
+{
+  const r = mutateF6((m) => { m.releaseRecord.dmgUploaded = true; m.releaseRecord.githubRelease.assets = ['app.dmg']; });
+  chk('FAIL string asset entry rejected as malformed', hasViolation(r.artifact, 'R3F_RELEASE_ASSETS_MALFORMED') && hasViolation(r.artifact, 'R3F_DMG_FLAG_WITHOUT_ASSET'));
+}
+// mirror-17 (MIRROR-R1-04): whitespace/invalid publishedAt never counts as published
+{
+  const r = mutateF6((m, st) => {
+    m.releaseStage = 'RELEASE_PUBLISHED';
+    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+    m.releaseRecord.githubRelease.draft = false;
+    m.releaseRecord.githubRelease.published = true;
+    m.releaseRecord.githubRelease.publishedAt = '   ';
+    m.releaseRecord.releaseExecuted = true;
+    st.enabledCapabilities.push('release_executed');
+  });
+  chk('FAIL whitespace publishedAt rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH') && hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH'));
 }
 
 H.cleanupAll();
