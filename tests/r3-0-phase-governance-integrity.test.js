@@ -8,7 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const os = require('os');
+const H = require('./helpers/managed-temp-dir.js');
 
 const REPO = path.resolve(__dirname, '..');
 const SCRIPT = 'scripts/check-r3-phase-governance-integrity.js';
@@ -22,7 +22,7 @@ function chk(name, cond, detail) {
 }
 
 function runValidator(phase, integrityRepo) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-int-art-'));
+  const tmp = H.acquireTempDir('r3-phase-int-art-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp, R3_PHASE_PROGRAM: phase });
   if (integrityRepo) env.R3_PHASE_INTEGRITY_REPO_OVERRIDE = integrityRepo;
   const r = cp.spawnSync('node', [SCRIPT], { cwd: REPO, encoding: 'utf8', env });
@@ -42,7 +42,7 @@ for (const phase of PHASES) {
 
 // ── FAIL: missing R3_PHASE_PROGRAM ──
 {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-int-art-'));
+  const tmp = H.acquireTempDir('r3-phase-int-art-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp });
   delete env.R3_PHASE_PROGRAM;
   const r = cp.spawnSync('node', [SCRIPT], { cwd: REPO, encoding: 'utf8', env });
@@ -54,7 +54,7 @@ for (const phase of PHASES) {
 
 // ── FAIL: synthetic repo missing a required governance file ──
 for (const phase of PHASES) {
-  const fake = fs.mkdtempSync(path.join(os.tmpdir(), 'r3-phase-int-fake-'));
+  const fake = H.acquireTempDir('r3-phase-int-fake-');
   // We only create the workflow file + the train manifest, deliberately omit the phase governance dir.
   fs.mkdirSync(path.join(fake, '.github', 'workflows'), { recursive: true });
   fs.writeFileSync(path.join(fake, '.github', 'workflows', 'ci.yml'), 'name: x\n');
@@ -70,5 +70,6 @@ for (const phase of PHASES) {
   chk(phase + ' FAIL missing phase governance GOVERNANCE_REQUIRED_FILE_MISSING', r.artifact && r.artifact.violations.some(v => v.code === 'GOVERNANCE_REQUIRED_FILE_MISSING'));
 }
 
+H.cleanupAll();
 console.log('phase-governance-integrity: ' + pass + ' passed, ' + fail + ' failed');
 if (fail) process.exit(1);

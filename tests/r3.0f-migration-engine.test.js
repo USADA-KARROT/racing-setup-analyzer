@@ -806,11 +806,17 @@ asyncCase('F1-R2-01: concurrent migrate() calls are serialized at the engine', f
 // concurrent asyncCases (otherwise they race on require.cache).
 function _runMigratorFailClosed(name, contractMatch, migratorAbsPath, recordLiteral) {
   var cp = require('child_process');
+  // Codex INFRA-R2-02: the fixture must NOT live at a deterministic shared path
+  // (os.tmpdir() + '/empty-<name>-contract.js') — two concurrent suite/reviewer
+  // processes would overwrite/unlink each other's fixture. A managed unique temp
+  // dir gives per-process isolation AND registry-backed cleanup.
+  var H = require('./helpers/managed-temp-dir.js');
+  var tmpDir = H.acquireTempDir('r3-0f-empty-' + name + '-');
+  var tmpContract = require('path').join(tmpDir, 'empty-' + name + '-contract.js');
   var script = "'use strict';\n" +
     "var Module = require('module');\n" +
     "var fs = require('fs');\n" +
-    "var os = require('os');\n" +
-    "var tmpContract = os.tmpdir() + '/empty-" + name + "-contract.js';\n" +
+    "var tmpContract = " + JSON.stringify(tmpContract) + ";\n" +
     "fs.writeFileSync(tmpContract, 'module.exports = {};');\n" +
     "var orig = Module._resolveFilename;\n" +
     "Module._resolveFilename = function(req, parent) {\n" +
@@ -820,8 +826,12 @@ function _runMigratorFailClosed(name, contractMatch, migratorAbsPath, recordLite
     "var M = require(" + JSON.stringify(migratorAbsPath) + ");\n" +
     "var r = M.migrate(" + recordLiteral + ");\n" +
     "process.stdout.write(JSON.stringify({ ok: r.ok, reason: r.reason }));\n";
-  var out = cp.execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' });
-  return JSON.parse(out);
+  try {
+    var out = cp.execFileSync(process.execPath, ['-e', script], { encoding: 'utf8' });
+    return JSON.parse(out);
+  } finally {
+    H.releaseTempDir(tmpDir);
+  }
 }
 
 var _path = require('path');

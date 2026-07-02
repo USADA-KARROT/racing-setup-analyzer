@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const os = require('os');
+const H = require('./helpers/managed-temp-dir.js');
 
 const REPO = path.resolve(__dirname, '..');
 const SCRIPT = 'scripts/check-r3-0c-governance.js';
@@ -23,7 +23,7 @@ function chk(name, cond, detail) {
 }
 
 function runValidator(govDir) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-gov-art-'));
+  const tmp = H.acquireTempDir('r3c-gov-art-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp });
   if (govDir) env.R3_0C_GOV_DIR_OVERRIDE = govDir;
   const r = cp.spawnSync('node', [SCRIPT], { cwd: REPO, encoding: 'utf8', env });
@@ -94,7 +94,7 @@ function baseC0State() {
 }
 
 function writeFixture(opts) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-gov-fix-'));
+  const dir = H.acquireTempDir('r3c-gov-fix-');
   fs.mkdirSync(path.join(dir, 'checkpoints'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'schema.json'), JSON.stringify(opts.schema || baseSchema(), null, 2));
   fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify(opts.state || baseC0State(), null, 2));
@@ -323,5 +323,6 @@ function fxAuth(paths, opts) {
   chk('K1 real-repo exit==0 when ok==true', (r.status === 0) === !!(r.artifact && r.artifact.ok === true));
 })();
 
+H.cleanupAll();
 console.log('r3-0c-governance: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);

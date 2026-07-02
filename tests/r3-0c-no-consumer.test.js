@@ -11,7 +11,7 @@
 const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
-const os = require('os');
+const H = require('./helpers/managed-temp-dir.js');
 
 const REPO = path.resolve(__dirname, '..');
 const SCRIPT = 'scripts/check-r3-0c-no-consumer.js';
@@ -23,7 +23,7 @@ function chk(name, cond, detail) {
 }
 
 function runValidator(opts) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-noc-art-'));
+  const tmp = H.acquireTempDir('r3c-noc-art-');
   const env = Object.assign({}, process.env, { ARTIFACT_DIR: tmp });
   if (opts && opts.base) env.R3_0C_NO_CONSUMER_BASE_OVERRIDE = opts.base;
   if (opts && Object.prototype.hasOwnProperty.call(opts, 'featuresJson')) env.R3_0C_NO_CONSUMER_FIXTURE_FEATURES_JSON = opts.featuresJson;
@@ -36,7 +36,7 @@ function runValidator(opts) {
 function hasViolation(art, code) { return !!(art && Array.isArray(art.violations) && art.violations.some(v => v.code === code)); }
 
 function buildFixtureBase(extra) {
-  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'r3c-noc-fix-'));
+  const base = H.acquireTempDir('r3c-noc-fix-');
   fs.mkdirSync(path.join(base, 'renderer', 'js'), { recursive: true });
   fs.mkdirSync(path.join(base, 'contracts', 'r3.0c'), { recursive: true });
   // benign renderer file (no contracts reference)
@@ -216,5 +216,6 @@ function deferredOk() {
   chk('H3 fixture features JSON parse error → FAILS', r.status !== 0 && hasViolation(r.artifact, 'FIXTURE_FEATURES_JSON_PARSE_ERROR'));
 })();
 
+H.cleanupAll();
 console.log('r3-0c-no-consumer: ' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail === 0 ? 0 : 1);
