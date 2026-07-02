@@ -12,7 +12,7 @@
 
 2.0.0 is the R3.0 Integrated Delivery Train: everything from R3.0A through R3.0F merged
 as one release on top of the 1.4.0 baseline. The authoritative per-milestone record is
-[CHANGELOG.md](../CHANGELOG.md) (its `[Unreleased] — 2.0.0 candidate` section is the
+[CHANGELOG.md](../CHANGELOG.md) (its `[2.0.0] — Release Candidate` section is the
 canonical summary and is intentionally not duplicated here).
 
 Highlights, briefly:
@@ -137,8 +137,7 @@ cannot control OS-level backups or other local processes. Full statement:
   see "Installation status" above).
 - Parallel known follow-up, NOT part of 2.0.0: the R2.4-era credibility-rung string
   cleanup (three pre-Train files carrying `'Measured (kinematic, confounded)'` as a
-  rung value) is in progress in a separate workstream — see "Known limitations" item 5;
-  it must not be assumed merged.
+  rung value) is in progress in a separate workstream; it must not be assumed merged.
 - License note: `package.json` declares `UNLICENSED` (no LICENSE file exists);
   a legacy `license: MIT` field in `CITATION.cff` contradicted this and was removed
   at the F6 stage — adopting an actual license remains an explicit product decision.

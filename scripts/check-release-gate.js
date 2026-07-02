@@ -324,9 +324,9 @@ const CONDITIONS = [
       if (!fs.existsSync(p)) return { ok: false, detail: { error: 'docs/release-notes-2.0.0.md does not exist' } };
       const text = fs.readFileSync(p, 'utf8');
       const required = [
-        // F6 stage: notes graduate from DRAFT to RELEASE CANDIDATE — still fail-closed
-        // on a missing/unknown status declaration.
-        ['draft/release-candidate status', /Status:\s*(DRAFT|RELEASE CANDIDATE)/i],
+        // F6 finalized: the notes must declare RELEASE CANDIDATE status — a reversion
+        // to DRAFT (or a missing/unknown declaration) fails the gate.
+        ['release-candidate status', /Status:\s*RELEASE CANDIDATE/i],
         ['unsigned/unnotarized disclosure', /not code-signed and not notarized/i],
         ['upgrade guidance', /^## Upgrade guidance/m],
         ['backup/rollback guidance', /^## Backup and rollback guidance/m],
@@ -340,14 +340,14 @@ const CONDITIONS = [
   {
     id: 11,
     key: 'changelog',
-    name: 'CHANGELOG — present with the 2.0.0-candidate hook and the 1.4.0 pin statement',
+    name: 'CHANGELOG — finalized [2.0.0] Release-Candidate section and the 1.4.0 pin statement',
     run(io) {
       const p = path.join(REPO, 'CHANGELOG.md');
       if (!fs.existsSync(p)) return { ok: false, detail: { error: 'CHANGELOG.md does not exist' } };
       const text = fs.readFileSync(p, 'utf8');
       const problems = [];
       if (!/^# Changelog/m.test(text)) problems.push('missing top-level "# Changelog" heading');
-      if (!/^## \[(Unreleased\] — 2\.0\.0 candidate|2\.0\.0\] — Release Candidate)/m.test(text)) problems.push('missing the 2.0.0 candidate/Release-Candidate section heading');
+      if (!/^## \[2\.0\.0\] — Release Candidate/m.test(text)) problems.push('missing the finalized [2.0.0] — Release Candidate section heading');
       if (!/pinned at .?1\.4\.0/i.test(text)) problems.push('missing the pinned-at-1.4.0 history statement');
       return { ok: problems.length === 0, detail: { problems: problems } };
     },

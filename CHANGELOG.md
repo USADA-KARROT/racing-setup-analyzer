@@ -43,8 +43,11 @@ the release has been published.
 - Electron host `webPreferences` explicitly sets exactly three keys — `preload`,
   `contextIsolation: true`, `nodeIntegration: false`; no safety-relevant key (`sandbox`,
   `webSecurity`, etc.) is ever explicitly weakened, so Electron's own defaults apply to
-  everything else. The preload bridge exposes exactly `{ platform, version }` on
-  `window.electronAPI` — nothing else.
+  everything else. The preload bridge is DESIGNED to expose exactly `{ platform,
+  version }` on `window.electronAPI` — nothing else; in the packaged app the preload
+  currently fails to load (a pre-existing v1.0.0 defect — the sandboxed preload cannot
+  `require('./package.json')`), so even this surface is not exposed at runtime. See
+  release notes Known limitations item 10.
 - **Comparison is same-case + same-session only.** Cross-case comparison and cross-session
   comparison within a single case are both **permanently forbidden** at every layer
   (authority, view model, export, decision engine, experiment loop).
