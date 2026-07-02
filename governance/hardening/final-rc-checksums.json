@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "note": "v2.0.1 RC LOCAL build artifacts (UNSIGNED dev candidates — NOT distributed; the published DMG will be a NEW signed+notarized+stapled build whose hashes replace these).",
+  "artifacts": {
+    "dmg": {
+      "name": "Racing Setup Analyzer-2.0.1-arm64.dmg",
+      "bytes": 99145105,
+      "sha256": "3a9d639c28f02746e06918aa115c4803ff7b45d697f41c7458e4af85ea2b8c0d"
+    },
+    "appExecutable": {
+      "sha256": "d1383e07b3dd17b2783c3364a1df372403b6cc50c3372046f06bb85b92d12920"
+    },
+    "appAsar": {
+      "sha256": "59fe27947c572b4d877fd46fee19fbbf385a09733756b2e06e1e45b8e7392344"
+    }
+  }
+}

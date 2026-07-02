@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "title": "FINAL RC EVIDENCE MATRIX — v2.0.1 public release candidate",
+  "rcBranch": "hardening/final-v2.0.1-rc",
+  "matrix": {
+    "Runtime": "PASS",
+    "Packaged preload": "PASS (electronAPI live; packaged CDP)",
+    "Version authority": "PASS (app.getVersion()=2.0.1 over the single allowlisted channel)",
+    "Displayed version": "PASS (api.getStats().version=2.0.1; never fabricated)",
+    "Clean profile": "PASS (12/12)",
+    "Existing profile": "PASS (12/12)",
+    "Real v1.4.0 upgrade": "PASS (9/9; sentinel-proven Local Storage preservation)",
+    "Reopen idempotency": "PASS (9/9)",
+    "Deterministic upgrade qualification": "PASS (14/14: future-schema/downgrade/malformed/interrupted/recovery)",
+    "UI truth": "PASS (packaged 12/12: Brief LIVE reveal/render/hide; deferred absent; 15 exclusions asar-verified)",
+    "Icon": "PASS (original Style-A monogram; bundle icon sha256 == committed asset)",
+    "arm64": "PASS (arm64-only Mach-O; config-enforced)",
+    "Minimum macOS": "PASS (12.0 declared + plist-verified)",
+    "Lockfile": "PASS (tracked, v3, npm ci reproducible)",
+    "npm ci": "PASS (416 packages, exact pins verified)",
+    "SBOM": "PASS (CycloneDX 1.5, 419 components, fresh at 2.0.1)",
+    "Vendor governance": "PASS (3 libs sha256-pinned, MIT, manifest-enforced)",
+    "Third-party notices": "PASS",
+    "License status": "PASS (UNLICENSED + explicit distribution statement; no false open-source claim)",
+    "Signing config": "PASS (hardened runtime + minimal entitlements wired; env-gated notarize)",
+    "Developer ID signature": "BLOCKED (DEVELOPER_ID_APPLICATION_MISSING — credential boundary)",
+    "Notarization": "BLOCKED (NOTARY_CREDENTIAL_MISSING)",
+    "Stapling": "BLOCKED (follows notarization)",
+    "Gatekeeper": "BLOCKED (follows signing+notarization)",
+    "Full suite": "PASS (116 files, exit 0, zero failures)",
+    "Release gate": "PASS (12/12 incl. CI-mirrored frozen exception + 2.0.1 doc conditions)",
+    "Packaged E2E": "PASS (runtime + UI-truth + upgrade batteries)",
+    "Secret scan": "PASS",
+    "Temp leak": "PASS (0)",
+    "Final cross-phase review": "PENDING (single final review gate; reviewer outage — one full Codex cross-phase review required before READY_FOR_SIGNING/PUBLISH)",
+    "Release published": "NO"
+  },
+  "artifacts": {
+    "dmg": {
+      "name": "Racing Setup Analyzer-2.0.1-arm64.dmg",
+      "bytes": 99145105,
+      "sha256": "3a9d639c28f02746e06918aa115c4803ff7b45d697f41c7458e4af85ea2b8c0d"
+    },
+    "appExecutable": {
+      "sha256": "d1383e07b3dd17b2783c3364a1df372403b6cc50c3372046f06bb85b92d12920"
+    },
+    "appAsar": {
+      "sha256": "59fe27947c572b4d877fd46fee19fbbf385a09733756b2e06e1e45b8e7392344"
+    }
+  },
+  "evidenceLogs": {
+    "runtimeClean": "7110a9d995ee91d1e176428a33becd1cbba61969dce64d604c9810303b2b21c5",
+    "runtimeExisting": "ee718656d8ee4fb745707b9abeb0ceb87e75586911043ab8c9bb0c3c3e6df74d",
+    "uiTruth": "915e5a7e2263c7bc0f4f39ca208d250b393aa78c08c4a29a99e5edc0080c8e2e",
+    "upgrade": "b21eb5b9f1ea2dd15c96fcb6855645f36fd481449c494e457120857b71228ed6",
+    "reopen": "c80c6efc8b04d4b309c3d8667e86b6492dd449c3447b3b9cf422c51692b9d64a"
+  },
+  "boundaries": "v2.0.0 tag untouched; draft Release 347825133 unpublished/0 assets; deployments 0; release_executed false; no v2.0.1 tag; nothing published."
+}

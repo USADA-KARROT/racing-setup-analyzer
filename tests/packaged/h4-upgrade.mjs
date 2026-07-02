@@ -46,8 +46,9 @@ try {
   chk('2.0.0 boots on the 1.4.0-authored profile (no preload crash)', !/Unable to load preload script/.test(log));
   const title = await ev('document.title');
   chk('renderer alive (document.title present)', typeof title === 'string' && title.length > 0, title);
+  const expectVer = process.env.H4_EXPECT_VERSION || '2.0.1';
   const ver = await ev('electronAPI.getAppVersion()');
-  chk('reports version 2.0.0', ver === '2.0.0', ver);
+  chk('reports version ' + expectVer, ver === expectVer, ver);
 
   if (phase === 'upgrade') {
     // The 1.4.0 profile had a Local Storage sentinel authored BY THE REAL 1.4.0 BINARY (h4_sentinel)

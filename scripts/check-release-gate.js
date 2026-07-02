@@ -344,8 +344,9 @@ const CONDITIONS = [
     key: 'releaseNotes',
     name: 'Release notes drafted — docs/release-notes-2.0.0.md with required sections',
     run(io) {
-      const p = path.join(REPO, 'docs', 'release-notes-2.0.0.md');
-      if (!fs.existsSync(p)) return { ok: false, detail: { error: 'docs/release-notes-2.0.0.md does not exist' } };
+      // v2.0.1 public line: the 2.0.1 notes are the primary document; the 2.0.0 notes remain as history.
+      const p = path.join(REPO, 'docs', 'release-notes-2.0.1.md');
+      if (!fs.existsSync(p)) return { ok: false, detail: { error: 'docs/release-notes-2.0.1.md does not exist' } };
       const text = fs.readFileSync(p, 'utf8');
       const required = [
         // F6 finalized: the notes must declare RELEASE CANDIDATE status — a reversion
@@ -371,7 +372,7 @@ const CONDITIONS = [
       const text = fs.readFileSync(p, 'utf8');
       const problems = [];
       if (!/^# Changelog/m.test(text)) problems.push('missing top-level "# Changelog" heading');
-      if (!/^## \[2\.0\.0\] — Release Candidate/m.test(text)) problems.push('missing the finalized [2.0.0] — Release Candidate section heading');
+      if (!/^## \[2\.0\.1\] — Public Release Candidate/m.test(text)) problems.push('missing the [2.0.1] — Public Release Candidate section heading');
       if (!/pinned at .?1\.4\.0/i.test(text)) problems.push('missing the pinned-at-1.4.0 history statement');
       return { ok: problems.length === 0, detail: { problems: problems } };
     },
