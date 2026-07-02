@@ -136,9 +136,11 @@ const CONDITIONS = [
       }
       const results = Array.isArray(manifest.results) ? manifest.results : [];
       const e2e = results.filter((x) => typeof x.file === 'string' && x.file.indexOf('tests/e2e/') === 0);
-      // A file passed iff its child exited 0, did not time out, and parsed zero failed assertions.
+      // A file passed iff its child exited 0, did not time out, and parsed EXACTLY zero
+      // failed assertions. STRICT === 0 (Codex F5-R1-01): a malformed row with a
+      // missing/null assertionsFailed must FAIL closed, not default to zero.
       const failed = e2e
-        .filter((x) => !(x.exitCode === 0 && x.timedOut !== true && (x.assertionsFailed || 0) === 0))
+        .filter((x) => !(x.exitCode === 0 && x.timedOut !== true && x.assertionsFailed === 0))
         .map((x) => x.file);
       // Fail-closed floor: the F2+F3 manifest ships 15 e2e files (9 flows + 6 probes).
       const ok = e2e.length >= 15 && failed.length === 0;
@@ -201,20 +203,28 @@ const CONDITIONS = [
     key: 'noOrphans',
     name: 'No orphans — zero production feature orphans + no unauthorized contract consumers (C/D/E/F)',
     run(io) {
+      // Codex F5-R1-02: condition 8 must NOT judge on a possibly-stale artifact from a
+      // previous run — it delegates check-feature-registry.js ITSELF (independently of
+      // condition 7), and only reads the artifact that THIS child just rewrote, and only
+      // when that child exited 0.
+      const regRun = io.delegate('scripts/check-feature-registry.js');
       let reg = null;
-      try { reg = io.readJson(path.join(ARTIFACT_DIR, 'feature-registry-result.json')); } catch (_) { }
+      if (regRun.ok) {
+        try { reg = io.readJson(path.join(ARTIFACT_DIR, 'feature-registry-result.json')); } catch (_) { }
+      }
       // check-feature-registry.js writes productionFeatureOrphans as a COUNT (number);
-      // the offending ids live in the sibling `orphans` array. Accept the count and
-      // fail closed when it is absent or non-zero.
+      // the offending ids live in the sibling `orphans` array. Fail closed when the
+      // child failed, the artifact is unreadable, or the count is absent/non-zero.
       const orphanCount = reg && typeof reg.productionFeatureOrphans === 'number' ? reg.productionFeatureOrphans : null;
       const c = io.delegate('scripts/check-r3-0c-no-consumer.js');
       const d = io.delegate('scripts/check-r3-phase-no-consumer.js', [], { R3_PHASE_PROGRAM: 'R3.0D' });
       const e = io.delegate('scripts/check-r3-phase-no-consumer.js', [], { R3_PHASE_PROGRAM: 'R3.0E' });
       const f = io.delegate('scripts/check-r3-phase-no-consumer.js', [], { R3_PHASE_PROGRAM: 'R3.0F' });
-      const ok = orphanCount === 0 && c.ok && d.ok && e.ok && f.ok;
+      const ok = regRun.ok && orphanCount === 0 && c.ok && d.ok && e.ok && f.ok;
       return {
         ok: ok,
         detail: {
+          registryChild: regRun.detail,
           productionFeatureOrphans: orphanCount,
           orphanIds: reg && Array.isArray(reg.orphans) ? reg.orphans : null,
           r30c: c.detail, r30d: d.detail, r30e: e.detail, r30f: f.detail,

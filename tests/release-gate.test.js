@@ -91,6 +91,14 @@ const GREEN_ARTIFACTS = {
   tooFew.results = tooFew.results.slice(0, 10);
   chk('e2e: fewer than 15 e2e files -> FAIL (floor guard)', cond(3).run(ioAllGreen(Object.assign({}, GREEN_ARTIFACTS, { 'test-manifest.json': tooFew }))).ok === false);
   chk('e2e: unreadable manifest -> FAIL (fail-closed)', cond(3).run(ioAllGreen({})).ok === false);
+  // Codex F5-R1-01 closure: a malformed row with a MISSING assertionsFailed must fail
+  // closed — strict === 0, never a falsy default.
+  const malformed = JSON.parse(JSON.stringify(GREEN_ARTIFACTS['test-manifest.json']));
+  delete malformed.results[5].assertionsFailed;
+  chk('e2e: row with missing assertionsFailed -> FAIL (strict === 0, F5-R1-01)', cond(3).run(ioAllGreen(Object.assign({}, GREEN_ARTIFACTS, { 'test-manifest.json': malformed }))).ok === false);
+  const nulled = JSON.parse(JSON.stringify(GREEN_ARTIFACTS['test-manifest.json']));
+  nulled.results[5].assertionsFailed = null;
+  chk('e2e: row with null assertionsFailed -> FAIL (strict === 0, F5-R1-01)', cond(3).run(ioAllGreen(Object.assign({}, GREEN_ARTIFACTS, { 'test-manifest.json': nulled }))).ok === false);
 })();
 
 // 4/5/6: artifact must corroborate the child exit code
@@ -109,17 +117,28 @@ const GREEN_ARTIFACTS = {
   chk('reachability: red child -> FAIL', cond(7).run(io).ok === false);
 })();
 
-// 8 noOrphans: ALL four consumer checks and the orphan list must be green
+// 8 noOrphans: the registry validator child, ALL four consumer checks, and the
+// orphan count must ALL be green
 (function () {
   chk('noOrphans: all green -> PASS', cond(8).run(ioAllGreen(GREEN_ARTIFACTS)).ok === true);
   chk('noOrphans: one orphan -> FAIL', cond(8).run(ioAllGreen(Object.assign({}, GREEN_ARTIFACTS, { 'feature-registry-result.json': { productionFeatureOrphans: 1, orphans: ['x'] } }))).ok === false);
   let call = 0;
   const ioOneRed = {
+    // condition 8 delegates 5 children: registry validator first, then the 4
+    // consumer checks — make the 3rd (a consumer check) red.
     delegate: () => { call++; return call === 3 ? { ok: false, detail: {} } : { ok: true, detail: {} }; },
     readJson: ioAllGreen(GREEN_ARTIFACTS).readJson,
   };
   chk('noOrphans: one red consumer check (of 4) -> FAIL', cond(8).run(ioOneRed).ok === false);
   chk('noOrphans: missing registry artifact -> FAIL (fail-closed)', cond(8).run({ delegate: () => ({ ok: true, detail: {} }), readJson: () => { throw new Error('none'); } }).ok === false);
+  // Codex F5-R1-02 closure: a STALE green artifact must not rescue a RED registry
+  // child — condition 8 delegates the registry validator itself and only trusts the
+  // artifact when that child exited 0.
+  const ioStaleGreen = {
+    delegate: (script) => ({ ok: String(script).indexOf('check-feature-registry') === -1, detail: {} }),
+    readJson: ioAllGreen(GREEN_ARTIFACTS).readJson, // green artifact "left over" from a prior run
+  };
+  chk('noOrphans: red registry child + stale green artifact -> FAIL (F5-R1-02)', cond(8).run(ioStaleGreen).ok === false);
 })();
 
 // 9/10/11: filesystem conditions against the REAL repo (happy path must hold at HEAD)

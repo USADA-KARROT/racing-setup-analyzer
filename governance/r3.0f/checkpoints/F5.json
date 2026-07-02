@@ -142,7 +142,7 @@
       "tests/release-gate.test.js",
       "tests/r3-0d-contracts-bundle-equivalence.test.js"
     ],
-    "newSuiteAssertionsTotal": 47,
+    "newSuiteAssertionsTotal": 50,
     "manifestAfterRegistration": {
       "discovered": 110,
       "ran": 110,
@@ -154,7 +154,7 @@
       "discoveryGhost": []
     },
     "evidenceTier": "TIER 3 — Claude-verified on the F5 branch; CI re-run on the candidate SHA is the authority.",
-    "note": "release-gate.test.js unit-tests the gate's fail-closed judgement via injectable io (37 assertions) without re-spawning the multi-minute validators; the bundle-equivalence test adds 10."
+    "note": "release-gate.test.js unit-tests the gate's fail-closed judgement via injectable io (40 assertions incl. the F5-R1-01 malformed-row and F5-R1-02 stale-artifact closures) without re-spawning the multi-minute validators; the bundle-equivalence test adds 10."
   },
   "localBuildEvidence": {
     "note": "Actual electron-builder run executed LOCALLY (CI is install-free by policy). Build artifacts and the npm lockfile/node_modules are NOT committed (build/ and package-lock.json are gitignored; verified untracked).",
@@ -233,8 +233,8 @@
     "command": "BASE_SHA=origin/feat/r3.0-integrated-delivery HEAD_SHA=HEAD node scripts/check-release-gate.js",
     "exitCode": 0,
     "stdout": "RELEASE-GATE {\"ok\":true,\"passed\":12,\"failed\":0,\"failedKeys\":[]}",
-    "artifactSha256": "f5f615db481ce254c0d7a44176d0005ab3a243a9cc07ce6611f8c917c2700e14",
-    "note": "Full 12-condition run on the F5 working tree (conditions 2 spawns the complete 110-file manifest). The FIRST full run (exit 1) fail-closed caught two artifact-schema misreads inside the gate itself (manifest fields live under summary; productionFeatureOrphans is a count) — fixed, unit-test stubs aligned to the real schemas, then this clean 12/12 run.",
+    "artifactSha256": "5f7363cd56b4bf09b6c14c66b67744f46ea3be9bfbdbbccb17d9b10492603a50",
+    "note": "Full 12-condition run on the F5 working tree (conditions 2 spawns the complete 110-file manifest). The FIRST full run (exit 1) fail-closed caught two artifact-schema misreads inside the gate itself (manifest fields live under summary; productionFeatureOrphans is a count) — fixed, unit-test stubs aligned to the real schemas, then this clean 12/12 run. THIRD full run after the Codex F5-R1-01/02 closures (strict assertionsFailed===0; condition 8 delegates the registry validator itself): 12/12 exit 0.",
     "performedAt": "2026-07-02"
   }
 }
