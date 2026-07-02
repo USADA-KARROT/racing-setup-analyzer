@@ -168,14 +168,28 @@ const CONDITIONS = [
   {
     id: 4,
     key: 'frozen',
-    name: 'Frozen 0 — no frozen-manifest file modified',
+    name: 'Frozen 0 — no frozen-manifest file modified (C8-authorized registry exception mirrored from CI)',
     run(io) {
-      const r = io.delegate('scripts/check-frozen-boundary.js');
+      // EXACTLY the CI workflow's conditional: renderer/js/feature-registry.js is allowlisted
+      // ONLY while governance/r3.0c/state.json grants featureRegistryActivationAllowed AND lists
+      // the file as an authorized production path. Any OTHER frozen file changed still fails,
+      // and the allowlist itself vanishes if governance ever revokes the grant.
+      let allow = '';
+      try {
+        const st = io.readJson(path.join(REPO, 'governance', 'r3.0c', 'state.json'));
+        if (st.featureRegistryActivationAllowed === true &&
+            (st.authorizedProductionPaths || []).some(e => e && e.path === 'renderer/js/feature-registry.js' && e.capability === 'feature_registry_active')) {
+          allow = 'renderer/js/feature-registry.js';
+        }
+      } catch (_) { /* fail-closed: no allow */ }
+      const r = io.delegate('scripts/check-frozen-boundary.js', [], { FROZEN_ALLOW: allow });
       let frozen = null;
       try { frozen = io.readJson(path.join(ARTIFACT_DIR, 'frozen-boundary-result.json')); } catch (_) { }
+      // ok iff the child passed AND nothing outside the (possibly empty) allowlist changed.
+      const violations = frozen && Array.isArray(frozen.violations) ? frozen.violations : null;
       return {
-        ok: r.ok && !!frozen && frozen.frozenDiffCount === 0,
-        detail: { inner: r.detail, frozenDiffCount: frozen ? frozen.frozenDiffCount : null },
+        ok: r.ok && !!frozen && violations !== null && violations.length === 0,
+        detail: { inner: r.detail, frozenAllow: allow || null, frozenDiffCount: frozen ? frozen.frozenDiffCount : null, violations },
       };
     },
   },

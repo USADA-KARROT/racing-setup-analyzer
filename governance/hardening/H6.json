@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "program": "PUBLIC_RELEASE_HARDENING",
+  "phase": "H6_SIGNING_NOTARIZATION_READINESS",
+  "baseSha": "3bb24917a5ebb4dc6c8393b9fa20a9987af71e27",
+  "integrationBranch": "release/v2.0.0-public-hardening",
+  "headSha": null,
+  "scope": "everything EXCEPT the actual Apple credentials (which only SKYLINE can install)",
+  "delivered": {
+    "entitlements": {
+      "main": "build-resources/entitlements.mac.plist",
+      "inherit": "build-resources/entitlements.mac.inherit.plist",
+      "set": "MINIMAL: allow-jit + allow-unsigned-executable-memory ONLY (V8/hardened-runtime requirements); disable-library-validation/dyld-env/network/device/PI deliberately absent with rationale",
+      "mainSha256": "0abcee40c3f34932538e19c9b1dcb024f140ecf432659d65d28ac2312b191b7a"
+    },
+    "builderConfig": "mac.hardenedRuntime=true + entitlements wired + notarize=false (env-gated by the runbook, never silently on); identity auto-discovery (absent identity -> honest unsigned dev build, verified to boot 12/12)",
+    "verifier": {
+      "path": "scripts/release-verify/verify-signing.sh",
+      "sha256": "447f6963ab04e94150b62c3642237c41fe33358c0a7fbdc3252e134c85190a1d",
+      "semantics": "OK/FAIL/BLOCKED; BLOCKED codes: DEVELOPER_ID_APPLICATION_MISSING, ADHOC_ONLY_NO_DEVELOPER_ID (Apple Silicon requires at least ad-hoc to execute — reported as blocked, never PASS), NOTARY_CREDENTIAL_MISSING, NOTARIZATION_TICKET_MISSING, GATEKEEPER_REJECTED_OR_UNNOTARIZED, DMG_UNSIGNED; FAIL for real defects (broken deep/strict signature, forbidden entitlements, unsigned nested code, wrong arch/bundle-id); machine-readable SIGNING-VERIFY summary"
+    },
+    "runbook": {
+      "path": "docs/release-signing-runbook.md",
+      "content": "credential-boundary steps (Developer ID cert into login keychain, Team ID, notarytool store-credentials RSA_NOTARY), signed-build + notarize + staple commands, verification battery, CI secret NAMES only, failure handling; secrets NEVER in repo/log/chat"
+    },
+    "gateFix": "release-gate condition 4 now mirrors the CI conditional FROZEN_ALLOW (C8-authorized feature-registry exception read from r3.0c governance state; fail-closed empty allow; violations-array shape required) — closes a gate/CI equivalence gap exposed by H5's registry change"
+  },
+  "unsignedBuildEvidence": "verify-signing.sh on the current unsigned arm64 build: fails=0, blocked=[DEVELOPER_ID_APPLICATION_MISSING, ADHOC_ONLY_NO_DEVELOPER_ID, NOTARY_CREDENTIAL_MISSING, DMG_UNSIGNED] — honest, no fabricated PASS; app still boots (packaged runtime 12/12)",
+  "inChainTest": "tests/h6-signing-readiness.test.js 25/25 (entitlements minimal+forbidden-absent, builder wiring, verifier semantics incl. never-secret, runbook boundaries)",
+  "credentialBoundary": "BLOCKED items require SKYLINE-local keychain installs per the runbook; no secret is requested through chat or repo",
+  "reviewStatus": {
+    "implementation": "PASS",
+    "internalVerification": "PASS",
+    "codexStageReview": "WAIVED_BY_SINGLE_FINAL_REVIEW_GATE",
+    "finalCrossPhaseReview": "PENDING"
+  },
+  "codexVerdict": null,
+  "note": "INTERNAL VERIFICATION PASS - FINAL CROSS-PHASE REVIEW PENDING."
+}
