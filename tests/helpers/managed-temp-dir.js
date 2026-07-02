@@ -41,19 +41,21 @@ function _makeTempDir(prefix) {
       /[\/\\]/.test(prefix) || prefix.indexOf('\0') !== -1) {
     throw new Error('managed-temp-dir: prefix must be a bare name fragment (no separators, no traversal): ' + JSON.stringify(prefix));
   }
-  var created = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
-  // Belt-and-suspenders: the created dir must sit DIRECTLY beneath the resolved temp root.
+  // Codex INFRA-R2-01 + INFRA-R3-01: resolve the temp root FIRST, then create beneath the
+  // canonical root. Creating through the unresolved os.tmpdir() and resolving afterwards
+  // leaves a TOCTOU window — a symlinked temp root retargeted between mkdtemp and realpath
+  // would make the helper register (and later delete) a same-named directory under the NEW
+  // target while leaking the directory actually created. mkdtemp under the already-resolved
+  // root returns a path that is canonical by construction.
   var tempRoot = fs.realpathSync(os.tmpdir());
+  var created = fs.mkdtempSync(path.join(tempRoot, prefix));
+  // Belt-and-suspenders: the created dir must still sit DIRECTLY beneath the resolved root.
   var parent = fs.realpathSync(path.dirname(created));
   if (parent !== tempRoot) {
     _cleanupBestEffort(created, 'escape-check');
     throw new Error('managed-temp-dir: created dir escaped the temp root: ' + created);
   }
-  // Return (and therefore register) the CANONICAL path (Codex INFRA-R2-01): if os.tmpdir()
-  // is a symlink that gets retargeted after acquisition, cleanup against the unresolved
-  // path could delete a same-named directory under the NEW target. Anchoring to the
-  // realpath at creation time pins every later cleanup to the directory actually created.
-  return path.join(tempRoot, path.basename(created));
+  return created;
 }
 
 function _cleanupBestEffort(tempDir, context) {
