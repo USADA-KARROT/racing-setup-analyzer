@@ -3,7 +3,7 @@
   "program": "R3.0F",
   "checkpoint": "F5_RELEASE_GATE",
   "baseSha": "bce141fa82f43af7aace0ce85a2973d77ecd484b",
-  "headSha": null,
+  "headSha": "cd5c5c6f18ce376f22f23c434e09b31cb81fc25a",
   "previousCheckpoint": "F4_DOCUMENTATION",
   "shaSeparation": "baseSha = Train HEAD after F4 (PR #36) and the test-infra temp-cleanup (PR #37) merges. headSha is stamped at the F5 candidate that Codex reviews.",
   "authorizedPaths": [
@@ -200,7 +200,44 @@
   "workflowRunId": null,
   "artifactId": null,
   "artifactBoundSha": null,
-  "codexVerdict": null,
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 3,
+    "reviewedCandidateSha": "cd5c5c6f18ce376f22f23c434e09b31cb81fc25a",
+    "verdictEvidenceFile": "governance/r3.0f/codex-checkpoint-evidence/F5/round-3-cd5c5c6-PASS.raw.txt",
+    "verdictEvidenceSha256": "44363e72192fa3e32b29bfcd34565f7bcade88bbe25d58b160ada4a22225118e",
+    "totalBlockRounds": 2,
+    "totalDistinctFindings": 4,
+    "rounds": [
+      {
+        "round": 1,
+        "verdict": "BLOCK",
+        "findings": 2,
+        "closures": [
+          "F5-R1-01 strict assertionsFailed===0 on e2e rows",
+          "F5-R1-02 condition 8 self-delegates the registry validator"
+        ]
+      },
+      {
+        "round": 2,
+        "verdict": "BLOCK",
+        "findings": 2,
+        "closures": [
+          "F5-R2-01 artifact ok===true corroboration on all delegated conditions",
+          "F5-R2-02 README roadmap sections synced tri-lingually"
+        ]
+      },
+      {
+        "round": 3,
+        "reviewedSha": "cd5c5c6f18ce376f22f23c434e09b31cb81fc25a",
+        "verdict": "PASS",
+        "findings": 0,
+        "evidence": "governance/r3.0f/codex-checkpoint-evidence/F5/round-3-cd5c5c6-PASS.raw.txt",
+        "evidenceSha256": "44363e72192fa3e32b29bfcd34565f7bcade88bbe25d58b160ada4a22225118e"
+      }
+    ],
+    "tierDisclosure": "TIER 1 for round 3 (raw stdout archived + sha256-anchored). Rounds 1-2 raw outputs retained in the session scratchpad; closures recorded in the f5(r2)/f5(r3) commit messages. Prompts for all 3 rounds archived under codex-checkpoint-evidence/F5/."
+  },
   "frozenDiff": null,
   "productionDiff": null,
   "runtimeConsumerCount": null,
