@@ -1,0 +1,13 @@
+  ✓ [h5] excluded modules ABSENT from the packaged asar file listing (all 15)
+  ✓ [h5] shipped comparison bundle PRESENT in asar listing
+  ✓ [h5] shipped engineer-ui PRESENT in asar listing
+  ✓ [h5] Comparisons pane node present (LIVE)
+  ✓ [h5] deferred subviews NOT in live nav
+  ✓ [h5] engineer_brief IS in live nav
+  ✓ [h5] brief mount REVEALED on subview navigation (hidden class removed)
+  ✓ [h5] brief aria-hidden=false when revealed
+  ✓ [h5] brief pane has RENDERED content (mounted, non-empty DOM)
+  ✓ [h5] brief hides again when navigating away
+  ✓ [h5] binary still alive (ownership)
+  ✓ [h5] port still ours at end (lsof)
+H5-UI-TRUTH: 12 passed, 0 failed

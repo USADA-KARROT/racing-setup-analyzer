@@ -30,7 +30,7 @@ Grounded in textbook vehicle dynamics (Milliken, Gillespie, OptimumG) and cross-
 | R3.0E | Experiment-outcome loop (experiment / outcome / follow-up link / append-only timeline stores + contracts) | ✅ complete — services shipped; Experiment Loop / Case Timeline panes not yet wired into the page (nav nodes live) |
 | R3.0F | Migration engine, E2E flows, hardening probes, documentation, release gate | ✅ complete; Train merged to `main`; v2.0.0 release candidate staged (tag/Release pending authorization) |
 
-Version 2.0.0 (release candidate — the v2.0.0 tag and GitHub Release are pending explicit authorization). The Comparisons pane is live and usable; the Engineer Brief / Experiment Loop / Case Timeline panes are the documented remaining wire-in work (see `docs/release-notes-2.0.0.md`, "Known limitations").
+Version 2.0.1 (public release candidate — the v2.0.1 tag and public GitHub Release are pending explicit authorization). The Comparisons pane and the Engineer Brief are live; Experiment Loop / Case Timeline are deferred (see `docs/release-notes-2.0.1.md`). Apple Silicon (arm64) macOS 12+ only.
 
 ## What it can do
 
@@ -144,7 +144,7 @@ Anything not yet wired is never presented in the app as if it already works — 
 
 ## License / contributing
 
-Personal/educational project, currently **UNLICENSED** (all rights reserved — no LICENSE file exists; adopting an actual license is an explicit product decision deferred past 2.0.0, see `docs/release-notes-2.0.0.md` "Known limitations"). Contributions and corrections are welcome. Built in Taiwan, aimed at making serious chassis-engineering knowledge accessible to the next generation of FSAE students and track-day engineers.
+Open-source under the **MIT License** (see [LICENSE](LICENSE)) — you may use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies, provided the original copyright and license notice are retained. Third-party components retain their own licenses; `THIRD_PARTY_NOTICES.md` is the authoritative list for bundled third-party software. Contributions and corrections are welcome. Built in Taiwan, aimed at making serious chassis-engineering knowledge accessible to the next generation of FSAE students and track-day engineers.
 
 ---
 ---
@@ -183,7 +183,7 @@ Personal/educational project, currently **UNLICENSED** (all rights reserved — 
 | R3.0E | 實驗-結果迴圈（實驗／結果／後續連結／僅追加時間軸的儲存層與契約） | ✅ 完成 — 服務已出貨；Experiment Loop / Case Timeline 面板尚未接進頁面（導覽節點已上線） |
 | R3.0F | 遷移引擎、E2E 流程、硬化探針、文件、發佈閘門 | ✅ 完成；Train 已合併進 `main`；v2.0.0 release candidate 已就緒（tag/Release 待授權） |
 
-版本 2.0.0（release candidate —— v2.0.0 tag 與 GitHub Release 待明確授權後發佈）。Comparisons 面板已上線可用；Engineer Brief / Experiment Loop / Case Timeline 面板為已記載的待接線工作（見 `docs/release-notes-2.0.0.md` 的 Known limitations）。
+版本 2.0.1（public release candidate —— v2.0.1 tag 與公開 GitHub Release 待明確授權後發佈）。Comparisons 面板與 Engineer Brief 已上線；Experiment Loop / Case Timeline 延後交付（見 `docs/release-notes-2.0.1.md`）。僅支援 Apple Silicon (arm64) macOS 12+。
 
 ### 它能做什麼
 
@@ -297,7 +297,7 @@ npm test
 
 ### 授權／貢獻
 
-個人／教育專案，目前**未授權（UNLICENSED，保留所有權利）**——倉庫沒有 LICENSE 檔案；採用正式授權是延後到 2.0.0 之後的明確產品決策（見 `docs/release-notes-2.0.0.md` 的 Known limitations）。歡迎貢獻與指正。在台灣打造，志在讓嚴肅的底盤工程知識，能被下一代 FSAE 學生與賽道工程師接觸到。
+以 **MIT License** 開源（見 [LICENSE](LICENSE)）——可自由使用、複製、修改、合併、發布、散布、再授權與銷售，惟須保留原始 copyright 與授權聲明。第三方元件仍各自適用其原授權；`THIRD_PARTY_NOTICES.md` 為隨附第三方軟體的授權權威清單。歡迎貢獻與指正。在台灣打造，志在讓嚴肅的底盤工程知識，能被下一代 FSAE 學生與賽道工程師接觸到。
 
 ---
 ---
@@ -336,7 +336,7 @@ npm test
 | R3.0E | 実験-結果ループ（実験／結果／フォローアップリンク／追記専用タイムラインのストアと契約） | ✅ 完了 — サービス出荷済み；Experiment Loop / Case Timeline パネルは未配線（ナビノードは稼働） |
 | R3.0F | マイグレーションエンジン、E2E フロー、ハードニングプローブ、ドキュメント、リリースゲート | ✅ 完了；Train は `main` にマージ済み；v2.0.0 release candidate 準備完了（タグ/Release は承認待ち） |
 
-バージョン 2.0.0（release candidate —— v2.0.0 タグと GitHub Release は明示承認待ち）。Comparisons パネルは稼働中；Engineer Brief / Experiment Loop / Case Timeline パネルは文書化済みの残配線作業（`docs/release-notes-2.0.0.md` の Known limitations 参照）。
+バージョン 2.0.1（public release candidate —— v2.0.1 タグと公開 GitHub Release は明示承認待ち）。Comparisons パネルと Engineer Brief は稼働中；Experiment Loop / Case Timeline は延期（`docs/release-notes-2.0.1.md` 参照）。Apple Silicon (arm64) macOS 12+ のみ対応。
 
 ### できること
 
@@ -450,4 +450,4 @@ npm test
 
 ### ライセンス／コントリビュート
 
-個人／教育プロジェクト。現在は**ライセンス未付与（UNLICENSED、全権利留保）**——リポジトリに LICENSE ファイルは存在せず、正式なライセンスの採用は 2.0.0 以降に先送りされた明示的なプロダクト決定である（`docs/release-notes-2.0.0.md` の Known limitations 参照）。コントリビュートと修正を歓迎。台湾発、真剣なシャシーエンジニアリングの知識を次世代の FSAE 学生とサーキット走行エンジニアに届けることを目指す。
+**MIT License** のオープンソース（[LICENSE](LICENSE) 参照）——原著作権表示とライセンス表示を保持する限り、使用・複製・改変・結合・公開・頒布・サブライセンス・販売が可能。サードパーティ製コンポーネントはそれぞれ元のライセンスに従う；`THIRD_PARTY_NOTICES.md` が同梱サードパーティソフトウェアの権威リスト。コントリビュートと修正を歓迎。台湾発、真剣なシャシーエンジニアリングの知識を次世代の FSAE 学生とサーキット走行エンジニアに届けることを目指す。

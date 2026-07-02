@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "program": "PUBLIC_RELEASE_HARDENING",
+  "phase": "H5_UI_DELIVERY_TRUTH",
+  "baseSha": "c3522335f097feba6e9049077ade3beabb44df88",
+  "integrationBranch": "release/v2.0.0-public-hardening",
+  "headSha": null,
+  "closes": [
+    "G ambiguous inert functionality (H0 blocker)"
+  ],
+  "rulings": {
+    "comparisons": "LIVE (unchanged; packaged E2E)",
+    "engineerBrief": "LIVE — achieved with SMALL wiring only: one Alpine visibility binding on the existing auto-mounted render-only D5 UI (no new architecture/data flow). Packaged E2E: reveal + rendered content + hide.",
+    "experimentLoop": "INTERNAL-DEFERRED — registry deferred + filtered from nav; modules excluded from package",
+    "caseTimeline": "INTERNAL-DEFERRED — same",
+    "cSeriesSuperseded": "8 modules package-EXCLUDED (no duplicate authority ships); sources retained as the bundle-equivalence baseline",
+    "i18nR30e": "INTERNAL-DEFERRED excluded (serves deferred panes only)",
+    "migrationEngine": "INTERNAL-DEFERRED excluded (H4 proved no runtime consumer — the real upgrade path is case-store per-read migration)",
+    "vehicleProfileF312": "INTERNAL-DEFERRED excluded (no runtime consumer)",
+    "legacy140Fixtures": "NOT APPLICABLE (v1.4.0 has no persistence layer)"
+  },
+  "truthMatrix": {
+    "path": "governance/hardening/h5-ui-truth-matrix.json",
+    "sha256": "868248521a64bceb0401ab0617722157787df26ff739bd481feb7a87587b28a8"
+  },
+  "enforcement": {
+    "inChain": "tests/h5-ui-truth.test.js 13/13 (matrix-vs-reality: exclusions, loaded-script audit, dead-import audit, ghost-registry audit, deferred filtering, LIVE wiring)",
+    "packaged": "tests/packaged/h5-ui-truth.mjs 12/12 (asar-listing absence of all 15 excluded modules, Comparisons LIVE, Brief reveal/render/hide over CDP, deferred absent from live nav, target-ownership)",
+    "gate": "release-gate condition 9c evolved: base three inclusions + only single-file !renderer/js/*.js exclusions + no excluded file may be page-loaded (packaged-404 guard)"
+  },
+  "testsUpdated": [
+    "feature-registry.test.js (31/31)",
+    "r3.0e-experiment-viewmodel.test.js (60/60, E1/E2/E5/E6 H5 semantics)",
+    "r3.0a-ui.test.js (67/67, 9 public subviews)",
+    "release-gate.test.js (47/47)"
+  ],
+  "reviewStatus": {
+    "implementation": "PASS",
+    "internalVerification": "PASS",
+    "codexStageReview": "WAIVED_BY_SINGLE_FINAL_REVIEW_GATE",
+    "finalCrossPhaseReview": "PENDING"
+  },
+  "codexVerdict": null,
+  "note": "INTERNAL VERIFICATION PASS - FINAL CROSS-PHASE REVIEW PENDING."
+}

@@ -168,14 +168,28 @@ const CONDITIONS = [
   {
     id: 4,
     key: 'frozen',
-    name: 'Frozen 0 — no frozen-manifest file modified',
+    name: 'Frozen 0 — no frozen-manifest file modified (C8-authorized registry exception mirrored from CI)',
     run(io) {
-      const r = io.delegate('scripts/check-frozen-boundary.js');
+      // EXACTLY the CI workflow's conditional: renderer/js/feature-registry.js is allowlisted
+      // ONLY while governance/r3.0c/state.json grants featureRegistryActivationAllowed AND lists
+      // the file as an authorized production path. Any OTHER frozen file changed still fails,
+      // and the allowlist itself vanishes if governance ever revokes the grant.
+      let allow = '';
+      try {
+        const st = io.readJson(path.join(REPO, 'governance', 'r3.0c', 'state.json'));
+        if (st.featureRegistryActivationAllowed === true &&
+            (st.authorizedProductionPaths || []).some(e => e && e.path === 'renderer/js/feature-registry.js' && e.capability === 'feature_registry_active')) {
+          allow = 'renderer/js/feature-registry.js';
+        }
+      } catch (_) { /* fail-closed: no allow */ }
+      const r = io.delegate('scripts/check-frozen-boundary.js', [], { FROZEN_ALLOW: allow });
       let frozen = null;
       try { frozen = io.readJson(path.join(ARTIFACT_DIR, 'frozen-boundary-result.json')); } catch (_) { }
+      // ok iff the child passed AND nothing outside the (possibly empty) allowlist changed.
+      const violations = frozen && Array.isArray(frozen.violations) ? frozen.violations : null;
       return {
-        ok: r.ok && !!frozen && frozen.frozenDiffCount === 0,
-        detail: { inner: r.detail, frozenDiffCount: frozen ? frozen.frozenDiffCount : null },
+        ok: r.ok && !!frozen && violations !== null && violations.length === 0,
+        detail: { inner: r.detail, frozenAllow: allow || null, frozenDiffCount: frozen ? frozen.frozenDiffCount : null, violations },
       };
     },
   },
@@ -273,10 +287,20 @@ const CONDITIONS = [
       if (b.appId !== 'com.racingsetup.analyzer') problems.push('build.appId drifted: ' + b.appId);
       if (b.productName !== 'Racing Setup Analyzer') problems.push('build.productName drifted: ' + b.productName);
       if (!b.directories || typeof b.directories.output !== 'string' || b.directories.output.length === 0) problems.push('build.directories.output missing');
-      // 9c. files allowlist is exactly the three production roots.
-      const files = Array.isArray(b.files) ? b.files.slice().sort() : [];
-      const expected = ['main.js', 'preload.js', 'renderer/**/*'].sort();
-      if (JSON.stringify(files) !== JSON.stringify(expected)) problems.push('build.files must be exactly [main.js, preload.js, renderer/**/*]; got ' + JSON.stringify(b.files));
+      // 9c. files allowlist: exactly the three production roots PLUS (H5) any number of
+      //     single-file '!renderer/js/<name>.js' EXCLUSIONS (the UI-truth package excludes).
+      //     Nothing else — no extra inclusions, no directory-wide or non-renderer excludes.
+      const files = Array.isArray(b.files) ? b.files.slice() : [];
+      const baseRoots = ['main.js', 'preload.js', 'renderer/**/*'];
+      const inclusions = files.filter(f => !String(f).startsWith('!'));
+      const exclusions = files.filter(f => String(f).startsWith('!'));
+      if (JSON.stringify(inclusions.slice().sort()) !== JSON.stringify(baseRoots.slice().sort())) problems.push('build.files inclusions must be exactly [main.js, preload.js, renderer/**/*]; got ' + JSON.stringify(inclusions));
+      const badExcl = exclusions.filter(f => !/^!renderer\/js\/[A-Za-z0-9._-]+\.js$/.test(f));
+      if (badExcl.length) problems.push('build.files exclusions must each be a single-file !renderer/js/<name>.js pattern; got ' + JSON.stringify(badExcl));
+      // every excluded file must NOT be referenced by the page (no packaged 404s)
+      const htmlForExcl = fs.readFileSync(path.join(REPO, 'renderer', 'index.html'), 'utf8');
+      const leakedExcl = exclusions.map(f => f.replace('!renderer/js/', '')).filter(f => htmlForExcl.includes('js/' + f));
+      if (leakedExcl.length) problems.push('build.files excludes page-loaded scripts (packaged 404): ' + JSON.stringify(leakedExcl));
       // 9d. every asset the build config references must exist on disk (no dangling icons).
       for (const [plat, cfg] of [['mac', b.mac], ['win', b.win]]) {
         if (cfg && typeof cfg.icon === 'string') {
@@ -320,8 +344,9 @@ const CONDITIONS = [
     key: 'releaseNotes',
     name: 'Release notes drafted — docs/release-notes-2.0.0.md with required sections',
     run(io) {
-      const p = path.join(REPO, 'docs', 'release-notes-2.0.0.md');
-      if (!fs.existsSync(p)) return { ok: false, detail: { error: 'docs/release-notes-2.0.0.md does not exist' } };
+      // v2.0.1 public line: the 2.0.1 notes are the primary document; the 2.0.0 notes remain as history.
+      const p = path.join(REPO, 'docs', 'release-notes-2.0.1.md');
+      if (!fs.existsSync(p)) return { ok: false, detail: { error: 'docs/release-notes-2.0.1.md does not exist' } };
       const text = fs.readFileSync(p, 'utf8');
       const required = [
         // F6 finalized: the notes must declare RELEASE CANDIDATE status — a reversion
@@ -347,7 +372,7 @@ const CONDITIONS = [
       const text = fs.readFileSync(p, 'utf8');
       const problems = [];
       if (!/^# Changelog/m.test(text)) problems.push('missing top-level "# Changelog" heading');
-      if (!/^## \[2\.0\.0\] — Release Candidate/m.test(text)) problems.push('missing the finalized [2.0.0] — Release Candidate section heading');
+      if (!/^## \[2\.0\.1\] — Public Release Candidate/m.test(text)) problems.push('missing the [2.0.1] — Public Release Candidate section heading');
       if (!/pinned at .?1\.4\.0/i.test(text)) problems.push('missing the pinned-at-1.4.0 history statement');
       return { ok: problems.length === 0, detail: { problems: problems } };
     },
@@ -355,7 +380,7 @@ const CONDITIONS = [
   {
     id: 12,
     key: 'tagPolicy',
-    name: 'Tag policy — version pinned at the authorized value (check-version-policy EXPECTED), lockfile untracked, workflows install-free',
+    name: 'Tag policy — version pinned at the authorized value (check-version-policy EXPECTED), lockfile TRACKED (H3 reproducible-build authority), verification lane install-free',
     run(io) {
       const r = _corroborate(io, io.delegate('scripts/check-version-policy.js'), 'version-policy.json');
       return { ok: r.ok, detail: r.detail };

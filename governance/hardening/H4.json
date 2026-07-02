@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "program": "PUBLIC_RELEASE_HARDENING",
+  "phase": "H4_REAL_UPGRADE_QUALIFICATION",
+  "baseSha": "493375b86ee76f934616f266d563045b2b58fc2c",
+  "integrationBranch": "release/v2.0.0-public-hardening",
+  "headSha": null,
+  "closes": [
+    "D5 upgrade smoke PARTIAL -> PASS (now backed by a REAL v1.4.0-binary-authored profile)"
+  ],
+  "keyFinding": {
+    "v140HasNoPersistenceLayer": true,
+    "evidence": "the v1.4.0 tag ships 4 renderer/js files and ZERO IndexedDB/localStorage case persistence; a real 1.4.0 run authored a profile with Local Storage + caches but NO IndexedDB directory (verified)",
+    "upgradeSemantics": "a real 1.4.0->2.0.0 transition is therefore NOT a case-data migration; it is a FRESH IndexedDB initialization by 2.0.0 over a genuine 1.4.0-authored userData profile, preserving the pre-existing Local Storage. The v1.4.0-era corrupted/partial-legacy-case fixtures are NOT APPLICABLE (1.4.0 cannot author case data) and are honestly recorded as such, not fabricated."
+  },
+  "realBinaryEvidence": {
+    "v140Binary": "REAL v1.4.0 app (electron . from the v1.4.0 tag worktree, electron 33.4.11) authored the fixture profile",
+    "fixtureProfile": "38 files, ~1.7M, IndexedDB ABSENT (authentic 1.4.0 state)",
+    "v200Binary": "packaged v2.0.0 arm64 .app (this candidate)",
+    "upgradePhase": "9/9 PASS — 2.0.0 boots on the 1.4.0 profile, initializes IndexedDB fresh, persists a schema-v1 case, AND the exact Local Storage sentinel authored by the real 1.4.0 binary (h4_sentinel) is read back intact (non-vacuous preservation proof)",
+    "reopenPhase": "9/9 PASS — case survives 2.0.0 restart, exactly one (no duplication), schema v1 unchanged, open() idempotent",
+    "isolation": "real profile moved aside; 1.4.0 fixture copied in; restored afterward (macOS Electron ignores $HOME)",
+    "committedEvidence": {
+      "authoringTranscript": {
+        "path": "governance/hardening/h4-evidence/authoring-transcript.txt",
+        "sha256": "fe8e66ed262b25a205ca4da87666660983e8d8da1a2698c0049432f256138ffe"
+      },
+      "fixtureTree": {
+        "path": "governance/hardening/h4-evidence/fixture-1.4.0-tree.txt",
+        "sha256": "c9c9940a9bd92569f99c5fc130f698fed87de9a703401c9636953c9e2598c15b"
+      },
+      "sentinelExtract": {
+        "path": "governance/hardening/h4-evidence/fixture-sentinel-extract.txt",
+        "sha256": "6d2e1aeeff62ccbf2b679219ca6dc202990621fbd8eaf0ed9829fed0746a1232"
+      },
+      "fileManifest": {
+        "path": "governance/hardening/h4-evidence/fixture-1.4.0-profile.sha256",
+        "sha256": "08839f277c7f0c729b5b493de25b3e988e15fa516eacdf65ab1704c364800fb3"
+      },
+      "upgradeLog": {
+        "path": "governance/hardening/h4-evidence/upgrade-phase.log",
+        "sha256": "24dbde7e5bc45dfb43348e97ffd9925c56792a97d54c997742dcd1242bb570d9"
+      },
+      "reopenLog": {
+        "path": "governance/hardening/h4-evidence/reopen-phase.log",
+        "sha256": "6e0dca8ec3aeeb85510e922948cac8308fd43b02792eca1b3d4edbc7e4ece595"
+      },
+      "fixtureProvenance": {
+        "path": "governance/hardening/h4-evidence/fixture-provenance.json",
+        "sha256": "7778765701e7ff9c153261f89a19b96e01b0ede731b023a9dd5446c67c426b6a"
+      }
+    },
+    "sentinelProof": "a sentinel string was written into Local Storage FROM WITHIN the real 1.4.0 renderer (CDP localStorage.setItem) before the fixture was captured; the packaged 2.0.0 binary reads back the exact same value, proving (a) the profile is genuinely 1.4.0-authored and (b) 2.0.0 preserves pre-existing Local Storage. Value recorded in fixture-provenance.json.",
+    "reproducibleAuthoring": {
+      "script": "tests/packaged/h4-author-140-fixture.sh (committed, re-runnable)",
+      "transcript": {
+        "path": "governance/hardening/h4-evidence/authoring-transcript.txt",
+        "sha256": "fe8e66ed262b25a205ca4da87666660983e8d8da1a2698c0049432f256138ffe"
+      },
+      "proves": "v1.4.0 tag SHA 7780d6d + electron 33.4.11 + sentinel write/readback from the 1.4.0 renderer + complete tree with indexeddb_paths=0 + leveldb sentinel extract + per-file manifest"
+    }
+  },
+  "deterministicQualification": {
+    "suite": "tests/h4-upgrade-qualification.test.js 14/14 over the SAME production modules (case-store.js + storage-backend.js + schema-migration.js)",
+    "scenarios": [
+      "future-schema fail-closed (migration refuses + open rejected)",
+      "downgrade refusal (CANNOT_OVERWRITE_FUTURE)",
+      "idempotent re-open",
+      "no duplication",
+      "malformed record fail-closed (no crash)",
+      "interrupted-init resilience (CASE_NOT_FOUND, list survives)",
+      "recovery after corruption"
+    ]
+  },
+  "codexVerdict": {
+    "verdict": "PENDING_REVIEWER_AVAILABILITY",
+    "roundsRun": [
+      {
+        "round": 1,
+        "verdict": "BLOCK",
+        "findings": 2,
+        "closures": [
+          "H4-R1-01 non-vacuous 1.4.0-authored Local Storage sentinel round-trip",
+          "H4-R1-02 committed auditable evidence"
+        ]
+      },
+      {
+        "round": 2,
+        "verdict": "BLOCK",
+        "findings": 1,
+        "closures": [
+          "H4-R2-01 reproducible authoring script + full transcript (v1.4.0 SHA, electron version, sentinel write/readback, complete tree indexeddb_paths=0, leveldb extract, per-file manifest)"
+        ]
+      }
+    ],
+    "tierDisclosure": "raw stdout of rounds 1-2 archived in the session scratchpad; final verdict deferred to the single cross-phase review"
+  },
+  "note": "upgrade smoke is now PASS (real 1.4.0 binary authored the fixture). No production runtime code changed. Harness: tests/packaged/h4-upgrade.mjs (real binary, CDP, target-ownership guards) — local evidence tooling, not in the install-free npm-test chain; the deterministic qualification IS in the chain.",
+  "reviewStatus": {
+    "implementation": "PASS",
+    "internalVerification": "PASS",
+    "codexStageReview": "PENDING_REVIEWER_AVAILABILITY",
+    "finalCrossPhaseReview": "PENDING",
+    "note": "SINGLE FINAL REVIEW GATE (SKYLINE directive, 2026-07-02): per-phase Codex review is replaced by one final cross-phase Codex review over the whole integration branch before any RC is marked READY. Codex H4 rounds that DID run: R1 BLOCK (2 findings, closed), R2 BLOCK (1 finding, closed in 776ae9e2); the R2-closure re-verification could not run (reviewer usage-limit outage). NOT claimed as a Codex PASS."
+  }
+}

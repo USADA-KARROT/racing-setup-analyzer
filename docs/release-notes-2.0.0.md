@@ -80,13 +80,26 @@ cannot control OS-level backups or other local processes. Full statement:
 
 ## Known limitations (2.0.0)
 
-1. **Pane wiring is partial.** The Comparisons pane is live and usable. The Engineer
+1. **[UPDATED in the v2.0.x public-release hardening line — H5.]** Pane delivery truth:
+   the **Comparisons pane is LIVE** and the **Engineer Brief is LIVE** (the hardening line
+   wired the existing render-only D5 UI to case-subview navigation — packaged E2E verifies
+   reveal/render/hide). **Experiment Loop and Case Timeline are DEFERRED**: filtered from
+   public navigation, not loaded by the page, and their modules are excluded from the
+   packaged app; their services/contracts remain source-governed under Node tests. The
+   paragraph below describes the 2.0.0 tag/draft snapshot, which predates H5:
+   **Pane wiring is partial.** The Comparisons pane is live and usable. The Engineer
    Brief, Experiment Loop, and Case Timeline **nav nodes** are live in navigation, but
    their pane content is not wired into `renderer/index.html` (the D5 Engineer Brief
    mount ships hidden/inert; the page loads no R3.0E viewmodel script). The underlying
    services and contracts ship, run under Node-level tests, and are documented, but a
    user cannot open those panes in 2.0.0.
-2. **Packaged-but-not-loaded modules.** 15 files under `renderer/js/` ship inside the
+2. **[RESOLVED in the v2.0.x public-release hardening line — H5.]** The 15 inert modules
+   below are now EXCLUDED from the packaged app (`build.files` exclusions; asar-listing
+   verified) — nothing packaged-but-never-loaded ships anymore. Sources remain in the
+   repository as the test/equivalence baseline, per the UI truth matrix
+   (`governance/hardening/h5-ui-truth-matrix.json`). The paragraph below describes the
+   2.0.0 tag/draft snapshot:
+   **Packaged-but-not-loaded modules.** 15 files under `renderer/js/` ship inside the
    package but are never loaded by the page (the R3.0E module family, the R3.0C
    authority-pipeline modules superseded by the bundled contracts, the F1 migration
    engine, `vehicle-profile-f312.js`, `i18n-r3-0e.js`). They are inert in the packaged
@@ -97,13 +110,15 @@ cannot control OS-level backups or other local processes. Full statement:
    repository carries no LICENSE file: all rights reserved; this public repository does
    not currently grant reuse rights. Adopting a license is a product decision deferred
    past 2.0.0.
-5. **No tracked lockfile (by policy).** The repository's verification lane is
+5. **[ADDRESSED in the v2.0.x public-release hardening line — H3.]** ~~No tracked lockfile (by policy).~~ The hardening branch tracks `package-lock.json` (reproducible `npm ci`), pins electron/electron-builder exactly, and adds a CycloneDX SBOM + license audit. The paragraph below describes the 2.0.0 tag/draft snapshot, which predates H3:
+   **No tracked lockfile (by policy).** The repository's verification lane is
    dependency-free and `scripts/check-version-policy.js` enforces that
    `package-lock.json` stays untracked. A fresh `npm install` resolves
    `electron ^33.0.0` / `electron-builder ^25.0.0` by semver range; build reproducibility
    is bounded by those ranges, not a pinned lock. This is an accepted, documented
    trade-off of the dependency-free governance lane.
-6. **Vendored renderer libraries.** Three third-party libraries ship vendored under
+6. **[ADDRESSED in the v2.0.x public-release hardening line — H3.]** ~~Vendored renderer libraries~~ are now governed by `supply-chain/vendor-manifest.json` (name/version/source/license/sha256/update-policy/vuln-audit) and covered by the SBOM + `THIRD_PARTY_NOTICES.md`. The paragraph below describes the 2.0.0 tag/draft snapshot, which predates H3:
+   **Vendored renderer libraries.** Three third-party libraries ship vendored under
    `renderer/lib/`, outside npm governance: `alpine.min.js` (Alpine.js), `chart.min.js`
    (Chart.js 4.4.7), `tailwind.js` (Tailwind CSS browser build). They load from disk
    only (no CDN at runtime); no integrity hashes are recorded in-repo.
@@ -117,7 +132,14 @@ cannot control OS-level backups or other local processes. Full statement:
 9. **No professional validation.** The product is not a professional race-engineer
    replacement; outputs are advisory, in physical units, with explicit credibility and
    limitations metadata (see `docs/r3-credibility-model.md`).
-10. **Preload `electronAPI` surface is not functional (pre-existing since v1.0.0).**
+10. **[FIXED in the v2.0.x public-release hardening line — H1; not yet in any published
+   release.]** ~~Preload `electronAPI` surface is not functional (pre-existing since
+   v1.0.0).~~ The hardening branch replaces the crashing `require('./package.json')`
+   with a main-process `app.getVersion()` authority over a single allowlisted IPC
+   channel; the renderer reports `unavailable` (never a fabricated version) if the
+   bridge fails. The paragraph below describes the state of the 2.0.0 tag/draft
+   snapshot, which predates the fix:
+   **Preload `electronAPI` surface is not functional (pre-existing since v1.0.0).**
    `preload.js` calls `require('./package.json')`, which Electron's default-sandboxed
    preload cannot resolve — the preload script fails to load and `window.electronAPI`
    (`{platform, version}`) is never exposed in the packaged app. The renderer's

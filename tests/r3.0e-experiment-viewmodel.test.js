@@ -239,21 +239,23 @@ console.log('Section E — feature-registry registration');
 (function () {
   // The viewmodel module does NOT mutate feature-registry directly; we verify the
   // registry now carries the expected entries (added as part of the E5 commit).
+  // H5 UI-delivery ruling: the two subviews are DEFERRED — registered in the registry
+  // as governance truth but FILTERED from public navigation (no empty-pane nav targets).
   var navIds = FR.deriveCaseSubviewIds();
-  chk('E1: case:experiment_loop nav node present',
-    navIds.indexOf('experiment_loop') !== -1);
-  chk('E2: case:case_timeline nav node present',
-    navIds.indexOf('case_timeline') !== -1);
+  chk('E1(H5): case:experiment_loop node registered but NOT publicly navigable',
+    !!FR.getNode('case:experiment_loop') && navIds.indexOf('experiment_loop') === -1);
+  chk('E2(H5): case:case_timeline node registered but NOT publicly navigable',
+    !!FR.getNode('case:case_timeline') && navIds.indexOf('case_timeline') === -1);
   // Features
   var allFeatures = FR.FEATURES;
   chk('E3: experiment_loop feature registered + case_scoped',
     allFeatures.experiment_loop && allFeatures.experiment_loop.area === 'case_scoped');
   chk('E4: case_timeline feature registered + case_scoped',
     allFeatures.case_timeline && allFeatures.case_timeline.area === 'case_scoped');
-  chk('E5: experiment_loop availability = available_conditional',
-    allFeatures.experiment_loop.availability === 'available_conditional');
-  chk('E6: case_timeline availability = available_conditional',
-    allFeatures.case_timeline.availability === 'available_conditional');
+  chk('E5(H5): experiment_loop availability = deferred (UI-delivery ruling)',
+    allFeatures.experiment_loop.availability === 'deferred');
+  chk('E6(H5): case_timeline availability = deferred (UI-delivery ruling)',
+    allFeatures.case_timeline.availability === 'deferred');
   chk('E7: experiment_loop nav target is case:experiment_loop',
     allFeatures.experiment_loop.navNodeId === 'case:experiment_loop');
   chk('E8: case_timeline nav target is case:case_timeline',

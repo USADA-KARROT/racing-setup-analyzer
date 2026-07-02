@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  H6 — hardened-runtime entitlements INHERITED by helper processes (same minimal set).
+
+  Rationale (Electron 33, no native modules, no auto-updater, local-first app):
+    - allow-jit: REQUIRED — V8 executes JIT-compiled code; without it the renderer
+      crashes at launch under the hardened runtime. (Electron notarization guidance.)
+    - allow-unsigned-executable-memory: REQUIRED for Electron's V8 memory model under
+      the hardened runtime (Electron/electron-builder guidance for Chromium-based apps).
+
+  Deliberately ABSENT (fail-closed minimalism; each would need evidence + a ruling):
+    - com.apple.security.cs.disable-library-validation  (no native modules are loaded)
+    - com.apple.security.cs.allow-dyld-environment-variables
+    - network server/client entitlements (sandbox entitlements are N/A — this is a
+      hardened-runtime app, not an App Store sandboxed app)
+    - device (camera/mic/USB), personal-information, and broad file-system entitlements
+-->
+<plist version="1.0">
+  <dict>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+  </dict>
+</plist>

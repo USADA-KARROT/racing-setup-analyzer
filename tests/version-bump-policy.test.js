@@ -38,6 +38,9 @@ function runPolicy(version, env) {
     fs.mkdirSync(path.join(box, '.github', 'workflows'), { recursive: true });
     fs.copyFileSync(SCRIPT, path.join(box, 'scripts', 'check-version-policy.js'));
     fs.writeFileSync(path.join(box, 'package.json'), JSON.stringify({ name: 'fixture', version: version }) + '\n');
+    // H3: a tracked package-lock.json is now the required reproducible-build authority. Give the
+    // fixture a minimal lockfile so the VERSION logic (not the lockfile rule) is what's under test.
+    fs.writeFileSync(path.join(box, 'package-lock.json'), JSON.stringify({ name: 'fixture', version: version, lockfileVersion: 3, packages: { '': { name: 'fixture', version: version } } }) + '\n');
     fs.writeFileSync(path.join(box, '.github', 'workflows', 'ci.yml'), 'name: x\non:\n  push:\n');
     cp.execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm x', { cwd: box });
     const r = cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'check-version-policy.js')], {
@@ -54,14 +57,14 @@ function runPolicy(version, env) {
 
 // 1. The post-bump pin: 2.0.0 passes with no allow env.
 (function () {
-  const r = runPolicy('2.0.0', { VERSION_BUMP_ALLOW: '' });
-  chk('pin: version 2.0.0 passes with NO VERSION_BUMP_ALLOW', r.status === 0 && r.artifact && r.artifact.ok === true, r.artifact);
+  const r = runPolicy('2.0.1', { VERSION_BUMP_ALLOW: '' });
+  chk('pin: version 2.0.1 passes with NO VERSION_BUMP_ALLOW', r.status === 0 && r.artifact && r.artifact.ok === true, r.artifact);
 })();
 
 // 2. Fail-closed without allow: a foreign version fails.
 (function () {
-  const r = runPolicy('2.0.1', { VERSION_BUMP_ALLOW: '' });
-  chk('fail-closed: 2.0.1 REJECTED without allow', r.status !== 0 && r.artifact && r.artifact.ok === false);
+  const r = runPolicy('2.0.2', { VERSION_BUMP_ALLOW: '' });
+  chk('fail-closed: 2.0.2 REJECTED without allow', r.status !== 0 && r.artifact && r.artifact.ok === false);
   const r2 = runPolicy('2.1.0', { VERSION_BUMP_ALLOW: '' });
   chk('fail-closed: 2.1.0 REJECTED without allow', r2.status !== 0);
   const r3 = runPolicy('2.0.0-rc.1', { VERSION_BUMP_ALLOW: '' });
@@ -71,15 +74,21 @@ function runPolicy(version, env) {
 // 3. No rollback: the PRE-bump value 1.4.0 now fails without an explicit allow.
 (function () {
   const r = runPolicy('1.4.0', { VERSION_BUMP_ALLOW: '' });
-  chk('no-rollback: 1.4.0 REJECTED after the F6 pin moved to 2.0.0', r.status !== 0 && r.artifact && r.artifact.ok === false);
+  chk('no-rollback: 1.4.0 REJECTED after the pin moved to 2.0.1', r.status !== 0 && r.artifact && r.artifact.ok === false);
+})();
+
+// 3b. rollback to the previous public pin (2.0.0) is also rejected
+(function () {
+  const r = runPolicy('2.0.0', { VERSION_BUMP_ALLOW: '' });
+  chk('no-rollback: 2.0.0 REJECTED after the pin moved to 2.0.1', r.status !== 0);
 })();
 
 // 4. Exact-allow-only: an allow admits exactly that version and nothing else.
 (function () {
   const r = runPolicy('3.0.0', { VERSION_BUMP_ALLOW: '3.0.0' });
   chk('allow: future authorized bump 3.0.0 passes ONLY with exact allow', r.status === 0);
-  const r2 = runPolicy('2.0.1', { VERSION_BUMP_ALLOW: '3.0.0' });
-  chk('allow: 2.0.1 still REJECTED when allow=3.0.0 (exact match only)', r2.status !== 0);
+  const r2 = runPolicy('2.0.2', { VERSION_BUMP_ALLOW: '3.0.0' });
+  chk('allow: 2.0.2 still REJECTED when allow=3.0.0 (exact match only)', r2.status !== 0);
   const r3 = runPolicy('3.0.1', { VERSION_BUMP_ALLOW: '3.0.0' });
   chk('allow: 3.0.1 REJECTED when allow=3.0.0 (no prefix/range semantics)', r3.status !== 0);
 })();
@@ -87,7 +96,7 @@ function runPolicy(version, env) {
 // 5. No re-bump / double-bump semantics: allow does not stack — with allow set to the
 //    current pin the pin itself still passes, but an unrelated jump does not.
 (function () {
-  const r = runPolicy('4.0.0', { VERSION_BUMP_ALLOW: '2.0.0' });
+  const r = runPolicy('4.0.0', { VERSION_BUMP_ALLOW: '2.0.1' });
   chk('no-double-bump: 4.0.0 REJECTED even with allow set to the current pin', r.status !== 0);
 })();
 
@@ -102,7 +111,70 @@ function runPolicy(version, env) {
   const state = JSON.parse(fs.readFileSync(path.join(REPO, 'governance', 'r3.0f', 'state.json'), 'utf8'));
   chk('release_executed remains DISABLED at RELEASE_PREPARED', state.enabledCapabilities.indexOf('release_executed') === -1);
   const pkg = JSON.parse(fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'));
-  chk('repo package.json carries exactly the bumped version 2.0.0', pkg.version === '2.0.0');
+  chk('repo package.json carries exactly the bumped version 2.0.1', pkg.version === '2.0.1');
+})();
+
+// 7. H3 lockfile-required policy: an otherwise-valid version FAILS if the lockfile is absent,
+//    and a PR that DELETES the lockfile FAILS.
+(function () {
+  const box = H.acquireTempDir('f6-version-policy-nolock-');
+  try {
+    fs.mkdirSync(path.join(box, 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(box, '.github', 'workflows'), { recursive: true });
+    fs.copyFileSync(SCRIPT, path.join(box, 'scripts', 'check-version-policy.js'));
+    fs.writeFileSync(path.join(box, 'package.json'), JSON.stringify({ name: 'fixture', version: '2.0.0' }) + '\n');
+    fs.writeFileSync(path.join(box, '.github', 'workflows', 'ci.yml'), 'name: x\non:\n  push:\n');
+    cp.execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm x', { cwd: box });
+    const r = cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'check-version-policy.js')], {
+      cwd: box, encoding: 'utf8', env: Object.assign({}, process.env, { ARTIFACT_DIR: path.join(box, 'artifacts'), BASE_SHA: 'HEAD', HEAD_SHA: 'HEAD' }),
+    });
+    let art = null; try { art = JSON.parse(fs.readFileSync(path.join(box, 'artifacts', 'version-policy.json'), 'utf8')); } catch (_) {}
+    chk('H3: correct version but NO lockfile is REJECTED', r.status !== 0 && art && art.ok === false && art.lockfileTracked === false);
+  } finally { H.releaseTempDir(box); }
+})();
+
+// 8. H3 lockfile PR-DELETION: a PR that removes a previously-tracked lockfile is REJECTED even though
+//    HEAD still shows it as tracked at BASE. This exercises lockfileRemovedByPR (--diff-filter=D).
+(function () {
+  const box = H.acquireTempDir('f6-version-policy-del-');
+  try {
+    fs.mkdirSync(path.join(box, 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(box, '.github', 'workflows'), { recursive: true });
+    fs.copyFileSync(SCRIPT, path.join(box, 'scripts', 'check-version-policy.js'));
+    fs.writeFileSync(path.join(box, 'package.json'), JSON.stringify({ name: 'fixture', version: '2.0.0' }) + '\n');
+    fs.writeFileSync(path.join(box, 'package-lock.json'), JSON.stringify({ name: 'fixture', version: '2.0.0', lockfileVersion: 3, packages: { '': { name: 'fixture', version: '2.0.0' } } }) + '\n');
+    fs.writeFileSync(path.join(box, '.github', 'workflows', 'ci.yml'), 'name: x\non:\n  push:\n');
+    // BASE commit HAS the lockfile
+    cp.execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm base', { cwd: box });
+    const baseSha = cp.execSync('git rev-parse HEAD', { cwd: box, encoding: 'utf8' }).trim();
+    // HEAD commit REMOVES it
+    cp.execSync('git rm -q package-lock.json && git -c user.email=t@t -c user.name=t commit -qm remove-lock', { cwd: box });
+    const headSha = cp.execSync('git rev-parse HEAD', { cwd: box, encoding: 'utf8' }).trim();
+    const r = cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'check-version-policy.js')], {
+      cwd: box, encoding: 'utf8', env: Object.assign({}, process.env, { ARTIFACT_DIR: path.join(box, 'artifacts'), BASE_SHA: baseSha, HEAD_SHA: headSha }),
+    });
+    let art = null; try { art = JSON.parse(fs.readFileSync(path.join(box, 'artifacts', 'version-policy.json'), 'utf8')); } catch (_) {}
+    chk('H3: a PR that DELETES the lockfile is REJECTED (lockfileRemovedByPR)', r.status !== 0 && art && art.ok === false && art.lockfileRemovedByPR === true);
+  } finally { H.releaseTempDir(box); }
+})();
+
+// 9. H3 verification-lane existence: deleting ci.yml (the dependency-free lane) is REJECTED.
+(function () {
+  const box = H.acquireTempDir('f6-version-policy-nolane-');
+  try {
+    fs.mkdirSync(path.join(box, 'scripts'), { recursive: true });
+    fs.mkdirSync(path.join(box, '.github', 'workflows'), { recursive: true });
+    fs.copyFileSync(SCRIPT, path.join(box, 'scripts', 'check-version-policy.js'));
+    fs.writeFileSync(path.join(box, 'package.json'), JSON.stringify({ name: 'fixture', version: '2.0.0' }) + '\n');
+    fs.writeFileSync(path.join(box, 'package-lock.json'), JSON.stringify({ name: 'fixture', version: '2.0.0', lockfileVersion: 3, packages: { '': {} } }) + '\n');
+    // NO ci.yml — the verification lane is missing
+    cp.execSync('git init -q && git add -A && git -c user.email=t@t -c user.name=t commit -qm x', { cwd: box });
+    const r = cp.spawnSync(process.execPath, [path.join(box, 'scripts', 'check-version-policy.js')], {
+      cwd: box, encoding: 'utf8', env: Object.assign({}, process.env, { ARTIFACT_DIR: path.join(box, 'artifacts'), BASE_SHA: 'HEAD', HEAD_SHA: 'HEAD' }),
+    });
+    let art = null; try { art = JSON.parse(fs.readFileSync(path.join(box, 'artifacts', 'version-policy.json'), 'utf8')); } catch (_) {}
+    chk('H3: missing ci.yml verification lane is REJECTED', r.status !== 0 && art && art.ok === false && art.verificationLaneExists === false);
+  } finally { H.releaseTempDir(box); }
 })();
 
 console.log('version-bump-policy: ' + passed + ' passed, ' + failed + ' failed');

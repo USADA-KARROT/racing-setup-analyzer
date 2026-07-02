@@ -45,7 +45,11 @@ if (ACTIVATION_ALLOWED) {
 } else {
   chk('mainNav comparisons is deferred R3.0C', R.deriveMainNav().find(n => n.id === 'comparisons').deferred === 'R3.0C');
 }
-chk('caseNav = 11 subviews (R3.0E E5 added experiment_loop + case_timeline)', R.deriveCaseNav().length === 11);
+chk('caseNav = 9 PUBLIC subviews (H5: experiment_loop + case_timeline are deferred and filtered from nav)', R.deriveCaseNav().length === 9);
+chk('H5: deferred subviews are NOT in public case nav', !R.deriveCaseNav().some(n => n.id === 'experiment_loop' || n.id === 'case_timeline'));
+chk('H5: deferred subview ids are NOT legal navigation targets', !R.deriveCaseSubviewIds().includes('experiment_loop') && !R.deriveCaseSubviewIds().includes('case_timeline'));
+chk('H5: the two ids remain in the registry as DEFERRED truth (not deleted)', R.FEATURES.experiment_loop.availability === 'deferred' && R.FEATURES.case_timeline.availability === 'deferred');
+chk('H5: engineer_brief remains publicly navigable (LIVE)', R.deriveCaseNav().some(n => n.id === 'engineer_brief'));
 chk('caseSubviewIds === caseNav ids (no separate whitelist)', JSON.stringify(R.deriveCaseSubviewIds()) === JSON.stringify(R.deriveCaseNav().map(n => n.id)));
 
 // THE ORPHAN FIX: setup_library pane ids now INCLUDE 'predict'

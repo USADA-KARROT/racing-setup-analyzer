@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "program": "PUBLIC_RELEASE_HARDENING",
+  "phase": "H3_REPRODUCIBLE_BUILD",
+  "baseSha": "0de228c9248d00aad8eabb71ae4fe5bc860bb604",
+  "integrationBranch": "release/v2.0.0-public-hardening",
+  "headSha": "36dec765fb1baa79cfcfde14dc9ea9ceda1edba6",
+  "policyFlip": {
+    "from": "dependency-free lane forbade a tracked package-lock.json (scripts/check-version-policy.js + .gitignore)",
+    "to": "a tracked package-lock.json is REQUIRED as the reproducible-build authority; its ABSENCE or PR-deletion is the violation",
+    "rationale": "a public, code-signed binary release must have reproducible dependency resolution and an auditable supply chain",
+    "verificationLanePreserved": "the dependency-free trusted-verification-gate (ci.yml) still installs nothing; the install-free ban is now scoped to that ONE workflow so the separate supply-chain-build lane may run a clean install"
+  },
+  "closes": [
+    "E1 no lockfile / build reproducibility",
+    "F vendored libraries ungoverned",
+    "H3 third-party notices / license audit"
+  ],
+  "artifacts": {
+    "lockfile": {
+      "path": "package-lock.json",
+      "lockfileVersion": 3,
+      "sha256": "29eec8d22bfe9995024aa000cbc715efb5c5063ec5f0347c733e4c0e403748ae"
+    },
+    "sbom": {
+      "path": "supply-chain/sbom.cdx.json",
+      "format": "CycloneDX 1.5",
+      "sha256": "1541608f5811657d4bf85995763312cf40b15cd7b4b1ce78ef114348a53c7065",
+      "components": 419,
+      "note": "CycloneDX 1.5: npm hashes hex-encoded from SRI; bom-ref = unique lockfile path; vendored components carry pkg:generic purls"
+    },
+    "vendorManifest": {
+      "path": "supply-chain/vendor-manifest.json",
+      "sha256": "1cb003ebf9b476162eac57591820dfc0acfa81c955d191f77b6c803781fededb",
+      "libraries": [
+        "alpinejs 3.14.8",
+        "chart.js 4.4.7",
+        "tailwindcss-browser 3.4.17"
+      ]
+    },
+    "buildEnvironment": {
+      "path": "supply-chain/build-environment.json",
+      "sha256": "99a71d6c51a8bb1ce5fe1eff97ecc3378265e1347fbdab64598ecc69f94235a9"
+    },
+    "thirdPartyNotices": {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "sha256": "d40aeae90b755d303254ff204447078bbf8029eac0462ff4d09d4548ba8f143a"
+    }
+  },
+  "pins": {
+    "electron": "33.4.11",
+    "electronBuilder": "25.1.8",
+    "enginesNode": ">=22.0.0",
+    "enginesNpm": ">=10.0.0",
+    "npmCi": "reproduces 416 npm packages; verified locally + in supply-chain-build lane",
+    "buildTarget": "electron-builder --mac --arm64; build.mac.target=[{dmg,arch:[arm64]}]; Windows targets removed (arm64 macOS-only)"
+  },
+  "checks": {
+    "checkSupplyChain": "scripts/check-supply-chain.js (--selftest + real): lockfile v3 + root match, exact devDep pins vs lockfile, engines, vendor hash drift, vendor coverage, npm+vendor license allowlist (permissive-only, no copyleft), SBOM freshness, notices coverage, arm64-only build env",
+    "generateSbom": "scripts/generate-sbom.js (deterministic; --check drift guard)",
+    "tests": "tests/supply-chain.test.js 17/17 (12 fail-closed sandbox cases: missing lockfile, range devDep, vendor hash drift, copyleft license, uncovered vendor file, stale SBOM, missing notices, wrong lockfileVersion, missing engines); version-bump-policy 18/18 (added H3 lockfile-required + real PR-deletion + missing-verification-lane cases) (added arm64 build-config cases)",
+    "ci": "ci.yml F2 step (dependency-free static supply-chain) + NEW .github/workflows/supply-chain-build.yml (npm ci reproducibility + post-install supply-chain governance)"
+  },
+  "licenseAudit": {
+    "npmComponents": 416,
+    "distribution": "permissive-only (MIT/ISC/Apache-2.0/BSD/BlueOak/…); zero copyleft (no GPL/LGPL/AGPL/MPL/EPL/CDDL); fail-closed on any non-allowlisted license",
+    "vendored": "3x MIT"
+  },
+  "vulnerabilityAuditProcedure": "npm advisory DB lookup per vendored library on each version bump (recorded in vendor-manifest.json.vulnerabilityAudit); npm dependency tree audited via the permissive-license allowlist + pinned lockfile",
+  "codexVerdict": {
+    "verdict": "PASS",
+    "verdictRound": 4,
+    "reviewedCandidateSha": "36dec765fb1baa79cfcfde14dc9ea9ceda1edba6",
+    "verdictEvidenceFile": "governance/hardening/codex-evidence/H3/round-4-raw.txt",
+    "verdictEvidenceSha256": "00bde97999db0379e6d048cabd7a743e406c315022abeaf5624d675f0576605c",
+    "totalBlockRounds": 3,
+    "totalDistinctFindings": 12,
+    "rounds": [
+      {
+        "round": 1,
+        "reviewedSha": "e34486b207f91ab51a86ceb8f87a5463b8c8590d",
+        "verdict": "BLOCK",
+        "findings": 8,
+        "evidence": "governance/hardening/codex-evidence/H3/round-1-raw.txt",
+        "evidenceSha256": "c525aa4610f28de661c9aa5d7c44a50c04aba35f9f229bf540f4adde96f7666c"
+      },
+      {
+        "round": 2,
+        "reviewedSha": "e68119c0b26b8be681d5894795a3a3d34eb02e72",
+        "verdict": "BLOCK",
+        "findings": 2,
+        "evidence": "governance/hardening/codex-evidence/H3/round-2-raw.txt",
+        "evidenceSha256": "2e7bda7f19d829c91404e1316579c069b4bbd8573c86cc4c091b5e461778084a"
+      },
+      {
+        "round": 3,
+        "reviewedSha": "700ab8398b68c881d04ce3eee77f6926a72975b8",
+        "verdict": "BLOCK",
+        "findings": 2,
+        "evidence": "governance/hardening/codex-evidence/H3/round-3-raw.txt",
+        "evidenceSha256": "d93cfaee5aea461fbb9cfdf499ecab56f35ffd70a9826a3d4a39f564f0eb2164"
+      },
+      {
+        "round": 4,
+        "reviewedSha": "36dec765fb1baa79cfcfde14dc9ea9ceda1edba6",
+        "verdict": "PASS",
+        "findings": 0,
+        "evidence": "governance/hardening/codex-evidence/H3/round-4-raw.txt",
+        "evidenceSha256": "00bde97999db0379e6d048cabd7a743e406c315022abeaf5624d675f0576605c"
+      }
+    ],
+    "tierDisclosure": "TIER 1 all 4 rounds: raw stdout + prompts archived under governance/hardening/codex-evidence/H3/ with sha256 anchors. All codex launches used < /dev/null."
+  },
+  "note": "H3 keeps the dependency-free verification lane intact and adds a reproducible-install + supply-chain-governance lane. No production runtime code changed. Vendored libraries retained (manifest route), not converted to npm imports."
+}

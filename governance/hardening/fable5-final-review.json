@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "review": "FABLE_5_CLEAN_ROOM_FINAL_REVIEW",
+  "reviewerAuthority": "Fable 5 (Codex reviewer deferred to optional post-release audit per SKYLINE directive 2026-07-02)",
+  "reviewBaseline": "0563f119e2bdfced959b7a808cf292e0f883807f (original main)",
+  "reviewTarget": "5285cfca2bf1a2d15df4334fcad927be6be2ece2 (integration branch = full RC, H1-H6 + Final RC)",
+  "reviewedDelta": "99 files changed, 48671 insertions, 101 deletions",
+  "reviewWorktree": "clean detached worktree at HEAD 5285cfc; fresh npm ci; all batteries re-run from scratch (no reuse of construction logs)",
+  "independence": "6 independent adversarial review lenses (runtime, supply-chain, upgrade, identity, ui-truth, version+boundary) + per-finding adversarial verification, none run by the builder; governance/tests/logs treated as evidence, not authority",
+  "verdict": "PASS",
+  "findings": {
+    "raised": 1,
+    "confirmed": 0,
+    "raisedAndRefuted": [
+      {
+        "id": "LENS-C-01",
+        "severity": "claimed high",
+        "verdict": "REJECTED",
+        "claim": "2.0.1 upgrade/reopen evidence is 2.0.0 relabeled",
+        "refutation": "matrix evidence-log hashes are DISTINCT from the committed 2.0.0 H4-phase logs (no substitution); the H4 harness was version-parameterized at ae1d462 to assert ver==='2.0.1', so a 2.0.0 run would FAIL — the recorded 9/9 could only be a genuine 2.0.1 run. The only true sub-fact (RC logs uncommitted, hash-only) is disclosed for all five entries; NOW addressed by committing the independent clean-room battery logs below."
+      }
+    ]
+  },
+  "cleanRoomBattery": {
+    "npmCi": "PASS (416 packages, electron 33.4.11 / builder 25.1.8)",
+    "fullSuite": "PASS (116 files, exit 0, 0 failures)",
+    "releaseGate": "PASS (12/12)",
+    "dependencyAudit": "PASS (external:0)",
+    "supplyChain": "PASS",
+    "sbomFreshness": "PASS (--check)",
+    "tempLeak": "0",
+    "packagedRuntimeClean": "12/12",
+    "packagedRuntimeExisting": "12/12",
+    "packagedUiTruth": "12/12",
+    "realUpgrade": "9/9",
+    "reopen": "9/9",
+    "appIdentity": "PASS",
+    "signingVerify": "fails=0 (BLOCKED: DEVELOPER_ID_APPLICATION_MISSING, ADHOC_ONLY_NO_DEVELOPER_ID, NOTARY_CREDENTIAL_MISSING, DMG_UNSIGNED — honest, expected for an unsigned preview)",
+    "asarDeterminism": "app.asar sha256 identical across construction + clean-room worktrees (bit-reproducible content layer)",
+    "cleanRoomAsarSha256": "59fe27947c572b4d877fd46fee19fbbf385a09733756b2e06e1e45b8e7392344",
+    "cleanRoomDmgSha256": "91ff0ae9520446f84f3b23ddb3226bee91fa1cd8459770fac8e1a55a79ac90a2",
+    "dmgReproducibilityNote": "the DMG CONTAINER is not bit-reproducible (documented in H3); the app.asar CONTENT layer IS deterministic. A published signed DMG will carry a new hash recorded at publish time."
+  },
+  "committedEvidenceLogs": {
+    "cleanroom-build.txt": "fc950193533587adcee253128df58da4c70fe6c904fe09e2f4909023c6f2633a",
+    "cleanroom-dep.txt": "2d40b9ce453f7fd04248a457a375616f1d01237a1778ea6c3af86bd10f8510b7",
+    "cleanroom-dmg-sha.txt": "2b6a2cb629a24ebcc598545e0d9d9a19fffac0d79fcd0408f911e1ff619f04c7",
+    "cleanroom-gate.txt": "b50ec0b169d6f2f656f4004df7d0f1bd0002f594e099a41b33b770539cb3168a",
+    "cleanroom-reopen.txt": "c80c6efc8b04d4b309c3d8667e86b6492dd449c3447b3b9cf422c51692b9d64a",
+    "cleanroom-rt-clean.txt": "20409d43f81b486ca16b7d44bc5caa649e1ff03ac2450f994e5352622bc42101",
+    "cleanroom-rt-existing.txt": "ced4728dacb4ee86ef7fdc355e622d5991e26c90c3072706d5d3a5d5d6df5460",
+    "cleanroom-sbom.txt": "d6f35bbe594be7c8fa87500c7b844258cd036a202aa13f1940dfc9a5c615b889",
+    "cleanroom-sc.txt": "7ddf52dcb9e5dc9212e495c17a2e444ff10841676f1b22a7e121724ccb7865cb",
+    "cleanroom-suite.txt": "40eaa87348c386551ba01812d472c8c720fc01050d21e1b3f835013a219e9b56",
+    "cleanroom-uitruth.txt": "915e5a7e2263c7bc0f4f39ca208d250b393aa78c08c4a29a99e5edc0080c8e2e",
+    "cleanroom-upgrade.txt": "e218f9aa5c0ca9930593c404735f8533434bd5b48962fd07e71d9aa3743927bf"
+  },
+  "versionConsistency": "2.0.1 across ALL surfaces: package.json, lockfile root, asar package.json, CFBundleShortVersionString, CFBundleVersion, SBOM metadata, DMG filename, CITATION, release-notes-2.0.1, CHANGELOG",
+  "signingTruth": {
+    "signing": "UNSIGNED",
+    "notarization": "NOT_PERFORMED",
+    "stapling": "NOT_PERFORMED",
+    "gatekeeper": "WARNING_EXPECTED_AND_DOCUMENTED",
+    "note": "unsigned Preview by policy; NOT a PASS, NOT a blocker this round; Developer ID + notarization deferred to the commercial stage; install via Finder right-click Open or System Settings per-app allow — never spctl --master-disable"
+  },
+  "releaseBoundary": {
+    "main": "untouched",
+    "v2.0.0_tag": "untouched",
+    "v2.0.1_tag": "none",
+    "draftRelease": "still draft (347825133)",
+    "assets": 0,
+    "deployments": 0,
+    "release_executed": false,
+    "published": false
+  },
+  "codexReview": "DEFERRED_OPTIONAL_POST_RELEASE_AUDIT (not a PASS, not a current blocker)",
+  "licenseStatus": "MIT (PROJECT LICENSE DECISION, SKYLINE 2026-07-02): the project transitioned from UNLICENSED to the MIT License at the final-publish authorization; LICENSE file added, all project-level statements updated; third-party licenses unchanged. (The review above was conducted while the decision was pending — its PASS is unaffected; the MIT transition is covered by the final publish battery.)",
+  "releaseReadiness": "READY_FOR_UNSIGNED_PREVIEW",
+  "remainingBlockers": [
+    "AUTHORIZATION_PUBLISH executing (this directive)"
+  ]
+}

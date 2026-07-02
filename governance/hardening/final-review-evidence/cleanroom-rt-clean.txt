@@ -1,0 +1,13 @@
+  ✓ [f5r-clean] preload loaded (no "Unable to load preload script" in logs)
+  ✓ [f5r-clean] no module-not-found preload crash in logs
+  ✓ [f5r-clean] electronAPI exists
+  ✓ [f5r-clean] electronAPI surface EXACTLY [getAppVersion, platform]
+  ✓ [f5r-clean] electronAPI.platform is a known platform string
+  ✓ [f5r-clean] getAppVersion() === 2.0.1
+  ✓ [f5r-clean] getAppVersion() never fabricates 1.0.0
+  ✓ [f5r-clean] api.getStats().version === 2.0.1 (startup-resolved)
+  ✓ [f5r-clean] getStats().version is never the fabricated 1.0.0
+  ✓ [f5r-clean] page cannot reach ipcRenderer/require/process and bridge has no generic invoke/send
+  ✓ [f5r-clean] spawned binary is still alive (CDP target ownership)
+  ✓ [f5r-clean] port still bound by OUR child PID at end-of-run (lsof)
+H1-RUNTIME(f5r-clean): 12 passed, 0 failed

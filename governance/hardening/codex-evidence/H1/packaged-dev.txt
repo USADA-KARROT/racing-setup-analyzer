@@ -1,0 +1,13 @@
+  ✓ [dev-consistency] preload loaded (no "Unable to load preload script" in logs)
+  ✓ [dev-consistency] no module-not-found preload crash in logs
+  ✓ [dev-consistency] electronAPI exists
+  ✓ [dev-consistency] electronAPI surface EXACTLY [getAppVersion, platform]
+  ✓ [dev-consistency] electronAPI.platform is a known platform string
+  ✓ [dev-consistency] getAppVersion() === 2.0.0
+  ✓ [dev-consistency] getAppVersion() never fabricates 1.0.0
+  ✓ [dev-consistency] api.getStats().version === 2.0.0 (startup-resolved)
+  ✓ [dev-consistency] getStats().version is never the fabricated 1.0.0
+  ✓ [dev-consistency] page cannot reach ipcRenderer/require/process and bridge has no generic invoke/send
+  ✓ [dev-consistency] spawned binary is still alive (CDP target ownership)
+  ✓ [dev-consistency] port still bound by OUR child PID at end-of-run (lsof)
+H1-RUNTIME(dev-consistency): 12 passed, 0 failed

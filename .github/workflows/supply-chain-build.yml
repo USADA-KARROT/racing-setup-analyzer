@@ -1,0 +1,73 @@
+name: supply-chain-build
+
+# H3 — reproducible-install / supply-chain lane.
+# SEPARATE from the dependency-free trusted-verification-gate: this lane DOES install (npm ci) to
+# prove the tracked package-lock.json reproduces the exact dependency tree. It never publishes,
+# tags, releases, signs, or uploads a distributable binary. It uploads only the JSON evidence
+# artifact (same pattern as the trusted-verification-gate). It does not run electron-builder (a full
+# packaged build is a local/manual step in the H-phase evidence, not this gate).
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supply-chain-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  reproducible-install:
+    name: reproducible-install
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout (PR HEAD commit, not the synthetic merge ref)
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        timeout-minutes: 5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Setup Node 22 LTS
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        timeout-minutes: 5
+        with:
+          node-version: '22'
+
+      - name: Reproducible clean install from the lockfile (npm ci)
+        timeout-minutes: 8
+        # npm ci fails closed if package.json and package-lock.json disagree or if the lockfile is
+        # missing — that IS the reproducibility contract. --ignore-scripts avoids running any
+        # dependency lifecycle script during install.
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Prove the installed tree matches the pinned toolchain
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          node -e "const e=require('electron/package.json').version; if(e!=='33.4.11'){console.error('electron '+e+' != 33.4.11');process.exit(1)} console.log('electron '+e)"
+          node -e "const b=require('electron-builder/package.json').version; if(b!=='25.1.8'){console.error('electron-builder '+b+' != 25.1.8');process.exit(1)} console.log('electron-builder '+b)"
+
+      - name: Supply-chain governance (post-install; SBOM freshness, vendor hashes, license allowlist)
+        timeout-minutes: 3
+        env:
+          ARTIFACT_DIR: ${{ github.workspace }}/artifacts
+        run: |
+          node scripts/check-supply-chain.js --selftest
+          node scripts/check-supply-chain.js
+          node scripts/generate-sbom.js --check
+
+      - name: Upload supply-chain evidence
+        if: ${{ !cancelled() }}
+        timeout-minutes: 3
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: supply-chain-evidence
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 90

@@ -5233,12 +5233,13 @@ root.app = app;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 </script>
 
-<!-- R3.0D D5 — Engineer Brief mount target. Hidden by default; the orchestrator publishes
-     state on case/session change, and the UI module renders into this element. The host
-     wiring (case-shell or a downstream wire-in commit) decides whether to reveal it as a
-     case subview pane. Until then, the mount stays inert (no Alpine bindings; no automatic
-     visibility). The render-only UI guarantees no side effects from this DOM presence. -->
+<!-- R3.0D D5 Engineer Brief mount — H5 LIVE wiring. The render-only UI auto-mounts below;
+     visibility is now bound to the case-shell subview state (nav: Cases → Engineer Brief).
+     Static class="hidden" keeps it hidden until Alpine initializes; the object-form :class
+     then drives it from shellSection/caseSubview. Render-only guarantee unchanged. -->
 <div id="r3-0d-engineer-brief-mount" data-r3-0d-engineer-brief-pane class="hidden"
+     :class="{ hidden: !(shellSection==='cases' && caseSubview==='engineer_brief') }"
+     :aria-hidden="(shellSection==='cases' && caseSubview==='engineer_brief') ? 'false' : 'true'"
      aria-hidden="true" role="region" aria-label="Engineer Brief"></div>
 <script>
 // R3.0D D5 auto-mount — idempotent; safe even if R3_0D_EngineerUi is unavailable (e.g., a
