@@ -1,0 +1,1405 @@
+Reading additional input from stdin...
+OpenAI Codex v0.141.0
+--------
+workdir: /Users/SKYLINE/Claude/worktrees/f6-release
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: none
+reasoning summaries: none
+session id: 019f2128-a294-7683-92b2-26bd4f598752
+--------
+user
+You are the adversarial GOVERNANCE auditor for a release-mirror change on this repository. You are reviewing commit 6df6e84536f20bba4bc672f2cedc085c5e295bdf on branch governance/r3.0-v2.0.0-release-mirror (base: main @ 74bdc5c6589644d12816bcbb14f6f2918cce73de). Confirm with `git rev-parse HEAD` before judging.
+
+FACTS (externally true, already executed under explicit user authorization): PR #42 was merged to main = 74bdc5c6. An ANNOTATED tag v2.0.0 exists: tag object 668c002161d4e1e28109b5d55df303f4bd75ef79, peeled commit exactly 74bdc5c6. A DRAFT GitHub Release id 347825133 exists: draft=true, published_at=null, prerelease=false, assets=[] (zero). NOTHING is published; no DMG uploaded; no deployment. The user's semantic ruling: release_executed=true means ONLY an actually-PUBLISHED GitHub Release (draft=false + non-null publishedAt); a tag alone or a draft Release alone must never enable it.
+
+THIS PR claims to be a governance-only mirror of those facts. Review `git diff 74bdc5c6..HEAD` plus any file. Judge:
+
+1. DRAFT-vs-PUBLISHED confusion: does ANY changed line (JSON fields, notes, validator messages, test names) treat the draft Release as published, released, available, or distributed? The mirror must be impossible to misread as a published release.
+2. release_executed: verify it is NOT enabled anywhere (governance/r3.0f/state.json enabledCapabilities; F6.json releaseRecord.releaseExecuted; train.json; any test fixture that would legitimize it prematurely). Verify the semantic ruling is recorded faithfully in capabilities.json and schema.json releaseStages.
+3. assets/dmgUploaded coherence: releaseRecord says assets=[] and dmgUploaded=false — is that internally consistent, and do the new validator rules R3F_DMG_FLAG_WITHOUT_ASSET / R3F_DMG_FLAG_NOT_FALSE_ON_EMPTY_ASSETS actually enforce both directions fail-closed (test them mentally against adversarial inputs: dmgUploaded=true with assets missing entirely; assets=[{name:'x.txt'}]; assets=['app.dmg'] string entries)?
+4. tag object vs peeled commit: F6.json must record BOTH tagObjectSha (668c0021…) and tagTarget (74bdc5c6…) without conflating them; the R3F_TAG_NOT_ANNOTATED rule must reject a record where tagObjectSha === tagTarget (lightweight-tag signature). Check the recorded SHAs against the FACTS above character-for-character.
+5. tag target vs release main SHA: verify releaseRecord.tagTarget === releaseRecord.mainMergeSha === 74bdc5c6589644d12816bcbb14f6f2918cce73de and the R3F_TAG_TARGET_MISMATCH rule fails when they diverge.
+6. Draft URL handling: verify NO field records the draft's untagged URL as if it were a public release URL; the urlNote approach must keep the draft-only nature explicit.
+7. Schema expressiveness: does schema.json releaseStages cleanly distinguish prepared / tagged+draft / published, is the order monotonic, and is releaseExecutedRequiresStage=RELEASE_PUBLISHED enforced by a validator rule (not just documented)?
+8. Monotonic publish path: from the current mirrored state, can a future publish advance by ONLY (a) releaseStage -> RELEASE_PUBLISHED, (b) githubRelease.draft=false/published=true/publishedAt=<ts>, (c) releaseRecord.releaseExecuted=true, (d) state enabledCapabilities += release_executed — with ZERO edits to any already-recorded evidence (tag SHAs, release id, historical fields)? Verify the mirror-3 test scenario proves exactly this and that no validator rule would force a history rewrite.
+9. Scope discipline: the diff must touch ONLY governance/r3.0f/{schema,capabilities,state}.json, governance/r3.0f/checkpoints/F6.json, scripts/check-r3-0-train.js, tests/r3-0-train.test.js. Any change to package.json, application source, release notes, CHANGELOG, README, build config is a defect.
+10. Fail-closed quality of the 8 new validator rules and 12 test scenarios: do the rules default to FAIL on missing/malformed fields rather than silently passing (e.g., releaseStage present but stages list unreadable; releaseRecord missing while stage says TAGGED_DRAFT; publishedAt empty string)? Identify any bypass where a crafted record slips through.
+
+Report findings as MIRROR-R6-NN with file:line evidence. If everything holds output exactly "VERDICT: PASS", else "VERDICT: BLOCK" with findings. Judge what exists; no out-of-scope enhancements.
+
+ROUND-2 ADDENDUM — this is round 2. Round 1 (on dbf2e28d) found: MIRROR-R1-01 mirror-3 published without advancing githubRelease.state (validator accepted the contradictory record); MIRROR-R1-02 missing releaseStage / unreadable releaseStages.order silently skipped validation; MIRROR-R1-03 bare-string asset entries satisfied the dmg corroboration; MIRROR-R1-04 any nonempty string (incl. whitespace) counted as publishedAt. All four closed in 10d0aa6a: R3F_RELEASE_STATE_FIELD_MISMATCH + state folded into the published predicate; R3F_RELEASE_STAGES_SCHEMA_MISSING + R3F_RELEASE_STAGE_MISSING fail-closed; R3F_RELEASE_ASSETS_MALFORMED with {name:string}-object-only assets; isIsoTs ISO-8601 + Date.parse check. Tests mirror-13..17 added (51 checks). VERIFY the closures are real (re-attack each one), then re-judge all 10 items on the current SHA.
+
+ROUND-3 ADDENDUM — this is round 3. Round 2 (on 10d0aa6a) found: MIRROR-R2-01 the claimed four-field publish path contradicted the implementation (state must also advance, so the declared field set was incomplete); MIRROR-R2-02 missing/non-array githubRelease.assets silently skipped the asset corroboration. Both closed in cacee2e4: schema.json releaseStages.publishForwardFields now EXHAUSTIVELY declares the seven forward-only publish-mirror fields (including githubRelease.state advancing DRAFT->PUBLISHED in lockstep — a state advance, not a history rewrite) and mirror-3 documents its edit set as exactly that declared set; R3F_RELEASE_ASSETS_MISSING now fails any recorded Release whose assets is missing or not an array (tests mirror-18/19, 53 checks). For item 8, judge the monotonic publish path against the DECLARED publishForwardFields set (not the earlier four-field phrasing). VERIFY both closures by re-attack, then re-judge all 10 items on the current SHA.
+
+ROUND-4 ADDENDUM — this is round 4. Round 3 (on cacee2e4) found: MIRROR-R3-01 deleting githubRelease.state made stateFieldOk default true, bypassing the mandatory DRAFT->PUBLISHED advance; MIRROR-R3-02 Date.parse accepted rollover dates (2026-02-30) as publishedAt. Both closed in 785701cb: R3F_RELEASE_STATE_FIELD_MISSING makes state mandatory on any recorded Release and stateFieldOk is now strictly derived (absence => false => published=false); isIsoTs round-trips all six calendar components through Date.UTC and rejects rollover. Tests mirror-20/21 (55 checks). VERIFY both closures by re-attack, then re-judge all 10 items on the current SHA.
+
+ROUND-5 ADDENDUM — this is round 5. Round 4 (on 785701cb) found: MIRROR-R4-01 isIsoTs accepted absurd offsets (+99:99); MIRROR-R4-02 RELEASE_TAGGED_DRAFT accepted published evidence (stage lag); MIRROR-R4-03 releaseExecutedRequiresStage was never read (hardcoded RELEASE_PUBLISHED); MIRROR-R4-04 the F6.json note contradicted the seven-field publishForwardFields set. All four closed in d750bf2b: offset range locked to +/-14:00; TAGGED_DRAFT-with-published-evidence fails R3F_RELEASE_STAGE_EVIDENCE_MISMATCH; releaseExecutedRequiresStage is read+validated (must be the FINAL stage; R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID) and the executed check uses the validated value; the note now cites publishForwardFields. Tests mirror-22..24 (59 checks). VERIFY the closures by re-attack, then re-judge all 10 items on the current SHA.
+
+ROUND-6 ADDENDUM — this is round 6. Round 5 (on d750bf2b) found: MIRROR-R5-01 the offset regex admitted +14:01..+14:59 beyond the +/-14:00 cap; MIRROR-R5-02 a crafted schema could rename the terminal stage and enable release_executed because the validator never pinned the canonical order. Both closed in 6df6e845: the offset alternation is now ((0d|1[0-3]):[0-5]d|14:00); the canonical order PREPARED->TAGGED_DRAFT->PUBLISHED is hard-pinned (R3F_RELEASE_STAGES_ORDER_DRIFT) and releaseExecutedRequiresStage must be exactly RELEASE_PUBLISHED as the canonical terminal (rule-invalid otherwise), with the executed check keyed to the validated rule. Tests mirror-25 (incl. +14:00-legal PASS-path) and mirror-26 (62 checks). VERIFY the closures by re-attack, then re-judge all 10 items on the current SHA.
+codex
+I’ll confirm the checked-out commit, inspect the exact base-to-HEAD diff and validator/tests, then run the relevant test suite.
+exec
+/bin/bash -lc 'git rev-parse HEAD && git status --short && git diff --name-only 74bdc5c6589644d12816bcbb14f6f2918cce73de..HEAD && git diff --stat 74bdc5c6589644d12816bcbb14f6f2918cce73de..HEAD' in /Users/SKYLINE/Claude/worktrees/f6-release
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-5TK43A4J' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-opiOamJP' (errno=Operation not permitted)
+6df6e84536f20bba4bc672f2cedc085c5e295bdf
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-L55mp3XZ' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-gISf9pRq' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-qHwfZXwL' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-qSkNrkfx' (errno=Operation not permitted)
+governance/r3.0f/capabilities.json
+governance/r3.0f/checkpoints/F6.json
+governance/r3.0f/schema.json
+governance/r3.0f/state.json
+scripts/check-r3-0-train.js
+tests/r3-0-train.test.js
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-jKMhFjVm' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-oEHljLvY' (errno=Operation not permitted)
+ governance/r3.0f/capabilities.json   |   2 +-
+ governance/r3.0f/checkpoints/F6.json |  30 ++++-
+ governance/r3.0f/schema.json         |   9 ++
+ governance/r3.0f/state.json          |   2 +-
+ scripts/check-r3-0-train.js          |  65 +++++++++
+ tests/r3-0-train.test.js             | 247 +++++++++++++++++++++++++++++++++++
+ 6 files changed, 346 insertions(+), 9 deletions(-)
+
+exec
+/bin/bash -lc 'git diff --unified=80 74bdc5c6589644d12816bcbb14f6f2918cce73de..HEAD -- governance/r3.0f/capabilities.json governance/r3.0f/checkpoints/F6.json governance/r3.0f/schema.json governance/r3.0f/state.json scripts/check-r3-0-train.js tests/r3-0-train.test.js' in /Users/SKYLINE/Claude/worktrees/f6-release
+ succeeded in 0ms:
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-yO3doGtJ' (errno=Operation not permitted)
+git: warning: confstr() failed with code 5: couldn't get path of DARWIN_USER_TEMP_DIR; using /tmp instead
+git: error: couldn't create cache file '/tmp/xcrun_db-vY09Rp9N' (errno=Operation not permitted)
+diff --git a/governance/r3.0f/capabilities.json b/governance/r3.0f/capabilities.json
+index e237b83..316e796 100644
+--- a/governance/r3.0f/capabilities.json
++++ b/governance/r3.0f/capabilities.json
+@@ -1,43 +1,43 @@
+ {
+   "schemaVersion": 1,
+   "program": "R3.0F",
+   "title": "R3.0F Capability Ledger",
+   "note": "Defines each capability the R3.0F (final) phase of the Integrated Delivery Train may eventually enable, its kind, and the earliest checkpoint at which it may be unlocked. A capability being DEFINED here does NOT mean it is ENABLED. Enablement is governed by governance/r3.0f/state.json (enabledCapabilities). F0 only defines the universe; no production capability is enabled at F0. release_executed is the only capability tied to the actual semver bump + tag/release creation.",
+   "capabilities": {
+     "governance_bootstrap_present": {
+       "kind": "governance",
+       "unlockFloor": "F0_BOOTSTRAP",
+       "description": "R3.0F Integrated Delivery Governance scaffold present: schema, state, capabilities, checkpoint-manifest schema, and integration with the train-level validators."
+     },
+     "migration_engine_present": {
+       "kind": "production",
+       "unlockFloor": "F1_MIGRATION_ENGINE",
+       "description": "Unified schema migration engine + per-store migrators (R2 export / R3 case / session / comparison [R3.0C] / experiment / outcome / hypothesis / follow-up). Old readable, future fail-closed, deterministic, no silent drop, backup + rollback. MUST NOT alter the frozen R3.0B case-record schema; migrators read/write via store APIs only."
+     },
+     "e2e_automation_present": {
+       "kind": "production",
+       "unlockFloor": "F2_E2E_AUTOMATION",
+       "description": "8 E2E flow automation (new user / real telemetry / measured / reference lap / VRE / setup experiment / driver experiment / export-import) for browser + Electron. Zero console error; no stale UI."
+     },
+     "quality_hardening_present": {
+       "kind": "production",
+       "unlockFloor": "F3_QUALITY_HARDENING",
+       "description": "Quality bar: no console error / no unhandled rejection / no stale UI; keyboard nav; desktop responsive; large library; storage failure handled; no raw arrays in view model / Alpine reactive tree; busy states; destructive confirmations."
+     },
+     "documentation_present": {
+       "kind": "production",
+       "unlockFloor": "F4_DOCUMENTATION",
+       "description": "README / positioning / capability-map / r3-architecture / r3-user-workflow / r3-data-and-privacy / r3-credibility-model / r3-experiment-loop / CHANGELOG — all consistent with shipped surface. No 'professional validated' / 'AI replaced race engineer' claims."
+     },
+     "release_gate_present": {
+       "kind": "production",
+       "unlockFloor": "F5_RELEASE_GATE",
+       "description": "12-condition release gate script (preflight, tests, E2E, frozen 0, preset 501, i18n parity, reachability, no orphans, Electron build OK, release notes drafted, CHANGELOG, tag policy). MUST run fail-closed."
+     },
+     "release_executed": {
+       "kind": "activation",
+       "unlockFloor": "F6_RELEASE",
+-      "description": "Final activation: package.json version 1.4.0 → 2.0.0 (single bump); the R3.0 Integrated Delivery Train Draft PR is merged; tag v2.0.0 and the corresponding GitHub Release are created AFTER merge + the new main CI PASS. release_executed=true on the post-merge state.json mirror records that this final activation completed; in the train branch itself this capability remains disabled until F6 checkpoint is staged."
++      "description": "Final activation. SEMANTIC RULING (SKYLINE, 2026-07-02): release_executed=true means ONLY that the v2.0.0 GitHub Release has actually been PUBLISHED (draft=false, publishedAt non-null). Creating the annotated tag does NOT enable it; creating a DRAFT Release does NOT enable it. Preconditions remain: single 1.4.0->2.0.0 bump merged to main via the F6 PR + new main CI PASS + tag v2.0.0 pointing at the post-merge main SHA. The enabling change itself lands only on a post-publish governance mirror under separate explicit authorization."
+     }
+   }
+ }
+diff --git a/governance/r3.0f/checkpoints/F6.json b/governance/r3.0f/checkpoints/F6.json
+index 5b7859e..2ab7d06 100644
+--- a/governance/r3.0f/checkpoints/F6.json
++++ b/governance/r3.0f/checkpoints/F6.json
+@@ -1,85 +1,85 @@
+ {
+   "schemaVersion": 1,
+   "program": "R3.0F",
+   "checkpoint": "F6_RELEASE",
+-  "releaseStage": "RELEASE_PREPARED",
++  "releaseStage": "RELEASE_TAGGED_DRAFT",
+   "baseSha": "0711e74a5583b65c1d7426aa9e61f143fe23a773",
+   "headSha": "2bec6752a765541d03dc9f5967242e1e780aa116",
+   "previousCheckpoint": "F5_RELEASE_GATE",
+   "shaSeparation": "baseSha = the R3.0 Train merge commit on main (PR #16). headSha is stamped at the F6 release-candidate SHA that Codex reviews.",
+   "authorizedPaths": [
+     {
+       "path": "renderer/js/r3-0f-migration-engine.js",
+       "capability": "migration_engine_present"
+     },
+     {
+       "path": "tests/e2e/helpers/flow-harness.js",
+       "capability": "e2e_automation_present"
+     },
+     {
+       "path": "tests/e2e/flow-01-new-user.test.js",
+       "capability": "e2e_automation_present"
+     },
+     {
+       "path": "tests/e2e/flow-02-real-telemetry.test.js",
+       "capability": "e2e_automation_present"
+     },
+     {
+       "path": "tests/e2e/flow-03-measured.test.js",
+       "capability": "e2e_automation_present"
+     },
+     {
+       "path": "tests/e2e/flow-04-reference-lap.test.js",
+       "capability": "e2e_automation_present"
+     },
+     {
+       "path": "tests/e2e/flow-05-vre.test.js",
+       "capability": "e2e_automation_present"
+     },
+     {
+       "path": "tests/e2e/flow-06-setup-experiment.test.js",
+       "capability": "e2e_automation_present"
+     },
+     {
+       "path": "tests/e2e/flow-07-driver-experiment.test.js",
+       "capability": "e2e_automation_present"
+     },
+     {
+       "path": "tests/e2e/flow-08-export-import.test.js",
+       "capability": "e2e_automation_present"
+     },
+     {
+       "path": "tests/e2e/flow-09-electron-smoke.test.js",
+       "capability": "e2e_automation_present"
+     },
+     {
+       "path": "tests/e2e/hardening-01-electron-boundary.test.js",
+       "capability": "quality_hardening_present"
+     },
+     {
+       "path": "tests/e2e/hardening-02-storage-failure.test.js",
+       "capability": "quality_hardening_present"
+     },
+     {
+       "path": "tests/e2e/hardening-03-no-stale-ui.test.js",
+       "capability": "quality_hardening_present"
+     },
+     {
+       "path": "tests/e2e/hardening-04-large-library.test.js",
+       "capability": "quality_hardening_present"
+     },
+     {
+       "path": "tests/e2e/hardening-05-xss-injection.test.js",
+       "capability": "quality_hardening_present"
+     },
+     {
+       "path": "tests/e2e/hardening-06-supply-chain.test.js",
+       "capability": "quality_hardening_present"
+     },
+     {
+       "path": "docs/r3-architecture.md",
+       "capability": "documentation_present"
+     },
+     {
+       "path": "docs/r3-user-workflow.md",
+       "capability": "documentation_present"
+@@ -156,96 +156,112 @@
+     "warnings": [
+       "default Electron icon (no custom icon declared — disclosed)",
+       "skipped macOS code signing (0 identities — disclosed; no notarization)"
+     ],
+     "packageAudit": {
+       "asarPackageVersion": "2.0.0",
+       "secretScan": "PASS — no keys/tokens/credentials/private paths in the asar contents",
+       "contents": "app.asar carries main.js/preload.js/renderer/** + package.json only; 15 packaged-but-not-loaded renderer modules disclosed in release notes"
+     }
+   },
+   "smokeEvidence": {
+     "method": "REAL packaged binary launched with --remote-debugging-port; renderer-level assertions over CDP (Node built-in WebSocket); production CaseStore over real IndexedDB",
+     "isolationNote": "macOS Electron ignores a $HOME override for userData (always ~/Library/Application Support/racing-setup-analyzer). Isolation was achieved EXTERNALLY: the real profile was moved aside before the clean phase and restored afterward; smoke-created data was fully removed (verified).",
+     "bootSmoke": "PASS — page target, packaged index.html, document.title, shell nav, Comparisons pane node, D5 Engineer Brief mount present AND still hidden/inert, zero missing dynamic i18n codes",
+     "cleanInstallSmoke": "PASS 10/10 — on a freshly created profile, production CaseStore.create over real IndexedDB persisted a schema-v1 record (SEEDED case reopened with matching metadata)",
+     "upgradeSmoke": "PARTIAL (disclosed) — relaunch on the same profile: seeded case SURVIVED restart, exactly one record (no duplication), schemaVersion 1 read back unchanged via the per-read migration path. PARTIAL because the fixture was seeded by the 2.0.0 binary itself (same frozen schema v1), not by a real 1.4.0-binary-produced userData; future-schema fail-closed behavior is covered by Node-level suites (case-store CANNOT_OVERWRITE_FUTURE + migration tests), not by this smoke.",
+     "findings": [
+       "PRE-EXISTING DEFECT (since the v1.0.0 initial commit, NOT an F6 regression): Electron's default-sandboxed preload cannot require('./package.json'); the preload script fails to load ('Unable to load preload script' + 'module not found: ./package.json'), so window.electronAPI is NEVER exposed in the packaged app; the renderer's typeof-guard fallback masks it (version string falls back to '1.0.0'). Confirmed in all smoke runs; disclosed in release notes Known limitations; fix deferred (production change outside the F6 authorized scope).",
+       "One STORAGE_UNAVAILABLE incident during smoke development was environmental (LevelDB profile lock from an earlier debug instance / world-writable temp profile attempt), not an app defect: reproduced clean on a fresh profile with 10/10 + 11/11 passes."
+     ]
+   },
+   "workflowRunId": null,
+   "artifactId": null,
+   "artifactBoundSha": null,
+   "codexVerdict": {
+     "verdict": "PASS",
+     "verdictRound": 3,
+     "reviewedCandidateSha": "2bec6752a765541d03dc9f5967242e1e780aa116",
+     "verdictEvidenceFile": "governance/r3.0f/codex-checkpoint-evidence/F6/round-3-2bec675-PASS.raw.txt",
+     "verdictEvidenceSha256": "15aadb043d308f056091d9294f80c0b76701cc4045af67ea01cce7f51a2020b7",
+     "totalBlockRounds": 2,
+     "totalDistinctFindings": 4,
+     "rounds": [
+       {
+         "round": 1,
+         "reviewedSha": "24decc20c012fbfbfbad580a74410ba1f561b458",
+         "verdict": "BLOCK",
+         "findings": 3,
+         "closures": [
+           "F6-R1-01 package.json change-count claims corrected (version bump + authorized test-script wiring)",
+           "F6-R1-02 release-gate conditions 10/11 locked to finalized-only document forms (test synced)",
+           "F6-R1-03 stale release-notes references fixed (finalized CHANGELOG heading; wrong item-5 pointer removed)"
+         ],
+         "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6/round-1-24decc2-BLOCK.raw.txt",
+         "evidenceSha256": "0966945358df545ac38b0dd0e4f6c400a896de2125cb0dc5a1614054063b1301"
+       },
+       {
+         "round": 2,
+         "reviewedSha": "37fcdb871e58d06b62f2afdc7b7131fef7856590",
+         "verdict": "BLOCK",
+         "findings": 1,
+         "closures": [
+           "F6-R2-01 README License/contributing sections (en/zh-TW/ja) said 'MIT-spirit' contradicting UNLICENSED — all three languages corrected to UNLICENSED/all-rights-reserved with the license decision explicitly deferred"
+         ],
+         "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6/round-2-37fcdb8-BLOCK.raw.txt",
+         "evidenceSha256": "664af4c07a27b8c82b4af118323434508d42b4fd7346e54e423c0a4b88a0a805"
+       },
+       {
+         "round": 3,
+         "reviewedSha": "2bec6752a765541d03dc9f5967242e1e780aa116",
+         "verdict": "PASS",
+         "findings": 0,
+         "evidence": "governance/r3.0f/codex-checkpoint-evidence/F6/round-3-2bec675-PASS.raw.txt",
+         "evidenceSha256": "15aadb043d308f056091d9294f80c0b76701cc4045af67ea01cce7f51a2020b7"
+       }
+     ],
+     "tierDisclosure": "TIER 1 for all 3 rounds (raw stdout archived + sha256-anchored; prompts archived alongside). One round-3 launch attempt stalled pre-review (codex waited on a never-EOF stdin; zero review output; process killed, snapshot archived as round-3-STALLED-ATTEMPT-not-counted.raw.txt) — NOT counted as a round per the external-blocker rule; the counted round 3 ran with stdin explicitly closed."
+   },
+   "packageVersion": "2.0.0",
+   "createdAt": null,
+   "status": "pending",
+   "governanceChanged": true,
+   "crossPhaseGate": {
+     "r3eCheckpoint": "E5_ACTIVATION",
+     "requiredFor": "F6_RELEASE",
+     "satisfied": true,
+     "note": "F1..F5 complete and merged; Train merged to main at 0711e74a with post-merge CI PASS (run 28560701177) and clean-worktree local verification (110 files / 10,790 assertions / gate 12/12 / evidence hashes matched)."
+   },
+   "r3bCaseRecordSchemaUntouched": true,
+   "releaseRecord": {
+-    "tag": null,
+-    "tagTarget": null,
+-    "githubRelease": null,
+-    "dmgUploaded": null,
+-    "note": "Intentionally empty at RELEASE_PREPARED: no tag, no GitHub Release, no DMG distribution exists. Populated only by the post-release governance update after separate explicit authorizations."
++    "tag": "v2.0.0",
++    "tagType": "annotated",
++    "tagObjectSha": "668c002161d4e1e28109b5d55df303f4bd75ef79",
++    "tagTarget": "74bdc5c6589644d12816bcbb14f6f2918cce73de",
++    "mainMergeSha": "74bdc5c6589644d12816bcbb14f6f2918cce73de",
++    "tagMessage": "Racing Setup Analyzer v2.0.0",
++    "githubRelease": {
++      "id": 347825133,
++      "state": "DRAFT",
++      "draft": true,
++      "published": false,
++      "publishedAt": null,
++      "prerelease": false,
++      "tagName": "v2.0.0",
++      "assets": [],
++      "urlNote": "Draft-only URL (GitHub renders drafts under an untagged-… path visible only to repo collaborators); intentionally NOT recorded as a public release URL because none exists."
++    },
++    "dmgUploaded": false,
++    "deploymentExecuted": false,
++    "releaseExecuted": false,
++    "note": "RELEASE_TAGGED_DRAFT mirror (2026-07-02, AUTHORIZATION B + C2): annotated tag v2.0.0 (object 668c0021) pushed, peeled commit exactly the PR #42 merge commit 74bdc5c6 (verified via ls-remote peel + local rev-parse + GitHub API tag object). Draft GitHub Release id 347825133 created with zero assets; NOT published. Per the semantic ruling, release_executed stays false until an actual publish under separate explicit authorization; the future publish mirror changes exactly the seven forward-only fields declared in schema.json releaseStages.publishForwardFields (stage, githubRelease.state/draft/published/publishedAt, record releaseExecuted, capability) — every recorded evidence field (tag SHAs, release id, mainMergeSha) stays immutable; no history rewrite."
+   },
+-  "note": "R3.0F F6_RELEASE checkpoint at the RELEASE_PREPARED stage: version bump staged, documents finalized to release-candidate status, release_executed still disabled, tag/Release/deployment absent. main remains at the Train merge commit 0711e74a until the F6 PR is merged under AUTHORIZATION A.",
++  "note": "R3.0F F6_RELEASE checkpoint at the RELEASE_TAGGED_DRAFT stage: PR #42 merged to main (74bdc5c6), annotated tag v2.0.0 pushed (peeled = the merge commit), DRAFT GitHub Release 347825133 created with no assets. NOTHING is published or distributed: no public Release, no DMG upload, no deployment, no signing. release_executed remains disabled per the published-only semantic ruling recorded in capabilities.json and schema.json releaseStages.",
+   "frozenDiff": null,
+   "productionDiff": null,
+   "runtimeConsumerCount": null,
+   "featureRegistryState": {
+     "expectedDeferredIds": [],
+     "expectedRendererAdapter": false,
+     "note": "F6 does NOT touch the feature registry. Actual registry state carried into 2.0.0: case_comparison/reference_lap/corner_delta activated at C8_ACTIVATION (Comparisons pane live); engineer_brief/experiment_loop/case_timeline are nav-live with 'available_conditional' data-gates but their pane content is not wired into renderer/index.html (nav nodes only — disclosed in release notes Known limitations item 1)."
+   }
+ }
+diff --git a/governance/r3.0f/schema.json b/governance/r3.0f/schema.json
+index fbd3b3f..54132d7 100644
+--- a/governance/r3.0f/schema.json
++++ b/governance/r3.0f/schema.json
+@@ -1,76 +1,85 @@
+ {
+   "schemaVersion": 1,
+   "program": "R3.0F",
+   "title": "R3.0F Product Hardening, Migration & Release — schema",
+   "note": "Defines the legal universe of checkpoints, capabilities, transitions, and authorized-path rules for the R3.0F (final) phase of the R3.0 Integrated Delivery Train. F0 establishes the schema; F1..F6 are NOT yet authorized — they describe future intent so the validator can refuse premature activation. R3.0F depends on R3.0E completing all the way to E5_ACTIVATION before any non-bootstrap F checkpoint may advance — that cross-phase rule is enforced by scripts/check-r3-0-train.js. Per SKYLINE ruling: NO intermediate release; the R3.0 Integrated Delivery Train merges once at F6_RELEASE with package version 2.0.0 and tag v2.0.0 created AFTER merge + new main CI PASS. F6 advancement permits exactly one package.json version bump (1.4.0 → 2.0.0).",
+   "checkpoints": [
+     "F0_BOOTSTRAP",
+     "F1_MIGRATION_ENGINE",
+     "F2_E2E_AUTOMATION",
+     "F3_QUALITY_HARDENING",
+     "F4_DOCUMENTATION",
+     "F5_RELEASE_GATE",
+     "F6_RELEASE"
+   ],
+   "transitions": {
+     "F0_BOOTSTRAP": ["F1_MIGRATION_ENGINE"],
+     "F1_MIGRATION_ENGINE": ["F2_E2E_AUTOMATION"],
+     "F2_E2E_AUTOMATION": ["F3_QUALITY_HARDENING"],
+     "F3_QUALITY_HARDENING": ["F4_DOCUMENTATION"],
+     "F4_DOCUMENTATION": ["F5_RELEASE_GATE"],
+     "F5_RELEASE_GATE": ["F6_RELEASE"],
+     "F6_RELEASE": []
+   },
+   "checkpointOrder": [
+     "F0_BOOTSTRAP",
+     "F1_MIGRATION_ENGINE",
+     "F2_E2E_AUTOMATION",
+     "F3_QUALITY_HARDENING",
+     "F4_DOCUMENTATION",
+     "F5_RELEASE_GATE",
+     "F6_RELEASE"
+   ],
+   "capabilities": [
+     "governance_bootstrap_present",
+     "migration_engine_present",
+     "e2e_automation_present",
+     "quality_hardening_present",
+     "documentation_present",
+     "release_gate_present",
+     "release_executed"
+   ],
+   "governanceCapabilities": [
+     "governance_bootstrap_present"
+   ],
+   "productionCapabilities": [
+     "migration_engine_present",
+     "e2e_automation_present",
+     "quality_hardening_present",
+     "documentation_present",
+     "release_gate_present",
+     "release_executed"
+   ],
+   "capabilityUnlockFloor": {
+     "governance_bootstrap_present": "F0_BOOTSTRAP",
+     "migration_engine_present": "F1_MIGRATION_ENGINE",
+     "e2e_automation_present": "F2_E2E_AUTOMATION",
+     "quality_hardening_present": "F3_QUALITY_HARDENING",
+     "documentation_present": "F4_DOCUMENTATION",
+     "release_gate_present": "F5_RELEASE_GATE",
+     "release_executed": "F6_RELEASE"
+   },
+   "runtimeConsumerCheckpoint": "F1_MIGRATION_ENGINE",
+   "algorithmCheckpoint": "F1_MIGRATION_ENGINE",
+   "uiCheckpoint": "F3_QUALITY_HARDENING",
+   "featureRegistryActivationCheckpoint": "F6_RELEASE",
++  "releaseStages": {
++    "note": "Monotonic F6_RELEASE progression recorded in checkpoints/F6.json releaseStage. Forward-only: RELEASE_PREPARED (bump staged; no tag/Release) -> RELEASE_TAGGED_DRAFT (annotated tag pushed AND/OR a DRAFT GitHub Release exists; nothing published, no assets) -> RELEASE_PUBLISHED (the GitHub Release is actually published: draft=false with a non-null publishedAt). Semantic ruling (SKYLINE, 2026-07-02): the release_executed capability means PUBLISHED ONLY — a tag alone or a draft Release alone must NOT enable it. Later stages never rewrite earlier evidence.",
++    "order": ["RELEASE_PREPARED", "RELEASE_TAGGED_DRAFT", "RELEASE_PUBLISHED"],
++    "releaseExecutedRequiresStage": "RELEASE_PUBLISHED",
++    "publishForwardFields": {
++      "note": "The COMPLETE, exhaustive field set a future publish mirror may change — every one is a forward-only state advance; everything else in releaseRecord (tag SHAs, release id, tagMessage, mainMergeSha, historical evidence) is immutable. The state field advances DRAFT -> PUBLISHED in lockstep with draft/published (enforced by R3F_RELEASE_STATE_FIELD_MISMATCH).",
++      "fields": ["releaseStage", "releaseRecord.githubRelease.state", "releaseRecord.githubRelease.draft", "releaseRecord.githubRelease.published", "releaseRecord.githubRelease.publishedAt", "releaseRecord.releaseExecuted", "state.json enabledCapabilities += release_executed"]
++    }
++  },
+   "bootstrapCheckpoint": "F0_BOOTSTRAP",
+   "contractPrefix": "contracts/r3.0f",
+   "authorizedPathRules": {
+     "mustBeRepoRelative": true,
+     "mustBeExact": true,
+     "forbiddenSubstrings": ["..", "*", "?", "["],
+     "forbiddenPrefixes": ["/"],
+     "allowedRoots": ["renderer/js/", "contracts/r3.0f/", "main.js", "preload.js", "renderer/index.html", "renderer/css/", "scripts/migrators/", "docs/", "tests/e2e/", "package.json", "CHANGELOG.md"],
+     "note": "R3.0F production authorization is by exact repo-relative path only. F6_RELEASE may authorize package.json for a single 1.4.0 → 2.0.0 version bump. No wildcards/regex/globs. The frozen R3.0B persistence schema MUST NOT be modified; F1 migration engine reads/writes via migration scripts only."
+   }
+ }
+diff --git a/governance/r3.0f/state.json b/governance/r3.0f/state.json
+index d12478e..c5eeeb0 100644
+--- a/governance/r3.0f/state.json
++++ b/governance/r3.0f/state.json
+@@ -39,82 +39,82 @@
+       "path": "tests/e2e/flow-07-driver-experiment.test.js",
+       "capability": "e2e_automation_present"
+     },
+     {
+       "path": "tests/e2e/flow-08-export-import.test.js",
+       "capability": "e2e_automation_present"
+     },
+     {
+       "path": "tests/e2e/flow-09-electron-smoke.test.js",
+       "capability": "e2e_automation_present"
+     },
+     {
+       "path": "tests/e2e/hardening-01-electron-boundary.test.js",
+       "capability": "quality_hardening_present"
+     },
+     {
+       "path": "tests/e2e/hardening-02-storage-failure.test.js",
+       "capability": "quality_hardening_present"
+     },
+     {
+       "path": "tests/e2e/hardening-03-no-stale-ui.test.js",
+       "capability": "quality_hardening_present"
+     },
+     {
+       "path": "tests/e2e/hardening-04-large-library.test.js",
+       "capability": "quality_hardening_present"
+     },
+     {
+       "path": "tests/e2e/hardening-05-xss-injection.test.js",
+       "capability": "quality_hardening_present"
+     },
+     {
+       "path": "tests/e2e/hardening-06-supply-chain.test.js",
+       "capability": "quality_hardening_present"
+     },
+     {
+       "path": "docs/r3-architecture.md",
+       "capability": "documentation_present"
+     },
+     {
+       "path": "docs/r3-user-workflow.md",
+       "capability": "documentation_present"
+     },
+     {
+       "path": "docs/r3-data-and-privacy.md",
+       "capability": "documentation_present"
+     },
+     {
+       "path": "docs/r3-credibility-model.md",
+       "capability": "documentation_present"
+     },
+     {
+       "path": "docs/r3-experiment-loop.md",
+       "capability": "documentation_present"
+     },
+     {
+       "path": "CHANGELOG.md",
+       "capability": "documentation_present"
+     },
+     {
+       "path": "docs/release-notes-2.0.0.md",
+       "capability": "release_gate_present"
+     },
+     {
+       "path": "package.json",
+       "capability": "release_gate_present"
+     }
+   ],
+   "enabledCapabilities": [
+     "governance_bootstrap_present",
+     "migration_engine_present",
+     "e2e_automation_present",
+     "quality_hardening_present",
+     "documentation_present",
+     "release_gate_present"
+   ],
+   "runtimeConsumersAllowed": true,
+   "uiAllowed": true,
+   "featureRegistryActivationAllowed": true,
+   "algorithmsAllowed": true,
+-  "note": "R3.0F F6_RELEASE state — RELEASE_PREPARED posture. The Train PR (#16) is merged to main (merge commit 0711e74a) and the single authorized package.json version bump 1.4.0 -> 2.0.0 is staged on the F6 release branch (package.json is authorized under release_gate_present for exactly this bump). featureRegistryActivationAllowed flips true at its F6_RELEASE floor; R3.0F introduces no case-scoped pane of its own, so this has no UI effect. release_executed remains DISABLED: it may only become true on the post-release state mirror AFTER the v2.0.0 tag and the GitHub Release are created under separate explicit authorization and the new main CI passes. The frozen R3.0B case-record schema is NOT modified."
++  "note": "R3.0F F6_RELEASE state — RELEASE_TAGGED_DRAFT posture (governance mirror of executed AUTHORIZATION A/B/C2, 2026-07-02): F6 PR #42 merged to main (merge commit 74bdc5c6); annotated tag v2.0.0 (object 668c0021) points exactly at that merge commit; DRAFT GitHub Release id 347825133 exists with zero assets. NOT published, no DMG uploaded, no deployment, no signing/notarization. release_executed remains DISABLED under the semantic ruling: it means the GitHub Release is actually PUBLISHED (draft=false, publishedAt non-null) — a tag alone or a draft Release alone never enables it. The future publish (if authorized) lands as another governance mirror that advances releaseStage to RELEASE_PUBLISHED. featureRegistryActivationAllowed remains true at its F6_RELEASE floor; R3.0F introduces no case-scoped pane of its own."
+ }
+diff --git a/scripts/check-r3-0-train.js b/scripts/check-r3-0-train.js
+index e5681c9..6dd4cde 100644
+--- a/scripts/check-r3-0-train.js
++++ b/scripts/check-r3-0-train.js
+@@ -146,159 +146,224 @@ function run() {
+     try { phaseSchema = readJson(path.join(phaseDirAbs, 'schema.json')); }
+     catch (e) { fail('PHASE_SCHEMA_UNREADABLE', phase + ' schema unreadable: ' + e.message, { phase }); continue; }
+     if (phaseState.program !== phase) fail('PHASE_STATE_PROGRAM_MISMATCH', phase + ' state.program=' + phaseState.program, { phase });
+     if (phaseSchema.program !== phase) fail('PHASE_SCHEMA_PROGRAM_MISMATCH', phase + ' schema.program=' + phaseSchema.program, { phase });
+     const trainView = phaseStates[phase];
+     if (!trainView) { fail('TRAIN_MISSING_PHASE_STATE', phase, { phase }); continue; }
+     if (trainView.currentCheckpoint !== phaseState.currentCheckpoint) fail('TRAIN_PHASE_CHECKPOINT_MISMATCH', phase + ' train=' + trainView.currentCheckpoint + ' state=' + phaseState.currentCheckpoint, { phase });
+     if (trainView.governanceDir !== dir) fail('TRAIN_PHASE_DIR_MISMATCH', phase, { phase });
+     if (trainView.finalActivationCheckpoint !== trainSchema.phaseFinalActivationCheckpoint[phase]) fail('TRAIN_PHASE_FINAL_ACTIVATION_MISMATCH', phase, { phase });
+ 
+     // ---- forbid R4 capabilities ----
+     for (const cap of phaseSchema.capabilities) {
+       for (const re of R4_PREFIX_PATTERNS) if (re.test(cap)) fail('R4_CAPABILITY_PRESENT', phase + ' capability ' + cap + ' looks like R4', { phase, capability: cap });
+     }
+ 
+     // ---- collect checkpoint manifests ----
+     const manifestNames = listJson(path.join(phaseDirAbs, 'checkpoints'));
+     const manifests = [];
+     for (const f of manifestNames) {
+       try { manifests.push(readJson(path.join(phaseDirAbs, 'checkpoints', f))); }
+       catch (e) { fail('PHASE_CHECKPOINT_MANIFEST_UNREADABLE', phase + '/' + f + ': ' + e.message, { phase, file: f }); }
+     }
+     phaseManifests[phase] = manifests;
+ 
+     phaseSummary[phase] = {
+       currentCheckpoint: phaseState.currentCheckpoint,
+       finalActivationCheckpoint: trainSchema.phaseFinalActivationCheckpoint[phase],
+       authorizedProductionPathCount: Array.isArray(phaseState.authorizedProductionPaths) ? phaseState.authorizedProductionPaths.length : -1,
+       enabledCapabilityCount: Array.isArray(phaseState.enabledCapabilities) ? phaseState.enabledCapabilities.length : -1,
+       runtimeConsumersAllowed: !!phaseState.runtimeConsumersAllowed,
+       uiAllowed: !!phaseState.uiAllowed,
+       featureRegistryActivationAllowed: !!phaseState.featureRegistryActivationAllowed,
+       algorithmsAllowed: !!phaseState.algorithmsAllowed,
+       checkpointManifestCount: manifests.length,
+     };
+   }
+ 
+   // ---- cross-phase advancement rules ----
+   const rules = trainSchema.crossPhaseAdvanceRequires || {};
+   for (const downstream of Object.keys(rules)) {
+     const phaseState = readJsonSafe(path.join(BASE, trainSchema.phaseGovernanceDirs[downstream], 'state.json'));
+     const phaseSchema = readJsonSafe(path.join(BASE, trainSchema.phaseGovernanceDirs[downstream], 'schema.json'));
+     if (!phaseState || !phaseSchema) continue;
+     if (phaseState.currentCheckpoint === phaseSchema.bootstrapCheckpoint) continue; // bootstrap allowed
+     const requirement = rules[downstream];
+     const [upstream, upstreamCheckpoint] = requirement.split(':');
+     const upstreamState = readJsonSafe(path.join(BASE, trainSchema.phaseGovernanceDirs[upstream], 'state.json'));
+     if (!upstreamState) { fail('CROSS_PHASE_UPSTREAM_STATE_UNREADABLE', downstream + ' requires ' + upstream + ' state', { phase: downstream }); continue; }
+     if (upstreamState.currentCheckpoint !== upstreamCheckpoint) {
+       fail('CROSS_PHASE_PREMATURE_ADVANCE', downstream + ' current=' + phaseState.currentCheckpoint + ' but ' + upstream + ' is ' + upstreamState.currentCheckpoint + ' (required ' + upstreamCheckpoint + ')', { downstream, upstream, requiredUpstreamCheckpoint: upstreamCheckpoint, actualUpstreamCheckpoint: upstreamState.currentCheckpoint });
+     }
+   }
+ 
+   // ---- capability + path monotonicity (per phase checkpoint history) ----
+   for (const phase of Object.keys(phaseManifests)) {
+     const phaseSchema = readJsonSafe(path.join(BASE, trainSchema.phaseGovernanceDirs[phase], 'schema.json'));
+     if (!phaseSchema) continue;
+     const order = phaseSchema.checkpointOrder;
+     const sorted = phaseManifests[phase].slice().filter(m => order.includes(m.checkpoint)).sort((a, b) => indexOf(order, a.checkpoint) - indexOf(order, b.checkpoint));
+     let prevCaps = new Set();
+     let prevPaths = new Set();
+     for (const m of sorted) {
+       const after = Array.isArray(m.enabledCapabilitiesAfter) ? m.enabledCapabilitiesAfter : [];
+       for (const cap of prevCaps) if (!after.includes(cap)) fail('CAPABILITY_REGRESSION', phase + ' checkpoint ' + m.checkpoint + ' drops capability ' + cap, { phase, checkpoint: m.checkpoint, capability: cap });
+       prevCaps = new Set(after);
+       const paths = (Array.isArray(m.authorizedPaths) ? m.authorizedPaths : []).map(e => (e && (typeof e === 'string' ? e : e.path)) || null).filter(Boolean);
+       for (const p of prevPaths) if (!paths.includes(p)) fail('AUTHORIZED_PATH_REMOVED', phase + ' checkpoint ' + m.checkpoint + ' removed path ' + p, { phase, checkpoint: m.checkpoint, path: p });
+       for (const p of paths) prevPaths.add(p);
+       // governance change visibility heuristic: if manifest declared changes to governance dirs/files and governanceChanged is false, fail.
+       const declaredFiles = collectMaybeFiles(m);
+       const touchesGovernance = declaredFiles.some(touchesGovernanceFile);
+       if (touchesGovernance && m.governanceChanged !== true) fail('GOVERNANCE_CHANGED_FLAG_MISSING', phase + ' checkpoint ' + m.checkpoint + ' touches governance files but governanceChanged != true', { phase, checkpoint: m.checkpoint });
+       // historical lineage: artifactBoundSha (if set) must equal headSha; PASS requires bound SHA match.
+       if (m.artifactBoundSha && m.headSha && m.artifactBoundSha !== m.headSha) fail('ARTIFACT_BOUND_SHA_MISMATCH', phase + ' checkpoint ' + m.checkpoint + ' artifactBoundSha=' + m.artifactBoundSha + ' headSha=' + m.headSha, { phase, checkpoint: m.checkpoint });
+       if (m.status === 'PASS' && (!m.artifactBoundSha || !m.headSha || m.artifactBoundSha !== m.headSha)) fail('PASS_REQUIRES_ARTIFACT_BOUND_SHA', phase + ' checkpoint ' + m.checkpoint + ' status PASS without SHA-bound artifact', { phase, checkpoint: m.checkpoint });
+       // R3.0B case-record schema untouched (E/F only — D has no flag)
+       if ((phase === 'R3.0E' || phase === 'R3.0F') && m.r3bCaseRecordSchemaUntouched !== true) fail('R3B_CASE_RECORD_SCHEMA_FLAG_NOT_TRUE', phase + ' checkpoint ' + m.checkpoint + ' r3bCaseRecordSchemaUntouched must be true', { phase, checkpoint: m.checkpoint });
+       // R3.0F: package version pin until F6
+       if (phase === 'R3.0F' && m.checkpoint !== 'F6_RELEASE' && m.packageVersion !== '1.4.0') fail('R3F_PACKAGE_VERSION_DRIFT', phase + ' checkpoint ' + m.checkpoint + ' packageVersion=' + m.packageVersion + ' (must remain 1.4.0 until F6_RELEASE)', { phase, checkpoint: m.checkpoint });
+       if (phase === 'R3.0F' && m.checkpoint === 'F6_RELEASE' && m.packageVersion && m.packageVersion !== '2.0.0' && m.packageVersion !== '1.4.0') fail('R3F_RELEASE_PACKAGE_VERSION_WRONG', 'F6_RELEASE packageVersion must be 1.4.0 (staged) or 2.0.0 (bumped); got ' + m.packageVersion, { phase, checkpoint: m.checkpoint });
++      // R3.0F F6 release-mirror consistency: release_executed means PUBLISHED ONLY (semantic
++      // ruling recorded in capabilities.json + schema releaseStages). Fail-closed on any
++      // record that could pass a tag-only or draft-only state off as an executed release.
++      if (phase === 'R3.0F' && m.checkpoint === 'F6_RELEASE') {
++        const rr = m.releaseRecord || {};
++        const gr = rr.githubRelease || null;
++        const stages = (phaseSchema.releaseStages && Array.isArray(phaseSchema.releaseStages.order)) ? phaseSchema.releaseStages.order : [];
++        const phaseStateNow = readJsonSafe(path.join(BASE, trainSchema.phaseGovernanceDirs[phase], 'state.json')) || {};
++        const capOn = Array.isArray(phaseStateNow.enabledCapabilities) && phaseStateNow.enabledCapabilities.includes('release_executed');
++        const isSha = s => typeof s === 'string' && /^[0-9a-f]{40}$/.test(s);
++        // publishedAt must be a real ISO-8601 UTC/offset timestamp whose calendar fields
++        // survive round-trip (rejects Date.parse rollover like 2026-02-30) — junk never counts
++        const isIsoTs = s => {
++          const t = typeof s === 'string' && s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-](?:(?:0\d|1[0-3]):[0-5]\d|14:00))$/);
++          if (!t) return false;
++          const y = +t[1], mo = +t[2], da = +t[3], h = +t[4], mi = +t[5], se = +t[6];
++          const d = new Date(Date.UTC(y, mo - 1, da, h, mi, se));
++          return d.getUTCFullYear() === y && d.getUTCMonth() === mo - 1 && d.getUTCDate() === da && d.getUTCHours() === h && d.getUTCMinutes() === mi && d.getUTCSeconds() === se;
++        };
++        // the state field is MANDATORY on a recorded Release (it is a declared
++        // publishForwardFields member) and must corroborate draft/published exactly
++        if (gr && gr.state == null) fail('R3F_RELEASE_STATE_FIELD_MISSING', 'githubRelease is recorded but has no state field — the DRAFT/PUBLISHED state advance is mandatory evidence and may not be omitted', { phase });
++        const stateFieldOk = !!(gr && (
++          (gr.state === 'DRAFT' && gr.draft === true && gr.published !== true) ||
++          (gr.state === 'PUBLISHED' && gr.draft === false && gr.published === true)));
++        if (gr && gr.state != null && !stateFieldOk) fail('R3F_RELEASE_STATE_FIELD_MISMATCH', 'githubRelease.state contradicts draft/published flags (state=' + gr.state + ', draft=' + gr.draft + ', published=' + gr.published + ')', { phase, state: gr.state, draft: gr.draft, published: gr.published });
++        const published = !!(gr && gr.draft === false && gr.published === true && isIsoTs(gr.publishedAt) && stateFieldOk);
++        // fail-closed on the stage machinery itself: the schema list, the checkpoint stage,
++        // AND the releaseExecutedRequiresStage rule are mandatory; the rule must be the FINAL
++        // stage of the declared order (a weakened schema is itself a violation)
++        if (!stages.length) fail('R3F_RELEASE_STAGES_SCHEMA_MISSING', 'F6_RELEASE requires schema.json releaseStages.order (missing/unreadable — cannot validate the stage fail-closed)', { phase });
++        const CANON_STAGES = ['RELEASE_PREPARED', 'RELEASE_TAGGED_DRAFT', 'RELEASE_PUBLISHED'];
++        if (stages.length && stages.join('|') !== CANON_STAGES.join('|')) fail('R3F_RELEASE_STAGES_ORDER_DRIFT', 'schema releaseStages.order drifted from the canonical PREPARED->TAGGED_DRAFT->PUBLISHED pin', { phase, order: stages });
++        const reqStage = phaseSchema.releaseStages ? phaseSchema.releaseStages.releaseExecutedRequiresStage : undefined;
++        const reqStageValid = stages.length > 0 && reqStage === 'RELEASE_PUBLISHED' && stages.indexOf(reqStage) === stages.length - 1 && stages.join('|') === CANON_STAGES.join('|');
++        if (stages.length && !reqStageValid) fail('R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID', 'schema releaseStages.releaseExecutedRequiresStage must be exactly RELEASE_PUBLISHED as the final stage of the canonical order; got ' + reqStage, { phase, releaseExecutedRequiresStage: reqStage });
++        if (typeof m.releaseStage !== 'string' || !m.releaseStage) fail('R3F_RELEASE_STAGE_MISSING', 'F6_RELEASE checkpoint must declare releaseStage', { phase });
++        else if (stages.length && !stages.includes(m.releaseStage)) fail('R3F_RELEASE_STAGE_UNKNOWN', 'F6_RELEASE releaseStage ' + m.releaseStage + ' is not in schema releaseStages.order', { phase, releaseStage: m.releaseStage });
++        // release_executed (capability OR record flag) requires an actually-published Release
++        if ((capOn || rr.releaseExecuted === true) && (!published || !reqStageValid || m.releaseStage !== reqStage)) fail('R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH', 'release_executed asserted but the GitHub Release is not published (draft/publishedAt/stage mismatch) — a tag alone or a draft Release alone never counts', { phase, capOn, recordFlag: rr.releaseExecuted === true, releaseStage: m.releaseStage, draft: gr && gr.draft, publishedAt: gr && gr.publishedAt });
++        // a draft Release on record forbids release_executed in BOTH places
++        if (gr && gr.draft === true && (capOn || rr.releaseExecuted === true)) fail('R3F_RELEASE_EXECUTED_ON_DRAFT', 'githubRelease.draft=true but release_executed is asserted', { phase, capOn, recordFlag: rr.releaseExecuted === true });
++        // dmgUploaded must corroborate with assets; a recorded Release MUST carry an
++        // assets array (missing/non-array is itself a violation — no silent skip), and
++        // every entry must be a {name: string} object — bare strings are rejected outright
++        if (gr && !Array.isArray(gr.assets)) fail('R3F_RELEASE_ASSETS_MISSING', 'githubRelease is recorded but assets is missing or not an array — asset evidence must be explicit', { phase, assets: gr.assets === undefined ? 'missing' : gr.assets });
++        const assets = gr && Array.isArray(gr.assets) ? gr.assets : null;
++        const assetsWellFormed = !!(assets && assets.every(a => a && typeof a === 'object' && !Array.isArray(a) && typeof a.name === 'string' && a.name.length > 0));
++        if (assets && assets.length > 0 && !assetsWellFormed) fail('R3F_RELEASE_ASSETS_MALFORMED', 'githubRelease.assets entries must be {name: string} objects (bare strings/malformed entries rejected)', { phase, assets });
++        const hasDmgAsset = !!(assets && assetsWellFormed && assets.some(a => /\.dmg$/i.test(a.name)));
++        if (rr.dmgUploaded === true && !hasDmgAsset) fail('R3F_DMG_FLAG_WITHOUT_ASSET', 'releaseRecord.dmgUploaded=true but githubRelease.assets contains no well-formed .dmg entry', { phase, assets: assets || 'missing' });
++        if (gr && assets && assets.length === 0 && rr.dmgUploaded !== false) fail('R3F_DMG_FLAG_NOT_FALSE_ON_EMPTY_ASSETS', 'githubRelease.assets is empty but releaseRecord.dmgUploaded is not exactly false', { phase, dmgUploaded: rr.dmgUploaded });
++        // once a tag is recorded: it must be v2.0.0, annotated-with-object, and point exactly at the recorded main merge SHA
++        if (rr.tag != null) {
++          if (rr.tag !== 'v2.0.0') fail('R3F_RELEASE_TAG_WRONG', 'releaseRecord.tag must be v2.0.0; got ' + rr.tag, { phase, tag: rr.tag });
++          if (!isSha(rr.tagTarget) || !isSha(rr.mainMergeSha) || rr.tagTarget !== rr.mainMergeSha) fail('R3F_TAG_TARGET_MISMATCH', 'releaseRecord.tagTarget must be the exact recorded mainMergeSha (both 40-hex)', { phase, tagTarget: rr.tagTarget, mainMergeSha: rr.mainMergeSha });
++          if (rr.tagType !== 'annotated' || !isSha(rr.tagObjectSha) || rr.tagObjectSha === rr.tagTarget) fail('R3F_TAG_NOT_ANNOTATED', 'recorded tag must be annotated with its own tag-object SHA distinct from the peeled commit', { phase, tagType: rr.tagType, tagObjectSha: rr.tagObjectSha });
++        }
++        if (gr && gr.tagName != null && gr.tagName !== rr.tag) fail('R3F_RELEASE_TAG_NAME_MISMATCH', 'githubRelease.tagName differs from releaseRecord.tag', { phase, tagName: gr.tagName, tag: rr.tag });
++        // stage/evidence coherence (monotonic, no history rewrite)
++        if (m.releaseStage === 'RELEASE_TAGGED_DRAFT' && rr.tag == null && !gr) fail('R3F_RELEASE_STAGE_EVIDENCE_MISMATCH', 'releaseStage RELEASE_TAGGED_DRAFT but neither a tag nor a githubRelease is recorded', { phase });
++        if (m.releaseStage === 'RELEASE_PREPARED' && (rr.tag != null || gr)) fail('R3F_RELEASE_STAGE_EVIDENCE_MISMATCH', 'releaseStage RELEASE_PREPARED but tag/Release evidence already recorded (stage may not lag evidence)', { phase });
++        if (m.releaseStage === 'RELEASE_PUBLISHED' && !published) fail('R3F_RELEASE_STAGE_EVIDENCE_MISMATCH', 'releaseStage RELEASE_PUBLISHED but githubRelease is not published', { phase });
++        if (m.releaseStage === 'RELEASE_TAGGED_DRAFT' && published) fail('R3F_RELEASE_STAGE_EVIDENCE_MISMATCH', 'releaseStage RELEASE_TAGGED_DRAFT but the githubRelease is already published (stage may not lag evidence)', { phase });
++      }
+     }
+   }
+ 
+   // ---- production guard: no R3.0B frozen module modification declared ----
+   // (Static check: train validator just asserts that none of the per-checkpoint manifests declare any of
+   //  the frozen R3.0B paths as authorizedPaths. The frozen-boundary check separately catches actual diff.)
+   for (const phase of Object.keys(phaseManifests)) {
+     for (const m of phaseManifests[phase]) {
+       const paths = (Array.isArray(m.authorizedPaths) ? m.authorizedPaths : []).map(e => (e && (typeof e === 'string' ? e : e.path)) || null).filter(Boolean);
+       for (const p of paths) if (FROZEN_R3B_PATHS.includes(p)) fail('AUTH_PATH_TOUCHES_R3B_FROZEN', phase + ' checkpoint ' + m.checkpoint + ' authorizes frozen R3.0B path ' + p, { phase, checkpoint: m.checkpoint, path: p });
+     }
+   }
+ 
+   return finish({
+     ok: violations.length === 0,
+     violations,
+     trainStatus: train.trainStatus,
+     currentPhase: train.currentPhase,
+     currentPhaseCheckpoint: train.currentPhaseCheckpoint,
+     targetVersion: train.targetVersion,
+     targetTag: train.targetTag,
+     intermediateReleaseAllowed: train.intermediateReleaseAllowed,
+     r4Excluded: train.r4Excluded,
+     phases: phaseSummary,
+     historicalCheckpointsByPhase: Object.keys(phaseManifests).reduce(function (acc, p) { acc[p] = phaseManifests[p].map(function (m) { return { checkpoint: m.checkpoint, headSha: m.headSha, status: m.status, governanceChanged: !!m.governanceChanged }; }); return acc; }, {}),
+   });
+ }
+ 
+ function readJsonSafe(p) { try { return readJson(p); } catch (_) { return null; } }
+ 
+ function collectMaybeFiles(m) {
+   // best-effort heuristic: per-checkpoint manifests may carry an optional changedFiles[] list. If absent
+   // we cannot detect (and we don't false-fail). When present, we use it to enforce governanceChanged.
+   if (Array.isArray(m.changedFiles)) return m.changedFiles.filter(s => typeof s === 'string');
+   return [];
+ }
+ 
+ function touchesGovernanceFile(rel) {
+   if (!rel || typeof rel !== 'string') return false;
+   if (rel.startsWith('governance/')) return true;
+   if (rel.startsWith('scripts/check-r3-0c-')) return true;
+   if (rel.startsWith('scripts/check-r3-phase-')) return true;
+   if (rel === 'scripts/check-r3-0-train.js') return true;
+   if (rel === 'scripts/collect-evidence.js') return true;
+   if (rel === '.github/workflows/ci.yml') return true;
+   return false;
+ }
+ 
+ let result, exitCode;
+ try { result = run(); exitCode = result.ok ? 0 : 1; }
+ catch (e) {
+   result = {
+     check: 'r3-0-train',
+     ok: false,
+     violations: [{ code: 'INTERNAL_VALIDATOR_FAILURE', message: String((e && e.stack) || e) }],
+     trainStatus: null,
+     currentPhase: null,
+     currentPhaseCheckpoint: null,
+     targetVersion: null,
+     targetTag: null,
+     intermediateReleaseAllowed: null,
+     r4Excluded: null,
+     phases: {},
+   };
+   exitCode = 2;
+ }
+ fs.mkdirSync(ARTIFACT_DIR, { recursive: true });
+ fs.writeFileSync(path.join(ARTIFACT_DIR, 'r3-0-train.json'), JSON.stringify(result, null, 2));
+ console.log('R3.0-TRAIN ' + JSON.stringify({
+   trainStatus: result.trainStatus,
+   currentPhase: result.currentPhase,
+   currentPhaseCheckpoint: result.currentPhaseCheckpoint,
+   targetVersion: result.targetVersion,
+   intermediateReleaseAllowed: result.intermediateReleaseAllowed,
+   r4Excluded: result.r4Excluded,
+   violations: (result.violations || []).length,
+   ok: result.ok,
+ }));
+ process.exit(exitCode);
+diff --git a/tests/r3-0-train.test.js b/tests/r3-0-train.test.js
+index 33aee20..16b4fed 100644
+--- a/tests/r3-0-train.test.js
++++ b/tests/r3-0-train.test.js
+@@ -312,83 +312,330 @@ function writeJson(p, o) { fs.writeFileSync(p, JSON.stringify(o, null, 2)); }
+   writeJson(path.join(dir, 'governance', 'r3.0d', 'schema.json'), dsch);
+   const r = runValidator(dir);
+   chk('FAIL R4 capability present', hasViolation(r.artifact, 'R4_CAPABILITY_PRESENT'));
+ }
+ 
+ // ── 18. authorized path touches frozen R3.0B persistence path ──
+ {
+   const dir = buildFixture();
+   const manifest = { schemaVersion: 1, program: 'R3.0E', checkpoint: 'E2_EXPERIMENT_STORE', baseSha: 'x', headSha: 'x',
+     previousCheckpoint: 'E1_CONTRACT_FOUNDATION', authorizedPaths: ['renderer/js/case-record-schema.js'], enabledCapabilitiesBefore: ['contract_foundation_present'], enabledCapabilitiesAfter: ['contract_foundation_present', 'experiment_store_present'],
+     forbiddenCapabilities: [], tests: null, workflowRunId: null, artifactId: null, artifactBoundSha: null, codexVerdict: null,
+     frozenDiff: 0, productionDiff: 0, runtimeConsumerCount: 0, featureRegistryState: {}, packageVersion: '1.4.0', createdAt: null,
+     status: 'pending', governanceChanged: true, crossPhaseGate: { r3dCheckpoint: 'D5_ENGINEER_BRIEF_ACTIVATION', requiredFor: 'E2_EXPERIMENT_STORE', satisfied: true },
+     r3bCaseRecordSchemaUntouched: true };
+   writeJson(path.join(dir, 'governance', 'r3.0e', 'checkpoints', 'E2.json'), manifest);
+   const r = runValidator(dir);
+   chk('FAIL auth path touches R3.0B frozen', hasViolation(r.artifact, 'AUTH_PATH_TOUCHES_R3B_FROZEN'));
+ }
+ 
+ // ── 19. R3.0E checkpoint missing r3bCaseRecordSchemaUntouched=true ──
+ {
+   const dir = buildFixture();
+   const manifest = { schemaVersion: 1, program: 'R3.0E', checkpoint: 'E2_EXPERIMENT_STORE', baseSha: 'x', headSha: 'x',
+     previousCheckpoint: 'E1_CONTRACT_FOUNDATION', authorizedPaths: ['renderer/js/experiment-store.js'], enabledCapabilitiesBefore: ['contract_foundation_present'], enabledCapabilitiesAfter: ['contract_foundation_present', 'experiment_store_present'],
+     forbiddenCapabilities: [], tests: null, workflowRunId: null, artifactId: null, artifactBoundSha: null, codexVerdict: null,
+     frozenDiff: 0, productionDiff: 0, runtimeConsumerCount: 0, featureRegistryState: {}, packageVersion: '1.4.0', createdAt: null,
+     status: 'pending', governanceChanged: true, crossPhaseGate: { r3dCheckpoint: 'D5_ENGINEER_BRIEF_ACTIVATION', requiredFor: 'E2_EXPERIMENT_STORE', satisfied: true },
+     r3bCaseRecordSchemaUntouched: false };
+   writeJson(path.join(dir, 'governance', 'r3.0e', 'checkpoints', 'E2.json'), manifest);
+   const r = runValidator(dir);
+   chk('FAIL R3.0E missing r3bCaseRecordSchemaUntouched=true', hasViolation(r.artifact, 'R3B_CASE_RECORD_SCHEMA_FLAG_NOT_TRUE'));
+ }
+ 
+ // ── 20. R3.0F packageVersion drift before F6 ──
+ {
+   const dir = buildFixture();
+   const manifest = { schemaVersion: 1, program: 'R3.0F', checkpoint: 'F1_MIGRATION_ENGINE', baseSha: 'x', headSha: 'x',
+     previousCheckpoint: 'F0_BOOTSTRAP', authorizedPaths: ['renderer/js/migration-engine.js'], enabledCapabilitiesBefore: [], enabledCapabilitiesAfter: ['migration_engine_present'],
+     forbiddenCapabilities: [], tests: null, workflowRunId: null, artifactId: null, artifactBoundSha: null, codexVerdict: null,
+     frozenDiff: 0, productionDiff: 0, runtimeConsumerCount: 0, featureRegistryState: {}, packageVersion: '1.5.0', createdAt: null,
+     status: 'pending', governanceChanged: true, crossPhaseGate: { r3eCheckpoint: 'E5_ACTIVATION', requiredFor: 'F1_MIGRATION_ENGINE', satisfied: true },
+     r3bCaseRecordSchemaUntouched: true, releaseRecord: null };
+   writeJson(path.join(dir, 'governance', 'r3.0f', 'checkpoints', 'F1.json'), manifest);
+   const r = runValidator(dir);
+   chk('FAIL F1 packageVersion drift', hasViolation(r.artifact, 'R3F_PACKAGE_VERSION_DRIFT'));
+ }
+ 
+ // ── 21. train state missing required field ──
+ {
+   const dir = buildFixture();
+   const ts = readJson(path.join(dir, 'governance', 'r3.0', 'train.json'));
+   delete ts.targetVersion;
+   writeJson(path.join(dir, 'governance', 'r3.0', 'train.json'), ts);
+   const r = runValidator(dir);
+   chk('FAIL train state missing field', hasViolation(r.artifact, 'TRAIN_STATE_REQUIRED_FIELD_MISSING') || hasViolation(r.artifact, 'TRAIN_TARGET_VERSION_WRONG'));
+ }
+ 
+ // ── 22. train state vs phase state checkpoint mismatch ──
+ // Note: the real-repo R3.0D is at D5_ENGINEER_BRIEF_ACTIVATION post-activation. Inject a
+ // disagreement by changing train.json's R3.0D checkpoint to something the state.json copy
+ // does not match — D0_BOOTSTRAP is the canonical pre-start value.
+ {
+   const dir = buildFixture();
+   const ts = readJson(path.join(dir, 'governance', 'r3.0', 'train.json'));
+   ts.phaseStates['R3.0D'].currentCheckpoint = 'D0_BOOTSTRAP'; // disagrees with state.json D5_ENGINEER_BRIEF_ACTIVATION
+   writeJson(path.join(dir, 'governance', 'r3.0', 'train.json'), ts);
+   const r = runValidator(dir);
+   chk('FAIL phase checkpoint mismatch', hasViolation(r.artifact, 'TRAIN_PHASE_CHECKPOINT_MISMATCH'));
+ }
+ 
+ // ── 23. invalid train status ──
+ {
+   const dir = buildFixture();
+   const ts = readJson(path.join(dir, 'governance', 'r3.0', 'train.json'));
+   ts.trainStatus = 'BOGUS_STATUS';
+   writeJson(path.join(dir, 'governance', 'r3.0', 'train.json'), ts);
+   const r = runValidator(dir);
+   chk('FAIL invalid trainStatus', hasViolation(r.artifact, 'TRAIN_STATUS_INVALID'));
+ }
+ 
++// ── 24. F6 release-mirror consistency (semantic ruling: release_executed = PUBLISHED only) ──
++// Fixture helpers: mutate the F6 checkpoint / R3.0F state copies and expect the exact violation.
++function f6Path(dir) { return path.join(dir, 'governance', 'r3.0f', 'checkpoints', 'F6.json'); }
++function f6State(dir) { return path.join(dir, 'governance', 'r3.0f', 'state.json'); }
++function mutateF6(fn) {
++  const dir = buildFixture();
++  const m = readJson(f6Path(dir));
++  const st = readJson(f6State(dir));
++  fn(m, st);
++  writeJson(f6Path(dir), m); writeJson(f6State(dir), st);
++  return runValidator(dir);
++}
++
++// mirror-1: tag recorded, no published Release, capability flipped on -> FAIL
++{
++  const r = mutateF6((m, st) => { st.enabledCapabilities.push('release_executed'); });
++  chk('FAIL release_executed capability with tag+draft only', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
++}
++// mirror-2: record flag releaseExecuted=true while Release is still a draft -> FAIL (both codes)
++{
++  const r = mutateF6((m) => { m.releaseRecord.releaseExecuted = true; });
++  chk('FAIL releaseExecuted record flag on draft Release', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_ON_DRAFT') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
++}
++// mirror-3: a genuinely published Release allows release_executed. The edit set below is
++// EXACTLY schema releaseStages.publishForwardFields — the exhaustive forward-only publish
++// mirror (stage, state, draft, published, publishedAt, record flag, capability); no other
++// recorded evidence (tag SHAs, release id, mainMergeSha) is touched.
++{
++  const r = mutateF6((m, st) => {
++    m.releaseStage = 'RELEASE_PUBLISHED';
++    m.releaseRecord.githubRelease.state = 'PUBLISHED';
++    m.releaseRecord.githubRelease.draft = false;
++    m.releaseRecord.githubRelease.published = true;
++    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
++    m.releaseRecord.releaseExecuted = true;
++    st.enabledCapabilities.push('release_executed');
++  });
++  chk('PASS-path: published Release permits release_executed (no mirror violations)', !hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH') && !hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_ON_DRAFT') && !hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH') && !hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH'));
++}
++// mirror-4: dmgUploaded=true with empty assets -> FAIL
++{
++  const r = mutateF6((m) => { m.releaseRecord.dmgUploaded = true; });
++  chk('FAIL dmgUploaded=true with no .dmg asset', hasViolation(r.artifact, 'R3F_DMG_FLAG_WITHOUT_ASSET'));
++}
++// mirror-5: dmgUploaded=true with only a non-dmg asset -> still FAIL
++{
++  const r = mutateF6((m) => { m.releaseRecord.dmgUploaded = true; m.releaseRecord.githubRelease.assets = [{ name: 'notes.txt' }]; });
++  chk('FAIL dmgUploaded=true with non-dmg asset only', hasViolation(r.artifact, 'R3F_DMG_FLAG_WITHOUT_ASSET'));
++}
++// mirror-6: empty assets but dmgUploaded not exactly false -> FAIL
++{
++  const r = mutateF6((m) => { delete m.releaseRecord.dmgUploaded; });
++  chk('FAIL empty assets require dmgUploaded===false', hasViolation(r.artifact, 'R3F_DMG_FLAG_NOT_FALSE_ON_EMPTY_ASSETS'));
++}
++// mirror-7: tag target differs from the recorded main merge SHA -> FAIL
++{
++  const r = mutateF6((m) => { m.releaseRecord.tagTarget = '1661f1c16d584c96aec2fc1704f6dd730a86d480'; });
++  chk('FAIL tagTarget != mainMergeSha', hasViolation(r.artifact, 'R3F_TAG_TARGET_MISMATCH'));
++}
++// mirror-8: wrong tag name -> FAIL
++{
++  const r = mutateF6((m) => { m.releaseRecord.tag = 'v2.0.1'; });
++  chk('FAIL releaseRecord.tag != v2.0.0', hasViolation(r.artifact, 'R3F_RELEASE_TAG_WRONG'));
++}
++// mirror-9: Release tag_name diverging from the recorded tag -> FAIL
++{
++  const r = mutateF6((m) => { m.releaseRecord.githubRelease.tagName = 'v1.9.9'; });
++  chk('FAIL githubRelease.tagName != releaseRecord.tag', hasViolation(r.artifact, 'R3F_RELEASE_TAG_NAME_MISMATCH'));
++}
++// mirror-10: stage rolled back to RELEASE_PREPARED while tag evidence exists -> FAIL (no history rewrite)
++{
++  const r = mutateF6((m) => { m.releaseStage = 'RELEASE_PREPARED'; });
++  chk('FAIL stage may not lag recorded tag/Release evidence', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH'));
++}
++// mirror-11: lightweight tag (or missing tag object) -> FAIL
++{
++  const r = mutateF6((m) => { m.releaseRecord.tagType = 'lightweight'; m.releaseRecord.tagObjectSha = m.releaseRecord.tagTarget; });
++  chk('FAIL non-annotated tag record', hasViolation(r.artifact, 'R3F_TAG_NOT_ANNOTATED'));
++}
++// mirror-12: unknown releaseStage -> FAIL
++{
++  const r = mutateF6((m) => { m.releaseStage = 'RELEASE_SHIPPED'; });
++  chk('FAIL unknown releaseStage', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_UNKNOWN'));
++}
++// mirror-13 (MIRROR-R1-01): published flags but state field still DRAFT -> FAIL
++{
++  const r = mutateF6((m, st) => {
++    m.releaseStage = 'RELEASE_PUBLISHED';
++    m.releaseRecord.githubRelease.draft = false;
++    m.releaseRecord.githubRelease.published = true;
++    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
++    m.releaseRecord.releaseExecuted = true;
++    st.enabledCapabilities.push('release_executed');
++    // state left as 'DRAFT' — contradictory record must be rejected
++  });
++  chk('FAIL state=DRAFT contradicting published flags', hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
++}
++// mirror-14 (MIRROR-R1-02): releaseStage deleted -> FAIL
++{
++  const r = mutateF6((m) => { delete m.releaseStage; });
++  chk('FAIL missing releaseStage', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_MISSING'));
++}
++// mirror-15 (MIRROR-R1-02): schema releaseStages unreadable -> FAIL
++{
++  const dir = buildFixture();
++  const sch = readJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'));
++  delete sch.releaseStages;
++  writeJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'), sch);
++  const r = runValidator(dir);
++  chk('FAIL schema releaseStages missing', hasViolation(r.artifact, 'R3F_RELEASE_STAGES_SCHEMA_MISSING'));
++}
++// mirror-16 (MIRROR-R1-03): bare-string asset entries are malformed AND never satisfy dmgUploaded
++{
++  const r = mutateF6((m) => { m.releaseRecord.dmgUploaded = true; m.releaseRecord.githubRelease.assets = ['app.dmg']; });
++  chk('FAIL string asset entry rejected as malformed', hasViolation(r.artifact, 'R3F_RELEASE_ASSETS_MALFORMED') && hasViolation(r.artifact, 'R3F_DMG_FLAG_WITHOUT_ASSET'));
++}
++// mirror-17 (MIRROR-R1-04): whitespace/invalid publishedAt never counts as published
++{
++  const r = mutateF6((m, st) => {
++    m.releaseStage = 'RELEASE_PUBLISHED';
++    m.releaseRecord.githubRelease.state = 'PUBLISHED';
++    m.releaseRecord.githubRelease.draft = false;
++    m.releaseRecord.githubRelease.published = true;
++    m.releaseRecord.githubRelease.publishedAt = '   ';
++    m.releaseRecord.releaseExecuted = true;
++    st.enabledCapabilities.push('release_executed');
++  });
++  chk('FAIL whitespace publishedAt rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH') && hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH'));
++}
++// mirror-18 (MIRROR-R2-02): assets deleted entirely -> FAIL (no silent skip)
++{
++  const r = mutateF6((m) => { delete m.releaseRecord.githubRelease.assets; });
++  chk('FAIL missing assets array', hasViolation(r.artifact, 'R3F_RELEASE_ASSETS_MISSING'));
++}
++// mirror-19 (MIRROR-R2-02): assets as a non-array -> FAIL
++{
++  const r = mutateF6((m) => { m.releaseRecord.githubRelease.assets = 'none'; });
++  chk('FAIL non-array assets', hasViolation(r.artifact, 'R3F_RELEASE_ASSETS_MISSING'));
++}
++// mirror-20 (MIRROR-R3-01): deleting state cannot bypass the mandatory state advance
++{
++  const r = mutateF6((m, st) => {
++    m.releaseStage = 'RELEASE_PUBLISHED';
++    delete m.releaseRecord.githubRelease.state;
++    m.releaseRecord.githubRelease.draft = false;
++    m.releaseRecord.githubRelease.published = true;
++    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
++    m.releaseRecord.releaseExecuted = true;
++    st.enabledCapabilities.push('release_executed');
++  });
++  chk('FAIL missing state field blocks release_executed', hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISSING') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
++}
++// mirror-21 (MIRROR-R3-02): impossible calendar date in publishedAt never counts as published
++{
++  const r = mutateF6((m, st) => {
++    m.releaseStage = 'RELEASE_PUBLISHED';
++    m.releaseRecord.githubRelease.state = 'PUBLISHED';
++    m.releaseRecord.githubRelease.draft = false;
++    m.releaseRecord.githubRelease.published = true;
++    m.releaseRecord.githubRelease.publishedAt = '2026-02-30T05:00:00Z';
++    m.releaseRecord.releaseExecuted = true;
++    st.enabledCapabilities.push('release_executed');
++  });
++  chk('FAIL impossible publishedAt date (2026-02-30) rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
++}
++// mirror-22 (MIRROR-R4-01): absurd timezone offset in publishedAt never counts as published
++{
++  const r = mutateF6((m, st) => {
++    m.releaseStage = 'RELEASE_PUBLISHED';
++    m.releaseRecord.githubRelease.state = 'PUBLISHED';
++    m.releaseRecord.githubRelease.draft = false;
++    m.releaseRecord.githubRelease.published = true;
++    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00+99:99';
++    m.releaseRecord.releaseExecuted = true;
++    st.enabledCapabilities.push('release_executed');
++  });
++  chk('FAIL invalid timezone offset (+99:99) rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
++}
++// mirror-23 (MIRROR-R4-02): stage stuck at TAGGED_DRAFT while the Release is published -> FAIL
++{
++  const r = mutateF6((m) => {
++    m.releaseRecord.githubRelease.state = 'PUBLISHED';
++    m.releaseRecord.githubRelease.draft = false;
++    m.releaseRecord.githubRelease.published = true;
++    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
++    // releaseStage left at RELEASE_TAGGED_DRAFT — stage may not lag published evidence
++  });
++  chk('FAIL stage lags published evidence', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH'));
++}
++// mirror-24 (MIRROR-R4-03): weakening/removing releaseExecutedRequiresStage is itself a violation
++{
++  const dir = buildFixture();
++  const sch = readJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'));
++  sch.releaseStages.releaseExecutedRequiresStage = 'RELEASE_TAGGED_DRAFT';
++  writeJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'), sch);
++  const r = runValidator(dir);
++  chk('FAIL weakened releaseExecutedRequiresStage', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID'));
++  const dir2 = buildFixture();
++  const sch2 = readJson(path.join(dir2, 'governance', 'r3.0f', 'schema.json'));
++  delete sch2.releaseStages.releaseExecutedRequiresStage;
++  writeJson(path.join(dir2, 'governance', 'r3.0f', 'schema.json'), sch2);
++  const r2 = runValidator(dir2);
++  chk('FAIL missing releaseExecutedRequiresStage', hasViolation(r2.artifact, 'R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID'));
++}
++// mirror-25 (MIRROR-R5-01): +14:59 offset is beyond the +/-14:00 hard cap
++{
++  const r = mutateF6((m, st) => {
++    m.releaseStage = 'RELEASE_PUBLISHED';
++    m.releaseRecord.githubRelease.state = 'PUBLISHED';
++    m.releaseRecord.githubRelease.draft = false;
++    m.releaseRecord.githubRelease.published = true;
++    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00+14:59';
++    m.releaseRecord.releaseExecuted = true;
++    st.enabledCapabilities.push('release_executed');
++  });
++  chk('FAIL offset beyond +/-14:00 cap rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
++  const r2 = mutateF6((m, st) => {
++    m.releaseStage = 'RELEASE_PUBLISHED';
++    m.releaseRecord.githubRelease.state = 'PUBLISHED';
++    m.releaseRecord.githubRelease.draft = false;
++    m.releaseRecord.githubRelease.published = true;
++    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00+14:00';
++    m.releaseRecord.releaseExecuted = true;
++    st.enabledCapabilities.push('release_executed');
++  });
++  chk('PASS-path: exactly +14:00 offset is legal publish evidence', !hasViolation(r2.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
++}
++// mirror-26 (MIRROR-R5-02): a crafted schema with a fake terminal stage cannot enable release_executed
++{
++  const dir = buildFixture();
++  const sch = readJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'));
++  sch.releaseStages.order = ['RELEASE_PREPARED', 'RELEASE_TAGGED_DRAFT', 'RELEASE_YOLO'];
++  sch.releaseStages.releaseExecutedRequiresStage = 'RELEASE_YOLO';
++  writeJson(path.join(dir, 'governance', 'r3.0f', 'schema.json'), sch);
++  const m = readJson(f6Path(dir)); const st = readJson(f6State(dir));
++  m.releaseStage = 'RELEASE_YOLO';
++  m.releaseRecord.githubRelease.state = 'PUBLISHED';
++  m.releaseRecord.githubRelease.draft = false;
++  m.releaseRecord.githubRelease.published = true;
++  m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
++  m.releaseRecord.releaseExecuted = true;
++  st.enabledCapabilities.push('release_executed');
++  writeJson(f6Path(dir), m); writeJson(f6State(dir), st);
++  const r = runValidator(dir);
++  chk('FAIL crafted terminal stage rejected (canonical order pin + rule invalid + executed blocked)', hasViolation(r.artifact, 'R3F_RELEASE_STAGES_ORDER_DRIFT') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
++}
++
+ H.cleanupAll();
+ console.log('r3-0-train: ' + pass + ' passed, ' + fail + ' failed');
+ if (fail) process.exit(1);
+
+codex
+The checkout and scope match the request. I’m now attacking the fail-closed predicates directly, including malformed schema, missing release fields, asset shapes, timestamp edge cases, and the declared publish-forward transition.
+exec
+/bin/bash -lc "nl -ba governance/r3.0f/schema.json | sed -n '55,115p'; nl -ba governance/r3.0f/state.json | sed -n '1,100p'; nl -ba governance/r3.0f/checkpoints/F6.json | sed -n '225,285p'; nl -ba governance/r3.0/capabilities.json 2>/dev/null | head -5; rg -n \"R3F_RELEASE|R3F_DMG|R3F_TAG|releaseStages|isIsoTs|releaseExecuted|githubRelease|assets\" scripts/check-r3-0-train.js governance/r3.0/train.json tests/r3-0-train.test.js" in /Users/SKYLINE/Claude/worktrees/f6-release
+ succeeded in 0ms:
+    55	    "migration_engine_present": "F1_MIGRATION_ENGINE",
+    56	    "e2e_automation_present": "F2_E2E_AUTOMATION",
+    57	    "quality_hardening_present": "F3_QUALITY_HARDENING",
+    58	    "documentation_present": "F4_DOCUMENTATION",
+    59	    "release_gate_present": "F5_RELEASE_GATE",
+    60	    "release_executed": "F6_RELEASE"
+    61	  },
+    62	  "runtimeConsumerCheckpoint": "F1_MIGRATION_ENGINE",
+    63	  "algorithmCheckpoint": "F1_MIGRATION_ENGINE",
+    64	  "uiCheckpoint": "F3_QUALITY_HARDENING",
+    65	  "featureRegistryActivationCheckpoint": "F6_RELEASE",
+    66	  "releaseStages": {
+    67	    "note": "Monotonic F6_RELEASE progression recorded in checkpoints/F6.json releaseStage. Forward-only: RELEASE_PREPARED (bump staged; no tag/Release) -> RELEASE_TAGGED_DRAFT (annotated tag pushed AND/OR a DRAFT GitHub Release exists; nothing published, no assets) -> RELEASE_PUBLISHED (the GitHub Release is actually published: draft=false with a non-null publishedAt). Semantic ruling (SKYLINE, 2026-07-02): the release_executed capability means PUBLISHED ONLY — a tag alone or a draft Release alone must NOT enable it. Later stages never rewrite earlier evidence.",
+    68	    "order": ["RELEASE_PREPARED", "RELEASE_TAGGED_DRAFT", "RELEASE_PUBLISHED"],
+    69	    "releaseExecutedRequiresStage": "RELEASE_PUBLISHED",
+    70	    "publishForwardFields": {
+    71	      "note": "The COMPLETE, exhaustive field set a future publish mirror may change — every one is a forward-only state advance; everything else in releaseRecord (tag SHAs, release id, tagMessage, mainMergeSha, historical evidence) is immutable. The state field advances DRAFT -> PUBLISHED in lockstep with draft/published (enforced by R3F_RELEASE_STATE_FIELD_MISMATCH).",
+    72	      "fields": ["releaseStage", "releaseRecord.githubRelease.state", "releaseRecord.githubRelease.draft", "releaseRecord.githubRelease.published", "releaseRecord.githubRelease.publishedAt", "releaseRecord.releaseExecuted", "state.json enabledCapabilities += release_executed"]
+    73	    }
+    74	  },
+    75	  "bootstrapCheckpoint": "F0_BOOTSTRAP",
+    76	  "contractPrefix": "contracts/r3.0f",
+    77	  "authorizedPathRules": {
+    78	    "mustBeRepoRelative": true,
+    79	    "mustBeExact": true,
+    80	    "forbiddenSubstrings": ["..", "*", "?", "["],
+    81	    "forbiddenPrefixes": ["/"],
+    82	    "allowedRoots": ["renderer/js/", "contracts/r3.0f/", "main.js", "preload.js", "renderer/index.html", "renderer/css/", "scripts/migrators/", "docs/", "tests/e2e/", "package.json", "CHANGELOG.md"],
+    83	    "note": "R3.0F production authorization is by exact repo-relative path only. F6_RELEASE may authorize package.json for a single 1.4.0 → 2.0.0 version bump. No wildcards/regex/globs. The frozen R3.0B persistence schema MUST NOT be modified; F1 migration engine reads/writes via migration scripts only."
+    84	  }
+    85	}
+     1	{
+     2	  "schemaVersion": 1,
+     3	  "program": "R3.0F",
+     4	  "currentCheckpoint": "F6_RELEASE",
+     5	  "authorizedProductionPaths": [
+     6	    {
+     7	      "path": "renderer/js/r3-0f-migration-engine.js",
+     8	      "capability": "migration_engine_present"
+     9	    },
+    10	    {
+    11	      "path": "tests/e2e/helpers/flow-harness.js",
+    12	      "capability": "e2e_automation_present"
+    13	    },
+    14	    {
+    15	      "path": "tests/e2e/flow-01-new-user.test.js",
+    16	      "capability": "e2e_automation_present"
+    17	    },
+    18	    {
+    19	      "path": "tests/e2e/flow-02-real-telemetry.test.js",
+    20	      "capability": "e2e_automation_present"
+    21	    },
+    22	    {
+    23	      "path": "tests/e2e/flow-03-measured.test.js",
+    24	      "capability": "e2e_automation_present"
+    25	    },
+    26	    {
+    27	      "path": "tests/e2e/flow-04-reference-lap.test.js",
+    28	      "capability": "e2e_automation_present"
+    29	    },
+    30	    {
+    31	      "path": "tests/e2e/flow-05-vre.test.js",
+    32	      "capability": "e2e_automation_present"
+    33	    },
+    34	    {
+    35	      "path": "tests/e2e/flow-06-setup-experiment.test.js",
+    36	      "capability": "e2e_automation_present"
+    37	    },
+    38	    {
+    39	      "path": "tests/e2e/flow-07-driver-experiment.test.js",
+    40	      "capability": "e2e_automation_present"
+    41	    },
+    42	    {
+    43	      "path": "tests/e2e/flow-08-export-import.test.js",
+    44	      "capability": "e2e_automation_present"
+    45	    },
+    46	    {
+    47	      "path": "tests/e2e/flow-09-electron-smoke.test.js",
+    48	      "capability": "e2e_automation_present"
+    49	    },
+    50	    {
+    51	      "path": "tests/e2e/hardening-01-electron-boundary.test.js",
+    52	      "capability": "quality_hardening_present"
+    53	    },
+    54	    {
+    55	      "path": "tests/e2e/hardening-02-storage-failure.test.js",
+    56	      "capability": "quality_hardening_present"
+    57	    },
+    58	    {
+    59	      "path": "tests/e2e/hardening-03-no-stale-ui.test.js",
+    60	      "capability": "quality_hardening_present"
+    61	    },
+    62	    {
+    63	      "path": "tests/e2e/hardening-04-large-library.test.js",
+    64	      "capability": "quality_hardening_present"
+    65	    },
+    66	    {
+    67	      "path": "tests/e2e/hardening-05-xss-injection.test.js",
+    68	      "capability": "quality_hardening_present"
+    69	    },
+    70	    {
+    71	      "path": "tests/e2e/hardening-06-supply-chain.test.js",
+    72	      "capability": "quality_hardening_present"
+    73	    },
+    74	    {
+    75	      "path": "docs/r3-architecture.md",
+    76	      "capability": "documentation_present"
+    77	    },
+    78	    {
+    79	      "path": "docs/r3-user-workflow.md",
+    80	      "capability": "documentation_present"
+    81	    },
+    82	    {
+    83	      "path": "docs/r3-data-and-privacy.md",
+    84	      "capability": "documentation_present"
+    85	    },
+    86	    {
+    87	      "path": "docs/r3-credibility-model.md",
+    88	      "capability": "documentation_present"
+    89	    },
+    90	    {
+    91	      "path": "docs/r3-experiment-loop.md",
+    92	      "capability": "documentation_present"
+    93	    },
+    94	    {
+    95	      "path": "CHANGELOG.md",
+    96	      "capability": "documentation_present"
+    97	    },
+    98	    {
+    99	      "path": "docs/release-notes-2.0.0.md",
+   100	      "capability": "release_gate_present"
+   225	  "createdAt": null,
+   226	  "status": "pending",
+   227	  "governanceChanged": true,
+   228	  "crossPhaseGate": {
+   229	    "r3eCheckpoint": "E5_ACTIVATION",
+   230	    "requiredFor": "F6_RELEASE",
+   231	    "satisfied": true,
+   232	    "note": "F1..F5 complete and merged; Train merged to main at 0711e74a with post-merge CI PASS (run 28560701177) and clean-worktree local verification (110 files / 10,790 assertions / gate 12/12 / evidence hashes matched)."
+   233	  },
+   234	  "r3bCaseRecordSchemaUntouched": true,
+   235	  "releaseRecord": {
+   236	    "tag": "v2.0.0",
+   237	    "tagType": "annotated",
+   238	    "tagObjectSha": "668c002161d4e1e28109b5d55df303f4bd75ef79",
+   239	    "tagTarget": "74bdc5c6589644d12816bcbb14f6f2918cce73de",
+   240	    "mainMergeSha": "74bdc5c6589644d12816bcbb14f6f2918cce73de",
+   241	    "tagMessage": "Racing Setup Analyzer v2.0.0",
+   242	    "githubRelease": {
+   243	      "id": 347825133,
+   244	      "state": "DRAFT",
+   245	      "draft": true,
+   246	      "published": false,
+   247	      "publishedAt": null,
+   248	      "prerelease": false,
+   249	      "tagName": "v2.0.0",
+   250	      "assets": [],
+   251	      "urlNote": "Draft-only URL (GitHub renders drafts under an untagged-… path visible only to repo collaborators); intentionally NOT recorded as a public release URL because none exists."
+   252	    },
+   253	    "dmgUploaded": false,
+   254	    "deploymentExecuted": false,
+   255	    "releaseExecuted": false,
+   256	    "note": "RELEASE_TAGGED_DRAFT mirror (2026-07-02, AUTHORIZATION B + C2): annotated tag v2.0.0 (object 668c0021) pushed, peeled commit exactly the PR #42 merge commit 74bdc5c6 (verified via ls-remote peel + local rev-parse + GitHub API tag object). Draft GitHub Release id 347825133 created with zero assets; NOT published. Per the semantic ruling, release_executed stays false until an actual publish under separate explicit authorization; the future publish mirror changes exactly the seven forward-only fields declared in schema.json releaseStages.publishForwardFields (stage, githubRelease.state/draft/published/publishedAt, record releaseExecuted, capability) — every recorded evidence field (tag SHAs, release id, mainMergeSha) stays immutable; no history rewrite."
+   257	  },
+   258	  "note": "R3.0F F6_RELEASE checkpoint at the RELEASE_TAGGED_DRAFT stage: PR #42 merged to main (74bdc5c6), annotated tag v2.0.0 pushed (peeled = the merge commit), DRAFT GitHub Release 347825133 created with no assets. NOTHING is published or distributed: no public Release, no DMG upload, no deployment, no signing. release_executed remains disabled per the published-only semantic ruling recorded in capabilities.json and schema.json releaseStages.",
+   259	  "frozenDiff": null,
+   260	  "productionDiff": null,
+   261	  "runtimeConsumerCount": null,
+   262	  "featureRegistryState": {
+   263	    "expectedDeferredIds": [],
+   264	    "expectedRendererAdapter": false,
+   265	    "note": "F6 does NOT touch the feature registry. Actual registry state carried into 2.0.0: case_comparison/reference_lap/corner_delta activated at C8_ACTIVATION (Comparisons pane live); engineer_brief/experiment_loop/case_timeline are nav-live with 'available_conditional' data-gates but their pane content is not wired into renderer/index.html (nav nodes only — disclosed in release notes Known limitations item 1)."
+   266	  }
+   267	}
+scripts/check-r3-0-train.js:225:      if (phase === 'R3.0F' && m.checkpoint === 'F6_RELEASE' && m.packageVersion && m.packageVersion !== '2.0.0' && m.packageVersion !== '1.4.0') fail('R3F_RELEASE_PACKAGE_VERSION_WRONG', 'F6_RELEASE packageVersion must be 1.4.0 (staged) or 2.0.0 (bumped); got ' + m.packageVersion, { phase, checkpoint: m.checkpoint });
+scripts/check-r3-0-train.js:227:      // ruling recorded in capabilities.json + schema releaseStages). Fail-closed on any
+scripts/check-r3-0-train.js:231:        const gr = rr.githubRelease || null;
+scripts/check-r3-0-train.js:232:        const stages = (phaseSchema.releaseStages && Array.isArray(phaseSchema.releaseStages.order)) ? phaseSchema.releaseStages.order : [];
+scripts/check-r3-0-train.js:238:        const isIsoTs = s => {
+scripts/check-r3-0-train.js:247:        if (gr && gr.state == null) fail('R3F_RELEASE_STATE_FIELD_MISSING', 'githubRelease is recorded but has no state field — the DRAFT/PUBLISHED state advance is mandatory evidence and may not be omitted', { phase });
+scripts/check-r3-0-train.js:251:        if (gr && gr.state != null && !stateFieldOk) fail('R3F_RELEASE_STATE_FIELD_MISMATCH', 'githubRelease.state contradicts draft/published flags (state=' + gr.state + ', draft=' + gr.draft + ', published=' + gr.published + ')', { phase, state: gr.state, draft: gr.draft, published: gr.published });
+scripts/check-r3-0-train.js:252:        const published = !!(gr && gr.draft === false && gr.published === true && isIsoTs(gr.publishedAt) && stateFieldOk);
+scripts/check-r3-0-train.js:254:        // AND the releaseExecutedRequiresStage rule are mandatory; the rule must be the FINAL
+scripts/check-r3-0-train.js:256:        if (!stages.length) fail('R3F_RELEASE_STAGES_SCHEMA_MISSING', 'F6_RELEASE requires schema.json releaseStages.order (missing/unreadable — cannot validate the stage fail-closed)', { phase });
+scripts/check-r3-0-train.js:258:        if (stages.length && stages.join('|') !== CANON_STAGES.join('|')) fail('R3F_RELEASE_STAGES_ORDER_DRIFT', 'schema releaseStages.order drifted from the canonical PREPARED->TAGGED_DRAFT->PUBLISHED pin', { phase, order: stages });
+scripts/check-r3-0-train.js:259:        const reqStage = phaseSchema.releaseStages ? phaseSchema.releaseStages.releaseExecutedRequiresStage : undefined;
+scripts/check-r3-0-train.js:261:        if (stages.length && !reqStageValid) fail('R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID', 'schema releaseStages.releaseExecutedRequiresStage must be exactly RELEASE_PUBLISHED as the final stage of the canonical order; got ' + reqStage, { phase, releaseExecutedRequiresStage: reqStage });
+scripts/check-r3-0-train.js:262:        if (typeof m.releaseStage !== 'string' || !m.releaseStage) fail('R3F_RELEASE_STAGE_MISSING', 'F6_RELEASE checkpoint must declare releaseStage', { phase });
+scripts/check-r3-0-train.js:263:        else if (stages.length && !stages.includes(m.releaseStage)) fail('R3F_RELEASE_STAGE_UNKNOWN', 'F6_RELEASE releaseStage ' + m.releaseStage + ' is not in schema releaseStages.order', { phase, releaseStage: m.releaseStage });
+scripts/check-r3-0-train.js:265:        if ((capOn || rr.releaseExecuted === true) && (!published || !reqStageValid || m.releaseStage !== reqStage)) fail('R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH', 'release_executed asserted but the GitHub Release is not published (draft/publishedAt/stage mismatch) — a tag alone or a draft Release alone never counts', { phase, capOn, recordFlag: rr.releaseExecuted === true, releaseStage: m.releaseStage, draft: gr && gr.draft, publishedAt: gr && gr.publishedAt });
+scripts/check-r3-0-train.js:267:        if (gr && gr.draft === true && (capOn || rr.releaseExecuted === true)) fail('R3F_RELEASE_EXECUTED_ON_DRAFT', 'githubRelease.draft=true but release_executed is asserted', { phase, capOn, recordFlag: rr.releaseExecuted === true });
+scripts/check-r3-0-train.js:268:        // dmgUploaded must corroborate with assets; a recorded Release MUST carry an
+scripts/check-r3-0-train.js:269:        // assets array (missing/non-array is itself a violation — no silent skip), and
+scripts/check-r3-0-train.js:271:        if (gr && !Array.isArray(gr.assets)) fail('R3F_RELEASE_ASSETS_MISSING', 'githubRelease is recorded but assets is missing or not an array — asset evidence must be explicit', { phase, assets: gr.assets === undefined ? 'missing' : gr.assets });
+scripts/check-r3-0-train.js:272:        const assets = gr && Array.isArray(gr.assets) ? gr.assets : null;
+scripts/check-r3-0-train.js:273:        const assetsWellFormed = !!(assets && assets.every(a => a && typeof a === 'object' && !Array.isArray(a) && typeof a.name === 'string' && a.name.length > 0));
+scripts/check-r3-0-train.js:274:        if (assets && assets.length > 0 && !assetsWellFormed) fail('R3F_RELEASE_ASSETS_MALFORMED', 'githubRelease.assets entries must be {name: string} objects (bare strings/malformed entries rejected)', { phase, assets });
+scripts/check-r3-0-train.js:275:        const hasDmgAsset = !!(assets && assetsWellFormed && assets.some(a => /\.dmg$/i.test(a.name)));
+scripts/check-r3-0-train.js:276:        if (rr.dmgUploaded === true && !hasDmgAsset) fail('R3F_DMG_FLAG_WITHOUT_ASSET', 'releaseRecord.dmgUploaded=true but githubRelease.assets contains no well-formed .dmg entry', { phase, assets: assets || 'missing' });
+scripts/check-r3-0-train.js:277:        if (gr && assets && assets.length === 0 && rr.dmgUploaded !== false) fail('R3F_DMG_FLAG_NOT_FALSE_ON_EMPTY_ASSETS', 'githubRelease.assets is empty but releaseRecord.dmgUploaded is not exactly false', { phase, dmgUploaded: rr.dmgUploaded });
+scripts/check-r3-0-train.js:280:          if (rr.tag !== 'v2.0.0') fail('R3F_RELEASE_TAG_WRONG', 'releaseRecord.tag must be v2.0.0; got ' + rr.tag, { phase, tag: rr.tag });
+scripts/check-r3-0-train.js:281:          if (!isSha(rr.tagTarget) || !isSha(rr.mainMergeSha) || rr.tagTarget !== rr.mainMergeSha) fail('R3F_TAG_TARGET_MISMATCH', 'releaseRecord.tagTarget must be the exact recorded mainMergeSha (both 40-hex)', { phase, tagTarget: rr.tagTarget, mainMergeSha: rr.mainMergeSha });
+scripts/check-r3-0-train.js:282:          if (rr.tagType !== 'annotated' || !isSha(rr.tagObjectSha) || rr.tagObjectSha === rr.tagTarget) fail('R3F_TAG_NOT_ANNOTATED', 'recorded tag must be annotated with its own tag-object SHA distinct from the peeled commit', { phase, tagType: rr.tagType, tagObjectSha: rr.tagObjectSha });
+scripts/check-r3-0-train.js:284:        if (gr && gr.tagName != null && gr.tagName !== rr.tag) fail('R3F_RELEASE_TAG_NAME_MISMATCH', 'githubRelease.tagName differs from releaseRecord.tag', { phase, tagName: gr.tagName, tag: rr.tag });
+scripts/check-r3-0-train.js:286:        if (m.releaseStage === 'RELEASE_TAGGED_DRAFT' && rr.tag == null && !gr) fail('R3F_RELEASE_STAGE_EVIDENCE_MISMATCH', 'releaseStage RELEASE_TAGGED_DRAFT but neither a tag nor a githubRelease is recorded', { phase });
+scripts/check-r3-0-train.js:287:        if (m.releaseStage === 'RELEASE_PREPARED' && (rr.tag != null || gr)) fail('R3F_RELEASE_STAGE_EVIDENCE_MISMATCH', 'releaseStage RELEASE_PREPARED but tag/Release evidence already recorded (stage may not lag evidence)', { phase });
+scripts/check-r3-0-train.js:288:        if (m.releaseStage === 'RELEASE_PUBLISHED' && !published) fail('R3F_RELEASE_STAGE_EVIDENCE_MISMATCH', 'releaseStage RELEASE_PUBLISHED but githubRelease is not published', { phase });
+scripts/check-r3-0-train.js:289:        if (m.releaseStage === 'RELEASE_TAGGED_DRAFT' && published) fail('R3F_RELEASE_STAGE_EVIDENCE_MISMATCH', 'releaseStage RELEASE_TAGGED_DRAFT but the githubRelease is already published (stage may not lag evidence)', { phase });
+tests/r3-0-train.test.js:408:  chk('FAIL release_executed capability with tag+draft only', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+tests/r3-0-train.test.js:410:// mirror-2: record flag releaseExecuted=true while Release is still a draft -> FAIL (both codes)
+tests/r3-0-train.test.js:412:  const r = mutateF6((m) => { m.releaseRecord.releaseExecuted = true; });
+tests/r3-0-train.test.js:413:  chk('FAIL releaseExecuted record flag on draft Release', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_ON_DRAFT') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+tests/r3-0-train.test.js:416:// EXACTLY schema releaseStages.publishForwardFields — the exhaustive forward-only publish
+tests/r3-0-train.test.js:422:    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+tests/r3-0-train.test.js:423:    m.releaseRecord.githubRelease.draft = false;
+tests/r3-0-train.test.js:424:    m.releaseRecord.githubRelease.published = true;
+tests/r3-0-train.test.js:425:    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
+tests/r3-0-train.test.js:426:    m.releaseRecord.releaseExecuted = true;
+tests/r3-0-train.test.js:429:  chk('PASS-path: published Release permits release_executed (no mirror violations)', !hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH') && !hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_ON_DRAFT') && !hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH') && !hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH'));
+tests/r3-0-train.test.js:431:// mirror-4: dmgUploaded=true with empty assets -> FAIL
+tests/r3-0-train.test.js:434:  chk('FAIL dmgUploaded=true with no .dmg asset', hasViolation(r.artifact, 'R3F_DMG_FLAG_WITHOUT_ASSET'));
+tests/r3-0-train.test.js:438:  const r = mutateF6((m) => { m.releaseRecord.dmgUploaded = true; m.releaseRecord.githubRelease.assets = [{ name: 'notes.txt' }]; });
+tests/r3-0-train.test.js:439:  chk('FAIL dmgUploaded=true with non-dmg asset only', hasViolation(r.artifact, 'R3F_DMG_FLAG_WITHOUT_ASSET'));
+tests/r3-0-train.test.js:441:// mirror-6: empty assets but dmgUploaded not exactly false -> FAIL
+tests/r3-0-train.test.js:444:  chk('FAIL empty assets require dmgUploaded===false', hasViolation(r.artifact, 'R3F_DMG_FLAG_NOT_FALSE_ON_EMPTY_ASSETS'));
+tests/r3-0-train.test.js:449:  chk('FAIL tagTarget != mainMergeSha', hasViolation(r.artifact, 'R3F_TAG_TARGET_MISMATCH'));
+tests/r3-0-train.test.js:454:  chk('FAIL releaseRecord.tag != v2.0.0', hasViolation(r.artifact, 'R3F_RELEASE_TAG_WRONG'));
+tests/r3-0-train.test.js:458:  const r = mutateF6((m) => { m.releaseRecord.githubRelease.tagName = 'v1.9.9'; });
+tests/r3-0-train.test.js:459:  chk('FAIL githubRelease.tagName != releaseRecord.tag', hasViolation(r.artifact, 'R3F_RELEASE_TAG_NAME_MISMATCH'));
+tests/r3-0-train.test.js:464:  chk('FAIL stage may not lag recorded tag/Release evidence', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH'));
+tests/r3-0-train.test.js:469:  chk('FAIL non-annotated tag record', hasViolation(r.artifact, 'R3F_TAG_NOT_ANNOTATED'));
+tests/r3-0-train.test.js:474:  chk('FAIL unknown releaseStage', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_UNKNOWN'));
+tests/r3-0-train.test.js:480:    m.releaseRecord.githubRelease.draft = false;
+tests/r3-0-train.test.js:481:    m.releaseRecord.githubRelease.published = true;
+tests/r3-0-train.test.js:482:    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
+tests/r3-0-train.test.js:483:    m.releaseRecord.releaseExecuted = true;
+tests/r3-0-train.test.js:487:  chk('FAIL state=DRAFT contradicting published flags', hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISMATCH') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+tests/r3-0-train.test.js:492:  chk('FAIL missing releaseStage', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_MISSING'));
+tests/r3-0-train.test.js:494:// mirror-15 (MIRROR-R1-02): schema releaseStages unreadable -> FAIL
+tests/r3-0-train.test.js:498:  delete sch.releaseStages;
+tests/r3-0-train.test.js:501:  chk('FAIL schema releaseStages missing', hasViolation(r.artifact, 'R3F_RELEASE_STAGES_SCHEMA_MISSING'));
+tests/r3-0-train.test.js:505:  const r = mutateF6((m) => { m.releaseRecord.dmgUploaded = true; m.releaseRecord.githubRelease.assets = ['app.dmg']; });
+tests/r3-0-train.test.js:506:  chk('FAIL string asset entry rejected as malformed', hasViolation(r.artifact, 'R3F_RELEASE_ASSETS_MALFORMED') && hasViolation(r.artifact, 'R3F_DMG_FLAG_WITHOUT_ASSET'));
+tests/r3-0-train.test.js:512:    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+tests/r3-0-train.test.js:513:    m.releaseRecord.githubRelease.draft = false;
+tests/r3-0-train.test.js:514:    m.releaseRecord.githubRelease.published = true;
+tests/r3-0-train.test.js:515:    m.releaseRecord.githubRelease.publishedAt = '   ';
+tests/r3-0-train.test.js:516:    m.releaseRecord.releaseExecuted = true;
+tests/r3-0-train.test.js:519:  chk('FAIL whitespace publishedAt rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH') && hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH'));
+tests/r3-0-train.test.js:521:// mirror-18 (MIRROR-R2-02): assets deleted entirely -> FAIL (no silent skip)
+tests/r3-0-train.test.js:523:  const r = mutateF6((m) => { delete m.releaseRecord.githubRelease.assets; });
+tests/r3-0-train.test.js:524:  chk('FAIL missing assets array', hasViolation(r.artifact, 'R3F_RELEASE_ASSETS_MISSING'));
+tests/r3-0-train.test.js:526:// mirror-19 (MIRROR-R2-02): assets as a non-array -> FAIL
+tests/r3-0-train.test.js:528:  const r = mutateF6((m) => { m.releaseRecord.githubRelease.assets = 'none'; });
+tests/r3-0-train.test.js:529:  chk('FAIL non-array assets', hasViolation(r.artifact, 'R3F_RELEASE_ASSETS_MISSING'));
+tests/r3-0-train.test.js:535:    delete m.releaseRecord.githubRelease.state;
+tests/r3-0-train.test.js:536:    m.releaseRecord.githubRelease.draft = false;
+tests/r3-0-train.test.js:537:    m.releaseRecord.githubRelease.published = true;
+tests/r3-0-train.test.js:538:    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
+tests/r3-0-train.test.js:539:    m.releaseRecord.releaseExecuted = true;
+tests/r3-0-train.test.js:542:  chk('FAIL missing state field blocks release_executed', hasViolation(r.artifact, 'R3F_RELEASE_STATE_FIELD_MISSING') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+tests/r3-0-train.test.js:548:    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+tests/r3-0-train.test.js:549:    m.releaseRecord.githubRelease.draft = false;
+tests/r3-0-train.test.js:550:    m.releaseRecord.githubRelease.published = true;
+tests/r3-0-train.test.js:551:    m.releaseRecord.githubRelease.publishedAt = '2026-02-30T05:00:00Z';
+tests/r3-0-train.test.js:552:    m.releaseRecord.releaseExecuted = true;
+tests/r3-0-train.test.js:555:  chk('FAIL impossible publishedAt date (2026-02-30) rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+tests/r3-0-train.test.js:561:    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+tests/r3-0-train.test.js:562:    m.releaseRecord.githubRelease.draft = false;
+tests/r3-0-train.test.js:563:    m.releaseRecord.githubRelease.published = true;
+tests/r3-0-train.test.js:564:    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00+99:99';
+tests/r3-0-train.test.js:565:    m.releaseRecord.releaseExecuted = true;
+tests/r3-0-train.test.js:568:  chk('FAIL invalid timezone offset (+99:99) rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+tests/r3-0-train.test.js:573:    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+tests/r3-0-train.test.js:574:    m.releaseRecord.githubRelease.draft = false;
+tests/r3-0-train.test.js:575:    m.releaseRecord.githubRelease.published = true;
+tests/r3-0-train.test.js:576:    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
+tests/r3-0-train.test.js:579:  chk('FAIL stage lags published evidence', hasViolation(r.artifact, 'R3F_RELEASE_STAGE_EVIDENCE_MISMATCH'));
+tests/r3-0-train.test.js:581:// mirror-24 (MIRROR-R4-03): weakening/removing releaseExecutedRequiresStage is itself a violation
+tests/r3-0-train.test.js:585:  sch.releaseStages.releaseExecutedRequiresStage = 'RELEASE_TAGGED_DRAFT';
+tests/r3-0-train.test.js:588:  chk('FAIL weakened releaseExecutedRequiresStage', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID'));
+tests/r3-0-train.test.js:591:  delete sch2.releaseStages.releaseExecutedRequiresStage;
+tests/r3-0-train.test.js:594:  chk('FAIL missing releaseExecutedRequiresStage', hasViolation(r2.artifact, 'R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID'));
+tests/r3-0-train.test.js:600:    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+tests/r3-0-train.test.js:601:    m.releaseRecord.githubRelease.draft = false;
+tests/r3-0-train.test.js:602:    m.releaseRecord.githubRelease.published = true;
+tests/r3-0-train.test.js:603:    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00+14:59';
+tests/r3-0-train.test.js:604:    m.releaseRecord.releaseExecuted = true;
+tests/r3-0-train.test.js:607:  chk('FAIL offset beyond +/-14:00 cap rejected', hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+tests/r3-0-train.test.js:610:    m.releaseRecord.githubRelease.state = 'PUBLISHED';
+tests/r3-0-train.test.js:611:    m.releaseRecord.githubRelease.draft = false;
+tests/r3-0-train.test.js:612:    m.releaseRecord.githubRelease.published = true;
+tests/r3-0-train.test.js:613:    m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00+14:00';
+tests/r3-0-train.test.js:614:    m.releaseRecord.releaseExecuted = true;
+tests/r3-0-train.test.js:617:  chk('PASS-path: exactly +14:00 offset is legal publish evidence', !hasViolation(r2.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+tests/r3-0-train.test.js:623:  sch.releaseStages.order = ['RELEASE_PREPARED', 'RELEASE_TAGGED_DRAFT', 'RELEASE_YOLO'];
+tests/r3-0-train.test.js:624:  sch.releaseStages.releaseExecutedRequiresStage = 'RELEASE_YOLO';
+tests/r3-0-train.test.js:628:  m.releaseRecord.githubRelease.state = 'PUBLISHED';
+tests/r3-0-train.test.js:629:  m.releaseRecord.githubRelease.draft = false;
+tests/r3-0-train.test.js:630:  m.releaseRecord.githubRelease.published = true;
+tests/r3-0-train.test.js:631:  m.releaseRecord.githubRelease.publishedAt = '2026-07-02T05:00:00Z';
+tests/r3-0-train.test.js:632:  m.releaseRecord.releaseExecuted = true;
+tests/r3-0-train.test.js:636:  chk('FAIL crafted terminal stage rejected (canonical order pin + rule invalid + executed blocked)', hasViolation(r.artifact, 'R3F_RELEASE_STAGES_ORDER_DRIFT') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_STAGE_RULE_INVALID') && hasViolation(r.artifact, 'R3F_RELEASE_EXECUTED_WITHOUT_PUBLISH'));
+
+codex
+VERDICT: BLOCK
+
+MIRROR-R6-01 — [scripts/check-r3-0-train.js:249](/Users/SKYLINE/Claude/worktrees/f6-release/scripts/check-r3-0-train.js:249): DRAFT validation uses `gr.published !== true`, so missing, `null`, or malformed `published` values pass. A recorded draft must require `published === false` to fail closed.
+tokens used
+33,024
+VERDICT: BLOCK
+
+MIRROR-R6-01 — [scripts/check-r3-0-train.js:249](/Users/SKYLINE/Claude/worktrees/f6-release/scripts/check-r3-0-train.js:249): DRAFT validation uses `gr.published !== true`, so missing, `null`, or malformed `published` values pass. A recorded draft must require `published === false` to fail closed.
+CODEX_EXIT=0
