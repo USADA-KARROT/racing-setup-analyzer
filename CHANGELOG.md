@@ -69,7 +69,7 @@ ladders that A through E established.
 ### F1 — Migration engine
 
 - **Deterministic migration from the 1.4.0 baseline toward the 2.0.0 release candidate; the
-  version remains pinned at 1.4.0 until the release gate flips.** Same inputs + same
+  version remains pinned at 1.4.0 until `F6_RELEASE`.** Same inputs + same
   injected clock + same backend state → identical writes and identical journal entries.
 - **Idempotent.** Running `migrate({confirm:true})` against a fully-migrated store performs
   zero writes and zero journal appends.
